@@ -85,7 +85,7 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// object-store stand-in), which would otherwise be untracked after the
 /// first run (#105, #107); and the archive of superseded scenario index
 /// versions, which every rewrite of the derived index fills.
-const GITIGNORE_LINES: [(&str, &str); 10] = [
+const GITIGNORE_LINES: [(&str, &str); 11] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
@@ -96,6 +96,7 @@ const GITIGNORE_LINES: [(&str, &str); 10] = [
     ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
     ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
     ("# the copies `canon migrate` keeps so `--revert` can restore them -- local, never committed.", paths::MIGRATE_BACKUP_GITIGNORE),
+    ("# the index `canon search` and `canon trace` build from the records -- derived, rebuilt when stale, never committed.", paths::INDEX_GITIGNORE),
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
@@ -198,6 +199,17 @@ pub(crate) fn gitignore_gap(repo: &Path) -> Option<String> {
         return None;
     }
     Some(format!("`.gitignore` lacks {}, which canon writes and git would show as untracked; fix: `canon migrate`", missing.join(", ")))
+}
+
+/// What `canon search` and `canon trace` warn when `<repo>/.gitignore` lacks the line of the search index
+/// directory: until `canon init` adds it, only the `.gitignore` the first index build writes inside
+/// `.canon/index` keeps the index out of git. `None` when the line is there, and outside a git checkout
+/// with no `.gitignore`.
+pub(crate) fn index_ignore_gap(repo: &Path) -> Option<String> {
+    if !repo.join(".git").exists() && !repo.join(".gitignore").exists() {
+        return None;
+    }
+    missing_gitignore_lines(repo).iter().any(|(_, line)| *line == paths::INDEX_GITIGNORE).then(|| format!("`.gitignore` lacks `{}`, the search index directory; run `canon init` to add it (until then `{}/.gitignore` keeps the index out of git)", paths::INDEX_GITIGNORE, paths::INDEX_DIR))
 }
 
 /// Ensures every [`GITIGNORE_LINES`] entry is present in
@@ -746,7 +758,8 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             let missing = missing_gitignore_lines(repo);
-            if agents.is_none() && missing.is_empty() {
+            // `canon demo init` (`emit_data` false) scaffolds a fresh repo and has nothing to refresh: any existing config refuses, before the policy it would overwrite.
+            if !emit_data || (agents.is_none() && missing.is_empty()) {
                 if emit_data {
                     log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists and nothing is left to refresh", canon_yaml_path.display()));
                     return log.finish(repo);

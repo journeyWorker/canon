@@ -1,2 +1,2 @@
 canon subject new: auth (dev, proposed) — written directly; nothing to promote
-next: canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id auth --case happy --actor-id <unit> --session-id <session> — auth owns no scenario; specify its behavior, one scenario per behavior
+next: canon scenario new <area>.<surface>.01 --title "<behavior>" --subject auth --case happy --actor <unit> --session <session> — auth owns no scenario; specify its behavior, one scenario per behavior

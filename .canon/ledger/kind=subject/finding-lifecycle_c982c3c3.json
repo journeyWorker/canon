@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-27T08:45:06.378968049Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-record-links",
+    "canon-0-30-ledger-naming",
+    "canon-0-31-cli-ids"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "finding-lifecycle",
+  "summary": "canon finding add/close and the promote-time transition exemption",
+  "title": "Finding lifecycle: a finding is raised open and closed later"
+}

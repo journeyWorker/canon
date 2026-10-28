@@ -1,0 +1,4 @@
+canon brief check: .canon/changes/add-login/brief.md — 1 blocker(s), 0 advisory(ies)
+  language: ko (detected)
+  blocker brief.old-format line 3: 7 `canon:section` comment(s), 1 `canon:waive` comment(s), 7 shipped Korean heading(s) (first at line 3)
+    hint: this brief is in the format canon 0.30 and earlier wrote; run `canon migrate` (it previews first and writes nothing), and until then no section rule is applied and its waiver comments are not read

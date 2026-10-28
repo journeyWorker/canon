@@ -63,13 +63,13 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
 /// A complete English brief with no blocker (flow steps `F1`, `F2`).
 fn clean_brief() -> String {
     "# Add login\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n"
+## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n"
         .to_string()
 }
 
@@ -80,7 +80,7 @@ fn brief_check_16_blockers_exit_1_with_the_report_and_a_refusal_exits_2() {
     let dir = repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     let brief = repo.join(".canon/changes/add-login/brief.md");
 
     // The fresh skeleton holds placeholders: structure blockers.
@@ -210,7 +210,7 @@ fn skills_install_22_the_write_commands_do_their_own_bookkeeping() {
     let dir = repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["scenario", "new", "demo.login.01", "--title", "Logs in", "--subject-id", "demo", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "demo.login.01", "--title", "Logs in", "--subject", "demo", "--case", "failure"]);
     ok(repo, &["format", ".canon/specs"]);
 
     // The gate indexes the new scenario itself and names it as having no evidence.
@@ -219,17 +219,17 @@ fn skills_install_22_the_write_commands_do_their_own_bookkeeping() {
     assert!(text(&gate).contains("uncovered-cell demo.login.01"), "{}", text(&gate));
 
     // evidence add promotes in the same run: the gate no longer names the scenario.
-    let staged = ["evidence", "add", "--scenario-id", "demo.login.01", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"];
+    let staged = ["evidence", "add", "--scenario", "demo.login.01", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl"];
     let add = json(&ok(repo, &[&staged[..], &["--json"]].concat()));
     assert!(add["data"]["records"][0]["committed"].is_string(), "promoted in the same run: {add}");
     let gate = canon(repo, &["gate", "check"]);
     assert!(!text(&gate).contains("uncovered-cell demo.login.01"), "{}", text(&gate));
 
     // --no-promote stages only: the gate still names the scenario and the next step is the promote.
-    ok(repo, &["scenario", "new", "demo.login.02", "--title", "Fails", "--subject-id", "demo", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "demo.login.02", "--title", "Fails", "--subject", "demo", "--case", "failure"]);
     let held = json(&ok(
         repo,
-        &["evidence", "add", "--scenario-id", "demo.login.02", "--class", "test-run", "--ref", "cargo test 2", "--role", "implementer", "--actor-id", "impl", "--no-promote", "--json"],
+        &["evidence", "add", "--scenario", "demo.login.02", "--class", "test-run", "--ref", "cargo test 2", "--role", "implementer", "--actor", "impl", "--no-promote", "--json"],
     ));
     assert!(held["data"]["records"][0]["committed"].is_null(), "{held}");
     assert_eq!(held["meta"]["next"][0]["argv"], serde_json::json!(["canon", "gate", "promote"]), "{held}");

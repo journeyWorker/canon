@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:26:31.411610422Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate_briefs.rs:642-656",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards] A briefs journal can stay incomplete forever (read from the code). If the run stops after the last brief is written but before the final journal write, the next plan writes nothing and apply returns early without setting complete=true; resume_backup then returns that directory on every later run, so later runs take no fresh snapshot and --revert targets the stale one. Fix: mark the journal complete when a resumed run finds nothing left to write.",
+  "worktree_dirty": false
+}

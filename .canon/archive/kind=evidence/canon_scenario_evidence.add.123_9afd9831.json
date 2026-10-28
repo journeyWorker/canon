@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "impl-031-loop",
+    "role": "implementer",
+    "session_id": "loop-2026-10-27"
+  },
+  "at": "2026-10-27T11:04:09.966592343Z",
+  "code_tree": "3a25cd810e85a89da5925ec37bd9f75fae18210b",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test governing_changes evidence_add_123"
+  },
+  "evidence_note": {
+    "command_result": "ok",
+    "summary": "test run green, branch feat/0.31"
+  },
+  "evidence_sha": "cbfb7db731bebcb11314a9a8cb965036f4b6680b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 286,
+  "scenario_id": "evidence.add.123",
+  "schema": 1,
+  "staging_id": "f833cb92",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

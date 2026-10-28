@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-c-2026-10-28-r2"
+  },
+  "at": "2026-10-28T10:31:33.115403Z",
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "kind": "review",
+  "pin": "ad3f83b54502a1c14404e6710e5153053a5b045f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:ledger_migrate_10_a_postgres_row_holding_a_planned_key_with_other_json_refuses_the_run",
+          "junit:ledger_migrate_10_sqlite_rows_take_their_0_30_keys",
+          "junit:ledger_migrate_10b_a_row_holding_a_planned_key_with_other_json_refuses_the_run",
+          "junit:ledger_migrate_10c_an_object_holding_a_planned_key_with_other_json_refuses_the_run"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ee7c90603450bba73fc7d2de6ab36228c7f0a0bc3fc3a9d3e81a7d25bfca80ba",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "feat/0.31"
+  },
+  "review_id": "01M6111AZV5E73HFSDH06X21Y6",
+  "reviewer": "rev-031-c",
+  "reviewer_harness": "omp",
+  "scenario_id": "ledger.migrate.10",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:26.327542757Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/brief_format.rs",
+  "kind": "finding",
+  "reviewed_sha": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "reviewer": "rev-031-b",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.17",
+    "authoring.brief-check.22",
+    "authoring.migrate.22",
+    "authoring.migrate.25",
+    "subject.lifecycle.47",
+    "report.dashboard.05"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec-fidelity] What r1/10 asked is still open at d9ea4138 for six scenarios, so they stay unsigned. brief-check.17 (brief_format.rs:218-246): no comparison of F1/F2 with a 0.30 brief, brief show/status are checked for state and counts only (not keys and roles), and no chore review or ship reads the new brief. brief-check.22 (:390-425): the ship check never runs; status briefs[].reason stands in for it. migrate.22 (:777-840): the Given's review pinned to a chore is never created, so 'the chore review is a new version pinned to the new digest with every other field as before' is unasserted. migrate.25 (:896-964): old_repo has no review, so 'old reviews byte for byte' and the refusal on a changed review version are untested (and a later plain edit, see r2/1). lifecycle.47 (:619-659): no subject ever moves (the draft case asserts only != OLD_BRIEF_FORMAT plus SUBJECT_GATE_VIOLATION), no reopen runs, and the second subject 'other' is another refused case, not the one that moves. dashboard.05: its Then now includes 'a Korean-prose brief reads the same, and a shipped Korean heading is flagged old-format', which report_dashboard_05 (dashboard_briefs.rs:203-237) does not assert; report_dashboard_16 does, so cite both in its evidence or extend the test. Closed in r2: dashboard.16 now loads /api/briefs (dashboard_briefs.rs:272-291).",
+  "worktree_dirty": false
+}

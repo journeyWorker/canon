@@ -36,10 +36,10 @@ fn main() -> ExitCode {
         }
         canon_cli::json_out::warn(error.message);
     }
-    if let Some(code) = refuse_without_config(&parsed) {
+    if let Some(code) = refuse_without_config(&command, &parsed) {
         return code;
     }
-    if let Some(code) = canon_cli::old_layout::refuse_write(&parsed) {
+    if let Some(code) = canon_cli::old_layout::refuse_write(&command, &parsed) {
         return code;
     }
     canon_cli::run::run(cli)

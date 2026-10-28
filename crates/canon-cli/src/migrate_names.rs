@@ -52,6 +52,9 @@ pub const JOURNAL: &str = "names-journal.json";
 /// The manifest of the whole-tree snapshot `canon migrate --revert` restores (see [`snapshot`]).
 pub const MANIFEST: &str = "tree-manifest.json";
 
+/// The hashes of the scope as the migrate left it (see [`seal`]), which [`revert_plan`] compares the tree against.
+pub const SEALED: &str = "tree-after.json";
+
 /// The directory of the backup that holds the snapshot's copies, by repo-relative path.
 pub const SNAPSHOT_DIR: &str = ".snapshot";
 
@@ -1057,6 +1060,48 @@ pub fn snapshot(repo: &Path, backup: &Path, scope: &[String]) -> Result<(), Stri
     std::fs::write(backup.join(MANIFEST), text).map_err(|e| format!("could not write the tree manifest: {e}"))
 }
 
+/// Derived or physical state a later run rewrites without a human's act: the search and scenario indexes, the lock,
+/// the sqlite hot store and its sidecars.
+fn derived(relative: &str) -> bool {
+    let under = |dir: &str| relative == dir.trim_end_matches('/') || relative.starts_with(dir);
+    under(&format!("{}/", canon_model::paths::INDEX_DIR))
+        || under(canon_model::paths::SCENARIO_INDEX_GITIGNORE)
+        || relative == canon_model::paths::SCENARIO_INDEX_LOCK_FILE
+        || relative.starts_with(canon_model::paths::HOT_DB_FILE)
+}
+
+/// Records, next to the snapshot, the hash of every file of its scope as `canon migrate` left it, after its last
+/// step. [`revert_plan`] refuses a revert that would restore or remove a file whose hash differs.
+pub fn seal(repo: &Path, backup: &Path) -> Result<(), String> {
+    let text = std::fs::read_to_string(backup.join(MANIFEST)).map_err(|e| format!("no tree manifest in {}: {e}", backup.display()))?;
+    let manifest: Manifest = serde_json::from_str(&text).map_err(|e| format!("the tree manifest in {} is unreadable: {e}", backup.display()))?;
+    let now = scan(repo, &manifest.scope)?;
+    let hashes: BTreeMap<&String, &String> = now.files.iter().map(|(path, entry)| (path, &entry.sha256)).collect();
+    let text = serde_json::to_string(&hashes).map_err(|e| e.to_string())?;
+    std::fs::write(backup.join(SEALED), text).map_err(|e| format!("could not write {SEALED}: {e}"))
+}
+
+/// The files the revert would restore or remove that differ from what the migrate left (or did not exist then, or
+/// were deleted since): a later edit, deletion, approval or record version, whoever's. Empty when the backup holds no
+/// seal (an older one).
+fn changed_since_migrate(repo: &Path, backup: &Path, manifest: &Manifest, diff: &Diff) -> Result<Vec<String>, String> {
+    let Ok(text) = std::fs::read_to_string(backup.join(SEALED)) else { return Ok(Vec::new()) };
+    let sealed: BTreeMap<String, String> = serde_json::from_str(&text).map_err(|e| format!("{SEALED} in {} is unreadable: {e}", backup.display()))?;
+    let now = scan(repo, &manifest.scope)?;
+    let rewritten = crate::migrate_briefs::journal_paths(backup);
+    let mut changed: Vec<String> = diff
+        .restore
+        .iter()
+        .chain(&diff.remove)
+        .filter(|path| !path.ends_with('/') && !derived(path) && !rewritten.contains(path.as_str()))
+        .filter(|path| sealed.get(path.as_str()) != now.files.get(path.as_str()).map(|entry| &entry.sha256))
+        .cloned()
+        .collect();
+    changed.sort();
+    changed.dedup();
+    Ok(changed)
+}
+
 /// What the tree differs from the snapshot by.
 #[derive(Debug, Default, PartialEq, Eq)]
 struct Diff {
@@ -1099,9 +1144,16 @@ pub struct RevertPlan {
     manifest: Manifest,
     diff: Diff,
     journal: Option<Journal>,
+    /// Restoring puts back an `Approved:` digest or a review pin: the human's (0.31 `brief-format`).
+    briefs: crate::migrate_briefs::RevertNote,
 }
 
 impl RevertPlan {
+    /// Whether the revert restores an `Approved:` line or a review pin.
+    pub fn rebinds(&self) -> bool {
+        self.briefs.rebinds
+    }
+
     /// The backup directory the plan restores from.
     pub fn backup(&self) -> &Path {
         &self.backup
@@ -1166,6 +1218,16 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
         }
     }
     let diff = diff(repo, &manifest)?;
+    // A tree that already is the snapshot was reverted before: nothing the migrate wrote is left to protect.
+    let briefs = crate::migrate_briefs::check_revert(repo, backup, diff.is_empty())?;
+    let acts = crate::migrate_briefs::later_human_acts(repo, backup, SNAPSHOT_DIR, &diff.remove, &diff.restore);
+    if !acts.is_empty() {
+        return Err(format!("a human's approval was made after `canon migrate` ran, and a revert would discard it: {}; nothing was written. Revert by hand, or approve again after the revert", acts.join(", ")));
+    }
+    let later = changed_since_migrate(repo, backup, &manifest, &diff)?;
+    if !later.is_empty() {
+        return Err(format!("{} changed after `canon migrate` ran, and a revert would discard {}: {}; nothing was written. Revert by hand, or keep the change and leave the migrate in place", if later.len() == 1 { "a file" } else { "files" }, if later.len() == 1 { "that change" } else { "those changes" }, later.join(", ")));
+    }
     let journal = match std::fs::read_to_string(backup.join(JOURNAL)) {
         Ok(text) if !diff.is_empty() => Some(serde_json::from_str::<Journal>(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?),
         _ => None,
@@ -1175,7 +1237,7 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
             return Err(format!("the migrate re-keyed Postgres rows and ${dsn_env} is not set, so their old keys cannot be restored; set it and run the revert again"));
         }
     }
-    Ok(RevertPlan { backup: backup.to_path_buf(), manifest, diff, journal })
+    Ok(RevertPlan { backup: backup.to_path_buf(), manifest, diff, journal, briefs })
 }
 
 #[cfg(unix)]
@@ -1295,6 +1357,11 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
             crate::json_out::data_with_next("migrate", &report, &report.plan.next_step(&base, "the plan only lists what the revert would restore; applying it takes its planDigest"));
         }
         return 0;
+    }
+    if plan.rebinds() {
+        if let Some(error) = crate::migrate_briefs::human_only("canon migrate --revert", &format!("{base} --commit --plan-digest {}", safe_plan.plan_digest)) {
+            return error.emit("canon migrate", json);
+        }
     }
     let safe_plan = safe_plan.committed();
     if let Err(e) = revert_apply(&repo, &plan) {

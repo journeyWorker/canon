@@ -289,14 +289,14 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
 }
 
 /// s42 (`close-the-open-loops`) task 3.2, end to end through the actual
-/// binary: `canon ingest records --run-id <RunId>` stamps that run onto
+/// binary: `canon ingest records --run <RunId>` stamps that run onto
 /// the trajectory it writes, and the value survives all the way into
 /// canon-learn's parquet `body` — which is where
 /// `mart_flywheel_funnel`'s attribution stage reads it from.
 ///
 /// The run id is not invented by the test: it comes from a real `canon
 /// dispatch begin`, because that is the only thing that writes the
-/// dispatch manifest `--run-id` is admitted against. The rejection half is
+/// dispatch manifest `--run` is admitted against. The rejection half is
 /// asserted in the same test so the two halves cannot drift: a
 /// well-formed ULID naming no dispatch must fail the pass LOUD rather
 /// than stamp an attribution that joins to nothing.
@@ -307,8 +307,8 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 
     // A well-formed ULID that no `canon dispatch begin` ever minted here.
     let unknown_run = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-    let rejected = run_canon(&["ingest", "records", "--repo", ".", "--run-id", unknown_run], &repo);
-    assert!(!rejected.status.success(), "an unknown --run-id must fail the whole pass; stdout: {}", stdout(&rejected));
+    let rejected = run_canon(&["ingest", "records", "--repo", ".", "--run", unknown_run], &repo);
+    assert!(!rejected.status.success(), "an unknown --run must fail the whole pass; stdout: {}", stdout(&rejected));
     assert!(
         stderr(&rejected).contains(unknown_run) && stderr(&rejected).contains("dispatch"),
         "the error must name the run and the manifest path consulted: {}",
@@ -326,8 +326,8 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
     let begun_payload = data_of(&stdout(&begun));
     let run_id = begun_payload["runId"].as_str().expect("run_id string").to_string();
 
-    let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
-    assert!(ingested.status.success(), "canon ingest records --run-id must exit 0; stderr: {}", stderr(&ingested));
+    let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run", &run_id, "--json"], &repo);
+    assert!(ingested.status.success(), "canon ingest records --run must exit 0; stderr: {}", stderr(&ingested));
     let payload = data_of(&stdout(&ingested));
     let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");

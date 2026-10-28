@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-w3-2026-10-27"
+  },
+  "at": "2026-10-27T15:33:14.905030654Z",
+  "change_id": "canon-0-31-search",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/search/graph.rs:344-355",
+  "introduced_by": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "kind": "finding",
+  "reviewed_sha": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "reviewer": "rev-031-c",
+  "round": 1,
+  "scenario_ids": [
+    "search.graph.03"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "(spec fidelity) The placeholder ids are not the distinct ids `canon query` reports as having no source whenever the referenced record is on disk in the ledger but not committed. graph.rs makes a placeholder only when no real node holds the id (`!nodes.contains_key(&placeholder) || ...placeholder`), while query (references::Sources) counts only committed sources. On this repo, where .canon/ledger/kind=change is gitignored and derived from the briefs, `canon query --kind subject` reports change ids canon-0-30-clippy-ci, canon-0-30-ledger-naming, canon-0-30-rust-sweep, canon-0-31-brief-format, canon-0-31-cli-ids and canon-0-31-loop as dangling, but the index holds them as non-placeholder change nodes: 239 distinct query ids vs 233 placeholders. F4 acceptance and search.graph.03 Then (sets equal) fail here; the test fixture never writes a record for a dangling id, so it cannot see it. Pick one rule (placeholder iff query reports it, or query and the index agree on the source set) and add the uncommitted-record case to search_graph_03. Blast radius: search neighbors and trace never mark these changes as sourceless; status dangling counts disagree with search.",
+  "worktree_dirty": false
+}

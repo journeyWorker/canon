@@ -35,9 +35,9 @@ fn attest(repo: &Path, extra: &[&str]) -> Output {
     let mut args = vec![
         "evidence",
         "add",
-        "--scenario-id",
+        "--scenario",
         "cart.add.01",
-        "--project-id",
+        "--project",
         "root",
         "--class",
         "test-run",

@@ -1,6 +1,6 @@
 description: "0.18 D3: a subject shipped under an `--override-reason` waiver of its unapproved brief cannot reopen outside an approved scope: `canon subject status <id> --to verifying --reason <text>` exits 1 with `unreviewed-promotion <id> — shipped → verifying: reopening needs the approved scope, …` naming the brief.md to approve, `--override-reason` does not waive it, and the subject stays shipped"
 steps:
-  - args: [subject, move, checkout, --to, shipped, --override-reason, "the human approved in chat; line to follow", --actor-id, lead]
+  - args: [subject, move, checkout, --to, shipped, --override-reason, "the human approved in chat; line to follow", --actor, lead]
     exit: 0
   - args: [subject, move, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges"]
     exit: 1

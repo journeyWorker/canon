@@ -92,7 +92,7 @@ plans:
 # area at a time, and `scope:` in `.canon/policy.yaml` is what keeps a
 # half-written area from blocking (see that file).
 #
-# `canon feature new`/`canon scenario new` take `--project-id <id>` to pick
+# `canon feature new`/`canon scenario new` take `--project <id>` to pick
 # between these two; a single-root repo still needs no flag.
 specs:
   roots:

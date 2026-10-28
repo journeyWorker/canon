@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:25:52.294948Z",
+  "change_id": "canon-0-31-cli-ids",
+  "code_tree": "e76ffa1bbe58488ee1dd1a0e53c9ddd7a2c8756b",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=context/capability.feature",
+  "kind": "finding",
+  "resolution_code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "resolution_sha": "eac30bbcc34f1d90101b95d81d0fd4cb509525f3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-d",
+  "round": 2,
+  "scenario_ids": [
+    "context.capability.21",
+    "context.capability.55"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec-fidelity] Align two scenario contracts with the approved rename. capability.21 still gives bare subject/change/project keys as the rejected input and /items/1/subject as its error field, while its last step accepts those same keys; the passing test correctly rejects subjectId/changeId/projectId. capability.55 promises a runnable full root-correction line, but inventory.rs emits only the --project root fragment and its test manually reconstructs a command; the brief preserves existing hint behavior. Correct the contradictory acceptance text or implement its stronger promise, then re-evidence. Blast radius: input migration and root-selection guidance.",
+  "worktree_dirty": true
+}

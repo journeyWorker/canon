@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="2" skipped="0" failures="2" errors="0" uuid="c1f90f5f-2454-405e-bf67-2d33505f6817" timestamp="2026-10-28T19:15:32.601+09:00" time="6.419">
+    <testsuite name="canon-cli::cli_ids" tests="2" skipped="0" errors="0" failures="2">
+        <testcase name="context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_and_its_hint_line_runs" classname="canon-cli::cli_ids" timestamp="2026-10-28T19:15:32.601+09:00" time="3.248">
+            <failure message="thread &apos;context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_and_its_hint_line_runs&apos; (26237372) panicked at crates/canon-cli/tests/cli_ids.rs:439:9" type="test failure with exit code 101">thread &apos;context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_and_its_hint_line_runs&apos; (26237372) panicked at crates/canon-cli/tests/cli_ids.rs:439:9:
+assertion `left == right` failed: [&quot;subject&quot;, &quot;adopt&quot;, &quot;--change-id&quot;, &quot;add-login&quot;, &quot;--subject-id&quot;, &quot;demo&quot;, &quot;--json&quot;]: {&quot;error&quot;:{&quot;code&quot;:&quot;USAGE&quot;,&quot;expected&quot;:[&quot;--change&quot;],&quot;field&quot;:&quot;--change-id&quot;,&quot;hint&quot;:&quot;--change-id was removed in 0.31.0; use `canon subject adopt --change add-login --subject-id demo --json`&quot;,&quot;message&quot;:&quot;--change-id was removed in 0.31.0&quot;,&quot;retryable&quot;:false,&quot;suggestions&quot;:[]},&quot;meta&quot;:{&quot;canonVersion&quot;:&quot;0.31.0&quot;,&quot;command&quot;:&quot;subject adopt&quot;,&quot;context&quot;:{&quot;actor&quot;:&quot;canon&quot;,&quot;repo&quot;:&quot;.&quot;,&quot;role&quot;:null},&quot;next&quot;:[],&quot;schemaVersion&quot;:&quot;1.0&quot;},&quot;ok&quot;:false}
+  left: [&quot;subject&quot;, &quot;adopt&quot;, &quot;--change&quot;, &quot;add-login&quot;, &quot;--subject-id&quot;, &quot;demo&quot;, &quot;--json&quot;]
+ right: [&quot;subject&quot;, &quot;adopt&quot;, &quot;demo&quot;, &quot;--change&quot;, &quot;add-login&quot;, &quot;--json&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_and_its_hint_line_runs ... FAILED
+
+failures:
+
+failures:
+    context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_and_its_hint_line_runs
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 3.23s
+
+</system-out>
+            <system-err>
+thread &apos;context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_and_its_hint_line_runs&apos; (26237372) panicked at crates/canon-cli/tests/cli_ids.rs:439:9:
+assertion `left == right` failed: [&quot;subject&quot;, &quot;adopt&quot;, &quot;--change-id&quot;, &quot;add-login&quot;, &quot;--subject-id&quot;, &quot;demo&quot;, &quot;--json&quot;]: {&quot;error&quot;:{&quot;code&quot;:&quot;USAGE&quot;,&quot;expected&quot;:[&quot;--change&quot;],&quot;field&quot;:&quot;--change-id&quot;,&quot;hint&quot;:&quot;--change-id was removed in 0.31.0; use `canon subject adopt --change add-login --subject-id demo --json`&quot;,&quot;message&quot;:&quot;--change-id was removed in 0.31.0&quot;,&quot;retryable&quot;:false,&quot;suggestions&quot;:[]},&quot;meta&quot;:{&quot;canonVersion&quot;:&quot;0.31.0&quot;,&quot;command&quot;:&quot;subject adopt&quot;,&quot;context&quot;:{&quot;actor&quot;:&quot;canon&quot;,&quot;repo&quot;:&quot;.&quot;,&quot;role&quot;:null},&quot;next&quot;:[],&quot;schemaVersion&quot;:&quot;1.0&quot;},&quot;ok&quot;:false}
+  left: [&quot;subject&quot;, &quot;adopt&quot;, &quot;--change&quot;, &quot;add-login&quot;, &quot;--subject-id&quot;, &quot;demo&quot;, &quot;--json&quot;]
+ right: [&quot;subject&quot;, &quot;adopt&quot;, &quot;demo&quot;, &quot;--change&quot;, &quot;add-login&quot;, &quot;--json&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses" classname="canon-cli::cli_ids" timestamp="2026-10-28T19:15:32.602+09:00" time="6.418">
+            <failure message="thread &apos;context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses&apos; (26237373) panicked at crates/canon-cli/tests/cli_ids.rs:726:5" type="test failure with exit code 101">thread &apos;context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses&apos; (26237373) panicked at crates/canon-cli/tests/cli_ids.rs:726:5:
+2 generated line(s) do not parse:
+finding close --help: error: unexpected argument &apos;--change&apos; found
+    canon finding close --change s44-spec-derived-worklist --round 1 --seq 1 --disposition fixed --resolution-rev x
+finding close --help: error: unexpected argument &apos;--change&apos; found
+    canon finding close --change s44-spec-derived-worklist --round 1 --seq 9 --disposition rejected
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses ... FAILED
+
+failures:
+
+failures:
+    context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 6.40s
+
+</system-out>
+            <system-err>
+thread &apos;context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses&apos; (26237373) panicked at crates/canon-cli/tests/cli_ids.rs:726:5:
+2 generated line(s) do not parse:
+finding close --help: error: unexpected argument &apos;--change&apos; found
+    canon finding close --change s44-spec-derived-worklist --round 1 --seq 1 --disposition fixed --resolution-rev x
+finding close --help: error: unexpected argument &apos;--change&apos; found
+    canon finding close --change s44-spec-derived-worklist --round 1 --seq 9 --disposition rejected
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

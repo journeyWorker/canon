@@ -294,11 +294,11 @@ fn resolve_spec_root<'a>(command: &str, roots: &'a [SpecRoot], project: Option<&
     let configured = || roots.iter().map(|r| r.id.as_str()).collect::<Vec<_>>().join(", ");
     match (project, roots) {
         (Some(id), _) => roots.iter().find(|r| &r.id == id).ok_or_else(|| {
-            format!("`--project-id {}` names no configured `specs.roots[]` entry (configured ids: {})", id.as_str(), configured())
+            format!("`--project {}` names no configured `specs.roots[]` entry (configured ids: {})", id.as_str(), configured())
         }),
         (None, [one]) => Ok(one),
         (None, many) => Err(format!(
-            "{} configured `specs.roots[]` entries (ids: {}); pass `--project-id <id>` to select which one `{command}` writes under",
+            "{} configured `specs.roots[]` entries (ids: {}); pass `--project <id>` to select which one `{command}` writes under",
             many.len(),
             configured()
         )),
@@ -343,7 +343,8 @@ struct Planner {
     roots: Vec<SpecRoot>,
     /// Every `@<id>` tag under each of `roots`, in the same order.
     corpus: Vec<BTreeSet<String>>,
-    flows: HashMap<FlowKey, Result<String, String>>,
+    /// The flow's tag value, or the refusal: the brief is old-format (`true`) or the flow cannot be resolved.
+    flows: HashMap<FlowKey, Result<String, (bool, String)>>,
 }
 
 impl Planner {
@@ -360,8 +361,14 @@ impl Planner {
             Some(flow) => {
                 let key = (spec.subject.as_ref().map(|s| s.as_str().to_string()), spec.change.as_ref().map(|c| c.as_str().to_string()), flow.clone());
                 let repo_root = &self.repo_root;
-                let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow).map_err(|e| e.to_string())).clone();
-                Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("--flow"))?)
+                let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow).map_err(|e| (matches!(e, crate::brief_check::FlowError::OldFormat { .. }), e.to_string()))).clone();
+                Some(found.map_err(|(old, e)| {
+                    if old {
+                        CliError::refused(crate::old_briefs::CODE, e).hint("run `canon migrate --json` to preview the rewrite, then the human runs `canon migrate --commit --plan-digest <digest>` when it re-binds an approval; nothing was written").field("--flow")
+                    } else {
+                        CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("--flow")
+                    }
+                })?)
             }
         };
         for (axis, value) in [("lane", spec.lane.as_deref()), ("case", spec.case.as_deref())] {
@@ -381,9 +388,9 @@ impl Planner {
             None => {
                 // D2: the tag-derived default mirrors `run_feature_new`'s
                 // own root selection — the SAME [`resolve_spec_root`], so
-                // `--project-id` means one thing across both commands and an
+                // `--project` means one thing across both commands and an
                 // unresolvable root is never guessed at.
-                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("--project-id"))?;
+                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("--project"))?;
                 resolve_feature_path(root, tag.area(), tag.surface())
             }
             Some(feature) => {
@@ -494,7 +501,7 @@ pub struct FeatureNewReport<'a> {
 impl Report for FeatureNewReport<'_> {}
 
 /// `canon scenario new <tag> --title <label> [--feature <path>]
-/// [--project-id <id>]` (task 5.1; s19 `derived-validated-scenario-feature`
+/// [--project <id>]` (task 5.1; s19 `derived-validated-scenario-feature`
 /// makes `--feature` optional, design D1-D3). Returns the process exit
 /// code: `0` on a successful append/create, `2` on a refused
 /// invocation — a `specs.roots[]` config fault, a spec root
@@ -507,7 +514,7 @@ impl Report for FeatureNewReport<'_> {}
 /// refusal-exits-`2`/nothing-written convention
 /// (`crate::review::run_add`).
 ///
-/// `spec.project` is `--project-id <id>`: which configured `specs.roots[]`
+/// `spec.project` is `--project <id>`: which configured `specs.roots[]`
 /// entry the DERIVED path lands under, selected by the root's `id`
 /// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]).
 pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: DateTime<Utc>, json: bool) -> u8 {
@@ -530,11 +537,11 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
     0
 }
 
-/// `canon feature new <area>.<surface> --title <label> [--project-id
+/// `canon feature new <area>.<surface> --title <label> [--project
 /// <id>]` (task 5.2). Returns the process exit code: `0` on a fresh
 /// file written, `2` on a refused invocation (a `specs.roots[]` config
 /// fault, a spec root [`resolve_spec_root`] cannot pin down — a
-/// multi-root config with no `--project-id <id>`, or a `--project-id` naming
+/// multi-root config with no `--project <id>`, or a `--project` naming
 /// no configured entry — a root still on the pre-0.17 layout (0.17
 /// D1), or the target file already existing). Uses `create_new` (atomic create-fails-if-exists), never
 /// a check-then-write race, so the existing file's bytes are UNTOUCHED
@@ -556,7 +563,7 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
 /// `corpus-authoring-scaffold` spec deliberately ties the fmt-clean
 /// round-trip to `scenario new`'s output, never this bare stub.
 ///
-/// `project` is `--project-id <id>`, naming which configured
+/// `project` is `--project <id>`, naming which configured
 /// `specs.roots[]` entry to scaffold under by that entry's `id`. By
 /// id, not by directory: the id is the operator's own handle on the
 /// root and is what becomes the `project_id` key of every record
@@ -585,7 +592,7 @@ pub fn run_feature_new(
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.clone()).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
+            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.clone()).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
         }
     };
 
@@ -596,10 +603,10 @@ pub fn run_feature_new(
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
     // The next-step hint below must be an invocation that actually
     // RUNS (design D4 calls it "the exact invocation that closes that
-    // gap"), so it carries `--project-id` exactly when a bare `canon
+    // gap"), so it carries `--project` exactly when a bare `canon
     // scenario new` would refuse for ambiguity — echoing the root just
     // resolved rather than making the operator re-derive it.
-    let project_hint = if roots.len() > 1 { format!(" --project-id {}", root.id.as_str()) } else { String::new() };
+    let project_hint = if roots.len() > 1 { format!(" --project {}", root.id.as_str()) } else { String::new() };
 
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
@@ -761,7 +768,7 @@ mod tests {
     fn resolve_spec_root_selects_a_named_project_at_any_root_count() {
         // Rule 2 is NOT conditioned on ambiguity: naming the only root
         // explicitly is as valid as naming one among several, so a
-        // script can always pass `--project-id` regardless of how many
+        // script can always pass `--project` regardless of how many
         // roots the repo it runs against happens to configure.
         let one = repo_with_spec_roots(1);
         let one_roots = spec_roots_of(&one);
@@ -777,7 +784,7 @@ mod tests {
         let dir = repo_with_spec_roots(2);
         let roots = spec_roots_of(&dir);
         let err = resolve_spec_root("canon feature new", &roots, Some(&project("nope"))).unwrap_err();
-        assert!(err.contains("`--project-id nope`"), "{err}");
+        assert!(err.contains("`--project nope`"), "{err}");
         assert!(err.contains("configured ids: p0, p1"), "{err}");
     }
 
@@ -788,7 +795,7 @@ mod tests {
         let err = resolve_spec_root("canon feature new", &roots, None).unwrap_err();
         assert!(err.contains("2 configured `specs.roots[]` entries"), "{err}");
         assert!(err.contains("ids: p0, p1"), "{err}");
-        assert!(err.contains("pass `--project-id <id>`"), "{err}");
+        assert!(err.contains("pass `--project <id>`"), "{err}");
         assert!(err.contains("`canon feature new`"), "{err}");
     }
 

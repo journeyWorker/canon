@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { advisoryTotal, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, renderBody, renderBrief, renderBriefs, type Brief, type BriefHandlers } from "../src/briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
 import { elements, escapeHtml, toHtml } from "../src/vnode";
 
-const handlers: BriefHandlers = { onInput: () => {}, onApprove: () => {} };
+const handlers: BriefHandlers = { onChange: () => {}, onApprove: () => {} };
 
 function brief(over: Partial<Brief> = {}): Brief {
   return {
@@ -114,28 +114,75 @@ test("a coverage blocker does not stop approval and is not drawn red", () => {
   expect(toHtml(item)).toContain("blocker, gates shipping");
 });
 
-test("Approve is disabled while the brief has blockers, even with both fields filled", () => {
-  expect(approveDisabled({ approvable: false }, "Ana", "Go.", false)).toBe(true);
-  const button = elements(renderBrief(brief(), handlers)).find((e) => e.tag === "button" && e.attrs.class === "approve-button")!;
-  expect(button.attrs.disabled).toBe(true);
+test("report.dashboard.13: a brief with blockers cannot be selected, an approvable one can", () => {
+  const blocked = elements(renderBrief(brief(), handlers)).find((e) => e.tag === "input" && e.attrs.type === "checkbox")!;
+  expect(blocked.attrs.disabled).toBe(true);
   expect(toHtml(renderBrief(brief(), handlers))).toContain("Not approvable yet: 1 blocker");
+  const open = elements(renderBrief(brief({ approvable: true }), handlers)).find((e) => e.tag === "input" && e.attrs.type === "checkbox")!;
+  expect(open.attrs.disabled).toBe(false);
+  expect(open.attrs["data-change"]).toBe("add-login");
 });
 
-test("Approve waits for both the name and the answer, and for a request in flight", () => {
-  const ok = { approvable: true };
-  expect(approveDisabled(ok, "", "Go.", false)).toBe(true);
-  expect(approveDisabled(ok, "Ana", "  ", false)).toBe(true);
-  expect(approveDisabled(ok, "Ana", "Go.", true)).toBe(true);
-  expect(approveDisabled(ok, "Ana", "Go.", false)).toBe(false);
+test("report.dashboard.13: the page has one name, one answer and one button, and shows how many are selected", () => {
+  const list = [brief({ approvable: true }), brief({ changeId: "b", approvable: true }), brief({ changeId: "c", approvable: true })];
+  const page = renderBriefs(list, handlers);
+  const els = elements(page);
+  expect(els.filter((e) => e.tag === "button" && e.attrs.class === "approve-button")).toHaveLength(1);
+  expect(els.filter((e) => e.tag === "input" && e.attrs.class === "approve-by")).toHaveLength(1);
+  expect(els.filter((e) => e.tag === "input" && e.attrs.class === "approve-note")).toHaveLength(1);
+  expect(els.filter((e) => e.tag === "input" && e.attrs.type === "checkbox")).toHaveLength(3);
+  expect(toHtml(page)).toContain("None selected");
+  expect(selectionText(0)).toBe("None selected");
+  expect(selectionText(3)).toBe("3 selected");
 });
 
-test("the form is empty on load: no value, autofill off", () => {
-  const inputs = elements(renderBrief(brief({ approvable: true }), handlers)).filter((e) => e.tag === "input");
-  expect(inputs).toHaveLength(2);
-  for (const input of inputs) {
+test("report.dashboard.13: Approve waits for a selection, the name and the answer, and for a request in flight", () => {
+  expect(approveDisabled(0, "Ana", "Go.", false)).toBe(true);
+  expect(approveDisabled(2, "", "Go.", false)).toBe(true);
+  expect(approveDisabled(2, "Ana", "  ", false)).toBe(true);
+  expect(approveDisabled(2, "Ana", "Go.", true)).toBe(true);
+  expect(approveDisabled(2, "Ana", "Go.", false)).toBe(false);
+});
+
+test("report.dashboard.13: the request carries the name and answer once and each selected brief's change id and sha256", () => {
+  const picked = [brief({ changeId: "a", sha256: "1".repeat(64) }), brief({ changeId: "b", sha256: "2".repeat(64) })];
+  expect(approvalRequest(picked, "Ana", "Go.")).toEqual({
+    by: "Ana",
+    note: "Go.",
+    briefs: [
+      { changeId: "a", sha256: "1".repeat(64) },
+      { changeId: "b", sha256: "2".repeat(64) },
+    ],
+  });
+});
+
+test("report.dashboard.14: a refused multi-brief approval names each refused brief and says to read it again", () => {
+  const failure = {
+    code: "BRIEF_APPROVE_REFUSED",
+    message: "1 of 3 briefs refused, so none was approved",
+    hint: "reload this page to read the briefs named as they are now",
+    refused: [{ changeId: "b", code: "BRIEF_CHANGED_SINCE_PAGE_LOAD", message: "b changed after this page loaded it" }],
+  };
+  expect(refusedIds(failure)).toEqual(["b"]);
+  const html = toHtml(renderApproveError(failure, null));
+  expect(html).toContain("<strong>b</strong> BRIEF_CHANGED_SINCE_PAGE_LOAD: b changed after this page loaded it");
+  expect(html).toContain("reload this page");
+  expect(html).toContain("none was approved");
+});
+
+test("report.dashboard.14: refusal text from the server is shown as text, never markup", () => {
+  const html = toHtml(renderApproveError({ code: "X", message: HOSTILE, hint: HOSTILE, refused: [{ changeId: HOSTILE, code: "C", message: HOSTILE }] }, null));
+  expect(html).not.toContain("<script>");
+  expect(html).toContain(escapeHtml(HOSTILE));
+});
+
+test("the selection boxes are empty on load and the fields hold no value, autofill off", () => {
+  const els = elements(renderBriefs([brief({ approvable: true })], handlers));
+  for (const input of els.filter((e) => e.tag === "input" && e.attrs.type === "text")) {
     expect("value" in input.attrs).toBe(false);
     expect(input.attrs.autocomplete).toBe("off");
   }
+  expect(els.filter((e) => e.tag === "input" && e.attrs.type === "checkbox").every((e) => !("checked" in e.attrs))).toBe(true);
 });
 
 test("no briefs shows the empty message", () => {

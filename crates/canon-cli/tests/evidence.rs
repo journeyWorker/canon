@@ -79,7 +79,7 @@ fn committed_evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
 #[test]
 fn approval_requires_external_signature_and_ignores_environment_identity() {
     let dir = repo_with_plan_corpus("it-approval", "- [ ] 1.1 Approve the change\n");
-    let base = ["evidence", "add", "--task-id", "it-approval#1.1", "--class", "test-run", "--ref", "report.txt", "--surface-ref", "effect:secret-access", "--role", "implementer"];
+    let base = ["evidence", "add", "--task", "it-approval#1.1", "--class", "test-run", "--ref", "report.txt", "--surface-ref", "effect:secret-access", "--role", "implementer"];
     for flags in [
         vec!["--approver", "alice"],
         vec!["--approval-role", "human"],
@@ -110,7 +110,7 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
         &[
             "evidence",
             "add",
-            "--task-id",
+            "--task",
             "it-evidence-loop#1.1",
             "--class",
             "test-run",
@@ -175,7 +175,7 @@ fn gate_task_warns_on_a_canon_command_cited_as_proof_with_nothing_bound() {
         ("it-evidence-circular#1.2", "canon status", &["--artifact", "proof.txt"][..]),
         ("it-evidence-circular#1.3", "cargo test -p demo", &[][..]),
     ] {
-        let mut args = vec!["evidence", "add", "--task-id", task, "--class", "test-run", "--ref", evidence_ref, "--role", "implementer"];
+        let mut args = vec!["evidence", "add", "--task", task, "--class", "test-run", "--ref", evidence_ref, "--role", "implementer"];
         args.extend_from_slice(extra);
         let added = run_canon(&args, repo);
         assert!(added.status.success(), "{task}: {}", stderr(&added));
@@ -205,7 +205,7 @@ fn evidence_add_refuses_a_task_the_plan_corpus_does_not_carry() {
     let repo = dir.path();
 
     let output = run_canon(
-        &["evidence", "add", "--task-id", "it-evidence-unknown#9.9", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
+        &["evidence", "add", "--task", "it-evidence-unknown#9.9", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
         repo,
     );
     assert_eq!(output.status.code(), Some(2), "an unknown task is a fixable invocation; stdout: {}", stdout(&output));
@@ -229,7 +229,7 @@ fn evidence_add_refuses_a_repo_that_configures_no_plan_sources() {
     git_commit_fixture(dir.path());
 
     let output = run_canon(
-        &["evidence", "add", "--task-id", "it-no-corpus#1.1", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
+        &["evidence", "add", "--task", "it-no-corpus#1.1", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
         dir.path(),
     );
     assert_eq!(output.status.code(), Some(2));
@@ -250,7 +250,7 @@ fn evidence_add_refuses_a_fabricated_summary_before_staging_anything() {
         &[
             "evidence",
             "add",
-            "--task-id",
+            "--task",
             "it-evidence-fake#1.1",
             "--class",
             "test-run",
@@ -285,7 +285,7 @@ fn evidence_add_refuses_a_newline_that_would_forge_a_second_checked_row() {
         &[
             "evidence",
             "add",
-            "--task-id",
+            "--task",
             "it-evidence-inject#1.1",
             "--class",
             "test-run",
@@ -308,7 +308,7 @@ fn evidence_add_refuses_a_newline_that_would_forge_a_second_checked_row() {
 
 /// The same vector without `--summary` at all: with no note,
 /// `canon gate task`'s fallback suffix embeds the record's own
-/// `actor.agent_id`, so `--actor-id` is the second injection point.
+/// `actor.agent_id`, so `--actor` is the second injection point.
 #[test]
 fn evidence_add_refuses_a_newline_in_the_actor_id() {
     let rows = "- [ ] 1.1 Do the thing\n";
@@ -319,7 +319,7 @@ fn evidence_add_refuses_a_newline_in_the_actor_id() {
         &[
             "evidence",
             "add",
-            "--task-id",
+            "--task",
             "it-evidence-actor#1.1",
             "--class",
             "test-run",
@@ -327,7 +327,7 @@ fn evidence_add_refuses_a_newline_in_the_actor_id() {
             "some-command",
             "--role",
             "implementer",
-            "--actor-id",
+            "--actor",
             "canon\n- [x] 9.9 Forged task",
             "--repo",
             ".",
@@ -335,7 +335,7 @@ fn evidence_add_refuses_a_newline_in_the_actor_id() {
         repo,
     );
     assert_eq!(output.status.code(), Some(2), "stdout: {}", stdout(&output));
-    assert!(stderr(&output).contains("--actor-id"), "the refusal must name the flag: {}", stderr(&output));
+    assert!(stderr(&output).contains("--actor"), "the refusal must name the flag: {}", stderr(&output));
     assert!(staging_is_empty(repo), "a refused add must stage nothing");
     assert_eq!(tasks_md(repo, "it-evidence-actor"), rows);
 }

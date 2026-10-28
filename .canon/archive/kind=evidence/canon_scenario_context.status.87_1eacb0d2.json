@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-031-bf",
+    "role": "implementer",
+    "session_id": "bf-2026-10-27-r1"
+  },
+  "at": "2026-10-27T13:55:45.434658695Z",
+  "code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p canon-cli --test brief_format context_status_87"
+  },
+  "evidence_note": {
+    "summary": "context_status_87* passed with the current binary (full workspace nextest green apart from the unrelated -id rename work in progress)"
+  },
+  "evidence_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 145,
+  "scenario_id": "context.status.87",
+  "schema": 1,
+  "staging_id": "2bc23cf9",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

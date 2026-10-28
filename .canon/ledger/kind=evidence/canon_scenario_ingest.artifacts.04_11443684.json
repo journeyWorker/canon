@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:22:57.530080651Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib verdict::tests::code_review_finding_becomes_dev_guardrail_candidate"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "ingest.artifacts.04",
+  "schema": 1,
+  "staging_id": "6366355f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

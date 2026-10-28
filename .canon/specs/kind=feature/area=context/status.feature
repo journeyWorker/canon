@@ -149,7 +149,7 @@ Feature: context status
     Given a subject with an unevidenced scenario, an open blocker finding and a due review
     When status is run
     Then every suggested command parses as printed
-    And every write suggestion carries `--actor-id <unit>` and `--session-id <session>` wherever its command takes them
+    And every write suggestion carries `--actor <unit>` and `--session <session>` wherever its command takes them
 
   # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -176,13 +176,13 @@ Feature: context status
   @subject:context-capability
   @case:happy
   @context.status.60
-  Scenario: Status reads a subject's brief approval from its newest change's canon brief.md
-    Given a building subject adopting two changes, the newer of whose brief.md has a line starting "Approved:" with the human's words
+  Scenario: Status reads a subject's brief approvals from the canon brief.md of each change it answers for
+    Given a building subject adopting a never-approved untagged change and a newer change whose brief.md has a line starting "Approved:" with the human's words
     And a shipped subject with an approved brief and a specced subject
     When canon status runs
-    Then the building and shipped subjects each show their brief as approved, naming the newest change, its brief.md and the recorded words, in --json and the human form
-    And the specced subject carries no brief field
-    And no step is addressed to a human
+    Then the building and shipped subjects each show their briefs as approved, one entry per change it answers for, naming the change, its brief.md and the recorded words, in --json and the human form
+    And the specced subject carries no briefs field
+    And the never-approved change is in pendingDrafts, and the only human step reports that pending draft
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:context-capability
@@ -239,13 +239,13 @@ Feature: context status
   @subject:context-capability
   @case:failure
   @context.status.65
-  Scenario: An older change's approval does not cover a newer adopted change
-    Given a ship-ready verifying subject whose older change is approved and whose newer adopted change's brief.md has no "Approved:" line
+  Scenario: An older change's approval does not cover a newer change a scenario tags, and an untagged never-approved one is a pending draft
+    Given a ship-ready verifying subject whose older change is approved and whose newer adopted change's brief.md has no "Approved:" line and no tagged scenario
     And a building subject whose older change is approved and whose newer change has no brief
     When canon status runs
-    Then each brief reads as not approved and names the newest change
-    And the verifying subject gets the human step naming the newest change's brief.md, marked as a pending draft that is not yet part of its scope because no scenario is tagged for it, and is still suggested to ship for its approved scope
-    And the building subject's newest change has no brief to answer, so it gets no human step and its brief line is an advisory
+    Then the verifying subject's briefs list holds only the older change, approved, and the newer change is in pendingDrafts
+    And the verifying subject gets the human step naming the newer change's brief.md, marked as a pending draft that is not yet part of its scope because no scenario is tagged for it, and is still suggested to ship for its approved scope
+    And the building subject's newer change, having no brief to answer, is a pending draft too and it gets no human step
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -366,3 +366,24 @@ Feature: context status
     When canon status, canon query and canon gate check are run
     Then the finding's change counts as dangling and the old pin is not checked
     And canon gate check prints and exits as it did before references were reported
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:24Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:context-capability
+  @case:happy
+  @flow:canon-0-31-loop.F3
+  @context.status.86
+  Scenario: Status lists one brief per governing change with its state and reason and only drafts as pending drafts
+    Given a subject adopting a tagged unapproved change, an approved change no scenario tags, an unapproved chore and a never-approved feature change no scenario tags
+    When canon status --json runs
+    Then the subject lists a brief for each of the first three with its brief path, its status approved, unapproved or changed, its reason tagged, approved or chore, and the check counts
+    And pendingDrafts holds only the never-approved feature change, flow holds the steps of the tagged change, and statusVersion is 4
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:02Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:context-capability
+  @case:happy
+  @flow:canon-0-31-brief-format.F4
+  @context.status.87
+  Scenario: status, gate check, context and brief show warn about an old-format brief and lead with canon migrate
+    Given a repo with a 0.30 brief
+    When canon status, canon gate check, canon context and canon brief show run
+    Then each warns without a config error and puts canon migrate first among the next steps, and still reports as before

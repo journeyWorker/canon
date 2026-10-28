@@ -1091,14 +1091,14 @@ fn gate_check_is_silent_about_coverage_with_the_section_or_without_scenarios() {
 /// End-to-end through the real authoring path: a scenario-keyed
 /// attestation clears exactly its own scenario. Before s44 this record
 /// was not authorable at all — `--task` was required and no
-/// `--project-id` existed, so the composite join could never close.
+/// `--project` existed, so the composite join could never close.
 #[test]
 fn a_scenario_keyed_attestation_clears_exactly_that_scenario() {
     let dir = repo_with_spec_corpus();
     enable_spec_coverage(dir.path(), "spec_coverage:\n  require_evidence: true\n");
 
     let add = run_canon(
-        &["evidence", "add", "--scenario-id", "core.login.01", "--project-id", "core", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."],
+        &["evidence", "add", "--scenario", "core.login.01", "--project", "core", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."],
         dir.path(),
     );
     assert!(add.status.success(), "stderr: {}", stderr(&add));
@@ -1121,12 +1121,12 @@ fn evidence_add_refuses_a_record_with_no_coverage_subject() {
 }
 
 /// The composite key is the scenario's identity; with exactly one spec
-/// root the project is implied, so a bare `--scenario-id` still closes
+/// root the project is implied, so a bare `--scenario` still closes
 /// the join and stages one record.
 #[test]
 fn evidence_add_infers_the_project_id_from_the_only_spec_root() {
     let dir = repo_with_spec_corpus();
-    let out = run_canon(&["evidence", "add", "--scenario-id", "core.login.01", "--class", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
+    let out = run_canon(&["evidence", "add", "--scenario", "core.login.01", "--class", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     let record = the_only_staged_record(&dir.path().join(".canon/ledger"));
     assert_eq!(record["project_id"], "core", "{record}");
@@ -1158,7 +1158,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn scenario_add_args<'a>(extra: &[&'a str]) -> Vec<&'a str> {
-    let mut args = vec!["evidence", "add", "--scenario-id", "core.login.01", "--project-id", "core", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."];
+    let mut args = vec!["evidence", "add", "--scenario", "core.login.01", "--project", "core", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--repo", "."];
     args.extend_from_slice(extra);
     args
 }
@@ -1260,7 +1260,7 @@ fn evidence_add_still_accepts_a_task_keyed_record() {
     std::fs::write(change.join("tasks.md"), "- [ ] 1 Do the thing\n").unwrap();
 
     let out = run_canon(
-        &["evidence", "add", "--task-id", "it-task-keyed#1", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--repo", "."],
+        &["evidence", "add", "--task", "it-task-keyed#1", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--repo", "."],
         dir.path(),
     );
     assert!(out.status.success(), "stderr: {}", stderr(&out));

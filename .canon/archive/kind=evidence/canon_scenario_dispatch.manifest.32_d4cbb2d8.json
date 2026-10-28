@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-031-fixes",
+    "role": "implementer",
+    "session_id": "fixes-2026-10-27-r1"
+  },
+  "at": "2026-10-27T13:04:45.014917727Z",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_32"
+  },
+  "evidence_note": {
+    "summary": "test now checks the authorize and validate exit-2/exit-1 rows of the schema; passes"
+  },
+  "evidence_sha": "7fe07ba296a665df458e12fe2956d5d451272314",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 84,
+  "scenario_id": "dispatch.manifest.32",
+  "schema": 1,
+  "staging_id": "c68a143c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

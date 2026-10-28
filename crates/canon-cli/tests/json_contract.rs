@@ -37,7 +37,7 @@ fn scratch_repo() -> TempDir {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     dir
@@ -59,6 +59,8 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("subject adopt", "subject-id"), "demo"),
         (("subject unadopt", "subject-id"), "demo"),
         (("skills show", "name"), "canon"),
+        (("context-pack show", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        (("context-pack verify", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();

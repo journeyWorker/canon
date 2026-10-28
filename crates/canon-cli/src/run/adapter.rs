@@ -25,7 +25,7 @@ fn run_adapter_validate(response: &std::path::Path, repo: &std::path::Path, json
             let error = if refused {
                 CliError::refused("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_REFUSED).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
             } else {
-                CliError::failed("ADAPTER_REFUSED", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
+                CliError::failed("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_FAILED).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
             };
             return ExitCode::from(error.emit("canon adapter validate", json));
         }
@@ -63,14 +63,13 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
     let result = match crate::adapter::authorize_response(response, repo) {
         Ok(result) => result,
         Err(error) => {
-            // A missing or unreadable file is a refusal (2); an envelope that does not validate is the check's finding (1).
-            let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
-            let message = error.to_string();
-            let error = if refused {
-                CliError::refused("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_REFUSED).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
-            } else {
-                CliError::failed("ADAPTER_REFUSED", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
+            // Every refusal of `authorize` is exit 2: a response that cannot be read or validated, or a policy file that is broken. Exit 1 stays with ADAPTER_EXECUTION_NOT_AUTHORIZED.
+            let hint = match error {
+                crate::adapter::AdapterError::Io { .. } => "check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it",
+                crate::adapter::AdapterError::Policy(_) => "fix the policy file `.canon/policy.yaml` (its adapter_capabilities section), then run `canon adapter authorize` again",
+                _ => "fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it",
             };
+            let error = CliError::refused("ADAPTER_REFUSED", error.to_string()).with_exit(crate::cli_error::EXIT_REFUSED).hint(hint);
             return ExitCode::from(error.emit("canon adapter authorize", json));
         }
     };

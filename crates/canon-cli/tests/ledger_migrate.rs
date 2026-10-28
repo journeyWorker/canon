@@ -329,11 +329,11 @@ fn assert_old_layout_refusal(repo: &Repo, args: &[&str]) {
 const EVIDENCE_ADD: [&str; 16] = [
     "evidence",
     "add",
-    "--scenario-id",
+    "--scenario",
     "auth.login.01",
-    "--project-id",
+    "--project",
     "root",
-    "--actor-id",
+    "--actor",
     "a",
     "--role",
     "implementer",
@@ -1175,11 +1175,39 @@ fn ledger_migrate_14_scenario_and_feature_authoring_is_refused() {
 fn ledger_migrate_15_divergence_writes_and_promotion_are_refused() {
     let repo = Repo::old();
     let before = repo.snapshot(false);
-    assert_old_layout_refusal(&repo, &["divergence", "add", "auth.login.01", "--actor-id", "r", "--role", "reviewer"]);
+    assert_old_layout_refusal(&repo, &["divergence", "add", "auth.login.01", "--actor", "r", "--role", "reviewer"]);
     assert_unchanged(&before, &repo, "the refused `canon divergence add`");
     assert_old_layout_refusal(&repo, &["gate", "promote"]);
     assert_unchanged(&before, &repo, "the refused `canon gate promote`");
     // The staged divergence is still staged, the committed one untouched.
     assert!(repo.path().join(".canon/ledger/_staging/kind=divergence/area=auth/root__auth.login.02__0000000000__000002__f4af29d00335.json").is_file());
     assert!(repo.status().is_empty(), "git status: {:?}", repo.status());
+}
+
+/// authoring.migrate.22 (the 0.29 fixture) -- one `canon migrate --commit` renames the ledger and rewrites the 0.30
+/// briefs: no comment is left, the unapproved briefs stay unapproved, and the review of the `tidy` chore, pinned to the
+/// old brief digest, is a new version pinned to the new one.
+#[test]
+fn ledger_migrate_16_one_run_renames_the_ledger_and_rewrites_the_briefs() {
+    let repo = Repo::old();
+    let old_tidy = repo.read(".canon/changes/tidy/brief.md");
+    assert!(old_tidy.contains("<!-- canon:kind chore -->") && repo.read(".canon/changes/add-login/brief.md").contains("canon:section"));
+    let steps = repo.preview()["data"]["steps"].to_string();
+    assert!(steps.contains("re-binds 0 `Approved:` line(s) and 1 review pin(s)"), "the plan says first that it re-binds the review pin: {steps}");
+    repo.migrate();
+    for change in ["add-login", "tidy"] {
+        let text = repo.read(&format!(".canon/changes/{change}/brief.md"));
+        assert!(!text.contains("<!--") && canon_ingest::brief::parse(&text).old_format.is_none(), "{change}: {text}");
+    }
+    assert!(repo.read(".canon/changes/tidy/brief.md").starts_with("---\nkind: chore\n---\n\n# "));
+    let new_digest = canon_cli::brief::brief_spec_digest(&repo.read(".canon/changes/tidy/brief.md"));
+    let old_digest = canon_cli::brief::brief_spec_digest(&old_tidy);
+    let reviews = repo.snapshot(true).into_iter().filter(|(p, _)| p.starts_with(".canon/ledger/kind=review") && p.to_string_lossy().contains("change_tidy")).collect::<Vec<_>>();
+    assert_eq!(reviews.len(), 1, "one version of the chore review in the ledger: {:?}", reviews.iter().map(|r| &r.0).collect::<Vec<_>>());
+    let body = String::from_utf8_lossy(&reviews[0].1).to_string();
+    assert!(body.contains(new_digest.as_str()) && !body.contains(old_digest.as_str()), "{body}");
+    assert!(repo.snapshot(true).keys().any(|p| p.starts_with(".canon/archive/kind=review") && p.to_string_lossy().contains("change_tidy")), "the old version is archived");
+    let (again, _) = repo.json(&["migrate"]);
+    let steps = again["data"]["steps"].to_string();
+    assert!(steps.contains("nothing to migrate") || !steps.contains("brief"), "a second run has nothing to do: {steps}");
 }

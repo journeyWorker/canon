@@ -2,9 +2,9 @@ description: "0.18 D3: once a shipped subject owns a new scenario nobody atteste
 steps:
   - args: [subject, move, checkout, --to, shipped]
     exit: 0
-  - args: [scenario, new, checkout.pay.03, --title, "A declined card is refused", --subject-id, checkout, --case, failure]
+  - args: [scenario, new, checkout.pay.03, --title, "A declined card is refused", --subject, checkout, --case, failure]
     exit: 0
   - args: [status]
     exit: 0
-  - args: [subject, move, checkout, --to, verifying, --reason, "follow-up: declined cards", --actor-id, impl]
+  - args: [subject, move, checkout, --to, verifying, --reason, "follow-up: declined cards", --actor, impl]
     exit: 0

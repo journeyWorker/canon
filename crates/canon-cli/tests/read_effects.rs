@@ -25,6 +25,9 @@ const INDEX_REFRESH_LEAVES: &[&str] = &["subject show"];
 
 const ALLOWED_WRITES: &[(&str, &[&str])] = &[
     ("query", &[".canon/audit/access.jsonl"]),
+    // The derived search index and its ignore file (0.31 `canon-0-31-search`): `canon init` ignores the directory.
+    ("search", &[".canon/index/search.db", ".canon/index/.gitignore"]),
+    ("trace", &[".canon/index/search.db", ".canon/index/.gitignore"]),
     // Scratch directories in the system temp dir, removed on exit: nothing under the repo.
     ("selftest", &[]),
     ("report check", &[]),
@@ -46,7 +49,7 @@ const EXTRA_INVOCATIONS: &[&str] = &[
     "query --kind task",
     "query --kind run",
     "query --kind change --history",
-    "finding list --change-id add-login --json",
+    "finding list --change add-login --json",
     "divergence list --json",
     "format .canon/specs --json",
     "brief check --json",
@@ -54,6 +57,10 @@ const EXTRA_INVOCATIONS: &[&str] = &[
     "context --json",
     "report check --json",
     "retrieve --for-role reviewer --domain dev --json",
+    "search Naming --json",
+    "search Si --expand 2",
+    "search Naming --kind finding --kind scenario --limit 1",
+    "trace add-login_1_1 --json",
 ];
 
 
@@ -99,7 +106,7 @@ fn fixture(home: &Path) -> TempDir {
     git(repo, &["init", "-q", "."]);
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
@@ -108,14 +115,14 @@ fn fixture(home: &Path) -> TempDir {
     ok(
         repo,
         home,
-        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
+        &["evidence", "add", "--project", "root", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor", "impl", "--session", "s1", "--role", "implementer"],
     );
     ok(
         repo,
         home,
-        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
+        &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "alice", "--role", "reviewer", "--session", "s2", "--original-spec-ref", "docs/prd.md"],
     );
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit"]);
     ok(repo, home, &["gate", "promote"]);
     // Specs ahead of the index: no `inventory sync` after this.
     ok(repo, home, &["scenario", "new", "auth.login.02", "--title", "Sign out", "--feature", feature]);

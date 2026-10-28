@@ -112,6 +112,8 @@ pub fn path(cmd: &Command) -> &'static str {
             RegimeCommand::Show(_) => "regime show",
         },
         Command::Query(_) => "query",
+        Command::Search(_) => "search",
+        Command::Trace(_) => "trace",
         Command::Export(_) => "export",
         Command::Purge(_) => "purge",
         Command::Report { action } => match action {

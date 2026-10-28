@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:16:03.774867Z",
+  "attachments": [
+    {
+      "case": "context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses",
+      "format": "junit",
+      "outcome": "failed",
+      "path": "target/031r-red-junit.xml",
+      "sha256": "716ba54dea0ccee50baf17d590a9b1f225f08418578b135773d8e8d8b4105053"
+    }
+  ],
+  "code_tree": "2c8c8dd0bb36e964f6667a2ddc2ddcb37163df07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r-red-junit.xml"
+  },
+  "evidence_sha": "b002d525109cd3d18d89ad641438b716c04627cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 258,
+  "scenario_id": "context.capability.56",
+  "schema": 1,
+  "staging_id": "b97b2c39",
+  "verdict": "divergent",
+  "worktree_dirty": true
+}

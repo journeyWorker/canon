@@ -123,7 +123,7 @@ is attributed, and is fresh — never on a self-report. See
 
    ```bash
    bunx @journeykit/canon subject new auth --domain dev --title "Auth"
-   bunx @journeykit/canon change new add-login --subject-id auth --title "Add login"
+   bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
    `change new` writes `.canon/changes/add-login/brief.md` and adopts the
@@ -142,8 +142,8 @@ is attributed, and is fresh — never on a self-report. See
    again. Each scenario points at the step it proves
    (`canon scenario new --flow F1`), and `canon status` lists each step
    with its scenarios, flagging a step with no scenario or no failure case;
-   `canon status` reads the approval in the subject's newest adopted change
-   to show whether its brief is approved, and asks for a human only when it
+   `canon status` reads the approval in each change the subject answers
+   for (tagged by its scenarios, approved, or a chore) and lists them in `briefs`, and asks for a human only when it
    is missing. Work that changes nothing a user can observe (a dependency,
    build or refactor change) is `canon change new <slug> --change-kind chore`, with a
    short brief and no new scenarios. A change from an external plan (an
@@ -210,7 +210,7 @@ the input schema and an example.
 
 ```bash
 canon scenario new auth.login.02 --title "Sign out"
-canon evidence add --scenario-id auth.login.02 --class test-run --ref "npm test" --role implementer
+canon evidence add --scenario auth.login.02 --class test-run --ref "npm test" --role implementer
 ```
 
 The same calls as one batch, validated before anything is written:

@@ -86,7 +86,7 @@ fn seed_scenario(repo: &Path, id: &str) {
 }
 
 /// The scenario lives in `project`'s configured spec root, so the stale-index
-/// refresh a reader runs indexes it (and `--project-id` names a root).
+/// refresh a reader runs indexes it (and `--project` names a root).
 fn seed_scenario_in(repo: &Path, project: &str, id: &str) {
     support::declare_scenario(repo, project, id, Some("demo-subject"));
 }
@@ -108,7 +108,7 @@ fn review_add(repo: &Path, scenario: &str) {
     let out = run(
         repo,
         &[
-            "review", "scenario", scenario, "--project-id", "demo", "--original-spec-ref", "specs/demo.feature", "--actor-id",
+            "review", "scenario", scenario, "--project", "demo", "--original-spec-ref", "specs/demo.feature", "--actor",
             "reviewer-2", "--role", "reviewer",
         ],
     );
@@ -122,7 +122,7 @@ fn change_review(repo: &Path, change: &str) -> Output {
     run(
         repo,
         &[
-            "review", "change", change, "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
+            "review", "change", change, "--project", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor",
             "reviewer-3", "--role", "reviewer",
         ],
     )
@@ -157,7 +157,7 @@ fn feature_brief(repo: &Path) {
 
 fn chore_brief(approved: DateTime<Utc>) -> String {
     format!(
-        "# Bump the client\n\n<!-- canon:kind chore -->\n\n## Intent\n\nBump the client\n\nApproved: Journey {} — \"go\"\n",
+        "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nApproved: Journey {} — \"go\"\n",
         approved.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
     )
 }
@@ -247,7 +247,7 @@ fn status_names_the_batch_evidence_after_a_blocker_is_closed_fixed() {
     let steps = status_steps(r);
     let first = &steps[0];
     let command = first["command"].as_str().unwrap();
-    assert!(command.starts_with("canon evidence add --project-id demo --all-scenarios"), "{first}");
+    assert!(command.starts_with("canon evidence add --project demo --all-scenarios"), "{first}");
     assert!(first["why"].as_str().unwrap().contains("blocker finding c-demo#1.1 was closed fixed"), "{first}");
     assert!(steps.iter().all(|s| !s["command"].as_str().unwrap().contains("--to shipped")), "never ship: {steps:?}");
 }
@@ -278,7 +278,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let reopened: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = reopened["meta"]["next"].as_array().unwrap();
-    assert!(next[0]["command"].as_str().unwrap().starts_with("canon evidence add --project-id demo --all-scenarios"), "after the reopen: {next:?}");
+    assert!(next[0]["command"].as_str().unwrap().starts_with("canon evidence add --project demo --all-scenarios"), "after the reopen: {next:?}");
     assert!(next.iter().all(|s| !s["command"].as_str().unwrap().contains("--to shipped")), "not ship: {next:?}");
 
     let out = ship(r);
@@ -334,7 +334,7 @@ fn a_chore_reviewed_scenario_by_scenario_after_its_evidence_needs_no_change_revi
 }
 
 /// 0.23 D5: the chore's review pins its brief. Editing the brief stales it,
-/// an unsigned outcome never counts, and `--change-id` refuses a feature change.
+/// an unsigned outcome never counts, and `--change` refuses a feature change.
 #[test]
 fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refused() {
     let dir = repo();
@@ -354,7 +354,7 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
     let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map_or(0, std::iter::Iterator::count);
-    let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
+    let json = run(r, &["review", "change", "c-demo", "--project", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor", "reviewer-3", "--role", "reviewer", "--json"]);
     assert_eq!(json.status.code(), Some(2));
     assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));
     let before = reviews(r);
@@ -415,11 +415,11 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     seed_subject(r, SubjectStatus::Shipped, &[], ago(250));
     let reopen = "canon subject move demo-subject --to verifying --reason";
 
-    let out = run(r, &["change", "new", "bump-client", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump the client"]);
+    let out = run(r, &["change", "new", "bump-client", "--subject", "demo-subject", "--change-kind", "chore", "--title", "Bump the client"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("subject `demo-subject` is shipped and stays so until reopened") && stdout(&out).contains(reopen), "{}", stdout(&out));
 
-    let out = run(r, &["change", "new", "bump-again", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump again", "--json"]);
+    let out = run(r, &["change", "new", "bump-again", "--subject", "demo-subject", "--change-kind", "chore", "--title", "Bump again", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let value: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = value["meta"]["next"].as_array().unwrap();
@@ -428,7 +428,7 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     // A subject that is not shipped gets no reopen step.
     let dir = repo();
     seed_subject(dir.path(), SubjectStatus::Building, &[], ago(250));
-    let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump the client", "--json"]);
+    let out = run(dir.path(), &["change", "new", "bump-client", "--subject", "demo-subject", "--change-kind", "chore", "--title", "Bump the client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(!stdout(&out).contains("--to verifying"), "{}", stdout(&out));
 }
@@ -463,14 +463,14 @@ fn gate_check_97_a_fixed_blocker_naming_a_scenario_is_reverified_by_that_scenari
     let err = stderr(&out);
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("1 evidenced scenario(s) (`world.demo.01`)"), "{err}");
     assert!(!err.contains("world.demo.02"), "B is not named: {err}");
-    assert!(err.contains("--scenario-id <id>") && err.contains("for each of `world.demo.01`") && !err.contains("--all-scenarios"), "the remedy is the per-scenario command: {err}");
+    assert!(err.contains("--scenario <id>") && err.contains("for each of `world.demo.01`") && !err.contains("--all-scenarios"), "the remedy is the per-scenario command: {err}");
     let gate = run(r, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("(`world.demo.01`)") && !stdout(&gate).contains("world.demo.02"), "gate check names A only: {}", stdout(&gate));
 
     let steps = status_steps(r);
     let command = steps[0]["command"].as_str().unwrap();
-    assert!(command.starts_with("canon evidence add --project-id demo --scenario-id world.demo.01 "), "{}", steps[0]);
+    assert!(command.starts_with("canon evidence add --project demo --scenario world.demo.01 "), "{}", steps[0]);
     assert!(!command.contains("--all-scenarios"), "{command}");
 
     // Evidence for A recorded before the close does not count.
@@ -517,7 +517,7 @@ fn gate_check_98_a_fixed_blocker_naming_no_scenario_still_asks_every_evidenced_s
     assert!(ship(r).status.success());
 }
 
-/// #87 through the CLI: `finding add --scenario-id` names the scenario, the
+/// #87 through the CLI: `finding add --scenario` names the scenario, the
 /// close inherits it (it takes no list of its own), and the ship refusal
 /// then names that scenario only.
 #[test]
@@ -529,8 +529,8 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     let add = run(
         r,
         &[
-            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
-            "--scenario-id", "world.demo.01", "--promote",
+            "finding", "add", "--change", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor", "reviewer-2", "--summary", "double click", "--scenario", "world.demo.01",
+            "--scenario", "world.demo.01", "--promote",
         ],
     );
     assert!(add.status.success(), "stderr: {}", stderr(&add));
@@ -552,7 +552,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
 }
 
-/// #87: a `--scenario-id` no scenario record carries is refused with its
+/// #87: a `--scenario` no scenario record carries is refused with its
 /// code, the flag and a hint, and nothing is staged.
 #[test]
 fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
@@ -561,26 +561,26 @@ fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
     two_scenarios(r);
     let out = run(
         r,
-        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
+        &["finding", "add", "--change", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor", "r", "--summary", "s", "--scenario", "world.demo.99", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(body["error"]["code"], "FINDING_UNKNOWN_SCENARIO", "{body}");
-    assert_eq!(body["error"]["field"], "--scenario-id", "{body}");
+    assert_eq!(body["error"]["field"], "--scenario", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("`world.demo.99`"), "{body}");
     assert!(body["error"]["hint"].is_string(), "{body}");
     assert!(!r.join(".canon/ledger/_staging/kind=finding").exists() || std::fs::read_dir(r.join(".canon/ledger/_staging/kind=finding")).unwrap().next().is_none(), "nothing staged");
 }
 
-/// #87: `--scenario-id` is repeatable; the record carries each id once, in
+/// #87: `--scenario` is repeatable; the record carries each id once, in
 /// the order given, and a finding without the flag carries no field at all.
 #[test]
 fn finding_add_32_records_the_scenarios_it_names_once_each() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--introduced-unknown", "--promote"];
-    let named = [&base[..], &["--seq", "1", "--scenario-id", "world.demo.02", "--scenario-id", "world.demo.01", "--scenario-id", "world.demo.02"]].concat();
+    let base = ["finding", "add", "--change", "c-demo", "--round", "1", "--actor", "r", "--summary", "s", "--severity", "should-fix", "--introduced-unknown", "--promote"];
+    let named = [&base[..], &["--seq", "1", "--scenario", "world.demo.02", "--scenario", "world.demo.01", "--scenario", "world.demo.02"]].concat();
     let plain = [&base[..], &["--seq", "2"]].concat();
     for args in [named, plain] {
         let out = run(r, &args);
@@ -594,8 +594,8 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
 }
 
 /// #87: a finding naming scenarios in two spec roots gets one runnable
-/// command per root, each with its own `--project-id` and that root's
-/// `--scenario-id` values; recording each clears the gate.
+/// command per root, each with its own `--project` and that root's
+/// `--scenario` values; recording each clears the gate.
 #[test]
 fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
     let dir = repo();
@@ -612,7 +612,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
         seed_other(scenario, ago(300));
         let out = run(
             r,
-            &["review", "scenario", scenario, "--project-id", "other", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
+            &["review", "scenario", scenario, "--project", "other", "--original-spec-ref", "specs/other.feature", "--actor", "reviewer-2", "--role", "reviewer"],
         );
         assert!(out.status.success(), "review add: {}", stderr(&out));
     }
@@ -621,15 +621,15 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("`canon evidence add --project-id demo --scenario-id <id> --report") && err.contains("for each of `world.demo.01`;"), "{err}");
-    assert!(err.contains("`canon evidence add --project-id other --scenario-id <id> --report") && err.contains("for each of `world.other.01`, `world.other.02`;"), "{err}");
+    assert!(err.contains("`canon evidence add --project demo --scenario <id> --report") && err.contains("for each of `world.demo.01`;"), "{err}");
+    assert!(err.contains("`canon evidence add --project other --scenario <id> --report") && err.contains("for each of `world.other.01`, `world.other.02`;"), "{err}");
     assert!(!err.contains("world.demo.02") && !err.contains("--all-scenarios"), "{err}");
 
     // Each root's command clears its own scenarios and no other's.
     seed_evidence(r, "world.demo.01", ago(50));
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
-    assert!(!stderr(&out).contains("world.demo.01") && stderr(&out).contains("--project-id other --scenario-id <id>") && stderr(&out).contains("`world.other.01`"), "{}", stderr(&out));
+    assert!(!stderr(&out).contains("world.demo.01") && stderr(&out).contains("--project other --scenario <id>") && stderr(&out).contains("`world.other.01`"), "{}", stderr(&out));
     seed_other("world.other.01", ago(40));
     assert_eq!(ship(r).status.code(), Some(1));
     seed_other("world.other.02", ago(30));

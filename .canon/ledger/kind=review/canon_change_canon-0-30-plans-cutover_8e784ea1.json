@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-chore",
+    "role": "reviewer",
+    "session_id": "rev-030-chore-2026-10-26"
+  },
+  "at": "2026-10-26T20:59:34.195395643Z",
+  "change_id": "canon-0-30-plans-cutover",
+  "code_tree": "794462a0f4c90da7568d664281c6a5cd4fe9a849",
+  "kind": "review",
+  "pin": "33c87aded76ef7474c1c904cb9850a39ccf6f3aa",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "0b3dcb55ad6734af4b7c8c977d1fb1649e8942bbbd44ef632258d0dc462ab144",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-30-plans-cutover/brief.md"
+  },
+  "review_id": "01M5X05TXK0EHX893PWP02J2SM",
+  "reviewer": "rev-030-chore",
+  "schema": 2,
+  "worktree_dirty": false
+}

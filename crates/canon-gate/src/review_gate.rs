@@ -627,7 +627,7 @@ fn latest_report_words(ctx: &GateContext, project: &str, scenario: &str) -> BTre
 /// evidence add --all-scenarios` with a `--report` for every report file bound
 /// to the latest evidence of `scenarios` (`(project_id, scenario_id)` pairs),
 /// as the roles a re-verification runs under. Never a per-scenario loop.
-/// `--project-id` is added only when the repo has several spec roots
+/// `--project` is added only when the repo has several spec roots
 /// (`multi_root`), where it is required, and then once per root that has
 /// evidenced scenarios: one command each, in root order. A root whose
 /// evidence bound no report has no command (the caller says to pass its
@@ -647,7 +647,7 @@ pub fn batch_commands(ctx: &GateContext, scenarios: &[(&str, &str)], multi_root:
         .map(|(project, reports)| {
             let mut command = String::from("canon evidence add --all-scenarios");
             if multi_root {
-                command.push_str(&format!(" --project-id {project}"));
+                command.push_str(&format!(" --project {project}"));
             }
             for word in reports {
                 command.push_str(&format!(" --report {}", crate::audit::shell_quote(&word)));
@@ -663,7 +663,7 @@ pub fn batch_commands(ctx: &GateContext, scenarios: &[(&str, &str)], multi_root:
 pub fn reverify_remedy(ctx: &GateContext, scenarios: &[(&str, &str)], multi_root: bool) -> String {
     let commands = batch_commands(ctx, scenarios, multi_root);
     let how = match commands.as_slice() {
-        [] => "record the evidence again with `canon evidence add --all-scenarios` and one --report for each test report of the suite (junit:, cucumber: or swift-testing: followed by its path; add --project-id when the repo has several spec roots)".to_string(),
+        [] => "record the evidence again with `canon evidence add --all-scenarios` and one --report for each test report of the suite (junit:, cucumber: or swift-testing: followed by its path; add --project when the repo has several spec roots)".to_string(),
         [one] => format!("record the evidence again with `{one}`"),
         many => format!("record the evidence again, once per spec root: {}", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
     };
@@ -671,9 +671,9 @@ pub fn reverify_remedy(ctx: &GateContext, scenarios: &[(&str, &str)], multi_root
 }
 
 /// The re-verification remedy of a finding that names its scenarios: the
-/// per-scenario `canon evidence add` (it takes one `--scenario-id`, and
+/// per-scenario `canon evidence add` (it takes one `--scenario`, and
 /// no filter on a batch), once for each scenario, grouped by spec root so
-/// each command carries its own `--project-id`. Not the whole-suite batch.
+/// each command carries its own `--project`. Not the whole-suite batch.
 pub fn scoped_reverify_remedy(scenarios: &[(&str, &str)]) -> String {
     let mut roots: Vec<(&str, Vec<&str>)> = Vec::new();
     for (project, id) in scenarios {
@@ -689,7 +689,7 @@ pub fn scoped_reverify_remedy(scenarios: &[(&str, &str)]) -> String {
         .iter()
         .map(|(project, ids)| {
             let ids = ids.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ");
-            format!("`canon evidence add --project-id {project} --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer` for each of {ids}")
+            format!("`canon evidence add --project {project} --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer` for each of {ids}")
         })
         .collect::<Vec<_>>()
         .join("; and ");

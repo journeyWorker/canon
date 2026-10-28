@@ -560,6 +560,15 @@ fn is_digest(value: &str) -> bool {
     hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+/// The usage error for an operand that is not a pack id: `sha256:` and 64 lower-case hex digits; `None` for a well-formed one (which may still name no pack).
+pub fn pack_id_usage_error(id: &str) -> Option<CliError> {
+    let well_formed = id.strip_prefix("sha256:").is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+    if well_formed {
+        return None;
+    }
+    Some(CliError::refused("USAGE", format!("invalid value `{id}` for <PACK_ID>: expected `sha256:` followed by 64 lower-case hex digits")).hint("pass the pack id `canon context-pack add` printed (sha256:<64 lower-case hex digits>)").field("<PACK_ID>"))
+}
+
 fn pack_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("manifests").join(format!("{id}.json")) }
 fn object_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("objects").join(id.replace(':', "-") + ".json") }
 

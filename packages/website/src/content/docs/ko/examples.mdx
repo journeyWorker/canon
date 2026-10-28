@@ -128,7 +128,7 @@ import { Steps } from "@astrojs/starlight/components";
    ```bash
    bunx @journeykit/canon scenario new auth.login.01 \
      --title "Login rejects bad password" \
-     --subject-id auth-core --lane behavior --actor-id alice
+     --subject auth-core --lane behavior --actor alice
    ```
 
    시나리오가 여럿이면 옵션 대신 `--input` 배열 하나로 한 번에 씁니다(전부
@@ -139,7 +139,7 @@ import { Steps } from "@astrojs/starlight/components";
    경로 `<root>/kind=feature/area=auth/login.feature`는 태그 자체의
    `<area>.<surface>`에서 유도되거나(또는 설정된
    `specs.roots[]` 항목 아래의 명시적 `--feature <path>`) 결정됩니다.
-   스텁은 태그 바로 위에 `# canon:` provenance 줄을 두며 `--actor-id`(또는
+   스텁은 태그 바로 위에 `# canon:` provenance 줄을 두며 `--actor`(또는
    `CANON_ACTOR`)를 기록하고, 이어서 `@subject:auth-core`,
    `@lane:behavior`, id 태그가 옵니다. `# canon:` 줄은 절대 손으로
    쓰거나 옮기지 마세요 — 스캐폴드가 그 줄의 유일한 출처입니다. 레저
@@ -153,8 +153,8 @@ import { Steps } from "@astrojs/starlight/components";
 
    ```bash
    bunx @journeykit/canon review scenario auth.login.01 \
-     --project-id root \
-     --actor-id alice \
+     --project root \
+     --actor alice \
      --original-spec-ref .canon/specs/kind=feature/area=auth/login.feature \
      --role dev
    ```
@@ -334,7 +334,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 2. **import된 plan change를 그 아래로 adopt.**
 
    ```bash
-   bunx @journeykit/canon subject adopt checkout-revamp --change-id checkout-revamp-plan
+   bunx @journeykit/canon subject adopt checkout-revamp --change checkout-revamp-plan
    ```
 
    subject를 `Change.subject_ids`에, change를 서브젝트의 `change_ids`에
@@ -345,20 +345,20 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
    `<other>` ``를 출력하며, 그 change의 열린 blocker는 두 서브젝트를 모두
    막습니다.
 
-   시나리오는 스펙 쪽에서 서브젝트에 연결됩니다: `--subject-id`로
+   시나리오는 스펙 쪽에서 서브젝트에 연결됩니다: `--subject`로
    스캐폴딩하거나(또는 `@subject:checkout-revamp`를 직접 추가) sync해서
    태그가 `Scenario` 레코드에 기록되게 합니다:
 
    ```bash
    bunx @journeykit/canon scenario new checkout.cart.01 \
-     --title "Adding an item raises the count" --subject-id checkout-revamp
+     --title "Adding an item raises the count" --subject checkout-revamp
    bunx @journeykit/canon inventory sync
    ```
 
 3. **작업 전 서브젝트 스코프 가이던스 retrieve.**
 
    ```bash
-   bunx @journeykit/canon retrieve --for-role dev --domain dev --subject-id checkout-revamp
+   bunx @journeykit/canon retrieve --for-role dev --domain dev --subject checkout-revamp
    ```
 
    retrieval은 area 후보를 `dev-checkout-revamp` 다음 `dev` 순서(폴백)로
@@ -388,7 +388,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 
    ```bash
    bunx @journeykit/canon subject move checkout-revamp --to verifying \
-     --reason "follow-up: totals round per line" --actor-id impl
+     --reason "follow-up: totals round per line" --actor impl
    ```
 
 5. **도메인별 관리 뷰 읽기.**

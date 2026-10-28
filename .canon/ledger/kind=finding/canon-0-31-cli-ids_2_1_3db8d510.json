@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:25:49.678710Z",
+  "change_id": "canon-0-31-cli-ids",
+  "code_tree": "489881bfb70541777f372a3c21cc89fc73a1974f",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/removed.rs:261-275",
+  "introduced_by": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "kind": "finding",
+  "resolution_code_tree": "0c730a96c6db7b34abd648a4cf679e6ba2b4072d",
+  "resolution_sha": "641c70cc8c4098b7fd1506009615fd265f0ab1ab",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-d",
+  "round": 2,
+  "scenario_ids": [
+    "context.capability.51"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] Rewrite operand moves regardless of removed-option order. Reproduced: canon subject adopt --change-id add-login --subject-id demo --json emits a hint containing --change add-login --subject-id demo; executing that exact hint exits 2 again for removed --subject-id. find only performs the operand move when the first hit has operand=true, and renamed excludes all operand rows. Apply every collected transformation while retaining the first hit for attribution; test both orders. Blast radius: adopt/unadopt and any leaf mixing renamed flags with older operand moves.",
+  "worktree_dirty": true
+}

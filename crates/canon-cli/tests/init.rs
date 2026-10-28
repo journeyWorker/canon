@@ -137,7 +137,7 @@ fn init_rerun_with_no_agents_md_leaves_an_existing_canon_yaml_alone_and_reports_
 
 /// Every canon `.gitignore` line, as a repo set up by `canon init` 0.17 has them.
 const CANON_GITIGNORE: &str =
-    ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n";
+    ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
 
 /// authoring.init.97 (#35): `canon init` re-run on a repo an older canon
 /// set up adds the canon `.gitignore` lines it lacks, each once, and keeps
@@ -155,7 +155,7 @@ fn authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines() {
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("canon.yaml already exists — left unchanged; the AGENTS.md block and the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
     assert!(
-        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/\n"),
+        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"),
         "{}",
         stdout(&out)
     );

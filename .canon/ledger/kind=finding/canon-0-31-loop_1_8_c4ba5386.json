@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:27:32.499550549Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/status.rs:994-1008; README.md:143-148",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reason": "README Upgrading and canon-subject.md now say reason is absent on the one entry of a subject with no governing change",
+  "resolution_code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "resolution_sha": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "context.status.86"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[spec-fidelity] A subject with no governing change gets one `briefs` entry with no `reason`: the awaiting newest change, or no change at all. F3 says one entry per governing change, with reason tagged, approved or chore. Keeping the entry is defensible, because the fallback rule still blocks reopen and ship on that change and status should agree with the guards. But the README Upgrading section lists reason as always one of the three, and no 0.31 scenario states the reason-less entry; only context.status.61 and a conformance case show it. Tools that follow the README will break on it. Fix: say in Upgrading (and in a scenario) that the reason is absent for the fallback entry.",
+  "worktree_dirty": false
+}

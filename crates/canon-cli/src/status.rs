@@ -128,8 +128,12 @@ use crate::inventory::{load_spec_roots, scan_feature_corpus};
 /// meaning or is removed; an added field does not bump it. `2` (0.16):
 /// a `next` entry's `command` is a canon command line only when its
 /// `actor` is `agent`. `3` (0.17): `brief.proposal` is removed; the canon
-/// `brief.md` is `brief.brief`, with `briefExists` and `source`.
-const STATUS_VERSION: u32 = 3;
+/// `brief.md` is `brief.brief`, with `briefExists` and `source`. `4` (0.31):
+/// a subject's `brief` is replaced by `briefs`, one entry per change the
+/// subject answers for (tagged, approved or chore), each with its `status`
+/// and `reason`; `pendingDrafts` holds only drafts, and `flow` the steps of
+/// every tagged change.
+const STATUS_VERSION: u32 = 4;
 
 /// The most `next:` entries status prints.
 pub const NEXT_LIMIT: usize = 5;
@@ -277,17 +281,25 @@ pub struct SubjectSummary {
     /// Open blocker findings on the subject's adopted changes.
     pub open_blockers: usize,
     pub missing_cases: Vec<MissingCase>,
-    /// Whether the brief is approved (0.16 D1): present for `building`,
-    /// `verifying` and `shipped` subjects, and for a `proposed` subject
-    /// whose newest adopted change has a brief to answer; omitted for
-    /// the others.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub brief: Option<BriefStatus>,
-    /// The adopted changes set aside as pending drafts
-    /// ([`crate::brief::scope_changes`]): each one's brief is not approved
-    /// and no scenario of the subject is tagged `@flow:<change>.*` for it,
-    /// so it is not part of the subject's scope yet and reopen, evidence and
-    /// ship read the newest approved or tagged change. Omitted when empty.
+    /// The briefs the subject answers for (0.31): one entry per adopted
+    /// change that is tagged by one of its scenarios, has an `Approved:`
+    /// line, or is a chore, in adoption order, each with whether it reads as
+    /// approved, why it governs and what `canon brief check` found. A subject
+    /// with no such change has the one entry of its newest adopted change,
+    /// which its reopen, ship and evidence wait on for a first approval, with
+    /// no `reason` (or, adopting no change, an entry with no `change`).
+    /// Present for `building`, `verifying` and `shipped` subjects, and for a
+    /// `proposed` subject whose change has a brief to answer; omitted when
+    /// empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub briefs: Vec<BriefStatus>,
+    /// The briefs of [`Self::pending_drafts`]: the next step's input, not part of the report.
+    #[serde(skip)]
+    pub draft_briefs: Vec<BriefStatus>,
+    /// The adopted changes that are pending drafts ([`crate::brief::governing`]):
+    /// never approved, not a chore, and no scenario of the subject tagged
+    /// `@flow:<change>.*` for them, so reopen, evidence and ship do not read
+    /// them. Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub pending_drafts: Vec<String>,
     /// For a `shipped` subject, what makes its gate red now (0.18 D3):
@@ -297,8 +309,8 @@ pub struct SubjectSummary {
     /// Status then names the reopen command. Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<String>,
-    /// The flow steps of the subject's current (newest adopted) change's
-    /// brief with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4).
+    /// The flow steps of the briefs of every tagged change the subject answers
+    /// for, with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4, 0.31).
     /// Omitted for a brief with no flow steps (a legacy brief) or no brief.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub flow: Vec<FlowStep>,
@@ -692,7 +704,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
-            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>"),
+            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor <unit> --session <session>"),
             why: format!("{} scenario(s) are tagged @subject:{id}, which no subject record carries", tagged.len()),
         });
     }
@@ -700,7 +712,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
-            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>".into(),
+            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor <unit> --session <session>".into(),
             why: "no subject exists yet; a subject is the unit status, review and shipping track".into(),
         });
     }
@@ -713,7 +725,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     // instead of one "owns no scenario" step per subject. But when the
     // .feature corpus itself holds no scenario, there is nothing to
     // index: the next step is writing features and scenarios, so each
-    // subject gets its `scenario new … --subject-id` step below.
+    // subject gets its `scenario new … --subject` step below.
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
     let promote_manual = !matches!(crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")), Ok(crate::write_mode::PromoteMode::Auto));
     let mut owners: Vec<(std::ops::Range<usize>, String)> = Vec::new();
@@ -732,8 +744,8 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
-                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit> --session-id <session>{}", project_flag(&roots, None)),
-                why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject-id <id>`".into(),
+                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor <unit> --session <session>{}", project_flag(&roots, None)),
+                why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`".into(),
             });
         }
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
@@ -977,19 +989,23 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
     let stale_reviews = gap_count(ReviewGapKind::Stale);
     let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, &derived.code_tree, subject) } else { Vec::new() };
 
-    // The flow the ship guard checks is the scope's, not a pending draft's.
-    let (scope, pending) = crate::brief::scope_changes(repo, ctx, &derived.flow_changes, subject, &changes);
-    // The brief status reports is the newest adopted change's, unless a pending
-    // draft sits above an unapproved tagged change: that one blocks, so it is
-    // the one the human is asked about.
-    let brief = if pending.is_empty() {
-        brief_with_findings(repo, plan_roots, subject, &changes)
-    } else {
-        match brief_with_findings(repo, plan_roots, subject, &scope) {
-            Some(scoped) if !scoped.approved => Some(scoped),
-            _ => brief_with_findings(repo, plan_roots, subject, &changes),
-        }
-    };
+    // The subject answers for its tagged, approved and chore changes (0.31);
+    // a pending draft is shown, never judged.
+    let governing = crate::brief::governing(repo, ctx, &derived.flow_changes, subject, &changes);
+    let one = |change: &ChangeId| brief_with_findings(repo, plan_roots, subject, std::slice::from_ref(change));
+    let mut briefs: Vec<BriefStatus> = governing
+        .governed
+        .iter()
+        .filter_map(|(change, reason)| {
+            let mut brief = one(change)?;
+            brief.reason = Some(*reason);
+            Some(brief)
+        })
+        .collect();
+    // No governing change: the newest adopted change awaits its first approval.
+    briefs.extend(if changes.is_empty() { crate::brief::brief_of(repo, plan_roots, subject, &[]) } else { governing.awaiting.as_ref().and_then(one) });
+    let draft_briefs: Vec<BriefStatus> = governing.drafts.iter().filter_map(one).collect();
+    let flow = governing.governed.iter().filter(|(_, reason)| *reason == crate::brief::Reason::Tagged).flat_map(|(change, _)| flow_steps(ctx, joins, repo, change, distinct_actor)).collect();
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
         title: subject.title.clone(),
@@ -1005,10 +1021,11 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         review_due,
         open_blockers,
         missing_cases,
-        brief,
-        pending_drafts: pending.iter().map(|c| c.as_str().to_string()).collect(),
+        briefs,
+        draft_briefs,
+        pending_drafts: governing.drafts.iter().map(|c| c.as_str().to_string()).collect(),
         red,
-        flow: scope.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
+        flow,
         reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, &derived.code_tree, subject) } else { Vec::new() },
         chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, subject) } else { Vec::new() },
     }
@@ -1064,9 +1081,10 @@ fn flow_steps(ctx: &GateContext, joins: &Joins, repo: &Path, change: &ChangeId, 
         .collect()
 }
 
-/// [`crate::brief::brief_of`] plus what `canon brief check` found in the
-/// brief's text (0.19 D2): the counts `canon status` shows. Omitted for a
-/// pre-0.19 brief and for a brief that does not exist yet.
+/// [`crate::brief::brief_of`] of the one change in `changes` plus what
+/// `canon brief check` found in the brief's text (0.19 D2): the counts
+/// `canon status` shows. Omitted for a pre-0.19 brief and for a brief that
+/// does not exist yet.
 fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes: &[ChangeId]) -> Option<BriefStatus> {
     let mut brief = crate::brief::brief_of(repo, plan_roots, subject, changes)?;
     if let (true, Some(change)) = (brief.brief_exists, changes.last()) {
@@ -1096,7 +1114,7 @@ fn shipped_red(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::Code
 /// `canon subject move <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
 pub(crate) fn reopen_command(id: &str) -> String {
-    format!("canon subject move {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit> --session-id <session>")
+    format!("canon subject move {id} --to verifying --reason \"<why it reopens>\" --actor <unit> --session <session>")
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -1112,14 +1130,14 @@ fn next_number(scenarios: &[&Scenario], project: &str, surface: &str) -> String 
     format!("{surface}.{:02}", max + 1)
 }
 
-/// `canon scenario new`'s `--project-id` flag: needed (and refused when
+/// `canon scenario new`'s `--project` flag: needed (and refused when
 /// absent) only when the repo configures more than one spec root. A
 /// known owning root is named exactly; otherwise a placeholder.
 fn project_flag(roots: &[ProjectId], project: Option<&str>) -> String {
     if roots.len() <= 1 {
         return String::new();
     }
-    format!(" --project-id {}", project.unwrap_or("<root-id>"))
+    format!(" --project {}", project.unwrap_or("<root-id>"))
 }
 
 /// The step for the first brief flow step with no scenario or no failure
@@ -1148,16 +1166,17 @@ fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &Subject
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(role),
-        command: format!("canon scenario new {suggested} --subject-id {id} --case {case} --flow {} --title \"{title}\" --actor-id <unit> --session-id <session>{}", step.id, project_flag(roots, project.as_deref())),
+        command: format!("canon scenario new {suggested} --subject {id} --case {case} --flow {} --title \"{title}\" --actor <unit> --session <session>{}", step.id, project_flag(roots, project.as_deref())),
         why: format!("{id}: brief flow step {} has {gap}, and the ship guard refuses until it has one; tag it with --flow so it covers the step", step.id),
     })
 }
 
-/// Whether `subject`'s brief is enforced and not approved (module doc):
-/// the human answers before anything is built or attested for it.
-/// Whether the summary's brief is a pending draft's ([`SubjectSummary::pending_drafts`]).
-fn on_pending_draft(summary: &SubjectSummary) -> bool {
-    summary.brief.as_ref().and_then(|brief| brief.change.as_deref()).is_some_and(|change| summary.pending_drafts.iter().any(|d| d == change))
+/// The briefs the subject answers for that wait for the human (module doc):
+/// enforced and not approved, among its governing changes and, with none, its
+/// newest adopted change ([`SubjectSummary::briefs`]). A pending draft is not
+/// one of them.
+fn blocking(summary: &SubjectSummary) -> Vec<&BriefStatus> {
+    summary.briefs.iter().filter(|brief| brief.enforced && !brief.approved).collect()
 }
 
 /// The planner's polish step for a brief with no blockers and advisories
@@ -1176,7 +1195,7 @@ fn polish_step(id: &str, brief: &BriefStatus, draft: bool) -> Option<NextStep> {
 }
 
 fn awaits_brief(summary: &SubjectSummary) -> bool {
-    !on_pending_draft(summary) && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
+    !blocking(summary).is_empty()
 }
 
 /// What every subject's `next:` rules ([`subject_steps`]) read alike.
@@ -1206,10 +1225,10 @@ fn subject_steps(
     let status = subject.status;
 
     // A pending draft blocks nothing: its subject keeps building, attesting
-    // and shipping for its approved scope. While `canon brief check` has
+    // and shipping for the scope it answers for. While `canon brief check` has
     // blockers the draft is the planner's to write; once clean, the human is
     // told it awaits an answer.
-    if let (Some(brief), true) = (summary.brief.as_ref().filter(|brief| brief.enforced), on_pending_draft(summary)) {
+    for brief in summary.draft_briefs.iter().filter(|brief| brief.enforced) {
         let draft = brief.change.as_deref().unwrap_or_default();
         match (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
             (Some(change), Some(counts)) => next.push(NextStep {
@@ -1227,7 +1246,7 @@ fn subject_steps(
                     role: None,
                     command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
                     why: format!(
-                        "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; {}",
+                        "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship do not read it until the human approves it or a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; {}",
                         brief.unanswered(),
                         brief.record()
                     ),
@@ -1237,31 +1256,39 @@ fn subject_steps(
     }
     // The pending-draft step is not a gap: it must not hold back the advance.
     let before = next.len();
-    if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced && !on_pending_draft(summary)) {
+    let waiting = blocking(summary);
+    if !waiting.is_empty() {
         // A brief `canon brief check` still has blockers for is the planner's
-        // to write; the human is asked only once it is clean (0.22 D4).
-        if let (Some(change), Some(counts)) = (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
-            next.push(NextStep {
-                actor: StepActor::Agent,
-                role: Some(Role::Planner),
-                command: format!("canon brief check {change}"),
-                why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
-            });
+        // to write; the human is asked only once every one is clean (0.22 D4).
+        let unclean: Vec<&&BriefStatus> = waiting.iter().filter(|brief| brief.findings.as_ref().is_some_and(|counts| counts.blockers > 0)).collect();
+        if !unclean.is_empty() {
+            for brief in unclean {
+                let (Some(change), Some(counts)) = (brief.change.as_deref(), brief.findings.as_ref()) else { continue };
+                next.push(NextStep {
+                    actor: StepActor::Agent,
+                    role: Some(Role::Planner),
+                    command: format!("canon brief check {change}"),
+                    why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
+                });
+            }
             return;
         }
-        next.extend(polish_step(id, brief, false));
-        let change = brief.change.as_deref().unwrap_or("the change");
+        for brief in &waiting {
+            next.extend(polish_step(id, brief, false));
+        }
+        let places = waiting.iter().map(|brief| brief.report_in().to_string()).collect::<Vec<_>>().join(", ");
+        let named = waiting.iter().map(|brief| brief.unanswered()).collect::<Vec<_>>().join("; ");
+        let tagged = waiting.iter().filter_map(|brief| brief.change.as_deref()).map(|change| format!("`@flow:{change}.*`")).collect::<Vec<_>>().join(", ");
+        let changes = waiting.iter().filter_map(|brief| brief.change.as_deref()).map(|change| format!("`{change}`")).collect::<Vec<_>>().join(", ");
         next.push(NextStep {
             actor: StepActor::Human,
             role: None,
             command: format!(
-                "stop and report the brief in {}; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)",
-                brief.report_in()
+                "stop and report the brief in {places}; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)"
             ),
             why: format!(
-                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged `@flow:{change}.*` and `{change}`'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; {} (one call records the brief and the policy approval)",
-                brief.unanswered(),
-                brief.record()
+                "{id}: {named} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged {tagged} and {changes}'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; {} (one call records the brief and the policy approval)",
+                crate::brief::record_all(&waiting)
             ),
         });
         return;
@@ -1270,7 +1297,7 @@ fn subject_steps(
     // A shipped subject whose gate went red (0.18 D3) is reopened first:
     // every gap below is follow-up work inside its approved change.
     if status == SubjectStatus::Shipped && !summary.red.is_empty() {
-        let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()).filter(|_| !on_pending_draft(summary)) {
+        let tasks = match summary.briefs.last().and_then(|brief| brief.change.as_deref()) {
             Some(change) => format!("keep the follow-up in its approved change `{change}` (never `canon change new`)"),
             None => "keep the follow-up in its change".to_string(),
         };
@@ -1295,7 +1322,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
-            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id {id} --case happy --actor-id <unit> --session-id <session>{}", project_flag(roots, None)),
+            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject {id} --case happy --actor <unit> --session <session>{}", project_flag(roots, None)),
             why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
         return;
@@ -1317,7 +1344,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
             command: format!(
-                "canon scenario new {} --title \"<what happens on this path>\" --subject-id {id} --case {} --actor-id <unit> --session-id <session>{}",
+                "canon scenario new {} --title \"<what happens on this path>\" --subject {id} --case {} --actor <unit> --session <session>{}",
                 next_number(all, &gap.project_id, &gap.surface),
                 gap.case,
                 project_flag(roots, Some(&gap.project_id))
@@ -1332,7 +1359,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario {} --project {} --class test-run --role implementer --actor <unit> --session <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -1356,7 +1383,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario {} --project {} --class test-run --role implementer --actor <unit> --session <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -1370,7 +1397,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon finding close {} --round {} --seq {} --disposition fixed --actor-id <unit> --session-id <session>",
+                "canon finding close {} --round {} --seq {} --disposition fixed --actor <unit> --session <session>",
                 blocker.change_id.as_str(),
                 blocker.round,
                 blocker.seq
@@ -1384,7 +1411,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<brief>\"",
+                "canon review change {} --project <root> --actor <reviewer> --session <review-session> --role reviewer --original-spec-ref \"<brief>\"",
                 change.as_str()
             ),
             why: format!("{id}: {why}"),
@@ -1398,12 +1425,12 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Reviewer),
                 command: format!(
-                    "canon review scenario {1} --project-id {0} --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<feature file>\"",
+                    "canon review scenario {1} --project {0} --actor <reviewer> --session <review-session> --role reviewer --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
                     first.scenario_id.as_str()
                 ),
                 why: format!(
-                    "{id}: {} of {} scenario(s) lack a qualifying review{}; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor",
+                    "{id}: {} of {} scenario(s) lack a qualifying review{}; review from another session (--session must differ from every evidence session), as an actor other than the evidence actor",
                     summary.scenarios - summary.reviewed,
                     summary.scenarios,
                     review_breakdown(summary)
@@ -1423,7 +1450,7 @@ fn subject_steps(
     let project_of = |scenario: &str| owned.iter().find(|s| s.scenario_id.as_str() == scenario).map_or("<root-id>", |s| s.project_id.as_str());
     let audit_command = |scenario: &str| {
         format!(
-            "canon evidence audit {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
+            "canon evidence audit {scenario} --project {} --evaluator <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor <evaluator>",
             project_of(scenario)
         )
     };
@@ -1449,12 +1476,13 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Orchestrator),
-            command: format!("canon subject move {id} --to {to} --actor-id <unit> --session-id <session>"),
+            command: format!("canon subject move {id} --to {to} --actor <unit> --session <session>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {
-                    let brief = match (!summary.pending_drafts.is_empty(), summary.brief.as_ref().is_some_and(|brief| brief.approved)) {
-                        (true, true) => "its scope's brief is approved (the newer draft is pending)",
+                    let approved = !summary.briefs.is_empty() && summary.briefs.iter().all(|brief| brief.approved);
+                    let brief = match (!summary.pending_drafts.is_empty(), approved) {
+                        (true, true) => "the briefs of its scope are approved (the draft is pending)",
                         (true, false) => "no brief of its scope is approved",
                         (false, true) => "the brief is approved",
                         (false, false) => "no brief is written to approve",
@@ -1558,27 +1586,38 @@ pub fn render(report: &StatusReport) -> String {
             for line in &s.accepted_divergences {
                 let _ = writeln!(out, "      advisory: {line}");
             }
-            if let Some(brief) = &s.brief {
+            let many = s.briefs.len() > 1;
+            for brief in &s.briefs {
+                let of = match (many, brief.change.as_deref()) {
+                    (true, Some(change)) => format!(" [{change}{}]", brief.reason.map_or(String::new(), |reason| format!(", {}", reason_word(reason)))),
+                    _ => String::new(),
+                };
                 let _ = match (&brief.approval, &brief.brief, &brief.change) {
-                    (Some(_), Some(_), _) if brief.changed => writeln!(out, "      brief: not approved ({}); {}", brief.unanswered(), brief.record()),
+                    (Some(_), Some(_), _) if brief.changed => writeln!(out, "      brief{of}: not approved ({}); {}", brief.unanswered(), brief.record()),
                     (Some(approval), Some(path), _) if brief.legacy_approval => writeln!(
                         out,
-                        "      brief: approved in {path} — {approval}\n      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, {}",
+                        "      brief{of}: approved in {path} — {approval}\n      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, {}",
                         brief.record_digest_hint()
                     ),
-                    (Some(approval), Some(path), _) => writeln!(out, "      brief: approved in {path} — {approval}"),
-                    (None, Some(_), _) => writeln!(out, "      brief: not approved ({})", brief.unanswered()),
-                    (_, None, Some(change)) => writeln!(out, "      brief: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
-                    _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
+                    (Some(approval), Some(path), _) => writeln!(out, "      brief{of}: approved in {path} — {approval}"),
+                    (None, Some(_), _) => writeln!(out, "      brief{of}: not approved ({})", brief.unanswered()),
+                    (_, None, Some(change)) => writeln!(out, "      brief{of}: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
+                    _ => writeln!(out, "      brief{of}: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
             }
             if !s.pending_drafts.is_empty() {
                 let names = s.pending_drafts.iter().map(|d| format!("`{d}`")).collect::<Vec<_>>().join(", ");
                 let verb = if s.pending_drafts.len() == 1 { "is a pending draft" } else { "are pending drafts" };
-                let _ = writeln!(out, "      {names} {verb}: not yet part of the subject's scope (brief not approved and no scenario tagged `@flow:<change>.*`); reopen, evidence and ship read the newest approved or tagged change");
+                let _ = writeln!(out, "      {names} {verb}: not yet part of the subject's scope (never approved, not a chore, no scenario tagged `@flow:<change>.*`); reopen, evidence and ship do not read {}", if s.pending_drafts.len() == 1 { "it" } else { "them" });
             }
-            if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
-                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief show` names the next step", counts.blockers, counts.advisories);
+            for brief in &s.briefs {
+                if let Some(counts) = brief.findings {
+                    let of = match (many, brief.change.as_deref()) {
+                        (true, Some(change)) => format!(" [{change}]"),
+                        _ => String::new(),
+                    };
+                    let _ = writeln!(out, "      brief check{of}: {} blocker(s), {} advisory(ies); `canon brief show` names the next step", counts.blockers, counts.advisories);
+                }
             }
             for step in &s.flow {
                 let _ = writeln!(out, "      flow {}{}", step.id, if step.gaps.is_empty() { String::new() } else { format!(" — {}", step.gaps.join(", ")) });
@@ -1595,7 +1634,7 @@ pub fn render(report: &StatusReport) -> String {
                 }
             }
             if !s.red.is_empty() {
-                if s.brief.as_ref().is_some_and(|brief| brief.enforced) && !on_pending_draft(s) {
+                if awaits_brief(s) {
                     let _ = writeln!(out, "      gate: red — {}; reopening is refused until the brief above is approved (answer it, or remove its `@flow:` tags, after which `canon subject unadopt` can take the change back)", s.red.join(", "));
                 } else {
                     let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
@@ -1646,6 +1685,15 @@ pub fn render(report: &StatusReport) -> String {
         let _ = writeln!(out, "waiting on {role}: {count}");
     }
     out
+}
+
+/// How a [`crate::brief::Reason`] reads in the human form.
+fn reason_word(reason: crate::brief::Reason) -> &'static str {
+    match reason {
+        crate::brief::Reason::Tagged => "tagged",
+        crate::brief::Reason::Approved => "approved",
+        crate::brief::Reason::Chore => "chore",
+    }
 }
 
 fn list_or(values: &[String], empty: &str) -> String {

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w1-2026-10-27"
+  },
+  "at": "2026-10-27T11:40:56.531029326Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_approve.rs:229,313; crates/canon-cli/src/policy_approval.rs:302",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.69"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[spec-fidelity] The policy approval takes its own clock reading. approve_all computes `when` once, but policy_approval::record stamps Utc::now() itself, at second precision. A call that crosses a second boundary gives the policy approved_at a different time from the briefs; F1 says one call writes one time. The .69 test strips approved_at, which hides this. Also: a multi-id refusal always carries the `clear the blockers` hint, even for a missing brief or an open fence. A multi-line --note gives APPROVAL_INCOMPLETE, not BRIEF_APPROVE_REFUSED. Fix: pass `when` into record.",
+  "worktree_dirty": false
+}

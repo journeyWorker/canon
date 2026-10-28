@@ -110,10 +110,10 @@ Feature: skills install
   @subject:skills-install
   @case:happy
   @skills.install.20
-  Scenario: One human answer approves the brief and the policy per scope, and an edited brief needs a new answer
+  Scenario: One human answer approves each brief it names and the policy, and an edited brief needs a new answer
     Given a change whose brief has no blocker
-    When the human's answer is recorded with canon brief approve <slug> --approver <the human> --note "<their words>"
-    Then the "Approved: <who> <when> — "<words>" (brief sha256:<digest>)" line is written into .canon/changes/<slug>/brief.md and the policy approval is recorded in the same call
+    When the human's answer is recorded with one call, canon brief approve <slug> --approver <the human> --note "<their words>"
+    Then the "Approved: <who> <when> — "<words>" (brief sha256:<digest>)" line is written into .canon/changes/<slug>/brief.md and the policy approval is recorded in that same call
     And a brief edited after its approval counts as not approved: status and evidence add name the change and the canon brief approve command that records a new answer, and evidence add exits 1 until it is recorded
     And approving again replaces the one Approved line instead of adding a second
 
@@ -187,10 +187,10 @@ Feature: skills install
   @case:failure
   @skills.install.44
   Scenario: An unapproved brief blocks attestation until the human's answer is recorded, and the approval is never assumed
-    Given a verifying subject whose only adopted change has a brief with no Approved line
+    Given a verifying subject whose only adopted change has a brief with no Approved line, and whose scenarios are tagged for it or none of its changes is approved
     When canon evidence add runs for any of the subject's scenarios, with no override reason
     Then each call exits 1 with BRIEF_UNAPPROVED naming the change's brief.md, so nothing is attested for that scope
-    And once the human's answer is recorded with canon brief approve the same call succeeds
+    And once the human's answer is recorded with canon brief approve, alone or with other ids in one call, the same call succeeds
     And an approved brief edited afterwards refuses again with BRIEF_CHANGED_SINCE_APPROVAL naming the brief
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -403,3 +403,70 @@ Feature: skills install
     When brief approve, policy approve and divergence accept run as planner, implementer, reviewer or orchestrator, by --as and by CANON_ROLE
     Then each exits 2 with HUMAN_ONLY, not retryable, and a hint naming the leaf and the options only the human supplies
     And the refusal changes nothing, and without a declared role the leaf runs
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:06Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:skills-install
+  @case:happy
+  @flow:canon-0-31-loop.F1
+  @skills.install.69
+  Scenario: One brief approve call approves several changes with one name, one answer and one time
+    Given three changes whose briefs have no blocker, no Approved line, and a repo with a policy file
+    When the human runs canon brief approve with the three change ids, one --approver and one --note
+    Then each brief ends with one Approved line carrying that approver, that answer and the same timestamp, and the policy approval records them once
+    And each brief and the policy approval read as if the three had been approved one at a time with the same answer
+    And running the same call again changes nothing and reports every id as unchanged
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:07Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:skills-install
+  @case:failure
+  @flow:canon-0-31-loop.F1
+  @skills.install.70
+  Scenario: A brief approve call with a blocked, a missing and an unclosed brief refuses all of them and writes nothing
+    Given three changes: one whose brief has a blocker finding, one id that has no brief, and one whose brief ends inside an open code fence
+    When the human runs canon brief approve with all three ids and one answer
+    Then the command exits 2 with one BRIEF_APPROVE_REFUSED naming all three ids, each with its own code and reason
+    And no brief and no policy approval was written or changed, and the same call with the three fixed approves all of them
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:09Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:skills-install
+  @case:failure
+  @flow:canon-0-31-loop.F1
+  @skills.install.71
+  Scenario: A brief approve call with several ids is human-only and the hint carries every id
+    Given three changes whose briefs have no blocker and the planner role declared
+    When canon brief approve runs with the three ids, by --as planner and by CANON_ROLE, with any flag
+    Then each exits 2 with HUMAN_ONLY and nothing is written
+    And the hint gives the human one canon brief approve line holding all three ids
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:10Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:skills-install
+  @case:edge
+  @flow:canon-0-31-loop.F1
+  @skills.install.72
+  Scenario: A repeated id counts once, one id prints as before and several print one entry each
+    Given two changes whose briefs have no blocker
+    When canon brief approve runs with one of them written twice, then with one id, then with both ids and --json
+    Then the repeated id is approved once, a single id prints the document it always printed, and several ids print one entry per id with written, unchanged, failed or skipped
+    And a --input array still stops at its first failure and keeps the approvals before it, one name and answer per element
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:11Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:skills-install
+  @case:edge
+  @flow:canon-0-31-loop.F3
+  @skills.install.73
+  Scenario: The skills, README, status help and schema state the governing-change rule and the status briefs list
+    Given the packaged skills, the README, the status help and the schema documentation of this release
+    When they are read for the rule on which changes a subject answers for and for the status JSON
+    Then they say that reopen, ship and status judge every tagged, approved-line and chore change, that a never-approved untagged feature change blocks nothing, and that brief approve takes several ids
+    And the README Upgrading section says the status brief field became the briefs list and the status schema version rose, and status --json carries that new version
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:58Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:skills-install
+  @case:happy
+  @flow:canon-0-31-brief-format.F3
+  @skills.install.74
+  Scenario: The brief skill documents carry the section table, the guidance, the frontmatter waiver and the old-format path
+    Given the brief-shape and brief-polish skill documents
+    When they are read
+    Then brief-shape carries the section table with each section's heading, role and the same guidance text brief show prints, the frontmatter waiver form and the old-format path
+    And brief-polish shows waivers as frontmatter entries and no skill document names a canon:section, canon:hint or canon:waive comment as the way to write a brief

@@ -205,3 +205,71 @@ Feature: canon migrate
     Then each puts canon migrate --json first in meta.next and warns that canon migrate is needed
     And a hook entry that still calls canon gate task is enough to be detected
     And after the migration is committed neither status nor context names canon migrate
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:50Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-31-brief-format.F5
+  @authoring.migrate.20
+  Scenario: A preview of the brief rewrite writes nothing and says first whether it re-binds an approval
+    Given a repo whose briefs are in the 0.30 format, one approved
+    When canon migrate runs without --commit
+    Then the working tree is byte-identical afterwards and the plan's first brief line says whether it re-binds approvals and review pins
+    And per brief it shows the comments removed, the waivers moved, the headings translated, the chore marker moved and the Approved: digest old and new
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:51Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F5
+  @authoring.migrate.21
+  Scenario: A preview refuses uncommitted briefs and names the briefs it will not re-bind
+    Given a git repo whose old brief has an uncommitted edit, a brief edited after its approval, and a brief whose marker role differs from the table
+    When canon migrate runs
+    Then the uncommitted brief is refused with MIGRATE_UNCOMMITTED and nothing is written
+    And the edited brief and the role-mismatched brief are named as not re-bound, with the reason
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:52Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-31-brief-format.F6
+  @authoring.migrate.22
+  Scenario: Committing the plan rewrites every brief, keeps approved briefs approved and leaves the prose, and a second run has nothing to do
+    Given a repo with approved and unapproved 0.30 briefs, feature and chore, with waivers, Korean headings and a review pinned to a chore
+    When canon migrate --commit with the plan digest runs, and then runs again
+    Then every brief is in the 0.31 format with no HTML comment, the approved ones read approved with no BRIEF_CHANGED_SINCE_APPROVAL, and their blockers and advisories, waivers included, are as before except for line numbers
+    And the prose outside comments and headings is byte-identical, the Approved: line keeps its approver, time and words, and the chore review is a new version pinned to the new digest with every other field as before
+    And the second run says there is nothing to do
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:53Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F6
+  @authoring.migrate.23
+  Scenario: A changed plan digest is refused with nothing written, and a brief edited after its approval stays changed
+    Given a plan previewed and then a brief changed
+    When canon migrate --commit runs with the old digest
+    Then it is refused with PLAN_CHANGED and nothing is written
+    And a brief edited after its approval is rewritten and still reads BRIEF_CHANGED_SINCE_APPROVAL
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:55Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F6
+  @authoring.migrate.24
+  Scenario: A plan that re-binds an approval or a review pin is human-only to commit, and one that re-binds nothing is not
+    Given a plan that re-binds an Approved: line and one that re-binds nothing
+    When canon migrate --commit runs as planner and as orchestrator
+    Then the re-binding plan is refused with HUMAN_ONLY, exit 2, and the tree is unchanged
+    And the plan that re-binds nothing is run by the orchestrator, and a preview is open to every role
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:56Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F6
+  @authoring.migrate.25
+  Scenario: Revert restores briefs, reviews and digests byte for byte, refuses when a file changed since, and a stopped run is finished by the next
+    Given a migrated repo, and a repo where the run stopped after some briefs
+    When canon migrate --revert runs, and canon migrate runs again
+    Then the revert restores the old briefs, the old digests and the old reviews byte for byte
+    And a revert is refused naming the file when a brief, an approval or a review version changed since the migrate, and writes nothing
+    And the next run finishes a stopped one, and the revert then restores every original

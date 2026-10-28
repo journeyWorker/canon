@@ -29,7 +29,7 @@ every 2nd subject adopts a chore change with an approved brief (the gate and
 `--staged-batch B` (repeatable) also commits `bench/batch-B.xml`, a JUnit
 report with one case for each of B scenarios spread across the corpus. The
 batch entry point under test is
-`canon evidence add --project-id root --all-scenarios --report junit:bench/batch-B.xml ...`
+`canon evidence add --project root --all-scenarios --report junit:bench/batch-B.xml ...`
 (`land_batch` in canon-cli/src/evidence.rs): B records landing in a ledger
 that already holds S*N*E.
 
@@ -106,6 +106,7 @@ GITIGNORE = """\
 .canon/scenario-index.lock
 .canon/artifact-store.lock
 .canon/dashboard-snapshot/
+.canon/index/
 """
 
 
@@ -258,31 +259,28 @@ def review_body(clock, sid, reviewer, pin, tree, digest, verdict):
 
 
 CHORE_BRIEF = """\
+---
+kind: chore
+---
+
 # Chore for {sid}
 
-<!-- canon:kind chore -->
-
-<!-- canon:section intent role=context -->
 ## Intent
 
 Keep the build of {sid} tidy.
 
-<!-- canon:section category role=context -->
 ## Category
 
 refactor
 
-<!-- canon:section invariants role=normative -->
 ## Invariants
 
 The behavior of every scenario of {sid} does not change.
 
-<!-- canon:section checks role=normative -->
 ## Checks
 
 The bench suite is run again at the chore commit.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 None.

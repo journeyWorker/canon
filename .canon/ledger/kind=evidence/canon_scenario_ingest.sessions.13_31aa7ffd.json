@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:23:35.086028316Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib bounded_privacy_truncates_unicode_scalars_without_claiming_redaction"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 55,
+  "scenario_id": "ingest.sessions.13",
+  "schema": 1,
+  "staging_id": "ae7344e4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

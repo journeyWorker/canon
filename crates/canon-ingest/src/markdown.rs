@@ -30,6 +30,11 @@ pub fn field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     field_lines(text, key).next().map(|(_, value)| value)
 }
 
+/// The 0-based index of the line [`field`] reads for `key`.
+pub fn field_index(text: &str, key: &str) -> Option<usize> {
+    field_lines(text, key).next().map(|(index, _)| index)
+}
+
 /// `text` with every line [`field`] would read for `key` removed (a line
 /// inside a fence or an HTML comment is not a field and stays). Every
 /// other byte, line endings included, is kept.

@@ -98,14 +98,14 @@ pub struct RetrieveArgs {
     /// Role scope; with --regime must equal its leading segment
     #[arg(long = "for-role", value_name = "ROLE", value_parser = crate::retrieve::parse_role)]
     pub for_role: RoleId,
-    /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject-id
+    /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject
     #[arg(long, value_parser = crate::retrieve::parse_regime, value_name = "KEY")]
     pub regime: Option<RegimeKey>,
     /// Derive the regime from a domain slug; mutually exclusive with --regime
     #[arg(long, value_name = "NAME")]
     pub domain: Option<String>,
     /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
-    #[arg(long, value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
+    #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
     /// Cap on the guidance items returned (default: 5)
     #[arg(long, value_name = "N", default_value = "5")]
@@ -131,13 +131,13 @@ pub struct QueryArgs {
     #[arg(long)]
     pub json: bool,
     /// Project a plugin's overlay fields onto each record (fail-soft)
-    #[arg(long, value_name = "PLUGIN_ID")]
+    #[arg(long = "plugin", value_name = "PLUGIN_ID")]
     pub plugin_id: Option<String>,
     /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
     #[arg(long, conflicts_with = "plugin_id")]
     pub history: bool,
     /// Scope --kind change/task to one ChangeId (other kinds exit 2)
-    #[arg(long, value_parser = crate::query::parse_change_id, value_name = "CHANGE_ID")]
+    #[arg(long = "change", value_parser = crate::query::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: Option<ChangeId>,
     /// Scope --kind change/task by status field (other kinds exit 2)
     #[arg(long, value_name = "STATUS")]
@@ -154,6 +154,39 @@ pub struct QueryArgs {
     /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
     #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
+}
+
+#[derive(Debug, Args)]
+pub struct SearchArgs {
+    /// The text to find in records, brief sections and scenario text: read as it is typed, so quotes and words such as AND are not syntax. Korean and any other text is found from three characters; a shorter text is found as a part of a node's text, in id order
+    #[arg(value_name = "TEXT")]
+    pub text: String,
+    /// Keep only nodes of this kind among the hits (repeatable): a record kind, or `brief` for a brief section or flow step; the neighbors of the hits are of any kind
+    #[arg(long, value_name = "KIND", value_parser = clap::builder::PossibleValuesParser::new(crate::search::kind_names()))]
+    pub kind: Vec<String>,
+    /// How many edges away from a hit its neighbors are listed (0: none)
+    #[arg(long, value_name = "N", default_value_t = 1)]
+    pub expand: u32,
+    /// The most hits to list, best first (there is no next page)
+    #[arg(long, value_name = "N", default_value_t = 20, value_parser = clap::value_parser!(u32).range(1..))]
+    pub limit: u32,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct TraceArgs {
+    /// A review id (26 characters), a commit sha (7 to 40 hex digits, the first characters are enough) or a finding key (`<change>_<round>_<seq>`, as `canon query --kind finding` shows it)
+    #[arg(value_name = "ID")]
+    pub id: String,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Debug, Args)]

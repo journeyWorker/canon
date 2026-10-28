@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "planner-031",
+    "role": "planner",
+    "session_id": "plan-031-2026-10-27"
+  },
+  "at": "2026-10-27T08:33:53.508478088Z",
+  "change_ids": [
+    "canon-0-31-search"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "search-index",
+  "summary": "",
+  "title": "Search: text search and record graph over canon's records"
+}

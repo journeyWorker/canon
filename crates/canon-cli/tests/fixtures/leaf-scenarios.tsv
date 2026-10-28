@@ -62,6 +62,7 @@ review change	gate.check.103	review.add.99
 review scenario	review.add.80,review.add.20	review.add.02,review.add.21
 scenario new	authoring.scaffold.01,authoring.scaffold.12	authoring.scaffold.03,authoring.scaffold.11
 schema	context.capability.27,context.capability.29	context.capability.46
+search	search.index.01,search.query.01	search.index.04,search.query.04
 selftest	gate.check.109	gate.check.108
 skills check	skills.install.53,skills.install.57	skills.install.54,skills.install.58
 skills doctor	skills.install.43,skills.install.56	skills.install.58,skills.install.64
@@ -78,3 +79,4 @@ subject show	subject.lifecycle.40	subject.lifecycle.41
 subject unadopt	subject.lifecycle.36	subject.lifecycle.37
 task done	gate.task.02,gate.task.07	gate.task.01,gate.task.06
 tier age	tier.storage.03,tier.storage.04	tier.storage.10,tier.storage.11
+trace	search.trace.01,search.trace.02	search.trace.04,search.graph.02

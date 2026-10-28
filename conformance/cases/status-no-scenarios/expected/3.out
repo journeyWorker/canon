@@ -1,4 +1,4 @@
-canon 0.30.0
+canon 0.31.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: failure
@@ -13,7 +13,7 @@ subjects (1):
 unowned: none
 
 next:
-  # no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject-id <id>`
-  canon feature new <area>.<surface> --title "<feature>" --actor-id <unit> --session-id <session>
+  # no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject <id>`
+  canon feature new <area>.<surface> --title "<feature>" --actor <unit> --session <session>
   # demo owns no scenario; specify its behavior, one scenario per behavior
-  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id demo --case happy --actor-id <unit> --session-id <session>
+  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject demo --case happy --actor <unit> --session <session>

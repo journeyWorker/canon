@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-w3-2026-10-27"
+  },
+  "at": "2026-10-27T15:33:15.408657738Z",
+  "change_id": "canon-0-31-search",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/search.rs",
+  "kind": "finding",
+  "reviewed_sha": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "reviewer": "rev-031-c",
+  "round": 1,
+  "scenario_ids": [
+    "search.trace.04",
+    "search.query.01"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "(spec fidelity) Two Then steps go unasserted: search_trace_04 never checks that nothing apart from the index is written, and search_query_01 never checks that equal scores are ordered by id (its two hits have different scores). The reviewer checked the first by hand (a search/trace run wrote only .canon/index/search.db and .canon/index/.gitignore), and the code orders by `score, n.id`. Blast radius: none; this is test coverage only.",
+  "worktree_dirty": false
+}

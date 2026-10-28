@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:14:16.371954397Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_rerun_keeps_canon_yaml_and_policy_and_refreshes_only_the_agents_md_block"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 170,
+  "scenario_id": "authoring.init.03",
+  "schema": 1,
+  "staging_id": "b62b860e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

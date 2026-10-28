@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w1-2026-10-27"
+  },
+  "at": "2026-10-27T11:40:56.260322984Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_approve.rs:383-396; crates/canon-cli/tests/brief_multi_approve.rs",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.72"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] No test covers the multi-id disk-error path, and its human summary is false on a policy failure. I exercised the path by hand. With three ids and the second brief read-only, the call exits 1 with written/failed/skipped, a stays approved, and a rerun reports a unchanged; this matches F1. With .canon/policy.approval.json unwritable, the human output still prints `2 change(s); policy approval recorded too` before POLICY_APPROVAL_FAILED. Fix: add a test with a read-only brief (and one with an unwritable policy approval), and print the policy clause only when no failure occurred.",
+  "worktree_dirty": false
+}

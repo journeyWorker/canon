@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:36:19.238349947Z",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "kind": "review",
+  "pin": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "fd14e9f455426e882cc3ef0195de8b4a5af7eb460748b117782860440dd57e74",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": ".canon/changes/canon-0-31-brief-format/brief.md"
+  },
+  "review_id": "01M5Z02NH6EA9ASXFAFDY66077",
+  "reviewer": "rev-031-b",
+  "scenario_id": "report.dashboard.16",
+  "schema": 2,
+  "worktree_dirty": false
+}

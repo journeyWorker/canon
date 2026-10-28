@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:26:31.603439427Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/scaffold.rs:362-364",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[spec-fidelity] scenario new --flow on an old-format brief refuses with SCAFFOLD_INVALID_ARGUMENT and the hint 'canon schema scenario new lists the accepted arguments', not OLD_BRIEF_FORMAT with the migrate hint F4 gives every refused write; the migrate advice survives only in the message. Fix: map FlowError::OldFormat to old_briefs::refusal (same code and hint).",
+  "worktree_dirty": false
+}

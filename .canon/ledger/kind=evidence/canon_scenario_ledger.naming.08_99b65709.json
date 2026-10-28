@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:25:03.490552683Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test ledger_naming ledger_naming_08_sqlite_key_conflict_rolls_the_batch_back; CANON_REQUIRE_LIVE=1 CANON_PG_DSN=postgres://canon:canon@127.0.0.1:55432/canon_v1 cargo test -p canon-store --features live-pg --test pg_tier_live ledger_naming_08_a_key_conflict_rolls_the_whole_batch_back"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 79,
+  "scenario_id": "ledger.naming.08",
+  "schema": 1,
+  "staging_id": "451ef79f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

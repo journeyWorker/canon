@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:15:47.089600808Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test context context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 197,
+  "scenario_id": "context.capability.01",
+  "schema": 1,
+  "staging_id": "3e91d733",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

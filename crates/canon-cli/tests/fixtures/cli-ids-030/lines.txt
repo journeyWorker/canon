@@ -1,0 +1,52 @@
+# context.capability.47: one line per command that takes an id, spelled as canon 0.30 took it (`--<noun>-id`).
+# `cli_ids.rs` runs each line in order on one fresh repo, with the bare spelling, and compares the exit, the output and
+# the stored records with what canon 0.30 printed and wrote for the 0.30 spelling (`expected.txt`). A line starting
+# with `git` runs git, one starting with `rm` removes a file. The fixture holds no brief: the brief format is another
+# change of 0.31. Bless with a 0.30 binary: `CANON_030_BIN=<path> cargo test -p canon-cli --test cli_ids context_capability_47`.
+subject new demo --domain dev --title Demo --actor-id planner-1 --session-id s-1 --json
+change new add-login --subject-id demo --title "Add login" --json
+rm .canon/changes/add-login/brief.md
+subject unadopt demo --change-id add-login --json
+subject adopt demo --change-id add-login --json
+subject unadopt demo --change-id add-login --json
+retrieve --for-role reviewer --domain dev --subject-id demo --json
+scenario new demo.login.01 --title "Signs in" --subject-id demo --case happy --actor-id planner-1 --session-id s-1 --project-id root --json
+feature new demo.signup --title Signup --actor-id planner-1 --session-id s-1 --project-id root --json
+rm .canon/specs/kind=feature/area=demo/signup.feature
+git add -A
+git commit -q -m specs
+inventory sync --json
+evidence add --scenario-id demo.login.01 --project-id root --class test-run --ref "npm test" --role implementer --actor-id impl-1 --session-id s-2 --json
+evidence add --scenario-id demo.login.01 --project-id root --run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --class test-run --ref "npm test" --role implementer --actor-id impl-1 --session-id s-2 --json
+evidence add --task-id add-login#1 --project-id root --class test-run --ref "npm test" --role implementer --actor-id impl-1 --session-id s-2 --json
+evidence approval-payload --scenario-id demo.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z
+evidence approval-payload --task-id add-login#1 --run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --approver alice --approval-at 2030-01-01T00:00:00Z
+evidence audit demo.login.01 --project-id root --ref audit.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --actor-id impl-1 --session-id s-2 --json
+gate promote --json
+review scenario demo.login.01 --project-id root --actor-id rev-1 --session-id s-3 --role reviewer --original-spec-ref login.feature --json
+review change add-login --project-id root --actor-id rev-1 --session-id s-3 --role reviewer --original-spec-ref brief.md --json
+finding add --change-id add-login --round 1 --seq 1 --severity note --actor-id rev-1 --session-id s-3 --scenario-id demo.login.01 --summary "Token is logged" --json
+finding add --change-id add-login --round 1 --seq 2 --severity note --actor-id rev-1 --session-id s-3 --review-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --summary "Unknown review" --json
+finding close add-login --round 1 --seq 1 --disposition rejected --reason "accepted" --actor-id impl-1 --session-id s-2 --json
+gate promote --json
+finding list --change-id add-login --json
+query --kind change --change-id add-login --json
+query --kind evidence --plugin-id none --json
+divergence add demo.login.01 --project-id root --actor-id rev-1 --session-id s-3 --role reviewer --reason "differs" --json
+divergence defer demo.login.01 --project-id root --actor-id rev-1 --session-id s-3 --role reviewer --reason "vendor" --expiry 2030-01-01T00:00:00Z --json
+divergence resolve demo.login.01 --project-id root --actor-id rev-1 --session-id s-3 --role reviewer --json
+divergence accept demo.login.01 --project-id root --actor-id alice --session-id s-4 --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer --json
+subject move demo --to specced --actor-id planner-1 --session-id s-1 --json
+dispatch begin --role implementer --regime implementer/canon/search/abcdef --task-id add-login#1 --actor-id impl-1 --session-id s-2 --skill-id canon --parent-run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --json
+ingest records --run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --json
+strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --actor-id planner-1 --contradicting-trajectory-id 01ARZ3NDEKTSV4RRFFQ69G5FAW --json
+query --kind subject --all --json
+query --kind change --all --json
+query --kind scenario --all --json
+query --kind evidence --all --json
+query --kind review --all --json
+query --kind finding --all --json
+query --kind divergence --all --json
+query --kind session --all --json
+query --kind run --all --json
+query --kind strategy_item --all --json

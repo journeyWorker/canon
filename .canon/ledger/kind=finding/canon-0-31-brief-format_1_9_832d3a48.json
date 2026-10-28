@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:50.451152863Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-ingest/src/plan_adapters/openspec.rs:746-752",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "resolution_code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "resolution_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "schema": 2,
+  "seq": 9,
+  "severity": "note",
+  "summary": "[standards] why_summary returns an empty summary and the missing-Why diagnostic for a proposal.md that has ## Why plus two known canon headings (e.g. ## Acceptance and ## Out of scope): the shared parser now reads it as a PRD brief, finds no Intent, and returns before the ## Why scan. 0.30 needed a canon:section intent marker, so this is new. Fix: fall through to the ## Why scan when intent_summary is None.",
+  "worktree_dirty": false
+}

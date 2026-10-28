@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28-r3"
+  },
+  "at": "2026-10-28T10:57:59.520499Z",
+  "attachments": [
+    {
+      "case": "context_capability_58_a_skill_command_that_keeps_an_old_id_spelling_fails_the_parse_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r3-junit.xml",
+      "sha256": "adfeeba2c76628bc06336818458909bde6843754b61be7bd801b14dbf2996b04"
+    },
+    {
+      "case": "context_capability_58_the_checker_reports_an_id_option_and_a_concept_spelled_two_ways",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r3-junit.xml",
+      "sha256": "adfeeba2c76628bc06336818458909bde6843754b61be7bd801b14dbf2996b04"
+    }
+  ],
+  "code_tree": "37209602b111694b47355a8225c645c01be1749b",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r3-junit.xml"
+  },
+  "evidence_sha": "480968acc35f6634fa7497b7042bf1ec34a952fa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 266,
+  "scenario_id": "context.capability.58",
+  "schema": 1,
+  "staging_id": "e8646f0c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

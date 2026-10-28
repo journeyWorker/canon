@@ -1,4 +1,4 @@
-//! Integration tests for `canon change new <slug> --subject-id <id> --title
+//! Integration tests for `canon change new <slug> --subject <id> --title
 //! <t>` (0.14 D2, 0.17 D2), against the actually-built `canon` binary in a
 //! repo set up by `canon init` alone: no hand edit of `canon.yaml`
 //! anywhere, and no `plans:` entry, since `.canon/changes` is canon's own
@@ -59,14 +59,14 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
     let dir = inited_repo_with_subject();
     let canon_yaml = std::fs::read(dir.path().join("canon.yaml")).unwrap();
 
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert!(out.status.success(), "stdout: {}\nstderr: {}", stdout(&out), stderr(&out));
     assert!(stdout(&out).contains(".canon/changes/add-login/brief.md"), "{}", stdout(&out));
     assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), canon_yaml, "canon.yaml must not change");
     assert!(!dir.path().join("openspec").exists(), "canon writes no openspec directory");
 
     let brief = std::fs::read_to_string(dir.path().join(".canon/changes/add-login/brief.md")).unwrap();
-    assert!(brief.contains("<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n") && brief.contains("<!-- canon:section out-of-scope role=context -->"), "{brief}");
+    assert!(brief.contains("## Intent\n\nAdd login\n") && brief.contains("## Out of scope") && !brief.contains("<!--"), "{brief}");
     assert!(!dir.path().join(".canon/changes/add-login/tasks.md").exists(), "0.19 D4: change new writes the brief only");
     assert!(stdout(&out).contains("brief.md") && !stdout(&out).contains("tasks.md"), "{}", stdout(&out));
 
@@ -102,7 +102,7 @@ fn change_new_scaffolds_imports_and_adopts_with_no_config_edit() {
 fn a_task_flip_keeps_the_changes_adopted_subject() {
     let dir = inited_repo_with_subject();
     let repo = dir.path();
-    let created = run(repo, &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]);
+    let created = run(repo, &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert!(created.status.success(), "{}", stderr(&created));
     let tasks_path = repo.join(".canon/changes/add-login/tasks.md");
     std::fs::write(&tasks_path, "# Tasks\n\n- [ ] 1 Write the failure-path scenarios\n").unwrap();
@@ -112,7 +112,7 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
     let brief = std::fs::read_to_string(&brief_path).unwrap();
     std::fs::write(&brief_path, format!("{brief}\nApproved: Journey 2026-10-12 — \"go\"\n")).unwrap();
 
-    let evidence = run(repo, &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
+    let evidence = run(repo, &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl"]);
     assert!(evidence.status.success(), "{}", stderr(&evidence));
     assert!(run(repo, &["gate", "promote"]).status.success());
     let flip = run(repo, &["task", "done", "add-login#1"]);
@@ -140,7 +140,7 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
 #[test]
 fn change_new_refuses_an_unknown_subject_and_writes_nothing() {
     let dir = inited_repo_with_subject();
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "no-such-subject", "--title", "Add login"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "no-such-subject", "--title", "Add login"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("subject `no-such-subject` does not exist"), "{}", stderr(&out));
     assert!(!dir.path().join(".canon/changes/add-login").exists());
@@ -150,11 +150,11 @@ fn change_new_refuses_an_unknown_subject_and_writes_nothing() {
 #[test]
 fn change_new_refuses_an_existing_slug_and_leaves_it_untouched() {
     let dir = inited_repo_with_subject();
-    assert!(run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]).status.success());
+    assert!(run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]).status.success());
     let brief_path = dir.path().join(".canon/changes/add-login/brief.md");
     let before = std::fs::read(&brief_path).unwrap();
 
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Something else"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Something else"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("already exists"), "{}", stderr(&out));
     assert_eq!(std::fs::read(&brief_path).unwrap(), before);
@@ -164,7 +164,7 @@ fn change_new_refuses_an_existing_slug_and_leaves_it_untouched() {
     let by_hand = dir.path().join(".canon/changes/by-hand");
     std::fs::create_dir_all(&by_hand).unwrap();
     std::fs::write(by_hand.join("brief.md"), "# By hand\n\n## Why\n\nWritten by a person.\n").unwrap();
-    let out = run(dir.path(), &["change", "new", "by-hand", "--subject-id", "auth", "--title", "By hand"]);
+    let out = run(dir.path(), &["change", "new", "by-hand", "--subject", "auth", "--title", "By hand"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/by-hand` already exists"), "{}", stderr(&out));
     assert_eq!(std::fs::read_to_string(by_hand.join("brief.md")).unwrap(), "# By hand\n\n## Why\n\nWritten by a person.\n");
@@ -201,7 +201,7 @@ fn change_new_leaves_nothing_behind_when_publishing_the_change_dir_fails() {
     // `.canon/changes` is a file, so `.canon/changes/<slug>` cannot be created.
     std::fs::write(dir.path().join(".canon/changes"), "not a directory\n").unwrap();
 
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(stderr(&out).contains("failed to create `.canon/changes/add-login`"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
@@ -250,7 +250,7 @@ fn change_new_leaves_nothing_behind_when_the_first_record_write_fails() {
     if !make_read_only(&ledger_subject) {
         return;
     }
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     make_writable(&ledger_subject);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(stderr(&out).contains("failed to record the adoption") && stderr(&out).contains("nothing was written"), "{}", stderr(&out));
@@ -270,12 +270,12 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     if !make_read_only(&ledger_change) {
         return;
     }
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     make_writable(&ledger_change);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(
         stderr(&out).contains("subject `auth` now lists change `add-login`, but the change record could not be written")
-            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt auth --change-id add-login`"),
+            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt auth --change add-login`"),
         "{}",
         stderr(&out)
     );
@@ -288,7 +288,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     // The printed repair, run as printed.
     let ingest = run(dir.path(), &["ingest", "plans"]);
     assert!(ingest.status.success(), "{}", stderr(&ingest));
-    let adopt = run(dir.path(), &["subject", "adopt", "auth", "--change-id", "add-login"]);
+    let adopt = run(dir.path(), &["subject", "adopt", "auth", "--change", "add-login"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert!(stdout(&adopt).contains("linked change `add-login` to subject `auth`"), "{}", stdout(&adopt));
     let changes = query(dir.path(), "change");
@@ -296,7 +296,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
 
     // Idempotent: a second run writes nothing.
     let before = ledger_file_count(dir.path());
-    let again = run(dir.path(), &["subject", "adopt", "auth", "--change-id", "add-login"]);
+    let again = run(dir.path(), &["subject", "adopt", "auth", "--change", "add-login"]);
     assert!(again.status.success(), "{}", stderr(&again));
     assert!(stdout(&again).contains("already linked") && stdout(&again).contains("nothing written"), "{}", stdout(&again));
     assert_eq!(ledger_file_count(dir.path()), before, "a rerun on a linked pair must write no record");
@@ -320,7 +320,7 @@ fn change_new_writes_canon_changes_beside_an_external_openspec_source_it_never_t
     let before = std::fs::read(external.join("proposal.md")).unwrap();
     assert!(run(dir.path(), &["subject", "new", "auth", "--domain", "dev", "--title", "Auth"]).status.success());
 
-    let out = run(dir.path(), &["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"]);
+    let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(dir.path().join(".canon/changes/add-login/brief.md").is_file());
     assert!(!dir.path().join("openspec/changes/add-login").exists(), "nothing is written under the external source");
@@ -334,8 +334,8 @@ fn change_new_writes_canon_changes_beside_an_external_openspec_source_it_never_t
 }
 
 /// subject.lifecycle.33 (0.18 D4, issue #28's repro): `change new
-/// refactor-core --subject-id perception`, then `subject adopt refactor-core
-/// --subject-id editing`. The second adopt adds the subject and says the
+/// refactor-core --subject perception`, then `subject adopt refactor-core
+/// --subject editing`. The second adopt adds the subject and says the
 /// change now belongs to both; both subjects list the change, the change
 /// lists both, status counts its open blocker against both, and that
 /// blocker refuses each subject's move into review scope.
@@ -351,10 +351,10 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
         let out = run(repo, &["subject", "new", id, "--domain", "dev", "--title", id]);
         assert!(out.status.success(), "{}", stderr(&out));
     }
-    let created = run(repo, &["change", "new", "refactor-core", "--subject-id", "perception", "--title", "Refactor core"]);
+    let created = run(repo, &["change", "new", "refactor-core", "--subject", "perception", "--title", "Refactor core"]);
     assert!(created.status.success(), "{}", stderr(&created));
 
-    let adopt = run(repo, &["subject", "adopt", "editing", "--change-id", "refactor-core"]);
+    let adopt = run(repo, &["subject", "adopt", "editing", "--change", "refactor-core"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert_eq!(
         without_next(&stdout(&adopt)),

@@ -10,11 +10,14 @@
 //! - **Blockers (structure, `brief.*`)**: a missing, duplicated or
 //!   out-of-order section; a flow with no steps or a duplicate step id;
 //!   step-detail subheadings that do not match the flow ids in order;
-//!   leftover placeholders (a `canon:hint` comment still in the brief, a
-//!   section with nothing in it, `TODO`/`TBD`); once the subject is
+//!   leftover placeholders (a section with nothing in it, `TODO`/`TBD`);
+//!   once the subject is
 //!   `building` or later, a flow step no scenario points at
 //!   (`brief.flow-uncovered`) or one with no `@case:failure` scenario
-//!   (`brief.flow-no-failure`); a waiver that is malformed.
+//!   (`brief.flow-no-failure`); a waiver that is malformed; a frontmatter
+//!   that does not read (`brief.frontmatter-invalid`); a brief in the old
+//!   format (`brief.old-format`), which gets that one blocker and no other
+//!   rule: `canon migrate` rewrites it, and its waiver comments are not read.
 //! - **Advisories (prose, `prose.*`)**: closed per-language phrase lists
 //!   (evaluative, connective, contrast, colloquial, degree, and the stock
 //!   AI vocabulary `prose.ai-vocabulary`), sentence and paragraph length,
@@ -46,9 +49,10 @@
 //!   `ja`/`zh` text gets the structure rules and no prose rules. A
 //!   `Source: <path>` line is exempt from every prose rule, and so is the
 //!   `Approved:` line.
-//! - **`brief.legacy` (advisory)**: a brief with no section markers (every
-//!   brief before 0.19) is read as before; no other rule applies to it.
-//! - **Chore briefs (0.19 D5)**: a brief carrying `<!-- canon:kind chore -->`
+//! - **`brief.legacy` (advisory)**: a brief with fewer than two known section
+//!   headings (every brief before 0.19) is read as before; no other rule
+//!   applies to it.
+//! - **Chore briefs (0.19 D5)**: a brief whose frontmatter says `kind: chore`
 //!   is judged by the chore rule set: sections intent, category,
 //!   invariants, checks, out-of-scope, in that order; a flow, detail or
 //!   acceptance section is `brief.chore-section`; a category that is not
@@ -57,22 +61,26 @@
 //!   block and the prose rules apply to the normative sections (invariants,
 //!   checks) as for any brief. The flow-coverage rules never apply.
 //!
-//! Sections are found by their marker comment, never by heading text.
-//! A marker key canon does not know is skipped, not reported.
+//! Sections are found by their English `##` heading through the one shared
+//! reader, [`canon_ingest::brief`]; a `##` line that is not a known heading
+//! is body text of the section before it.
 //!
 //! # Waivers
-//! `<!-- canon:waive <rule-id> <section-key> "<reason>" [match="<text>"] -->` waives one
-//! rule in one section; the reason is required. The output lists every
-//! waiver, with the severity of the rule it waives. There is no global
-//! switch. With `match="<text>"` only the rule's findings in that section whose
-//! matched text (`Finding::matched`, the phrase, date or value the rule matched)
-//! or excerpt contains `<text>` are cleared, never the hint (an effective date
-//! is waived with `match="<the date>"`, not section-wide). After the reason's
-//! closing quote only a whole `match="<non-empty>"` is accepted; anything else
-//! (`match =`, `MATCH=`, unquoted, empty, extra text) and a reason holding a
-//! double quote is `brief.waiver-invalid`, never a silent section-wide
-//! waiver. A finding about the whole brief (no section: the total of
-//! `prose.length`) is waived with the section key `brief`.
+//! The frontmatter's `waive` list waives one rule in one section; each entry
+//! has `rule`, `section`, `reason` and optionally `match`, and the reason is
+//! required. The output lists every waiver, with the severity of the rule it
+//! waives. There is no global switch. With `match: "<text>"` only the rule's
+//! findings in that section whose matched text (`Finding::matched`, the
+//! phrase, date or value the rule matched) or excerpt contains `<text>` are
+//! cleared, never the hint (an effective date is waived with `match: "<the
+//! date>"`, not section-wide). An entry with an empty reason, an unknown rule
+//! id, a missing field or a key canon does not know is `brief.waiver-invalid`,
+//! never a silent section-wide waiver; a frontmatter that is not YAML, or has
+//! a key canon does not know, is `brief.frontmatter-invalid` and no waiver of
+//! it is read. A finding about the whole brief (no section: the total of
+//! `prose.length`) is waived with the section key `brief`. The approval digest
+//! covers the frontmatter, so a waiver added after the approval is a change
+//! after the approval.
 //!
 //! # Flow coverage
 //! The flow rules read scenarios through [`flow_scenarios`], the one
@@ -84,20 +92,23 @@
 //! to each scenario's evidence and review state.
 //!
 //! # `canon brief show`
-//! Prints the brief's state and the next one to three steps (`shape`,
-//! `clarify`, `harden`, `align`, `polish`, `approve`), derived from the
-//! findings. It never edits.
+//! Prints the brief's state, the guidance of every empty section in the
+//! brief's language ([`crate::brief_template::guidance`]) and the next one to
+//! three steps (`shape`, `clarify`, `harden`, `align`, `polish`, `approve`,
+//! or `migrate` for an old-format brief), derived from the findings. It never
+//! edits.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use canon_ingest::markdown::{fence_of, field};
+use canon_ingest::brief::{Brief, Frontmatter, Line};
+use canon_ingest::markdown::field;
 use canon_model::{paths, ChangeId, SubjectStatus};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::json_out::Report;
-use crate::brief_template::{canonical_role, heading_of, marker, ChangeKind, Role, CHORE_CATEGORIES};
+use crate::brief_template::{guidance, heading_of, ChangeKind, Role, CHORE_CATEGORIES};
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Resolved, Shipped, Tally};
@@ -123,7 +134,7 @@ impl Severity {
 }
 
 /// Every rule id and its severity. A waiver names one of these.
-pub const RULES: [(&str, Severity); 28] = [
+pub const RULES: [(&str, Severity); 30] = [
     ("brief.section-missing", Severity::Blocker),
     ("brief.section-duplicate", Severity::Blocker),
     ("brief.section-order", Severity::Blocker),
@@ -137,6 +148,8 @@ pub const RULES: [(&str, Severity); 28] = [
     ("brief.chore-category", Severity::Blocker),
     ("brief.chore-empty", Severity::Blocker),
     ("brief.waiver-invalid", Severity::Blocker),
+    ("brief.frontmatter-invalid", Severity::Blocker),
+    ("brief.old-format", Severity::Blocker),
     ("brief.legacy", Severity::Advisory),
     ("prose.evaluative", Severity::Advisory),
     ("prose.connective", Severity::Advisory),
@@ -214,8 +227,13 @@ pub struct Counts {
 pub struct Evaluation {
     pub findings: Vec<Finding>,
     pub waivers: Vec<Waiver>,
-    /// No section markers: a pre-0.19 brief, read as before.
+    /// Fewer than two known section headings: a pre-0.19 brief, read as before.
     pub legacy: bool,
+    /// The brief is in the format canon 0.30 and earlier wrote: it gets one
+    /// blocker, [`OLD_FORMAT_RULE`], and no section rule.
+    pub old_format: bool,
+    /// The keys of the sections that hold nothing yet, in brief order.
+    pub empty_sections: Vec<String>,
     /// Lines of the questions section that are not a "none" answer.
     pub open_questions: usize,
     /// What the brief's `Approved:` line says about its text (0.19 D3).
@@ -263,6 +281,9 @@ pub enum FlowError {
     /// The change has no `brief.md` to read flow steps from.
     #[error("change `{change}` has no brief at {}/{change}/brief.md; write it with `canon change new`", paths::CHANGES_DIR)]
     NoBrief { change: String },
+    /// The brief is in the old format: its flow steps are not read.
+    #[error("{}", crate::old_briefs::message(&[(change.as_str(), what.as_str())]))]
+    OldFormat { change: String, what: String },
     /// The brief defines no flow step at all.
     #[error("the brief of change `{change}` defines no flow steps (`F1`, `F2`, …); write the flow first")]
     NoFlowSteps { change: String },
@@ -279,7 +300,7 @@ pub enum FlowError {
     #[error("no subject `{0}`")]
     NoSubject(String),
     /// The subject has adopted no change.
-    #[error("subject `{0}` has not adopted a change; run `canon change new <slug> --subject-id {0}`")]
+    #[error("subject `{0}` has not adopted a change; run `canon change new <slug> --subject {0}`")]
     NoAdoptedChange(String),
 }
 
@@ -383,13 +404,16 @@ impl FlowChangesIndex {
 /// The flow step ids `change`'s brief defines, in order; empty for a
 /// legacy brief or no brief.
 pub fn flow_ids(repo: &Path, change: &ChangeId) -> Vec<String> {
-    let Some(path) = crate::brief::canon_brief(repo, change) else { return Vec::new() };
-    let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
-    let language = Language::unset();
-    let (lines, comments) = scan(&text);
-    let secs = sections(&lines, &comments);
+    let Some(path) = crate::brief::canon_brief(repo, change) else {
+        return Vec::new();
+    };
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    let brief = canon_ingest::brief::parse(&text);
+    let secs = sections(&brief);
     let mut sink = Out { findings: Vec::new() };
-    flow_and_detail(&mut sink, &secs, &language).into_iter().map(|(id, _)| id).collect()
+    flow_and_detail(&mut sink, &secs).into_iter().map(|(id, _)| id).collect()
 }
 
 /// The `<change>.<F-id>` value of the `@flow:` tag `canon scenario new
@@ -402,8 +426,11 @@ pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, cha
         (None, Some(subject)) => newest_change_of(repo, subject)?,
         (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(FlowError::ChangeUnresolved)?,
     };
-    if crate::brief::canon_brief(repo, &change).is_none() {
+    let Some(path) = crate::brief::canon_brief(repo, &change) else {
         return Err(FlowError::NoBrief { change: change.as_str().to_string() });
+    };
+    if let Some(old) = std::fs::read_to_string(&path).ok().and_then(|text| canon_ingest::brief::parse(&text).old_format) {
+        return Err(FlowError::OldFormat { change: change.as_str().to_string(), what: old.describe() });
     }
     let ids = flow_ids(repo, &change);
     if ids.iter().any(|id| id == flow) {
@@ -428,81 +455,8 @@ pub fn newest_change_of(repo: &Path, subject: &canon_model::SubjectId) -> Result
 
 // ───────────────────────────── document scan ─────────────────────────────
 
-/// A brief line outside HTML comments and fenced code.
-struct Line {
-    no: usize,
-    text: String,
-}
-
-/// An HTML comment: its first line and its body.
-struct Comment {
-    line: usize,
-    body: String,
-}
-
-fn scan(text: &str) -> (Vec<Line>, Vec<Comment>) {
-    let mut lines = Vec::new();
-    let mut comments = Vec::new();
-    let mut fence: Option<(char, usize)> = None;
-    let mut open: Option<Comment> = None;
-    for (i, raw) in text.lines().enumerate() {
-        let no = i + 1;
-        if open.is_none() {
-            match (fence, fence_of(raw)) {
-                (None, Some((ch, run, _))) => {
-                    fence = Some((ch, run));
-                    lines.push(Line { no, text: String::new() });
-                    continue;
-                }
-                (Some((open_ch, open_run)), Some((ch, run, true))) if ch == open_ch && run >= open_run => {
-                    fence = None;
-                    lines.push(Line { no, text: String::new() });
-                    continue;
-                }
-                (Some(_), _) => {
-                    lines.push(Line { no, text: String::new() });
-                    continue;
-                }
-                (None, None) => {}
-            }
-        }
-        let mut out = String::new();
-        let mut rest = raw;
-        loop {
-            match open.take() {
-                Some(mut comment) => match rest.find("-->") {
-                    Some(at) => {
-                        comment.body.push_str(&rest[..at]);
-                        comment.body = comment.body.trim().to_string();
-                        comments.push(comment);
-                        rest = &rest[at + 3..];
-                    }
-                    None => {
-                        comment.body.push_str(rest);
-                        comment.body.push(' ');
-                        open = Some(comment);
-                        break;
-                    }
-                },
-                None => match rest.find("<!--") {
-                    Some(at) => {
-                        out.push_str(&rest[..at]);
-                        open = Some(Comment { line: no, body: String::new() });
-                        rest = &rest[at + 4..];
-                    }
-                    None => {
-                        out.push_str(rest);
-                        break;
-                    }
-                },
-            }
-        }
-        lines.push(Line { no, text: out.trim_end().to_string() });
-    }
-    (lines, comments)
-}
-
-/// One marked section: its marker and the lines up to the next marker.
+/// One section of a brief: its key and role (from its heading), the line of
+/// its heading and the lines from the heading to the next section.
 struct Section<'a> {
     key: String,
     role: Role,
@@ -529,30 +483,8 @@ impl Section<'_> {
     }
 }
 
-fn sections<'a>(lines: &'a [Line], comments: &[Comment]) -> Vec<Section<'a>> {
-    let mut markers: Vec<(usize, String, Option<Role>)> = Vec::new();
-    for comment in comments {
-        let mut tokens = comment.body.split_whitespace();
-        if tokens.next() != Some("canon:section") {
-            continue;
-        }
-        let Some(key) = tokens.next() else { continue };
-        let role = tokens.find_map(|t| t.strip_prefix("role=")).and_then(Role::parse);
-        markers.push((comment.line, key.to_string(), role));
-    }
-    markers.sort_by_key(|m| m.0);
-    let mut out = Vec::new();
-    for (i, (line, key, role)) in markers.iter().enumerate() {
-        let end = markers.get(i + 1).map_or(usize::MAX, |m| m.0);
-        let canonical = canonical_role(key);
-        out.push(Section {
-            key: key.clone(),
-            role: role.or(canonical).unwrap_or(Role::Context),
-            marker_line: *line,
-            lines: lines.iter().filter(|l| l.no > *line && l.no < end).collect(),
-        });
-    }
-    out
+fn sections(brief: &Brief) -> Vec<Section<'_>> {
+    brief.sections.iter().map(|section| Section { key: section.key.to_string(), role: section.role, marker_line: section.line, lines: brief.section_lines(section).iter().collect() }).collect()
 }
 
 fn excerpt(text: &str) -> String {
@@ -603,33 +535,47 @@ impl Out {
     }
 }
 
+/// The rule id of the one blocker an old-format brief gets.
+pub const OLD_FORMAT_RULE: &str = "brief.old-format";
+
 /// Reads `text` against the rules. `flows` is `Some` once the subject is
 /// `building` or later: only then do the flow-coverage rules apply.
 pub fn evaluate(text: &str, resolved: &Resolved, flows: Option<&FlowIndex>) -> Evaluation {
     let language = &resolved.language;
-    let (lines, comments) = scan(text);
+    let brief = canon_ingest::brief::parse(text);
     let approval = crate::brief::approval_of(text);
     let approved = approval.approved();
-    let secs = sections(&lines, &comments);
+    if let Some(old) = &brief.old_format {
+        let mut out = Out { findings: Vec::new() };
+        out.push(
+            OLD_FORMAT_RULE,
+            None,
+            old.markers.first().map_or(1, |m| m.line),
+            old.describe(),
+            "this brief is in the format canon 0.30 and earlier wrote; run `canon migrate` (it previews first and writes nothing), and until then no section rule is applied and its waiver comments are not read".to_string(),
+        );
+        return Evaluation { findings: out.findings, waivers: Vec::new(), legacy: false, old_format: true, empty_sections: Vec::new(), open_questions: 0, approval, approved };
+    }
+    let secs = sections(&brief);
     if secs.is_empty() {
         let mut out = Out { findings: Vec::new() };
         out.push(
             "brief.legacy",
             None,
             1,
-            "no `canon:section` markers".to_string(),
+            "fewer than two known section headings".to_string(),
             "a pre-0.19 brief is read as before; the structure and prose rules do not apply to it. `canon change new` writes the PRD format".to_string(),
         );
-        return Evaluation { findings: out.findings, waivers: Vec::new(), legacy: true, open_questions: 0, approval, approved };
+        return Evaluation { findings: out.findings, waivers: Vec::new(), legacy: true, old_format: false, empty_sections: Vec::new(), open_questions: 0, approval, approved };
     }
 
-    let kind = kind_of_comments(&comments);
+    let kind = if brief.kind == canon_ingest::brief::Kind::Chore { ChangeKind::Chore } else { ChangeKind::Feature };
     let mut out = Out { findings: Vec::new() };
-    structure(&mut out, &secs, language, kind);
-    placeholders(&mut out, &secs, &comments);
+    structure(&mut out, &secs, &brief.other_h2, kind);
+    placeholders(&mut out, &secs, language);
     match kind {
         ChangeKind::Feature => {
-            let flow_ids = flow_and_detail(&mut out, &secs, language);
+            let flow_ids = flow_and_detail(&mut out, &secs);
             if let Some(index) = flows {
                 coverage(&mut out, &secs, &flow_ids, index);
             }
@@ -643,31 +589,16 @@ pub fn evaluate(text: &str, resolved: &Resolved, flows: Option<&FlowIndex>) -> E
         prose(&mut out, section, shipped, scope);
     }
     lengths(&mut out, &judged, resolved);
-    let open_questions = secs
-        .iter()
-        .find(|s| s.key == "questions")
-        .map_or(0, |s| s.body().iter().filter(|l| !is_none_answer(&l.text)).count());
+    let open_questions = secs.iter().find(|s| s.key == "questions").map_or(0, |s| s.body().iter().filter(|l| !is_none_answer(&l.text)).count());
+    let empty_sections: Vec<String> = secs.iter().filter(|s| s.body().is_empty()).map(|s| s.key.clone()).collect();
 
-    let (findings, waivers) = apply_waivers(out.findings, &comments);
-    Evaluation { findings, waivers, legacy: false, open_questions, approval, approved }
+    let (findings, waivers) = apply_waivers(out.findings, brief.frontmatter.as_ref());
+    Evaluation { findings, waivers, legacy: false, old_format: false, empty_sections, open_questions, approval, approved }
 }
 
-/// The kind a brief's `canon:kind` comment names; no marker, or a value
-/// canon does not know, is a feature brief.
-fn kind_of_comments(comments: &[Comment]) -> ChangeKind {
-    comments
-        .iter()
-        .find_map(|c| {
-            let mut tokens = c.body.split_whitespace();
-            (tokens.next() == Some("canon:kind")).then(|| tokens.next().and_then(ChangeKind::parse))
-        })
-        .flatten()
-        .unwrap_or(ChangeKind::Feature)
-}
-
-/// Whether `text` is a chore brief (carries [`CHORE_KIND_MARKER`]).
+/// Whether `text` is a chore brief ([`canon_ingest::brief::is_chore`]).
 pub fn is_chore(text: &str) -> bool {
-    kind_of_comments(&scan(text).1) == ChangeKind::Chore
+    canon_ingest::brief::is_chore(text)
 }
 
 fn is_none_answer(line: &str) -> bool {
@@ -675,23 +606,22 @@ fn is_none_answer(line: &str) -> bool {
     ["none", "n/a", "없음", "해당 없음"].contains(&word.as_str())
 }
 
-/// Missing, duplicated and out-of-order sections.
-fn structure(out: &mut Out, secs: &[Section], language: &Language, kind: ChangeKind) {
+/// Missing, duplicated and out-of-order sections. A missing section whose
+/// heading is nearly there (`## Intnet`, `## intent`) names that heading.
+fn structure(out: &mut Out, secs: &[Section], other_h2: &[(usize, String)], kind: ChangeKind) {
     let expected_sections = kind.sections();
     for expected in expected_sections {
         let found: Vec<&Section> = secs.iter().filter(|s| s.key == expected.key).collect();
-        let heading = heading_of(language, expected.key);
+        let heading = heading_of(expected.key);
         if found.is_empty() {
-            out.push(
-                "brief.section-missing",
-                Some(expected.key),
-                1,
-                format!("no `{}` marker", expected.key),
-                format!("add `{}` above the `{heading}` heading", marker(expected.key, expected.role)),
-            );
+            let hint = match canon_ingest::brief::near_miss(heading, other_h2) {
+                Some((line, text)) => format!("`## {text}` on line {line} is not a known heading; rename it `## {heading}`"),
+                None => format!("add a `## {heading}` heading and write the section"),
+            };
+            out.push("brief.section-missing", Some(expected.key), 1, format!("no `{}` section", expected.key), hint);
         }
         for extra in found.iter().skip(1) {
-            out.push("brief.section-duplicate", Some(expected.key), extra.marker_line, format!("second `{}` marker", expected.key), "keep one section per key".to_string());
+            out.push("brief.section-duplicate", Some(expected.key), extra.marker_line, format!("second `{heading}` heading"), "keep one section per key".to_string());
         }
     }
     let order = |key: &str| expected_sections.iter().position(|s| s.key == key);
@@ -751,23 +681,20 @@ fn chore_rules(out: &mut Out, secs: &[Section]) {
     }
 }
 
-/// Hints still in the brief, empty sections, and `TODO`/`TBD`.
-fn placeholders(out: &mut Out, secs: &[Section], comments: &[Comment]) {
-    for (i, section) in secs.iter().enumerate() {
-        let end = secs.get(i + 1).map_or(usize::MAX, |s| s.marker_line);
-        let hints: Vec<&Comment> = comments.iter().filter(|c| c.line > section.marker_line && c.line < end && c.body.starts_with("canon:hint")).collect();
-        for hint in &hints {
+/// Empty sections and `TODO`/`TBD`. An empty section is one not yet
+/// written; its hint is that section's guidance, in the brief's language.
+fn placeholders(out: &mut Out, secs: &[Section], language: &Language) {
+    for section in secs {
+        let body = section.body();
+        if body.is_empty() {
+            let key = section.key.as_str();
             out.push(
                 "brief.placeholder",
-                Some(&section.key),
-                hint.line,
-                excerpt(hint.body.trim_start_matches("canon:hint").trim()),
-                "replace the template hint with the section's content".to_string(),
+                Some(key),
+                section.marker_line,
+                "the section is empty".to_string(),
+                format!("write the section; if there is nothing to say, say so in one line. {}", guidance(language, key)).trim_end().to_string(),
             );
-        }
-        let body = section.body();
-        if hints.is_empty() && body.is_empty() {
-            out.push("brief.placeholder", Some(&section.key), section.marker_line, "the section is empty".to_string(), "write the section; if there is nothing to say, say so in one line".to_string());
         }
         for line in body {
             if line.text.split(|c: char| !c.is_alphanumeric()).any(|w| w == "TODO" || w == "TBD") {
@@ -779,8 +706,10 @@ fn placeholders(out: &mut Out, secs: &[Section], comments: &[Comment]) {
 
 /// Flow-step rules and the detail-to-flow match. Returns the flow ids
 /// (first occurrences, in order) with the line each is on.
-fn flow_and_detail(out: &mut Out, secs: &[Section], language: &Language) -> Vec<(String, usize)> {
-    let Some(flow) = secs.iter().find(|s| s.key == "flow") else { return Vec::new() };
+fn flow_and_detail(out: &mut Out, secs: &[Section]) -> Vec<(String, usize)> {
+    let Some(flow) = secs.iter().find(|s| s.key == "flow") else {
+        return Vec::new();
+    };
     let flow_body = flow.body();
     let mut ids: Vec<(String, usize)> = Vec::new();
     for line in &flow_body {
@@ -801,7 +730,7 @@ fn flow_and_detail(out: &mut Out, secs: &[Section], language: &Language) -> Vec<
             Some("flow"),
             flow_body[0].no,
             excerpt(&flow_body[0].text),
-            format!("write the flow as a numbered list whose items start with `F1`, `F2`, …: `1. F1 …` (heading `{}`)", heading_of(language, "flow")),
+            format!("write the flow as a numbered list whose items start with `F1`, `F2`, …: `1. F1 …` (under `## {}`)", heading_of("flow")),
         );
     }
     let Some(detail) = secs.iter().find(|s| s.key == "detail") else { return ids };
@@ -854,61 +783,50 @@ fn coverage(out: &mut Out, secs: &[Section], ids: &[(String, usize)], index: &Fl
     }
 }
 
-/// Splits `body` (the text after a waiver's opening quote) into the reason
-/// and what follows its closing quote. The closing quote is the last one
-/// that ends the body or is followed by whitespace and `match="`, so a reason
-/// may mention `match=` inside its quotes.
-fn split_reason(body: &str) -> Option<(&str, &str)> {
-    if let Some(at) = body.rfind("\" match=\"") {
-        // The reason ends here only when what follows is a whole `match="…"`.
-        let tail = &body[at + 1..];
-        if tail.trim_start().starts_with("match=\"") {
-            return Some((&body[..at], tail));
-        }
-    }
-    let inner = body.trim_end().strip_suffix('"')?;
-    Some((inner, ""))
-}
-
-fn apply_waivers(findings: Vec<Finding>, comments: &[Comment]) -> (Vec<Finding>, Vec<Waiver>) {
+fn apply_waivers(findings: Vec<Finding>, frontmatter: Option<&Frontmatter>) -> (Vec<Finding>, Vec<Waiver>) {
     let mut kept = findings;
     let mut waivers = Vec::new();
     let mut invalid = Vec::new();
-    for comment in comments.iter().filter(|c| c.body.starts_with("canon:waive")) {
-        let rest = comment.body.trim_start_matches("canon:waive").trim();
-        let parsed = (|| {
-            let (rule, rest) = rest.split_once(char::is_whitespace)?;
-            let (section, rest) = rest.trim_start().split_once(char::is_whitespace)?;
-            // `"<reason>"`, then optionally `match="<non-empty>"`; nothing else may follow.
-            let rest = rest.trim();
-            let body = rest.strip_prefix('"')?;
-            let (reason, tail) = split_reason(body)?;
-            let needle = match tail.trim() {
-                "" => None,
-                t => {
-                    let m = t.strip_prefix("match=\"")?.strip_suffix('"')?;
-                    (!m.trim().is_empty() && !m.contains('"')).then(|| m.to_string())?.into()
-                }
-            };
-            (!reason.trim().is_empty() && !reason.contains('"')).then(|| (rule.to_string(), section.to_string(), reason.trim().to_string(), needle))
-        })();
-        match parsed {
-            Some((rule, section, reason, match_text)) if severity_of(&rule).is_some() => {
+    for (line, message) in frontmatter.iter().flat_map(|f| f.problems.iter()) {
+        invalid.push(Finding {
+            rule: "brief.frontmatter-invalid".to_string(),
+            severity: Severity::Blocker,
+            section: None,
+            line: *line,
+            excerpt: excerpt(message),
+            matched: None,
+            hint: "the frontmatter is YAML with the keys `kind` (`chore`) and `waive` (a list of `rule`, `section`, `reason`, optionally `match`); fix it, and no waiver is read until it parses"
+                .to_string(),
+        });
+    }
+    for entry in frontmatter.iter().flat_map(|f| f.waivers.iter()) {
+        let rule = entry.rule.as_deref().map(str::trim).filter(|r| severity_of(r).is_some());
+        let section = entry.section.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        let reason = entry.reason.as_deref().map(str::trim).filter(|r| !r.is_empty());
+        let needle_ok = entry.match_text.as_ref().is_none_or(|m| !m.trim().is_empty());
+        match (rule, section, reason) {
+            (Some(rule), Some(section), Some(reason)) if needle_ok && entry.unknown_keys.is_empty() && entry.not_text.is_empty() => {
+                let match_text = entry.match_text.clone();
                 let before = kept.len();
                 kept.retain(|f| {
                     let hit = f.rule == rule && f.section.as_deref().unwrap_or("brief") == section && match_text.as_ref().is_none_or(|n| f.matched.as_deref().is_some_and(|m| m.contains(n.as_str())) || f.excerpt.contains(n.as_str()));
                     !hit
                 });
-                waivers.push(Waiver { severity: severity_of(&rule), applied: kept.len() < before, rule, section, reason, line: comment.line, match_text });
+                waivers.push(Waiver { severity: severity_of(rule), applied: kept.len() < before, rule: rule.to_string(), section: section.to_string(), reason: reason.to_string(), line: entry.line, match_text });
             }
             _ => invalid.push(Finding {
                 rule: "brief.waiver-invalid".to_string(),
                 severity: Severity::Blocker,
                 section: None,
-                line: comment.line,
-                excerpt: excerpt(&comment.body),
+                line: entry.line,
+                excerpt: excerpt(&format!(
+                    "rule {} section {}{}",
+                    entry.rule.as_deref().unwrap_or("(none)"),
+                    entry.section.as_deref().unwrap_or("(none)"),
+                    if entry.reason.as_deref().is_none_or(|r| r.trim().is_empty()) { ", no reason" } else { "" }
+                )),
                 matched: None,
-                hint: "write `<!-- canon:waive <rule-id> <section-key> \"<reason>\" -->` (optionally `match=\"<text>\"` after the reason) with a known rule id and a non-empty reason".to_string(),
+                hint: "write each `waive` entry with `rule: <rule-id>` (a known id), `section: <section key or brief>` and `reason: \"<why>\"` that is not empty, and optionally `match: \"<text>\"`; no other key".to_string(),
             }),
         }
     }
@@ -1756,7 +1674,7 @@ fn section_tally(section: &Section) -> Tally {
 /// The prose letters of a whole brief, for [`crate::language::resolve`].
 pub fn prose_tally(text: &str) -> Tally {
     let mut tally = Tally::default();
-    for line in scan(text).0 {
+    for line in canon_ingest::brief::parse(text).lines {
         tally.add_line(&line.text);
     }
     tally
@@ -1833,7 +1751,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
     if let Some(change) = requested {
         return crate::brief::canon_brief(repo, change)
             .map(|path| (change.clone(), path))
-            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject-id <id> --title <title>`"));
+            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject <id> --title <title>`"));
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
@@ -1845,7 +1763,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         .collect();
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     match live.len() {
-        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject-id <id> --title <title>`; it scaffolds brief.md")),
+        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
@@ -1883,10 +1801,10 @@ pub struct FlowStep {
     pub line: usize,
 }
 
-/// One marked section of a brief as a reader shows it: found by marker
-/// (never by heading text, so the `ko` headings read the same), with its
-/// heading and the body lines after it. Fenced code and HTML comments are
-/// not part of a body, as in every other reading of the brief.
+/// One section of a brief as a reader shows it: found by its English
+/// heading, with that heading and the body lines after it. Fenced code and
+/// HTML comments are not part of a body, as in every other reading of the
+/// brief.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefSection {
@@ -1894,7 +1812,7 @@ pub struct BriefSection {
     pub role: &'static str,
     /// The heading's text, `#` marks dropped.
     pub heading: Option<String>,
-    /// The marker's line.
+    /// The heading's line in the file.
     pub line: usize,
     /// The body lines, a blank line between paragraphs.
     pub body: Vec<String>,
@@ -1905,8 +1823,8 @@ pub struct BriefSection {
 /// The sections of `text`, in brief order: what [`evaluate`] reads, so the
 /// page and the checker cannot disagree about where a section starts.
 pub fn parse_sections(text: &str) -> Vec<BriefSection> {
-    let (lines, comments) = scan(text);
-    sections(&lines, &comments)
+    let brief = canon_ingest::brief::parse(text);
+    sections(&brief)
         .iter()
         .map(|section| {
             let mut heading = None;
@@ -1972,7 +1890,7 @@ pub fn status_report(repo: &Path, change: &ChangeId, building: bool) -> Option<(
     let language = crate::language::for_brief(repo, &text).ok()?;
     let flows = if building && field(&text, "Approved:").is_some() { flow_scenarios(repo, change).ok() } else { None };
     let evaluation = evaluate(&text, &language, flows.as_ref());
-    if evaluation.legacy {
+    if evaluation.legacy || evaluation.old_format {
         return None;
     }
     let mut per_rule: BTreeMap<&str, usize> = BTreeMap::new();
@@ -2002,6 +1920,8 @@ pub struct BriefCheckReport<'a> {
     language_note: Option<&'a str>,
     phase: Phase,
     legacy: bool,
+    /// The brief is in the format canon 0.30 and earlier wrote; `canon migrate` rewrites it.
+    old_format: bool,
     approved: bool,
     counts: Counts,
     findings: &'a [Finding],
@@ -2010,7 +1930,7 @@ pub struct BriefCheckReport<'a> {
 
 impl Report for BriefCheckReport<'_> {}
 
-/// `canon brief check [--change-id <slug>] [--json]`.
+/// `canon brief check [--change <slug>] [--json]`.
 pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
@@ -2028,6 +1948,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
             language_note: checked.language_note.as_deref(),
             phase: checked.phase,
             legacy: ev.legacy,
+            old_format: ev.old_format,
             approved: ev.approved,
             counts,
             findings: &ev.findings,
@@ -2085,13 +2006,32 @@ fn approve_step(ev: &Evaluation, fresh: &str) -> Step {
 /// The next one to three steps for `ev` (module doc).
 fn next_steps(ev: &Evaluation) -> Vec<Step> {
     let mut steps = Vec::new();
+    if ev.old_format {
+        steps.push(Step {
+            step: "migrate",
+            why: "the brief is in the format canon 0.30 and earlier wrote; `canon migrate` previews the rewrite and writes nothing, and the human runs it with `--commit` when it re-binds an approval"
+                .to_string(),
+        });
+        return steps;
+    }
     if ev.legacy {
         if !ev.approved {
             steps.push(approve_step(ev, "the brief has no `Approved:` line; the human answers it"));
         }
         return steps;
     }
-    if ev.has(&["brief.section-missing", "brief.section-duplicate", "brief.section-order", "brief.placeholder", "brief.flow-no-steps", "brief.waiver-invalid", "brief.chore-section", "brief.chore-category", "brief.chore-empty"]) {
+    if ev.has(&[
+        "brief.section-missing",
+        "brief.section-duplicate",
+        "brief.section-order",
+        "brief.placeholder",
+        "brief.flow-no-steps",
+        "brief.waiver-invalid",
+        "brief.frontmatter-invalid",
+        "brief.chore-section",
+        "brief.chore-category",
+        "brief.chore-empty",
+    ]) {
         steps.push(Step { step: "shape", why: "sections are missing, out of order or still hold the template's placeholders".to_string() });
     }
     if ev.open_questions > 0 {
@@ -2121,7 +2061,18 @@ pub struct BriefShowReport<'a> {
     brief: &'a str,
     state: &'static str,
     counts: Counts,
+    /// The sections that hold nothing yet, each with its guidance in the brief's language.
+    empty_sections: Vec<EmptySection>,
     next: Vec<Step>,
+}
+
+/// A section not yet written and what goes in it.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct EmptySection {
+    key: String,
+    /// The `##` heading the section is found by.
+    heading: &'static str,
+    guidance: &'static str,
 }
 
 impl Report for BriefShowReport<'_> {}
@@ -2129,6 +2080,7 @@ impl Report for BriefShowReport<'_> {}
 /// `canon brief show [<change>] [--json]`: state and next steps.
 pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
+    crate::old_briefs::announce(&repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
         Err(e) => return fail("canon brief show", json, &e),
@@ -2137,6 +2089,7 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let counts = ev.counts();
     let changed = matches!(ev.approval, crate::brief::Approval::Changed { .. });
     let state = match (ev.legacy, ev.approved, counts.blockers) {
+        _ if ev.old_format => "old-format",
         _ if changed => "changed-since-approval",
         (true, true, _) => "legacy-approved",
         (true, false, _) => "legacy",
@@ -2145,11 +2098,15 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
         (false, false, _) => "draft",
     };
     let next = next_steps(ev);
+    let empty_sections: Vec<EmptySection> = ev.empty_sections.iter().map(|key| EmptySection { key: key.clone(), heading: heading_of(key), guidance: guidance(&checked.language, key) }).collect();
     if json {
-        let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
+        let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, empty_sections, next };
         crate::json_out::data("brief show", &body);
     } else {
         println!("canon brief show: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
+        for section in &empty_sections {
+            println!("  empty: ## {} — {}", section.heading, section.guidance);
+        }
         if next.is_empty() {
             println!("  next: nothing — the brief is approved and clean");
         }
@@ -2176,7 +2133,7 @@ mod tests {
         assert_eq!(message(FlowError::NoFlowSteps { change: c() }), "the brief of change `add-cart` defines no flow steps (`F1`, `F2`, …); write the flow first");
         assert_eq!(message(FlowError::UnknownFlowStep { change: c(), flow: "F9".to_string(), known: "F1, F2".to_string() }), "the brief of change `add-cart` defines no flow step `F9` (it has F1, F2)");
         assert_eq!(message(FlowError::NoSubject("cart".to_string())), "no subject `cart`");
-        assert_eq!(message(FlowError::NoAdoptedChange("cart".to_string())), "subject `cart` has not adopted a change; run `canon change new <slug> --subject-id cart`");
+        assert_eq!(message(FlowError::NoAdoptedChange("cart".to_string())), "subject `cart` has not adopted a change; run `canon change new <slug> --subject cart`");
         assert_eq!(message(FlowError::ChangeUnresolved(CliError::refused("USAGE", "no live change"))), "USAGE — no live change; name the change as the operand");
     }
 
@@ -2197,7 +2154,7 @@ mod tests {
             "The `Save` button and the `Save draft` label.",
             "Next.js로 만든 화면과 `iPhone` 이용자, src/dst 두 지점.",
             "The `저장` button and the `No calendar shared` label.",
-            "Pass `--project-id` to `canon brief check`.",
+            "Pass `--project` to `canon brief check`.",
             "Read and/or write, yes/no, read/write access.",
             "On 2026/10/21 the 1/2 share opens.",
             "The /settings/profile route and https://example.com/a/b.html open.",

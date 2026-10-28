@@ -52,7 +52,7 @@ fn repo_with_change() -> TempDir {
     let dir = repo();
     let subject = canon(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     assert!(subject.status.success(), "{}", stderr(&subject));
-    let change = canon(dir.path(), &["change", "new", "add-x", "--subject-id", "demo", "--title", "X"]);
+    let change = canon(dir.path(), &["change", "new", "add-x", "--subject", "demo", "--title", "X"]);
     assert!(change.status.success(), "{}", stderr(&change));
     dir
 }
@@ -205,7 +205,7 @@ fn context_capability_30_a_failure_is_an_error_object_with_code_message_hint_and
 fn context_capability_31_json_mode_carries_warnings_in_meta_and_leaves_stderr_empty() {
     let dir = repo();
     let finding = |seq: &str, json: bool| {
-        let mut args = vec!["finding", "add", "--change-id", "c1", "--round", "1", "--seq", seq, "--severity", "note", "--actor-id", "x", "--summary", "s", "--role", "reviwer", "--no-promote"];
+        let mut args = vec!["finding", "add", "--change", "c1", "--round", "1", "--seq", seq, "--severity", "note", "--actor", "x", "--summary", "s", "--role", "reviwer", "--no-promote"];
         if json {
             args.push("--json");
         }
@@ -381,7 +381,7 @@ fn context_capability_35_a_removed_leaf_is_exit_two_with_the_leaf_that_replaced_
         (&["gate", "task", "add-x#1", "--json"], "gate task", "canon task done"),
         (&["subject", "status", "demo", "--json"], "subject status", "canon subject show"),
         (&["learn", "promote", "--json"], "learn promote", "canon strategy promote"),
-        (&["review", "add", "--scenario-id", "a.b.01", "--json"], "review add", "canon review scenario"),
+        (&["review", "add", "--scenario", "a.b.01", "--json"], "review add", "canon review scenario"),
         (&["regime-key", "--json"], "regime-key", "canon regime show"),
         (&["divergence", "status", "--json"], "divergence status", "canon divergence list"),
     ] {
@@ -405,7 +405,7 @@ fn context_capability_36_a_removed_option_is_exit_two_with_the_option_that_repla
         (&["query", "--canon-yaml", "x", "--kind", "evidence", "--json"], "--canon-yaml", "query", "--repo"),
         (&["retrieve", "-k", "3", "--for-role", "reviewer", "--domain", "dev", "--json"], "-k", "retrieve", "--limit"),
         (&["init", "--check-config", "--json"], "--check-config", "init", "--check"),
-        (&["evidence", "add", "--kind", "audit", "--scenario-id", "a.b.01", "--json"], "--kind", "evidence add", "--class"),
+        (&["evidence", "add", "--kind", "audit", "--scenario", "a.b.01", "--json"], "--kind", "evidence add", "--class"),
         (&["tier", "age", "--dry-run", "--json"], "--dry-run", "tier age", "--commit"),
     ] {
         let error = refused(dir.path(), args);

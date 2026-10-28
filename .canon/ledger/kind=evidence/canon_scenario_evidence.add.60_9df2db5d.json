@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:19:38.492835195Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op && cargo test -p canon-cli --lib gate::tests::promote_after_stage_reads_the_records_own_outcome_off_staging"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 353,
+  "scenario_id": "evidence.add.60",
+  "schema": 1,
+  "staging_id": "deaeb9df",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

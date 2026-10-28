@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:26:15.792987967Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/evidence.rs:290-300",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.131"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] evidence add checks old-format only in the briefs the scenario answers to, not every governing change of the subject. F4: the briefs a write judges are all the subject's governing changes, so a subject with an approved old brief refuses evidence before migrate. brief_refusals collects old_format only from attested_briefs, so for a scenario tagged @flow:B.F1 (or a task B#1) on a subject that also governs an approved 0.30 brief A, only B is checked and the write goes through. subject move does use governing().judged() (subject.rs:1018). evidence_add_131 covers only an untagged scenario. Fix: collect old briefs over governing(...).judged() for each attested subject.",
+  "worktree_dirty": false
+}

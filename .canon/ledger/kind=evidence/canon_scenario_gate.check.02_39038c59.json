@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:21:25.226011779Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 166,
+  "scenario_id": "gate.check.02",
+  "schema": 1,
+  "staging_id": "a63cf34c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

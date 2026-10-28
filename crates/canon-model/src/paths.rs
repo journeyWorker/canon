@@ -145,6 +145,19 @@ pub const SCENARIO_INDEX_LOCK_FILE: &str = ".canon/scenario-index.lock";
 /// state, so `canon init` ignores it.
 pub const ARTIFACT_STORE_LOCK_FILE: &str = ".canon/artifact-store.lock";
 
+/// The directory of the derived search index (`canon search`, `canon trace`): rebuilt from the records,
+/// the briefs and the `.feature` files whenever one of them changed, so it is never committed. The first
+/// build also writes a `.gitignore` of `*` in it, so the index stays out of git before `canon init` has
+/// added [`INDEX_GITIGNORE`] to the repo's own.
+pub const INDEX_DIR: &str = ".canon/index";
+
+/// The search index file (a SQLite database; the `-wal` and `-shm` files SQLite adds beside it are in the
+/// same ignored directory).
+pub const INDEX_FILE: &str = ".canon/index/search.db";
+
+/// The `.gitignore` line covering [`INDEX_DIR`].
+pub const INDEX_GITIGNORE: &str = ".canon/index/";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +193,9 @@ mod tests {
             SCENARIO_ARCHIVE_GITIGNORE,
             SCENARIO_INDEX_LOCK_FILE,
             ARTIFACT_STORE_LOCK_FILE,
+            INDEX_DIR,
+            INDEX_FILE,
+            INDEX_GITIGNORE,
         ];
         for path in all {
             assert!(

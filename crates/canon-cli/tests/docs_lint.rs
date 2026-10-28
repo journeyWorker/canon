@@ -151,6 +151,18 @@ fn canon_segments(line: &str, redirects: bool) -> Vec<String> {
         .collect()
 }
 
+/// The `canon …` commands of one inline code span: split at ` && ` and `; ` (a `|` there is an alternative, not a
+/// pipe). A span that quotes what canon prints (`canon review scenario: pinned …`, a command word ending in `:`) is
+/// output, not a command.
+fn inline_commands(code: &str) -> Vec<String> {
+    code.split(" && ")
+        .flat_map(|part| part.split("; "))
+        .map(str::trim)
+        .filter(|part| part.starts_with("canon ") && !part.split_whitespace().take_while(|w| !w.starts_with(['-', '<'])).any(|w| w.ends_with(':')))
+        .map(str::to_string)
+        .collect()
+}
+
 /// Every command in `text` (markdown), by mode, with its `source:line`.
 fn extract(text: &str, mdx: bool, source: &str) -> Vec<Cmd> {
     let mut out = Vec::new();
@@ -158,6 +170,17 @@ fn extract(text: &str, mdx: bool, source: &str) -> Vec<Cmd> {
     let mut generated = false;
     let mut continued = String::new();
     let mut continued_at = 0;
+    // The prose paragraph read so far, from its first line's number: an inline code span may wrap its lines.
+    let mut paragraph = String::new();
+    let mut paragraph_at = 0;
+    let flush = |paragraph: &mut String, at: usize, out: &mut Vec<Cmd>| {
+        for (offset, code) in code_spans(paragraph) {
+            for text in inline_commands(&code) {
+                out.push(Cmd { source: format!("{source}:{}", at + offset), text, mode: Mode::Syntax });
+            }
+        }
+        paragraph.clear();
+    };
     for (n, raw) in text.lines().enumerate() {
         let n = n + 1;
         let line = raw.trim();
@@ -168,6 +191,7 @@ fn extract(text: &str, mdx: bool, source: &str) -> Vec<Cmd> {
                 continue;
             }
         } else if let Some(rest) = line.strip_prefix("```").or_else(|| line.strip_prefix("~~~")) {
+            flush(&mut paragraph, paragraph_at, &mut out);
             let marker = line[..3].to_string();
             let _ = rest;
             let info = line.trim_start_matches(marker.chars().next().unwrap()).trim().split([' ', ',', '{']).next().unwrap_or("").to_ascii_lowercase();
@@ -198,27 +222,78 @@ fn extract(text: &str, mdx: bool, source: &str) -> Vec<Cmd> {
             continue;
         }
         if line.contains("canon:generated ") {
+            flush(&mut paragraph, paragraph_at, &mut out);
             generated = line.contains(" begin ");
             continue;
         }
         let _ = mdx;
-        let codes = inline_codes(&raw.replace("\\|", "|"));
-        let last = codes.len().saturating_sub(1);
-        for (i, code) in codes.into_iter().enumerate() {
-            if code.starts_with("canon ") {
-                let placeholder = code.contains('<') || code.contains('[') || code.contains('|');
-                let example_cell = generated && line.starts_with('|') && i == last;
-                let mode = if example_cell && !placeholder { Mode::Runnable } else { Mode::Syntax };
-                out.push(Cmd { source: format!("{source}:{n}"), text: code, mode });
+        // A table row is a block of its own; in a generated block its last cell is the runnable example.
+        if line.starts_with('|') {
+            flush(&mut paragraph, paragraph_at, &mut out);
+            let codes = code_spans(&raw.replace("\\|", "|"));
+            let last = codes.len().saturating_sub(1);
+            for (i, (_, code)) in codes.into_iter().enumerate() {
+                for text in inline_commands(&code) {
+                    let placeholder = text.contains('<') || text.contains('[') || text.contains('|');
+                    let example_cell = generated && i == last;
+                    let mode = if example_cell && !placeholder { Mode::Runnable } else { Mode::Syntax };
+                    out.push(Cmd { source: format!("{source}:{n}"), text, mode });
+                }
             }
+            continue;
         }
+        if line.is_empty() {
+            flush(&mut paragraph, paragraph_at, &mut out);
+            continue;
+        }
+        if paragraph.is_empty() {
+            paragraph_at = n;
+        } else {
+            paragraph.push('\n');
+        }
+        paragraph.push_str(line);
     }
+    flush(&mut paragraph, paragraph_at, &mut out);
     out
 }
 
-/// The text of every backtick-delimited span of one line.
-fn inline_codes(line: &str) -> Vec<String> {
-    line.split('`').skip(1).step_by(2).map(|code| code.trim().to_string()).collect()
+/// The inline code spans of `text` (one paragraph or table row), as markdown reads them, each with the offset of the
+/// line it starts on: a run of N backticks opens a span that the next run of exactly N closes, so a span may wrap
+/// lines (a line break reads as a space) and hold a shorter run of backticks; an opening run with no closer is text.
+fn code_spans(text: &str) -> Vec<(usize, String)> {
+    let bytes = text.as_bytes();
+    let run_at = |i: usize| bytes[i..].iter().take_while(|&&b| b == b'`').count();
+    let mut spans = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'`' {
+            i += 1;
+            continue;
+        }
+        let open = run_at(i);
+        let mut j = i + open;
+        let close = loop {
+            match bytes[j..].iter().position(|&b| b == b'`') {
+                None => break None,
+                Some(at) => {
+                    let run = run_at(j + at);
+                    if run == open {
+                        break Some(j + at);
+                    }
+                    j += at + run;
+                }
+            }
+        };
+        match close {
+            Some(end) => {
+                let line = text[..i].matches('\n').count();
+                spans.push((line, text[i + open..end].replace('\n', " ").trim().to_string()));
+                i = end + open;
+            }
+            None => i += open,
+        }
+    }
+    spans
 }
 
 fn placeholder_in(text: &str) -> Option<String> {
@@ -386,7 +461,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
     let repo = base.path();
     ok(repo, home.path(), &["init", "--providers", "none"]);
     ok(repo, home.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home.path(), &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home.path(), &["feature", "new", "auth.login", "--title", "Login"]);
     ok(repo, home.path(), &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(repo, home.path(), &["inventory", "sync"]);
@@ -418,8 +493,9 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
     out
 }
 
+/// context.capability.57: every command line of the skills, the website and the hints parses against the clap tree.
 #[test]
-fn every_command_in_the_docs_and_hints_parses() {
+fn context_capability_57_every_command_in_the_docs_and_hints_parses() {
     let spec = canon_cli::spec::generate();
     let root = canon_cli::cli::command();
     let mut commands = markdown_commands(&doc_gen::repo_root());
@@ -428,10 +504,10 @@ fn every_command_in_the_docs_and_hints_parses() {
     assert_all_parse(&root, &commands, true);
 }
 
-/// The `meta.next` commands the example sweep prints: an agent runs these, so they parse too.
+/// context.capability.56: the `meta.next` commands the example sweep prints: an agent runs these, so they parse too.
 /// (A step that has a `<placeholder>` for what only the agent knows is checked as a syntax line.)
 #[test]
-fn every_meta_next_command_parses() {
+fn context_capability_56_every_meta_next_command_parses() {
     let spec = canon_cli::spec::generate();
     let root = canon_cli::cli::command();
     let commands = next_commands(&spec);
@@ -461,6 +537,19 @@ fn assert_all_parse(root: &clap::Command, commands: &[Cmd], stale_pending: bool)
     assert!(problems.is_empty(), "{} problem(s):\n{}", problems.len(), problems.join("\n"));
 }
 
+/// context.capability.57: an inline span that wraps a line, or is delimited by two backticks, is read whole and checked.
+#[test]
+fn context_capability_57_a_code_span_that_wraps_a_line_or_uses_double_backticks_is_read_whole() {
+    let md = "Run `canon review\nadd auth.login.01` to sign.\nOr ``canon query --kind `evidence` --bogus`` here, and `canon\ngate check`.\n\n`canon status` stands alone, and an unclosed ` stays text.\n| a | `canon\n";
+    let cmds = extract(md, false, "t.md");
+    let shown: Vec<(&str, &str)> = cmds.iter().map(|c| (c.text.as_str(), c.source.as_str())).collect();
+    assert_eq!(shown, [("canon review add auth.login.01", "t.md:1"), ("canon query --kind `evidence` --bogus", "t.md:3"), ("canon gate check", "t.md:3"), ("canon status", "t.md:6")]);
+    let root = canon_cli::cli::command();
+    assert!(check(&root, &cmds[0]).is_some_and(|p| p.contains("t.md:1")), "the obsolete `review add` is caught");
+    assert!(check(&root, &cmds[1]).is_some(), "an option the leaf lacks inside a double-backtick span is caught");
+    assert!(check(&root, &cmds[2]).is_none() && check(&root, &cmds[3]).is_none());
+}
+
 #[test]
 fn the_extractor_reads_what_the_convention_says() {
     let md = "```bash\nCANON_ROLE=reviewer canon status --json | jq .\ncanon gate check # trailing\nnpm test\n```\n```text\ncanon evidence add <flags>\n```\nProse `canon query --kind <kind>` and `npm i`.\n";
@@ -477,6 +566,23 @@ fn the_extractor_reads_what_the_convention_says() {
     assert!(check(&root, &placeholder).is_some());
     let agents = extract(canon_cli::init::AGENTS_BLOCK, false, "AGENTS block");
     assert!(agents.len() >= 8, "the AGENTS block yields {} commands", agents.len());
+}
+
+/// context.capability.58: a skill that keeps an id-suffixed option fails the parse check, whatever the mode of its line.
+#[test]
+fn context_capability_58_a_skill_command_that_keeps_an_old_id_spelling_fails_the_parse_check() {
+    let root = canon_cli::cli::command();
+    let old = "```bash\ncanon evidence add --actor-id impl-1 --scenario auth.login.01 --class test-run --ref r\n```\n```text\ncanon finding list --change-id <slug>\n```\nProse `canon scenario new <id> --project-id <root>`.\n";
+    let cmds = extract(old, false, "reference/role-implementer.md");
+    assert_eq!(cmds.len(), 3, "{cmds:?}");
+    for cmd in &cmds {
+        let problem = check(&root, cmd).unwrap_or_else(|| panic!("`{}` passes the parse check", cmd.text));
+        assert!(problem.contains("role-implementer.md") && problem.contains("-id"), "{problem}");
+    }
+    let new = old.replace("--actor-id", "--actor").replace("--change-id", "--change").replace("--project-id", "--project");
+    for cmd in extract(&new, false, "reference/role-implementer.md") {
+        assert!(check(&root, &cmd).is_none(), "`{}` fails: {:?}", cmd.text, check(&root, &cmd));
+    }
 }
 
 /// A guide is read through `canon skills show`, and the consumer's repo holds no `reference/` tree, so no guide

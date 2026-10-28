@@ -444,7 +444,7 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
         // ANY task id to live in. Naming a synthesized openspec source
         // here would blame a dialect the operator never configured —
         // the same refusal `crate::dispatch::DispatchError::NoPlanSources`
-        // already makes for `--task-id`.
+        // already makes for `--task`.
         return Err(format!(
             "this repo configures no plan sources (no `{}` and no `plans.sources` entries in canon.yaml), so no plan document exists for {task_id} to live in — write the change with `canon change new`, or list your external plans under `plans.sources`",
             canon_model::paths::CHANGES_DIR
@@ -643,7 +643,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task <id> ...`, then run `canon task done` again").emit("canon task done", json)
         }
     }
 }
@@ -665,7 +665,7 @@ fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> O
     }
     let canon_ref = task_records.iter().find_map(|body| body.get("evidence").and_then(|e| e.get("ref")).and_then(|r| r.as_str()).filter(|r| r.starts_with("canon ")))?;
     Some(format!(
-        "canon task done: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task-id {task_id} --artifact <path> (or --report <format>:<path>)"
+        "canon task done: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task {task_id} --artifact <path> (or --report <format>:<path>)"
     ))
 }
 
@@ -1216,7 +1216,9 @@ fn promotable_kinds() -> String {
 pub struct GateInstallHooksReport {
     /// True when `--dry-run` previewed the install without writing.
     pub dry_run: bool,
+    /// True when an agent hook file (`.claude/settings.json` or `.codex/hooks.json`) changed or, under `--dry-run`, would change; it says nothing of the pre-commit script or of any git hook.
     pub installed: bool,
+    /// True when the pre-commit script was written or, under `--dry-run`, would be; no git hook is installed either way.
     pub pre_commit_script_written: bool,
 }
 
@@ -1235,6 +1237,10 @@ impl crate::reports::Report for GateInstallHooksReport {}
 /// pre-commit script" scenario.
 pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
+    if !repo.is_dir() {
+        let what = if repo.exists() { "is not a directory" } else { "does not exist" };
+        return CliError::refused("HOOKS_INSTALL_FAILED", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+    }
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
     let claude_path = repo.join(".claude").join("settings.json");
@@ -1277,15 +1283,21 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
             }
         }
         script_written = true;
-        crate::say!(json, "canon gate install-hooks: {} {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
     }
 
     let changed = !matches!((claude_outcome, codex_outcome), (InstallOutcome::Unchanged, InstallOutcome::Unchanged));
+    let hook_files = format!("{} and {}", claude_path.display(), codex_path.display());
     if changed {
-        crate::say!(json, "canon gate install-hooks: {}", if dry_run { "would install" } else { "installed" });
+        crate::say!(json, "canon gate install-hooks: {} the agent hook in {hook_files}", if dry_run { "would install" } else { "installed" });
     } else {
-        crate::say!(json, "canon gate install-hooks: no diff, nothing written");
+        crate::say!(json, "canon gate install-hooks: no diff, nothing written to {hook_files}");
     }
+    if script_written {
+        crate::say!(json, "canon gate install-hooks: {} the pre-commit script {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
+    } else {
+        crate::say!(json, "canon gate install-hooks: the pre-commit script {} is not written here (a canon gate hook or the script already exists)", script_path.display());
+    }
+    crate::say!(json, "canon gate install-hooks: no git hook was installed; copy the script to .git/hooks/pre-commit or call it from a hook runner");
     if !changed && !script_written {
         crate::json_out::mark_unchanged();
     }

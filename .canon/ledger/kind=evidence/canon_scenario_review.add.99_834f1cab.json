@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:27:48.687052131Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test commits outside_git_and_with_no_commit_every_leaf_refuses_no_commit_and_writes_nothing"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 169,
+  "scenario_id": "review.add.99",
+  "schema": 1,
+  "staging_id": "f9cc94b4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-031-search",
+    "role": "implementer",
+    "session_id": "search-2026-10-27"
+  },
+  "at": "2026-10-27T15:03:49.910482461Z",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p canon-cli --test search search_query_07"
+  },
+  "evidence_note": {
+    "summary": "search_query_07_* passed against the debug binary of the working tree (crates/canon-cli/tests/search.rs); full workspace nextest, clippy -D warnings, conformance and CLI spec drift green"
+  },
+  "evidence_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "search.query.07",
+  "schema": 1,
+  "staging_id": "718edfb2",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

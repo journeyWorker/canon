@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28-r3"
+  },
+  "at": "2026-10-28T10:58:20.901638Z",
+  "change_id": "canon-0-31-cli-ids",
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/docs_lint.rs:205-221",
+  "kind": "finding",
+  "resolution_code_tree": "d4ed20ac3f2429e3e5a6870b0f29f636b3e031e4",
+  "resolution_sha": "602c96a1f390d45cf9f23a3553356e105226e158",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ad3f83b54502a1c14404e6710e5153053a5b045f",
+  "reviewer": "rev-031-d",
+  "round": 3,
+  "scenario_ids": [
+    "context.capability.57"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec-fidelity; static review] Finish the every-command documentation check before signing capability.57. Its newly bound sweep extracts inline code one physical line at a time with split(backtick), so canon-subject.md:99-100 supplies only canon review rather than the full obsolete canon review add command across the newline; double-backtick spans such as line 228 are omitted too. The bound tests pass while this actual invalid command escapes validation. Track matching backtick delimiters across lines, add regression cases for both span forms, and correct the obsolete review command. Blast radius: wrapped and multi-backtick commands in skills and website prose; the parity and generated-next-step fixes otherwise resolve r2/3.",
+  "worktree_dirty": false
+}

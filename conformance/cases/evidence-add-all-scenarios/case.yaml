@@ -2,7 +2,7 @@ description: "0.18 D1: `canon evidence add --report junit:<path> --all-scenarios
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [evidence, add, --project-id, root, --all-scenarios, --report, junit:reports/junit.xml, --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project, root, --all-scenarios, --report, junit:reports/junit.xml, --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent]
     exit: 0
   - args: [gate, promote]
     exit: 0

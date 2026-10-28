@@ -1,8 +1,8 @@
 description: "0.21 D5: repeating `canon evidence add` with identical input writes nothing — it names the record already there (`unchanged`) and exits 0; a different reference is a new record, staged as usual"
 steps:
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote]
+  - args: [evidence, add, --scenario, cart.add.01, --project, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor, impl-agent, --promote]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote]
+  - args: [evidence, add, --scenario, cart.add.01, --project, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor, impl-agent, --promote]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add -- --nocapture", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --scenario, cart.add.01, --project, root, --class, test-run, --ref, "cargo test cart_add -- --nocapture", --role, implementer, --actor, impl-agent]
     exit: 0

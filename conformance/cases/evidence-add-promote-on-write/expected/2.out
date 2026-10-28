@@ -1,2 +1,2 @@
 canon gate promote: nothing staged — no records under `_staging/` for any promotable kind (evidence, finding, divergence)
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)
+next: canon subject new <id> --domain <domain> --title "<title>" --actor <unit> --session <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)

@@ -405,7 +405,7 @@ Feature: gate check
   Scenario: A fixed blocker that names its scenarios is re-verified by evidence for those scenarios alone
     Given a subject with scenarios A and B, both evidenced and reviewed, and a blocker naming only A closed fixed after that evidence
     When the subject is moved to shipped with canon subject move, and gate check and status are read
-    Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario-id, never the whole-suite batch
+    Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario, never the whole-suite batch
     And evidence for B recorded after the close does not clear it, and evidence for A recorded before the close does not either
     And evidence for A recorded after the close clears gate check and the move, while B's evidence stays older than the close
 
@@ -426,7 +426,7 @@ Feature: gate check
   Scenario: A scoped re-verification across spec roots names a runnable command for each root
     Given a blocker closed fixed naming one scenario in one spec root and two in another, all evidenced before the close
     When the subject is moved to shipped
-    Then the refusal names, per root, canon evidence add with that root's own --project-id and --scenario-id, for each of that root's scenarios
+    Then the refusal names, per root, canon evidence add with that root's own --project and --scenario, for each of that root's scenarios
     And evidence recorded for one root's scenarios leaves only the other root's scenarios named, and recording the last clears the move
 
   # canon: {"schema":1,"at":"2026-10-22T04:47:50Z","actor":{"agent_id":"canon-impl-027"}}
@@ -486,6 +486,7 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:happy
   @flow:canon-0-30-spec-backfill.F3
+  @flow:canon-0-31-fixes.F2
   @gate.check.105
   Scenario: Gate install-hooks writes the hook commands and the pre-commit script, and a second run writes nothing
     Given a git work tree with a canon.yaml and no hook files
@@ -494,29 +495,33 @@ Feature: gate check
     And .claude/settings.json and .codex/hooks.json each hold a PreToolUse command hook running canon task done with a 30 second timeout
     And the pre-commit script is written under .canon/scripts
     And the second run exits 0 with installed false, marks the result unchanged and changes no file
+    And the human-readable output names .claude/settings.json, .codex/hooks.json and the pre-commit script, says no git hook was installed, and says to copy the script into git's pre-commit hook or call it from a hook runner
     And --event, --matcher, --command and --timeout set the hook entry written
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
   @subject:gate-trust-spine
   @case:happy
   @flow:canon-0-30-spec-backfill.F3
+  @flow:canon-0-31-fixes.F2
   @gate.check.106
   Scenario: Gate install-hooks with --dry-run reports what it would install and writes nothing
     Given a git work tree with a canon.yaml and no hook files
     When canon gate install-hooks --dry-run is run
-    Then it exits 0 and reports only three fields: dryRun true, installed true and preCommitScriptWritten true
-    And it names no file, and no file or directory was created in the tree
+    Then it exits 0 and the JSON report holds only three fields: dryRun true, installed true and preCommitScriptWritten true
+    And the JSON report names no file, the human-readable output names the two agent hook files and the script, and no file or directory was created in the tree
     And the same command without --dry-run then exits 0 with dryRun false and writes .claude/settings.json, .codex/hooks.json and .canon/scripts/canon-gate-pre-commit.sh
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
   @subject:gate-trust-spine
   @case:failure
   @flow:canon-0-30-spec-backfill.F3
+  @flow:canon-0-31-fixes.F2
   @gate.check.107
   Scenario: Gate install-hooks refuses a repo that is no directory and an unreadable timeout and writes nothing
     Given a git work tree with a canon.yaml and a plain file afile
-    When canon gate install-hooks is run with --repo afile, with --timeout abc, or with an option it does not have
+    When canon gate install-hooks is run with --repo afile, with --repo naming a directory that does not exist (also with --dry-run), with --timeout abc, or with an option it does not have
     Then --repo afile exits 2 with HOOKS_INSTALL_FAILED saying afile is not a directory
+    And the missing directory exits 2 with HOOKS_INSTALL_FAILED and is not created
     And --timeout abc exits 2 with USAGE naming the --timeout field, and the unknown option exits 2
     And the tree is unchanged after each
 

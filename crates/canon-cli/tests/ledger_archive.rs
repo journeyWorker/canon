@@ -261,8 +261,8 @@ fn accept(repo: &Path, actor: &str, session: &str) -> Output {
     canon(
         repo,
         &[
-            "divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "the engine drops the event", "--tracking", "https://example.com/issues/1",
-            "--role", "reviewer", "--actor-id", actor, "--session-id", session,
+            "divergence", "accept", SCENARIO, "--project", "demo", "--reason", "the engine drops the event", "--tracking", "https://example.com/issues/1",
+            "--role", "reviewer", "--actor", actor, "--session", session,
         ],
     )
 }

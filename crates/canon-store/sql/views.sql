@@ -1026,7 +1026,7 @@ spec_cov AS (
     ) = 1
 ),
 -- s44 made evidence authorable against a scenario directly
--- (`canon evidence add --scenario-id --project-id`), keyed by the same
+-- (`canon evidence add --scenario --project`), keyed by the same
 -- composite this view is driven by. `mart_trust_matrix` cannot see
 -- those records — it is keyed `task_id` and `int_task_evidence` filters
 -- `task_id IS NOT NULL` — so a panel reading evidence only through the
@@ -1394,7 +1394,7 @@ ORDER BY role, regime_key;
 --               has at least one trajectory of the SAME role stamped
 --               with that run's own `run_id`
 --               (`canon_learn::Trajectory::run_id`, stamped only by
---               an explicit `canon ingest artifacts --run-id`) whose
+--               an explicit `canon ingest records --run`) whose
 --               `outcome` is one of the resolved variants. This is
 --               s40 task 3.1's ORIGINAL wording — "a resolved
 --               trajectory joined to its own run" — which s40 left
@@ -1406,7 +1406,7 @@ ORDER BY role, regime_key;
 --               falls back to that run's own terminal `Run.status`.
 --               Weaker on purpose: all it records is that the run
 --               reached a terminal state. A repo that never passes
---               `--run-id` reads `applied_attributed 0` and every count
+--               `--run` reads `applied_attributed 0` and every count
 --               under `applied_proxy`, which is the honest
 --               description of what its corpus supports.
 --
@@ -1467,7 +1467,7 @@ ORDER BY role, regime_key;
 -- Why `retrieved` does not evaporate on a rebuild. This stage joins a
 -- recorded `StrategyRef` — a snapshot frozen into `Run.
 -- injected_guidance` at dispatch time — against the CURRENT
--- `stg_strategy_items`. Every `canon ingest artifacts` calls
+-- `stg_strategy_items`. Every `canon ingest records` calls
 -- `canon-learn`'s `rebuild_namespace`, which deletes a regime's whole
 -- distilled layer and re-distills it, so that join only holds if a
 -- re-derived strategy keeps its id. It does: `StrategyId` is a pure

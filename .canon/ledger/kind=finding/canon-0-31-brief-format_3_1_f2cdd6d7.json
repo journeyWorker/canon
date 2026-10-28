@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:26:00.209374Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "e112b44230888ff258f38731c15fc6adf8c938ad",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/migrate_names.rs:1097",
+  "introduced_by": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "finding",
+  "resolution_code_tree": "de016efbe9c3455f006369945acb6c977c0f156e",
+  "resolution_sha": "b002d525109cd3d18d89ad641438b716c04627cb",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-c",
+  "round": 3,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The new changed_since_migrate guard misses files deleted after migration. diff puts a snapshot file absent from the current tree into restore (line 1126), but the guard at line 1097 only flags an entry when now.files.get(path).is_some_and(...). For a non-derived file present both in the snapshot and sealed post-migrate state, subsequently deleted, this is false; revert therefore restores the deleted file instead of refusing the later change. This contradicts the promise to refuse when a file changed since migration. Fix: compare the optional current hash against the optional sealed hash, so Some-to-None is a change while files removed by migration itself remain allowed; add a regression deleting a sealed non-journal file after migration. Blast radius: whole-snapshot revert protection, not only rewritten briefs. Established by code-path inspection; no reproduction command was run.",
+  "worktree_dirty": false
+}

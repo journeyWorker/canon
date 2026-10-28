@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:26:47.754150502Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_reads report_generation_14_snapshot_without_an_output_directory_is_refused_with_exit_2_and_writes_nothing"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 60,
+  "scenario_id": "report.generation.14",
+  "schema": 1,
+  "staging_id": "806e866d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

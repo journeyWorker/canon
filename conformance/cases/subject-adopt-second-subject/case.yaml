@@ -1,4 +1,4 @@
-description: "0.18 D4 (#28): after `canon change new refactor-core --subject-id perception`, `canon subject adopt refactor-core --subject-id editing` adds the subject, says the change now belongs to both (exit 0) and never re-points; a rerun writes nothing; `canon query --kind subject --json` lists the change under both"
+description: "0.18 D4 (#28): after `canon change new refactor-core --subject perception`, `canon subject adopt refactor-core --subject editing` adds the subject, says the change now belongs to both (exit 0) and never re-points; a rerun writes nothing; `canon query --kind subject --json` lists the change under both"
 steps:
   - args: [init, --providers, none]
     exit: 0
@@ -6,11 +6,11 @@ steps:
     exit: 0
   - args: [subject, new, editing, --domain, dev, --title, Editing]
     exit: 0
-  - args: [change, new, refactor-core, --subject-id, perception, --title, Refactor core]
+  - args: [change, new, refactor-core, --subject, perception, --title, Refactor core]
     exit: 0
-  - args: [subject, adopt, editing, --change-id, refactor-core]
+  - args: [subject, adopt, editing, --change, refactor-core]
     exit: 0
-  - args: [subject, adopt, editing, --change-id, refactor-core]
+  - args: [subject, adopt, editing, --change, refactor-core]
     exit: 0
   - args: [query, --kind, subject, --json]
     exit: 0

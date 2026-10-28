@@ -16,12 +16,13 @@ Feature: Demo repo scaffold and review
   @subject:authoring-scaffold
   @case:failure
   @flow:canon-0-30-spec-backfill.F5
+  @flow:canon-0-31-fixes.F1
   @authoring.demo.02
   Scenario: demo init in a directory that already has a canon.yaml is refused and changes nothing
-    Given a directory that canon demo init already set up
+    Given a directory that canon demo init already set up, or one with a canon.yaml whose .gitignore holds no canon lines
     When canon demo init --repo names it again
     Then it exits 2 with INIT_CONFIG_EXISTS
-    And the directory tree is identical to before the call
+    And the directory tree is identical to before the call, and the policy file is unchanged
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:05Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
   @subject:authoring-scaffold

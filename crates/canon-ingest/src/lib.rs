@@ -50,6 +50,7 @@ pub mod adapters;
 pub mod artifact_adapter;
 pub mod artifact_adapters;
 pub mod artifact_registry;
+pub mod brief;
 pub mod markdown;
 pub mod normalize;
 pub mod plan_writeback;

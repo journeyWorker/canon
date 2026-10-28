@@ -1,0 +1,12 @@
+description: "0.31 brief-format F4 + F5 + F6: a brief in the 0.30 format (canon:section comments, shipped Korean headings, a waiver comment) is one `brief.old-format` blocker (exit 1) with a `canon migrate` hint; `canon migrate` previews the rewrite and writes nothing; `--commit --plan-digest` rewrites it (comments gone, headings in English, the waiver in the frontmatter) and the check then judges it by the section rules; a second `canon migrate` has nothing to do"
+steps:
+  - args: [brief, check]
+    exit: 1
+  - args: [migrate]
+    exit: 0
+  - args: [migrate, --commit, --plan-digest, "b14184278b085ee5d3131a0b435a095fc341ceda9559dc3327e8bc6d87337832"]
+    exit: 0
+  - args: [brief, check]
+    exit: 0
+  - args: [migrate]
+    exit: 0

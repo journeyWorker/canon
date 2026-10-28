@@ -58,7 +58,7 @@ pub struct IngestRecordsArgs {
     #[arg(long)]
     pub json: bool,
     /// Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)
-    #[arg(long, value_name = "RUN_ID", value_parser = crate::dispatch::parse_run_id)]
+    #[arg(long = "run", value_name = "RUN_ID", value_parser = crate::dispatch::parse_run_id)]
     pub run_id: Option<RunId>,
     #[command(flatten)]
     pub input: crate::cli::InputArgs,

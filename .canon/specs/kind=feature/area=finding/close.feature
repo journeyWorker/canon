@@ -91,8 +91,8 @@ Feature: finding close
   @case:happy
   @finding.close.09
   Scenario: A close records the session that authored the transition, not the raiser's
-    Given a finding raised with --session-id sess-raise and promoted
-    When it is closed with --session-id sess-close and promoted
+    Given a finding raised with --session sess-raise and promoted
+    When it is closed with --session sess-close and promoted
     Then the raised version keeps sess-raise and the transition carries sess-close
 
   # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
@@ -109,8 +109,8 @@ Feature: finding close
   @case:happy
   @finding.close.81
   Scenario: A close carries the scenarios the finding names and takes no list of its own
-    Given a committed blocker raised with --scenario-id naming one of a subject's two evidenced scenarios
-    When it is closed fixed with canon finding close, which has no --scenario-id
+    Given a committed blocker raised with --scenario naming one of a subject's two evidenced scenarios
+    When it is closed fixed with canon finding close, which has no --scenario
     Then the closed version carries the same scenario ids as the version it closes
     And the subject's ship refusal names that scenario only, until evidence for it is recorded after the close
 

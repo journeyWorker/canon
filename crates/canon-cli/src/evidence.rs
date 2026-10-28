@@ -28,7 +28,7 @@
 //! - **An agent that can run this command can authorize its own
 //!   checkbox.** There is no separation between the author of an
 //!   attestation and its beneficiary, no signature, and no second party.
-//!   `canon evidence add --task-id <id> --class test-run --ref never-ran
+//!   `canon evidence add --task <id> --class test-run --ref never-ran
 //!   --role implementer` stages, promotes, and satisfies `canon gate
 //!   task <id>`.
 //! - The value is ATTRIBUTION and AUDIT, not verification: every flip
@@ -93,7 +93,7 @@
 //! one. So the three-command loop is:
 //!
 //! ```text
-//! canon evidence add --task-id <id> --kind <k> --ref <r> --role <role>
+//! canon evidence add --task <id> --kind <k> --ref <r> --role <role>
 //! canon gate promote
 //! canon task done <id>
 //! ```
@@ -137,7 +137,7 @@
 //! `--summary` becomes that suffix verbatim (`canon_gate::gate_task`
 //! returns it as the approved note), and with no `--summary` the
 //! fallback suffix `canon_gate`'s `default_evidence_text` builds embeds
-//! `--actor-id`. A `tasks.md` row is ONE LINE, so a line separator in
+//! `--actor`. A `tasks.md` row is ONE LINE, so a line separator in
 //! either value does not produce a longer row — it produces a second
 //! document line. s42's own review found the consequence:
 //! `--summary $'ok\n- [x] 9.9 Forged task'` appended a fully CHECKED row
@@ -145,7 +145,7 @@
 //! purpose is refusing unevidenced completion.
 //!
 //! [`run_add`] therefore refuses any `canon_ingest::task_rows::
-//! ROW_LINE_BREAKS` character in `--summary` or `--actor-id`, as a usage
+//! ROW_LINE_BREAKS` character in `--summary` or `--actor`, as a usage
 //! error, before anything is staged — and the write-back refuses a
 //! multi-line note again on its own (`canon_ingest::
 //! reject_multi_line_note`), so a different author reaching `flip_task`
@@ -183,7 +183,7 @@
 //!
 //! Unknown-task admission is shared the same way:
 //! [`crate::dispatch::validate_task_binding`], the very decision `canon
-//! dispatch begin --task-id` makes (s41 extracted the D8 ownership rule
+//! dispatch begin --task` makes (s41 extracted the D8 ownership rule
 //! into one place precisely because a second copy had already drifted).
 //!
 //! # Nothing is attested under an unapproved brief (0.16 M7)
@@ -278,7 +278,7 @@ fn brief_refusals(
     flow_changes: &crate::brief_check::FlowChangesIndex,
     task_id: Option<&TaskId>,
     scenario: Option<(&ProjectId, &ScenarioId)>,
-) -> Vec<BriefRefusal> {
+) -> Result<Vec<BriefRefusal>, CliError> {
     // An unreadable `plans:` section finds no external proposal.md;
     // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
@@ -287,7 +287,18 @@ fn brief_refusals(
         .flatten()
         .collect::<Vec<_>>()
         .join(" and ");
-    crate::brief::attested_briefs(repo, &plan_roots, ctx, flow_changes, task_id, scenario)
+    let attested = crate::brief::attested_briefs(repo, &plan_roots, ctx, flow_changes, task_id, scenario);
+    // 0.31: a brief in the 0.30 format is not judged but refused, approved or not, and `--override-reason` does not waive it.
+    let mut old: Vec<crate::old_briefs::OldBrief> = Vec::new();
+    for found in attested.iter().filter_map(|(_, brief)| brief.old_format.as_ref()).cloned().chain(crate::brief::old_format_governing(repo, ctx, flow_changes, task_id, scenario)) {
+        if !old.contains(&found) {
+            old.push(found);
+        }
+    }
+    if let Some(error) = crate::old_briefs::refusal(&old) {
+        return Err(error);
+    }
+    Ok(attested
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
         .map(|(subject, brief)| BriefRefusal {
@@ -298,7 +309,7 @@ fn brief_refusals(
             ),
             changed: brief.changed,
         })
-        .collect()
+        .collect())
 }
 
 /// One brief refusal: the `unreviewed-promotion` violation it prints, and
@@ -469,7 +480,7 @@ pub struct EvidenceArgs {
     /// scenario id (repeatable; 0.14 D5).
     pub report_cases: Vec<String>,
     /// `--all-scenarios` (0.18 D1): one record per indexed scenario of
-    /// `--project-id` that owns a case in the `--report`s
+    /// `--project` that owns a case in the `--report`s
     /// ([`run_add_all`]).
     pub all_scenarios: bool,
     /// The artifact store's per-file size limit, in MiB.
@@ -545,12 +556,12 @@ pub fn audit_verdict(result: AuditResult) -> EvidenceVerdict {
 /// The audit an `--kind audit` invocation records, or `None` for every
 /// other kind (0.15 D3). The four evaluator/result flags are required
 /// with `--kind audit` and refused elsewhere; the declared-record flags
-/// the gate reads only off declared evidence (`--task-id`, `--verdict`,
+/// the gate reads only off declared evidence (`--task`, `--verdict`,
 /// `--surface-ref`, the approval set) are refused on an audit, so no
 /// value is recorded that nothing would ever read.
 fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
     let audit_flags = [
-        ("--evaluator-id", args.evaluator_id.is_some()),
+        ("--evaluator", args.evaluator_id.is_some()),
         ("--evaluator-version", args.evaluator_version.is_some()),
         ("--evaluator-digest", args.evaluator_digest.is_some()),
         ("--audit-result", args.audit_result.is_some()),
@@ -570,7 +581,7 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
         ));
     }
     let declared_only = [
-        ("--task-id", args.task_id.is_some()),
+        ("--task", args.task_id.is_some()),
         ("--verdict", args.verdict.is_some()),
         ("--surface-ref", !args.surface_ref.is_empty()),
         ("--approver", args.approval_by.is_some()),
@@ -581,19 +592,19 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
     let refused: Vec<&str> = declared_only.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
     if !refused.is_empty() {
         return Err(format!(
-            "{} do(es) not apply to `--class {AUDIT_KIND}`: an audit re-checks one scenario (--scenario-id/--project-id), its verdict is its --audit-result, and it never flips a task or approves a risk",
+            "{} do(es) not apply to `--class {AUDIT_KIND}`: an audit re-checks one scenario (--scenario/--project), its verdict is its --audit-result, and it never flips a task or approves a risk",
             refused.join(", ")
         ));
     }
     if args.scenario_id.is_none() {
-        return Err(format!("`--class {AUDIT_KIND}` needs --scenario-id and --project-id: an audit re-checks one scenario's declared success"));
+        return Err(format!("`--class {AUDIT_KIND}` needs --scenario and --project: an audit re-checks one scenario's declared success"));
     }
     let (Some(evaluator_id), Some(evaluator_version), Some(evaluator_digest), Some(result)) =
         (&args.evaluator_id, &args.evaluator_version, &args.evaluator_digest, &args.audit_result)
     else {
         unreachable!("every audit flag is present, checked above");
     };
-    for (flag, value) in [("--evaluator-id", evaluator_id), ("--evaluator-version", evaluator_version)] {
+    for (flag, value) in [("--evaluator", evaluator_id), ("--evaluator-version", evaluator_version)] {
         if value.is_empty() || value.trim() != value || first_row_line_break(value).is_some() {
             return Err(format!("{flag} must be a non-empty, trimmed, single-line value"));
         }
@@ -626,9 +637,9 @@ type ApprovalBinding = (Vec<u8>, Vec<String>, Vec<String>);
 fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, String> {
     let subject = args.task_id.as_ref().map(ToString::to_string)
         .or_else(|| args.scenario_id.as_ref().map(ToString::to_string))
-        .ok_or("give --task-id or --scenario-id")?;
+        .ok_or("give --task or --scenario")?;
     if args.scenario_id.is_some() && args.project_id.is_none() {
-        return Err("--scenario-id requires --project-id".into());
+        return Err("--scenario requires --project".into());
     }
     if args.approval_by.is_empty() || args.approval_by.trim() != args.approval_by
         || first_row_line_break(&args.approval_by).is_some() {
@@ -740,7 +751,11 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
             return error.emit("canon evidence approval-payload", args.json);
         }
     }
-    match approval_binding(&repo, args) {
+    let bound = approval_binding(&repo, args).map_err(ApprovalRefusal::from).and_then(|bound| {
+        ensure_scenario_indexed(&repo, args)?;
+        Ok(bound)
+    });
+    match bound {
         Ok((payload, surface, effects)) if args.json => {
             let hex: String = payload.iter().map(|byte| format!("{byte:02x}")).collect();
             crate::json_out::data(
@@ -754,10 +769,40 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
                 CliError::refused("WRITE_FAILED", error.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon evidence approval-payload", false)
             }
         },
-        Err(error) => {
+        Err(ApprovalRefusal::NotIndexed(error)) => error.emit("canon evidence approval-payload", args.json),
+        Err(ApprovalRefusal::Binding(error)) => {
             CliError::refused("EVIDENCE_REFUSED", error.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence approval-payload", args.json)
         }
     }
+}
+
+/// Why `approval-payload` printed no bytes.
+enum ApprovalRefusal {
+    /// The binding itself was refused (`EVIDENCE_REFUSED`).
+    Binding(String),
+    /// The scenario is not in the scenario index (`EVIDENCE_SCENARIO_NOT_INDEXED`).
+    NotIndexed(CliError),
+}
+
+impl From<String> for ApprovalRefusal {
+    fn from(message: String) -> Self {
+        Self::Binding(message)
+    }
+}
+
+/// Refuse a `--scenario` the scenario index does not hold: there is nothing a signer could attest to.
+fn ensure_scenario_indexed(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(), ApprovalRefusal> {
+    let (Some(scenario), Some(project)) = (&args.scenario_id, &args.project_id) else {
+        return Ok(());
+    };
+    let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::NotIndexed(CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root")))?;
+    if canon_gate::spec_coverage::latest_scenarios(&context).iter().any(|s| &s.project_id == project && &s.scenario_id == scenario) {
+        return Ok(());
+    }
+    Err(ApprovalRefusal::NotIndexed(
+        CliError::refused("EVIDENCE_SCENARIO_NOT_INDEXED", format!("scenario `{scenario}` is not in the scenario index of spec root `{project}`; no bytes were produced"))
+            .hint("run `canon inventory sync` so the spec root's scenarios are indexed (and check the id), then run `canon evidence approval-payload` again"),
+    ))
 }
 
 /// `canon evidence add` (module doc). Returns the process exit code.
@@ -767,7 +812,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
 /// invocation leaves the staging directory byte-identical — the same
 /// "a refused add writes nothing" property `crate::review::run_add`
 /// holds, and the reason `crate::dispatch::begin` validates its
-/// `--task-id` before minting anything.
+/// `--task` before minting anything.
 ///
 /// Not idempotent, deliberately: each call stamps a fresh `at`, so a
 /// second identical invocation stages a SECOND record and `canon gate
@@ -859,12 +904,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // The document-bound fields, refused before anything is staged
     // (module doc's injection section). Both of these — and ONLY these —
     // reach a plan document: `--summary` becomes the row's ` — ✅ `
-    // suffix verbatim, and `--actor-id` becomes it via
+    // suffix verbatim, and `--actor` becomes it via
     // `default_evidence_text` when no summary is given. Checked through
     // the row grammar's OWN separator set rather than a local `contains
     // ('\n')`, so this refusal and the write-back's cannot disagree about
     // which inputs are safe.
-    for (flag, value) in [("--summary", args.summary.as_deref()), ("--actor-id", Some(args.actor_id.as_str()))] {
+    for (flag, value) in [("--summary", args.summary.as_deref()), ("--actor", Some(args.actor_id.as_str()))] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
         return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
@@ -878,7 +923,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // `None`), so staging one would be writing an attestation nothing
     // can ever read back.
     if args.task_id.is_none() && args.scenario_id.is_none() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "give --task-id, --scenario-id, or both; a record with neither carries no coverage subject and no gate can read it back").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "give --task, --scenario, or both; a record with neither carries no coverage subject and no gate can read it back").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // A scenario-keyed record needs the COMPOSITE key, because
@@ -886,10 +931,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // carry the same scenario id. Refused rather than defaulted: there
     // is no safe guess when `specs.roots[]` holds more than one entry.
     if args.scenario_id.is_some() && args.project_id.is_none() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--scenario-id needs --project-id; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--scenario needs --project; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
-    // The SAME plan-corpus admission `canon dispatch begin --task-id` makes
+    // The SAME plan-corpus admission `canon dispatch begin --task` makes
     // (module doc) — an id no import pass would persist as a `Task`
     // record is not an id evidence may be attested against. Skipped
     // entirely for a scenario-only record: there is no task to admit.
@@ -911,7 +956,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         let subject = match (&args.task_id, &args.scenario_id) {
             (Some(task_id), _) => task_id.to_string(),
             (None, Some(scenario_id)) => scenario_id.as_str().to_string(),
-            (None, None) => unreachable!("one of --task-id/--scenario-id is required, checked above"),
+            (None, None) => unreachable!("one of --task/--scenario is required, checked above"),
         };
         // Worded and exited like every other gate-red refusal of this
         // command (0.18 D5, #32): `refused —`, exit 1.
@@ -947,7 +992,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
         }
     };
-    let refusals = brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
+    let refusals = match brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref())) {
+        Ok(refusals) => refusals,
+        Err(error) => return error.emit(&args.full(), args.json),
+    };
     if let Err(error) = report_brief_refusals(args, &refusals) {
         return error.emit(&args.full(), args.json);
     }
@@ -1071,7 +1119,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // A repeat of the subject's latest record writes nothing (`crate::retry`).
     let (subject, next) = match &args.task_id {
         Some(task_id) => (task_id.to_string(), format!("then `canon task done {task_id}`")),
-        None => (args.scenario_id.as_ref().expect("one of --task-id/--scenario-id is required, checked above").as_str().to_string(), "then `canon gate check`".to_string()),
+        None => (args.scenario_id.as_ref().expect("one of --task/--scenario is required, checked above").as_str().to_string(), "then `canon gate check`".to_string()),
     };
     let outcome = match &record_audit_result {
         Some(result) => format!("audit {}", result.as_str()),
@@ -1229,17 +1277,17 @@ fn brief_override_of(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Option<B
 }
 
 /// `--all-scenarios` (0.18 D1) checks its flag combination before
-/// anything else: it needs a `--report` to split and the `--project-id`
+/// anything else: it needs a `--report` to split and the `--project`
 /// whose indexed scenarios own the cases, and refuses every flag that
-/// names one subject (`--scenario-id`, `--task-id`, `--report-case`, an
+/// names one subject (`--scenario`, `--task`, `--report-case`, an
 /// audit, an approval).
 fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
     if !args.all_scenarios {
         return Ok(());
     }
     let one_subject = [
-        ("--scenario-id", args.scenario_id.is_some()),
-        ("--task-id", args.task_id.is_some()),
+        ("--scenario", args.scenario_id.is_some()),
+        ("--task", args.task_id.is_some()),
         ("--report-case", !args.report_cases.is_empty()),
         ("--class audit", args.kind == AUDIT_KIND),
         ("--approver", args.approval_by.is_some()),
@@ -1250,7 +1298,7 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
     let refused: Vec<&str> = one_subject.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
     if !refused.is_empty() {
         return Err(format!(
-            "{} name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario-id and without --all-scenarios",
+            "{} name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario and without --all-scenarios",
             refused.join(", ")
         ));
     }
@@ -1258,7 +1306,7 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
         return Err("--all-scenarios splits a --report <format>:<path> by the scenario each case belongs to; none was given".to_string());
     }
     if args.project_id.is_none() {
-        return Err("--all-scenarios needs --project-id: the cases are matched against that spec root's indexed scenarios".to_string());
+        return Err("--all-scenarios needs --project: the cases are matched against that spec root's indexed scenarios".to_string());
     }
     Ok(())
 }
@@ -1291,7 +1339,7 @@ fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
 }
 
 /// `canon evidence add --all-scenarios` (0.18 D1): one record per indexed
-/// scenario of `--project-id` that owns a case in the reports
+/// scenario of `--project` that owns a case in the reports
 /// ([`crate::evidence_attach::bind_all_scenarios`]), each with its own
 /// cases and its own verdict (`--verdict` when given, else derived from
 /// its cases). All or nothing: the fabrication scan, every record's brief
@@ -1301,7 +1349,7 @@ fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
 /// per record, then each unindexed scenario id it skipped, then any
 /// review the batch makes stale.
 fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
-    let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project-id, checked by check_all_scenarios_flags");
+    let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project, checked by check_all_scenarios_flags");
     let mut gate_context = match load_gate_context(repo) {
         Ok(ctx) => ctx,
         Err(e) => {
@@ -1343,7 +1391,13 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     // One flow-change index for the whole batch: each lookup is then a map
     // read, not a walk of every spec root per scenario (0.29 D3).
     let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
-    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect();
+    let refusals: Vec<Vec<BriefRefusal>> = match scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect() {
+        Ok(refusals) => refusals,
+        Err(error) => {
+            let hint = format!("no record of the batch is written; {}", error.hint_text().unwrap_or_default());
+            return error.hint(hint).emit("canon evidence add", args.json);
+        }
+    };
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
         let hint = format!("no record of the batch is written; {}", error.hint_text().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);
@@ -1626,12 +1680,12 @@ fn repin_command(review: &Review) -> String {
     let mut words = vec![
         "canon review scenario".to_string(),
         shell_quote(review.target()),
-        format!("--project-id {}", shell_quote(review.project_id.as_str())),
-        format!("--actor-id {}", shell_quote(&review.envelope.actor.agent_id)),
+        format!("--project {}", shell_quote(review.project_id.as_str())),
+        format!("--actor {}", shell_quote(&review.envelope.actor.agent_id)),
         format!("--role {}", shell_quote(role)),
     ];
     if let Some(session) = &review.envelope.actor.session_id {
-        words.push(format!("--session-id {}", shell_quote(session.as_str())));
+        words.push(format!("--session {}", shell_quote(session.as_str())));
     }
     words.push(match &review.provenance_ref {
         ProvenanceRef::UpstreamRef(r) => format!("--upstream-ref {}", shell_quote(r)),
@@ -1943,7 +1997,7 @@ mod tests {
     /// The shared-admission requirement of task 4.1: an id the plan
     /// corpus does not carry is refused by
     /// `crate::dispatch::validate_task_binding`, the same decision
-    /// `canon dispatch begin --task-id` makes — never a second local copy.
+    /// `canon dispatch begin --task` makes — never a second local copy.
     #[test]
     fn an_unknown_task_is_refused_through_the_shared_admission_and_stages_nothing() {
         let tmp = repo_with_plan_corpus();
@@ -2054,7 +2108,7 @@ mod tests {
     /// LAYER ONE of the newline-injection fix (module doc): the exact
     /// forgery s42's review demonstrated, refused as a usage error before
     /// anything is staged — for `--summary`, which becomes the row suffix
-    /// verbatim, and for `--actor-id`, which becomes it via
+    /// verbatim, and for `--actor`, which becomes it via
     /// `default_evidence_text` when no summary is given.
     ///
     /// Both spellings of the vector, and the row grammar's WHOLE
@@ -2068,7 +2122,7 @@ mod tests {
 
         let mut forged_actor = args(None);
         forged_actor.actor_id = "canon\n- [x] 9.9 Forged task".to_string();
-        assert_eq!(run_add(tmp.path(), &forged_actor), 2, "--actor-id reaches the default suffix, so it must refuse one too");
+        assert_eq!(run_add(tmp.path(), &forged_actor), 2, "--actor reaches the default suffix, so it must refuse one too");
 
         for separator in canon_ingest::task_rows::ROW_LINE_BREAKS {
             let summary = format!("ok{separator}- [x] 9.9 Forged task");

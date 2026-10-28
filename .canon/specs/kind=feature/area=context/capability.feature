@@ -143,7 +143,7 @@ Feature: context capability
     Given the whole command tree as `canon schema --json` and `canon schema <command> --json` show it
     When every visible flag of every command is read
     Then no two flags differ only by an -id suffix
-    And change, project, subject, actor, scenario, session and run each appear only as --<name>-id
+    And change, project, subject, actor, scenario, session and run each appear only as --<name>, and no option ends in -id
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -161,10 +161,10 @@ Feature: context capability
   @context.capability.16
   Scenario: A removed flag spelling is a usage error whose hint names the flag that replaced it
     Given a repo with a change and a brief
-    When `canon scenario new demo.login.01 --title A --change add-login --json` runs, the spelling 0.23 took and 0.24 deprecated
-    Then it exits 2 with the USAGE error, field `--change`, `expected` listing `--change-id`, and a hint
-    And nothing runs, and `--change=<slug>` and a `--change` missing its value are refused the same way
-    And `--change-id <slug>` runs, and the JSON envelope carries no meta.deprecated
+    When `canon scenario new demo.login.01 --title A --json` runs with the id-suffixed spelling of the change option, the spelling 0.30 took and 0.31 removed
+    Then it exits 2 with the USAGE error, the field the spelling typed, `expected` listing `--change`, and a hint
+    And nothing runs, and the spelling joined to its value by an equals sign and the spelling missing its value are refused the same way
+    And `--change <slug>` runs, and the JSON envelope carries no meta.deprecated
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -183,7 +183,8 @@ Feature: context capability
   Scenario: Help and schema show only the one name, with no deprecated field
     Given the help of a command that renamed a flag, and of query
     When the help and `canon schema <command> --json` are read
-    Then they show --change-id and the kinds without the _record suffix, and none of the removed spellings
+    Then they show --change and the kinds without the _record suffix, and none of the removed spellings
+    And no option of any command ends in -id
     And no option carries deprecatedAliases or deprecatedValues
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
@@ -211,21 +212,21 @@ Feature: context capability
   @case:failure
   @context.capability.21
   Scenario: A scenario batch element with a removed key name refuses the batch and names the key to use
-    Given a JSON array for `canon scenario new --input` whose second element uses the key subject, change or project
+    Given a JSON array for `canon scenario new --input` whose second element uses the key subjectId, changeId or projectId that the id-suffixed options made
     When the batch runs
-    Then it exits 2 with INPUT_UNKNOWN_FIELD and writes nothing
-    And the error's field points at the element and the key, as `/items/1/subject`, and `expected` lists the key that replaced it, `subjectId`
-    And an array using subjectId, projectId and changeId is written as before
+    Then it exits 2 with INPUT_UNKNOWN_FIELD and writes nothing, the first element included
+    And the error's field points at the element and the key, as `/items/1/subjectId`, `expected` lists the valid keys, the key without Id among them, and the hint names it
+    And an array using the keys subject, project and change is written
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
   @case:failure
   @context.capability.22
   Scenario: A checker over the command tree reports a concept spelled two ways
-    Given a list of commands whose flags include both --change and --change-id
+    Given a list of commands whose flags include both --change and its id-suffixed spelling
     When the one-name checker runs over it
     Then it reports the split by the two spellings and the commands that carry each
-    And a concept written without its -id suffix and a --kind value ending in _record are each reported
+    And an option that ends in -id and a --kind value ending in _record are each reported
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -477,3 +478,158 @@ Feature: context capability
     When canon schema runs with the command nope, and with a leaf command followed by extra path words
     Then each exits 2 with UNKNOWN_COMMAND, the first naming nope and the second saying the leaf takes no sub-path
     And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-27T13:10:01Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:happy
+  @flow:canon-0-31-cli-ids.F1
+  @context.capability.47
+  Scenario: Every id option is the bare noun and runs, writing the record the old spelling wrote
+    Given the fourteen options that took an id in 0.30, now spelled --actor, --session, --project, --change, --run, --task, --subject, --scenario, --skill, --parent-run, --evaluator, --review, --plugin and --contradicting-trajectory
+    When a line of each of the 24 commands that has one runs with the bare spelling, the same value and the same fixture a 0.30 canon ran with the id-suffixed spelling
+    Then it exits as it did, and the record, the report JSON and meta.next are equal byte for byte once times, ULIDs and digests are masked
+    And the stored records and the report JSON keep their id-suffixed keys, and no option of any command ends in -id
+
+  # canon: {"schema":1,"at":"2026-10-27T13:10:11Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F1
+  @context.capability.48
+  Scenario: The id-suffixed spelling of an option on the same line exits 2 and the ledger is unchanged
+    Given a repo with a change and a ledger, and a line that ran with the bare spelling
+    When the same line runs with the 0.30 id-suffixed spelling of one option, such as the change
+    Then it exits 2 with the USAGE error and writes nothing, so the ledger and the working tree are as they were
+    And the message says the option was removed in 0.31.0, and the hint is the line with the bare spelling
+
+  # canon: {"schema":1,"at":"2026-10-27T13:10:18Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F2
+  @context.capability.49
+  Scenario: Every removed id spelling is a usage error naming the bare spelling, in the space and equals forms and with its value missing
+    Given every row of the removed-spellings table that is an id option, one command of its scope at a time
+    When the command runs with the id-suffixed spelling and a value, with the spelling joined to its value by an equals sign, and with the spelling and no value
+    Then each exits 2 with the USAGE error, the field is the spelling typed and expected lists the option that replaced it
+    And the hint says the spelling was removed in 0.31.0 and shows the typed line with the bare spelling, and nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-27T13:10:30Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:edge
+  @flow:canon-0-31-cli-ids.F2
+  @context.capability.50
+  Scenario: A token after -- or an option's value is never read as an old id spelling, and a command that never had it gets the ordinary error
+    Given a command line that carries an id-suffixed spelling only after `--` or as the value of another option, and a command that never had that spelling
+    When the lines run
+    Then the first runs without a usage error about a removed spelling
+    And the command that never had the spelling gets the ordinary unknown-argument error, with no removal hint
+    And `canon dispatch begin --task add-search#1` runs, the spelling 0.28 removed being valid again
+
+  # canon: {"schema":1,"at":"2026-10-27T13:10:37Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F2
+  @context.capability.51
+  Scenario: A line with several old id spellings is refused once and its hint line runs as printed
+    Given a line of one command that carries several id-suffixed spellings, one of them as `--name=value` and one that was moved to an operand in 0.28
+    When it runs
+    Then it is refused once, the message naming the first spelling in the line
+    And the hint is the whole line with every id-suffixed spelling replaced, the 0.28 operand move included
+    And running the hint line exactly as printed exits 0 and writes the records the first line meant
+
+  # canon: {"schema":1,"at":"2026-10-27T13:10:51Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:happy
+  @flow:canon-0-31-cli-ids.F3
+  @context.capability.52
+  Scenario: An input document keyed by the bare option names writes what the flags write
+    Given a leaf that takes --input and the same invocation spelled as flags
+    When the document uses the camelCase of the bare option names, singular for a repeatable option, and the flags run on a second repo
+    Then both write the same bytes once times, ULIDs and digests are masked
+    And the report JSON and the stored record keep the keys they had in 0.30
+
+  # canon: {"schema":1,"at":"2026-10-27T13:11:03Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F3
+  @context.capability.53
+  Scenario: A batch whose second element keeps an old Id key is refused naming that element's key, and writes nothing
+    Given a JSON array for `canon scenario new --input` whose second element names the scenario's subject with the key the id-suffixed option made
+    When the batch runs
+    Then it exits 2 with INPUT_UNKNOWN_FIELD and the field points at that element's key, as `/items/1/` and the key
+    And expected lists the valid keys, the hint names the key without Id, and the first element is not written either
+
+  # canon: {"schema":1,"at":"2026-10-27T13:11:14Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F4
+  @context.capability.54
+  Scenario: With two spec roots a missing --project is refused in the new spelling and the placeholders stay in the hint
+    Given a repo that configures two spec roots
+    When `canon feature new` runs without --project
+    Then it exits 2 with SPEC_ROOT_UNRESOLVED and nothing is written
+    And the message and the hint name --project, and the placeholder in the hint is the one it had
+
+  # canon: {"schema":1,"at":"2026-10-27T13:11:30Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F4
+  @context.capability.55
+  Scenario: An unknown --project root and an unknown finding --review are refused naming the new options
+    Given a repo with one spec root, and a committed change
+    When `canon evidence add` names a root that is not configured with --project, and `canon finding add` names a review the ledger does not hold with --review
+    Then the first exits 2 with UNKNOWN_SPEC_ROOT, the field --project and a hint naming `--project` with the one configured root, as before the rename
+    And the second is refused with the field --review, and neither writes anything
+
+  # canon: {"schema":1,"at":"2026-10-27T13:12:22Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:edge
+  @flow:canon-0-31-cli-ids.F4
+  @context.capability.56
+  Scenario: Every command line canon generates uses the bare spelling and parses against the spec
+    Given the next steps and their argv, the error hints, the status suggestions, the gate violations' remedies, and the examples of the schema and the help
+    When each command line is parsed against the spec
+    Then it parses, and it contains no option that ends in -id
+    And a placeholder or an ellipsis stays where it was
+
+  # canon: {"schema":1,"at":"2026-10-27T13:14:10Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:happy
+  @flow:canon-0-31-cli-ids.F5
+  @context.capability.57
+  Scenario: The schema shows no option ending in -id, and every command line in the skills and the website parses
+    Given `canon schema <command> --json` for every command, the skills and the website's command pages
+    When the options and every command line in the text are read
+    Then no option ends in -id, and every command line parses against the spec
+    And the skill guide states the rule once: an option that takes an id is the bare noun, and a JSON key is that name without Id
+
+  # canon: {"schema":1,"at":"2026-10-27T13:14:41Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F5
+  @context.capability.58
+  Scenario: The one-name checker reports an -id option and a concept spelled two ways, and a skill that keeps the old spelling fails the parse check
+    Given a command tree whose commands carry both --change and its id-suffixed spelling, and a skill text that still holds an id-suffixed actor option
+    When the one-name checker runs over the tree, and the generated-command parse check runs over the skill
+    Then the checker reports the two spellings and the commands that carry each, and an option that ends in -id on its own
+    And the parse check fails on the skill line
+
+  # canon: {"schema":1,"at":"2026-10-27T13:15:00Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:edge
+  @flow:canon-0-31-cli-ids.F5
+  @context.capability.59
+  Scenario: The spec corpus names no id option spelling and canon format passes
+    Given the spec corpus of this repo and the platformer example
+    When every step is read for an option that ends in -id
+    Then none is found, and canon format passes on both corpora
+
+  # canon: {"schema":1,"at":"2026-10-27T13:16:15Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-31-cli-ids.F5
+  @context.capability.60
+  Scenario: A rewritten scenario without a new review is reported by gate check as a stale review
+    Given a scenario with evidence and a review, whose step text is then rewritten
+    When canon gate check runs before the scenario is reviewed again
+    Then it reports the review as stale for the scenario and exits 1
+    And after new evidence and a review from another session it is clean

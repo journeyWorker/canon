@@ -66,13 +66,13 @@ fn a_reviewer_accepts_a_divergent_scenario_attested_by_another_actor() {
     let (code, _) = run(
         &repo,
         home.path(),
-        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.02", "--class", "test-run", "--ref", "npm test", "--verdict", "divergent", "--summary", "1 failed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
+        &["evidence", "add", "--project", "root", "--scenario", "auth.login.02", "--class", "test-run", "--ref", "npm test", "--verdict", "divergent", "--summary", "1 failed", "--actor", "impl", "--session", "s1", "--role", "implementer"],
     );
     assert_eq!(code, 0);
     let (code, accepted) = run(
         &repo,
         home.path(),
-        &["divergence", "accept", "auth.login.02", "--project-id", "root", "--reason", "the engine drops the event", "--tracking", "https://example.com/engine/issues/1", "--actor-id", "rev", "--role", "reviewer", "--session-id", "s9"],
+        &["divergence", "accept", "auth.login.02", "--project", "root", "--reason", "the engine drops the event", "--tracking", "https://example.com/engine/issues/1", "--actor", "rev", "--role", "reviewer", "--session", "s9"],
     );
     assert_eq!((code, &accepted["ok"]), (0, &Value::Bool(true)), "{accepted}");
 }

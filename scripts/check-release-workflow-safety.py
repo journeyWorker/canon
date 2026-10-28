@@ -281,10 +281,11 @@ def _relative(path: pathlib.Path, root: pathlib.Path) -> str:
 
 
 def _is_workflow(path: pathlib.Path) -> bool:
-    return (
-        len(path.parts) >= 3
-        and path.parts[0:2] == (".github", "workflows")
-        and path.suffix in {".yml", ".yaml"}
+    """Workflow files and composite actions: both carry `uses:` refs and `run:` steps."""
+    if path.suffix not in {".yml", ".yaml"}:
+        return False
+    return (len(path.parts) >= 3 and path.parts[0:2] == (".github", "workflows")) or (
+        len(path.parts) >= 4 and path.parts[0:2] == (".github", "actions")
     )
 
 
@@ -698,6 +699,8 @@ def main(argv: list[str] | None = None) -> int:
         "Cargo.toml",
         # Workspace clippy configuration (rust-coding-rules.md §1); clippy reads it from the root.
         "clippy.toml",
+        # The one Rust toolchain pin; rustup and cargo read it from the root.
+        "rust-toolchain.toml",
         "README.md",
         "bun.lock",
         "canon.yaml",

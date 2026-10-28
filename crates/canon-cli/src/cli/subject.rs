@@ -11,7 +11,7 @@ pub enum SubjectCommand {
     Adopt(SubjectAdoptArgs),
     /// Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
     #[command(
-        after_help = "Examples:\n  canon subject unadopt demo --change-id add-login\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope, and for a change a scenario the subject owns is tagged\n`@flow:<change>.*` for (remove or retag it first). A pair that is not linked writes nothing and exits 0."
+        after_help = "Examples:\n  canon subject unadopt demo --change add-login\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope, and for a change a scenario the subject owns is tagged\n`@flow:<change>.*` for (remove or retag it first). A pair that is not linked writes nothing and exits 0."
     )]
     Unadopt(SubjectUnadoptArgs),
     /// Show a subject (read-only)
@@ -38,7 +38,7 @@ pub struct SubjectNewArgs {
     #[arg(long, value_parser = crate::retrieve::parse_role, default_value = "implementer", value_name = "ROLE")]
     pub owner_role: RoleId,
     /// The invoking actor's id
-    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -57,7 +57,7 @@ pub struct SubjectAdoptArgs {
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub subject_id: SubjectId,
     /// The imported Change's id
-    #[arg(long, value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
+    #[arg(long = "change", value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: ChangeId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -76,7 +76,7 @@ pub struct SubjectUnadoptArgs {
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub subject_id: SubjectId,
     /// The change to take out of the subject
-    #[arg(long, value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
+    #[arg(long = "change", value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: ChangeId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -116,7 +116,7 @@ pub struct SubjectMoveArgs {
     #[arg(long, value_name = "TEXT")]
     pub reason: Option<String>,
     /// The invoking actor's id, recorded with an --override-reason waiver or a --reason
-    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,

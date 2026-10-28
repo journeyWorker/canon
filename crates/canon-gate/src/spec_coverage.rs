@@ -64,8 +64,8 @@
 //! is a required field, and a repo may configure several
 //! `specs.roots[]`, so two roots can carry the same scenario id. An
 //! `EvidenceRecord` whose `project_id` is absent therefore cannot
-//! satisfy this join; `canon evidence add` requires `--project-id`
-//! alongside `--scenario-id` for that reason.
+//! satisfy this join; `canon evidence add` requires `--project`
+//! alongside `--scenario` for that reason.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -509,7 +509,7 @@ mod tests {
     }
 
     /// A SCENARIO-keyed record carrying the composite key — the shape
-    /// `canon evidence add --scenario-id --project-id` now produces.
+    /// `canon evidence add --scenario --project` now produces.
     fn evidence(scenario_id: &str, verdict: EvidenceVerdict) -> EvidenceRecord {
         let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
         EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario_id).unwrap()), None, verdict).with_project_id(project())

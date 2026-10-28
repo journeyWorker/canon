@@ -32,12 +32,18 @@ pub mod task;
 pub mod tier;
 mod top;
 
-use canon_model::RoleId;
-use crate::cli_error::CliError;
-use std::process::ExitCode;
+use crate::cli::top::{
+    CompletionArgs, ContextArgs, DashboardArgs, FormatArgs, InitArgs, MigrateArgs, PurgeArgs,
+    RetrieveArgs, SchemaArgs, SelftestArgs, StatusArgs,
+};
 use crate::cli::{Cli, Command};
-use top::{run_regime_show, run_report, run_query, run_fmt, run_context, run_init, run_retrieve, run_dashboard, run_completion};
-use crate::cli::top::{PurgeArgs, FormatArgs, ContextArgs, StatusArgs, InitArgs, MigrateArgs, RetrieveArgs, DashboardArgs, SelftestArgs, SchemaArgs, CompletionArgs};
+use crate::cli_error::CliError;
+use canon_model::RoleId;
+use std::process::ExitCode;
+use top::{
+    run_completion, run_context, run_dashboard, run_fmt, run_init, run_query, run_regime_show,
+    run_report, run_retrieve,
+};
 
 pub fn run(cli: Cli) -> ExitCode {
     let declared = cli.declared_role;
@@ -74,6 +80,8 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Tier { action } => tier::run(action),
         Command::Ledger { action } => ledger::run(action),
         Command::Query(args) => run_query(args),
+        Command::Search(args) => crate::search::run_search(args),
+        Command::Trace(args) => crate::search::run_trace(args),
         Command::Export(args) => ExitCode::from(crate::retention::run_export(args)),
         Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => {
             let base = crate::safety::command("purge", &[("--kind", kind.as_str().to_string()), ("--before", before.to_rfc3339())], &repo);

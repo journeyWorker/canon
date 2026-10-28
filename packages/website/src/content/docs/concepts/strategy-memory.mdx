@@ -84,7 +84,7 @@ platformer.session.04: resolved divergence — Idle and resize sessions stay err
 </Aside>
 
 Strategy memory is **rebuilt, not recomputed once**: `canon ingest
-artifacts` re-derives distilled strategies from the current trajectory
+records` re-derives distilled strategies from the current trajectory
 set (`rebuild_namespace`) every time it runs. That re-derivation is
 deterministic — a second ingest pass over the same artifacts derives
 byte-identical trajectory content, so the duplicate skip the rebuild
@@ -204,9 +204,9 @@ rollback and does not produce a rollback record. An explicit rollback is
 separate:
 
 ```bash
-canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regression" --actor-id alice \
+canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regression" --actor alice \
   --signature-file rollback.sig --approval-at 2026-10-02T12:00:00Z \
-  --contradicting-trajectory-id 01ARZ3NDEKTSV4RRFFQ69G5FAW --repo .
+  --contradicting-trajectory 01ARZ3NDEKTSV4RRFFQ69G5FAW --repo .
 ```
 
 The rollback signature covers the

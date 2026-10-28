@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:30:51.203638340Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test tier_age a_stale_digest_moves_nothing_and_a_fresh_preview_commits"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 56,
+  "scenario_id": "tier.storage.10",
+  "schema": 1,
+  "staging_id": "c38e2c0e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

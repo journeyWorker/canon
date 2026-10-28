@@ -73,6 +73,7 @@ use serde_yaml::Value;
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::json_out::Report;
+use crate::migrate_briefs;
 use crate::migrate_names;
 use crate::migrate_pins;
 use crate::safety::{self, Effect, Mode};
@@ -318,23 +319,40 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
             return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
+    // The renamed ledger is judged in a scratch copy (the review pins, the chore reviews of the briefs).
+    let world = match names.renames().then(|| migrate_names::scratch(&repo, &renamed_config, &names)).transpose() {
+        Ok(world) => world,
+        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("check that the system temp directory is writable, then run `canon migrate` again").emit("canon migrate", json),
+    };
+    let view = world.as_ref().map_or(repo.as_path(), |w| w.path());
+    // 0.31 `brief-format`: the briefs in the 0.30 format, and the approvals and review pins their rewrite re-binds.
+    let real_ledger = match canon_gate::GateCtx::from_repo(&repo) {
+        Ok(ctx) => ctx.ledger_root,
+        Err(e) => {
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string())
+                .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run `canon migrate` again")
+                .emit("canon migrate", json)
+        }
+    };
+    let ledger_prefix = real_ledger.strip_prefix(&repo).map_or_else(|_| PathBuf::from(canon_model::paths::LEDGER_DIR), Path::to_path_buf);
+    let view_ledger = world.as_ref().map_or_else(|| real_ledger.clone(), |w| w.ledger_root().to_path_buf());
+    let briefs = match migrate_briefs::plan(&repo, &view_ledger, &ledger_prefix) {
+        Ok(briefs) => briefs,
+        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
+    };
     if git {
         let mut moved_paths = plan.moved_paths.clone();
         moved_paths.extend(names.moved_paths().into_iter().map(PathBuf::from));
+        moved_paths.extend(briefs.paths());
         if let Some(dirty) = uncommitted(&repo, &moved_paths) {
             return CliError::refused("MIGRATE_UNCOMMITTED", format!("uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}")).hint("commit or stash the listed paths (`git status` shows them), then run `canon migrate` again").emit("canon migrate", json);
         }
     }
 
     let index_changes = index_changes(&repo, &plan, &names);
-    print_plan(&repo, &plan, &names, config != text, index_changes, &mut log);
+    print_plan(&repo, &plan, &names, &briefs, config != text, index_changes, &mut log);
     // The read-only steps after the file moves: the compaction and the review pins. A repo that is renamed
     // first is judged in its renamed state: a scratch copy of the ledger holds the files under their new names.
-    let world = match names.renames().then(|| migrate_names::scratch(&repo, &renamed_config, &names)).transpose() {
-        Ok(world) => world,
-        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("check that the system temp directory is writable, then run `canon migrate` again").emit("canon migrate", json),
-    };
-    let view = world.as_ref().map_or(repo.as_path(), |w| w.path());
     let ledger_lines = match crate::ledger::migrate_lines(view, true) {
         Ok(lines) => lines,
         Err(e) => return e.emit("canon migrate", json),
@@ -345,7 +363,15 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     };
     let old_world = names.old_evidence();
     let pins = migrate_pins::run_in(&repo, world.as_ref().map(migrate_names::Scratch::ledger_root), &old_world, false);
-    let safe_plan = safety::Plan::new(effects(&repo, &plan, &names, config != text, ledger_effects, pins.as_ref().ok(), index_changes));
+    let mut listed = effects(&repo, &plan, &names, config != text, ledger_effects, pins.as_ref().ok(), index_changes);
+    listed.extend(briefs.effects());
+    let safe_plan = safety::Plan::new(listed);
+    // A plan that re-binds an `Approved:` line or a review pin is the human's to commit.
+    if matches!(mode, Mode::Commit(_)) && briefs.rebinds() {
+        if let Some(error) = migrate_briefs::human_only("canon migrate", &format!("{base} --commit --plan-digest {}", safe_plan.plan_digest)) {
+            return error.emit("canon migrate", json);
+        }
+    }
     let commit = match safe_plan.gate(mode, &base) {
         Ok(commit) => commit,
         Err(e) => return e.emit("canon migrate", json),
@@ -391,7 +417,10 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     // Everything a step may touch is copied once more, whole, so `canon migrate --revert` can undo every step; a
     // repeat that only rebuilds the index leaves no snapshot (the newest one stays the one to revert).
     let snapshotted = safe_plan.effects.iter().any(|effect| effect.action != "rebuild");
-    let backup_path = if names.renames() || snapshotted {
+    let resume = migrate_briefs::resume_backup(&repo);
+    let backup_path = if resume.is_some() {
+        resume.clone()
+    } else if names.renames() || snapshotted {
         match migrate_names::backup_dir(&repo, backup_path) {
             Ok(dir) => Some(dir),
             Err(e) => return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that .canon/ is writable and the disk has room, then run `canon migrate` again").emit("canon migrate", json),
@@ -399,7 +428,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     } else {
         backup_path
     };
-    if let Some(dir) = backup_path.as_ref().filter(|_| snapshotted) {
+    if let Some(dir) = backup_path.as_ref().filter(|_| snapshotted && resume.is_none()) {
         let extra = snapshot_paths(&plan, &names);
         if let Err(e) = migrate_names::snapshot(&repo, dir, &migrate_names::scope(&repo, extra)) {
             return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that .canon/ is writable and the disk has room, then run `canon migrate` again").emit("canon migrate", json);
@@ -415,6 +444,24 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
             return CliError::refused("MIGRATE_STOPPED", e).hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
         }
         log.line(format!("canon migrate: renamed {} record file(s) to the 0.30 rule (kind=<kind>/<components>_<digest8>.json)", names.moves.len()));
+    }
+    if let Some(dir) = backup_path.as_ref() {
+        if let Err(e) = migrate_briefs::apply(&repo, &briefs, dir) {
+            return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest"))
+                .hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/")
+                .emit("canon migrate", json);
+        }
+        if briefs.writes() {
+            log.line(format!(
+            "canon migrate: rewrote {} brief(s) to the 0.31 format{}",
+            briefs.briefs.len(),
+            if briefs.rebinds() {
+                format!(" and re-bound {} `Approved:` line(s) and {} review pin(s)", briefs.briefs.iter().filter(|b| b.rebinds_approval()).count(), briefs.reviews.len())
+            } else {
+                String::new()
+            }
+        ));
+        }
     }
     if let Err(e) = plan.legacy.apply(&repo) {
         return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest")).hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
@@ -490,7 +537,9 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
                 .emit("canon migrate", json);
         }
     }
-    rebuild_index(&repo, log, safe_plan, backup_dir, &old_world, json)
+    // A run that wrote something, or that finished a stopped one in its backup (whose plan may have nothing left but
+    // the index), seals the backup.
+    rebuild_index(&repo, log, safe_plan, backup_dir, snapshotted || resume.is_some(), &old_world, json)
 }
 
 /// The plan for `repo` with `canon.yaml` `text`, or why it is refused.
@@ -1105,11 +1154,14 @@ fn print_names(names: &migrate_names::Plan, log: &mut crate::json_out::Log) {
     }
 }
 
-fn print_plan(repo: &Path, plan: &Plan, names: &migrate_names::Plan, config_changes: bool, index_changes: bool, log: &mut crate::json_out::Log) {
+fn print_plan(repo: &Path, plan: &Plan, names: &migrate_names::Plan, briefs: &migrate_briefs::Plan, config_changes: bool, index_changes: bool, log: &mut crate::json_out::Log) {
+    for line in briefs.lines() {
+        log.line(line);
+    }
     print_names(names, log);
     let names_work = names.renames() || !names.config_keys.is_empty() || !names.gitignore_lines.is_empty();
     if !plan.changes_files() && plan.left.is_empty() {
-        if !names_work {
+        if !names_work && briefs.is_empty() {
             log.line("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names");
         }
         if index_changes {
@@ -1328,8 +1380,8 @@ fn tracked_index_files(repo: &Path) -> usize {
 
 /// The full index rebuild (module doc). Exit `1` when a root does not
 /// sync clean: the migration stands, and `canon inventory sync` lists
-/// what to fix.
-fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, old_world: &migrate_names::OldWorld, json: bool) -> u8 {
+/// what to fix. With `seal`, the backup records what the migrate left.
+fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, seal: bool, old_world: &migrate_names::OldWorld, json: bool) -> u8 {
     match crate::inventory::rebuild(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             // Nothing planned but the index rebuild, and the rebuild wrote nothing: a repeat that found the repo migrated.
@@ -1347,6 +1399,12 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan,
                 }
                 Err(e) => {
                     return CliError::refused("MIGRATE_PINS_FAILED", format!("the files moved and the index was rebuilt, but the reviews were not pinned to what their evidence says: {e}")).hint("fix what the message names, then run `canon migrate` again; it finishes the reviews").emit("canon migrate", json);
+                }
+            }
+            // What the migrate left, for `canon migrate --revert` to tell a later change from the migrate's own.
+            if let Some(dir) = backup_dir.as_deref().filter(|_| seal) {
+                if let Err(e) = migrate_names::seal(repo, &repo.join(dir)) {
+                    log.line(format!("canon migrate: note — {e}; `canon migrate --revert` cannot tell later changes from the migrate's own"));
                 }
             }
             if json {

@@ -50,9 +50,9 @@ const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-dig
 /// Batch examples of the per-leaf table (D7), by leaf.
 const BATCH_EXAMPLES: &[(&str, &str)] = &[
     ("scenario new", r#"[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Signs out","case":"happy"}]"#),
-    ("evidence add", r#"[{"scenarioId":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenarioId":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]"#),
-    ("finding add", r#"[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actorId":"reviewer-1","summary":"No rate limit"}]"#),
-    ("divergence add", r#"[{"operands":["auth.login.01"],"actorId":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"actorId":"reviewer-1","role":"reviewer"}]"#),
+    ("evidence add", r#"[{"scenario":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenario":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]"#),
+    ("finding add", r#"[{"change":"add-login","round":1,"seq":1,"severity":"note","actor":"reviewer-1","summary":"Token is logged"},{"change":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actor":"reviewer-1","summary":"No rate limit"}]"#),
+    ("divergence add", r#"[{"operands":["auth.login.01"],"actor":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"actor":"reviewer-1","role":"reviewer"}]"#),
     ("subject new", r#"[{"operands":["payments"],"domain":"dev","title":"Payments"},{"operands":["billing"],"domain":"dev","title":"Billing"}]"#),
 ];
 
@@ -82,7 +82,7 @@ pub struct BatchItem<R> {
     /// The element's ordinary report (`written`, `unchanged`, and a failure that kept one).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<R>,
-    /// The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`).
+    /// The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`).
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<ErrorBody>")]
     pub error: Option<Value>,
@@ -260,8 +260,8 @@ impl Leaf {
 // ---------------------------------------------------------------- field pointers
 
 /// How the options of the leaf map to document keys, kept for the error
-/// renderer: an error about `--scenario-id` that came from a document is
-/// about `/scenarioId`.
+/// renderer: an error about `--scenario` that came from a document is
+/// about `/scenario`.
 #[derive(Debug)]
 struct DocMap {
     /// `(long option, key)` for every key the command line did not supply.
@@ -537,10 +537,15 @@ fn type_name(value: &Value) -> &'static str {
     }
 }
 
-/// The valid keys nearest to a refused one: the singular of a plural (`scenarioIds` for `scenarioId`) first,
-/// then by edit distance.
+/// The valid keys nearest to a refused one: the key without the `Id` or `Ids` suffix a 0.30 document spelled
+/// (`scenarioId` for `scenario`), then the singular of a plural (`scenarios` for `scenario`), then by edit distance.
 fn key_suggestions(name: &str, valid: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
+    for bare in [name.strip_suffix("Ids"), name.strip_suffix("Id")].into_iter().flatten() {
+        if let Some(key) = valid.iter().find(|k| k.as_str() == bare) {
+            out.push(key.clone());
+        }
+    }
     for singular in [name.strip_suffix("es"), name.strip_suffix('s')].into_iter().flatten() {
         if let Some(key) = valid.iter().find(|k| k.eq_ignore_ascii_case(singular)) {
             out.push(key.clone());

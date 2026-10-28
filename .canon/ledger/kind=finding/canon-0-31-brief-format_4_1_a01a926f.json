@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28-r3"
+  },
+  "at": "2026-10-28T10:58:09.251267Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/migrate_briefs.rs:765-778",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "26a09e857e43a39eae34a407ee4b9a3dbaa35394",
+  "resolution_sha": "9f0fbc483dc6060297371300d1a978271a9ff188",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ad3f83b54502a1c14404e6710e5153053a5b045f",
+  "reviewer": "rev-031-c",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.migrate.25"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] Deleting the newly pinned chore review after migration still bypasses revert protection. check_revert accepts a missing journal review.to unless that new version exists in the archive; journal_paths also excludes review.to from the general sealed-state check. When the user deletes review.to without archiving it, the original snapshot and current tree both lack that path, so the snapshot diff cannot detect the deletion, and revert restores review.from from the backup instead of refusing. Fix: accept a missing new version as already restored only when the original review.from exists with its original hash; otherwise refuse naming the deleted review. Add a deletion case beside the new later-review-version fixture. Blast radius: review preservation during whole-snapshot revert. Established by source-path inspection, not a reproduction run; the current bound migrate25 test passes but never deletes its new review.",
+  "worktree_dirty": false
+}

@@ -1,5 +1,5 @@
 providers: claude (from canon.yaml skills.providers)
-gitignore: `.gitignore` lacks .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, which canon writes and git would show as untracked; fix: `canon migrate`
+gitignore: `.gitignore` lacks .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/, which canon writes and git would show as untracked; fix: `canon migrate`
 stray: <repo>/.agents/skills/canon — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r <repo>/.agents/skills/canon`, or select it with `canon skills install --providers=claude,codex`
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**

@@ -1,4 +1,4 @@
-canon 0.30.0
+canon 0.31.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: <none>
@@ -15,4 +15,4 @@ unowned: none
 
 next:
   # cart: every scenario is evidenced and reviewed, with no blocker or case gap, and no brief is written to approve; ship it yourself unless the brief says the human ships
-  canon subject move cart --to shipped --actor-id <unit> --session-id <session>
+  canon subject move cart --to shipped --actor <unit> --session <session>

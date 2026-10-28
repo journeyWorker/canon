@@ -123,3 +123,13 @@ Feature: ingest plans
     When plans are imported
     Then the command fails naming .canon/changes as always read with no entry and plans.sources as listing only external plans
     And nothing is imported
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:05Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:ingest-pipelines
+  @case:edge
+  @flow:canon-0-31-brief-format.F1
+  @ingest.plans.13
+  Scenario: The plan import's Intent summary is the first paragraph of the Intent section of a new-format brief
+    Given a new-format brief with a multi-line Intent paragraph and one with an empty Intent section
+    When canon ingest plans imports them
+    Then the summary is the first paragraph with whitespace normalized, and an empty Intent gives an empty summary

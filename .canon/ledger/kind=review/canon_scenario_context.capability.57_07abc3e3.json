@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-031-d",
+    "role": "reviewer",
+    "session_id": "rev-031-d-2026-10-28-r3"
+  },
+  "at": "2026-10-28T11:01:41.435089Z",
+  "code_tree": "37209602b111694b47355a8225c645c01be1749b",
+  "kind": "review",
+  "pin": "10b8f9a262179f80b07fbdd2f06797dcb8e1e577",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:context_capability_57_a_code_span_that_wraps_a_line_or_uses_double_backticks_is_read_whole",
+          "junit:context_capability_57_every_command_in_the_docs_and_hints_parses",
+          "junit:context_capability_57_the_schema_shows_no_option_ending_in_id_and_the_docs_spell_none"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "915d468a358f3e3120317b14974036a560df6aa94573345686ba83ec774c096e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "feat/0.31"
+  },
+  "review_id": "01M612RGXVEGH1JVM89KFA5FYC",
+  "reviewer": "rev-031-d",
+  "reviewer_harness": "omp",
+  "scenario_id": "context.capability.57",
+  "schema": 2,
+  "worktree_dirty": false
+}

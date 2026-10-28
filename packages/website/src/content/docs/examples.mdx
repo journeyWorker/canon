@@ -122,7 +122,7 @@ the status report.
    ```bash
    bunx @journeykit/canon scenario new auth.login.01 \
      --title "Login rejects bad password" \
-     --subject-id auth-core --lane behavior --actor-id alice
+     --subject auth-core --lane behavior --actor alice
    ```
 
    To scaffold many at once, pass `--input` an array: `canon scenario new
@@ -134,7 +134,7 @@ the status report.
    from the tag's own `<area>.<surface>` (or an explicit
    `--feature <path>` under a configured `specs.roots[]`
    entry). The stub carries its `# canon:` provenance line directly
-   above the tags, naming `--actor-id` (or `CANON_ACTOR`), then
+   above the tags, naming `--actor` (or `CANON_ACTOR`), then
    `@subject:auth-core`, `@lane:behavior`, and the id tag. Never
    hand-type or move a `# canon:` line — the scaffold is the one place
    it comes from. Writes no ledger record; you still fill in the Gherkin
@@ -147,8 +147,8 @@ the status report.
 
    ```bash
    bunx @journeykit/canon review scenario auth.login.01 \
-     --project-id root \
-     --actor-id alice \
+     --project root \
+     --actor alice \
      --original-spec-ref .canon/specs/kind=feature/area=auth/login.feature \
      --role dev
    ```
@@ -315,7 +315,7 @@ guidance, then drive it through its evidence-gated lifecycle.
 2. **Adopt an imported plan change under it.**
 
    ```bash
-   bunx @journeykit/canon subject adopt checkout-revamp --change-id checkout-revamp-plan
+   bunx @journeykit/canon subject adopt checkout-revamp --change checkout-revamp-plan
    ```
 
    This appends the subject to `Change.subject_ids` and the change to the
@@ -327,19 +327,19 @@ guidance, then drive it through its evidence-gated lifecycle.
    then gates both.
 
    Scenarios join the subject from the spec side: scaffold them with
-   `--subject-id` (or add `@subject:checkout-revamp` by hand), then sync so
+   `--subject` (or add `@subject:checkout-revamp` by hand), then sync so
    the tag lands on the `Scenario` record:
 
    ```bash
    bunx @journeykit/canon scenario new checkout.cart.01 \
-     --title "Adding an item raises the count" --subject-id checkout-revamp
+     --title "Adding an item raises the count" --subject checkout-revamp
    bunx @journeykit/canon inventory sync
    ```
 
 3. **Retrieve subject-scoped guidance before working.**
 
    ```bash
-   bunx @journeykit/canon retrieve --for-role dev --domain dev --subject-id checkout-revamp
+   bunx @journeykit/canon retrieve --for-role dev --domain dev --subject checkout-revamp
    ```
 
    Retrieval tries the area candidates `dev-checkout-revamp` then `dev`
@@ -370,7 +370,7 @@ guidance, then drive it through its evidence-gated lifecycle.
 
    ```bash
    bunx @journeykit/canon subject move checkout-revamp --to verifying \
-     --reason "follow-up: totals round per line" --actor-id impl
+     --reason "follow-up: totals round per line" --actor impl
    ```
 
 5. **Read the per-domain management view.**

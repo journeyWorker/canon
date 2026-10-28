@@ -120,7 +120,7 @@ fn subject_id(s: &str) -> SubjectId {
 }
 
 /// s36 derived-candidates path over the real binary: with the
-/// subject-scoped namespace populated, `--domain`/`--subject-id` serves the
+/// subject-scoped namespace populated, `--domain`/`--subject` serves the
 /// `<domain>-<subject_id>` hit — no fallback, no stderr note, `--json`
 /// stays a raw array. The candidate keys are DERIVED with the same
 /// `canon_cli::retrieve::derive_candidates` the binary uses, so the
@@ -136,7 +136,7 @@ fn retrieve_domain_subject_serves_the_subject_scoped_hit() {
 
     let repo = dir.path().to_str().unwrap();
     let output =
-        run_canon(&["retrieve", "--for-role", "planning", "--domain", "planning", "--subject-id", "my-subject", "--repo", repo, "--json"], dir.path());
+        run_canon(&["retrieve", "--for-role", "planning", "--domain", "planning", "--subject", "my-subject", "--repo", repo, "--json"], dir.path());
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     let guidance: Vec<serde_json::Value> = serde_json::from_slice::<serde_json::Value>(&output.stdout).expect("--json output must parse as one document")["data"].as_array().expect("data is the guidance array").clone();
     assert_eq!(guidance.len(), 1);
@@ -159,7 +159,7 @@ fn retrieve_domain_subject_falls_back_to_domain_when_subject_is_empty() {
 
     let repo = dir.path().to_str().unwrap();
     let output =
-        run_canon(&["retrieve", "--for-role", "planning", "--domain", "planning", "--subject-id", "my-subject", "--repo", repo, "--json"], dir.path());
+        run_canon(&["retrieve", "--for-role", "planning", "--domain", "planning", "--subject", "my-subject", "--repo", repo, "--json"], dir.path());
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     let doc: serde_json::Value = serde_json::from_slice(&output.stdout).expect("--json stdout is one document on fallback");
     let guidance = doc["data"].as_array().expect("data is the guidance array").clone();
@@ -170,7 +170,7 @@ fn retrieve_domain_subject_falls_back_to_domain_when_subject_is_empty() {
 
     // Human mode surfaces the fallback line on stdout.
     let human =
-        run_canon(&["retrieve", "--for-role", "planning", "--domain", "planning", "--subject-id", "my-subject", "--repo", repo], dir.path());
+        run_canon(&["retrieve", "--for-role", "planning", "--domain", "planning", "--subject", "my-subject", "--repo", repo], dir.path());
     assert!(human.status.success(), "stderr: {}", stderr(&human));
     assert!(stdout(&human).contains("fell back from"), "human output notes the fallback: {}", stdout(&human));
 }

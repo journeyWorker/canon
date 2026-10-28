@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:27:31.707164217Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief.rs:577-585",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reason": "at 008e5eb3 an unapproved chore no longer blocks untagged evidence (hand run: chore-only subject, evidence add exits 0); no test exercises this fallback",
+  "resolution_code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "resolution_sha": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.125"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] An unapproved chore blocks evidence through the untagged fallback. untagged_scope returns changes.last() with no kind filter when no adopted change has an Approved line, so a building subject adopting only an unapproved chore k (or feature f then chore k, none approved) refuses `evidence add` for an untagged scenario with BRIEF_UNAPPROVED naming k's brief (reproduced with the 344527ef binary). Brief F3: an unapproved chore blocks only reopen and ship, never evidence; the fallback waits for the newest adopted FEATURE change. The brief.rs module doc and README say the same. evidence.add.125 misses it because its Given has an approved change. Fix: skip chores in the fallback, and add a scenario/test for the chore-only and feature+chore setups.",
+  "worktree_dirty": false
+}

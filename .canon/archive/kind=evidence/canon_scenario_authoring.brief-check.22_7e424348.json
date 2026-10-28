@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-031-bf",
+    "role": "implementer",
+    "session_id": "bf-2026-10-27"
+  },
+  "at": "2026-10-27T12:33:36.912494777Z",
+  "code_tree": "b0291e293dee0eee9ff26d8ea2c5ce9e1417a247",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_format authoring_brief_check_22"
+  },
+  "evidence_note": {
+    "summary": "workspace nextest passed, including brief_format::authoring_brief_check_22*"
+  },
+  "evidence_sha": "5f89e598504080f489efe3c6c609c769be904d94",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 103,
+  "scenario_id": "authoring.brief-check.22",
+  "schema": 1,
+  "staging_id": "f1d12d96",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

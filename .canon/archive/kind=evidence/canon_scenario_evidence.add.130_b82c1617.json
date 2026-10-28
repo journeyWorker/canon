@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-031-fixes",
+    "role": "implementer",
+    "session_id": "fixes-2026-10-27-r1"
+  },
+  "at": "2026-10-27T13:04:46.103278611Z",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate evidence_add_130; cargo test -p canon-cli --test schema_codes"
+  },
+  "evidence_note": {
+    "summary": "approval-payload refuses an unindexed scenario; canon schema lists EVIDENCE_SCENARIO_NOT_INDEXED on approval-payload only, and schema_codes pins it per leaf; passes"
+  },
+  "evidence_sha": "7fe07ba296a665df458e12fe2956d5d451272314",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 292,
+  "scenario_id": "evidence.add.130",
+  "schema": 1,
+  "staging_id": "cdd734e7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

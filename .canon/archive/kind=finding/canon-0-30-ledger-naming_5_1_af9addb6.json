@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-c-2026-10-28"
+  },
+  "at": "2026-10-28T09:39:57.292083Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "e112b44230888ff258f38731c15fc6adf8c938ad",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/ledger_migrate.rs:189",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-c",
+  "round": 5,
+  "scenario_ids": [
+    "ledger.migrate.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] The bound ledger_migrate_10b_a_row_holding_a_planned_key_with_other_json_refuses_the_run failed in the review suite and in 3 of 5 explicitly requested isolated reruns (2 passed): Repo::snapshot panics at ledger_migrate.rs:189:60 on fs::read(...).unwrap(), Os code 2 NotFound, \"No such file or directory\". This prevents reliable evidence that a colliding sqlite key leaves the tree unchanged. The helper enumerates then reads every file; disappearing sqlite sidecars are a likely race, not established by the current error. Fix: snapshot the relevant stable files deterministically, excluding known transient sqlite sidecars before reading for the non-strict snapshot, while retaining a strict dedicated preview-sidecar assertion and reporting the failing path for other IO errors. Blast radius: this snapshot helper is shared by migration refusal and rollback tests. Leave this scenario unsigned until the bound check runs reliably.",
+  "worktree_dirty": false
+}

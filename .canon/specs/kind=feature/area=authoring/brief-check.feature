@@ -117,11 +117,11 @@ Feature: authoring brief check
   @subject:authoring-scaffold
   @case:happy
   @authoring.brief-check.12
-  Scenario: A waiver comment clears each new rule in its section and a whole-brief finding with the key brief
-    Given a bad Korean brief and a waiver comment for each new rule and section it shows, with the key brief for the whole-brief length
+  Scenario: A frontmatter waiver clears each new rule in its section and a whole-brief finding with the key brief
+    Given a bad Korean brief and a frontmatter waive entry for each new rule and section it shows, with the key brief for the whole-brief length
     When canon brief check runs
     Then every new finding is waived, the output lists each waiver as an advisory, and a waiver for another section clears nothing
-    And a waiver with match="<text>" clears only the rule's findings in that section whose matched text (the finding's matched field) or excerpt contains it, never the hint's words (an effective date is waived and the dated decision note beside it stays), one that fits nothing waives nothing, and an empty, unquoted, differently cased, spaced or trailing-text match is brief.waiver-invalid, while a reason that merely mentions match= is a plain waiver
+    And a waiver with match="<text>" clears only the rule's findings in that section whose matched text (the finding's matched field) or excerpt contains it, never the hint's words (an effective date is waived and the dated decision note beside it stays), one that fits nothing waives nothing, and an entry with an empty reason or match, an unknown rule id or an unknown key is brief.waiver-invalid, while a reason that merely mentions match= is a plain waiver
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -162,3 +162,103 @@ Feature: authoring brief check
     Then the brief with the blocker exits 1 with ok false and error code BRIEF_HAS_BLOCKERS, and data still carries the findings and counts
     And the same brief with its blocker fixed exits 0 even while advisories remain
     And the unknown slug exits 2 with BRIEF_NOT_FOUND and no report
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:37Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-31-brief-format.F1
+  @authoring.brief-check.17
+  Scenario: A brief of English headings with no comments passes brief check, and every reader finds the same sections
+    Given a brief with a frontmatter-free title, the seven English headings and no HTML comment, in English and in Korean prose, written for a change
+    When canon brief check, brief show, status and the dashboard brief page read it
+    Then every reader finds the same seven sections with the key and role the heading names, brief check exits 0, and the flow steps F1 and F2 read the same as in a 0.30 brief
+    And the Intent summary of a plan import and a chore's review and ship read the new brief the same way
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:38Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F1
+  @authoring.brief-check.18
+  Scenario: A misspelt or differently cased heading is named with the nearest heading, and a deleted or moved section is reported
+    Given a brief whose Intent heading is written `## Intnet`, another whose heading differs only in case, one with a deleted section and one with two sections swapped
+    When canon brief check runs on each
+    Then the first two report brief.section-missing for the section and name the nearest heading, `Intent` or the right case, in the hint
+    And the deleted section is brief.section-missing, the swap is brief.section-order, and a `##` line that is no known heading stays body text of the section before it
+    And a brief with a shipped Korean heading and no markers is old-format and gets no near-heading hint
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:40Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @flow:canon-0-31-brief-format.F1
+  @authoring.brief-check.19
+  Scenario: The language setting changes the prose rules and never the headings, and a note with one known heading is a pre-PRD brief
+    Given a Korean brief and the same brief with language set to en, and a note with exactly one known heading
+    When canon brief check runs on each
+    Then the headings are judged the same whatever the language, only the prose rules and the guidance language change
+    And a heading inside a code fence is no heading, and the note with one known heading is read as a pre-PRD brief, brief.legacy, not as a pile of missing sections
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:41Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-31-brief-format.F2
+  @authoring.brief-check.20
+  Scenario: A frontmatter waiver clears one rule in one section, is listed, and adding one after the approval is a change after the approval
+    Given a brief whose frontmatter waive list holds a rule, a section, a reason and a match
+    When canon brief check runs, and the brief is approved and then a waiver entry is added
+    Then the entry clears that rule in that section, or only the findings containing its match, and the output lists the waiver with its rule severity and whether it applied
+    And the frontmatter is not prose: no sentence rule, length count or language detection reads it, and the reported lines are the file's real lines
+    And the approval digest covers the frontmatter, so the added entry reads as BRIEF_CHANGED_SINCE_APPROVAL
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:42Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F2
+  @authoring.brief-check.21
+  Scenario: A waiver with an empty reason or unknown rule or key, and a frontmatter that does not read, are blockers that waive nothing
+    Given waiver entries with an empty reason, an unknown rule id, a missing section or an unknown key, a frontmatter that is not YAML, one with an unknown top-level key, and an entry for a section key canon does not know
+    When canon brief check runs on each
+    Then each invalid entry is brief.waiver-invalid and waives nothing, the broken or unknown-key frontmatter is brief.frontmatter-invalid and no waiver of it is read
+    And the entry for an unknown section key is no blocker and is listed as a waiver that matches nothing
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:43Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @flow:canon-0-31-brief-format.F2
+  @authoring.brief-check.22
+  Scenario: kind chore in the frontmatter makes a chore brief and its absence a feature brief
+    Given one brief with `kind: chore` in its frontmatter and one without
+    When canon brief check, the chore review and the ship check read each
+    Then the first is judged by the chore rule set (intent, category, invariants, checks, out-of-scope) and the second as a feature brief
+    And a chore brief that moved to the frontmatter still reads as a chore in the chore review and the ship check
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:45Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-31-brief-format.F3
+  @authoring.brief-check.23
+  Scenario: brief show prints each empty section's guidance in the brief's language and check reports each empty section
+    Given a brief written by canon change new, whose sections are empty, in a repo with language ko and in one without
+    When canon brief check and canon brief show run
+    Then brief check reports brief.placeholder for each empty section with that section's guidance in the hint, and Intent holding the title is not empty
+    And brief show lists the guidance of each empty section in Korean for ko and in English otherwise, in text and in JSON emptySections
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:46Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F3
+  @authoring.brief-check.24
+  Scenario: A section filled with a leftover TODO is still a placeholder blocker
+    Given a brief whose empty sections are filled but one still says TODO
+    When canon brief check runs
+    Then the section with TODO keeps its brief.placeholder blocker and the guidance text is not a placeholder
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:47Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-31-brief-format.F4
+  @authoring.brief-check.25
+  Scenario: A 0.30 brief gets one old-format blocker and its waiver comments are not read
+    Given a brief in the 0.30 format with canon:section comments and a canon:waive comment
+    When canon brief check runs
+    Then it reports one blocker, brief.old-format, naming canon migrate, no section rule is applied and the waiver comment is not read
+    And brief show says old-format and its first next step is migrate

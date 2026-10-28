@@ -4,7 +4,7 @@ steps:
     exit: 1
   - args: [status]
     exit: 0
-  - args: [subject, move, checkout, --to, shipped, --override-reason, "the human approved in chat; the line follows", --actor-id, lead]
+  - args: [subject, move, checkout, --to, shipped, --override-reason, "the human approved in chat; the line follows", --actor, lead]
     exit: 0
   - args: [query, --kind, subject, --json]
     exit: 0

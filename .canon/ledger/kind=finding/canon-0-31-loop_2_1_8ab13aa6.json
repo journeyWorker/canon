@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:27:40.746714517Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/status.rs:1286-1292",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-a",
+  "round": 2,
+  "scenario_ids": [
+    "evidence.add.125"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] After the loop/1 and loop/2 fixes, status still tells the agent evidence is refused where the guard accepts it. Repro (008e5eb3): a building subject t whose only change is an unapproved chore k, plus an untagged scenario; evidence add exits 0, yet its own next line and status say 'canon evidence add refuses ... t's untagged scenarios not evidenced before t adopted its first change, while no adopted change is approved'. With a tagged unapproved tg and a newer draft d, status prints both 'report the pending draft ... t is not blocked meanwhile' and tg's step saying t's untagged scenarios are refused. Fix: build the untagged clause from untagged_scope's answer (add it only when it waits on that change), and drop 'not blocked meanwhile' when another governing change blocks.",
+  "worktree_dirty": false
+}

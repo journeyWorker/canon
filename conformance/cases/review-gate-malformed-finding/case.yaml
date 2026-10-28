@@ -2,7 +2,7 @@ description: "With `require_review.block_on_findings`, a Finding row the ledger 
 steps:
   - args: [subject, move, cart, --to, verifying]
     exit: 1
-  - args: [subject, move, cart, --to, verifying, --override-reason, reviewer out until Monday, --actor-id, lead]
+  - args: [subject, move, cart, --to, verifying, --override-reason, reviewer out until Monday, --actor, lead]
     exit: 1
   - args: [gate, check]
     exit: 1

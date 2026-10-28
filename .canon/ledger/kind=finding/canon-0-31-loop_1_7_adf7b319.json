@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w1-2026-10-27"
+  },
+  "at": "2026-10-27T11:40:56.795176541Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/governing_changes.rs:152-312; crates/canon-cli/tests/subject.rs:1277-1306",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.42",
+    "subject.lifecycle.43",
+    "subject.lifecycle.45",
+    "subject.lifecycle.46",
+    "evidence.add.68",
+    "skills.install.44"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[spec-fidelity] Several Then steps have no test; I checked each by hand with the 344527ef binary and the behavior holds. 42: reopen with one of two tagged changes approved is never run (ship only). 43: ship is never run after the edit (reopen only). 45: reopen after an edited chore and the ship --override-reason waiver are untested. 46: reopen naming two unapproved tagged changes with one hint is untested (ship only). evidence.add.68: the test uses an untagged scenario while the reworded Given tags it, and `with others in one call` is untested (also skills.install.44). Hand runs: reopen named b alone and then a and b with `canon brief approve a b`; ship refused an edited and untagged b; reopen refused an edited chore; ship --override-reason waived it. Fix: add these cases to the bound tests.",
+  "worktree_dirty": false
+}

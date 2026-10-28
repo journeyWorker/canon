@@ -129,7 +129,7 @@ Feature: ledger naming
   @ledger.naming.12
   Scenario: The write result line names the file under the new rule
     Given a scenario with no evidence
-    When `canon evidence add --scenario-id` records evidence
+    When `canon evidence add --scenario` records evidence
     Then the output line names `kind=evidence/<project>_scenario_<scenario id>_<digest8>.json`
     And the file is stored under that name with `kind: evidence` in its body
 

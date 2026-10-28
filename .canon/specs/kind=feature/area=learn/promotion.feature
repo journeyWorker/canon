@@ -126,7 +126,7 @@ Feature: learn promotion
   @learn.promotion.12
   Scenario: A rollback of a promoted strategy signed by the pinned approver disables it and prints the rollback record
     Given a strategy promoted with a paired evaluation and an approval signed by the pinned approver alice, and a rollback signature over the strategy, the reason and the time
-    When canon strategy rollback runs with that reason, --actor-id alice, the signature file and the approval time
+    When canon strategy rollback runs with that reason, --actor alice, the signature file and the approval time
     Then it exits 0 and prints the record: the strategy id, the actor alice, the reason, an approval digest and the rollback time
     And the promoted file's status changes from active to rolled_back and gains the rollback reason and actor
     And the rest of its front matter and its body survive unchanged
@@ -142,4 +142,16 @@ Feature: learn promotion
     Then the missing signature file exits 2 with LEARN_SIGNATURE_UNREADABLE
     And the file that is not a signature exits 1 with LEARN_ROLLBACK_FAILED, its message saying the ssh signature verification failed
     And the malformed timestamp and the missing reason each exit 2 with USAGE
+    And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-27T10:49:05Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:learn-promotion
+  @case:failure
+  @flow:canon-0-31-fixes.F6
+  @learn.promotion.14
+  Scenario: A rollback of an unknown strategy is refused before any signature is read and writes nothing
+    Given a repo with no strategy of a well-formed id, and a signature file that is missing or wrong
+    When canon strategy rollback runs for that id with that signature file
+    Then it exits 2 with LEARN_STRATEGY_NOT_FOUND, with the file missing and with it wrong alike
+    And a rollback of an existing strategy with a wrong signature still exits 1 with LEARN_ROLLBACK_FAILED
     And no file in the repo changed

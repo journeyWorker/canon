@@ -64,6 +64,22 @@ class SupplyChainFixtureTests(unittest.TestCase):
         errors = self.errors("reject-action-ref")
         self.assertTrue(any("full 40-hex commit SHA" in error for error in errors))
 
+    def test_rejects_mutable_ref_in_composite_action(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            action = pathlib.Path(".github/actions/setup-rust/action.yml")
+            (root / action).parent.mkdir(parents=True)
+            (root / action).write_text(
+                "runs:\n  using: composite\n  steps:\n    - uses: actions/cache@v5\n",
+                encoding="utf-8",
+            )
+
+            errors = CHECKER.supply_chain_errors(root, [action])
+
+            self.assertEqual(len(errors), 1, errors)
+            self.assertIn(".github/actions/setup-rust/action.yml:", errors[0])
+            self.assertIn("full 40-hex commit SHA", errors[0])
+
     def test_rejects_unverified_download(self) -> None:
         errors = self.errors("reject-download")
         self.assertTrue(any("SHA-256 verification" in error for error in errors))

@@ -333,7 +333,7 @@ fn run_commit(verb: &str, status: DivergenceStatus, args: CommitArgs<'_>) -> u8 
     }
 }
 
-/// The actor of a divergence record: `actor_id` in `role`, in `session` when `--session-id` named one.
+/// The actor of a divergence record: `actor_id` in `role`, in `session` when `--session` named one.
 fn actor_in(actor_id: &str, role: &RoleId, session: Option<&SessionId>) -> Actor {
     let actor = Actor::new(actor_id, role.clone());
     match session {
@@ -358,7 +358,7 @@ pub fn run_defer(args: CommitArgs<'_>, reason: &str, expiry: DateTime<Utc>) -> u
 #[derive(Debug)]
 pub struct AcceptArgs {
     pub project_id: ProjectId,
-    /// `--scenario-id`, repeatable: one acceptance per scenario, all or nothing.
+    /// `--scenario`, repeatable: one acceptance per scenario, all or nothing.
     pub scenario_ids: Vec<ScenarioId>,
     pub reason: String,
     /// Where the gap is tracked (an issue URL or reference).
@@ -400,7 +400,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         return invalid("--reason is empty: say why the gap is accepted".to_string(), "--reason");
     }
     if args.scenario_ids.is_empty() {
-        return invalid("no scenario to accept: give --scenario-id <id> (repeatable)".to_string(), "--scenario-id");
+        return invalid("no scenario to accept: give --scenario <id> (repeatable)".to_string(), "--scenario");
     }
     let mut scenario_ids: Vec<&ScenarioId> = Vec::new();
     for id in &args.scenario_ids {
@@ -428,7 +428,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
     }
     if !missing.is_empty() {
         return CliError::refused("DIVERGENCE_INVALID_ARGUMENT", format!("no scenario record for {} in spec root `{}`; an acceptance pins the evidence of a scenario the index knows", missing.join(", "), args.project_id.as_str()))
-            .field("--scenario-id")
+            .field("--scenario")
             .hint("run `canon inventory sync`, then accept again")
             .emit(CMD, args.json);
     }
@@ -633,7 +633,7 @@ mod tests {
     }
 
     /// A repo whose `canon.yaml` configures the spec root `app-a`, the
-    /// project id these tests write under (`--project-id` must name one).
+    /// project id these tests write under (`--project` must name one).
     fn repo_dir() -> TempDir {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "specs:\n  roots:\n    - id: app-a\n      root: specs\n").unwrap();

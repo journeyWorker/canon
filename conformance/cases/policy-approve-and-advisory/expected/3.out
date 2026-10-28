@@ -1,4 +1,4 @@
-canon 0.30.0
+canon 0.31.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: failure
@@ -12,4 +12,4 @@ unowned: none
 
 next:
   # no subject exists yet; a subject is the unit status, review and shipping track
-  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session>
+  canon subject new <id> --domain <domain> --title "<title>" --actor <unit> --session <session>

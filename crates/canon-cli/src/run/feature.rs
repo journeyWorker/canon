@@ -12,11 +12,11 @@ pub fn run(cmd: FeatureCommand) -> ExitCode {
     }
 }
 
-/// `canon feature new <area>.<surface> --title <label> [--project-id
+/// `canon feature new <area>.<surface> --title <label> [--project
 /// <id>]` (s16 P5, `crate::scaffold::run_feature_new`'s own doc)
 /// — same single-`Utc::now()`-call discipline as `canon scenario new`.
 /// `2` on a refused invocation (config fault, a spec root the
-/// `--project-id` rules can't pin down, or an already-existing target
+/// `--project` rules can't pin down, or an already-existing target
 /// file), `0` on a fresh file
 /// written.
 fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> ExitCode {

@@ -2,9 +2,9 @@ description: "0.24 D4: with --all-scenarios a bare --artifact is refused (exit 2
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [evidence, add, --project-id, root, --all-scenarios, --report, junit:reports/junit.xml, --artifact, notes/qa.md, --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project, root, --all-scenarios, --report, junit:reports/junit.xml, --artifact, notes/qa.md, --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent]
     exit: 2
-  - args: [evidence, add, --project-id, root, --all-scenarios, --report, junit:reports/junit.xml, --artifact, "cart.add.02=notes/qa.md", --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project, root, --all-scenarios, --report, junit:reports/junit.xml, --artifact, "cart.add.02=notes/qa.md", --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent]
     exit: 0
   - args: [gate, promote]
     exit: 0

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28-r3"
+  },
+  "at": "2026-10-28T10:35:01.422693Z",
+  "attachments": [
+    {
+      "case": "authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished",
+      "format": "junit",
+      "outcome": "failed",
+      "path": "target/031r3-red-migrate_briefs-junit.xml",
+      "sha256": "de7f75425b959cff74f3d5811597da4286140c38b64b43c847a95191994f71ec"
+    }
+  ],
+  "code_tree": "c524067440767281f85e6ee423017b84f54ff594",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r3-red-migrate_briefs-junit.xml"
+  },
+  "evidence_sha": "2136a748ea3dfc8a78eb400a0eba73734086bd1c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 162,
+  "scenario_id": "authoring.migrate.25",
+  "schema": 1,
+  "staging_id": "6160a4df",
+  "verdict": "divergent",
+  "worktree_dirty": true
+}

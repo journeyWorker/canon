@@ -147,15 +147,15 @@ fn refs(repo: &Path) -> Vec<String> {
 }
 
 fn evidence_doc(scenario: &str, reference: &str) -> Value {
-    json!({"scenarioId": scenario, "class": "test-run", "ref": reference, "role": "implementer"})
+    json!({"scenario": scenario, "class": "test-run", "ref": reference, "role": "implementer"})
 }
 
 fn finding_doc(seq: u32, severity: &str) -> Value {
-    json!({"changeId": CHANGE, "round": 1, "seq": seq, "severity": severity, "introducedUnknown": true, "actorId": "reviewer-2", "summary": format!("finding {seq}")})
+    json!({"change": CHANGE, "round": 1, "seq": seq, "severity": severity, "introducedUnknown": true, "actor": "reviewer-2", "summary": format!("finding {seq}")})
 }
 
 fn review_doc(scenarios: &[&str]) -> Value {
-    json!({"operands": scenarios, "actorId": "reviewer-2", "role": "reviewer", "originalSpecRef": "docs/prd.md"})
+    json!({"operands": scenarios, "actor": "reviewer-2", "role": "reviewer", "originalSpecRef": "docs/prd.md"})
 }
 
 fn statuses(body: &Value) -> Vec<String> {
@@ -201,7 +201,7 @@ fn evidence_add_107_one_invalid_element_writes_nothing_and_points_at_it() {
     let r = f.path();
     let before = tree(r);
 
-    let bad_value = json!([evidence_doc("auth.login.01", "npm test"), {"scenarioId": "auth.login.02", "class": "test-run", "ref": "npm test", "role": "implementer", "verdict": "great"}]);
+    let bad_value = json!([evidence_doc("auth.login.01", "npm test"), {"scenario": "auth.login.02", "class": "test-run", "ref": "npm test", "role": "implementer", "verdict": "great"}]);
     let out = f.run(&["evidence", "add", "--input", &bad_value.to_string(), "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
@@ -209,7 +209,7 @@ fn evidence_add_107_one_invalid_element_writes_nothing_and_points_at_it() {
     assert_eq!(body["error"]["field"], "/items/1/verdict", "{body}");
     assert_eq!(tree(r), before, "the valid first element was not written either");
 
-    let missing_key = json!([evidence_doc("auth.login.01", "npm test"), {"scenarioId": "auth.login.02", "ref": "npm test", "role": "implementer"}]);
+    let missing_key = json!([evidence_doc("auth.login.01", "npm test"), {"scenario": "auth.login.02", "ref": "npm test", "role": "implementer"}]);
     let out = f.run(&["evidence", "add", "--input", &missing_key.to_string(), "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
@@ -221,7 +221,7 @@ fn evidence_add_107_one_invalid_element_writes_nothing_and_points_at_it() {
 fn evidence_add_108_a_repeat_writes_nothing_and_is_reported_unchanged() {
     let f = fixture();
     let r = f.path();
-    let args = ["evidence", "add", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
+    let args = ["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
     let first = f.ok(&args);
     assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first add writes");
     let before = tree(r);
@@ -248,7 +248,7 @@ fn evidence_add_113_an_explicit_faithful_verdict_over_a_skipped_or_failed_case_i
     std::fs::write(r.join("skipped.xml"), r#"<testsuite><testcase name="auth.login.01 signs in"/><testcase name="auth.login.01 flaky"><skipped/></testcase></testsuite>"#).unwrap();
     std::fs::write(r.join("failed.xml"), r#"<testsuite><testcase name="auth.login.01 signs in"/><testcase name="auth.login.01 breaks"><failure/></testcase></testsuite>"#).unwrap();
     let add = |report: &str, verdict: Option<&str>| {
-        let mut args = vec!["evidence", "add", "--scenario-id", "auth.login.01", "--report", report, "--role", "implementer", "--json"];
+        let mut args = vec!["evidence", "add", "--scenario", "auth.login.01", "--report", report, "--role", "implementer", "--json"];
         if let Some(verdict) = verdict {
             args.extend(["--verdict", verdict]);
         }
@@ -297,7 +297,7 @@ fn finding_add_09_a_finding_is_a_recorded_observation_never_checked_against_the_
     let f = fixture();
     let r = f.path();
     f.ok(&[
-        "finding", "add", "--change-id", CHANGE, "--round", "2", "--seq", "3", "--severity", "blocker", "--introduced-unknown", "--actor-id", "reviewer-2", "--summary", "the retry loop never ends", "--file-ref",
+        "finding", "add", "--change", CHANGE, "--round", "2", "--seq", "3", "--severity", "blocker", "--introduced-unknown", "--actor", "reviewer-2", "--summary", "the retry loop never ends", "--file-ref",
         "no/such/file.rs:1-2",
     ]);
     let findings = committed(r, "finding");
@@ -345,7 +345,7 @@ fn finding_add_06_an_annotated_tag_resolves_to_the_commit_it_names() {
 
     for (seq, rev) in [(1, "v1"), (2, tag_object.as_str())] {
         let out = f.run(&[
-            "finding", "add", "--change-id", CHANGE, "--round", "1", "--seq", &seq.to_string(), "--severity", "note", "--actor-id", "reviewer-2", "--summary", "tagged", "--rev", rev,
+            "finding", "add", "--change", CHANGE, "--round", "1", "--seq", &seq.to_string(), "--severity", "note", "--actor", "reviewer-2", "--summary", "tagged", "--rev", rev,
             "--introduced-rev", rev, "--json",
         ]);
         assert!(out.status.success(), "{rev}: {}{}", text(&out.stdout), text(&out.stderr));
@@ -364,7 +364,7 @@ fn finding_add_31_a_short_revision_that_names_no_commit_is_refused_and_nothing_i
     let r = f.path();
     let before = tree(r);
     for flag in ["--rev", "--introduced-rev", "--resolution-rev"] {
-        let mut args = vec!["finding", "add", "--change-id", CHANGE, "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "reviewer-2", "--summary", "s", "--json"];
+        let mut args = vec!["finding", "add", "--change", CHANGE, "--round", "1", "--seq", "1", "--severity", "note", "--actor", "reviewer-2", "--summary", "s", "--json"];
         if flag == "--resolution-rev" {
             args.extend(["--disposition", "fixed"]);
         }
@@ -384,7 +384,7 @@ fn finding_close_08_a_fixed_close_records_head_by_default_and_refuses_a_revision
     let r = f.path();
     let head = git(r, &["rev-parse", "HEAD"]);
     for seq in 1..=3u32 {
-        f.ok(&["finding", "add", "--change-id", CHANGE, "--round", "1", "--seq", &seq.to_string(), "--severity", "note", "--actor-id", "reviewer-2", "--summary", "s"]);
+        f.ok(&["finding", "add", "--change", CHANGE, "--round", "1", "--seq", &seq.to_string(), "--severity", "note", "--actor", "reviewer-2", "--summary", "s"]);
     }
 
     let before = tree(r);
@@ -420,7 +420,7 @@ fn review_scenario_93_an_object_is_one_report_and_an_array_is_a_batch() {
     assert_eq!(reviewed, ["auth.login.01", "auth.login.02"], "one review per operand");
 
     // An array is a batch of such documents: one item per element, in order, each written.
-    let doc = |scenarios: &[&str], reviewer: &str| json!({"operands": scenarios, "actorId": reviewer, "role": "reviewer", "originalSpecRef": "docs/prd.md"});
+    let doc = |scenarios: &[&str], reviewer: &str| json!({"operands": scenarios, "actor": reviewer, "role": "reviewer", "originalSpecRef": "docs/prd.md"});
     let two = f.ok(&["review", "scenario", "--input", &json!([doc(&["auth.login.02"], "reviewer-3"), doc(&["auth.login.01", "auth.login.02"], "reviewer-4")]).to_string(), "--json"]);
     let body = json_of(&two);
     assert_eq!(statuses(&body), ["written", "written"]);
@@ -441,7 +441,7 @@ fn review_scenario_94_one_invalid_or_unindexed_element_writes_nothing() {
     let r = f.path();
     let before = tree(r);
 
-    let bad_outcome = json!([review_doc(&["auth.login.01"]), {"operands": ["auth.login.02"], "actorId": "reviewer-2", "role": "reviewer", "originalSpecRef": "docs/prd.md", "reviewOutcome": "approved"}]);
+    let bad_outcome = json!([review_doc(&["auth.login.01"]), {"operands": ["auth.login.02"], "actor": "reviewer-2", "role": "reviewer", "originalSpecRef": "docs/prd.md", "reviewOutcome": "approved"}]);
     let out = f.run(&["review", "scenario", "--input", &bad_outcome.to_string(), "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");

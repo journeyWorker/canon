@@ -173,37 +173,96 @@ export function renderRuleGroup(group: RuleGroup): VNode {
   );
 }
 
-/** The Approve button is off while the brief has blockers, while a request
+/** The one Approve button is off until a brief is selected, while a request
  * is in flight, and until both the name and the note hold something. */
-export function approveDisabled(brief: Pick<Brief, "approvable">, by: string, note: string, busy: boolean): boolean {
-  return !brief.approvable || busy || by.trim() === "" || note.trim() === "";
+export function approveDisabled(selected: number, by: string, note: string, busy: boolean): boolean {
+  return selected === 0 || busy || by.trim() === "" || note.trim() === "";
+}
+
+/** "None selected" / "1 selected" / "3 selected". */
+export function selectionText(count: number): string {
+  return count === 0 ? "None selected" : `${count} selected`;
+}
+
+/** The `POST /api/briefs/approve` body: one name and answer, and for each
+ * selected brief its change id and the sha256 of the file this page read. */
+export function approvalRequest(selected: Pick<Brief, "changeId" | "sha256">[], by: string, note: string): { by: string; note: string; briefs: { changeId: string; sha256: string }[] } {
+  return { by, note, briefs: selected.map((b) => ({ changeId: b.changeId, sha256: b.sha256 })) };
 }
 
 export interface BriefHandlers {
-  /** Both fields changed: the page re-reads them and sets the button. */
-  onInput: (card: HTMLElement) => void;
-  onApprove: (brief: Brief, card: HTMLElement) => void;
+  /** A selection box or a field changed: the page re-reads them and sets the count and the button. */
+  onChange: () => void;
+  /** The one form was submitted. */
+  onApprove: () => void;
+}
+
+export interface Refusal {
+  changeId: string;
+  code: string;
+  message: string;
+}
+
+export interface ApproveFailure {
+  code: string;
+  message: string;
+  hint: string | null;
+  /** The briefs a multi-brief call refused, each with its own code. */
+  refused: Refusal[];
+}
+
+/** What a refused approval shows: the server's message and hint, and each
+ * refused brief by name, with how to read it again. */
+export function renderApproveError(failure: ApproveFailure, reload: VNode | null): VNode {
+  return h(
+    "div",
+    { class: "approve-error", role: "alert" },
+    h("p", {}, failure.message),
+    failure.refused.length > 0
+      ? h("ul", { class: "refused-briefs" }, failure.refused.map((r) => h("li", { "data-change": r.changeId }, h("strong", {}, r.changeId), ` ${r.code}: ${r.message}`)))
+      : null,
+    failure.hint ? h("p", { class: "finding-hint" }, failure.hint) : null,
+    reload,
+  );
+}
+
+/** The change ids a refusal names, for marking their cards. */
+export function refusedIds(failure: Pick<ApproveFailure, "refused">): string[] {
+  return failure.refused.map((r) => r.changeId);
+}
+
+export function renderApproveBar(handlers: BriefHandlers): VNode {
+  const form = h(
+    "form",
+    { class: "approve-form approve-bar", autocomplete: "off" },
+    h("p", { class: "selected-count", role: "status" }, selectionText(0)),
+    h("label", {}, "Your name", h("input", { type: "text", class: "approve-by", autocomplete: "off", maxlength: "200" })),
+    h("label", {}, "Your answer", h("input", { type: "text", class: "approve-note", autocomplete: "off", maxlength: "2000" })),
+    h("button", { type: "submit", class: "approve-button", disabled: approveDisabled(0, "", "", false) }, "Approve selected"),
+    h("div", { class: "approve-message", role: "status" }),
+  );
+  return withOn(form, {
+    input: () => handlers.onChange(),
+    submit: (event) => {
+      event.preventDefault();
+      handlers.onApprove();
+    },
+  });
 }
 
 export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
   const blockers = brief.findings.filter((f) => f.blocksApproval).length;
   const others = brief.findings.filter((f) => f.severity !== "advisory");
   const groups = groupAdvisories(brief.findings);
-  const form = h(
-    "form",
-    { class: "approve-form", autocomplete: "off" },
-    h("label", {}, "Your name", h("input", { type: "text", class: "approve-by", autocomplete: "off", maxlength: "200" })),
-    h("label", {}, "Your answer", h("input", { type: "text", class: "approve-note", autocomplete: "off", maxlength: "2000" })),
-    h("button", { type: "submit", class: "approve-button", disabled: approveDisabled(brief, "", "", false) }, "Approve"),
-    blockers > 0 ? h("p", { class: "approve-blocked" }, `Not approvable yet: ${blockers} blocker${blockers === 1 ? "" : "s"} to clear in the brief.`) : null,
-  );
+  const select = h("input", { type: "checkbox", class: "brief-select", "data-change": brief.changeId, disabled: !brief.approvable, "aria-label": `Select ${brief.changeId}` });
+  withOn(select, { change: () => handlers.onChange() });
   const card = h(
     "article",
     { class: "panel brief", "data-change": brief.changeId, "data-sha256": brief.sha256, "data-approvable": brief.approvable ? "true" : "false" },
     h(
       "header",
       {},
-      h("h2", {}, brief.changeId),
+      h("label", { class: "brief-select-label" }, select, " ", h("h2", {}, brief.changeId)),
       h("p", { class: "panel-source" }, brief.brief, brief.subjects.length ? ` · subjects: ${brief.subjects.join(", ")}` : " · no subject adopts it"),
       brief.counts.blockers > 0 || brief.counts.advisories > 0
         ? h(
@@ -216,6 +275,7 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
         : null,
       h("p", { class: "brief-language" }, languageText(brief)),
       brief.changedSinceApproval ? h("p", { class: "brief-changed" }, "Edited since it was approved: the approval no longer covers it.") : null,
+      blockers > 0 ? h("p", { class: "approve-blocked" }, `Not approvable yet: ${blockers} blocker${blockers === 1 ? "" : "s"} to clear in the brief.`) : null,
     ),
     brief.sections.length > 0 ? brief.sections.map(renderSection) : h("pre", { class: "brief-raw" }, brief.text),
     h(
@@ -227,17 +287,7 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
       groups.map(renderRuleGroup),
     ),
     brief.sections.length > 0 ? h("details", { class: "brief-raw-details" }, h("summary", {}, "Raw brief"), h("pre", { class: "brief-raw" }, brief.text)) : null,
-    h("div", { class: "approve-message", role: "status" }),
-    form,
   );
-  const formNode = form;
-  withOn(formNode, {
-    input: (event) => handlers.onInput((event.currentTarget as HTMLElement).closest("article") as HTMLElement),
-    submit: (event) => {
-      event.preventDefault();
-      handlers.onApprove(brief, (event.currentTarget as HTMLElement).closest("article") as HTMLElement);
-    },
-  });
   return card;
 }
 
@@ -262,5 +312,5 @@ export function advisoryTotal(briefs: Pick<Brief, "counts">[]): string {
 
 export function renderBriefs(briefs: Brief[], handlers: BriefHandlers): VNode {
   if (briefs.length === 0) return h("p", { class: "empty briefs-empty" }, EMPTY_MESSAGE);
-  return h("div", { class: "briefs-list" }, h("p", { class: "briefs-total" }, advisoryTotal(briefs)), briefs.map((brief) => renderBrief(brief, handlers)));
+  return h("div", { class: "briefs-list" }, h("p", { class: "briefs-total" }, advisoryTotal(briefs)), renderApproveBar(handlers), briefs.map((brief) => renderBrief(brief, handlers)));
 }

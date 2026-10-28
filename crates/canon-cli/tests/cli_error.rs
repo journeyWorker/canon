@@ -76,7 +76,7 @@ fn repo_with_unapproved_brief() -> TempDir {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
     let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
     text.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
@@ -91,7 +91,7 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
     let dir = repo_with_unapproved_brief();
     let out = run(
         dir.path(),
-        &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"],
+        &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl"],
     );
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(human_code(&out), "BRIEF_UNAPPROVED");
@@ -122,7 +122,7 @@ fn query_scope_errors_and_unknown_kinds_have_codes_in_json_mode() {
     ok(repo, &["init", "--providers", "none"]);
 
     // A flag that does not apply to the kind: canon's own refusal.
-    let out = run(repo, &["query", "--kind", "subject", "--change-id", "add-login", "--json"]);
+    let out = run(repo, &["query", "--kind", "subject", "--change", "add-login", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "QUERY_INVALID_ARGUMENT");
 

@@ -279,6 +279,12 @@ pub enum PolicyApprovalError {
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`
 /// and `canon brief approve`, which records both in one call.
 pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, PolicyApprovalError> {
+    record_at(repo, by, note, &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true))
+}
+
+/// [`record`] at `approved_at` (an RFC 3339 time to the second): `canon brief
+/// approve` writes the brief and the policy approval with one time.
+pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str) -> Result<PolicyApproval, PolicyApprovalError> {
     if by.trim().is_empty() {
         return Err(PolicyApprovalError::BlankApprover);
     }
@@ -299,8 +305,7 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
     let approval = PolicyApproval {
         policy_digest: policy_digest(&policy),
         approved_by: by.to_string(),
-        approved_at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-        note: note.map(str::to_string),
+        approved_at: approved_at.to_string(), note: note.map(str::to_string),
     };
     let approval_path = repo.join(paths::POLICY_APPROVAL_FILE);
     let mut body = serde_json::to_string_pretty(&approval).expect("a PolicyApproval always serializes");

@@ -79,7 +79,7 @@ fn gate(repo: &Path, exit: i32) -> String {
 }
 
 fn attest(repo: &Path, id: &str) {
-    ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+    ok(repo, &["evidence", "add", "--scenario", id, "--project", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl-agent"]);
     ok(repo, &["gate", "promote"]);
 }
 
@@ -212,8 +212,8 @@ fn migrate_pins_02_a_legacy_review_of_a_changed_scenario_stays_stale() {
     ok(
         repo,
         &[
-            "review", "scenario", "cart.add.02", "--project-id", "root", "--upstream-ref", "docs/plan.md#re-review",
-            "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
+            "review", "scenario", "cart.add.02", "--project", "root", "--upstream-ref", "docs/plan.md#re-review",
+            "--actor", "reviewer-2", "--role", "reviewer", "--session", "sess-review",
         ],
     );
     gate(repo, 0);
@@ -360,7 +360,7 @@ fn migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_only_for_its_
     .unwrap();
     commit_file(repo, &format!("b/{old}"), BASE, "project b");
     for project in ["a", "b"] {
-        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", project, "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario", "cart.add.01", "--project", project, "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl-agent"]);
         let legacy = serde_json::json!({
             "schema": 1,
             "kind": "review",

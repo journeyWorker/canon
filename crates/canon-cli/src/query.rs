@@ -55,7 +55,7 @@ pub struct QueryOutcome {
     pub violation_count: usize,
     /// s19 `query-scope-filters` (design D6): `Some((done, total))` for
     /// `--kind task` only, computed over `records` (i.e. AFTER any
-    /// `--change-id`/`--status` filtering) — every other kind's
+    /// `--change`/`--status` filtering) — every other kind's
     /// `QueryOutcome` always carries `None`.
     pub rollup: Option<(usize, usize)>,
     /// Set by [`page_outcome`]: what the page says about the rest of the
@@ -118,8 +118,8 @@ pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = R
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
-/// `--change-id`'s `clap` value parser — grammar-level `ChangeId::parse`
-/// only; KIND-gating (whether `--change-id` even applies to the queried
+/// `--change`'s `clap` value parser — grammar-level `ChangeId::parse`
+/// only; KIND-gating (whether `--change` even applies to the queried
 /// `--kind`) happens in [`validate_scope`], not here, so a malformed
 /// grammar and an inapplicable kind produce two distinctly-worded
 /// errors (design D5).
@@ -144,7 +144,7 @@ fn status_domain(kind: RecordKind) -> &'static [&'static str] {
 }
 
 /// s19 `query-scope-filters` design D5, extended by s36
-/// `subject-domain-loop`: `--change-id`/`--status`/`--domain` usage
+/// `subject-domain-loop`: `--change`/`--status`/`--domain` usage
 /// faults — a flag on a `--kind` that does not support it, or a
 /// `--status` value outside the QUERIED kind's own status domain.
 #[derive(Debug, thiserror::Error)]
@@ -166,15 +166,15 @@ impl ScopeError {
     }
 }
 
-/// Validate `--change-id`/`--status`/`--domain` BEFORE any tier read
+/// Validate `--change`/`--status`/`--domain` BEFORE any tier read
 /// (task 3.2): per-flag kind-gating (design D5) first, then — only
 /// once gating passes — `--status`'s value against the queried kind's
-/// own domain (design D5, task 3.3). `--change-id` applies to
+/// own domain (design D5, task 3.3). `--change` applies to
 /// `change`/`task`; `--status` to `change`/`task`/`subject` (s36);
 /// `--domain` to `subject` only (s36).
 pub fn validate_scope(kind: RecordKind, change_id: Option<&ChangeId>, status: Option<&str>, domain: Option<&str>) -> Result<(), ScopeError> {
     if change_id.is_some() && !matches!(kind, RecordKind::Change | RecordKind::Task) {
-        return Err(ScopeError::UnsupportedKind { flag: "--change-id", supported: "`--kind change`/`--kind task`", kind });
+        return Err(ScopeError::UnsupportedKind { flag: "--change", supported: "`--kind change`/`--kind task`", kind });
     }
     if status.is_some() && !matches!(kind, RecordKind::Change | RecordKind::Task | RecordKind::Subject) {
         return Err(ScopeError::UnsupportedKind { flag: "--status", supported: "`--kind change`/`--kind task`/`--kind subject`", kind });
@@ -199,7 +199,7 @@ fn record_task_id(raw: &RawRecord) -> Option<TaskId> {
     raw.0.get("task_id").and_then(Value::as_str).and_then(|s| TaskId::parse(s).ok())
 }
 
-/// `--change-id`'s per-record match (design D5/spec Requirement 2):
+/// `--change`'s per-record match (design D5/spec Requirement 2):
 /// `Change` records by `change_id` equality, `Task` records by
 /// `TaskId::change_id()`'s owning change — the SAME derivation
 /// `canon-ingest`'s plan/verdict adapters already use, never a second
@@ -284,6 +284,12 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
         return records;
     }
     fold_latest_by_natural_key(kind, records)
+}
+
+/// The current records of `kind` among `records`, every version a store holds: what `canon query` shows
+/// without `--history`, in the same fold (`canon search` indexes exactly these).
+pub(crate) fn current_of(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
+    fold_rewritten_kind(kind, fold_pg_routed_kind(kind, records))
 }
 
 /// The git-routed kinds that are nonetheless RE-WRITTEN — each append
@@ -457,7 +463,7 @@ fn apply_scope(kind: RecordKind, records: Vec<RawRecord>, change_id: Option<&Cha
 }
 
 /// `--kind task`'s `done`/`total` rollup (design D6, task 3.5), computed
-/// over the (possibly `--change-id`/`--status`-filtered) result set —
+/// over the (possibly `--change`/`--status`-filtered) result set —
 /// `None` for every other kind.
 fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)> {
     if kind != RecordKind::Task {
@@ -711,7 +717,7 @@ pub struct QueryReport {
     pub count: usize,
     /// Records the tiers reported as violations and the query left out.
     pub violations: usize,
-    /// The resolved plugin id (`--plugin-id`) when its overlays were projected.
+    /// The resolved plugin id (`--plugin`) when its overlays were projected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugin: Option<String>,
     /// The overlay identities actually projected.

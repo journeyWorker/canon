@@ -1,6 +1,6 @@
 # Corpus-size bench
 
-Does `canon gate check`, `canon status` or a batch `canon evidence add` cost
+Does `canon gate check`, `canon status`, `canon search` or a batch `canon evidence add` cost
 more than the corpus it reads? Three stdlib-only Python 3 scripts answer it
 for any `canon` binary.
 
@@ -36,7 +36,7 @@ written, so the first run measures steady state. It holds:
   gate and `status` derive the code tree;
 - with `--staged-batch B`, `bench/batch-B.xml`, a JUnit report with one case for
   each of B scenarios spread over the corpus. The batch entry point is
-  `canon evidence add --project-id root --all-scenarios --report junit:bench/batch-B.xml --class test-run --ref bench --role implementer --actor-id bench-batch`
+  `canon evidence add --project root --all-scenarios --report junit:bench/batch-B.xml --class test-run --ref bench --role implementer --actor bench-batch`
   (`land_batch` in `crates/canon-cli/src/evidence.rs`).
 
 The policy asks for evidence, a failure case per feature and reviews, so the
@@ -51,8 +51,12 @@ run. Wall time and the 1-minute load average are recorded but never judged.
 
 | Axis | Command | Sizes (`small`) | Sizes (`full`) | What grows |
 |---|---|---|---|---|
-| `scenarios` | `gate check`, `status` | 100, 300, 1000 | 300, 1000, 3000 | subjects, scenarios, evidence, reviews together (25 scenarios per subject, E=3, R=2) |
+| `scenarios` | `gate check`, `status`, `search (rebuild)`, `search (reuse)` | 100, 300, 1000 | 300, 1000, 3000 | subjects, scenarios, evidence, reviews together (25 scenarios per subject, E=3, R=2) |
 | `batch` | `evidence add --all-scenarios` | 10, 30, 100 | 10, 30, 100, 300 | B records into a ledger of 10*B scenarios |
+
+`search (rebuild)` runs `canon search` on a fresh copy of the corpus with no index, so every run builds the whole
+index: the cost the first search after a write pays (the 0.31 brief's limit is 5 seconds for 2,300 records).
+`search (reuse)` runs on a current index, which costs reading and hashing the inputs.
 
 The batch ledger grows with B on purpose. Landing B records that each rescan the
 ledger costs B times the ledger: 100x for 10x the batch into 10x the ledger,

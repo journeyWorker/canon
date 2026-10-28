@@ -87,6 +87,230 @@ Since 0.30 canon plans its own work as canon changes in
 cite under `docs/superpowers/` and `openspec/` were removed in 0.30; read
 them in git history, e.g. `git show 0977bce1:<path>`.
 
+## 0.31.0 release
+
+Six canon changes under `.canon/changes/canon-0-31-*`, each with an approved
+brief, scenarios or chore checks, evidence and an independent review:
+`canon-0-31-ci`, `canon-0-31-loop`, `canon-0-31-fixes`,
+`canon-0-31-brief-format`, `canon-0-31-cli-ids` and `canon-0-31-search`.
+
+### `canon-0-31-ci`: one toolchain, release checks in every PR
+
+- `rust-toolchain.toml` pins Rust 1.99.1 for local builds and every CI job;
+  each Rust job fails when `rustc` differs from the file.
+- An unfiltered PR workflow runs the release-workflow safety check and a
+  check build of the man-page generator, the two steps that failed only after
+  the 0.30.0 tag. The safety check also scans `.github/actions/**`.
+
+### Fixed in 0.31: commands without `--repo` outside a repo
+
+The 0.30.0 release binary refused `canon schema`, `canon skills show` and the
+other commands that take no `--repo` with `CONFIG_MISSING` when run outside a
+repo. The check asked clap for an undeclared `repo` argument, which is an
+error in debug builds (so every test passed) and "absent" in release builds.
+It now asks the command tree whether the command declares `--repo`.
+
+### `canon-0-31-loop`: approval and adopt flow
+
+- `canon brief approve` takes one or more change ids: one name, one answer and
+  one timestamp for all of them. Every id is checked before any is written, and
+  one refused id (a blocker, no brief, an open code fence) refuses the call with
+  `BRIEF_APPROVE_REFUSED` (exit 2) naming every refused id with its own code;
+  nothing is written. A disk error while writing (exit 1) leaves the ids already
+  written approved and skips the rest. With one id the output is unchanged; with
+  several, `--json` carries one entry per id (`written`, `unchanged`, `failed`,
+  `skipped`). The briefs page of `canon dashboard` selects several briefs and
+  approves them with one name and answer.
+- A subject answers for every adopted change that is **tagged** (a scenario it
+  owns is tagged `@flow:<change>.*`), has an **approved** line (even when edited
+  since), or is a **chore**. Reopen, ship and `canon status` judge all of them;
+  the order of adoption and of approval no longer matters. A never-approved,
+  untagged feature change is a pending draft and blocks nothing. Evidence
+  follows the scenario: a tagged scenario answers to the changes it tags, an
+  untagged one to every approved-line change (chores included); an unapproved
+  chore blocks reopen and ship, not evidence. A subject with no governing change
+  keeps the old rule (its newest adopted change awaits its first approval).
+- A directory, or a file that is no SQLite database, at the hot path makes
+  `canon report build`, `check` and `snapshot` fail (exit 1) naming the path,
+  as `canon query` does; the dashboard comes up and says why it has no snapshot
+  (#114). A path with nothing at it still reads as no hot records.
+
+### `canon-0-31-fixes`: six behaviors that disagreed with the docs
+
+- Not-found and invalid input exit 2; exit 1 stays with check results and
+  refused verdicts.
+- `canon demo init` refuses (`INIT_CONFIG_EXISTS`, exit 2) any directory that
+  holds a `canon.yaml`, and leaves its policy file as it was.
+- `canon gate install-hooks` refuses a `--repo` that is no existing directory
+  (`HOOKS_INSTALL_FAILED`, exit 2, also under `--dry-run`). Its output names the
+  two agent hook files and the script, says no git hook was installed, and says
+  to copy the script into git's pre-commit hook or call it from a hook runner.
+- `canon context-pack show` and `verify` take a pack id of `sha256:` and 64
+  lower-case hex digits; anything else is `USAGE` (exit 2). A well-formed id with
+  no pack is still `CONTEXT_PACK_NOT_FOUND`.
+- `canon evidence approval-payload` refuses a `--scenario` the scenario index
+  does not hold (`EVIDENCE_SCENARIO_NOT_INDEXED`, exit 2; run
+  `canon inventory sync`).
+- `ADAPTER_REFUSED`: `adapter authorize` exits 2 for a response whose envelope
+  breaks a rule and for a broken policy file (it was 1); exit 1 there is only
+  `ADAPTER_EXECUTION_NOT_AUTHORIZED`. `adapter validate` keeps exit 1 for a
+  rule-breaking envelope and exit 2 for an unreadable file.
+- `canon strategy rollback` looks the strategy id up first:
+  `LEARN_STRATEGY_NOT_FOUND`, exit 2, whatever the signature file is. A
+  signature that does not verify stays `LEARN_ROLLBACK_FAILED`, exit 1.
+
+### `canon-0-31-brief-format`: a brief without HTML comments
+
+- A brief is a frontmatter, a title, `##` sections and the `Approved:` line.
+  Sections are found by their English heading (`Intent`, `Desired outcome`,
+  `User flow`, `Step detail`, `Acceptance`, `Questions and assumptions`,
+  `Out of scope`; chore: `Intent`, `Category`, `Invariants`, `Checks`, `Out of
+  scope`), compared exactly. A misspelt heading (`## Intnet`) is reported with
+  the nearest heading. `language:` picks only the language of the prose rules
+  and the guidance, never the headings. One shared reader
+  (`canon_ingest::brief`) serves `brief check` and `show`, `status`, the
+  dashboard, the chore review, re-verify and ship checks, `scenario new
+  --flow`, language detection and the plan import's Intent summary.
+- Waivers are entries of the frontmatter `waive` list (`rule`, `section`,
+  `reason`, optional `match`), visible on GitHub; the approval digest covers
+  the frontmatter, so adding one after the approval is a change after the
+  approval. A frontmatter that is not YAML, or has an unknown key, is a
+  blocker (`brief.frontmatter-invalid`) and no waiver of it is read. A chore
+  has `kind: chore` in the frontmatter.
+- `canon change new` writes empty sections. `canon brief check` reports each
+  with its guidance in the hint, and `canon brief show` lists the guidance of
+  every empty section (`emptySections` in JSON).
+- A brief from 0.30 (`canon:` comments or Korean headings) gets one blocker,
+  `brief.old-format`. `status`, `gate check`, `context` and `brief show` warn and
+  lead with `canon migrate --json`; a command that writes and judges such a
+  brief (`evidence add`, `subject move` to ship or reopen, `subject adopt`,
+  `scenario new --flow`, `review change`) is refused with `OLD_BRIEF_FORMAT`.
+- `canon migrate` previews, then `--commit --plan-digest` rewrites the briefs
+  (and the 0.30 ledger names in the same run). The plan says first whether it
+  re-binds `Approved:` lines or chore review pins. Re-binding needs the old
+  digest to match the old text and the rewrite to change nothing but comments,
+  waiver comments, the chore marker and Korean headings; the sections read and
+  the judged set stay the same. Such a `--commit` is the human's
+  (`HUMAN_ONLY` for every agent role); a plan that re-binds nothing runs under
+  an orchestrator. A brief edited after its approval, or whose marker role
+  differs from the table, is rewritten but not re-bound and is named.
+  `canon migrate --revert` restores the briefs and reviews byte for byte and
+  refuses, naming the file, when one changed since the migrate.
+
+### `canon-0-31-cli-ids`: an option that takes an id is the bare noun
+
+- The 14 options that took a record or config id lose their `-id` suffix, on all 67 places of 24 commands:
+  `--actor`, `--session`, `--project` (the spec root's id; the repository directory stays `--repo`), `--change`,
+  `--run`, `--task`, `--subject`, `--scenario`, `--skill`, `--parent-run`, `--evaluator`, `--review`, `--plugin` and
+  `--contradicting-trajectory`. Value names, value formats, repetition, defaults, required conditions, environment
+  variables (`CANON_ACTOR`), commands, operands, effects, exit codes, stored records and report JSON are unchanged.
+- The old spelling has no alias and no grace period: it is a usage error (exit 2, `USAGE`) before anything is
+  written, `field` is the spelling typed, `expected` is the option that replaced it, and `error.hint` is the typed line
+  with every old `-id` spelling replaced, which runs as printed (`--old=value` and a missing value are refused the
+  same way; a token after `--` and the value of another option are not read as an option).
+- `--input` document keys follow the option names: `scenarioId` is `scenario`, `actorId` is `actor`, `parentRunId`
+  is `parentRun`, and so on for the other twelve. The old keys are refused with `INPUT_UNKNOWN_FIELD` (exit 2,
+  nothing written), `field` the pointer into the document, `expected` the valid keys and the hint the new key.
+  Record keys, report keys, error JSON keys, `--fields` values and the dashboard's HTTP request keys keep their
+  `*_id` / `*Id` names. No ledger migration, and no report schema version changes.
+- `canon schema`, the skills, the website (English and Korean), the grammar document and the option vocabulary use the
+  new names only. The one-name checker now reports an option that ends in `-id` and a concept spelled two ways.
+- The dashboard's hint for an unattributed run names `canon ingest records --run` (it still named `ingest artifacts`,
+  which 0.28 removed).
+
+### `canon-0-31-search`: search and the record graph
+
+- `canon search "<text>"` finds records, brief sections and flow steps, and scenario text (title, tags, steps, doc
+  strings, tables, `Examples`, and the Feature and Rule `Background` a scenario inherits), and lists each hit with its
+  neighbors. `data` holds `hits[]` (`id`, `kind`, `rank`, `score`, `title`, `snippet`, `placeholder`), `neighbors[]`
+  (`id`, `kind`, `hops`, `via`, `from`, `title`, `placeholder`, and `refs` for a placeholder), `edges[]` (`from`, `to`,
+  `rel`), `counts` (`matched`, `hits`, `neighbors`, `edges`) and `index`. `--kind` (repeatable, the record kinds and
+  `brief`) filters the hits only, `--expand <N>` is the hop count (default 1), `--limit <N>` the hit count (default 20,
+  no pages). Hits are ranked by full-text score, ties by id, and only the current version of a record is a hit. The text
+  is literal: quotes and `AND` are not syntax. From three characters the text is matched by SQLite FTS5's trigram
+  tokenizer (so Korean is found without word breaks); a shorter text is a substring match over the nodes' text, in id
+  order. No match is exit 0 with empty `hits`; an empty or all-space text is exit 2 (`SEARCH_QUERY_EMPTY`).
+- A node id is the kind and the natural key `canon query` shows (`finding:<change>_<round>_<seq>`, `review:<project>_scenario_<id>`,
+  `scenario:<project>_<scenario id>`), a brief section `brief:<change>#<section>`, a flow step `brief:<change>#F1`. Two
+  current reviews with one key are `review:<key>@<digest>`. Edges: the reference fields of each kind (the field names
+  the `rel`; a finding's `review_id` goes to every review that carries it), and the joins of the review loop:
+  `re-review` (a finding's fix commit is the reviewed commit of a later finding of the change), `fix-reviewed` (a
+  review pinned at the fix commit that covers the finding's change or scenario), `fix-of-fix` (the fix commit
+  introduced a later finding), `evidence-at-commit` (evidence at a commit a finding reviewed or fixed in, or a review
+  pinned at, when that finding or review points at the evidence's scenario; evidence is never joined to evidence), and
+  `flow` (a scenario's `@flow:<change>.<F-id>` tag to the brief step). A reference no committed source holds, the
+  ones `canon query` reports, is a placeholder node (`placeholder: true`, the number of references to it in `refs`): it
+  has no text, so only a neighbor shows it.
+- `canon trace <finding key|review id|sha>` prints the chain of one review loop in time order: `data.chain[]` of one
+  entry per record version (`at`, `id`, `kind`, `role`, `sha`, `version`, `archived`, `edges[]`), the ledger archive's
+  old versions of findings, reviews and evidence included. A finding is two entries, the version that recorded it
+  (`finding`) and the one that closed it fixed (`fix`). The operand is a 26-character review id (the start is every
+  review of that run; with no such review it is read as a sha prefix), a commit sha or its first 7 to 40 hex digits (the
+  start is every record that holds it), or a finding key. An id no record says, an ambiguous sha prefix and any other
+  operand are exit 2 (`TRACE_NOT_FOUND`, `TRACE_OPERAND_INVALID`), and the message names the three shapes.
+- Both commands are `read` and first bring a derived index up to date: `.canon/index/search.db`, built from the
+  promoted ledger records (and the archive's old versions of finding, review and evidence), this worktree's sqlite hot
+  store, the briefs and the `.feature` files. It is never a source of records; `rm -r .canon/index` changes nothing but
+  `data.index.rebuilt`. Any input change makes it stale and it is rebuilt in full before anything is read (the new file
+  is written beside the old one and renamed, so runs at the same time leave one complete index). The first build writes
+  `.canon/index/.gitignore` (`*`), and `canon init` adds `.canon/index/` to the repo's own `.gitignore`; until then both
+  commands warn. A file that is not a database is deleted and rebuilt with a warning; an unwritable directory builds
+  the index in memory for the run with a warning naming the path (`data.index.inMemory`). Staged records and those
+  routed to postgres or an object store are not read, and `data.index.unreadStores` names those backends. Records that
+  cannot be read are exit 1 (`SEARCH_INDEX_FAILED`).
+- Cost, measured: a stale index over a ledger of 2,300 records and 19 briefs rebuilds in 0.4 s (a debug build, the
+  acceptance test's fixture); in the corpus bench (`scripts/bench`, release build) 1,000 scenarios with their
+  evidence and reviews (3,860 nodes) rebuild in 0.5 s CPU and 98 MB, and a run on a current index reads and hashes
+  the inputs in 0.25 s. The brief's limit is 5 s. The bench has the rows `search (rebuild)` and `search (reuse)`, which
+  the `bench-shape` CI job holds to 20x for 10x the corpus.
+
+### Found by the final review
+
+Three review rounds after the last implementation run (all 871 scenarios signed, `canon gate check` clean) found
+and fixed:
+
+- `canon migrate --revert` refuses, naming the file, when a file the migrate left was **deleted** since (it restored
+  it), when the review version the migrate wrote was deleted, and after a run that stopped past its last brief write
+  and was resumed (the resumed run never sealed its backup, so no later change was guarded).
+- The old-spelling hint of a line that mixes removed options (`subject adopt --change-id … --subject-id …`) runs as
+  printed in either order.
+- A dropped SQLite tier closes its connections before returning, so its `-wal`/`-shm` files are gone when the next
+  read of the tree starts (a test saw them vanish mid-read).
+- Skill and website commands that no longer existed (`canon review add`, `canon divergence promote`,
+  `canon ingest artifacts`), now caught by a docs sweep that reads code spans across lines and double backticks.
+
+### Upgrading
+
+Run `canon migrate` once on a repo with 0.30 briefs: until the human commits it, `canon evidence add` and the other writes above refuse.
+
+Scripts and CI that pass an id option with its old spelling get exit 2 and the line to run instead on the first run:
+
+<!-- canon:generated removed-031 begin -->
+| 0.30 spelling | 0.31 spelling | What changed |
+|---|---|---|
+| `--actor-id` on `canon dispatch begin`, `canon divergence accept`, `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon evidence add`, `canon evidence audit`, `canon feature new`, `canon finding add`, `canon finding close`, `canon review change`, `canon review scenario`, `canon scenario new`, `canon strategy rollback`, `canon subject move`, `canon subject new` | `--actor` |  |
+| `--session-id` on `canon dispatch begin`, `canon divergence accept`, `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon evidence add`, `canon evidence audit`, `canon feature new`, `canon finding add`, `canon finding close`, `canon review change`, `canon review scenario`, `canon scenario new`, `canon subject move`, `canon subject new` | `--session` |  |
+| `--project-id` on `canon divergence accept`, `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon evidence add`, `canon evidence approval-payload`, `canon evidence audit`, `canon feature new`, `canon review change`, `canon review scenario`, `canon scenario new` | `--project` |  |
+| `--change-id` on `canon finding add`, `canon finding list`, `canon query`, `canon scenario new`, `canon subject adopt`, `canon subject unadopt` | `--change` |  |
+| `--run-id` on `canon evidence add`, `canon evidence approval-payload`, `canon evidence audit`, `canon ingest records` | `--run` |  |
+| `--task-id` on `canon dispatch begin`, `canon evidence add`, `canon evidence approval-payload` | `--task` |  |
+| `--subject-id` on `canon change new`, `canon retrieve`, `canon scenario new` | `--subject` |  |
+| `--scenario-id` on `canon evidence add`, `canon evidence approval-payload`, `canon finding add` | `--scenario` |  |
+| `--skill-id` on `canon dispatch begin` | `--skill` |  |
+| `--parent-run-id` on `canon dispatch begin` | `--parent-run` |  |
+| `--evaluator-id` on `canon evidence audit` | `--evaluator` |  |
+| `--review-id` on `canon finding add` | `--review` |  |
+| `--plugin-id` on `canon query` | `--plugin` |  |
+| `--contradicting-trajectory-id` on `canon strategy rollback` | `--contradicting-trajectory` |  |
+<!-- canon:generated removed-031 end -->
+
+`canon status --json` `statusVersion` is `4`. A subject's `brief` object is
+gone; read `briefs` instead, a list with one entry per change the subject
+answers for: `change`, `brief` (path), `status` (`approved`, `unapproved`,
+`changed`), `reason` (`tagged`, `approved`, `chore`; absent on the one entry of a subject with no such change, its newest adopted change awaiting a first approval) and `findings` (the check
+counts). `pendingDrafts` holds only pending drafts, and `flow` the steps of
+every tagged change. Tools that read the old `brief` field must read `briefs`.
+
 ## 0.30.0 release
 
 0.30 is canon's first release planned and shipped through canon itself: six
@@ -452,7 +676,7 @@ names its replacement. The table is generated from the command spec
 | `--change` on `canon brief show`, `canon brief check`, `canon brief approve` | `canon brief show` | the change is the operand |
 | `--change-id` on `canon finding close` | `canon finding close` | the change is the operand |
 | `--run-id` on `canon dispatch end` | `canon dispatch end` | the run is the operand |
-| `--subject-id` on `canon subject adopt`, `canon subject unadopt` | `canon subject adopt` | the subject is the operand and the change is `--change-id` |
+| `--subject-id` on `canon subject adopt`, `canon subject unadopt` | `canon subject adopt` | the subject is the operand and the change is `--change` |
 | `--name` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
 | `--version` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
 | `--scenario-id` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept` | `canon divergence add` | the scenario is the operand |
@@ -464,8 +688,8 @@ names its replacement. The table is generated from the command spec
 | `--change-id` on `canon review change` | `canon review change` | the change is the operand |
 | `--from` on `canon scenario new` | `--input` | a batch is an `--input` array with `operands` per element |
 | `--all` on `canon schema` | `canon schema` | the listing is unfiltered; `--as` filters it by role |
-| `--agent-id` on `canon dispatch begin` | `--actor-id` |  |
-| `--reviewer` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept`, `canon finding add`, `canon review scenario`, `canon review change` | `--actor-id` | it is the reviewer, and required where `--reviewer` was |
+| `--agent-id` on `canon dispatch begin` | `--actor` |  |
+| `--reviewer` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept`, `canon finding add`, `canon review scenario`, `canon review change` | `--actor` | it is the reviewer, and required where `--reviewer` was |
 | `--by` on `canon brief approve`, `canon policy approve` | `--approver` |  |
 | `--principal` on `canon strategy approval-payload` | `--approver` |  |
 | `--approval-by` on `canon evidence add`, `canon evidence approval-payload` | `--approver` |  |
@@ -488,9 +712,6 @@ names its replacement. The table is generated from the command spec
 | `--status` on `canon dispatch end` | `--run-outcome` |  |
 | `--status` on `canon divergence add` | `--state` |  |
 | `--outcome` on `canon review scenario`, `canon review change` | `--review-outcome` |  |
-| `--task` on `canon dispatch begin`, `canon evidence add`, `canon evidence approval-payload` | `--task-id` |  |
-| `--plugin` on `canon query` | `--plugin-id` |  |
-| `--parent-run` on `canon dispatch begin` | `--parent-run-id` |  |
 | `--source` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--skills-source` |  |
 | `--source` on `canon ingest plans` | `--plan-source` |  |
 | `--role` on `canon regime show` | `--role-segment` |  |
@@ -702,7 +923,7 @@ reasons:
 - **Context sections are judged.** Intent and Questions get the phrase rules
   and the new rules.
 - **Six new advisory rules.** Each is waivable with
-  `<!-- canon:waive <rule> <section> "<reason>" -->`; the whole-brief length
+  a `waive` entry in the brief's frontmatter; the whole-brief length
   finding uses the section key `brief`.
 
   | Rule | What it reports |

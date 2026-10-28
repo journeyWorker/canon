@@ -48,7 +48,7 @@ fn role_of(actor: &Value) -> Option<&str> {
 fn subject_new_is_attributed_to_the_declared_role_and_owned_by_the_owner_role() {
     let dir = repo();
     let repo = dir.path();
-    ok(repo, &["subject", "new", "pause-menu", "--domain", "dev", "--title", "X", "--actor-id", "planner-1", "--json"], Some("planner"), None);
+    ok(repo, &["subject", "new", "pause-menu", "--domain", "dev", "--title", "X", "--actor", "planner-1", "--json"], Some("planner"), None);
     let planned = subject(repo, "pause-menu");
     assert_eq!(role_of(&planned["actor"]), Some("planner"), "{planned}");
     assert_eq!(planned["actor"]["agent_id"], "planner-1");
@@ -78,12 +78,12 @@ fn subject_move_records_the_declared_role_with_its_reason() {
     let dir = repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "mover", "--domain", "dev", "--title", "X", "--json"], None, None);
-    ok(repo, &["subject", "move", "mover", "--to", "specced", "--reason", "scoped", "--actor-id", "plan-1", "--json"], Some("planner"), None);
+    ok(repo, &["subject", "move", "mover", "--to", "specced", "--reason", "scoped", "--actor", "plan-1", "--json"], Some("planner"), None);
     let moved = subject(repo, "mover");
     assert_eq!(moved["status_reason"]["actor"]["agent_id"], "plan-1", "{moved}");
     assert_eq!(role_of(&moved["status_reason"]["actor"]), Some("planner"), "{moved}");
 
-    ok(repo, &["subject", "move", "mover", "--to", "building", "--reason", "started", "--actor-id", "plan-2", "--json"], None, None);
+    ok(repo, &["subject", "move", "mover", "--to", "building", "--reason", "started", "--actor", "plan-2", "--json"], None, None);
     let moved = subject(repo, "mover");
     assert_eq!(moved["status_reason"]["actor"]["agent_id"], "plan-2", "{moved}");
     assert_eq!(role_of(&moved["status_reason"]["actor"]), None, "no declared role, no role recorded: {moved}");
@@ -111,8 +111,8 @@ fn provenance(repo: &Path) -> Vec<Value> {
 fn feature_new_and_scenario_new_stamp_the_declared_role() {
     let dir = repo();
     let repo = dir.path();
-    ok(repo, &["feature", "new", "cart.add", "--title", "Add to cart", "--actor-id", "plan-1"], Some("planner"), None);
-    ok(repo, &["scenario", "new", "cart.add.01", "--title", "Adds an item", "--case", "happy", "--actor-id", "plan-1"], Some("planner"), None);
+    ok(repo, &["feature", "new", "cart.add", "--title", "Add to cart", "--actor", "plan-1"], Some("planner"), None);
+    ok(repo, &["scenario", "new", "cart.add.01", "--title", "Adds an item", "--case", "happy", "--actor", "plan-1"], Some("planner"), None);
     let stamped = provenance(repo);
     assert!(stamped.len() >= 2, "{stamped:?}");
     assert!(stamped.iter().all(|p| p["actor"]["agent_id"] == "plan-1" && p["actor"]["role"] == "planner"), "{stamped:?}");

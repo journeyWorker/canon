@@ -30,6 +30,9 @@ fn run_context_pack_add(args: ContextPackAddArgs) -> ExitCode {
 }
 
 fn run_context_pack_show(repo: &std::path::Path, id: &str, json: bool) -> ExitCode {
+    if let Some(error) = crate::context_pack::pack_id_usage_error(id) {
+        return ExitCode::from(error.emit("canon context-pack show", json));
+    }
     let repo = crate::context::resolve_repo_root(repo);
     match crate::context_pack::show(&repo, id) {
         Ok(pack) => {
@@ -47,6 +50,9 @@ fn run_context_pack_show(repo: &std::path::Path, id: &str, json: bool) -> ExitCo
 }
 
 fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> ExitCode {
+    if let Some(error) = crate::context_pack::pack_id_usage_error(id) {
+        return ExitCode::from(error.emit("canon context-pack verify", json));
+    }
     let repo = crate::context::resolve_repo_root(repo);
     match crate::context_pack::verify(&repo, id) {
         Ok(()) => {

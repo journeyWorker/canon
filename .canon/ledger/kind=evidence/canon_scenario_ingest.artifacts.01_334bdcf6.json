@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:22:53.927063783Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib artifact_registry::tests::handoff_is_tagged_records_and_every_other_s4_adapter_is_tagged_path"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 27,
+  "scenario_id": "ingest.artifacts.01",
+  "schema": 1,
+  "staging_id": "879e9ad0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

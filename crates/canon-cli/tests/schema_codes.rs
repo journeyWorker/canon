@@ -64,7 +64,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `promote_after_stage`'s command comes from its caller.
     ("gate.rs", &["task done", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
-    // `require_spec_root`: the refusal of a `--project-id` no configured spec root carries, made by every write command that takes one.
+    // `require_spec_root`: the refusal of a `--project` no configured spec root carries, made by every write command that takes one.
     ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
     ("learn.rs", &["strategy"]),
     ("ledger.rs", &["ledger compact"]),
@@ -72,7 +72,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("main.rs", &[]),
     ("run/mod.rs", &[]),
     ("run/entry.rs", &[]),
-    // `project_for`: `--project-id` is required when several spec roots exist, for each of these.
+    // `project_for`: `--project` is required when several spec roots exist, for each of these.
     ("run/divergence.rs", &["divergence add", "divergence resolve", "divergence defer", "divergence accept"]),
     ("run/evidence.rs", &["evidence add", "evidence audit", "evidence approval-payload"]),
     ("run/review.rs", &["review scenario", "review change"]),
@@ -84,6 +84,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
     ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
+    ("migrate_briefs.rs", &["migrate"]),
+    // `refusal` builds the error for the command that judges the brief.
+    ("old_briefs.rs", &["evidence add", "evidence audit", "subject move", "subject adopt", "scenario new", "review change"]),
     // Every code is next to its emit.
     ("migrate_names.rs", &[]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
@@ -93,6 +96,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("retention.rs", &["export", "purge"]),
     ("review.rs", &["review scenario", "review change"]),
     // Every code is next to its `human("canon selftest")`.
+    // `open_index` builds the refusals of the index for both leaves; every other code is next to its emit.
+    ("search/mod.rs", &["search", "trace"]),
     ("safety.rs", &["purge", "artifacts move", "migrate", "ledger compact", "tier age"]),
     ("selftest.rs", &[]),
     // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.
@@ -110,13 +115,14 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("FINDING_UNKNOWN_SCENARIO", "finding add")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("FINDING_UNKNOWN_SCENARIO", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
 /// Files whose `.emit(command, …)` takes the command from the caller, and the
 /// leaves that caller is: `run_report` serves the three `report` leaves.
-const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"])];
+// `open_index` takes the command of the leaf that calls it.
+const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"]), ("search/mod.rs", &["search", "trace"])];
 
 /// The leaves that record a human's decision and refuse every agent role.
 const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept"];
@@ -182,7 +188,7 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
-    let mut files: Vec<PathBuf> = ["", "run"]
+    let mut files: Vec<PathBuf> = ["", "run", "search"]
         .iter()
         .flat_map(|dir| fs::read_dir(src_dir().join(dir)).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect::<Vec<_>>())
         .collect();
@@ -306,4 +312,15 @@ fn every_registered_code_is_emitted_by_some_command() {
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
     let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !AWAITING_WIRING.contains(c)).collect();
     assert!(orphans.is_empty(), "registered but attributed to no command: {orphans:?}");
+}
+
+/// A code the sources name for one command only is listed under that command's leaves and no other (a file default must not spread it).
+#[test]
+fn a_spliced_code_is_listed_under_its_own_command_only() {
+    let table = derive();
+    for (code, command) in SPLICED {
+        let listed: BTreeSet<&str> = table.iter().filter(|(_, codes)| codes.contains(code)).map(|(path, _)| *path).collect();
+        let expected: BTreeSet<&str> = leaves_under(command).into_iter().collect();
+        assert_eq!(listed, expected, "`{code}` must be listed under `{command}` only");
+    }
 }

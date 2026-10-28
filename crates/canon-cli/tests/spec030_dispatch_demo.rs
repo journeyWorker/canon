@@ -390,6 +390,21 @@ fn authoring_demo_02_demo_init_in_a_directory_that_already_has_a_canon_yaml_is_r
     assert_eq!(snapshot(d), before);
 }
 
+// 0.31 F1: a canon.yaml whose .gitignore holds no canon lines refuses too, and its policy file survives.
+#[test]
+fn authoring_demo_02_demo_init_refuses_a_config_whose_gitignore_has_no_canon_lines_and_keeps_the_policy() {
+    let dir = TempDir::new().unwrap();
+    let d = dir.path();
+    std::fs::write(d.join("canon.yaml"), "tiers: {}\n").unwrap();
+    std::fs::create_dir_all(d.join(".canon")).unwrap();
+    std::fs::write(d.join(".canon/policy.yaml"), "version: mine\n").unwrap();
+    let before = snapshot(d);
+    refused(d, &["demo", "init", "--repo", d.to_str().unwrap()], 2, "INIT_CONFIG_EXISTS");
+    assert_eq!(snapshot(d), before);
+    assert_eq!(std::fs::read_to_string(d.join(".canon/policy.yaml")).unwrap(), "version: mine\n");
+    assert!(!d.join(".gitignore").exists());
+}
+
 #[test]
 fn authoring_demo_03_demo_review_records_the_reviewer_review_and_the_gate_turns_green() {
     let dir = demo_repo();
@@ -409,4 +424,80 @@ fn authoring_demo_04_demo_review_in_a_directory_that_demo_init_never_set_up_is_r
     let before = snapshot(d);
     refused(d, &["demo", "review", "--repo", d.to_str().unwrap()], 2, "DEMO_NOT_INITIALIZED");
     assert_eq!(snapshot(d), before);
+}
+
+// ---- 0.31 fixes: F3 pack id format, F5 adapter exits --------------------------
+
+const MALFORMED_PACK_IDS: [&str; 4] = ["sha256:abc", "", "sha256:ABCDEF0000000000000000000000000000000000000000000000000000000000", "nothex"];
+
+fn pack_id_format_is_a_usage_error(verb: &str) {
+    let dir = repo_with_context();
+    let d = dir.path();
+    add_pack(d);
+    let before = snapshot(d);
+    for id in MALFORMED_PACK_IDS {
+        let b = refused(d, &["context-pack", verb, id], 2, "USAGE");
+        assert!(b["error"]["message"].as_str().unwrap().contains("PACK_ID"), "{id}: {b}");
+        assert_eq!(snapshot(d), before);
+    }
+    refused(d, &["context-pack", verb, ZERO_PACK], 2, "CONTEXT_PACK_NOT_FOUND");
+}
+
+#[test]
+fn dispatch_manifest_29_context_pack_show_on_a_malformed_pack_id_is_a_usage_error() {
+    pack_id_format_is_a_usage_error("show");
+}
+
+#[test]
+fn dispatch_manifest_30_context_pack_verify_on_a_malformed_pack_id_is_a_usage_error() {
+    pack_id_format_is_a_usage_error("verify");
+}
+
+#[test]
+fn dispatch_manifest_31_adapter_authorize_on_a_response_whose_envelope_breaks_a_rule_is_refused_as_a_fixable_invocation() {
+    let dir = repo();
+    let d = dir.path();
+    let before = snapshot(d);
+    let b = refused(d, &["adapter", "authorize", "--response", &adapter("reject-negative-cost.json")], 2, "ADAPTER_REFUSED");
+    assert!(b["error"]["message"].as_str().unwrap().contains("telemetry.cost_usd"), "{b}");
+    assert_eq!(snapshot(d), before);
+
+    let policy = d.join(".canon/policy.yaml");
+    let good = std::fs::read_to_string(&policy).unwrap();
+    std::fs::write(&policy, "adapter_capabilities: [unclosed\n").unwrap();
+    let broken = snapshot(d);
+    let b = refused(d, &["adapter", "authorize", "--response", &adapter("omp.json")], 2, "ADAPTER_REFUSED");
+    assert!(b["error"]["hint"].as_str().unwrap().contains("policy file"), "{b}");
+    assert_eq!(snapshot(d), broken);
+
+    std::fs::write(&policy, good).unwrap();
+    refused(d, &["adapter", "authorize", "--response", &adapter("omp.json")], 1, "ADAPTER_EXECUTION_NOT_AUTHORIZED");
+}
+
+#[test]
+fn dispatch_manifest_32_schema_error_adapter_refused_states_the_exit_of_each_adapter_call() {
+    let dir = TempDir::new().unwrap();
+    let d = dir.path();
+    let err = body(&run(d, &["schema", "--error", "ADAPTER_REFUSED"]));
+    let meaning = err["data"]["error"]["meaning"].as_str().unwrap();
+    assert_eq!(err["data"]["error"]["exit"], 2, "{err}");
+    let exits = |leaf: &[&str]| -> Vec<(i64, String)> {
+        let mut args = vec!["schema"];
+        args.extend_from_slice(leaf);
+        let doc = body(&run(d, &args));
+        doc["data"]["exits"].as_array().unwrap_or_else(|| panic!("{doc}")).iter().map(|e| (e["code"].as_i64().unwrap(), e["meaning"].as_str().unwrap().to_string())).collect()
+    };
+    let authorize_exits = exits(&["adapter", "authorize"]);
+    let exit2 = &authorize_exits.iter().find(|(code, _)| *code == 2).expect("authorize lists exit 2").1;
+    assert!(exit2.contains("ADAPTER_REFUSED") && exit2.contains("envelope breaks a rule") && exit2.contains("policy file is broken"), "{exit2}");
+    let exit1 = &authorize_exits.iter().find(|(code, _)| *code == 1).expect("authorize lists exit 1").1;
+    assert!(exit1.contains("ADAPTER_EXECUTION_NOT_AUTHORIZED") && exit1.contains("only exit 1"), "{exit1}");
+    let validate_exits = exits(&["adapter", "validate"]);
+    assert!(validate_exits.iter().any(|(code, m)| *code == 1 && m.contains("envelope breaks a rule")), "{validate_exits:?}");
+    assert!(validate_exits.iter().any(|(code, m)| *code == 2 && m.contains("unreadable")), "{validate_exits:?}");
+    assert!(meaning.contains("adapter authorize") && meaning.contains("adapter validate") && meaning.contains("exit 1"), "{meaning}");
+    let authorize = body(&run(d, &["schema", "adapter", "authorize"])).to_string();
+    assert!(authorize.contains("ADAPTER_EXECUTION_NOT_AUTHORIZED") && authorize.contains("the only exit 1") && authorize.contains("policy file is broken"), "{authorize}");
+    let validate = body(&run(d, &["schema", "adapter", "validate"])).to_string();
+    assert!(validate.contains("envelope breaks a rule"), "{validate}");
 }

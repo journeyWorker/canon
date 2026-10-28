@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-27T08:33:58.563115915Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-fixes",
+    "canon-0-31-brief-format"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "authoring-scaffold",
+  "summary": "",
+  "title": "Authoring: feature and scenario scaffolding"
+}

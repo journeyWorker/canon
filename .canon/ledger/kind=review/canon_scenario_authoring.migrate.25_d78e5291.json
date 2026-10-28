@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-c-2026-10-28-r3"
+  },
+  "at": "2026-10-28T11:00:54.204379Z",
+  "code_tree": "37209602b111694b47355a8225c645c01be1749b",
+  "kind": "review",
+  "pin": "10b8f9a262179f80b07fbdd2f06797dcb8e1e577",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c97615f59ec2557fd19cffb3353c00ca06a525f345bf2acd3ce397df8e69f85f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "feat/0.31"
+  },
+  "review_id": "01M612Q2SWWPEKXV1XTT960SE0",
+  "reviewer": "rev-031-c",
+  "reviewer_harness": "omp",
+  "scenario_id": "authoring.migrate.25",
+  "schema": 2,
+  "worktree_dirty": false
+}

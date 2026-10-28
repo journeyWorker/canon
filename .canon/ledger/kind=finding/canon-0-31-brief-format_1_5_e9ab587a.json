@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:41.966184463Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-ingest/src/brief.rs:265-276",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "resolution_code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "resolution_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.21"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] A frontmatter with no closing --- (or a BOM before the first ---) is silently not a frontmatter. frontmatter_end returns None, so no brief.frontmatter-invalid is raised and the YAML lines are read as prose. Repro: '---\\nkind: chore\\n' then a 0.31 chore brief: brief check reports 5 brief.section-missing blockers (read as a feature) and nothing about the frontmatter; review change and governing read it as a feature too. F2 makes a frontmatter that does not read as YAML a blocker. Fix: when line 1 (BOM stripped) is --- and nothing closes it, return a Frontmatter with a 'not closed' problem; strip a leading BOM before the fence test.",
+  "worktree_dirty": false
+}

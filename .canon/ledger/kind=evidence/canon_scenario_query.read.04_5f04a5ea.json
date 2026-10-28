@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:30:49.685047273Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test query two_reviews_of_one_scenario_at_two_pins_are_two_records_and_both_read_back"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 41,
+  "scenario_id": "query.read.04",
+  "schema": 1,
+  "staging_id": "01ca6ec3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

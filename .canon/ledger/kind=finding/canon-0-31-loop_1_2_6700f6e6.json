@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:27:31.858086956Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief.rs:577-585; crates/canon-cli/src/status.rs:1611",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reason": "the guard now waits on the tagged change tg, not the newer draft d (hand run); status says the draft is not read, which holds",
+  "resolution_code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "resolution_sha": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.125",
+    "context.status.86"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[standards] Status and the evidence guard disagree about a pending draft. A building subject adopts tg (tagged by scenario X, unapproved) and then d (never approved, untagged): `evidence add` for an untagged, never-evidenced scenario Y is refused with BRIEF_UNAPPROVED naming d's brief, because the fallback takes the newest adopted change. Status meanwhile lists d in pendingDrafts with `reopen, evidence and ship do not read it` and `t is not blocked meanwhile` (reproduced). This breaks the F3 acceptance that a never-approved untagged feature brief does not block evidence recording. Fix: take the fallback from the governing set (the newest non-chore governing change; with no governing change, the newest adopted feature change), never from the drafts, or make status say the draft gates untagged evidence.",
+  "worktree_dirty": false
+}

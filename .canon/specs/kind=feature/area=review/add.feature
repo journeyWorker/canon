@@ -80,7 +80,7 @@ Feature: review scenario
   @review.add.08
   Scenario: A review records the reviewing session and says it was written directly
     Given evidence attested for a scenario
-    When a review is added with --session-id
+    When a review is added with --session
     Then the review's actor carries that session_id
     And the command says it was written directly, with nothing to promote
 
@@ -310,7 +310,7 @@ Feature: review scenario
   @review.add.92
   Scenario: A review for a project id that names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
-    When review scenario names a --project-id that is no configured root
+    When review scenario names a --project that is no configured root
     Then it exits 2 with UNKNOWN_SPEC_ROOT, writes no review record, and the hint names the configured root
 
   # canon: {"schema":1,"at":"2026-10-23T12:07:06Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -419,3 +419,13 @@ Feature: review scenario
     Then the repeat writes no record and shows the earlier review id of each scenario
     And the run after the change writes one record with a new review id and shows the earlier ids of the other two
     And the review id is left out when two reviews are compared, as the time is
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:04Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:review-attestation
+  @case:edge
+  @flow:canon-0-31-brief-format.F1
+  @review.add.103
+  Scenario: A change review of a chore pins a brief whose chore kind is in the frontmatter and refuses an old-format one
+    Given a chore whose frontmatter says kind: chore and one in the 0.30 format
+    When canon review change runs for each
+    Then the first pins the brief digest of the new text and the second is refused with OLD_BRIEF_FORMAT

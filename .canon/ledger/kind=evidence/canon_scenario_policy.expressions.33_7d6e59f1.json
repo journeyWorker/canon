@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:25:55.638949865Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate policy_expressions_33_policy_show_reports_the_policy_digest_and_whether_its_approval_holds_no_longer_holds_or_is_absent"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 55,
+  "scenario_id": "policy.expressions.33",
+  "schema": 1,
+  "staging_id": "2b42ac17",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

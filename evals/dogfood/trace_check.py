@@ -76,11 +76,12 @@ def classify_failure(output):
     for flag in re.findall(r"unexpected argument '(--[\w-]+)'", output):
         if re.search(r"similar argument exists", output):
             return "naming"
-        if re.search(re.escape(flag) + r"-id\b", output.replace(f"'{flag}'", "")):
+        # A 0.30 spelling (`--actor-id`) of an option that is now the bare noun (`--actor`).
+        if flag.endswith("-id") and re.search(re.escape(flag[:-3]) + r"(?![\w-])", output.replace(f"'{flag}'", "")):
             return "naming"
     if error_code(output) == "USAGE":
         for flag in re.findall(r"(?:unknown|unexpected)[^\n]*?(--[\w-]+)", output):
-            if re.search(re.escape(flag) + r"-id\b|" + re.escape(flag) + r"_record\b", output.replace(flag, "", 1)):
+            if (flag.endswith("-id") and re.search(re.escape(flag[:-3]) + r"(?![\w-])", output.replace(flag, "", 1))) or re.search(re.escape(flag) + r"_record\b", output.replace(flag, "", 1)):
                 return "naming"
     return "other"
 

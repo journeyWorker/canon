@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:30:30.760889794Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate tier_storage_15_export_refuses_sensitive_records_without_policy_permission_an_unknown_kind_and_an_unreadable_bound"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 61,
+  "scenario_id": "tier.storage.15",
+  "schema": 1,
+  "staging_id": "eedb1849",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

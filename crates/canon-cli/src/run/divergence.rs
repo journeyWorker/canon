@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use super::{human_only, record_role};
 use canon_model::RoleId;
 
-/// `--project-id` of a divergence leaf (D1): the one given, else the only
+/// `--project` of a divergence leaf (D1): the one given, else the only
 /// spec root `canon.yaml` configures.
 fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool) -> Result<ProjectId, ExitCode> {
     let repo = crate::context::resolve_repo_root(repo);
@@ -50,7 +50,7 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
         }
         DivergenceCliCommand::Accept(DivergenceAcceptArgs { project_id, scenario_ids, reason, tracking, expiry, actor_id, role, session_id, repo, json, .. }) => {
             let ids: Vec<String> = scenario_ids.iter().map(ToString::to_string).collect();
-            let call = format!("canon divergence accept {} --actor-id <their name> --session-id <their session> --reason \"<why>\" --tracking <ISSUE_URL>", ids.join(" "));
+            let call = format!("canon divergence accept {} --actor <their name> --session <their session> --reason \"<why>\" --tracking <ISSUE_URL>", ids.join(" "));
             if let Err(code) = human_only("canon divergence accept", &call, json) {
                 return code;
             }

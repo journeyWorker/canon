@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28-r4"
+  },
+  "at": "2026-10-28T11:02:37.668857Z",
+  "change_id": "canon-0-31-cli-ids",
+  "code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/cli_ids.rs:296",
+  "kind": "finding",
+  "resolution_code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "resolution_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "reviewer": "rev-031-c",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.50"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "(standards pass) context_capability_50 claims `dispatch begin --task add-login#1` runs again, but the line it runs has no --role, so it exits 2 USAGE (`--role <ROLE>` not provided) and the test only asserts the stdout lacks `was removed`. The comment says the line reaches the command, which it does not. Adding `--role implementer` makes it reach TASK_NOT_FOUND (checked by hand), which actually shows --task is accepted. Blast radius: none beyond the test.",
+  "worktree_dirty": false
+}

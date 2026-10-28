@@ -48,7 +48,7 @@ fn repo_with_clean_brief() -> TempDir {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     std::fs::write(brief_path(repo), en_brief("")).unwrap();
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
     let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
@@ -58,7 +58,7 @@ fn repo_with_clean_brief() -> TempDir {
     dir
 }
 
-const ATTEST: [&str; 12] = ["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"];
+const ATTEST: [&str; 12] = ["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl"];
 
 fn approve(repo: &Path, who: &str, words: &str) -> Output {
     run(repo, &["brief", "approve", "--approver", who, "--note", words])
@@ -73,13 +73,13 @@ fn status_text(repo: &Path) -> String {
 fn en_brief(extra: &str) -> String {
     format!(
         "# Add login\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n{extra}"
+## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n\n{extra}"
     )
 }
 

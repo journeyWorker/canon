@@ -183,9 +183,9 @@ record.
 An operator-requested rollback is a distinct authenticated action:
 
 ```text
-canon strategy rollback <strategy_id> --reason "<reason>" --actor-id alice \
+canon strategy rollback <strategy_id> --reason "<reason>" --actor alice \
   --signature-file rollback.sig --approval-at 2026-10-02T12:00:00Z \
-  [--contradicting-trajectory-id <trajectory_id>] --repo .
+  [--contradicting-trajectory <trajectory_id>] --repo .
 ```
 
 `--signature-file` is an armored SSH detached signature over the

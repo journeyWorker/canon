@@ -118,7 +118,7 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
     let needing_config: &[&[&str]] = &[
         &["status"],
         &["query", "--kind", "subject"],
-        &["finding", "list", "--change-id", "add-login"],
+        &["finding", "list", "--change", "add-login"],
         &["divergence", "list"],
         &["brief", "check"],
         &["policy", "show"],

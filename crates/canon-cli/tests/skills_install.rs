@@ -1362,7 +1362,7 @@ fn skills_install_64_doctor_reports_a_missing_gitignore_line_with_the_fix() {
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     let install = canon(&["skills", "install", "--providers", "claude"], &source, &target);
     assert_eq!(install.status.code(), Some(0), "{}", String::from_utf8_lossy(&install.stdout));
-    let managed = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n";
+    let managed = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
 
     fs::write(target.join(".gitignore"), managed.replace(".canon/learn/\n", "").replace(".canon/r2/\n", "")).unwrap();
     let doctor = canon(&["skills", "doctor"], &source, &target);

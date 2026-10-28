@@ -12,7 +12,7 @@ use tempfile::TempDir;
 
 const FEATURE: &str = ".canon/specs/kind=feature/area=shop/cart.feature";
 const SCENARIO: &str = "shop.cart.01";
-const CHORE_BRIEF: &str = "# Bump the client\n\n<!-- canon:kind chore -->\n\n## Intent\n\nBump the client\n\nApproved: Journey 2026-10-12T00:00:00Z — \"go\"\n";
+const CHORE_BRIEF: &str = "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nApproved: Journey 2026-10-12T00:00:00Z — \"go\"\n";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
@@ -100,20 +100,20 @@ fn head(repo: &Path) -> String {
 /// `setup` records.
 fn leaves() -> Vec<(&'static str, Vec<&'static str>)> {
     vec![
-        ("review scenario", vec!["review", "scenario", SCENARIO, "--actor-id", "rev-1", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]),
-        ("review change", vec!["review", "change", "bump-client", "--actor-id", "rev-2", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]),
-        ("divergence add", vec!["divergence", "add", SCENARIO, "--actor-id", "rev-1", "--role", "reviewer"]),
-        ("divergence defer", vec!["divergence", "defer", SCENARIO, "--actor-id", "rev-1", "--role", "reviewer", "--reason", "later", "--expiry", "2099-01-01"]),
-        ("divergence resolve", vec!["divergence", "resolve", SCENARIO, "--actor-id", "rev-1", "--role", "reviewer"]),
-        ("evidence add", vec!["evidence", "add", "--scenario-id", SCENARIO, "--class", "test-run", "--ref", "cargo test", "--role", "implementer"]),
+        ("review scenario", vec!["review", "scenario", SCENARIO, "--actor", "rev-1", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]),
+        ("review change", vec!["review", "change", "bump-client", "--actor", "rev-2", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]),
+        ("divergence add", vec!["divergence", "add", SCENARIO, "--actor", "rev-1", "--role", "reviewer"]),
+        ("divergence defer", vec!["divergence", "defer", SCENARIO, "--actor", "rev-1", "--role", "reviewer", "--reason", "later", "--expiry", "2099-01-01"]),
+        ("divergence resolve", vec!["divergence", "resolve", SCENARIO, "--actor", "rev-1", "--role", "reviewer"]),
+        ("evidence add", vec!["evidence", "add", "--scenario", SCENARIO, "--class", "test-run", "--ref", "cargo test", "--role", "implementer"]),
         (
             "evidence audit",
             vec![
-                "evidence", "audit", SCENARIO, "--ref", "audit-run", "--evaluator-id", "ev", "--evaluator-version", "1", "--evaluator-digest",
+                "evidence", "audit", SCENARIO, "--ref", "audit-run", "--evaluator", "ev", "--evaluator-version", "1", "--evaluator-digest",
                 "0000000000000000000000000000000000000000000000000000000000000000", "--audit-result", "confirmed", "--role", "reviewer",
             ],
         ),
-        ("finding add", vec!["finding", "add", "--change-id", "bump-client", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "rev-1", "--summary", "nit", "--disposition", "fixed"]),
+        ("finding add", vec!["finding", "add", "--change", "bump-client", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "rev-1", "--summary", "nit", "--disposition", "fixed"]),
         ("finding close", vec!["finding", "close", "bump-client", "--round", "2", "--seq", "1", "--disposition", "fixed"]),
     ]
 }
@@ -127,7 +127,7 @@ fn run_leaf(repo: &Path, argv: &[&str], extra: &[&str]) -> Output {
 
 /// `finding close` closes a finding that is open and committed.
 fn open_finding_for_close(repo: &Path) {
-    ok(repo, &["finding", "add", "--change-id", "bump-client", "--round", "2", "--seq", "1", "--severity", "note", "--actor-id", "rev-1", "--summary", "open one"]);
+    ok(repo, &["finding", "add", "--change", "bump-client", "--round", "2", "--seq", "1", "--severity", "note", "--actor", "rev-1", "--summary", "open one"]);
 }
 
 fn error_of(out: &Output) -> Value {
@@ -179,7 +179,7 @@ fn every_rev_default_resolves_head_and_records_the_code_it_saw() {
     let closed = findings.iter().filter(|f| f["round"] == 2).max_by_key(|f| f["at"].as_str().unwrap().to_string()).unwrap();
     assert_eq!(sha_of(closed, "resolution_sha").as_deref(), Some(head.as_str()));
 
-    let payload = ok(r, &["evidence", "approval-payload", "--scenario-id", SCENARIO, "--project-id", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"]);
+    let payload = ok(r, &["evidence", "approval-payload", "--scenario", SCENARIO, "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"]);
     assert!(payload.contains(&head), "the signed payload binds HEAD: {payload}");
 }
 
@@ -193,14 +193,14 @@ fn an_explicit_short_sha_branch_and_head_tilde_one_record_the_full_sha() {
     let second = head(r);
     assert_ne!(first, second);
     for (reviewer, rev, expected) in [("a-short", &first[..8], &first), ("a-branch", "main", &second), ("a-tilde", "HEAD~1", &first), ("a-full", second.as_str(), &second)] {
-        let out = canon(r, &["review", "scenario", SCENARIO, "--actor-id", reviewer, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--rev", rev]);
+        let out = canon(r, &["review", "scenario", SCENARIO, "--actor", reviewer, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--rev", rev]);
         assert!(out.status.success(), "{rev}: {}", text(&out.stderr));
         let record = records(r, "review").into_iter().find(|rec| rec["reviewer"] == reviewer).unwrap();
         assert_eq!(record["pin"], expected.as_str(), "--rev {rev}");
         assert_eq!(record["worktree_dirty"], false, "a named commit is not a dirty working tree");
         assert_eq!(record["code_tree"], code_tree(r, Some(expected)).unwrap().tree, "--rev {rev} records the code of that commit");
     }
-    let unknown = canon(r, &["divergence", "add", SCENARIO, "--actor-id", "x", "--role", "reviewer", "--rev", "no-such-rev", "--json"]);
+    let unknown = canon(r, &["divergence", "add", SCENARIO, "--actor", "x", "--role", "reviewer", "--rev", "no-such-rev", "--json"]);
     assert_eq!(unknown.status.code(), Some(2));
     assert_eq!(error_of(&unknown)["code"], "NO_COMMIT");
 }
@@ -254,7 +254,7 @@ fn outside_git_and_with_no_commit_every_leaf_refuses_no_commit_and_writes_nothin
             assert_eq!(error["code"], "NO_COMMIT", "{name}: {error}");
             assert!(error["hint"].as_str().is_some_and(|h| h.contains("git")), "{name} says how to fix it: {error}");
         }
-        let payload = canon(r, &["evidence", "approval-payload", "--scenario-id", SCENARIO, "--project-id", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+        let payload = canon(r, &["evidence", "approval-payload", "--scenario", SCENARIO, "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
         assert_eq!(payload.status.code(), Some(2));
         assert_eq!(error_of(&payload)["code"], "NO_COMMIT");
         assert_eq!(files(&r.join(".canon/ledger")).len(), before, "a refusal writes nothing");

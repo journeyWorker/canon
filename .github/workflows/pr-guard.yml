@@ -1,0 +1,52 @@
+name: PR Guard
+
+# Two fast checks that run on EVERY pull request, with no `paths:` filter.
+# 0.30's release PR touched so many files that the path-filtered workflows may
+# not have run, and the release then failed twice after the tag: the release
+# workflow safety check and the man-page generator build. Both are cheap here,
+# so a filter can never hide them. The release-mode man-page build stays in
+# build-native.yml behind its path filter; the debug `cargo check` below is
+# what catches a broken generator when that filter does not match.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+permissions:
+  contents: read
+
+jobs:
+  safety:
+    name: Release workflow safety check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Check release workflow safety
+        run: python3 scripts/check-release-workflow-safety.py
+
+  man-check:
+    name: Man-page generator builds (cargo check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-pr-guard-man-check-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo check the man-page generator
+        run: cargo check --locked -p canon-cli --features man --example canon-man

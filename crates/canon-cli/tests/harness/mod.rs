@@ -273,7 +273,7 @@ pub fn fixture(home: &Path) -> TempDir {
     git(repo, &["init", "-q", "."]);
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
@@ -281,11 +281,11 @@ pub fn fixture(home: &Path) -> TempDir {
     // Records about a commit need one.
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "seed"]);
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit"]);
     ok(
         repo,
         home,
-        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
+        &["evidence", "add", "--project", "root", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor", "impl", "--session", "s1", "--role", "implementer"],
     );
     ok(repo, home, &["scenario", "new", "auth.login.02", "--title", "Sign out", "--feature", feature]);
     git(repo, &["add", "-A"]);
@@ -448,13 +448,13 @@ pub const INVENTORY_YAML: &str = "schema: 1\nkind: inventory\nat: \"2026-07-10T0
 /// A complete brief with flow steps `F1` and `F2`.
 pub fn clean_brief() -> String {
     "# Add login\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n"
+## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n\n"
         .to_string()
 }
 
@@ -506,7 +506,7 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
         // The example's `auth.login.02` is in the fixture already.
         "scenario new" => argv = swapped(argv, "auth.login.02", "auth.login.03"),
         "review change" => {
-            ok(&repo, home, &["change", "new", "tidy", "--subject-id", "demo", "--title", "Tidy", "--change-kind", "chore"]);
+            ok(&repo, home, &["change", "new", "tidy", "--subject", "demo", "--title", "Tidy", "--change-kind", "chore"]);
             argv = swapped(argv, "add-login", "tidy");
         }
         "context-pack add" | "prompt add" => put(&repo, &manifest_of(&argv), MANIFEST),
@@ -527,7 +527,7 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
             put(&repo, ".canon/changes/add-login/tasks.md", "# Tasks: Add login\n\n- [ ] 1 Write the failure-path scenarios\n");
             ok(&repo, home, &["ingest", "plans"]);
             ok(&repo, home, &["brief", "approve", "add-login", "--approver", "alice", "--note", "approved as written"]);
-            ok(&repo, home, &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--role", "implementer", "--actor-id", "impl"]);
+            ok(&repo, home, &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--role", "implementer", "--actor", "impl"]);
         }
         "plugin sync" => {
             put(&repo, ".canon/plugins/porting/plugin.yaml", PORTING_YAML);

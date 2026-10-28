@@ -44,7 +44,7 @@ pub struct Gap {
     /// The `(project_id, scenario_id)` pairs with no evidence after `since`.
     pub scenarios: Vec<(String, String)>,
     /// The finding names its scenarios (0.24.1, #87), so only `scenarios`
-    /// need evidence, one `canon evidence add --scenario-id` each; the
+    /// need evidence, one `canon evidence add --scenario` each; the
     /// rest of the suite is not asked for.
     pub scoped: bool,
     /// The batch command(s) that clear a whole-suite gap: one `canon evidence
@@ -86,10 +86,10 @@ impl Gap {
     /// evidenced).
     pub fn commands(&self) -> Vec<String> {
         if let Some((project, id)) = self.scoped.then(|| self.scenarios.first()).flatten() {
-            return vec![format!("canon evidence add --project-id {project} --scenario-id {id} --report <junit|cucumber|swift-testing>:<path> --role implementer")];
+            return vec![format!("canon evidence add --project {project} --scenario {id} --report <junit|cucumber|swift-testing>:<path> --role implementer")];
         }
         if self.commands.is_empty() {
-            return vec![format!("canon evidence add --project-id {} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --role implementer", self.project())];
+            return vec![format!("canon evidence add --project {} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --role implementer", self.project())];
         }
         self.commands.clone()
     }
@@ -99,7 +99,7 @@ impl Gap {
         reverify_scenarios(&self.pairs())
     }
 
-    /// The project to pass to `--project-id`.
+    /// The project to pass to `--project`.
     pub fn project(&self) -> &str {
         self.scenarios.first().map_or("<root>", |(project, _)| project.as_str())
     }
@@ -180,7 +180,7 @@ pub fn chore_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subj
 }
 
 /// Whether `canon.yaml` configures several spec roots, which makes
-/// `--project-id` required on the commands the hints name.
+/// `--project` required on the commands the hints name.
 fn multi_root(repo: &Path) -> bool {
     crate::inventory::load_spec_roots(&repo.join("canon.yaml")).is_ok_and(|roots| roots.len() > 1)
 }
@@ -278,7 +278,7 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo
 /// The `canon review change` step a chore's review gap names.
 pub fn chore_review_remedy(change: &ChangeId) -> String {
     format!(
-        "have a reviewer record one review of the chore: `canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<brief>\"`",
+        "have a reviewer record one review of the chore: `canon review change {} --project <root> --actor <reviewer> --session <review-session> --role reviewer --original-spec-ref \"<brief>\"`",
         change.as_str()
     )
 }
@@ -294,7 +294,7 @@ pub fn hint(repo: &Path, ctx: Option<&GateContext>, code_tree: &CodeTreeMemo, su
         return None;
     }
     if reverify.iter().all(|v| is_scoped_reverify(v)) {
-        return Some("record evidence again for the scenarios named, one command each (`canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`); the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
+        return Some("record evidence again for the scenarios named, one command each (`canon evidence add --project <root> --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`); the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
     }
     let commands = ctx.map(|ctx| batch_commands_of(repo, ctx, code_tree, subject)).unwrap_or_default();
     let how = match commands.as_slice() {

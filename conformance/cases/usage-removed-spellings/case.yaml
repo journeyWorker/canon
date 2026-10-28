@@ -1,13 +1,19 @@
-description: "0.25 D6: the spellings 0.24 deprecated no longer parse. A removed flag (`brief check --change`, `change new --subject`, with `=` or a space) and a removed kind value (`query --kind review_record`, `purge --kind=session_record`) are usage errors (exit 2, code USAGE) whose hint names the spelling to use; the canonical spellings run; help and `canon schema <command> --json` carry no deprecated field"
+description: "0.25 D6, 0.31: the spellings 0.24 deprecated and the id-suffixed options 0.31 renamed no longer parse. A removed flag (`brief check --change`, `change new --subject-id`, `finding list --change-id=`, with `=` or a space), a line with several id-suffixed spellings whose hint line runs as printed, and a removed kind value (`query --kind review_record`, `purge --kind=session_record`) are usage errors (exit 2, code USAGE) whose hint names the spelling to use; the canonical spellings run; help and `canon schema <command> --json` carry no deprecated field"
 env: { CANON_ACTOR: canon }
 steps:
   - args: [init, --no-agents-md, --no-policy]
     exit: 0
   - args: [subject, new, auth, --domain, dev, --title, Auth]
     exit: 0
-  - args: [change, new, add-login, --subject, auth, --title, Add login, --json]
-    exit: 2
   - args: [change, new, add-login, --subject-id, auth, --title, Add login, --json]
+    exit: 2
+  - args: [change, new, add-login, --subject, auth, --title, Add login, --json]
+    exit: 0
+  - args: [finding, list, --change-id=add-login, --json]
+    exit: 2
+  - args: [scenario, new, auth.login.01, --title, A, --subject-id, auth, --actor-id, a, --session-id, s, --json]
+    exit: 2
+  - args: [scenario, new, auth.login.01, --title, A, --subject, auth, --actor, a, --session, s, --json]
     exit: 0
   - args: [brief, check, --change, add-login, --json]
     exit: 2

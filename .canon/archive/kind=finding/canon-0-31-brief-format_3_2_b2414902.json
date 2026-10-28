@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-031-d",
+    "role": "reviewer",
+    "session_id": "rev-031-d-2026-10-28"
+  },
+  "at": "2026-10-28T09:42:34.405853Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "98447f5d2bbf3dcd120a6fd9e4c1c8641cd7fca0",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/brief_format.rs",
+  "kind": "finding",
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-d",
+  "round": 3,
+  "scenario_ids": [
+    "authoring.brief-check.17",
+    "authoring.brief-check.22",
+    "authoring.migrate.25"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec-fidelity] Complete remaining r2/2 assertions: brief-check.17 and .22 never exercise an actual chore ship check; migrate.25 has no review fixture, so cannot prove old-review restoration or refusal of a later review version. Add these assertions and bind their cases. The five assigned brief_format tests passed. migrate.25 also remains unsigned for the independently confirmed deletion defect already recorded as canon-0-31-brief-format_3_1; do not duplicate it. Blast radius: chore ship classification and review-pin restoration are outside these bound checks.",
+  "worktree_dirty": true
+}

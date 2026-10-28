@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::removed_028::{Kind, ROWS};
+use crate::removed_028::{Kind, ROWS, V31};
 use crate::safety::Effect;
 use crate::skills;
 use crate::status::{NextStep, StepActor};
@@ -71,7 +71,8 @@ fn line_uses_removed(line: &str) -> bool {
         return false;
     }
     let word_end = |tail: &str| tail.is_empty() || !tail.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-    ROWS.iter().any(|row| match row.kind {
+    // The 0.31 id options are not 0.27-era state: no script canon installed ever spelled them.
+    ROWS.iter().filter(|row| row.since != V31).any(|row| match row.kind {
         Kind::Command => line.match_indices(&format!("canon {}", row.old)).any(|(at, hit)| word_end(&line[at + hit.len()..])),
         Kind::Option => {
             let words = || line.split(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == '=');
@@ -517,6 +518,8 @@ pub fn announce(repo: &Path) {
     let legacy = detect(repo);
     // A 0.29 ledger layout (0.30 `ledger-naming`): the same `canon migrate` step; one step when both hold.
     crate::old_layout::announce(repo, legacy.is_none());
+    // 0.31 `brief-format`: a brief in the 0.30 format.
+    crate::old_briefs::announce(repo);
     if let Some(found) = legacy {
         let stale = if found.skill { format!("; {STALE_GUIDE}") } else { "; run `canon migrate --json` to preview the upgrade".to_string() };
         crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));
