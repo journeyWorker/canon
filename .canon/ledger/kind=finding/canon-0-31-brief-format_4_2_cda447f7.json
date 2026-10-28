@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-c-2026-10-28-r2"
+  },
+  "at": "2026-10-28T10:31:11.254549Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate.rs:1402-1406",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "ad3f83b54502a1c14404e6710e5153053a5b045f",
+  "reviewer": "rev-031-c",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.migrate.25"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[standards] Resuming an interrupted run after its last brief write can permanently omit the post-migration seal. If interruption happens before the journal is marked complete and before seal runs, all briefs are already new-format. The resumed plan has no non-rebuild effects: resume_backup reuses the original backup and migrate_briefs::apply marks its journal complete, but rebuild_index only calls seal when the current plan has a non-rebuild effect. The backup therefore still lacks tree-after.json; changed_since_migrate treats that as an older backup and skips protection, allowing later edits or deletions of a pre-existing already-0.31 unapproved brief to be overwritten by revert. Fix: seal the reused backup after successfully completing a resumed migration even when no rewriting remained; add an interruption case with all new brief bytes present, journal incomplete and no seal. Blast radius: later-change protection after resumed migrations. Source-path inspection only; current test restores one old brief before resume, which forces a rewrite and masks this route.",
+  "worktree_dirty": false
+}
