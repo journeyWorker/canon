@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:25:54.915175Z",
+  "change_id": "canon-0-31-cli-ids",
+  "code_tree": "e76ffa1bbe58488ee1dd1a0e53c9ddd7a2c8756b",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/cli_ids.rs",
+  "kind": "finding",
+  "resolution_code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "resolution_sha": "201ef420f7d6b6e79f0ed91e5297db7906270fbf",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-d",
+  "round": 2,
+  "scenario_ids": [
+    "context.capability.47",
+    "context.capability.56",
+    "context.capability.57"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[spec-fidelity] Bind checks that prove the stated parity and parsing coverage. capability.47 inventories 67 options but executes only three command families, never comparing all 24 commands and stored records against 0.30; conformance golden replay compares output, not stored-record parity. capability.56 scans most hints/remedies for old spelling rather than parsing them and permits zero parsed next steps. capability.57 scans docs but never parses their command lines; the separate docs_lint parser sweep is not bound. Add or bind those checks and re-evidence; all 13 cli_ids tests passed. Blast radius: unexercised command families and generated instructions.",
+  "worktree_dirty": true
+}

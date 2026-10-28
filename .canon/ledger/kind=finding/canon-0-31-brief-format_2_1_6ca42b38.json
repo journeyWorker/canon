@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:26:20.563048Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/migrate_briefs.rs:792-813",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "resolution_code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "resolution_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "reviewer": "rev-031-b",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.migrate.25"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] migrate --revert still discards a later edit of a brief the migrate did not rewrite, without refusing. later_human_acts only compares the Approved: line of such a brief and check_revert only covers the journal's rewritten files, but the revert restores every file of the whole-.canon snapshot. Repro (d9ea4138 release binary): canon init; change new x and y; x gets an old-format heading (## 의도); commit; migrate --commit (rewrites x only); commit; append 'later edit' to y's brief and commit; migrate --revert preview lists 'restore .canon/changes/y/brief.md' and no refusal; CANON_ROLE=orchestrator migrate --revert --commit exits 0 and y loses the line. F6 (brief line 109): a file to restore that changed after the migrate (a later approval, edit, new review version) is named and the revert refused, writing nothing. r1/3's approval cases are fixed. Blast radius: the same path discards any later review or evidence version not in the journal. Fix: refuse when any restored/removed path under the snapshot differs from what the migrate left (compare against the manifest of the post-migrate state, or record the post-migrate hash of every snapshot path in the journal).",
+  "worktree_dirty": false
+}

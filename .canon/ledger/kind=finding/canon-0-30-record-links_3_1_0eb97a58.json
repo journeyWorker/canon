@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:26:02.834463Z",
+  "change_id": "canon-0-30-record-links",
+  "code_tree": "e76ffa1bbe58488ee1dd1a0e53c9ddd7a2c8756b",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/record_links.rs",
+  "kind": "finding",
+  "resolution_code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "resolution_sha": "201ef420f7d6b6e79f0ed91e5297db7906270fbf",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "reviewer": "rev-031-d",
+  "round": 3,
+  "scenario_ids": [
+    "inventory.sync.54",
+    "query.read.84",
+    "review.add.102"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec-fidelity] Cover the missing branches before re-signing. inventory.sync.54 has no step-free scenario, so cannot assert that its legacy record is not rewritten. query.read.84 queries findings only and supplies no review reference, evidence/task/scenario or subject query despite requiring each. review.add.102 changes a feature step, not evidence, so mixed new/retained review ids are never tested after evidence changes. Add those fixtures and exact assertions, then re-evidence. All 25 record_links tests passed; these are evidence gaps, not demonstrated runtime defects. Blast radius: empty-step migration, reference resolution by kind and evidence-pin idempotence.",
+  "worktree_dirty": true
+}
