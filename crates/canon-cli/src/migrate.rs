@@ -537,7 +537,9 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
                 .emit("canon migrate", json);
         }
     }
-    rebuild_index(&repo, log, safe_plan, backup_dir, &old_world, json)
+    // A run that wrote something, or that finished a stopped one in its backup (whose plan may have nothing left but
+    // the index), seals the backup.
+    rebuild_index(&repo, log, safe_plan, backup_dir, snapshotted || resume.is_some(), &old_world, json)
 }
 
 /// The plan for `repo` with `canon.yaml` `text`, or why it is refused.
@@ -1378,8 +1380,8 @@ fn tracked_index_files(repo: &Path) -> usize {
 
 /// The full index rebuild (module doc). Exit `1` when a root does not
 /// sync clean: the migration stands, and `canon inventory sync` lists
-/// what to fix.
-fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, old_world: &migrate_names::OldWorld, json: bool) -> u8 {
+/// what to fix. With `seal`, the backup records what the migrate left.
+fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, seal: bool, old_world: &migrate_names::OldWorld, json: bool) -> u8 {
     match crate::inventory::rebuild(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             // Nothing planned but the index rebuild, and the rebuild wrote nothing: a repeat that found the repo migrated.
@@ -1400,7 +1402,7 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan,
                 }
             }
             // What the migrate left, for `canon migrate --revert` to tell a later change from the migrate's own.
-            if let Some(dir) = backup_dir.as_deref().filter(|_| plan.effects.iter().any(|effect| effect.action != "rebuild")) {
+            if let Some(dir) = backup_dir.as_deref().filter(|_| seal) {
                 if let Err(e) = migrate_names::seal(repo, &repo.join(dir)) {
                     log.line(format!("canon migrate: note — {e}; `canon migrate --revert` cannot tell later changes from the migrate's own"));
                 }

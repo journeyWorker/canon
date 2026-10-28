@@ -1217,8 +1217,9 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
             return Err(format!("the backup {} lacks its copy of {path}; it cannot restore the repo", backup.display()));
         }
     }
-    let briefs = crate::migrate_briefs::check_revert(repo, backup)?;
     let diff = diff(repo, &manifest)?;
+    // A tree that already is the snapshot was reverted before: nothing the migrate wrote is left to protect.
+    let briefs = crate::migrate_briefs::check_revert(repo, backup, diff.is_empty())?;
     let acts = crate::migrate_briefs::later_human_acts(repo, backup, SNAPSHOT_DIR, &diff.remove, &diff.restore);
     if !acts.is_empty() {
         return Err(format!("a human's approval was made after `canon migrate` ran, and a revert would discard it: {}; nothing was written. Revert by hand, or approve again after the revert", acts.join(", ")));

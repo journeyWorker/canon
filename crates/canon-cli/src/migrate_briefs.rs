@@ -742,9 +742,10 @@ pub struct RevertNote {
 
 /// Checks the files the migrate rewrote before `canon migrate --revert`: each
 /// is still as the migrate left it (or already restored); a file changed
-/// since (a later approval, edit or review version) is named and the revert
-/// refused, with nothing written.
-pub fn check_revert(repo: &Path, backup: &Path) -> Result<RevertNote, String> {
+/// since (a later approval, edit, deletion or review version) is named and the
+/// revert refused, with nothing written. `reverted` is whether the tree already
+/// is the backup's snapshot (an earlier revert finished).
+pub fn check_revert(repo: &Path, backup: &Path, reverted: bool) -> Result<RevertNote, String> {
     let Some(journal) = read_journal(backup) else {
         return Ok(RevertNote::default());
     };
@@ -758,21 +759,16 @@ pub fn check_revert(repo: &Path, backup: &Path) -> Result<RevertNote, String> {
             _ => changed.push(brief.path.clone()),
         }
     }
-    let ledger = canon_gate::GateCtx::from_repo(repo).ok().map(|ctx| ctx.ledger_root);
-    let archive = ledger.as_deref().and_then(canon_store::archive::archive_root_of);
-    let prefix = ledger.as_deref().and_then(|root| root.strip_prefix(repo).ok().map(Path::to_path_buf));
     for review in &journal.reviews {
         let now = std::fs::read(repo.join(&review.to)).map(|b| sha256_hex(&b)).ok();
         match now {
             Some(sha) if sha == review.new_sha256 => note.rebinds = true,
             Some(_) => changed.push(review.to.clone()),
             None => {
-                // Gone: restored by an earlier revert, or superseded by a later version, which moved it to the archive.
-                let in_archive = match (&archive, &prefix) {
-                    (Some(root), Some(prefix)) => Path::new(&review.to).strip_prefix(prefix).is_ok_and(|rel| root.join(rel).is_file()),
-                    _ => false,
-                };
-                if in_archive {
+                // Gone: already restored when an earlier revert put the tree, or the old version, back as it was;
+                // deleted, or superseded by a later version (which moved it to the archive), otherwise.
+                let restored = reverted || std::fs::read(repo.join(&review.from)).is_ok_and(|b| sha256_hex(&b) == review.old_sha256);
+                if !restored {
                     changed.push(review.to.clone());
                 }
             }
