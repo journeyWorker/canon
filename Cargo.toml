@@ -101,6 +101,15 @@ uninlined_format_args = "warn"
 unnested_or_patterns = "warn"
 wildcard_imports = "warn"
 
+# Debug info: line tables for our crates (backtraces keep file:line), none for
+# dependencies. `cargo test --workspace --no-run` from scratch (2026-10-28,
+# forca-rust sandbox): full debug info 22.6 GB / 174 s, this 15.4 GB / 142 s.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # Size-optimized release profile. `panic = "abort"` is deliberately NOT
 # set: canon-policy wraps the CEL compiler/interpreter in
 # `std::panic::catch_unwind` (eval.rs/validate.rs) to convert a parser
