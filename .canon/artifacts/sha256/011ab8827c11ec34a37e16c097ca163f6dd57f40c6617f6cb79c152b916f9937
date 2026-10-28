@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="1" skipped="0" failures="1" errors="0" uuid="ba07a20e-86fa-4a52-8f62-8d490b656f9a" timestamp="2026-10-28T19:35:28.516+09:00" time="6.279">
+    <testsuite name="canon-cli::brief_format" tests="1" skipped="0" errors="0" failures="1">
+        <testcase name="authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished" classname="canon-cli::brief_format" timestamp="2026-10-28T19:35:28.516+09:00" time="6.278">
+            <failure message="thread &apos;authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished&apos; (27280681) panicked at crates/canon-cli/tests/brief_format.rs:1199:5" type="test failure with exit code 101">thread &apos;authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished&apos; (27280681) panicked at crates/canon-cli/tests/brief_format.rs:1199:5:
+the resumed run sealed the backup
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished ... FAILED
+
+failures:
+
+failures:
+    authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 24 filtered out; finished in 6.27s
+
+</system-out>
+            <system-err>
+thread &apos;authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished&apos; (27280681) panicked at crates/canon-cli/tests/brief_format.rs:1199:5:
+the resumed run sealed the backup
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28-r3"
+  },
+  "at": "2026-10-28T10:57:56.032241Z",
+  "attachments": [
+    {
+      "case": "authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r3-junit.xml",
+      "sha256": "adfeeba2c76628bc06336818458909bde6843754b61be7bd801b14dbf2996b04"
+    }
+  ],
+  "code_tree": "37209602b111694b47355a8225c645c01be1749b",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r3-junit.xml"
+  },
+  "evidence_sha": "480968acc35f6634fa7497b7042bf1ec34a952fa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 164,
+  "scenario_id": "authoring.migrate.25",
+  "schema": 1,
+  "staging_id": "c6478c8b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
