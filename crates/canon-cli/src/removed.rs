@@ -103,7 +103,8 @@ impl Removed {
         let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
         words.push(shell_word(&operand));
         words.extend(args.iter().zip(&taken).filter(|(_, taken)| !**taken).map(|(arg, _)| shell_word(arg)));
-        Removed { command, used: used.clone(), replacement: words.join(" "), note: row.note, field: used, since: row.since, line: None }
+        let line = words.join(" ");
+        Removed { command, used: used.clone(), replacement: line.clone(), note: row.note, field: used, since: row.since, line: Some(line) }
     }
 
     /// A removed option that is renamed in place: the whole typed line with every removed option replaced.
@@ -269,9 +270,19 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
         // Every removed option on the line that is renamed in place, the first one included: the corrected line.
         let renamed: Vec<(usize, String)> = hits.iter().filter(|hit| !hit.row.operand).filter_map(|hit| hit.renamed.clone().map(|token| (hit.at, token))).collect();
         let (row, command, used) = (first.row, first.command.clone(), first.used.clone());
-        if row.operand {
-            let others: Vec<(usize, String)> = renamed.into_iter().filter(|(at, _)| *at != first.at).collect();
-            return Some(Removed::operand_row(row, command, used, args, &path_at, &others));
+        // A value that became an operand moves wherever its option stands on the line; the error still names the
+        // first removed spelling, and its hint is the line with every transformation applied.
+        if let Some(moved) = hits.iter().find(|hit| hit.row.operand) {
+            let others: Vec<(usize, String)> = renamed.into_iter().filter(|(at, _)| *at != moved.at).collect();
+            let corrected = Removed::operand_row(moved.row, moved.command.clone(), moved.used.clone(), args, &path_at, &others);
+            match corrected.line {
+                Some(line) if moved.at != first.at => {
+                    let mut removed = Removed::from_row(row, command, used.clone(), used);
+                    removed.line = Some(line);
+                    return Some(removed);
+                }
+                _ => return Some(corrected),
+            }
         }
         if row.since == V31 || (renamed.len() > 1 && first.renamed.is_some()) {
             return Some(Removed::renamed_line(row, command, used, args, &renamed));
