@@ -88,13 +88,13 @@ const MUTATIONS: &[Mutation] = &[
     Mutation {
         name: "give an option name another value name on one leaf",
         file: "crates/canon-cli/src/cli/divergence.rs",
-        apply: |text| replace_once(text, "#[arg(long, value_name = \"ACTOR_ID\")]", "#[arg(long, value_name = \"NAME\")]"),
+        apply: |text| replace_once(text, "#[arg(long = \"actor\", value_name = \"ACTOR_ID\")]", "#[arg(long = \"actor\", value_name = \"NAME\")]"),
         catches: ("grammar_t3_options", "one_name_has_one_value_name_arity_and_value_set_on_every_leaf"),
     },
     Mutation {
         name: "drop a row of the vocabulary",
         file: "docs/design/cli-vocabulary.tsv",
-        apply: |text| drop_line(text, |l| l.starts_with("actor-id\t")),
+        apply: |text| drop_line(text, |l| l.starts_with("actor\t")),
         catches: ("grammar_t3_options", "the_vocabulary_and_the_spec_use_the_same_options_with_the_same_value_names"),
     },
 ];
