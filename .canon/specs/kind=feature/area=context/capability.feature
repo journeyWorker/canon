@@ -212,10 +212,10 @@ Feature: context capability
   @case:failure
   @context.capability.21
   Scenario: A scenario batch element with a removed key name refuses the batch and names the key to use
-    Given a JSON array for `canon scenario new --input` whose second element uses the key subject, change or project
+    Given a JSON array for `canon scenario new --input` whose second element uses the key subjectId, changeId or projectId that the id-suffixed options made
     When the batch runs
-    Then it exits 2 with INPUT_UNKNOWN_FIELD and writes nothing
-    And the error's field points at the element and the key, as `/items/1/subject`, and `expected` lists the valid keys, the key the option is named after among them
+    Then it exits 2 with INPUT_UNKNOWN_FIELD and writes nothing, the first element included
+    And the error's field points at the element and the key, as `/items/1/subjectId`, `expected` lists the valid keys, the key without Id among them, and the hint names it
     And an array using the keys subject, project and change is written
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
@@ -577,7 +577,7 @@ Feature: context capability
   Scenario: An unknown --project root and an unknown finding --review are refused naming the new options
     Given a repo with one spec root, and a committed change
     When `canon evidence add` names a root that is not configured with --project, and `canon finding add` names a review the ledger does not hold with --review
-    Then the first exits 2 with UNKNOWN_SPEC_ROOT, the field --project and a hint that is a runnable line naming the one configured root
+    Then the first exits 2 with UNKNOWN_SPEC_ROOT, the field --project and a hint naming `--project` with the one configured root, as before the rename
     And the second is refused with the field --review, and neither writes anything
 
   # canon: {"schema":1,"at":"2026-10-27T13:12:22Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
