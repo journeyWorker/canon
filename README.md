@@ -264,6 +264,21 @@ It now asks the command tree whether the command declares `--repo`.
   the inputs in 0.25 s. The brief's limit is 5 s. The bench has the rows `search (rebuild)` and `search (reuse)`, which
   the `bench-shape` CI job holds to 20x for 10x the corpus.
 
+### Found by the final review
+
+Three review rounds after the last implementation run (all 871 scenarios signed, `canon gate check` clean) found
+and fixed:
+
+- `canon migrate --revert` refuses, naming the file, when a file the migrate left was **deleted** since (it restored
+  it), when the review version the migrate wrote was deleted, and after a run that stopped past its last brief write
+  and was resumed (the resumed run never sealed its backup, so no later change was guarded).
+- The old-spelling hint of a line that mixes removed options (`subject adopt --change-id … --subject-id …`) runs as
+  printed in either order.
+- A dropped SQLite tier closes its connections before returning, so its `-wal`/`-shm` files are gone when the next
+  read of the tree starts (a test saw them vanish mid-read).
+- Skill and website commands that no longer existed (`canon review add`, `canon divergence promote`,
+  `canon ingest artifacts`), now caught by a docs sweep that reads code spans across lines and double backticks.
+
 ### Upgrading
 
 Run `canon migrate` once on a repo with 0.30 briefs: until the human commits it, `canon evidence add` and the other writes above refuse.
