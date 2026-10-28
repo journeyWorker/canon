@@ -97,7 +97,7 @@ canon retrieve --for-role dev --domain dev --subject subject-domain-loop --limit
 - **Changes**: adopt imported plan changes under the Subject (see
   [Adopt flow](#adopt-flow)).
 - **Reviews / evidence / divergences**: authored as usual (`canon review
-  add`, `canon finding add`, `canon gate`, `canon divergence …`) against
+  scenario`, `canon finding add`, `canon gate check`, the `canon divergence` leaves) against
   the Subject's scenarios and adopted changes — the join spine carries
   them back through `scenario_id` and `change_id`. See `canon-review`
   for the finish-a-subject order.
@@ -225,7 +225,7 @@ edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`) are named for
 different reasons, and the answer does not depend on the order the changes
 were adopted or approved. The ship guard's brief-structure check runs over
 all of them. When several block, the hint is one
-``canon brief approve <id>… --approver <the human> --note "<their words>"``
+``canon brief approve <id>+ --approver <the human> --note "<their words>"``
 line naming every blocking change; a reopen refusal cannot be passed with
 `--override-reason`, a ship brief refusal can. A change never approved, not a
 chore and tagged by no scenario is a *pending draft* and blocks nothing: the
@@ -669,9 +669,9 @@ uses, so status and the gate cannot disagree about a gap:
   only step; no scenario → `canon scenario new --subject <id>` (and, when no
   `.feature` file holds a scenario yet, `canon feature new` first, unless
   every subject waits on its brief); a missing case → `canon scenario new
-  <surface>.<next nn> … --case <case>`; (building and later) an
-  unevidenced or divergent scenario → `canon evidence add --scenario
-  …` (its reason adds "then `canon gate promote`" only under
+  <surface>.<nn> --title "<what happens on this path>" --subject <id> --case <case>`; (building and later) an
+  unevidenced or divergent scenario → `canon evidence add --scenario <id>
+  --project <root> --class test-run --role implementer --ref "<test command>"` (its reason adds "then `canon gate promote`" only under
   `write.promote: manual`); an open blocker → `canon finding close <change>`; a
   due, unreviewed, evidenced scenario → `canon review scenario <id>` from another
   session; none of these → `canon subject move <id> --to <next status>`.

@@ -155,7 +155,7 @@ blockers and advisories. Each brief that has no blocker has a selection box
 and the page shows how many are selected. The human types their name and their
 answer once and clicks Approve: one request carries every selected brief with
 the sha256 of the file the page read, and records exactly what `canon brief
-approve <id>… --approver <name> --note <text>` records, the `Approved:` line
+approve <id>+ --approver <name> --note <text>` records, the `Approved:` line
 bound to the brief digest and the policy approval, for each. A brief that
 changed after the page loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`) or that has
 blockers refuses the whole request (409 `BRIEF_APPROVE_REFUSED`, naming each

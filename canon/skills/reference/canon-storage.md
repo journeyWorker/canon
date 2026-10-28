@@ -265,8 +265,8 @@ write:
 `--promote` / `--no-promote` decide for one write and win over the config
 without reading it; both at once is a usage error (exit `2`). If the
 promotion refuses the command's own record, the record stays staged, the
-line ends ``— run `canon gate promote` to commit it`` (`canon divergence
-promote` for a divergence), and the command exits `1`. With neither flag,
+line ends ``— run `canon gate promote` to commit it`` (`canon gate promote
+--kind divergence` for a divergence), and the command exits `1`. With neither flag,
 a malformed `write:` section (anything but `promote: auto | manual`)
 refuses the write, exit `2`, before anything is staged. `canon init
 --check` reports `[PASS] write (promote: auto)`, `[not configured]

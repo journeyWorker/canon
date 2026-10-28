@@ -84,7 +84,7 @@ platformer.session.04: resolved divergence — Idle and resize sessions stay err
 </Aside>
 
 Strategy memory is **rebuilt, not recomputed once**: `canon ingest
-artifacts` re-derives distilled strategies from the current trajectory
+records` re-derives distilled strategies from the current trajectory
 set (`rebuild_namespace`) every time it runs. That re-derivation is
 deterministic — a second ingest pass over the same artifacts derives
 byte-identical trajectory content, so the duplicate skip the rebuild
