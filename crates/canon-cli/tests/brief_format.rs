@@ -1073,6 +1073,18 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     assert_eq!(tree(r), before_refusal, "a refused preview writes nothing");
     restore(r, &migrated);
 
+    // The version the migrate wrote, deleted without a later one to archive it: the revert refuses naming it too, rather
+    // than putting the old version back over the deletion.
+    let (written, _) = change_reviews(r, "d").into_iter().find(|(path, _)| !path.contains("archive")).expect("the version the migrate wrote");
+    fs::remove_file(r.join(&written)).unwrap();
+    let before_refusal = tree(r);
+    let out = canon(r, &["migrate", "--revert", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    let message = json(&out)["error"]["message"].as_str().unwrap().to_string();
+    assert!(message.contains(&written) && message.contains("nothing was written"), "{message}");
+    assert_eq!(tree(r), before_refusal, "a refused preview writes nothing");
+    restore(r, &migrated);
+
     // A later edit of a rewritten brief makes the revert refuse, naming it, and nothing is written.
     let edited = format!("{}\nlater\n", read_brief(r, "b"));
     write_brief(r, "b", &edited);
@@ -1167,4 +1179,29 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     let done = canon(r, &["migrate", "--revert", "--commit", "--plan-digest", &revert_digest, "--json"]);
     assert!(done.status.success(), "{}", out_text(&done));
     assert_eq!(tree(r)[".canon/changes/b/brief.md"], before[".canon/changes/b/brief.md"], "the revert after a finished stopped run restores the original");
+
+    // A run stopped after its last brief write, before its journal was complete and the backup sealed: the next run has
+    // nothing left to write but finishes the journal and seals the backup, so a later edit is refused again.
+    commit_all(r);
+    let (_, digest) = plan(r);
+    assert!(commit(r, None, &digest).status.success());
+    let backup = fs::read_dir(r.join(".canon/migrate-backup")).unwrap().filter_map(Result::ok).map(|e| e.path()).filter(|p| p.join("briefs-journal.json").is_file()).max().unwrap();
+    let journal_path = backup.join("briefs-journal.json");
+    let mut journal: Value = serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+    journal["complete"] = Value::Bool(false);
+    fs::write(&journal_path, serde_json::to_vec(&journal).unwrap()).unwrap();
+    fs::remove_file(backup.join("tree-after.json")).unwrap();
+    let (_, digest) = plan(r);
+    let out = commit(r, None, &digest);
+    assert!(out.status.success(), "{}", out_text(&out));
+    let journal: Value = serde_json::from_slice(&fs::read(&journal_path).unwrap()).unwrap();
+    assert_eq!(journal["complete"], true, "the same journal was finished");
+    assert!(backup.join("tree-after.json").is_file(), "the resumed run sealed the backup");
+    let z_text = read_brief(r, "z");
+    write_brief(r, "z", &format!("{z_text}\nlater\n"));
+    let before_refusal = tree(r);
+    let out = canon(r, &["migrate", "--revert", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    assert!(json(&out)["error"]["message"].as_str().unwrap().contains(".canon/changes/z/brief.md"), "{}", out_text(&out));
+    assert_eq!(tree(r), before_refusal, "a refused preview writes nothing");
 }
