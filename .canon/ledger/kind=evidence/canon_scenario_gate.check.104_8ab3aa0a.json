@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T17:29:00.931750Z",
+  "attachments": [
+    {
+      "path": "target/0-32-changelog-recipes.log",
+      "sha256": "9e2f4e60cbe88fc9481b168d09638aa95a1495bf405326806f5264ca81a2dd0c"
+    },
+    {
+      "case": "a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_command",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "f8335320391853fa20a4253b66231590bbec4cdd",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test reverify_code a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_command; just recipes (target/0-32-changelog-recipes.log)"
+  },
+  "evidence_note": {
+    "summary": "chore 0.32 changelog-just recipe runs: release-check lint build docs conformance launcher dashboard man install test pass; platformer fails on Node 26 (passes with NODE_OPTIONS=--no-experimental-webstorage); gate red only on the pending chore review; bench Linux-only; live not run, no docker"
+  },
+  "evidence_sha": "d1e7cdca85229096cda3ace13ca740bce0e8503e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 267,
+  "scenario_id": "gate.check.104",
+  "schema": 1,
+  "staging_id": "baa07541",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
