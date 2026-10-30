@@ -85,6 +85,7 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
 - meta에 펼쳐져 있던 `unchanged`, `waitingOn`, `nextOmitted`와 그 밖의 평평한 멤버(`hotStore`, `deprecated` 등)는 해당 보고서의 data 멤버가 된다. 구현자가 meta에 펼쳐진 멤버를 전수 조사해 목록을 CHANGELOG에 싣는다. data에 이미 있는 멤버는 겹쳐 두지 않는다.
 - data 멤버가 늘어난 보고서는 `schemaVersion`의 minor를 올린다. 배치 입력의 항목이 모두 바뀐 것이 없으면 배치 보고서의 data에 `unchanged`가 있다.
 - data에 둘 수 없는 canon 전용 값은 `x-canon`으로 간다.
+- `--fields` 출력과 쪽 출력을 포함해 meta에는 계약이 정의한 멤버와 `x-canon`만 남는다. 계약 검사가 모든 봉투를 봉투 스키마로 검증하기 때문이다.
 
 ### F4 다음 단계와 경고
 
@@ -111,16 +112,17 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
 |---|---|---|
 | `PLAN_CHANGED` | `PLAN_STALE` | 2 |
 | `INPUT_ELEMENT_FAILED` | `BATCH_INCOMPLETE` | 1 |
-| `INPUT_BATCH_UNSUPPORTED`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`, `INPUT_UNREADABLE`, `INPUT_STDIN_TTY`, `INPUT_STDIN_CONFLICT` | `INPUT_INVALID` | 2 |
+| `INPUT_BATCH_UNSUPPORTED`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`, `INPUT_UNREADABLE`, `INPUT_STDIN_TTY` | `INPUT_INVALID` | 2 |
+| `INPUT_STDIN_CONFLICT` | `USAGE`, `field`는 `--input` | 2 |
 | `INPUT_INVALID`, `INPUT_CONFLICT`, `INPUT_TOO_LARGE` | 그대로 | 2 |
 | `INVALID_CURSOR` | `CURSOR_INVALID` | 2 |
 | `UNKNOWN_FIELD` | `USAGE` | 2 |
 | `USAGE`(모르는 명령, 명령 없는 호출) | `UNKNOWN_COMMAND`, `COMMAND_REQUIRED` | 2 |
 | (없음) | `INTERNAL` | 1 |
 
-- 합쳐진 `INPUT_*`의 구분은 메시지와 `field`에 남는다. `BATCH_INCOMPLETE`의 `data` 모양과 입력 문서 포인터는 지금 그대로다.
+- `INPUT_INVALID`는 `--input`을 읽거나 나눌 수 없을 때와 입력 문서가 조각 스키마를 어길 때만 쓴다. `INPUT_STDIN_TTY`는 `field`가 `--input`이다. 다른 옵션도 stdin을 읽는 경우(`INPUT_STDIN_CONFLICT`)는 사용 오류다. 합쳐진 `INPUT_*`의 구분은 메시지와 `field`에 남는다. `BATCH_INCOMPLETE`의 `data` 모양과 입력 문서 포인터는 지금 그대로다.
 - canon이 만들 수 있는 예약 코드는 레지스트리에 계약의 종료 값과 retryable로 등록된다. 예약 코드 12개 중 `OPERATION_REUSED`만 canon에 `--operation`이 없어 등록하지 않는다.
-- 버그로 panic이 나면 JSON 모드에서 `INTERNAL`(exit 1) 봉투가 나온다. 메시지가 보고 방법을 알려 준다. 지금은 exit 101이다.
+- 버그로 panic이 나면 JSON 모드에서 `INTERNAL`(exit 1) 봉투가 나온다. 메시지가 보고 방법을 알려 준다. 지금은 exit 101이다. 닫힌 stdout으로 SIGPIPE를 받아 죽는 경우는 0.20처럼 신호 종료(128+n)로 남는다. 신호 종료는 레지스트리 밖이다.
 - 코드 이름이 바뀐 곳은 명령 명세 파일의 오류 표, 명령별 코드 목록, 스키마 응답, CHANGELOG의 대체표다.
 
 ### F7 종료 코드
@@ -129,7 +131,7 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
 - 지금 이런 곳이 10곳이다. `ADAPTER_REFUSED`는 1과 2를 쓴다. subject 상태 이동의 gate 위반이 3곳이고, `brief approve`와 evidence 배치는 값을 계산한다. 배치 항목 실패(1)와 배치 사전 검사 실패(2)도 있다.
 - 한 코드가 두 종료 값을 쓰던 상황은 코드를 나눈다. 새 코드 이름은 구현자가 정하고 CHANGELOG에 대체표로 싣는다.
 - `WRITE_FAILED`는 exit 1이다. 작업이 시작된 뒤 쓰기에 실패한 경우다. 작업이 시작되기 전에 알 수 있는 실패(쓸 수 없는 대상, 닿지 않는 저장소)는 새 사전 조건 코드(기본 이름 `WRITE_UNAVAILABLE`, exit 2)로 나눈다. 사전 조건은 인수 해석, 컨텍스트와 설정, 선행 조건, 이름이 가리키는 객체 확인이다.
-- 레지스트리에서 exit 2이면서 이름이 작업 중 실패를 가리키는 코드 14개(`*_FAILED`, `*_UNREACHABLE`, `*_UNAVAILABLE`류)를 같은 기준으로 점검한다. 작업 중에 날 수 있는 것만 exit 1 코드로 나눈다.
+- 레지스트리에서 exit 2이면서 이름이 작업 중 실패를 가리키는 코드 13개(`*_FAILED`, `*_UNREACHABLE`, `*_UNAVAILABLE`류)를 점검한다. 같은 상황이 작업 전과 작업 중에 모두 날 수 있을 때만 코드를 둘로 나눈다. 작업 전에만 나면 exit 2로 두고, 작업 중에만 나면 exit 1로 바꾼다.
 - 0, 1, 2 밖의 종료 값은 없다. 신호 종료는 예외다.
 
 ### F8 소비자 이동
@@ -162,6 +164,7 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
   - `canon query --kind subject --limit 1 --json`은 `meta.page`에 `returned`, `total`, `nextCursor`를 싣고 `hasMore`, `returned`, `total`이 meta 최상위에 없다. `meta.next`에 같은 호출 + `--cursor` 항목이 있다.
   - 마지막 쪽에는 `nextCursor`도 cursor 다음 단계도 없다.
   - 같은 `evidence add`를 두 번 실행하면 두 번째는 `data.unchanged`가 `true`이고 meta에는 `unchanged`가 없다. `waitingOn`도 data에 있다.
+  - `--fields`를 준 `canon query ... --json`과 쪽 출력의 meta 멤버가 모두 봉투 스키마가 허용한 것이다. meta에 정의 밖 키를 하나 넣으면 봉투 검증이 실패한다.
   - 실패 경로: 발급받지 않은 cursor는 exit 2, `CURSOR_INVALID`.
 - F4:
   - 다음 단계 항목에 `why` 키가 없고 `reason`이 있다. 각 `argv`에 `<`를 가진 단어가 없고, JSON 모드에서는 `--json`을 가진다. `command`를 셸처럼 쪼갠 결과가 `canon`과 `argv`를 이은 것과 같다.
@@ -176,10 +179,12 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
   - 레지스트리에 `PLAN_STALE`, `BATCH_INCOMPLETE`, `CURSOR_INVALID`, `COMMAND_REQUIRED`, `INTERNAL`이 있고 표의 옛 코드는 없다. 각 예약 코드의 종료 값이 계약의 값과 같다.
   - 옛 코드 문자열이 어떤 소스, 명세 파일, 스킬에도 없음을 테스트가 확인한다.
   - 실패 경로: 시험용으로 panic을 일으키면 JSON 모드에서 `INTERNAL` 봉투와 exit 1이 나온다. 종료 값 101은 나오지 않는다.
+  - 닫힌 stdout으로 SIGPIPE를 받아 죽으면 신호 종료 값이고 레지스트리 코드가 아니다.
+  - `--input -`를 쓰면서 다른 옵션도 stdin을 읽는 호출은 `INPUT_STDIN_CONFLICT`였고 이제 exit 2, `USAGE`, `field`가 `--input`이다. 터미널에서 `--input -`를 쓰는 호출은 `INPUT_INVALID`, `field`가 `--input`이다.
 - F7:
   - 소스에서 종료 값을 덮어쓰는 호출이 없음을 테스트가 확인한다. ==**모든 오류 코드는 레지스트리의 종료 값으로 끝난다.**==
   - 쓸 수 없는 대상에 쓰는 명령은 exit 2와 사전 조건 코드이고 아무것도 바뀌지 않는다. 첫 기록을 쓴 뒤 쓰기가 실패하는 시험은 exit 1, `WRITE_FAILED`다.
-  - 점검한 14개 코드의 결과가 표로 CHANGELOG에 있다.
+  - 점검한 13개 코드의 결과가 표로 CHANGELOG에 있다. 나눈 코드, exit 1로 바꾼 코드, exit 2로 둔 코드가 갈려 있다.
 - F8:
   - `cargo test --workspace`, conformance, 생성 문서 drift 테스트가 통과하고 conformance 재생성 diff는 계약 변경분뿐이다.
   - 옛 이름 검사 테스트가 안내, 웹사이트, 대시보드, 평가 스크립트에서 통과한다. 옛 이름을 하나 되살리면 실패한다.
@@ -187,14 +192,15 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
 
 ## Questions and assumptions
 
-- 가정: 합쳐진 `INPUT_*`는 위 표대로 간다. `INPUT_MISSING`은 레지스트리에 없고 시나리오 문장에만 나오므로 문장을 고친다. 계약 저자 확인이 필요하다.
-- 가정: 사전 조건 코드의 이름은 `WRITE_UNAVAILABLE`이다. 계약의 예시는 `STORE_UNAVAILABLE`이다. 다른 이름을 원하면 알려 달라.
-- 가정: 레지스트리에서 exit 2인 `*_FAILED`류 14개 점검은 계약 8.3에서 나온다. 계약 요약에는 `WRITE_FAILED`만 있었다. 계획자가 더했다.
-- 가정: 다음 단계의 `why`를 `reason`으로, `actor`와 `role` 표시를 `x-canon`으로 옮긴다. 자리표시자가 필요한 단계는 다음 단계에서 뺀다. 계약 6.8과 봉투 스키마에서 나왔고 계약 요약에는 없었다. 역할별 안내에서 이 단계를 읽던 에이전트 흐름이 바뀐다.
-- 가정: 계약 7.2.1에서 `INVALID_CURSOR`→`CURSOR_INVALID`, `INTERNAL` 등록과 panic의 `INTERNAL` 봉투, 계약 6.9에서 cursor 다음 단계 항목, 계약 7.4에서 텍스트 모드 오류 형식을 이 변경에 넣었다. 계약 요약에는 없었다.
-- 가정: 이 변경에서 계약 6.9의 "cursor는 발급한 호출의 인수에 묶인다"와 6.10의 `meta.fields`, 투영 규칙은 하지 않는다. L1 검사(0.34)에서 나온다.
-- 가정: 배치의 `data` 모양, `BATCH_INCOMPLETE`의 항목별 상태, 입력 문서 포인터는 그대로다. L2(0.35) 일이다.
-- 가정: meta에 펼쳐진 나머지 멤버는 data로 가고, 늘어난 보고서는 minor를 올린다. 계약 요약의 방향을 따랐다.
+- 계약 저자가 정했다. `INPUT_*`는 F6 표대로 간다. `INPUT_STDIN_CONFLICT`는 `USAGE`이고 `INPUT_STDIN_TTY`는 `INPUT_INVALID`다. `INPUT_MISSING`은 레지스트리에 없고 시나리오 문장에만 나오므로 문장을 고친다.
+- 계약 저자가 정했다. panic은 `INTERNAL`(exit 1)이고 메시지가 보고 방법을 알려 준다. SIGPIPE 종료는 신호 종료로 남는다. 계약 8.4가 신호 종료를 레지스트리 밖에 둔다.
+- 계약 저자가 정했다. `*_FAILED`류 13개는 같은 상황이 작업 전과 중에 모두 날 때만 나눈다. 작업 전에만 나면 exit 2, 작업 중에만 나면 exit 1이다. `WRITE_FAILED`는 exit 1이다.
+- 계약 저자가 정했다. 다음 단계의 `why`는 `reason`, `actor`와 `role` 표시는 `x-canon`이다. 자리표시자가 필요한 단계는 다음 단계에서 뺀다. 역할별 안내에서 이 단계를 읽던 에이전트 흐름이 바뀐다.
+- 계약 저자가 정했다. `INVALID_CURSOR`는 `CURSOR_INVALID`가 되고, cursor 다음 단계 항목과 텍스트 모드 오류 형식을 이 변경에 넣는다. 계약 검사가 모든 봉투를 봉투 스키마로 검증하므로 `--fields`와 쪽 출력에 정의 밖 meta 키가 남지 않게 한다.
+- 계약 저자가 정했다. 계약 6.9의 "cursor는 발급한 호출의 인수에 묶인다"와 6.10의 투영 규칙은 이 변경에서 하지 않고 0.34에서 한다. 이 변경이 쓰는 meta 키는 정의된 것뿐이다.
+- 계약 저자가 정했다. 배치의 `data` 모양, `BATCH_INCOMPLETE`의 항목별 상태, 입력 문서 포인터는 그대로이고 0.35 일이다.
+- 결정: meta에 펼쳐진 나머지 멤버는 data로 가고, 늘어난 보고서는 minor를 올린다. 계약 요약의 방향이다.
+- 가정: 사전 조건 코드의 기본 이름은 `WRITE_UNAVAILABLE`이다. 계약의 예시는 `STORE_UNAVAILABLE`이다. 다른 이름을 원하면 알려 달라.
 - 가정: 이 변경은 `atip-contract`와 시나리오 문장에 바뀐 이름이 나오는 출시된 subject 12개에 함께 속한다. 게이트가 다른 subject의 evidence가 오래됐다고 알리면 오케스트레이터가 그 subject에도 붙인다.
 - 가정: 0.33은 breaking이다. 별칭과 호환 옵션은 없다. 순서는 `canon-0-33-atip-crate`, 이 변경, `canon-0-33-atip-check` 순이다.
 - 정책 질문은 없다. 종료 코드와 코드 이름이 바뀌어도 gate가 요구하는 것과 승인자는 바뀌지 않는다.

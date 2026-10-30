@@ -121,13 +121,13 @@ atip/1 계약은 규칙만 있고, 빌드된 바이너리를 밖에서 대어 �
 
 ## Questions and assumptions
 
-- 가정: 검사기는 Rust로 쓴다. 계약 저자의 답이다. 워크스페이스에 `crates/atip-check`를 두고 바이너리 이름은 `atip`이다. 나중에 `crates/atip`처럼 atip 레포로 옮긴다.
-- 가정: 이 릴리스는 L0 검사 16개를 모두 구현한다. 계약 저자는 15개라고 했으나 검사기 문서의 L0 표는 16개다. 16으로 간다.
-- 가정: 오류 코드 이름 `LEVEL_UNSUPPORTED`는 저자의 예시다. 계획자가 기본 이름을 정했다. `BINARY_UNUSABLE`과 `FIXTURE_INVALID`는 exit 2이고 `LEVEL_NOT_MET`은 exit 1이다. 검사기의 레지스트리는 예약 코드 `USAGE`, `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INTERNAL`을 가진다.
-- 가정: L0 fixture에 `commands`, `search`, `domainRejects`는 없어도 되고 있어도 무시한다. 허용 목록은 L0에 없다. 계약 저자의 답이다.
+- 결정(계약 저자 답): 검사기는 Rust로 쓰고 JSON Schema 2020-12 검증기를 쓴다. `format`은 주석으로만 본다. 계약 스키마는 원본 그대로 넣는다. 워크스페이스에 `crates/atip-check`를 두고 바이너리 이름은 `atip`이다. 나중에 `crates/atip`처럼 atip 레포로 옮긴다.
+- 결정(계약 저자 답): 이 릴리스는 L0 검사 16개를 모두 구현한다. 검사기 문서의 L0 표가 16개이고 저자가 16이 맞다고 확인했다. `--level L1`과 `L2`는 exit 2 `LEVEL_UNSUPPORTED`이고 hint가 0.34, 0.35를 말한다. 가짜 도구의 위반 시험이 모든 검사 id에서 실패를 만든다.
+- 가정: `LEVEL_UNSUPPORTED`는 저자의 예시 이름이다. `BINARY_UNUSABLE`과 `FIXTURE_INVALID`는 exit 2이고 `LEVEL_NOT_MET`은 exit 1이라는 이름은 계획자의 기본값이다. 검사기의 레지스트리는 예약 코드 `USAGE`, `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INTERNAL`을 가진다.
+- 결정(계약 저자 답): L0 fixture 키는 `setup`, `env`, `timeoutSeconds`, `probe`, `registry`다. `registry`는 레지스트리 행 스키마의 배열이고 canon은 `canon schema --errors --json`에서 생성한다. `probe`는 공백으로 나누는 명령 id이고 `L0.unknown-option`이 `meta.command`를 이 id와 비교한다. L0에 허용 목록 키는 없다. `commands`, `search`, `domainRejects`는 L1과 L2 키라 없어도 되고 있으면 무시한다. 검사기 자신도 L0를 따른다.
 - 가정: canon fixture의 `registry`는 `canon schema --errors --json`의 각 행에서 레지스트리 행 스키마가 허용하는 다섯 키만 골라 생성한다. 그 응답이 다섯 키 밖의 멤버를 가지면 생성기가 버린다.
 - 가정: pty 검사는 macOS와 Linux에서만 돈다. canon의 CI 대상과 같다.
-- 가정: 플랫폼별 바이너리 배포(npm), 계약 문서의 ECMAScript 정규식 검사(`regress`)는 이 변경이 아니다. 저자의 답이다.
+- 결정(계약 저자 답): 플랫폼별 바이너리 배포(npm)와 L1의 ECMAScript 정규식 구현(`regress`)은 이 변경이 아니다.
 - 가정: canon에 대한 CI 잡은 `canon-0-33-atip-l0`가 출시된 뒤에 초록이 된다. 순서는 crate 추출, L0, 이 변경이다. 이 변경의 F1부터 F5는 L0 변경 없이 먼저 만들 수 있다.
 - 정책 질문은 없다. CI 잡 추가는 gate가 요구하는 것을 바꾸지 않는다.
 
