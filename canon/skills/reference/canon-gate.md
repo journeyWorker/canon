@@ -315,7 +315,7 @@ check `canon status` and the ship guard use; see
 
 ```stderr
 canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
-canon evidence add: refused — stop and get the human's answer to the brief: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --approver <the human> --note "<their words>"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+canon evidence add: refused — stop and get the human's answer to the brief: nothing is built or attested for a subject before its brief is approved. Show it (`canon brief show --body`), ask with the harness question tool, and on their explicit approval record it with `canon brief approve --approver <their name> --note "<their words>" --relayed-via <the question tool> --actor <your actor id> --digest <change>=<the digest shown>` (or they approve on `canon dashboard`); never unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
 For a change from an external plan with no canon brief yet, the first
