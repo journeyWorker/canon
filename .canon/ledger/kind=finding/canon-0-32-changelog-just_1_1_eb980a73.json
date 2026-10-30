@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-changelog",
+    "role": "reviewer",
+    "session_id": "s-0-32-changelog-rev"
+  },
+  "at": "2026-10-30T17:33:02.587441Z",
+  "change_id": "canon-0-32-changelog-just",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md:20-86",
+  "introduced_by": "96990f59d027366bc6e9b4a58f334900e57b8f7d",
+  "kind": "finding",
+  "resolution_code_tree": "f8335320391853fa20a4253b66231590bbec4cdd",
+  "resolution_sha": "482a81fd238dbcb81b6579ec0213c324cbb84edd",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "a54e36a653a2753f34cb5826f38bf44db99207b5",
+  "reviewer": "rev-changelog",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "0.31.0 entry misses the readability bar the human approved (~20 short lines: summary, 4 Breaking, 3 Added, 2 Fixed, 3 Upgrading). It has 7 Breaking, 6 Added, 7 Changed, 4 Fixed and 3 Upgrading bullets of ~290 chars each, with field lists repeated (statusVersion 4 `briefs` fields, the 14 option names again in the Breaking bullet and again in the table). Content is complete (nothing a user must do is lost; no slugs/modules/rounds/bench numbers), so this is about density. Cut: (a) the `canon search` / `canon trace` Added bullets (lines 36-40) to one line each: what the command does and its one-line usage; drop the `hits[]/neighbors[]/edges[]` field lists, node-id grammar, edge names (`re-review`, `fix-reviewed`, ...), and the `.canon/index` rebuild/in-memory/unreadStores/exit-code details; (b) Breaking: merge the two brief-format bullets and the waiver bullet into one; drop the heading list and the `brief` object field list from the statusVersion bullet (keep 'read `briefs`, statusVersion 4'); merge the two adapter exit-code bullets; (c) Changed: reduce the subject-judging paragraph to one sentence and drop the minor refusal-code bullets (demo init, install-hooks, approval-payload, strategy rollback, report build, dashboard hint) or fold them into one 'Several commands now exit 2 for bad input' line; (d) Fixed: keep the CONFIG_MISSING one, drop the three minor ones. Upgrading is fine as is.",
+  "worktree_dirty": true
+}
