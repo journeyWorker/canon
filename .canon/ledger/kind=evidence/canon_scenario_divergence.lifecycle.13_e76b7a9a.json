@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:29:34.498500Z",
+  "attachments": [
+    {
+      "case": "divergence_lifecycle_13_list_refuses_an_invalid_timestamp_a_zero_limit_or_a_cursor_canon_did_not_issue_with_exit_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-32-changelog-junit.xml"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 58,
+  "scenario_id": "divergence.lifecycle.13",
+  "schema": 1,
+  "staging_id": "82b6d7f5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

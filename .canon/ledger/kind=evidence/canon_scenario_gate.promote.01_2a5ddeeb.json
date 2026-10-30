@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:31:51.740755Z",
+  "attachments": [
+    {
+      "case": "promote::tests::promote_assigns_monotonic_gap_free_run_seq_within_one_invocation",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::promote_assigns_monotonic_gap_free_run_seq_within_one_invocation"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "gate.promote.01",
+  "schema": 1,
+  "staging_id": "976e6d9f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

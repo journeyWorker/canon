@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:31:00.126983Z",
+  "attachments": [
+    {
+      "case": "gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test gate gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 227,
+  "scenario_id": "gate.check.02",
+  "schema": 1,
+  "staging_id": "b596b174",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
