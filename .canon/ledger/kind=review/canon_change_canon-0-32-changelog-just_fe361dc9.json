@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-changelog",
+    "role": "reviewer",
+    "session_id": "s-0-32-changelog-rev"
+  },
+  "at": "2026-10-30T17:36:40.720295Z",
+  "change_id": "canon-0-32-changelog-just",
+  "code_tree": "f8335320391853fa20a4253b66231590bbec4cdd",
+  "kind": "review",
+  "pin": "c2ac262c5207ac1ec8be9c01ad6c2c5b20aea660",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "7b9c9b14c7e81252dfba644bb3bca6f37937cd50828b02d1fa308bb6394b7ece",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66Y56RGD8DC838PJS6ZDXB6",
+  "reviewer": "rev-changelog",
+  "schema": 2,
+  "worktree_dirty": false
+}
