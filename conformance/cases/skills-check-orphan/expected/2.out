@@ -3,7 +3,7 @@ stale: <repo>/.claude/skills/canon/SKILL.md (claude)
 missing: <repo>/.claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh (claude)
 stale: <repo>/.canon/skills/.install-lock.json
 orphan: <repo>/.claude/skills/canon/reference/retired.md (claude) — the install lock lists it, but this canon's bundle no longer ships it; its bytes still match the install lock; run `canon skills install --providers=claude`, which removes it
-outdated: <repo>/.canon/skills/.install-lock.json installed by canon 0.27.0, this canon is 0.31.0 — run `canon skills install --providers=claude`
+outdated: <repo>/.canon/skills/.install-lock.json installed by canon 0.27.0, this canon is 0.32.0 — run `canon skills install --providers=claude`
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
   .canon/REPORT.md

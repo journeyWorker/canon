@@ -4,6 +4,8 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.32.0 — 2026-10-31
+
 An agent can record the approval a human gave in the conversation, and release notes move from the README to this file.
 
 ### Added
