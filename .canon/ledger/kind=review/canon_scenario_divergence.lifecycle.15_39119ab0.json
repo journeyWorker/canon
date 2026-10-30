@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T16:02:08.016921Z",
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "kind": "review",
+  "pin": "8aaab8716f8204498862568ed937f9fd8b056272",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:divergence_lifecycle_15_a_relayed_acceptance_without_name_or_answer_or_with_relay_denied_writes_nothing"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bdc49768d03f346c3f52ecaf5708d1c032d3292e3612ebf610fe382030a72dee",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-relay-approval/brief.md"
+  },
+  "review_id": "01M66RR30G1HNNR53CK0Y1HHRE",
+  "reviewer": "rev-relay",
+  "reviewer_harness": "omp",
+  "scenario_id": "divergence.lifecycle.15",
+  "schema": 2,
+  "worktree_dirty": false
+}
