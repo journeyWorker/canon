@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T15:52:36.630075Z",
+  "change_id": "canon-0-32-relay-approval",
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/canon-gate.md:318",
+  "introduced_by": "0decd2bf68edbf6940c36c538e4e0e5f98997413",
+  "kind": "finding",
+  "reviewed_sha": "639d675389e29f757b9d83d77fb9be87470b0692",
+  "reviewer": "rev-relay",
+  "round": 2,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Spec fidelity (guides): the sample refusal text in canon-gate.md l.318 quotes the old evidence-add message ('Record their answer with `canon brief approve --approver <the human> --note ...` only from that answer'), while the real BRIEF_STOP in evidence.rs:236 now says show, ask, record with --relayed-via and --digest. Documentation drift only; the guide still says nothing that tells an agent to stop and report.",
+  "worktree_dirty": false
+}

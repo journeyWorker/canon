@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T15:52:29.635517Z",
+  "change_id": "canon-0-32-relay-approval",
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "disposition": "open",
+  "introduced_by": "639d675389e29f757b9d83d77fb9be87470b0692",
+  "kind": "finding",
+  "reviewed_sha": "639d675389e29f757b9d83d77fb9be87470b0692",
+  "reviewer": "rev-relay",
+  "round": 2,
+  "scenario_ids": [
+    "subject.lifecycle.48",
+    "subject.lifecycle.49",
+    "subject.lifecycle.50",
+    "subject.lifecycle.51",
+    "subject.lifecycle.52",
+    "subject.lifecycle.53",
+    "subject.lifecycle.54",
+    "subject.lifecycle.55",
+    "subject.lifecycle.56",
+    "subject.lifecycle.57",
+    "subject.lifecycle.58",
+    "subject.lifecycle.59",
+    "subject.lifecycle.60",
+    "divergence.lifecycle.14",
+    "divergence.lifecycle.15"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards: the round-2 evidence for all 15 relay scenarios (impl-relay, evidence_sha a54e36a6, worktree_dirty true) is one free-text ref 'cargo test --workspace --locked (...)' with no report and no bound case, where round 1 bound a junit report and the named test per scenario. Nothing ties a scenario to the test that proves it (e.g. subject.lifecycle.57 now has two tests, the dashboard leg of 52 is a bun test), and a review pins only the verdict, so a later edit or deletion of a bound test never stales the review. I ran the named tests myself (relay_approval 13, divergence_accept 10, brief_format 26, status 29, brief_scope 16, dashboard_briefs 19, canon-gate 242; bun briefs-render 24) and they pass, so I sign; the implementer should rebind with --report junit and --report-case per scenario, and from a clean tree. Blast radius: the whole 0.32 relay scenario set.",
+  "worktree_dirty": false
+}

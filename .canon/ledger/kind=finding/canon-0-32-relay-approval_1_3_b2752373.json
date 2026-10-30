@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T15:52:25.089429Z",
+  "change_id": "canon-0-32-relay-approval",
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/relay_approval.rs:292-306,370-394",
+  "introduced_by": "0decd2bf68edbf6940c36c538e4e0e5f98997413",
+  "kind": "finding",
+  "resolution_code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "resolution_sha": "639d675389e29f757b9d83d77fb9be87470b0692",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "cb4bd244d26cb31c7f7baa11f072f9b927d59c01",
+  "reviewer": "rev-relay",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.54",
+    "subject.lifecycle.55",
+    "subject.lifecycle.59"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Spec fidelity of the bound tests: scenario 59 names `canon migrate --commit` under approval.relay: deny, but its test runs only brief approve and policy approve (migrate deny is unproven by any test; I ran it by hand and it refuses HUMAN_ONLY naming approval.relay). Scenario 55 names brief approve, policy approve and divergence accept for each agent role, but the test loops the four roles over brief approve only. Also migrate --commit --relayed-via with no role declared, and with relay denied, succeeds silently (exit 0, the relay option ignored) when the plan re-binds no Approved: line, so the brief's 'no role + relay option -> USAGE' and 'deny -> HUMAN_ONLY' do not hold for that migrate (observed in the real binary: plain `migrate --commit --plan-digest <d> --relayed-via ask` exits 0 with nothing relayed). Impact is low: nothing human-only is recorded then.",
+  "worktree_dirty": false
+}
