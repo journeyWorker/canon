@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-30T11:10:28.514116Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-clippy-ci",
+    "canon-0-30-spec-backfill",
+    "canon-0-30-ledger-naming",
+    "canon-0-31-ci",
+    "canon-0-31-fixes",
+    "canon-0-31-cli-ids",
+    "canon-0-32-changelog-just"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "gate-trust-spine",
+  "summary": "",
+  "title": "Gate: the trust-spine evidence gate and its failure classes"
+}
