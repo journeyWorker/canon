@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:35:43.420701Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/engine/collision.ts:34-35 sends moving platforms through the same x/y solid resolver as tiles. As a result platforms block the player from the side and underside (or snap upward based on current overlap) instead of allowing passage and landing only when descending across the top, violating the required one-way-top traversal semantics. Give platform solids a previous-bottom/downward-motion top-only branch and skip them on x/underside resolution.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 1,
+  "scenario_id": "platformer.moving.02",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

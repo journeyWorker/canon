@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-30T17:36:59.827156Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-loop",
+    "canon-0-32-relay-approval"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-32-orch"
+    },
+    "reason": "0.32 relay-approval and changelog-just reviewed, gate clean"
+  },
+  "subject_id": "subject-lifecycle",
+  "summary": "",
+  "title": "Subject: the durable product unit and its status ladder"
+}

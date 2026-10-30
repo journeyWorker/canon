@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:50:34.021791Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/App.tsx:45-46 calls sim.setPaused() inside a React setPaused updater. sim.setPaused synchronously notifies both useSyncExternalStore subscribers while App is rendering its state update, reproducibly emitting 'Cannot update a component (HUD) while rendering a different component (App)' on every Escape/P pause in dev. Compute the next pause state outside the updater/effect and notify the simulation after React commits.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 3,
+  "scenario_id": "platformer.session.04",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

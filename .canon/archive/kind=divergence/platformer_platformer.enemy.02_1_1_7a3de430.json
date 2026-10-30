@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:40:03.596818Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/App.tsx:72-80 unmounts HUD as soon as screen changes to gameover, while GameOverScreen renders no hearts. The required zero-heart counter therefore disappears at the same moment the game-over screen appears. Keep HUD mounted behind/with game over or render the zero-heart state in GameOverScreen.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 1,
+  "scenario_id": "platformer.enemy.02",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

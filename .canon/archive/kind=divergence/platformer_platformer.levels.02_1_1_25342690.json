@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:35:26.083267Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/engine/records.ts:54-57 treats acorns/time as one lexicographically ranked run and replaces both fields together. A 12-acorn/60s clear overwrites an 11-acorn/50s record with the slower time, while a 10-acorn/40s clear cannot update the faster time. This loses best-record data and violates independent max-acorns/min-time persistence; update each field independently.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 1,
+  "scenario_id": "platformer.levels.02",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}
