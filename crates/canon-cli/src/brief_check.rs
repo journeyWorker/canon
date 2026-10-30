@@ -1996,9 +1996,9 @@ pub struct Step {
 /// re-approval when its text changed after the approval (0.19 D3).
 fn approve_step(ev: &Evaluation, fresh: &str) -> Step {
     let why = if matches!(ev.approval, crate::brief::Approval::Changed { .. }) {
-        format!("the brief changed after its approval ({}); the human answers the changed brief and records it with `canon brief approve` (their own shell or `canon dashboard`, never yours)", crate::brief::CHANGED_CODE)
+        format!("the brief changed after its approval ({}); show the human the changed brief (`canon brief show --body`), ask them, and record their explicit approval with `canon brief approve --relayed-via <the question tool>` (or they approve on `canon dashboard`)", crate::brief::CHANGED_CODE)
     } else {
-        format!("{fresh}; the human records it with `canon brief approve --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role")
+        format!("{fresh}; show the human the brief (`canon brief show --body`), ask them, and on their explicit approval record it with `canon brief approve --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest <change>=<the digest shown>` (or they approve on `canon dashboard`); never unset your role to run it")
     };
     Step { step: "approve", why }
 }
@@ -2009,7 +2009,7 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
     if ev.old_format {
         steps.push(Step {
             step: "migrate",
-            why: "the brief is in the format canon 0.30 and earlier wrote; `canon migrate` previews the rewrite and writes nothing, and the human runs it with `--commit` when it re-binds an approval"
+            why: "the brief is in the format canon 0.30 and earlier wrote; `canon migrate` previews the rewrite and writes nothing, and re-binding an approval takes the human's explicit answer (`--commit --relayed-via <the question tool>` records it, or the human runs `--commit`)"
                 .to_string(),
         });
         return steps;

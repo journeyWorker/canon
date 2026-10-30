@@ -132,11 +132,11 @@ const APPROVED: &str = "Approved: Journey 2026-10-11 — \"승인. 네 가정대
 /// The one `next` step status addresses to a human, for subject `id`
 /// whose newest adopted change is `change` (0.16 M7: stop and report).
 fn brief_step(_id: &str, change: &str) -> String {
-    format!("stop and report the brief in .canon/changes/{change}/brief.md; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)")
+    format!("show the brief in .canon/changes/{change}/brief.md to the human (`canon brief show <change> --body`) and ask; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)")
 }
 
 /// The prefix every human step's command starts with.
-const BRIEF_STEP_PREFIX: &str = "stop and report the brief in ";
+const BRIEF_STEP_PREFIX: &str = "show the brief in ";
 
 /// Canon's own `brief.md` for `change` at
 /// `<repo>/.canon/changes/<change>/` (0.17 D3), with `extra` after the
@@ -862,7 +862,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     assert_eq!(human.len(), 1, "{report}");
     assert_eq!(
         human[0]["command"],
-        "stop and report the brief in plans/changes/c-live/proposal.md; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)"
+        "show the brief in plans/changes/c-live/proposal.md to the human (`canon brief show <change> --body`) and ask; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)"
     );
     let why = human[0]["why"].as_str().unwrap();
     assert!(

@@ -688,7 +688,7 @@ uses, so status and the gate cannot disagree about a gap:
   newest change's canon
   `brief.md` has no `Approved:` line, or it has no canon `brief.md` yet
   and comes from an external openspec `proposal.md`) and clean gets
-  `human: stop and report the brief in <brief>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
+  `human: show the brief in <brief> to the human and ask; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`,
   where `<brief>` is the canon `brief.md`, or the external `proposal.md`
   when no canon brief exists yet. Its reason reads ``<id>: <why
   unanswered> (an older change's approval does not cover a new scope),
@@ -752,7 +752,7 @@ first, with `meta.nextOmitted` counting what was cut and `meta.waitingOn`
 
 ```json
 "next": [
-  { "command": "stop and report the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers; then record their words with `canon brief approve c-promo --approver <the human> --note \"<their words>\"`", "argv": [], "why": "promo: the brief is not approved", "actor": "human", "role": null },
+  { "command": "show the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers; then record their words with `canon brief approve c-promo --approver <the human> --note \"<their words>\"`", "argv": [], "why": "promo: the brief is not approved", "actor": "human", "role": null },
   { "command": "canon finding close c-cart --round 1 --seq 1 --disposition fixed --actor <unit> --session <session>", "argv": [], "why": "cart: 1 open blocker finding(s); fix it, commit, then close it", "actor": "agent", "role": "implementer" },
   { "command": "canon status", "argv": ["canon", "status"], "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again", "actor": "agent", "role": "planner" }
 ]

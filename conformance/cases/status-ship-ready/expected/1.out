@@ -10,7 +10,7 @@ subjects (1):
   verifying (1):
     checkout: 2 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
       brief: approved in .canon/changes/c-checkout/brief.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
-      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, the human re-approves with `canon brief approve c-checkout --approver <their name> --note "<their words>"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it
+      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, show the human the brief (`canon brief show c-checkout --body`), ask them, and on their explicit approval record it with `canon brief approve c-checkout --approver <their name> --note "<their words>" --relayed-via <the question tool> --actor <your actor id> --digest c-checkout=<the digest shown>` (or the human approves on `canon dashboard`); never unset your role to run it
 
 unowned: none
 

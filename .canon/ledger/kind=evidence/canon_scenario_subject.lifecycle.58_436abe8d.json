@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-relay",
+    "role": "implementer",
+    "session_id": "s-0-32-relay-impl"
+  },
+  "at": "2026-10-30T13:23:19.032810Z",
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test --workspace --locked (0.32 relay-approval follow-up: show/ask/relay wording in hints, status next step, BRIEF_STOP)"
+  },
+  "evidence_note": {
+    "summary": "passes after the hint rewording; clippy -D warnings clean"
+  },
+  "evidence_sha": "96990f59d027366bc6e9b4a58f334900e57b8f7d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 198,
+  "scenario_id": "subject.lifecycle.58",
+  "schema": 1,
+  "staging_id": "03bb1bd9",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

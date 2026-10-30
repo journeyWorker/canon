@@ -95,7 +95,7 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
     );
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(human_code(&out), "BRIEF_UNAPPROVED");
-    assert!(stderr(&out).contains("\nhint: stop, report the brief to the human"), "the next step is its own hint line: {}", stderr(&out));
+    assert!(stderr(&out).contains("\nhint: stop and get the human's answer to the brief"), "the next step is its own hint line: {}", stderr(&out));
 }
 
 #[test]

@@ -269,7 +269,7 @@ impl BriefStatus {
     /// The re-approval advice for a digest-less or changed approval: the human's call, never the agent's.
     pub fn record_digest_hint(&self) -> String {
         format!(
-            "the human re-approves with `canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it",
+            "show the human the brief (`canon brief show {0} --body`), ask them, and on their explicit approval record it with `canon brief approve {0} --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest {0}=<the digest shown>` (or the human approves on `canon dashboard`); never unset your role to run it",
             self.change.as_deref().unwrap_or("<change>")
         )
     }
@@ -280,10 +280,10 @@ impl BriefStatus {
         if self.changed {
             return self.record_digest_hint();
         }
-        let call = format!("`canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it", self.change.as_deref().unwrap_or("<change>"));
+        let call = format!("show the human the brief (`canon brief show {0} --body`), ask them, and on their explicit approval record it with `canon brief approve {0} --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest {0}=<the digest shown>` (or the human approves on `canon dashboard`); never unset your role to run it", self.change.as_deref().unwrap_or("<change>"));
         match (self.brief_exists, &self.source) {
-            (false, Some(source)) => format!("create {brief} holding a `Source: {source}` line; when they answer, the human records it with {call}"),
-            _ => format!("when they answer, the human records it with {call}"),
+            (false, Some(source)) => format!("create {brief} holding a `Source: {source}` line; when they answer, {call}"),
+            _ => format!("when they answer, {call}"),
         }
     }
 }
@@ -546,9 +546,9 @@ pub fn record_all(blockers: &[&BriefStatus]) -> String {
                 .collect::<Vec<_>>();
             let call = approve_all_call(many);
             if creates.is_empty() {
-                format!("when they answer, the human records them with {call}")
+                format!("when they answer, {call}")
             } else {
-                format!("{}; when they answer, the human records them with {call}", creates.join("; "))
+                format!("{}; when they answer, {call}", creates.join("; "))
             }
         }
     }
@@ -558,7 +558,7 @@ pub fn record_all(blockers: &[&BriefStatus]) -> String {
 /// hint of a refusal names it: one `canon brief approve <id>…` line.
 pub fn approve_all_call(blockers: &[&BriefStatus]) -> String {
     let ids = blockers.iter().filter_map(|b| b.change.as_deref()).collect::<Vec<_>>().join(" ");
-    format!("`canon brief approve {ids} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it")
+    format!("show the human each brief (`canon brief show <change> --body`), ask them, and on their explicit approval record it with `canon brief approve {ids} --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id>` and a `--digest <change>=<the digest shown>` for each (or the human approves on `canon dashboard`); never unset your role to run it")
 }
 
 /// When `subject` first adopted a change: the earliest of its own record

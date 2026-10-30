@@ -42,7 +42,7 @@ pub struct OldBrief {
 pub fn message(found: &[(&str, &str)]) -> String {
     let each = found.iter().map(|(change, what)| format!("the brief of change `{change}` ({what})")).collect::<Vec<_>>().join("; ");
     format!(
-        "{each} is in the format canon 0.30 and earlier wrote; canon 0.31 finds sections by their English `##` heading and keeps waivers in the frontmatter. Hint: run `canon migrate --json` to preview the rewrite (a bare run only previews, and `--commit --plan-digest <digest>` applies it; the human runs it when it re-binds an `Approved:` line)"
+        "{each} is in the format canon 0.30 and earlier wrote; canon 0.31 finds sections by their English `##` heading and keeps waivers in the frontmatter. Hint: run `canon migrate --json` to preview the rewrite (a bare run only previews, and `--commit --plan-digest <digest>` applies it; re-binding an `Approved:` line takes the human's explicit answer, recorded with `--relayed-via <tool>` or by the human running it)"
     )
 }
 
@@ -100,7 +100,7 @@ pub fn refusal_among(repo: &Path, changes: &[ChangeId]) -> Option<CliError> {
 pub fn migrate_step(found: &[OldBrief]) -> NextStep {
     NextStep {
         command: "canon migrate --json".into(),
-        why: format!("{} brief(s) are in the format canon 0.30 wrote; the preview lists what it rewrites, whether it re-binds an `Approved:` line (then the human runs the commit) and the exact command that applies it", found.len()),
+        why: format!("{} brief(s) are in the format canon 0.30 wrote; the preview lists what it rewrites, whether it re-binds an `Approved:` line (then the commit takes the human's explicit answer) and the exact command that applies it", found.len()),
         actor: StepActor::Agent,
         role: Some(crate::role::Role::Orchestrator),
     }
