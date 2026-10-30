@@ -4,6 +4,19 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+An agent can record the approval a human gave in the conversation, and release notes move from the README to this file.
+
+### Added
+- `canon brief show <change> --body` prints the brief as written, then a `digest: sha256:…` line equal to the digest `canon brief approve` records. `--json` gives `body` and `digest`.
+- `--relayed-via <tool>` on `canon brief approve`, `canon policy approve`, `canon divergence accept` and `canon migrate --commit`: an agent role records the human's answer from the conversation (`--approver`, `--note` with the human's words, `--actor` or `CANON_ACTOR`). `brief approve` with `--relayed-via` also needs `--digest <change>=<sha256:…>` per brief, the digest the human was shown; a brief that changed since is refused with `RELAY_DIGEST_MISMATCH` (exit 2, nothing written).
+- Relayed approvals are marked: the `Approved:` line reads `(relayed by <role> <actor> via <tool>)`, and `policy.approval.json`, divergence acceptance records and the migrate journal gain a `relay` field. `canon brief show`, `canon status` (`relay` in each brief entry) and the dashboard briefs page show it.
+- `approval: { relay: allow | deny }` in `canon.yaml`, default `allow`. With `deny`, a relayed call is refused with `HUMAN_ONLY` naming the key. `canon init` writes the key as a comment.
+
+### Changed
+- `canon brief approve`, `canon policy approve` and `canon migrate` accept `--actor`; `canon divergence accept` and `canon migrate` accept `--approver` and `--note`.
+- An agent role calling one of the four commands without `--relayed-via` still gets `HUMAN_ONLY`; the hint now describes showing the brief, asking, and recording with `--relayed-via`. The skill guides and `canon status` next steps describe the same procedure instead of "report the command and wait".
+- Release notes live in `CHANGELOG.md`; the README keeps the introduction and quick start. Contributors run `just` to list the build, test, lint and gate recipes.
+
 ## 0.31.0 — 2026-10-28
 
 Id options lose their `-id` suffix, briefs drop HTML comments, and `canon search` / `canon trace` are new.

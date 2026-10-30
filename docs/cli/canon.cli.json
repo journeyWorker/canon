@@ -16494,7 +16494,7 @@
     "BatchBriefApproveReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -22981,7 +22981,7 @@
     "BatchPolicyApproveReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -27043,7 +27043,7 @@
           "type": "object"
         },
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -27144,7 +27144,7 @@
     "BriefApproveReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -27436,7 +27436,7 @@
     "BriefShowReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -29256,7 +29256,7 @@
     "DashboardBriefsReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -34692,7 +34692,7 @@
     "PolicyApproveReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -34773,7 +34773,7 @@
     "PolicyShowReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
@@ -37472,7 +37472,7 @@
     "StatusReport": {
       "$defs": {
         "ApprovalRelay": {
-          "description": "A divergence's fold-relevant state (design D8). `Open`/`Resolved`\nare the pre-s15 pair (still bare `\"open\"`/`\"resolved\"` on the wire —\nunaffected by the two additive variants below); `StillDivergent` is\na re-review that found the divergence persists; `Deferred` postpones\nreview until `expiry` (honored by [`crate::fold::fold_to_current_state`]'s\n`as_of` parameter). `ResolvedInvalid` deliberately does NOT exist\nhere — it is a fold-time-DERIVED [`crate::fold::FoldedState`]\noutput, never a persisted status (design D8/D9: the on-disk record\nis never rewritten to reflect a stale binding).\n\nHow an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
           "properties": {
             "actor": {
               "description": "The agent's actor id.",
