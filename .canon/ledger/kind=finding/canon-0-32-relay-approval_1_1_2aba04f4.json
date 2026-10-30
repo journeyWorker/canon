@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T13:48:18.433725Z",
+  "change_id": "canon-0-32-relay-approval",
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/role-planner.md:309-313,349",
+  "introduced_by": "0decd2bf68edbf6940c36c538e4e0e5f98997413",
+  "kind": "finding",
+  "reviewed_sha": "cb4bd244d26cb31c7f7baa11f072f9b927d59c01",
+  "reviewer": "rev-relay",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.51",
+    "subject.lifecycle.50"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (F2 Acceptance: no sentence tells the agent to report and stop): the guides still hand the brief to the human and stop. role-planner.md Done-when (l.309-313) says 'the brief is handed to the human and you stop. Nothing else starts before that', and the Excuses row (l.349) says 'The brief is the report; stop' — both contradict step 4-5 (show, ask, record) in the same file. Also canon/skills/SKILL.src.md:91 (loop item 1: 'checks it with canon brief check, and stops for the human'), canon-subject.md:210 ('then stops and reports it'), and the orchestrator next step from status ('human: report the pending draft's brief ... to the human'). Blast radius: a planner that follows Done-when never reaches the ask; the projected stubs and `canon skills show canon|role-planner` carry the same text.",
+  "worktree_dirty": false
+}
