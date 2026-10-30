@@ -104,7 +104,10 @@ One grammar for the whole CLI, generated from one command spec. Old spellings fa
 - `--json` prints one envelope and nothing on stderr: `{"ok", "data", "meta"}` or `{"ok": false, "error", "meta"}`; warnings in `meta.warnings`; every report, error and `--input` key is camelCase (`foo_bar` → `fooBar`), except `canon context`'s `policy.*` keys (snake_case, as in `policy.yaml`); the `export` result key `out` is `output`.
 - `purge`, `tier age`, `ledger compact`, `artifacts move` and `migrate` preview by default; `--commit --plan-digest <DIGEST>` acts (`PLAN_CHANGED` if the plan moved); their `--dry-run` is removed.
 - `brief approve`, `policy approve`, `divergence accept` are human-only (`HUMAN_ONLY`); `brief approve` with blockers fails `BRIEF_APPROVE_REFUSED` (exit `2`); `brief check` with blockers exits `1`.
-- Error codes renamed: `ARTIFACTS_MIGRATE_REFUSED` → `ARTIFACTS_MOVE_REFUSED`, `EVIDENCE_VAULT_FAILED` → `ARTIFACTS_STORE_FAILED`; removed: `PURGE_PLAN_REQUIRED`, `FINDING_UNRESOLVABLE_COMMIT`.
+- Error codes renamed: `ARTIFACTS_MIGRATE_REFUSED` → `ARTIFACTS_MOVE_REFUSED`, `EVIDENCE_VAULT_FAILED` → `ARTIFACTS_STORE_FAILED`, `FINDING_RESOLUTION_SHA_UNEXPECTED` → `FINDING_RESOLUTION_REV_UNEXPECTED`.
+- Error codes removed: `PURGE_PLAN_REQUIRED`, `FINDING_RESOLUTION_SHA_REQUIRED`, `FINDING_UNRESOLVABLE_COMMIT` (an unknown revision is `NO_COMMIT`).
+- Exit changes: every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits `2`, as do `init --check` of a malformed config and `task done` on an unknown task.
+- `canon context` keys record kinds by the name `--kind` takes (`evidence`, not `evidence_record`); `finding close` reports a repeat with `meta.unchanged: true` instead of a report `unchanged` key.
 - `--project-id` only with more than one spec root; `schema --all` is gone (use `--as <role>`); `skills install` writes a short `SKILL.md` stub; an empty check reports `UNVERIFIABLE` (exit `1`).
 
 ### Added
@@ -113,6 +116,7 @@ One grammar for the whole CLI, generated from one command spec. Old spellings fa
 - `canon context` gains a `commands` index (filtered by `--as`); `--fields` takes camelCase or snake_case, an unknown name is `UNKNOWN_FIELD` (exit `2`).
 - `--repo <DIR>` is declared once for all commands (default: nearest `canon.yaml`); `--session-id` joins `--actor-id`; `--override-reason` is the only "proceed although refused" flag.
 - `canon subject move --to` changes a subject's state (`subject show` replaces `subject status`); `evidence add --all-scenarios --report junit:a.xml` is the batch form.
+- Uncommitted code is recorded, not refused: records carry a `code_tree` and `worktree_dirty`, and `canon.yaml` `code.exclude` (default `docs/**`, `*.md`) says what is not code.
 - Destructive commands report `planDigest`, `effects[]`, `committed`; commands needing a commit refuse with `NO_COMMIT`; `canon migrate` rewrites hooks, old skill and `AGENTS.md`, reports `backupDir`.
 
 ### Changed
@@ -301,7 +305,7 @@ Each concept gets one flag name across every command, and evidence batches bind 
 The working set keeps only current records: superseded versions move to `.canon/archive`, evidence stops carrying attachments, reviews pin verdicts and checks, and artifact bytes can live off git.
 
 ### Breaking
-- `evidence add --drop-attachment` and `--drop-reason` are removed (exit 2); evidence binds only the files its own write names.
+- `evidence add --drop-attachment` and `--drop-reason` are removed (exit 2), with the evidence `attachment_drop` field and the `EVIDENCE_CARRY_BLOB_MISSING` code; evidence binds only the files its own write names.
 - Review JSON `pins.evidence: [{key, digest}]` becomes `pins.checks: [{role, verdict, checks: [...]}]`; `Review.scenario_id` is optional, `change_id` is new.
 - `canon query` reads the ledger only; add `--history` to include superseded versions; `divergence resolve|defer|accept` stage and promote in one run (`--no-promote` stages only).
 - Reviews predating 0.23 pins do not count until `canon migrate` pins them; a transition needing the review is refused as `unreviewed-promotion`.
