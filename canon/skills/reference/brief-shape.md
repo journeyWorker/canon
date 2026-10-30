@@ -69,7 +69,7 @@ prints the guidance of each empty one (in `language:`). A wrong heading
 
 ## Next
 
-`clarify` if the Questions section still has open lines; `harden` if flow and detail disagree; otherwise report to the human, who approves with `canon brief approve` (theirs; agent roles are refused).
+`clarify` if the Questions section still has open lines; `harden` if flow and detail disagree; otherwise show the brief to the human and ask; record an explicit approval with `brief approve` with `--relayed-via <tool>` (`canon skills show role-planner`).
 
 ## Invariants (every brief pass)
 
@@ -77,4 +77,4 @@ prints the guidance of each empty one (in `language:`). A wrong heading
 - Explaining writes nothing. Asked what a finding means or what a pass would do, answer in chat and leave the brief untouched.
 - No pass requires another as a prerequisite. Run the one the findings or the human point at, in any order.
 - A pass closes only the findings it rechecked: rerun `canon brief check` after the edit and report a finding as closed only when it is gone from that run. Never claim a rule you did not rerun.
-- Write in the brief's language (detected from the text; `language:` in `canon.yaml` overrides it). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and the human's `canon brief approve` again (agent roles are refused).
+- Write in the brief's language (detected from the text; `language:` in `canon.yaml` overrides it). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer, shown and asked again, and a new `canon brief approve` (recorded with `--relayed-via` from that answer).

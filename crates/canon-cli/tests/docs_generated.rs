@@ -1,5 +1,5 @@
 //! T14: the derived documentation blocks (role command lists, the website's
-//! CLI tables, the README's removed-spellings table) equal what the spec
+//! CLI tables, the CHANGELOG's removed-spellings tables) equal what the spec
 //! renders. `CANON_BLESS_DOCS=1 cargo test -p canon-cli --test docs_generated`
 //! rewrites them; see `tests/doc_gen/mod.rs` for the marker convention.
 

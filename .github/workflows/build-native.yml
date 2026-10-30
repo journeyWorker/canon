@@ -4,7 +4,7 @@ name: Build Native (Test Only)
 # D3): S0's acceptance bar (macOS arm64 + Linux x64 gnu) plus Windows x64
 # msvc, the same three rows the sibling `lute` monorepo ships. Every
 # matrix row builds on a host that natively matches the target triple
-# (macos-14 runners are Apple Silicon; ubuntu-latest and windows-latest
+# (macos-15 runners are Apple Silicon; ubuntu-latest and windows-latest
 # runners are x86_64), so no cross-compilation toolchain (zig /
 # cargo-zigbuild) is needed for any row — that machinery only becomes
 # necessary once a target is added whose triple doesn't match any
@@ -116,7 +116,7 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-14
+          - host: macos-15
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             binary_ext: ""

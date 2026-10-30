@@ -131,3 +131,23 @@ Feature: divergence lifecycle
     When canon divergence list runs with --as-of bogus, with --limit 0, with --cursor zzz, and with both --limit and --all
     Then --as-of bogus, --limit 0 and the combined flags each exit 2 with USAGE naming the option, and --cursor zzz exits 2 with INVALID_CURSOR
     And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:39Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:divergence-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F3
+  @divergence.lifecycle.14
+  Scenario: A relayed acceptance records the relay, the approver and the answer on the divergence
+    Given a scenario whose latest evidence is divergent, and a reviewer-session-independent agent role with an actor
+    When canon divergence accept runs with --relayed-via, --approver, --note and --actor
+    Then it exits 0 and the acceptance record holds relay with role, actor, tool, approver and answer, and the same call by a human has no relay
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:44Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:divergence-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F3
+  @divergence.lifecycle.15
+  Scenario: A relayed acceptance without the human's name or answer, or with relay denied, is refused and writes nothing
+    Given the same scenario and an agent role
+    When canon divergence accept runs relayed without --approver, without --note, and with approval.relay denied in canon.yaml
+    Then each exits 2 (USAGE for the missing option, HUMAN_ONLY naming approval.relay for the denial) and no divergence record is written

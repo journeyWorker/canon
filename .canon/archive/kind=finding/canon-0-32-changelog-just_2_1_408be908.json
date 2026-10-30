@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-changelog",
+    "role": "reviewer",
+    "session_id": "s-0-32-changelog-rev"
+  },
+  "at": "2026-10-30T17:33:03.567728Z",
+  "change_id": "canon-0-32-changelog-just",
+  "code_tree": "f8335320391853fa20a4253b66231590bbec4cdd",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md:96-212,299-323",
+  "introduced_by": "d1e7cdca85229096cda3ace13ca740bce0e8503e",
+  "kind": "finding",
+  "reviewed_sha": "482a81fd238dbcb81b6579ec0213c324cbb84edd",
+  "reviewer": "rev-changelog",
+  "round": 2,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Condensing dropped things a user must know (readability is now fine: every entry is 1-line bullets, ~20 lines). 0.28.0: (a) renamed error code FINDING_RESOLUTION_SHA_UNEXPECTED -> FINDING_RESOLUTION_REV_UNEXPECTED and removed FINDING_RESOLUTION_SHA_REQUIRED are gone (the Error codes bullet lists only ARTIFACTS_MIGRATE_REFUSED, EVIDENCE_VAULT_FAILED, PURGE_PLAN_REQUIRED, FINDING_UNRESOLVABLE_COMMIT); scripts matching them break silently. (b) exit-code changes dropped: every *_NOT_FOUND, *_UNREADABLE and *_INVALID_ARGUMENT now exits 2, init --check of a malformed config exits 2, task done on an unknown task exits 2 (only brief check exit 1 survives; 0.31's 'not-found exits 2' does not cover 0.28). (c) JSON key changes dropped: canon context keys record kinds by the --kind name (evidence, not evidence_record); finding close reports a repeat via meta.unchanged instead of FindingCloseReport.unchanged. (d) minor: canon.yaml code.exclude (default docs/**, *.md) and the new code_tree/worktree_dirty record fields are no longer mentioned. 0.23.0: the evidence schema loses attachment_drop and the code EVIDENCE_CARRY_BLOB_MISSING is removed (only the flags are mentioned). Fix: add these as one-line items (a one 'Error codes' line, one 'Exit codes' line, one JSON-keys line). New error codes (PLAN_CHANGED, UNKNOWN_ERROR_CODE, INPUT_*, SKILLS_INVALID_ARGUMENT, 0.25 dashboard codes, 0.22 divergence-accept codes) are rightly dropped: they are additive and discoverable, but add one pointer line 'canon schema --errors --json lists every error code' to 0.28 Added (the current text says it, fine). Blast radius: only changelog readers; no checks exercise changelog completeness.",
+  "worktree_dirty": false
+}

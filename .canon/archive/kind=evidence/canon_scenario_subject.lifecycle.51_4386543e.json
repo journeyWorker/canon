@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-relay",
+    "role": "implementer",
+    "session_id": "s-0-32-relay-impl"
+  },
+  "at": "2026-10-30T15:39:58.003595Z",
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test --workspace --locked (r1: guides, scanner, migrate relay option, dashboard panel, relay in accepted line)"
+  },
+  "evidence_note": {
+    "summary": "passes; clippy -D warnings clean; the only failures are 2 pre-existing dashboard smoke/panel-copy tests (flywheel-funnel COLUMNS export), untouched"
+  },
+  "evidence_sha": "a54e36a653a2753f34cb5826f38bf44db99207b5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 241,
+  "scenario_id": "subject.lifecycle.51",
+  "schema": 1,
+  "staging_id": "19c1684a",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

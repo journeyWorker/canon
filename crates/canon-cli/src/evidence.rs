@@ -233,7 +233,7 @@ use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
 
 /// What `canon evidence add` tells the agent when a brief refuses the
 /// attestation (0.16 M7): the stop belongs at the brief.
-const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. The human records their answer in their own shell (`canon brief approve --approver <their name> --note \"<their words>\"`, or on `canon dashboard`); never run it yourself or unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
+const BRIEF_STOP: &str = "stop and get the human's answer to the brief: nothing is built or attested for a subject before its brief is approved. Show it (`canon brief show --body`), ask with the harness question tool, and on their explicit approval record it with `canon brief approve --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest <change>=<the digest shown>` (or they approve on `canon dashboard`); never unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
 
 /// The refusal for a note a fabrication-marker scan rejected: one line per
 /// violation, exit 1 like every other gate-red refusal of this command

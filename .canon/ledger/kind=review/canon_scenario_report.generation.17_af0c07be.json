@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-repin",
+    "role": "reviewer",
+    "session_id": "s-0-32-repin"
+  },
+  "at": "2026-10-30T14:35:40.278856Z",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "kind": "review",
+  "pin": "d5d25d10fb07c83798ba760daffacf5a8165ba73",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:report_generation_17_a_hot_path_that_is_a_directory_is_named_as_why_there_is_no_snapshot"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "070b668dca62a345188ade78f6dd682bed2535a592a5e1503ca619b79a3b7a7d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66KSRVP9ST9GPMRDX5E00GC",
+  "reviewer": "rev-repin",
+  "scenario_id": "report.generation.17",
+  "schema": 2,
+  "worktree_dirty": true
+}

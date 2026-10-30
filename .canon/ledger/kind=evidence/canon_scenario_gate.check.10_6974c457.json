@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:31:10.432788Z",
+  "attachments": [
+    {
+      "case": "spec_coverage::tests::an_excluded_lane_is_out_of_scope_after_subject_scope",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "spec_coverage::tests::an_unlisted_lane_remains_in_scope",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib -- an_excluded_lane_is_out_of_scope_after_subject_scope an_unlisted_lane_remains_in_scope"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 235,
+  "scenario_id": "gate.check.10",
+  "schema": 1,
+  "staging_id": "ccf761a3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

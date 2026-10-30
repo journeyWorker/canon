@@ -282,14 +282,15 @@ fn parity_transcript(binary: &Path, old_spelling: bool) -> String {
 
 // ── F1 ───────────────────────────────────────────────────────────────────
 
-/// context.capability.47: the 14 options are the bare nouns on the 67 places of 24 commands, and a line of each of the
+/// context.capability.47: the 14 options are the bare nouns on the 70 places of 27 commands (0.32: `--actor` names the agent that relays an approval
+/// on `brief approve`, `policy approve` and `migrate`), and a line of each of the
 /// 24 commands exits, prints and stores what canon 0.30 did for the same line in its spelling.
 #[test]
 fn context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_the_old_spelling_wrote() {
     let by_name = options_by_name();
     let mut places = 0;
     let mut commands = std::collections::BTreeSet::new();
-    for (noun, count) in NOUNS.iter().zip([16, 15, 11, 6, 4, 3, 3, 3, 1, 1, 1, 1, 1, 1]) {
+    for (noun, count) in NOUNS.iter().zip([19, 15, 11, 6, 4, 3, 3, 3, 1, 1, 1, 1, 1, 1]) {
         let leaves = by_name.get(*noun).unwrap_or_else(|| panic!("no command takes --{noun}"));
         assert_eq!(leaves.len(), count, "--{noun} is on {leaves:?}");
         assert!(!by_name.contains_key(&format!("{noun}-id")), "--{noun}-id is still an option of {:?}", by_name.get(&format!("{noun}-id")));
@@ -297,7 +298,7 @@ fn context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_
         commands.extend(leaves.iter().cloned());
     }
     assert!(by_name.keys().all(|name| !name.ends_with("-id")), "{:?}", by_name.keys().filter(|n| n.ends_with("-id")).collect::<Vec<_>>());
-    assert_eq!((places, commands.len()), (67, 24));
+    assert_eq!((places, commands.len()), (70, 27));
 
     // The parity replay. With CANON_030_BIN naming a canon 0.30 binary the fixture is blessed from it instead.
     let expected_path = parity_dir().join("expected.txt");

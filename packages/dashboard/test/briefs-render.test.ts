@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { advisoryTotal, approvalRequest, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, renderRelayed, renderBriefsPage, relayText, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
 import { elements, escapeHtml, toHtml } from "../src/vnode";
 
 const handlers: BriefHandlers = { onChange: () => {}, onApprove: () => {} };
@@ -255,4 +255,27 @@ test("each brief card names the language it was judged in and where that came fr
   expect(detected).toContain("language: ko (detected)");
   const configured = toHtml(renderBrief(brief({ language: "en", languageSource: "configured", languageNote: "the text reads as ko" }), handlers));
   expect(configured).toContain("language: en (configured; the text reads as ko)");
+});
+
+test("subject.lifecycle.52: the page lists the approvals an agent recorded for the human, and says so on an edited brief", () => {
+  const relay = { role: "planner", actor: "plan-1", tool: "ask" };
+  expect(relayText(relay)).toBe("relayed by planner `plan-1` via ask");
+  expect(renderRelayed([])).toBeNull();
+  const html = toHtml(renderRelayed([{ changeId: "add-login", brief: ".canon/changes/add-login/brief.md", approval: "Ana 2026-10-30T00:00:00Z", relay }])!);
+  expect(html).toContain("Approved through an agent");
+  expect(html).toContain("add-login");
+  expect(html).toContain("relayed by planner");
+  const edited = toHtml(renderBrief(brief({ changedSinceApproval: true, previousRelay: relay }), handlers));
+  expect(edited).toContain("that approval was relayed by planner");
+});
+
+test("subject.lifecycle.52: the relayed panel stays on the page when the last waiting brief is approved", () => {
+  const relayed = [{ changeId: "add-login", brief: ".canon/changes/add-login/brief.md", approval: "Ana", relay: { role: "planner", actor: "plan-1", tool: "ask" } }];
+  const html = (nodes: ReturnType<typeof renderBriefsPage>) => nodes.map((n) => toHtml(n)).join("");
+  const waiting = html(renderBriefsPage([brief()], relayed, handlers));
+  const afterLast = html(renderBriefsPage([], relayed, handlers));
+  expect(waiting).toContain("Approved through an agent");
+  expect(afterLast).toContain(EMPTY_MESSAGE);
+  expect(afterLast).toContain("Approved through an agent");
+  expect(afterLast).toContain("add-login");
 });

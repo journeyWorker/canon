@@ -1,0 +1,84 @@
+# just recipes run on d1e7cdca, 2026-10-30T16:39:22Z, Darwin arm64, node v26.12.1, bun 1.4.4, just just 1.59.0
+start tree clean outside .canon: yes
+
+## just release-check: exit 0
+----------------------------------------------------------------------
+Ran 12 tests in 0.030s
+
+OK
+
+## just lint: exit 0
+    Checking canon-learn v0.31.0 (/Users/journey/Workspace/canon/crates/canon-learn)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.60s
+cargo clippy -p canon-store --all-targets --features live-pg,live-r2 --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s
+
+## just build: exit 0
+cargo build --locked -p canon-cli
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.42s
+
+## just docs: exit 0
+test the_files_that_need_blocks_have_them ... ok
+test every_generated_block_is_what_the_spec_renders ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+## just conformance: exit 0
+test mismatch_diff_is_unified_with_context ... ok
+test conformance_corpus_replays_byte_exact ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 54.46s
+
+## just launcher: exit 0
+ 5 pass
+ 0 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [688.00ms]
+
+## just platformer: exit 1 (local Node 26: `localStorage` is undefined in the jsdom tests, 12 of 19 fail with "Cannot read properties of undefined (reading 'clear')"; CI's Node does not hit it)
+
+JUNIT report written to /Users/journey/Workspace/canon/examples/platformer/reports/junit.xml
+error: script "test:junit" exited with code 1
+error: recipe `platformer` failed on line 62 with exit code 1
+
+## just platformer (NODE_OPTIONS=--no-experimental-webstorage): exit 0
+   Start at  01:40:52
+   Duration  2.41s (transform 329ms, setup 0ms, collect 1.59s, tests 2.55s, environment 2.03s, prepare 375ms)
+
+JUNIT report written to /Users/journey/Workspace/canon/examples/platformer/reports/junit.xml
+
+## just dashboard: exit 0
+dist/assets/nav-uIEhRts6.js                              1.54 kB │ gzip:     0.80 kB
+dist/assets/briefs-DebWh422.js                           9.17 kB │ gzip:     3.51 kB
+dist/assets/main--ZHJKSkW.js                           216.78 kB │ gzip:    52.83 kB
+✓ built in 1.43s
+
+## just man: exit 0
+   Compiling canon-learn v0.31.0 (/Users/journey/Workspace/canon/crates/canon-learn)
+   Compiling canon-vocab v0.31.0 (/Users/journey/Workspace/canon/crates/canon-vocab)
+    Finished `release` profile [optimized] target(s) in 1m 48s
+     Running `target/release/examples/canon-man man-pages`
+
+## just install: exit 0
+    Finished `release` profile [optimized] target(s) in 3m 41s
+  Installing /Volumes/External/tmp/changelog-just-r1/install/bin/canon
+   Installed package `canon-cli v0.31.0 (/Users/journey/Workspace/canon/crates/canon-cli)` (executable `canon`)
+warning: be sure to add `/Volumes/External/tmp/changelog-just-r1/install/bin` to your PATH to be able to run the installed binaries
+
+## just gate: exit 1 (builds, syncs and checks; the only violation is unreviewed-promotion for this chore, which waits for the reviewer's signed change review)
+
+unreviewed-promotion (1):
+  unreviewed-promotion gate-trust-spine — chore change `canon-0-32-changelog-just` approved: no signed review of change `canon-0-32-changelog-just`: the latest review recorded no sign-off (`rev-changelog` indeterminate);
+error: recipe `gate` failed on line 39 with exit code 1
+
+## just bench: exit 1 (scripts/bench/run.py reads /proc/loadavg: Linux only, so it cannot run on this Mac; CI runs it on ubuntu)
+         ~~~~^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/proc/loadavg'
+error: recipe `bench` failed on line 76 with exit code 1
+
+## just test: exit 0 (first run exit 101: the recipe script had CANON_ROLE=implementer exported, which makes the brief_approve tests run as an agent and get HUMAN_ONLY; rerun with `env -u CANON_ROLE just test`)
+cargo test --workspace --locked: 3287 passed, 0 failed
+
+## just live: not run, docker is not running here (docker info fails)
+## just ci: not run as one command; its parts release-check lint test gate launcher platformer are above
+DONE

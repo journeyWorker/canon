@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-repin",
+    "role": "reviewer",
+    "session_id": "s-0-32-repin"
+  },
+  "at": "2026-10-30T14:35:40.278856Z",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "kind": "review",
+  "pin": "d5d25d10fb07c83798ba760daffacf5a8165ba73",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:ledger_migrate_16_a_review_keeps_its_review_id_through_canon_migrate",
+          "junit:ledger_migrate_16_one_run_renames_the_ledger_and_rewrites_the_briefs"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "cd051ac8b5967223e4e445cef3a10fc8220a2c7bb58f00c0316c6124f25d5136",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66KSRVP9ST9GPMRDX5E00GC",
+  "reviewer": "rev-repin",
+  "scenario_id": "ledger.migrate.16",
+  "schema": 2,
+  "worktree_dirty": true
+}

@@ -485,3 +485,146 @@ Feature: subject lifecycle
     When each is moved to shipped, and a shipped one is reopened
     Then the first is refused with OLD_BRIEF_FORMAT and stays where it is
     And the second moves, because the command does not judge that change
+
+  # canon: {"schema":1,"at":"2026-10-30T11:53:55Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F1
+  @subject.lifecycle.48
+  Scenario: Brief show --body prints the brief's bytes and the digest an approval records
+    Given a change whose brief file ends without an Approved line
+    When canon brief show <change> --body runs, once without and once with --json, and then canon brief approve records the human's answer
+    Then the plain output is the brief file's bytes followed by one last line digest: sha256:<hex>, and nothing is written
+    And the digest is the one the Approved line records after the approval, and --json carries the brief text as body and the same value as digest
+
+  # canon: {"schema":1,"at":"2026-10-30T11:53:59Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F1
+  @subject.lifecycle.49
+  Scenario: Brief show --body of an unknown change or an unreadable brief is refused with exit 2 and writes nothing
+    Given a repo with no change named missing and a change whose brief.md is not UTF-8 text
+    When canon brief show missing --body and canon brief show <broken> --body run
+    Then each exits 2 with the code the same call without --body gives, and prints no brief text
+    And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:02Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F2
+  @subject.lifecycle.50
+  Scenario: The planner guidance shows the brief, asks with the harness question tool and counts only an explicit approval
+    Given the planner guide of the skill, its source and the reference the install projects from it
+    When their approval stop is read
+    Then it says to show the brief with canon brief show <change> --body to the human's view without retyping it, naming omp out:// and the visible tool output of harnesses without that channel
+    And it says to ask with the harness question tool, naming ask for omp and AskUserQuestion for Claude Code, or in the chat when there is none, and to record with --relayed-via
+    And divergence accept and the migrate commit get the same procedure
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:07Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F2
+  @subject.lifecycle.51
+  Scenario: The guidance treats a conditional answer as a revision request and no longer says to report the command and wait
+    Given the same guides
+    When they say what counts as the human's answer
+    Then only an explicit approval counts, a question or a condition is a revision request, and no answer records nothing
+    And no sentence tells the planner to report the command to the human and wait, and canon skills check exits 0 once the projected stubs are installed
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:12Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.52
+  Scenario: A planner's relayed approval of two briefs marks both Approved lines, and status, brief show and the dashboard show it
+    Given two changes whose briefs pass the checks and a planner role declared with an actor
+    When canon brief approve <a> <b> runs with --relayed-via ask, the human's name and answer, --actor and each change's shown digest
+    Then both briefs carry an Approved line with (relayed by planner <actor> via ask) before the digest, and the call exits 0
+    And canon status lists both approvals as relayed, canon brief show names the relay, and the dashboard briefs list carries them in relayed
+    And the same name and answer approved by a human without the option differ in the line only by that marker
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:15Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.53
+  Scenario: A relayed brief approval whose shown digest differs or is missing is refused with exit 2 and nothing is written
+    Given two changes with approvable briefs, the first shown with a stale digest and the second shown with none
+    When canon brief approve runs relayed for the first alone, for the second alone, and for both
+    Then each exits 2, the first with RELAY_DIGEST_MISMATCH and the second with USAGE, and neither brief file nor the policy approval changed
+    And an id whose digest is right is refused too when another id of the call is not
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:17Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.54
+  Scenario: A relayed approval without the human's name, answer or an actor, or with no role declared, is refused with exit 2
+    Given a planner role and a brief that passes the checks
+    When canon brief approve is relayed with an empty --approver, an empty --note, no --actor and no CANON_ACTOR, and when --relayed-via is given with no role declared
+    Then each exits 2 with USAGE naming the missing option, or APPROVAL_INCOMPLETE for an empty name or answer, and nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:20Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.55
+  Scenario: An agent role without the relay option is refused HUMAN_ONLY and the hint names the relay procedure
+    Given each agent role in turn declared with --as
+    When canon brief approve, canon policy approve and canon divergence accept run without --relayed-via
+    Then each exits 2 with HUMAN_ONLY, and the hint names the relay procedure (canon brief show --body, the question tool, --relayed-via) before the human's own call
+    And nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:23Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.56
+  Scenario: A relayed policy approval records its relay fields in the approval file and refuses the same way
+    Given a repo with a policy and a planner role with an actor
+    When canon policy approve runs with --relayed-via, --approver, --note and --actor, and without --note, and with a role but no --relayed-via
+    Then the first exits 0 and .canon/policy.approval.json holds relay with role, actor and tool, and canon policy show --json reports it
+    And the second exits 2 with USAGE and the third with HUMAN_ONLY, and the file is unchanged by both
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:27Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.57
+  Scenario: A relayed migrate commit that re-binds Approved lines records its relay in the backup journal
+    Given a repo whose migrate plan re-binds an Approved line, a planner role and the plan digest
+    When canon migrate --commit --plan-digest <d> runs without the relay option, and then with --relayed-via, --approver, --note and --actor
+    Then the first exits 2 with HUMAN_ONLY and rewrites nothing, and the second migrates and the backup journal holds relay with role, actor, tool, approver and answer
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:30Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:edge
+  @flow:canon-0-32-relay-approval.F3
+  @subject.lifecycle.58
+  Scenario: An Approved line without a relay marker reads as before and the marker is outside the digest
+    Given a brief with an Approved line written before 0.32 and one with a relay marker
+    When both are read for approval, status and the approval time, and the marker is edited by hand
+    Then the old line reads as approved as before, with no relay, and the marked line reads as approved and relayed
+    And editing the marker does not change the brief's digest, so the approval still binds
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:33Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-32-relay-approval.F4
+  @subject.lifecycle.59
+  Scenario: With approval.relay denied in canon.yaml a relayed approval is refused HUMAN_ONLY naming the key
+    Given canon.yaml with approval: { relay: deny } and a planner role
+    When canon brief approve, canon policy approve and canon migrate --commit run with --relayed-via and everything else a relay needs
+    Then each exits 2 with HUMAN_ONLY naming approval.relay in its message or hint, and the hint gives the call the human runs
+    And nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-30T11:54:35Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-32-relay-approval.F4
+  @subject.lifecycle.60
+  Scenario: Without the key relaying is allowed, and canon init shows the key commented
+    Given a repo whose canon.yaml has no approval key, and a fresh canon init
+    When a relayed brief approval runs, and the written canon.yaml is read
+    Then the approval is recorded, and the init template carries approval: and relay: allow | deny as comments
+    And a malformed approval section is refused CONFIG_UNREADABLE rather than read as allow

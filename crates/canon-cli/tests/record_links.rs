@@ -927,7 +927,7 @@ fn hand_written_finding_add_blocker_and_should_fix_examples_name_the_introducing
         }
     }
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut files = vec![root.join("README.md")];
+    let mut files = vec![root.join("README.md"), root.join("CHANGELOG.md")];
     markdown(&root.join("canon/skills"), &mut files);
     let (mut seen, mut problems) = (0, Vec::new());
     for file in files {

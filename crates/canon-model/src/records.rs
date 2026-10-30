@@ -1146,6 +1146,27 @@ pub struct ReviewOutcomeError {
     pub value: String,
 }
 
+/// How an approval reached canon when an agent recorded it for a human
+/// (0.32): the agent's declared role and actor, the tool the human was asked
+/// with, and, where the record has no field of its own for them, the human's
+/// name and answer. Written only for a relayed approval; a record without it
+/// is the human's own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ApprovalRelay {
+    /// The role the recording agent declared (`--as` / `CANON_ROLE`).
+    pub role: String,
+    /// The agent's actor id.
+    pub actor: String,
+    /// The tool the human was asked with (`ask`, `AskUserQuestion`, `chat`).
+    pub tool: String,
+    /// The human's name, when the record holds it nowhere else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approver: Option<String>,
+    /// The human's answer as given, when the record holds it nowhere else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<String>,
+}
+
 /// A divergence's fold-relevant state (design D8). `Open`/`Resolved`
 /// are the pre-s15 pair (still bare `"open"`/`"resolved"` on the wire —
 /// unaffected by the two additive variants below); `StillDivergent` is
@@ -1183,6 +1204,9 @@ pub enum DivergenceStatus {
         /// only by `canon migrate`.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         evidence: Vec<EvidencePin>,
+        /// Set when an agent recorded the acceptance for a human (0.32).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        relay: Option<ApprovalRelay>,
     },
 }
 

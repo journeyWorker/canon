@@ -702,9 +702,13 @@ def main(argv: list[str] | None = None) -> int:
         # The one Rust toolchain pin; rustup and cargo read it from the root.
         "rust-toolchain.toml",
         "README.md",
+        # The release notes (README.md only introduces the project); read by the docs tests and the README's Changelog link.
+        "CHANGELOG.md",
         "bun.lock",
         "canon.yaml",
         "docker-compose.yml",
+        # The contributor command recipes (`just --list`); each mirrors a CI step.
+        "justfile",
         # The Orca "Forca" workspace recipe (#66); Orca reads it from the root.
         "orca.yaml",
         "package.json",

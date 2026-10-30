@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:32:12.726097Z",
+  "attachments": [
+    {
+      "case": "a_task_flip_keeps_the_changes_adopted_subject",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "plan_adapters::openspec::tests::parse_change_reads_only_the_named_change",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change a_task_flip_keeps_the_changes_adopted_subject; cargo test -p canon-ingest parse_change_reads_only_the_named_change"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 54,
+  "scenario_id": "gate.task.10",
+  "schema": 1,
+  "staging_id": "fc068b47",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

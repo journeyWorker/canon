@@ -504,7 +504,7 @@ pub fn error_rows() -> Vec<ErrorRow> {
     crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: i32::from(info.exit), retryable: info.retryable, fix: info.fix }).collect()
 }
 
-/// Every removed spelling with its replacement (the README's Upgrading list
+/// Every removed spelling with its replacement (the CHANGELOG's Upgrading tables
 /// and the usage-error hints are generated from it).
 pub fn removed_rows() -> Vec<Value> {
     crate::removed_028::ROWS

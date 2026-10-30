@@ -175,6 +175,13 @@ fn skeleton_yaml() -> String {
     out.push_str("  # `canon divergence add`) promote in the same run. `manual` keeps\n");
     out.push_str("  # them staged until `canon gate promote`; `--no-promote` keeps one.\n");
     out.push_str("  promote: auto\n");
+    out.push_str("# approval:\n");
+    out.push_str("#   # An agent may record the answer a human gave in the conversation for\n");
+    out.push_str("#   # `canon brief approve`, `canon policy approve`, `canon divergence accept`\n");
+    out.push_str("#   # and a `canon migrate --commit` that re-binds approvals, with\n");
+    out.push_str("#   # `--relayed-via <tool>`; the record says it was relayed. `deny` refuses that\n");
+    out.push_str("#   # (HUMAN_ONLY): the human runs those calls themselves. Default: allow.\n");
+    out.push_str("#   relay: allow\n");
     out
 }
 
@@ -286,7 +293,7 @@ Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator)
 
 The loop:
 
-1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; the human records it in one call, in their own shell or on `canon dashboard`: `canon brief approve <slug> --approver <their name> --note \"<their words>\"`; you report that exact call, slug filled in, and wait, and never unset your role (`env -u CANON_ROLE`, no `--as`) to run it yourself. Never approve without a human answer. A brief edited after its approval needs a new answer.
+1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then show it to the human in that language with `canon brief show <slug> --body` (their own view, never retyped) and ask with the harness question tool (`ask` in omp, `AskUserQuestion` in Claude Code, otherwise in the chat): build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you show it. Only an explicit approval counts; a question or a condition is a revision request, and no answer records nothing. One human answer approves the brief and the policy; record it in one call: `canon brief approve <slug> --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest <slug>=<the digest shown>` (or the human runs the call themselves, or approves on `canon dashboard`); never unset your role (`env -u CANON_ROLE`, no `--as`) to run it yourself. Never approve without a human answer. A brief edited after its approval needs a new answer.
 2. Subject: `canon subject new`, then `canon change new` for the change (`--change-kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then one change-level review with `canon review change <slug>`; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
 3. Scenarios: `canon scenario new --flow <F-id>`, one per behavior of a flow step, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.

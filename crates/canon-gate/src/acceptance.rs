@@ -46,17 +46,20 @@ pub struct Acceptance {
     pub expiry: Option<DateTime<Utc>>,
     /// Who accepted it (`Divergence.reviewer`).
     pub reviewer: String,
+    /// Set when an agent recorded the acceptance for the human (0.32).
+    pub relay: Option<canon_model::ApprovalRelay>,
 }
 
 impl Acceptance {
-    /// `accepted-divergence <id> — <tracking> (expires <date>)`, the line
+    /// `accepted-divergence <id> — <tracking> (expires <date>)` (and ` (relayed by <role> <actor> via <tool>)` for a relayed acceptance), the line
     /// `canon status` and `canon gate check` list.
     pub fn line(&self) -> String {
         let expires = match self.expiry {
             Some(expiry) => format!("expires {}", expiry.format("%Y-%m-%d")),
             None => "no expiry".to_string(),
         };
-        format!("accepted-divergence {} — {} ({expires})", self.scenario_id.as_str(), self.tracking)
+        let relayed = self.relay.as_ref().map(|r| format!(" (relayed by {} {} via {})", r.role, r.actor, r.tool)).unwrap_or_default();
+        format!("accepted-divergence {} — {} ({expires}){relayed}", self.scenario_id.as_str(), self.tracking)
     }
 }
 
@@ -71,7 +74,7 @@ pub enum Held {
 }
 
 fn acceptance_of(record: &Divergence) -> Option<Acceptance> {
-    let DivergenceStatus::Accepted { reason, tracking, expiry, .. } = &record.status else { return None };
+    let DivergenceStatus::Accepted { reason, tracking, expiry, relay, .. } = &record.status else { return None };
     Some(Acceptance {
         project_id: record.project_id.clone(),
         scenario_id: record.scenario_id.clone(),
@@ -79,6 +82,7 @@ fn acceptance_of(record: &Divergence) -> Option<Acceptance> {
         reason: reason.clone(),
         expiry: *expiry,
         reviewer: record.reviewer.clone(),
+        relay: relay.clone(),
     })
 }
 

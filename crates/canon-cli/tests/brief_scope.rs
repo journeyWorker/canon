@@ -776,12 +776,12 @@ fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
 
     let blocked = steps(repo);
     assert!(has(&blocked, "canon brief check b"), "{blocked:?}");
-    assert!(!has(&blocked, "report the pending draft's brief"), "{blocked:?}");
+    assert!(!has(&blocked, "show the pending draft's brief"), "{blocked:?}");
     assert!(has(&blocked, "canon subject move s --to shipped"), "{blocked:?}");
 
     std::fs::write(brief_path(repo, "b"), brief("")).unwrap();
     let clean = steps(repo);
-    assert!(has(&clean, "report the pending draft's brief in .canon/changes/b/brief.md to the human; s is not blocked meanwhile"), "{clean:?}");
+    assert!(has(&clean, "show the pending draft's brief in .canon/changes/b/brief.md to the human and ask; s is not blocked meanwhile"), "{clean:?}");
     assert!(!has(&clean, "canon brief check"), "{clean:?}");
     assert!(has(&clean, "canon subject move s --to shipped"), "{clean:?}");
 }
@@ -927,7 +927,7 @@ fn context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_re
     let steps = status["meta"]["next"].as_array().unwrap();
     let position = |needle: &str| steps.iter().position(|s| s["command"].as_str().unwrap().contains(needle));
     let polish = position("canon skills show brief-polish").unwrap_or_else(|| panic!("{steps:?}"));
-    let report = position("report the pending draft's brief").unwrap_or_else(|| panic!("{steps:?}"));
+    let report = position("show the pending draft's brief").unwrap_or_else(|| panic!("{steps:?}"));
     assert_eq!(report, polish + 1, "{steps:?}");
     assert_eq!(steps[polish]["role"], "planner");
     assert!(steps[polish]["command"].as_str().unwrap().contains("`canon brief check b`"), "{}", steps[polish]);

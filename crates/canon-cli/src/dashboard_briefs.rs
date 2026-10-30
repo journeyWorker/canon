@@ -103,6 +103,7 @@ pub fn list(repo: &Path) -> Reply {
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
 
     let mut briefs = Vec::new();
+    let mut relayed = Vec::new();
     let mut unreadable = Vec::new();
     for (change, path) in live {
         let bytes = match std::fs::read(&path) {
@@ -117,7 +118,15 @@ pub fn list(repo: &Path) -> Reply {
             continue;
         };
         let approval = approval_of(&text);
+        let line = match &approval {
+            crate::brief::Approval::Bound { line } | crate::brief::Approval::Unbound { line } | crate::brief::Approval::Changed { line, .. } => Some(line.as_str()),
+            crate::brief::Approval::Missing => None,
+        };
+        let relay = line.and_then(crate::relay::parse_marker);
         if approval.approved() {
+            if let (Some(relay), Some(line)) = (relay, line) {
+                relayed.push(RelayedBrief { change_id: change.as_str().to_string(), brief: path.strip_prefix(repo).unwrap_or(&path).to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/"), approval: line.to_string(), relay });
+            }
             continue;
         }
         let checked = match check_text(repo, change.clone(), &path, &text) {
@@ -150,6 +159,7 @@ pub fn list(repo: &Path) -> Reply {
             language_source: checked.language_source.as_str(),
             language_note: checked.language_note,
             changed_since_approval: matches!(approval, crate::brief::Approval::Changed { .. }),
+            previous_relay: relay,
             legacy: checked.evaluation.legacy,
             sections,
             findings,
@@ -158,7 +168,7 @@ pub fn list(repo: &Path) -> Reply {
             text,
         });
     }
-    Reply::ok(crate::json_out::envelope("dashboard briefs", &DashboardBriefsReport { briefs, unreadable }))
+    Reply::ok(crate::json_out::envelope("dashboard briefs", &DashboardBriefsReport { briefs, relayed, unreadable }))
 }
 
 /// A brief the page could not read.
@@ -184,6 +194,18 @@ pub struct BriefFinding {
     pub blocks_approval: bool,
 }
 
+/// An approved brief whose approval an agent recorded for the human (0.32).
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayedBrief {
+    pub change_id: String,
+    /// The brief file, relative to the repo root.
+    pub brief: String,
+    /// The `Approved:` line's text.
+    pub approval: String,
+    pub relay: canon_model::ApprovalRelay,
+}
+
 /// One brief still waiting for the human's answer.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -199,6 +221,9 @@ pub struct PendingBrief {
     pub language_source: &'static str,
     pub language_note: Option<String>,
     pub changed_since_approval: bool,
+    /// The relay of the approval this brief was edited after (0.32), when an agent recorded it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_relay: Option<canon_model::ApprovalRelay>,
     pub legacy: bool,
     pub sections: Vec<crate::brief_check::BriefSection>,
     pub findings: Vec<BriefFinding>,
@@ -211,6 +236,8 @@ pub struct PendingBrief {
 #[serde(rename_all = "camelCase")]
 pub struct DashboardBriefsReport {
     pub briefs: Vec<PendingBrief>,
+    /// The approved briefs an agent recorded the approval of for the human (0.32), with who relayed it and through which tool.
+    pub relayed: Vec<RelayedBrief>,
     pub unreadable: Vec<UnreadableBrief>,
 }
 
@@ -294,7 +321,7 @@ fn approve_many(repo: &Path, briefs: &[ApproveBrief], request: &ApproveRequest) 
             for (entry, _) in &many.entries {
                 crate::human_err!("canon dashboard: {} {:?} by `{}`", entry.change, entry.outcome, many.approved_by);
             }
-            let report = crate::brief_approve::ApprovedMany { approved_by: many.approved_by, policy_approved: many.policy_approved, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
+            let report = crate::brief_approve::ApprovedMany { approved_by: many.approved_by, policy_approved: many.policy_approved, relay: None, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
             if let Some(e) = many.failure {
                 return Reply { status: 500, body: crate::json_out::failure_value("dashboard briefs", &e, Some(&report)) };
             }

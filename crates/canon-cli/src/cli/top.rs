@@ -50,6 +50,18 @@ pub struct MigrateArgs {
     /// With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)
     #[arg(long, value_name = "DIR", requires = "revert")]
     pub backup: Option<PathBuf>,
+    /// With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it
+    #[arg(long, value_name = "NAME", requires = "commit", conflicts_with = "revert")]
+    pub relayed_via: Option<String>,
+    /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
+    #[arg(long, value_name = "ACTOR_ID", requires = "relayed_via")]
+    pub actor: Option<String>,
+    /// With --relayed-via, who the human is
+    #[arg(long, value_name = "NAME", requires = "relayed_via")]
+    pub approver: Option<String>,
+    /// With --relayed-via, the human's answer as they gave it
+    #[arg(long, value_name = "TEXT", requires = "relayed_via")]
+    pub note: Option<String>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

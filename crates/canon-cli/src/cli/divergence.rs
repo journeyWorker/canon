@@ -159,6 +159,15 @@ pub struct DivergenceAcceptArgs {
     /// The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence
     #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
+    /// Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --approver and --note are required
+    #[arg(long, value_name = "NAME")]
+    pub relayed_via: Option<String>,
+    /// With --relayed-via, who the human is
+    #[arg(long, value_name = "NAME", requires = "relayed_via")]
+    pub approver: Option<String>,
+    /// With --relayed-via, the human's answer as they gave it
+    #[arg(long, value_name = "TEXT", requires = "relayed_via")]
+    pub note: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form

@@ -1,6 +1,6 @@
 import "./style.css";
 import { renderNav } from "./nav";
-import { advisoryTotal, approvalRequest, approveDisabled, refusedIds, renderApproveError, renderBriefs, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, refusedIds, renderApproveError, renderBriefsPage, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
 import { h, toDom } from "./vnode";
 
 // The briefs page: the changes whose brief awaits the human, and the form
@@ -116,17 +116,20 @@ const handlers: BriefHandlers = {
 
 let shown: Brief[] = [];
 
-function render(briefs: Brief[]): void {
+let relayedShown: RelayedBrief[] = [];
+
+function render(briefs: Brief[], relayed: RelayedBrief[] = relayedShown): void {
   shown = briefs;
-  main!.replaceChildren(toDom(renderBriefs(briefs, handlers)));
+  relayedShown = relayed;
+  main!.replaceChildren(...renderBriefsPage(briefs, relayed, handlers).map(toDom));
 }
 
 async function load(): Promise<void> {
   try {
     const response = await fetch("/api/briefs", { headers: { accept: "application/json" } });
-    const json = (await response.json()) as { data?: { briefs: Brief[]; unreadable: { changeId: string; message: string }[] } } & Partial<ApiError>;
+    const json = (await response.json()) as { data?: { briefs: Brief[]; relayed?: RelayedBrief[]; unreadable: { changeId: string; message: string }[] } } & Partial<ApiError>;
     if (!response.ok || !json.data) throw new Error(json.error ? `${json.error.code}: ${json.error.message}` : `the server answered ${response.status}`);
-    render(json.data.briefs);
+    render(json.data.briefs, json.data.relayed ?? []);
     for (const skipped of json.data.unreadable) {
       notices!.append(toDom(h("div", { class: "banner" }, `${skipped.changeId}: ${skipped.message}`)));
     }

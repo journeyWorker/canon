@@ -1,6 +1,6 @@
 # Canon 0.28: the per-leaf command table
 
-0.31 update: every option that takes a record or config id is the bare noun (`--actor`, not `--actor-id`), in the options columns and in the "0.28 spelling" column of the migration tables below; the "0.27 spelling" column is as 0.27 spelled it. The 0.31 renames are in the README's Upgrading list.
+0.31 update: every option that takes a record or config id is the bare noun (`--actor`, not `--actor-id`), in the options columns and in the "0.28 spelling" column of the migration tables below; the "0.27 spelling" column is as 0.27 spelled it. The 0.31 renames are in the CHANGELOG's 0.31.0 Upgrading steps.
 
 Status: normative draft, reviewed together with the 0.28 grammar plan (`docs/superpowers/plans/2026-10-22-canon-cli-grammar.md`, removed in 0.30; `git show 0977bce1:<path>`). This is the final table of every leaf that plan D1 promises. The spec generator (D2), the skill, the website reference and the "Removed in 0.28" hints are generated from it; an agent must be able to build any command from this table alone.
 
@@ -276,7 +276,7 @@ One row per leaf. Columns: command id; operand; required options; optional optio
 
 ## 0.27 → 0.28
 
-Every 0.27 leaf (the 70 in `canon schema --all`, plus the runnable group `canon brief`) and every renamed or removed option. Generated into the README Upgrading section, the "Removed in 0.28" table and the usage-error hints (D8): an old spelling is a usage error, exit 2, whose `error.hint` names the replacement and `error.expected` lists the valid spellings. Operands are written bare here (`C` = a change id, `S` = a scenario id).
+Every 0.27 leaf (the 70 in `canon schema --all`, plus the runnable group `canon brief`) and every renamed or removed option. Generated into the CHANGELOG's 0.28.0 Upgrading steps, the "Removed in 0.28" table and the usage-error hints (D8): an old spelling is a usage error, exit 2, whose `error.hint` names the replacement and `error.expected` lists the valid spellings. Operands are written bare here (`C` = a change id, `S` = a scenario id).
 
 ### Commands
 

@@ -15,6 +15,7 @@ as-of	TIMESTAMP	point in time a deferral's expiry is judged at
 audit-result	RESULT	outcome of an external audit
 backup	DIR	with migrate --revert: the backup directory to restore
 before	TIMESTAMP	upper time bound, exclusive
+body	-	mode: print the brief file as it is, then its digest
 case	NAME	case tag of a scenario
 change	CHANGE_ID	change
 change-kind	CHANGE_KIND	kind of a change
@@ -27,6 +28,7 @@ contradicting-trajectory	ID	trajectory that contradicts a strategy
 cursor	CURSOR	paging position
 detail	TEXT	free-text detail of a record
 dialect	NAME	plan dialect
+digest	DIGEST	the digest of a brief the human was shown, as <change>=<sha256:digest>
 disposition	DISPOSITION	what became of a finding
 domain	NAME	subject domain
 dry-run	-	mode: validate fully and write nothing
@@ -85,6 +87,7 @@ providers	LIST	comma list of harness providers
 reason	TEXT	why a record or refusal waiver exists
 ref	TEXT	what the evidence refers to
 regime	KEY	full regime key
+relayed-via	NAME	the question tool an agent asked the human with, when it records their answer
 release	-	mode: release-scoped trust check
 repo	DIR	repository to act on
 repo-name	NAME	repository segment of a regime key

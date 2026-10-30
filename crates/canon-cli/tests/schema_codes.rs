@@ -68,6 +68,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
     ("learn.rs", &["strategy"]),
     ("ledger.rs", &["ledger compact"]),
+    // `relay::authorize`: the refusals of a relayed approval, made for the human-only leaf that calls it.
+    ("relay.rs", &["brief approve", "policy approve", "divergence accept", "migrate"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
     ("run/mod.rs", &[]),
@@ -125,7 +127,7 @@ const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), (
 const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"]), ("search/mod.rs", &["search", "trace"])];
 
 /// The leaves that record a human's decision and refuse every agent role.
-const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept"];
+const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept", "migrate"];
 
 const GLOBAL: &[&str] = &["USAGE", "UNKNOWN_ROLE"];
 

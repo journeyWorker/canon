@@ -2,7 +2,7 @@
 
 Make the brief something a human reads once and understands. Run it whenever
 `canon brief check` reports `prose.*` advisories; `canon status` and
-`meta.next` name it before the human stop. It never blocks approval, and it
+`meta.next` name it before the approval step. It never blocks approval, and it
 is not finished by silencing rules: it is finished when the brief reads
 plainly and each advisory is gone or waived with a reason.
 
@@ -218,7 +218,7 @@ uses the section key `brief`.
 1. Fix the mode problems above, then the findings, section by section.
 2. Run `canon brief check <slug> --json`: the findings are in `data.findings[]`.
 3. Repeat until no advisory remains, or each remaining one is waived with a reason.
-4. Stop and report to the human, in the brief's language. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
+4. Stop polishing and show the brief to the human (`canon brief show <slug> --body`), in the brief's language, and ask. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
 
 ## NEVER
 
@@ -236,7 +236,7 @@ uses the section key `brief`.
 
 ## Next
 
-Report to the human, who approves with `canon brief approve` (theirs; agent roles are refused).
+Show the brief to the human and ask (`canon brief show <slug> --body`, then the harness question tool); record an explicit approval with `brief approve` with `--relayed-via <tool>` (`canon skills show role-planner`).
 
 ## Invariants (every brief pass)
 
@@ -244,4 +244,4 @@ Report to the human, who approves with `canon brief approve` (theirs; agent role
 - Explaining writes nothing. Asked what a finding means or what a pass would do, answer in chat and leave the brief untouched.
 - No pass requires another as a prerequisite. Run the one the findings or the human point at, in any order.
 - A pass closes only the findings it rechecked: rerun `canon brief check` after the edit and report a finding as closed only when it is gone from that run. Never claim a rule you did not rerun.
-- Write in the brief's language (detected from the text, or `language:` in `canon.yaml` when set). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and the human's `canon brief approve` again (agent roles are refused).
+- Write in the brief's language (detected from the text, or `language:` in `canon.yaml` when set). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer, shown and asked again, and a new `canon brief approve` (recorded with `--relayed-via` from that answer).

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-changelog",
+    "role": "reviewer",
+    "session_id": "s-0-32-changelog-rev"
+  },
+  "at": "2026-10-30T14:38:17.935223Z",
+  "change_id": "canon-0-32-changelog-just",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md:118-272",
+  "introduced_by": "96990f59d027366bc6e9b4a58f334900e57b8f7d",
+  "kind": "finding",
+  "reviewed_sha": "a54e36a653a2753f34cb5826f38bf44db99207b5",
+  "reviewer": "rev-changelog",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "0.28.0 entry is a reference manual, not a changelog line list: 14 Breaking bullets plus 19 Added, 7 Changed, plus an 80-row table. Two problems. (1) Incomplete list: the camelCase-keys Breaking bullet (line 129, ~1000 chars) enumerates renamed keys per command and ends the `ingest sessions` group with 'and so on', so the exact renamed keys (malformed_records, skipped_unchanged, sessions_normalized, runs_written, events_written, rows_skipped, workspace_label, project_key, parent_run_id) are no longer stated anywhere; the old notes listed them. Either list them or, better, state the rule once ('every report, error and --input key is now camelCase: snake_case `foo_bar` becomes `fooBar`; the one non-mechanical rename is `out` -> `output` in the export manifest; `policy.*` keys of `canon context` keep policy.yaml's snake_case') and delete the per-command enumeration; that loses nothing a user must know. (2) Density: drop the reference-grade Added bullets that are not upgrade-relevant: the full new-error-code list (line 163, point to `canon schema --errors --json`), the `meta` and `error` field inventories (lines 144-145), the 41-leaf batch count, `MigrateReport.backupDir`/effects, `code_tree`/`worktree_dirty` record fields can be one line. Keep: Breaking items, renamed/removed error codes, exit changes, the Upgrading steps and tables.",
+  "worktree_dirty": true
+}

@@ -1,0 +1,59 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:31:24.689879Z",
+  "attachments": [
+    {
+      "case": "policy::tests::an_absent_require_review_resolves_to_none",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "policy::tests::an_empty_require_review_takes_every_default",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "policy::tests::a_malformed_require_review_poisons_the_section",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "policy::tests::each_require_review_field_resolves_independently",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "spec_coverage::tests::absent_require_review_reads_neither_reviews_nor_findings",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate require_review (an_absent_require_review_resolves_to_none, an_empty_require_review_takes_every_default, each_require_review_field_resolves_independently)"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 247,
+  "scenario_id": "gate.check.18",
+  "schema": 1,
+  "staging_id": "a2e21b89",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

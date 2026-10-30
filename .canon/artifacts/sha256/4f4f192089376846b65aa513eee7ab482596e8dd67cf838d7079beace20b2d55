@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="17" skipped="0" failures="0" errors="0" uuid="24d8e541-d24d-41ee-9864-e8b260aee12f" timestamp="2026-10-31T00:56:45.216+09:00" time="7.803">
+    <testsuite name="canon-cli::relay_approval" tests="13" skipped="0" errors="0" failures="0">
+        <testcase name="subject_lifecycle_50_the_guides_show_ask_and_record_with_the_relay_option" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.219+09:00" time="0.019"/>
+        <testcase name="subject_lifecycle_51_conditional_answers_are_revisions_and_no_guide_says_report_and_wait" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.219+09:00" time="2.553"/>
+        <testcase name="subject_lifecycle_48_brief_show_body_prints_the_bytes_and_the_digest_an_approval_records" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.219+09:00" time="4.501"/>
+        <testcase name="subject_lifecycle_53_a_relayed_approval_with_a_wrong_or_missing_digest_writes_nothing" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.219+09:00" time="4.504"/>
+        <testcase name="subject_lifecycle_49_brief_show_body_refuses_an_unknown_change_and_an_unreadable_brief" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.219+09:00" time="4.532"/>
+        <testcase name="subject_lifecycle_54_a_relayed_approval_without_name_answer_actor_or_role_is_refused" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.242+09:00" time="4.743"/>
+        <testcase name="subject_lifecycle_56_a_relayed_policy_approval_records_its_relay_and_refuses_like_the_brief" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:47.774+09:00" time="2.503"/>
+        <testcase name="subject_lifecycle_55_an_agent_role_without_the_relay_option_is_human_only_and_the_hint_names_the_procedure" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:47.773+09:00" time="2.637"/>
+        <testcase name="subject_lifecycle_52_a_relayed_approval_of_two_briefs_marks_both_lines_and_status_and_show_name_it" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:45.219+09:00" time="5.926"/>
+        <testcase name="subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:49.729+09:00" time="1.981"/>
+        <testcase name="subject_lifecycle_60_without_the_key_relaying_is_allowed_and_init_shows_it_commented" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:49.752+09:00" time="2.234"/>
+        <testcase name="subject_lifecycle_58_old_approved_lines_read_as_before_and_the_marker_is_outside_the_digest" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:49.724+09:00" time="2.757"/>
+        <testcase name="subject_lifecycle_57_the_relay_option_of_migrate_is_never_ignored" classname="canon-cli::relay_approval" timestamp="2026-10-31T00:56:49.721+09:00" time="2.947"/>
+    </testsuite>
+    <testsuite name="canon-cli::divergence_accept" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="divergence_lifecycle_15_a_relayed_acceptance_without_name_or_answer_or_with_relay_denied_writes_nothing" classname="canon-cli::divergence_accept" timestamp="2026-10-31T00:56:45.219+09:00" time="2.554"/>
+        <testcase name="divergence_lifecycle_14_a_relayed_acceptance_records_the_relay_the_approver_and_the_answer" classname="canon-cli::divergence_accept" timestamp="2026-10-31T00:56:45.219+09:00" time="4.510"/>
+    </testsuite>
+    <testsuite name="canon-cli::dashboard_briefs" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="subject_lifecycle_52_the_briefs_list_carries_the_relayed_approvals" classname="canon-cli::dashboard_briefs" timestamp="2026-10-31T00:56:45.219+09:00" time="4.623"/>
+    </testsuite>
+    <testsuite name="canon-cli::brief_format" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="subject_lifecycle_57_a_relayed_migrate_commit_records_the_relay_in_the_backup_journal" classname="canon-cli::brief_format" timestamp="2026-10-31T00:56:45.219+09:00" time="7.800"/>
+    </testsuite>
+</testsuites>

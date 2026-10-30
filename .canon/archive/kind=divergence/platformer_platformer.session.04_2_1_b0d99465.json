@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:35:50.451902Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/render/PixiStage.tsx:28-32 assigns app before awaiting loadTextures. If unmount/HMR occurs during that await, cleanup destroys the Application and nulls its stage/renderer; the cancelled continuation then calls application.destroy(true) a second time, which throws while destroying the null stage. Centralize teardown behind an idempotent owner and fully destroy children/textures once.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 2,
+  "scenario_id": "platformer.session.04",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

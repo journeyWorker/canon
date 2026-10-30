@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T16:02:08.016921Z",
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "kind": "review",
+  "pin": "8aaab8716f8204498862568ed937f9fd8b056272",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:subject_lifecycle_57_a_relayed_migrate_commit_records_the_relay_in_the_backup_journal",
+          "junit:subject_lifecycle_57_the_relay_option_of_migrate_is_never_ignored"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "81e14bc456d8d711441b5e5a7eaa0678705474687b9e5ae12be9d4bc8ffa43dc",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-relay-approval/brief.md"
+  },
+  "review_id": "01M66RR30G1HNNR53CK0Y1HHRE",
+  "reviewer": "rev-relay",
+  "reviewer_harness": "omp",
+  "scenario_id": "subject.lifecycle.57",
+  "schema": 2,
+  "worktree_dirty": false
+}

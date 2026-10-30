@@ -1,4 +1,4 @@
-canon 0.31.0
+canon 0.32.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: <none>
@@ -10,7 +10,7 @@ subjects (1):
   building (1):
     cart: 1 scenarios, 1 evidenced, 1 reviewed, 1 open blockers
       brief: approved in .canon/changes/c-cart/brief.md — Journey 2026-10-08 — "approved, go ahead"
-      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, the human re-approves with `canon brief approve c-cart --approver <their name> --note "<their words>"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it
+      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, show the human the brief (`canon brief show c-cart --body`), ask them, and on their explicit approval record it with `canon brief approve c-cart --approver <their name> --note "<their words>" --relayed-via <the question tool> --actor <your actor id> --digest c-cart=<the digest shown>` (or the human approves on `canon dashboard`); never unset your role to run it
 
 unowned: none
 

@@ -169,7 +169,7 @@ fn subject_lifecycle_42_every_tagged_change_must_be_approved_in_either_order() {
         assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
         let err = stderr(&out);
         assert!(err.contains(".canon/changes/a/brief.md") && err.contains(".canon/changes/b/brief.md"), "{err}");
-        assert!(err.contains("`canon brief approve a b --approver <their name> --note \"<their words>\"`"), "one call with both ids: {err}");
+        assert!(err.contains("`canon brief approve a b --approver <their name> --note \"<their words>\" --relayed-via <the question tool>"), "one call with both ids: {err}");
 
         approve_all(repo, &[first]);
         let out = ship(repo, "s");

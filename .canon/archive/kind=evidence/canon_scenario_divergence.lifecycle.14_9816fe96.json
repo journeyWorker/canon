@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-relay",
+    "role": "implementer",
+    "session_id": "s-0-32-relay-impl"
+  },
+  "at": "2026-10-30T12:50:58.379738Z",
+  "code_tree": "b3a3d3ce8f98f5100738c6e7f4f7f16f057b5044",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test divergence_accept divergence_lifecycle_14"
+  },
+  "evidence_note": {
+    "summary": "passes; cargo test --workspace --locked, clippy -D warnings (3 lines) and check-release-workflow-safety.py green"
+  },
+  "evidence_sha": "2592417f32d1d71d54c8eb68d3e043e56ea796c2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 53,
+  "scenario_id": "divergence.lifecycle.14",
+  "schema": 1,
+  "staging_id": "d4afe3b1",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-repin",
+    "role": "reviewer",
+    "session_id": "s-0-32-repin"
+  },
+  "at": "2026-10-30T14:35:40.278856Z",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "kind": "review",
+  "pin": "d5d25d10fb07c83798ba760daffacf5a8165ba73",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:failure_class::tests::all_has_exactly_eleven_classes_no_duplicates",
+          "junit:failure_class::tests::failure_classes_const_matches_enum_exactly",
+          "junit:failure_class::tests::serde_wire_form_matches_as_str",
+          "junit:failure_class::tests::violation_line_matches_parity_wire_format"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "55dccf6ce05204bf3ae56afc7e9e7b14f98aa2708ad7371b82533c70fa5c8e6b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66KSRVP9ST9GPMRDX5E00GC",
+  "reviewer": "rev-repin",
+  "scenario_id": "gate.check.04",
+  "schema": 2,
+  "worktree_dirty": true
+}

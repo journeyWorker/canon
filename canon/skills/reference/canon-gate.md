@@ -299,9 +299,9 @@ never rides along into a confirming audit. `--drop-attachment` and
 
 ### Nothing is attested before the brief is approved (`--override-reason`)
 
-The approval is never assumed: the agent writes the brief, stops and
-reports it, and builds nothing for that scope until the human answers.
-`canon evidence add` is the backstop for that stop (0.16 M7). It
+The approval is never assumed: the agent writes the brief, shows it to the
+human and asks, and builds nothing for that scope until the human answers.
+`canon evidence add` is the backstop for that rule (0.16 M7). It
 refuses (exit `1`, nothing staged or stored) while a subject the record
 attests for has an enforced, unapproved brief: a change the record
 answers to (below) has a canon `.canon/changes/<change>/brief.md` with no `Approved:`
@@ -315,7 +315,7 @@ check `canon status` and the ship guard use; see
 
 ```stderr
 canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
-canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --approver <the human> --note "<their words>"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+canon evidence add: refused — stop and get the human's answer to the brief: nothing is built or attested for a subject before its brief is approved. Show it (`canon brief show --body`), ask with the harness question tool, and on their explicit approval record it with `canon brief approve --approver <their name> --note "<their words>" --relayed-via <the question tool> --actor <your actor id> --digest <change>=<the digest shown>` (or they approve on `canon dashboard`); never unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
 For a change from an external plan with no canon brief yet, the first

@@ -22,6 +22,9 @@ pub struct BriefShowArgs {
     /// The change to read (default: the repo's only live change)
     #[arg(value_parser = crate::subject::parse_change_id)]
     pub change_id: Option<ChangeId>,
+    /// Print the brief file's bytes as they are, then a last line with the approval digest `brief approve` would record (with --json: `body` and `digest` fields); what a human is shown before they answer
+    #[arg(long)]
+    pub body: bool,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
@@ -51,6 +54,15 @@ pub struct BriefApproveArgs {
     /// The human's own words
     #[arg(long, value_name = "TEXT")]
     pub note: String,
+    /// Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it
+    #[arg(long, value_name = "NAME")]
+    pub relayed_via: Option<String>,
+    /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
+    #[arg(long, value_name = "ACTOR_ID", requires = "relayed_via")]
+    pub actor: Option<String>,
+    /// With --relayed-via, the digest `canon brief show --body` showed the human, as `<change>=<sha256:digest>`, once per change; a brief whose digest differs is refused
+    #[arg(long = "digest", value_name = "DIGEST", requires = "relayed_via")]
+    pub digests: Vec<String>,
     /// The changes to approve, one answer for all, none written unless every one is approvable (default: the repo's only live change)
     #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]
     pub change_ids: Vec<ChangeId>,

@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-relay",
+    "role": "implementer",
+    "session_id": "s-0-32-relay-impl"
+  },
+  "at": "2026-10-30T15:57:10.487512Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_52_a_relayed_approval_of_two_briefs_marks_both_lines_and_status_and_show_name_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-relay-junit.xml",
+      "sha256": "4f4f192089376846b65aa513eee7ab482596e8dd67cf838d7079beace20b2d55"
+    },
+    {
+      "case": "subject_lifecycle_52_the_briefs_list_carries_the_relayed_approvals",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-relay-junit.xml",
+      "sha256": "4f4f192089376846b65aa513eee7ab482596e8dd67cf838d7079beace20b2d55"
+    }
+  ],
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-32-relay-junit.xml"
+  },
+  "evidence_sha": "f4cc412a20bcff010c059b580e52419631759130",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 255,
+  "scenario_id": "subject.lifecycle.52",
+  "schema": 1,
+  "staging_id": "45485727",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

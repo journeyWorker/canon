@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-relay",
+    "role": "reviewer",
+    "session_id": "s-0-32-relay-rev"
+  },
+  "at": "2026-10-30T15:52:25.773151Z",
+  "change_id": "canon-0-32-relay-approval",
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "disposition": "fixed",
+  "file_ref": "canon/skills/reference/role-planner.md:255-261",
+  "introduced_by": "0decd2bf68edbf6940c36c538e4e0e5f98997413",
+  "kind": "finding",
+  "resolution_code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "resolution_sha": "639d675389e29f757b9d83d77fb9be87470b0692",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "cb4bd244d26cb31c7f7baa11f072f9b927d59c01",
+  "reviewer": "rev-relay",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.50"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Guide gap (F1: 'each harness names how it shows the body'): the omp instruction 'redirect to out://' omits that out:// is off for subagents and non-TUI sessions (omp: `out:// is off in this session`, the redirect then errors) and caps a reply at 64 KiB, and does not say to fall back to leaving the tool output visible there; a planner spawned as a subagent or a brief over 64 KiB hits it. In the same planner/orchestrator flow, a subagent has no ask tool either, so the guide should say the orchestrator relays.",
+  "worktree_dirty": false
+}

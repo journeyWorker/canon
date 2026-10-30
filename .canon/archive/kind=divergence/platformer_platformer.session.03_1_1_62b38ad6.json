@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:35:19.571318Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/App.tsx:32-42 only transitions playing -> levelComplete. Pressing R after a win makes GameSimulation.restartLevel reset the simulation, but App remains on the levelComplete overlay, so the player moves invisibly underneath and the required second play/restart cycle is blocked. Route R through App or transition levelComplete -> playing when restart clears completion.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 1,
+  "scenario_id": "platformer.session.03",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

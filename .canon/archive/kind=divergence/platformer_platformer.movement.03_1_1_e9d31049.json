@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:35:13.743260Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/engine/simulation.ts:151 clears jumpBuffered after every render tick even when accumulator < FIXED_DT and no simulation step ran. At 120/144 Hz, a jump captured on a zero-step frame is discarded before the next fixed step, making jump/coyote/buffer input intermittently fail and breaking traversal. Preserve the edge flag until at least one fixed step consumes it.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 1,
+  "scenario_id": "platformer.movement.03",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

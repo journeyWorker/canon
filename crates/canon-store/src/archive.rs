@@ -702,7 +702,7 @@ mod tests {
     fn divergences_keep_the_fold_winner_and_the_latest_acceptance() {
         let dir = tempfile::tempdir().unwrap();
         let tier = ledger(&dir);
-        let accepted = DivergenceStatus::Accepted { reason: "known".into(), tracking: "ISSUE-1".into(), expiry: None, evidence: Vec::new(), checks: None };
+        let accepted = DivergenceStatus::Accepted { reason: "known".into(), tracking: "ISSUE-1".into(), expiry: None, evidence: Vec::new(), checks: None, relay: None };
         tier.write(&divergence(1, DivergenceStatus::Open, 0)).unwrap();
         tier.write(&divergence(2, accepted, 10)).unwrap();
         tier.write(&divergence(3, DivergenceStatus::StillDivergent, 20)).unwrap();

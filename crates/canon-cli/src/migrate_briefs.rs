@@ -444,7 +444,7 @@ impl Plan {
         let approvals = self.briefs.iter().filter(|b| b.rebind_approval).count();
         let mut out = vec![if self.rebinds() {
             format!(
-                "canon migrate: briefs — this plan re-binds {approvals} `Approved:` line(s) and {} review pin(s); `--commit` is the human's (HUMAN_ONLY for every agent role), a preview is open to all",
+                "canon migrate: briefs — this plan re-binds {approvals} `Approved:` line(s) and {} review pin(s); `--commit` is the human's (HUMAN_ONLY for every agent role unless it records their explicit answer with --relayed-via), a preview is open to all",
                 self.reviews.len()
             )
         } else {
@@ -616,6 +616,10 @@ struct Journal {
     complete: bool,
     briefs: Vec<JournalBrief>,
     reviews: Vec<JournalReview>,
+    /// Set when an agent committed the plan for a human (0.32): its role,
+    /// actor and tool, and the human's name and answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    relay: Option<canon_model::ApprovalRelay>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -664,7 +668,7 @@ pub fn resume_backup(repo: &Path) -> Option<PathBuf> {
 /// Writes the plan (module doc): the journal first, the reviews, then the
 /// briefs, the journal complete last. Each step is skipped when it is
 /// already done, so a repeat after a stop finishes the rest.
-pub fn apply(repo: &Path, plan: &Plan, backup: &Path) -> Result<(), String> {
+pub fn apply(repo: &Path, plan: &Plan, backup: &Path, relay: Option<&canon_model::ApprovalRelay>) -> Result<(), String> {
     if !plan.writes() {
         // Nothing left to write: a stopped run whose work is all done is complete.
         if let Some(mut journal) = read_journal(backup).filter(|j| !j.complete) {
@@ -675,6 +679,9 @@ pub fn apply(repo: &Path, plan: &Plan, backup: &Path) -> Result<(), String> {
     }
     let mut journal = read_journal(backup).unwrap_or_default();
     journal.complete = false;
+    if relay.is_some() {
+        journal.relay = relay.cloned();
+    }
     for brief in &plan.briefs {
         if !journal.briefs.iter().any(|j| j.path == brief.path) {
             journal.briefs.push(JournalBrief {

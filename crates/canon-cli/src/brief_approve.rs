@@ -18,9 +18,10 @@
 //! Canon cannot tell a human from an agent running this command: the
 //! skill makes it a human stop, and `--note` carries their words.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
-use canon_model::ChangeId;
+use canon_model::{ApprovalRelay, ChangeId};
 use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -46,16 +47,30 @@ pub enum ApprovedTextError {
 }
 
 /// `text` approved: its `Approved:` lines replaced by one that binds the
-/// result's remaining text. `Err` when the line would not be read back
+/// result's remaining text. A `relay` (0.32) puts its marker before the
+/// digest, outside it. `Err` when the line would not be read back
 /// (the brief ends inside an open code fence or HTML comment).
-pub fn approved_text(text: &str, by: &str, when: &str, note: &str) -> Result<String, ApprovedTextError> {
+pub fn approved_text(text: &str, by: &str, when: &str, note: &str, relay: Option<&ApprovalRelay>) -> Result<String, ApprovedTextError> {
     let body = format!("{}\n\n", without_field(text, "Approved:").trim_end());
-    let value = format!("{by} {when} — \"{note}\" (brief {})", brief_digest(&body));
+    let value = format!("{by} {when} — \"{note}\"{} (brief {})", relay_part(relay), brief_digest(&body));
     let approved = format!("{body}Approved: {value}\n");
     if field(&approved, "Approved:") != Some(value.as_str()) || brief_digest(&approved) != brief_digest(&body) {
         return Err(ApprovedTextError::UnreadableLine);
     }
     Ok(approved)
+}
+
+/// ` (relayed by …)` for a relayed approval, nothing for the human's own.
+fn relay_part(relay: Option<&ApprovalRelay>) -> String {
+    relay.map(|r| format!(" {}", crate::relay::marker(r))).unwrap_or_default()
+}
+
+/// The digest `brief approve` records for the brief `text`: what `canon brief
+/// show --body` prints and a relayed approval names. It is the digest of the
+/// text without its `Approved:` lines, normalised the way the approval writes
+/// it (one blank line at the end), so trailing whitespace does not change it.
+pub fn approval_digest(text: &str) -> String {
+    brief_digest(&format!("{}\n\n", without_field(text, "Approved:").trim_end()))
 }
 
 /// What one approval recorded: the `brief approve --json` data of one id.
@@ -67,6 +82,9 @@ pub struct Approved {
     pub digest: String,
     pub approved_by: String,
     pub policy_approved: bool,
+    /// Set when an agent recorded the approval for the human (0.32).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay: Option<ApprovalRelay>,
 }
 
 impl Report for Approved {}
@@ -108,6 +126,9 @@ pub struct ApprovalEntry {
 pub struct ApprovedMany {
     pub approved_by: String,
     pub policy_approved: bool,
+    /// Set when an agent recorded the approvals for the human (0.32).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay: Option<ApprovalRelay>,
     pub approvals: Vec<ApprovalEntry>,
 }
 
@@ -138,6 +159,7 @@ fn hint_for(code: &str) -> &'static str {
         "BRIEF_APPROVE_REFUSED" => "run `canon brief check`, clear the blockers it lists, then ask the human to approve",
         "BRIEF_UNAPPROVABLE" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
         "BRIEF_UNREADABLE" => "check that brief.md is a readable UTF-8 file, then run `canon brief approve` again",
+        "RELAY_DIGEST_MISMATCH" => "run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw",
         "POLICY_APPROVAL_FAILED" => "check that .canon/policy.yaml is readable and writable, then run `canon brief approve` again",
         _ => "check that the change's brief.md is writable, then run `canon brief approve` again",
     }
@@ -151,6 +173,15 @@ fn refuse(code: &'static str, message: &str, exit: u8) -> CliError {
 /// sends back to say which file it showed.
 pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+/// How a call records its approval beyond the human's own: the relay (0.32)
+/// and, for a relay, the digest of each brief the human was shown.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Opts<'a> {
+    pub relay: Option<&'a ApprovalRelay>,
+    /// `change id -> shown digest`; required for every id of a relayed call.
+    pub shown: Option<&'a BTreeMap<String, String>>,
 }
 
 /// One id of a call, and the sha256 of the brief file the caller showed the
@@ -175,9 +206,12 @@ struct Checked {
 /// the brief exists and reads, `canon brief check` has no blocker, the page's
 /// copy (when there is one) is the file, and an `Approved:` line can be
 /// appended where it will be read.
-fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved: bool) -> Result<Checked, CliError> {
+fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved: bool, opts: Opts<'_>) -> Result<Checked, CliError> {
     let checked = check(repo, item.change)?;
     let path = repo.join(&checked.brief);
+    if let Some(shown) = opts.shown {
+        verify_shown(&checked.change, &checked.brief, &path, shown)?;
+    }
     if let Some(expected) = item.expected_sha256 {
         verify_bytes(&checked.brief, std::fs::read(&path).ok().as_deref(), expected)?;
     }
@@ -199,11 +233,25 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
     }
     // The same approval again, by the same human, on a brief and a policy
     // that already carry it: nothing to write.
-    let unchanged = already_approved_so(&text, by, note) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note)).is_some());
+    let unchanged = already_approved_so(&text, by, note, opts.relay) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note), opts.relay).is_some());
     if !unchanged {
-        approved_text(&text, by, "1970-01-01T00:00:00Z", note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &format!("{}: {e}", checked.brief), EXIT_REFUSED))?;
+        approved_text(&text, by, "1970-01-01T00:00:00Z", note, opts.relay).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &format!("{}: {e}", checked.brief), EXIT_REFUSED))?;
     }
     Ok(Checked { change: checked.change, brief: checked.brief, path, text, unchanged })
+}
+
+/// `Err` unless the digest the human was shown for `change` (`shown`) is the
+/// digest of the brief file now: a relayed approval is of what they read.
+fn verify_shown(change: &ChangeId, brief: &str, path: &Path, shown: &BTreeMap<String, String>) -> Result<(), CliError> {
+    let Some(digest) = shown.get(change.as_str()) else {
+        return Err(CliError::refused("USAGE", format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", change.as_str())).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")));
+    };
+    let text = std::fs::read_to_string(path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{brief}`: {e}"), EXIT_ERROR))?;
+    let now = approval_digest(&text);
+    if digest.eq_ignore_ascii_case(&now) {
+        return Ok(());
+    }
+    Err(CliError::refused("RELAY_DIGEST_MISMATCH", format!("{brief} is {now} now, but the human was shown {digest}; the human must answer for the brief as it is, so nothing was recorded")).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")))
 }
 
 /// The answer's own two lines, trimmed: refused up front, for every id alike.
@@ -221,19 +269,19 @@ fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
 }
 
 /// Writes one approved brief (and, first, the policy approval) at `when`.
-fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, policy_approved: bool) -> Result<Approved, CliError> {
-    let approved = approved_text(&checked.text, by, when, note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e.to_string(), EXIT_REFUSED))?;
+fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, policy_approved: bool, relay: Option<&ApprovalRelay>) -> Result<Approved, CliError> {
+    let approved = approved_text(&checked.text, by, when, note, relay).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e.to_string(), EXIT_REFUSED))?;
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
     if policy_approved {
-        crate::policy_approval::record_at(repo, by, Some(note), when).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string(), EXIT_ERROR))?;
+        crate::policy_approval::record_at(repo, by, Some(note), when, relay).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string(), EXIT_ERROR))?;
     }
     std::fs::write(&checked.path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR))?;
-    Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved })
+    Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved, relay: relay.cloned() })
 }
 
-fn already(checked: Checked, by: &str, policy_approved: bool) -> Approved {
-    Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&checked.text), approved_by: by.to_string(), policy_approved }
+fn already(checked: Checked, by: &str, policy_approved: bool, relay: Option<&ApprovalRelay>) -> Approved {
+    Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&checked.text), approved_by: by.to_string(), policy_approved, relay: relay.cloned() }
 }
 
 /// The one approval: used by `canon brief approve` and by the dashboard's
@@ -251,12 +299,12 @@ pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, exp
 fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<(Approved, bool), CliError> {
     let (by, note) = answer(by, note)?;
     let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
-    let checked = check_one(repo, Item { change, expected_sha256 }, &by, &note, policy_approved)?;
+    let checked = check_one(repo, Item { change, expected_sha256 }, &by, &note, policy_approved, Opts::default())?;
     if checked.unchanged {
-        return Ok((already(checked, &by, policy_approved), true));
+        return Ok((already(checked, &by, policy_approved, None), true));
     }
     let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    write_one(repo, checked, &by, &note, &when, policy_approved).map(|approved| (approved, false))
+    write_one(repo, checked, &by, &note, &when, policy_approved, None).map(|approved| (approved, false))
 }
 
 /// The error of a call with several ids when any is refused (0.31): one
@@ -276,6 +324,7 @@ fn refused_many(refused: Vec<(String, CliError)>, total: usize) -> (CliError, Re
 pub struct Many {
     pub approved_by: String,
     pub policy_approved: bool,
+    pub relay: Option<ApprovalRelay>,
     pub entries: Vec<(ApprovalEntry, Option<Approved>)>,
     /// The first write failure, when one stopped the call.
     pub failure: Option<CliError>,
@@ -288,6 +337,12 @@ pub struct Many {
 /// exactly as one id is; a write failure (exit 1) leaves the ids already
 /// written approved and skips the rest. A repeated id counts once.
 pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Result<Many, (CliError, Option<Refused>)> {
+    approve_all_with(repo, items, by, note, Opts::default())
+}
+
+/// [`approve_all`] with [`Opts`]: a relayed call (0.32) writes the marker and
+/// refuses an id whose shown digest is missing or differs.
+pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, opts: Opts<'_>) -> Result<Many, (CliError, Option<Refused>)> {
     let (by, note) = answer(by, note).map_err(|e| (e, None))?;
     let mut distinct: Vec<Item<'_>> = Vec::new();
     for item in items {
@@ -299,7 +354,7 @@ pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Res
     let mut checked: Vec<Checked> = Vec::new();
     let mut refused: Vec<(String, CliError)> = Vec::new();
     for item in &distinct {
-        match check_one(repo, *item, &by, &note, policy_approved) {
+        match check_one(repo, *item, &by, &note, policy_approved, opts) {
             Ok(one) => checked.push(one),
             Err(e) => refused.push((item.change.map_or_else(|| "<the only live change>".to_string(), |c| c.as_str().to_string()), e)),
         }
@@ -322,12 +377,12 @@ pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Res
             continue;
         }
         if one.unchanged {
-            let done = already(one, &by, policy_approved);
+            let done = already(one, &by, policy_approved, opts.relay);
             entries.push((ApprovalEntry { change, outcome: Outcome::Unchanged, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done)));
             continue;
         }
         let brief = one.brief.clone();
-        match write_one(repo, one, &by, &note, &when, policy_approved) {
+        match write_one(repo, one, &by, &note, &when, policy_approved, opts.relay) {
             Ok(done) => entries.push((ApprovalEntry { change, outcome: Outcome::Written, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done))),
             Err(e) => {
                 entries.push((ApprovalEntry { change, outcome: Outcome::Failed, brief: Some(brief), digest: None, error: Some(e.message.clone()) }, None));
@@ -335,7 +390,7 @@ pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Res
             }
         }
     }
-    Ok(Many { approved_by: by, policy_approved, entries, failure })
+    Ok(Many { approved_by: by, policy_approved, relay: opts.relay.cloned(), entries, failure })
 }
 
 /// The findings that stop an approval: blockers, coverage rules excluded.
@@ -354,10 +409,24 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
 /// `canon brief approve`. Returns the process exit code. One id (or none: the
 /// only live change) prints what it always printed; several print one entry
 /// each.
-pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json: bool) -> u8 {
+pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, relay: Option<&ApprovalRelay>, shown: &BTreeMap<String, String>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
+    if relay.is_some() {
+        // Every id names the digest its brief showed, and nothing else: refused before any brief is read.
+        let missing = changes.iter().find(|c| !shown.contains_key(c.as_str()));
+        let stray = shown.keys().find(|k| !changes.is_empty() && !changes.iter().any(|c| c.as_str() == k.as_str()));
+        let refusal = match (missing, stray) {
+            (Some(c), _) => Some(format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", c.as_str())),
+            (_, Some(k)) => Some(format!("--digest names `{k}`, which is not one of the changes approved")),
+            _ => None,
+        };
+        if let Some(message) = refusal {
+            return CliError::refused("USAGE", message).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")).emit("canon brief approve", json);
+        }
+    }
     let items: Vec<Item<'_>> = if changes.is_empty() { vec![Item { change: None, expected_sha256: None }] } else { changes.iter().map(|change| Item { change: Some(change), expected_sha256: None }).collect() };
-    let many = match approve_all(&repo, &items, by, note) {
+    let opts = Opts { relay, shown: relay.map(|_| shown) };
+    let many = match approve_all_with(&repo, &items, by, note, opts) {
         Ok(many) => many,
         Err((e, Some(data))) if json => return e.emit_with_data("canon brief approve", true, &data),
         Err((e, _)) => return e.emit("canon brief approve", json),
@@ -370,7 +439,8 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json
         if !json {
             let policy = if approved.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
             let verb = if unchanged { "already approved, unchanged" } else { "approved" };
-            println!("canon brief approve: {} {verb} by `{}` ({}){policy}", approved.brief, approved.approved_by, approved.digest);
+            let via = approved.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
+            println!("canon brief approve: {} {verb} by `{}`{via} ({}){policy}", approved.brief, approved.approved_by, approved.digest);
         }
         crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, approved);
         return 0;
@@ -382,7 +452,7 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json
     if all_unchanged {
         crate::json_out::mark_unchanged();
     }
-    let report = ApprovedMany { approved_by: many.approved_by.clone(), policy_approved: many.policy_approved, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
+    let report = ApprovedMany { approved_by: many.approved_by.clone(), policy_approved: many.policy_approved, relay: many.relay.clone(), approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
     if !json {
         let policy = match (report.policy_approved, &many.failure) {
             (true, None) => "; policy approval recorded too",
@@ -397,7 +467,8 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json
             };
             println!("canon brief approve: {} {what} by `{}`{}", entry.change, report.approved_by, entry.error.as_ref().map(|e| format!(" — {e}")).unwrap_or_default());
         }
-        println!("canon brief approve: {} change(s){policy}", report.approvals.len());
+        let via = report.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
+        println!("canon brief approve: {} change(s){via}{policy}", report.approvals.len());
     }
     if let Some(e) = many.failure {
         let named = report.approvals.iter().map(|entry| format!("`{}` {}", entry.change, match entry.outcome { Outcome::Written => "written", Outcome::Unchanged => "unchanged", Outcome::Failed => "failed", Outcome::Skipped => "skipped" })).collect::<Vec<_>>().join(", ");
@@ -411,9 +482,9 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json
 /// Whether `text` already carries an `Approved:` line by `by` with `note`
 /// that binds the brief's current body: the line a repeat of the same
 /// approval would write, up to the time it was written.
-fn already_approved_so(text: &str, by: &str, note: &str) -> bool {
+fn already_approved_so(text: &str, by: &str, note: &str, relay: Option<&ApprovalRelay>) -> bool {
     let body = format!("{}\n\n", without_field(text, "Approved:").trim_end());
-    let tail = format!(" — \"{note}\" (brief {})", brief_digest(&body));
+    let tail = format!(" — \"{note}\"{} (brief {})", relay_part(relay), brief_digest(&body));
     field(text, "Approved:")
         .and_then(|value| value.strip_prefix(by))
         .and_then(|value| value.strip_prefix(' '))
@@ -427,7 +498,7 @@ mod tests {
 
     #[test]
     fn a_brief_ending_inside_a_fence_is_refused_in_its_old_words() {
-        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok").unwrap_err();
+        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None).unwrap_err();
         assert_eq!(error.to_string(), "the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first");
     }
 }

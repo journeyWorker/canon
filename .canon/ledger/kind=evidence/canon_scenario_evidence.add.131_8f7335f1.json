@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-changelog",
+    "role": "implementer",
+    "session_id": "s-0-32-changelog-impl"
+  },
+  "at": "2026-10-30T13:29:34.498500Z",
+  "attachments": [
+    {
+      "case": "evidence_add_131_every_governing_change_of_the_subject_is_checked",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    },
+    {
+      "case": "evidence_add_131_is_refused_when_a_brief_it_judges_is_old_format_and_an_override_does_not_waive_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-changelog-junit.xml",
+      "sha256": "fe63c4ba113bb08b4004625a5d55771e2e8df35d56d41e35718430b8edc2c0ca"
+    }
+  ],
+  "code_tree": "31c05f0a84077d4671b27f24b63e1c6d7b56337a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-32-changelog-junit.xml"
+  },
+  "evidence_sha": "703994368d0b26994d4ad2c9aa9cabd36cad2875",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 404,
+  "scenario_id": "evidence.add.131",
+  "schema": 1,
+  "staging_id": "175c60bd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

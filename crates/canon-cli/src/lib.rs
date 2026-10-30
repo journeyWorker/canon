@@ -54,6 +54,7 @@ pub mod paging;
 pub mod plans;
 pub mod plugin_sync;
 pub mod policy_approval;
+pub mod relay;
 pub mod policy_level;
 pub mod query;
 pub mod references;

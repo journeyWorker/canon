@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-30T11:43:27.932083Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill",
+    "canon-0-30-ledger-naming",
+    "canon-0-31-cli-ids",
+    "canon-0-32-relay-approval"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-32-orch"
+    },
+    "change": "canon-0-32-relay-approval",
+    "reason": "0.32: canon-0-32-changelog-just / canon-0-32-relay-approval adopted and approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-32-orch"
+    },
+    "reason": "0.32: canon-0-32-changelog-just / canon-0-32-relay-approval adopted and approved"
+  },
+  "subject_id": "divergence-lifecycle",
+  "summary": "",
+  "title": "Divergence: stage, promote, resolve, expire"
+}

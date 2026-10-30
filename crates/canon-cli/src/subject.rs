@@ -1098,8 +1098,8 @@ pub fn run_move(
             }
             if brief_gap.is_some() {
                 fixes.push(match &approve_call {
-                    Some(call) => format!("get the human's answer to the briefs; the human records them all with one call: {call}"),
-                    None => "get the human's answer to the brief; the human records it with `canon brief approve` in their own shell".to_string(),
+                    Some(call) => format!("get the human's answer to the briefs; {call}"),
+                    None => "get the human's answer to the brief (show it with `canon brief show --body`, ask, and record an explicit approval with `canon brief approve --relayed-via <tool>`)".to_string(),
                 });
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();

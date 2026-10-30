@@ -398,7 +398,7 @@ fn markdown_commands(spec_root: &Path) -> Vec<Cmd> {
     let mut out = Vec::new();
     for path in doc_gen::doc_files() {
         let rel = doc_gen::rel_of(&path);
-        if rel == "README.md" {
+        if rel == "CHANGELOG.md" {
             continue;
         }
         let text = fs::read_to_string(&path).expect("read doc");

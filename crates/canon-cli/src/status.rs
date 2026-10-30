@@ -1244,7 +1244,7 @@ fn subject_steps(
                 next.push(NextStep {
                     actor: StepActor::Human,
                     role: None,
-                    command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
+                    command: format!("show the pending draft's brief in {} to the human and ask; {id} is not blocked meanwhile", brief.report_in()),
                     why: format!(
                         "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship do not read it until the human approves it or a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; {}",
                         brief.unanswered(),
@@ -1284,7 +1284,7 @@ fn subject_steps(
             actor: StepActor::Human,
             role: None,
             command: format!(
-                "stop and report the brief in {places}; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)"
+                "show the brief in {places} to the human (`canon brief show <change> --body`) and ask; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)"
             ),
             why: format!(
                 "{id}: {named} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged {tagged} and {changes}'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; {} (one call records the brief and the policy approval)",

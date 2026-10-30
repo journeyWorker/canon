@@ -1,0 +1,17 @@
+{
+  "actor": {
+    "agent_id": "review-voice",
+    "role": "review"
+  },
+  "at": "2026-07-14T20:35:34.990753Z",
+  "detail": "SHIP-BLOCKER examples/platformer/src/engine/records.ts:24-29 accepts any truthy best value and any numeric unlockedLevel as valid schema-v1 progress. Corrupt but parseable JSON such as best='oops' reaches progress.best[key] assignment and throws on level completion; extreme/non-finite unlockedLevel can also make Array.from fail. Validate finite bounded integers, a plain best object, and each record's numeric fields before exposing the data.",
+  "kind": "divergence",
+  "project_id": "platformer",
+  "reviewer": "review-voice",
+  "round": 1,
+  "run_seq": 2,
+  "scenario_id": "platformer.levels.02",
+  "schema": 1,
+  "sha": "0c32f3f709a8a845980f87c895b279839a9a693a",
+  "status": "open"
+}

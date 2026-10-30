@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-relay",
+    "role": "implementer",
+    "session_id": "s-0-32-relay-impl"
+  },
+  "at": "2026-10-30T15:57:13.553965Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_54_a_relayed_approval_without_name_answer_actor_or_role_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-32-relay-junit.xml",
+      "sha256": "4f4f192089376846b65aa513eee7ab482596e8dd67cf838d7079beace20b2d55"
+    }
+  ],
+  "code_tree": "c45a89c249b08bb6c24770419bf23d40f4295bd5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-32-relay-junit.xml"
+  },
+  "evidence_sha": "f4cc412a20bcff010c059b580e52419631759130",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 257,
+  "scenario_id": "subject.lifecycle.54",
+  "schema": 1,
+  "staging_id": "a161582d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

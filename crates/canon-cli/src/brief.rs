@@ -37,6 +37,12 @@
 //! answer. A line with no digest (written before 0.19) stays approved
 //! ([`BriefStatus::legacy_approval`]); status advises re-approving it.
 //!
+//! # A relayed approval (0.32)
+//! An agent may record the human's answer for them ([`crate::relay`]); the
+//! line then carries `(relayed by <role> <actor> via <tool>)` before the
+//! digest, outside it, and [`BriefStatus::relay`] reads it back. A line
+//! without the marker is the human's own.
+//!
 //! # Canon never writes into an external plan (0.17 D3)
 //! The approval is read only from that canon `brief.md`. A change
 //! `canon change new` wrote has its brief there already. A change
@@ -208,6 +214,10 @@ pub struct BriefStatus {
     /// The approval line's text after `Approved:`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval: Option<String>,
+    /// Set when an agent recorded the approval for the human (0.32): the
+    /// `(relayed by …)` marker of the approval line, read back.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay: Option<canon_model::ApprovalRelay>,
     /// The brief changed after its approval (0.19 D3): the line's digest
     /// no longer matches, so it is not approved and `canon brief approve`
     /// must run again.
@@ -259,7 +269,7 @@ impl BriefStatus {
     /// The re-approval advice for a digest-less or changed approval: the human's call, never the agent's.
     pub fn record_digest_hint(&self) -> String {
         format!(
-            "the human re-approves with `canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it",
+            "show the human the brief (`canon brief show {0} --body`), ask them, and on their explicit approval record it with `canon brief approve {0} --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest {0}=<the digest shown>` (or the human approves on `canon dashboard`); never unset your role to run it",
             self.change.as_deref().unwrap_or("<change>")
         )
     }
@@ -270,10 +280,10 @@ impl BriefStatus {
         if self.changed {
             return self.record_digest_hint();
         }
-        let call = format!("`canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it", self.change.as_deref().unwrap_or("<change>"));
+        let call = format!("show the human the brief (`canon brief show {0} --body`), ask them, and on their explicit approval record it with `canon brief approve {0} --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id> --digest {0}=<the digest shown>` (or the human approves on `canon dashboard`); never unset your role to run it", self.change.as_deref().unwrap_or("<change>"));
         match (self.brief_exists, &self.source) {
-            (false, Some(source)) => format!("create {brief} holding a `Source: {source}` line; when they answer, the human records it with {call}"),
-            _ => format!("when they answer, the human records it with {call}"),
+            (false, Some(source)) => format!("create {brief} holding a `Source: {source}` line; when they answer, {call}"),
+            _ => format!("when they answer, {call}"),
         }
     }
 }
@@ -327,6 +337,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             brief_exists: false,
             source: None,
             approval: None,
+            relay: None,
             changed: false,
             legacy_approval: false,
             findings: None,
@@ -351,6 +362,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief: Some(rel(repo, &path)),
                 brief_exists: true,
                 source: field(&text, "Source:").map(str::to_string),
+                relay: approval.as_deref().and_then(crate::relay::parse_marker),
                 approval,
                 changed: matches!(verdict, Approval::Changed { .. }),
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
@@ -370,6 +382,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: Some(rel(repo, &proposal)),
                 approval: None,
+                relay: None,
                 changed: false,
                 legacy_approval: false,
                 findings: None,
@@ -387,6 +400,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: None,
                 approval: None,
+                relay: None,
                 changed: false,
                 legacy_approval: false,
                 findings: None,
@@ -532,9 +546,9 @@ pub fn record_all(blockers: &[&BriefStatus]) -> String {
                 .collect::<Vec<_>>();
             let call = approve_all_call(many);
             if creates.is_empty() {
-                format!("when they answer, the human records them with {call}")
+                format!("when they answer, {call}")
             } else {
-                format!("{}; when they answer, the human records them with {call}", creates.join("; "))
+                format!("{}; when they answer, {call}", creates.join("; "))
             }
         }
     }
@@ -544,7 +558,7 @@ pub fn record_all(blockers: &[&BriefStatus]) -> String {
 /// hint of a refusal names it: one `canon brief approve <id>…` line.
 pub fn approve_all_call(blockers: &[&BriefStatus]) -> String {
     let ids = blockers.iter().filter_map(|b| b.change.as_deref()).collect::<Vec<_>>().join(" ");
-    format!("`canon brief approve {ids} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it")
+    format!("show the human each brief (`canon brief show <change> --body`), ask them, and on their explicit approval record it with `canon brief approve {ids} --approver <their name> --note \"<their words>\" --relayed-via <the question tool> --actor <your actor id>` and a `--digest <change>=<the digest shown>` for each (or the human approves on `canon dashboard`); never unset your role to run it")
 }
 
 /// When `subject` first adopted a change: the earliest of its own record

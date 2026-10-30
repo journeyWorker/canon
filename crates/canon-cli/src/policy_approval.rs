@@ -25,7 +25,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use canon_model::paths;
+use canon_model::{paths, ApprovalRelay};
 use schemars::JsonSchema;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,10 @@ pub struct PolicyApproval {
     pub approved_by: String,
     pub approved_at: String,
     pub note: Option<String>,
+    /// Set when an agent recorded the approval for the human (0.32): its role,
+    /// actor and the tool the human was asked with. Absent for the human's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay: Option<ApprovalRelay>,
 }
 
 /// What the approval file says about the policy in force.
@@ -176,6 +180,8 @@ pub struct PolicyShowReport<'a> {
     /// The digest the approval covers; differs from `policyDigest` when `state` is `changed`.
     pub approved_digest: Option<&'a str>,
     pub note: Option<&'a str>,
+    /// Set when an agent recorded the approval for the human.
+    pub relay: Option<&'a ApprovalRelay>,
     /// Why the approval is unreadable.
     pub detail: Option<&'a str>,
 }
@@ -191,6 +197,9 @@ pub struct PolicyApproveReport<'a> {
     pub approved_by: &'a str,
     pub approved_at: &'a str,
     pub approval: &'a str,
+    /// Set when an agent recorded the approval for the human.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay: Option<&'a ApprovalRelay>,
 }
 
 impl crate::reports::Report for PolicyApproveReport<'_> {}
@@ -218,6 +227,7 @@ pub fn run_show(repo: &Path, json: bool) -> u8 {
             approved_at: approval.map(|a| a.approved_at.as_str()),
             approved_digest: approval.map(|a| a.policy_digest.as_str()),
             note: approval.and_then(|a| a.note.as_deref()),
+            relay: approval.and_then(|a| a.relay.as_ref()),
             detail,
         };
         crate::json_out::data("policy show", &data);
@@ -233,6 +243,9 @@ pub fn run_show(repo: &Path, json: bool) -> u8 {
         if let Some(note) = &a.note {
             println!("note: {note}");
         }
+        if let Some(relay) = &a.relay {
+            println!("{}", crate::relay::describe(relay));
+        }
     }
     if let Some((closed, _)) = closed_failure(&repo) {
         println!("gate: fails closed ({}); {REAPPROVE_HINT}", closed.label());
@@ -242,9 +255,9 @@ pub fn run_show(repo: &Path, json: bool) -> u8 {
 
 /// The recorded approval when it already covers the policy's current bytes
 /// and says what a repeat of `by` with `note` would record, up to its time.
-pub fn matching_approval(repo: &Path, by: &str, note: Option<&str>) -> Option<PolicyApproval> {
+pub fn matching_approval(repo: &Path, by: &str, note: Option<&str>, relay: Option<&ApprovalRelay>) -> Option<PolicyApproval> {
     match approval_state(repo) {
-        ApprovalState::Approved(approval) if approval.approved_by == by && approval.note.as_deref() == note => Some(approval),
+        ApprovalState::Approved(approval) if approval.approved_by == by && approval.note.as_deref() == note && approval.relay.as_ref() == relay => Some(approval),
         _ => None,
     }
 }
@@ -278,13 +291,13 @@ pub enum PolicyApprovalError {
 /// repo root. `Err` carries the refusal (no policy to approve, an
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`
 /// and `canon brief approve`, which records both in one call.
-pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, PolicyApprovalError> {
-    record_at(repo, by, note, &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true))
+pub fn record(repo: &Path, by: &str, note: Option<&str>, relay: Option<&ApprovalRelay>) -> Result<PolicyApproval, PolicyApprovalError> {
+    record_at(repo, by, note, &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true), relay)
 }
 
 /// [`record`] at `approved_at` (an RFC 3339 time to the second): `canon brief
 /// approve` writes the brief and the policy approval with one time.
-pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str) -> Result<PolicyApproval, PolicyApprovalError> {
+pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str, relay: Option<&ApprovalRelay>) -> Result<PolicyApproval, PolicyApprovalError> {
     if by.trim().is_empty() {
         return Err(PolicyApprovalError::BlankApprover);
     }
@@ -298,7 +311,7 @@ pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str) -
     };
     // Approving what is approved already, by the same approver in the same words, writes nothing: the record keeps its time.
     if let ApprovalState::Approved(existing) = approval_state(repo) {
-        if existing.approved_by == by && existing.note.as_deref() == note {
+        if existing.approved_by == by && existing.note.as_deref() == note && existing.relay.as_ref() == relay {
             return Ok(existing);
         }
     }
@@ -306,6 +319,7 @@ pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str) -
         policy_digest: policy_digest(&policy),
         approved_by: by.to_string(),
         approved_at: approved_at.to_string(), note: note.map(str::to_string),
+        relay: relay.cloned(),
     };
     let approval_path = repo.join(paths::POLICY_APPROVAL_FILE);
     let mut body = serde_json::to_string_pretty(&approval).expect("a PolicyApproval always serializes");
@@ -317,11 +331,11 @@ pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str) -
 /// `canon policy approve`. Returns the process exit code: `0` written,
 /// `2` refused (no policy to approve, an empty `--approver`, or a write
 /// failure).
-pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> u8 {
+pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&ApprovalRelay>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
-    let existing = matching_approval(&repo, by, note);
+    let existing = matching_approval(&repo, by, note, relay);
     let unchanged = existing.is_some();
-    match existing.map_or_else(|| record(&repo, by, note), Ok) {
+    match existing.map_or_else(|| record(&repo, by, note, relay), Ok) {
         Ok(approval) => {
             if unchanged {
                 crate::json_out::mark_unchanged();
@@ -337,7 +351,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> u8 
                     crate::write_mode::DIRECT
                 );
             }
-            let data = PolicyApproveReport { policy: paths::POLICY_FILE, policy_digest: &approval.policy_digest, approved_by: &approval.approved_by, approved_at: &approval.approved_at, approval: paths::POLICY_APPROVAL_FILE };
+            let data = PolicyApproveReport { policy: paths::POLICY_FILE, policy_digest: &approval.policy_digest, approved_by: &approval.approved_by, approved_at: &approval.approved_at, approval: paths::POLICY_APPROVAL_FILE, relay: approval.relay.as_ref() };
             crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, &data);
             0
         }
@@ -354,12 +368,12 @@ mod tests {
     #[test]
     fn the_refusals_read_as_before() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(record(dir.path(), " ", None).unwrap_err().to_string(), "--approver must name who approved the policy");
-        let missing = record(dir.path(), "me", None).unwrap_err();
+        assert_eq!(record(dir.path(), " ", None, None).unwrap_err().to_string(), "--approver must name who approved the policy");
+        let missing = record(dir.path(), "me", None, None).unwrap_err();
         assert_eq!(missing.to_string(), format!("{} does not exist, so there is no policy to approve; `canon init` writes a starter policy", dir.path().join(paths::POLICY_FILE).display()));
         let unreadable = tempfile::tempdir().unwrap();
         fs::create_dir_all(unreadable.path().join(paths::POLICY_FILE)).unwrap();
-        let read = record(unreadable.path(), "me", None).unwrap_err();
+        let read = record(unreadable.path(), "me", None, None).unwrap_err();
         assert!(read.to_string().starts_with(&format!("cannot read {}: ", unreadable.path().join(paths::POLICY_FILE).display())), "{read}");
         assert!(std::error::Error::source(&read).is_some());
     }
@@ -375,7 +389,7 @@ mod tests {
     fn approval_tracks_the_policy_bytes() {
         let dir = repo_with_policy("spec_coverage: {}\n");
         assert_eq!(approval_state(dir.path()), ApprovalState::Unapproved);
-        assert_eq!(run_approve(dir.path(), "alice", Some("first look"), false), 0);
+        assert_eq!(run_approve(dir.path(), "alice", Some("first look"), None, false), 0);
         assert!(matches!(&approval_state(dir.path()), ApprovalState::Approved(a) if a.approved_by == "alice" && a.note.as_deref() == Some("first look")));
         assert_eq!(advisory(dir.path()), None);
 
@@ -387,7 +401,7 @@ mod tests {
     #[test]
     fn no_policy_is_refused_and_says_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(run_approve(dir.path(), "alice", None, false), 2);
+        assert_eq!(run_approve(dir.path(), "alice", None, None, false), 2);
         assert!(!dir.path().join(paths::POLICY_APPROVAL_FILE).exists());
         assert_eq!(advisory(dir.path()), None);
     }

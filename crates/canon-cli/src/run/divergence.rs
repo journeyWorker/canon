@@ -5,7 +5,7 @@ use crate::cli_error::CliError;
 use canon_model::ProjectId;
 use std::path::Path;
 use std::process::ExitCode;
-use super::{human_only, record_role};
+use super::record_role;
 use canon_model::RoleId;
 
 /// `--project` of a divergence leaf (D1): the one given, else the only
@@ -48,12 +48,15 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
             };
             ExitCode::from(crate::divergence::run_defer(crate::divergence::CommitArgs { repo: &repo, project_id: &project_id, scenario_id: &scenario_id, commit: &commit, round, reviewer: &actor_id, detail: "", actor_id: &actor_id, role: &role, session: session.session_id.as_ref(), json }, &reason, expiry))
         }
-        DivergenceCliCommand::Accept(DivergenceAcceptArgs { project_id, scenario_ids, reason, tracking, expiry, actor_id, role, session_id, repo, json, .. }) => {
+        DivergenceCliCommand::Accept(DivergenceAcceptArgs { project_id, scenario_ids, reason, tracking, expiry, actor_id, role, session_id, relayed_via, approver, note, repo, json, .. }) => {
             let ids: Vec<String> = scenario_ids.iter().map(ToString::to_string).collect();
             let call = format!("canon divergence accept {} --actor <their name> --session <their session> --reason \"<why>\" --tracking <ISSUE_URL>", ids.join(" "));
-            if let Err(code) = human_only("canon divergence accept", &call, json) {
-                return code;
-            }
+            let relay_call = format!("canon divergence accept {} --actor <your actor id> --session <your session> --reason \"<why>\" --tracking <ISSUE_URL> --approver <their name> --note \"<their own words>\" --relayed-via <the question tool>", ids.join(" "));
+            let root = crate::context::resolve_repo_root(&repo);
+            let relay = match crate::relay::authorize("canon divergence accept", &call, &relay_call, &root, crate::relay::Call { via: relayed_via.as_deref(), actor: Some(&actor_id), approver: approver.as_deref(), note: note.as_deref() }) {
+                Ok(relay) => relay.map(|relay| canon_model::ApprovalRelay { approver: approver.as_ref().map(|a| a.trim().to_string()), answer: note.as_ref().map(|n| n.trim().to_string()), ..relay }),
+                Err(e) => return ExitCode::from(e.emit("canon divergence accept", json)),
+            };
             let project_id = match project_for(&repo, project_id, "canon divergence accept", json) {
                 Ok(id) => id,
                 Err(code) => return code,
@@ -61,7 +64,7 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
             // A human accepts as the reviewer: with no declared role the attribution defaults to `reviewer`.
             let role = role.unwrap_or_else(|| RoleId::parse("reviewer").expect("a role name is a valid role id"));
             crate::inventory::refresh_stale_index(&repo, "canon divergence accept");
-            ExitCode::from(crate::divergence::run_accept(&repo, &crate::divergence::AcceptArgs { project_id, scenario_ids, reason, tracking, expiry, reviewer: actor_id.clone(), actor_id, role, session_id, json }))
+            ExitCode::from(crate::divergence::run_accept(&repo, &crate::divergence::AcceptArgs { project_id, scenario_ids, reason, tracking, expiry, reviewer: actor_id.clone(), actor_id, role, session_id, relay, json }))
         }
         DivergenceCliCommand::List(DivergenceListArgs { repo, as_of, json, page, fields }) => ExitCode::from(crate::divergence::run_list(&repo, as_of, json, &page.page(), fields.as_deref())),
     }
