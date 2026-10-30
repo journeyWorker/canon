@@ -1,0 +1,75 @@
+{
+  "actor": {
+    "agent_id": "rev-repin",
+    "role": "reviewer",
+    "session_id": "s-0-32-repin"
+  },
+  "at": "2026-10-30T14:35:40.278856Z",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "kind": "review",
+  "pin": "d5d25d10fb07c83798ba760daffacf5a8165ba73",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:spec_coverage::tests::a_blocker_on_a_shared_change_gates_every_subject_it_belongs_to",
+          "junit:spec_coverage::tests::a_corpus_kind_routed_off_the_read_rung_refuses_rather_than_passing_empty",
+          "junit:spec_coverage::tests::a_dangling_subject_link_is_reported_rather_than_skipped",
+          "junit:spec_coverage::tests::a_distinct_review_passes_and_an_excluded_lane_needs_none",
+          "junit:spec_coverage::tests::a_divergent_latest_verdict_is_mismatched_work",
+          "junit:spec_coverage::tests::a_new_blocker_after_an_unreviewed_only_waiver_is_a_violation",
+          "junit:spec_coverage::tests::a_new_unreviewed_scenario_after_a_waiver_is_a_violation",
+          "junit:spec_coverage::tests::a_pinned_review_counts_only_while_its_spec_and_evidence_are_current",
+          "junit:spec_coverage::tests::a_poisoned_policy_section_refuses_instead_of_passing",
+          "junit:spec_coverage::tests::a_resolved_divergence_is_not_mismatched_work",
+          "junit:spec_coverage::tests::a_resynced_scenario_is_judged_once_on_its_latest_generation",
+          "junit:spec_coverage::tests::a_review_by_the_evidence_actor_counts_only_without_distinct_actor",
+          "junit:spec_coverage::tests::a_review_from_an_evidence_session_does_not_count_and_a_missing_session_never_matches",
+          "junit:spec_coverage::tests::a_review_kind_routed_off_the_read_rung_refuses",
+          "junit:spec_coverage::tests::a_review_pinned_before_0_23_does_not_count_until_migrated",
+          "junit:spec_coverage::tests::a_review_pinned_before_any_evidence_turns_stale_when_evidence_arrives",
+          "junit:spec_coverage::tests::a_scenario_with_no_evidence_is_reported",
+          "junit:spec_coverage::tests::a_spec_pin_is_compared_like_for_like",
+          "junit:spec_coverage::tests::a_surface_with_only_happy_scenarios_is_reported_for_the_missing_case",
+          "junit:spec_coverage::tests::a_waived_subjects_recorded_gaps_are_advisories_not_violations",
+          "junit:spec_coverage::tests::absent_exclude_lanes_preserves_existing_coverage_behavior",
+          "junit:spec_coverage::tests::absent_require_review_reads_neither_reviews_nor_findings",
+          "junit:spec_coverage::tests::an_absent_policy_section_derives_nothing_even_with_an_unevidenced_corpus",
+          "junit:spec_coverage::tests::an_evidenced_scenario_is_clean",
+          "junit:spec_coverage::tests::an_excluded_failure_scenario_does_not_satisfy_its_surface",
+          "junit:spec_coverage::tests::an_excluded_lane_is_out_of_scope_after_subject_scope",
+          "junit:spec_coverage::tests::an_in_scope_scenario_without_a_review_is_unreviewed_promotion",
+          "junit:spec_coverage::tests::an_open_divergence_on_an_evidenced_scenario_is_mismatched_work",
+          "junit:spec_coverage::tests::an_unlinked_scenario_is_out_of_scope_only_when_a_scope_is_configured",
+          "junit:spec_coverage::tests::an_unlisted_lane_remains_in_scope",
+          "junit:spec_coverage::tests::an_unreadable_finding_blocks_as_malformed_evidence_naming_its_file",
+          "junit:spec_coverage::tests::evidence_without_a_project_id_does_not_cover_a_scenario",
+          "junit:spec_coverage::tests::invalidating_a_context_makes_the_next_read_see_a_changed_corpus",
+          "junit:spec_coverage::tests::one_scenario_is_never_double_counted",
+          "junit:spec_coverage::tests::only_a_latest_open_blocker_on_an_in_scope_subjects_change_is_open_blocker",
+          "junit:spec_coverage::tests::only_a_signed_latest_review_per_reviewer_qualifies",
+          "junit:spec_coverage::tests::require_evidence_false_is_also_silent",
+          "junit:spec_coverage::tests::scope_narrows_to_subjects_in_the_named_statuses",
+          "junit:spec_coverage::tests::subject_scenarios_follow_the_latest_tag_generation",
+          "junit:spec_coverage::tests::the_indexed_joins_match_a_scan_of_the_latest_generations",
+          "junit:spec_coverage::tests::the_latest_scenario_generation_decides_its_case",
+          "junit:spec_coverage::tests::unreadable_kinds_are_ignored_when_the_section_is_absent",
+          "junit:spec_coverage::tests::untagged_scenarios_satisfy_no_required_case"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "93d0b5576b51bfa5a0cfcdb9418559b30cabd49d1d1989de5607c5ab810841e6",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66KSRVP9ST9GPMRDX5E00GC",
+  "reviewer": "rev-repin",
+  "scenario_id": "gate.check.14",
+  "schema": 2,
+  "worktree_dirty": true
+}

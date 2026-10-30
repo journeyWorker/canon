@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-repin",
+    "role": "reviewer",
+    "session_id": "s-0-32-repin"
+  },
+  "at": "2026-10-30T14:35:40.278856Z",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "kind": "review",
+  "pin": "d5d25d10fb07c83798ba760daffacf5a8165ba73",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:dashboard::tests::report_dashboard_01_an_embedded_app_is_served_decompressed_to_a_browser_that_does_not_accept_gzip",
+          "junit:dashboard::tests::report_dashboard_01_an_embedded_app_is_served_gzip_to_a_browser_that_accepts_it",
+          "junit:dashboard::tests::report_dashboard_01_resolve_app_serves_the_checkout_build_only_for_canons_own_dashboard_package"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "28da25f31bc01e15ce42fcc6c32d67723d3d2087325ba5364e56ab5366dbc0fd",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66KSRVP9ST9GPMRDX5E00GC",
+  "reviewer": "rev-repin",
+  "scenario_id": "report.dashboard.01",
+  "schema": 2,
+  "worktree_dirty": true
+}

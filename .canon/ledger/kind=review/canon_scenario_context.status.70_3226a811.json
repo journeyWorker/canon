@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-repin",
+    "role": "reviewer",
+    "session_id": "s-0-32-repin"
+  },
+  "at": "2026-10-30T14:35:40.278856Z",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "kind": "review",
+  "pin": "d5d25d10fb07c83798ba760daffacf5a8165ba73",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step_is_the_reopen",
+          "junit:context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only_when_they_block"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bac98b587ba5e4baa91034c5caf0defae7bca00b791fa0b6e0b6ab08da4401ff",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-32-changelog-just/brief.md"
+  },
+  "review_id": "01M66KSRVP9ST9GPMRDX5E00GC",
+  "reviewer": "rev-repin",
+  "scenario_id": "context.status.70",
+  "schema": 2,
+  "worktree_dirty": true
+}
