@@ -368,6 +368,8 @@ pub struct AcceptArgs {
     pub actor_id: String,
     pub role: RoleId,
     pub session_id: Option<SessionId>,
+    /// Set when an agent records the acceptance for a human (0.32).
+    pub relay: Option<canon_model::ApprovalRelay>,
     pub json: bool,
 }
 
@@ -464,6 +466,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
                 expiry: args.expiry,
                 checks: Some(canon_gate::freshness::current_checks(&context, scenario)),
                 evidence: Vec::new(),
+                relay: args.relay.clone(),
             },
             round: 1,
             reviewer: &args.reviewer,

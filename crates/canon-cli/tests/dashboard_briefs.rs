@@ -312,6 +312,33 @@ fn report_dashboard_16_reads_sections_by_their_english_headings() {
     assert_eq!(ready["approvable"], false, "{ready}");
 }
 
+/// subject.lifecycle.52 (dashboard leg): a brief whose approval an agent
+/// relayed is listed under `relayed`, with who relayed it and through which
+/// tool, and is not listed as waiting.
+#[test]
+fn subject_lifecycle_52_the_briefs_list_carries_the_relayed_approvals() {
+    let dir = repo_with_briefs();
+    let repo = dir.path();
+    let shown = canon(repo, &["brief", "show", "ready", "--body"]);
+    let digest = String::from_utf8(shown.stdout).unwrap().lines().last().unwrap().strip_prefix("digest: ").unwrap().to_string();
+    let relayed = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["brief", "approve", "ready", "--approver", "Ana", "--note", "Go.", "--relayed-via", "ask", "--actor", "plan-1", "--digest", &format!("ready={digest}")])
+        .current_dir(repo)
+        .env("CANON_ROLE", "planner")
+        .output()
+        .unwrap();
+    assert!(relayed.status.success(), "{}", String::from_utf8_lossy(&relayed.stderr));
+    let live = serve(repo);
+    let list = get(&live, "/api/briefs").json();
+    let ids: Vec<&str> = list["data"]["briefs"].as_array().unwrap().iter().map(|b| b["changeId"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["blocked"], "ready is approved now: {list}");
+    let relayed = list["data"]["relayed"].as_array().unwrap();
+    assert_eq!(relayed.len(), 1, "settled was the human's own approval: {list}");
+    assert_eq!(relayed[0]["changeId"], "ready");
+    assert_eq!(relayed[0]["relay"], json!({ "role": "planner", "actor": "plan-1", "tool": "ask" }));
+    assert!(relayed[0]["approval"].as_str().unwrap().contains("(relayed by planner plan-1 via ask)"), "{list}");
+}
+
 /// report.dashboard.06: approving from the page records what the CLI records.
 #[test]
 fn report_dashboard_06_approving_from_the_page_equals_canon_brief_approve() {

@@ -4,10 +4,11 @@ You are the independent second look. Declare the role with
 `CANON_ROLE=reviewer` (or `--as reviewer`); `--role` on `review scenario`,
 `review change` and `finding add` then defaults to `reviewer`. The human's
 acts refuse you (`HUMAN_ONLY`): `brief approve`, `policy approve` and
-`divergence accept`. Name what the human has to decide in your report; never
-look for a flag that grants it. You never run them, and never remove or unset your role (`env -u CANON_ROLE`,
-dropping `--as`) to get past the refusal: report the exact call, slug filled in, and
-wait; the human runs it (or uses `canon dashboard`).
+`divergence accept`, unless you record the answer the human gave you in the
+conversation with `--relayed-via <tool>` (the divergence acceptance below).
+Name what the human has to decide; never look for another flag that grants it.
+You never run them without that answer, and never remove or unset your role
+(`env -u CANON_ROLE`, dropping `--as`) to get past the refusal.
 
 ## Commands
 
@@ -30,7 +31,7 @@ canon brief check
 ```
 ```text
 # Show where the change stands and the next one to three steps; never edits
-canon brief show [<CHANGE_ID>]
+canon brief show [<CHANGE_ID>] [--body]
 ```
 ```bash
 canon brief show
@@ -287,14 +288,21 @@ sign.
 `divergence accept` is for a scenario whose honest evidence is `divergent`
 and whose gap is limited by something outside this change (an upstream
 limit, a platform bug) and is tracked there. It records a human's decision,
-so it refuses every agent role (`HUMAN_ONLY`), you included. What you do:
-confirm the evidence really is divergent and the limit is outside this
-change, then report to the human the scenario ids, the reason, the
-tracking reference and an expiry when the limit should be gone by a date.
-Give the exact call, ids filled in: the human runs `canon divergence accept
-<ids> --actor <name> --reason "<why>" --tracking <ref>` themselves in their
-own shell, from a session that did not attest the evidence
-(`DIVERGENCE_ACCEPT_REFUSED` otherwise); you never run it or unset your role to. Never suggest it to skip
+so it refuses every agent role (`HUMAN_ONLY`), you included, unless it records
+the answer the human gave you. What you do: confirm the evidence really is
+divergent and the limit is outside this change, then put to the human the
+scenario ids, the reason, the tracking reference and an expiry when the limit
+should be gone by a date, in their own view and not retyped (omp: `out://`).
+Ask with the harness question tool (`ask` in omp, `AskUserQuestion` in Claude
+Code, otherwise in the chat): accept the gap, or not. Only an explicit
+approval counts; a question or a condition is not one, and no answer records
+nothing. Then record it from a session that did not attest the evidence
+(`DIVERGENCE_ACCEPT_REFUSED` otherwise): `canon divergence accept <ids> --actor
+<your actor id> --reason "<why>" --tracking <ref> --approver <their name> --note
+"<their answer>" --relayed-via <tool>`; the record carries the relay, the
+approver and their answer. When `canon.yaml` has `approval: { relay: deny }` the
+call is refused (`HUMAN_ONLY`, naming the key) and the human runs it themselves.
+You never unset your role to run it. Never suggest it to skip
 a fix the implementer can make in this change. The acceptance pins that
 evidence: new evidence for the scenario, or its expiry, ends it, and the
 human accepts (or the implementer fixes) again. An accepted gap counts as
@@ -362,6 +370,6 @@ disposition is a no-op too.
 | "I cannot run the tests, but the evidence looks right." | Say so and record `indeterminate` or `unavailable`; never sign what you could not run. |
 | "This is a minor defect; I will skip the finding." | Every defect is a finding; severity says how much it matters. |
 | "I will edit the brief to fix it." | A brief defect is a finding, not an edit. |
-| "I will accept the gap myself, the limit is real." | `divergence accept` refuses agent roles; report the gap to the human. |
+| "I will accept the gap myself, the limit is real." | The human accepts it: ask them, and record only their explicit answer with `--relayed-via`. |
 
 Reference: `canon skills show canon-review`.

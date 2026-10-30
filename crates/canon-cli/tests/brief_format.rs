@@ -1044,6 +1044,46 @@ fn authoring_migrate_24_a_plan_that_re_binds_is_human_only_and_one_that_does_not
     assert!(!read_brief(p, "b").contains("<!--"));
 }
 
+/// subject.lifecycle.57: a migrate commit that re-binds `Approved:` lines is
+/// recorded by an agent role only with the relay option, the human's name and
+/// answer and an actor, and the backup journal then holds the relay.
+#[test]
+fn subject_lifecycle_57_a_relayed_migrate_commit_records_the_relay_in_the_backup_journal() {
+    let dir = old_repo();
+    let r = dir.path();
+    let (_, digest) = plan(r);
+    let before = tree(r);
+    let relayed = |extra: &[&str]| {
+        let mut args = vec!["migrate", "--commit", "--plan-digest", digest.as_str(), "--json", "--relayed-via", "AskUserQuestion"];
+        args.extend(extra);
+        canon_as(r, Some("planner"), &args)
+    };
+    let plain = commit(r, Some("planner"), &digest);
+    assert_eq!((plain.status.code(), json(&plain)["error"]["code"].as_str()), (Some(2), Some("HUMAN_ONLY")), "{}", out_text(&plain));
+    assert!(json(&plain)["error"]["hint"].as_str().unwrap().contains("--relayed-via"), "{}", out_text(&plain));
+    // (This file's runner sets CANON_ACTOR, so the actor is never the missing part here.)
+    for extra in [&["--actor", "plan-1", "--note", "ok"][..], &["--actor", "plan-1", "--approver", "Ana"]] {
+        let out = relayed(extra);
+        assert_eq!((out.status.code(), json(&out)["error"]["code"].as_str()), (Some(2), Some("USAGE")), "{extra:?}: {}", out_text(&out));
+    }
+    assert_eq!(tree(r), before, "the refused calls rewrote nothing");
+
+    let out = relayed(&["--actor", "plan-1", "--approver", "Ana", "--note", "Yes, migrate them."]);
+    assert!(out.status.success(), "{}", out_text(&out));
+    assert!(!read_brief(r, "a").contains("<!--"), "the briefs were rewritten");
+    let backups: Vec<_> = std::fs::read_dir(r.join(".canon/migrate-backup")).unwrap().filter_map(Result::ok).collect();
+    let journal: Value = backups.iter().find_map(|d| std::fs::read(d.path().join("briefs-journal.json")).ok()).map(|b| serde_json::from_slice(&b).unwrap()).expect("a briefs journal");
+    assert_eq!(journal["relay"], serde_json::json!({ "role": "planner", "actor": "plan-1", "tool": "AskUserQuestion", "approver": "Ana", "answer": "Yes, migrate them." }), "{journal}");
+    assert_eq!(journal["complete"], true);
+
+    // The human's own commit leaves no relay in its journal.
+    let own = old_repo();
+    let (_, own_digest) = plan(own.path());
+    assert!(commit(own.path(), None, &own_digest).status.success());
+    let own_journal: Value = std::fs::read_dir(own.path().join(".canon/migrate-backup")).unwrap().filter_map(Result::ok).find_map(|d| std::fs::read(d.path().join("briefs-journal.json")).ok()).map(|b| serde_json::from_slice(&b).unwrap()).unwrap();
+    assert!(own_journal.get("relay").is_none(), "{own_journal}");
+}
+
 /// authoring.migrate.25
 #[test]
 fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished() {

@@ -9,6 +9,9 @@ Options:
       --approver <NAME>      Who approved (the human, not the agent)
       --as <ROLE>            The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it [possible values: planner, implementer, reviewer, orchestrator]
       --note <TEXT>          The human's own words
+      --relayed-via <NAME>   Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it
+      --actor <ACTOR_ID>     With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
+      --digest <DIGEST>      With --relayed-via, the digest `canon brief show --body` showed the human, as `<change>=<sha256:digest>`, once per change; a brief whose digest differs is refused
       --repo <DIR>           The repo to act on (default: the nearest ancestor directory holding a canon.yaml)
       --json                 Output JSON instead of the human-readable form
       --input <JSON|FILE|->  The arguments as JSON: an object (one run) or an array / NDJSON file or `-` (a batch); keys are the option names in camelCase, `operands` an array

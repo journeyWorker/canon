@@ -40,11 +40,21 @@ export interface Brief {
   languageSource?: string;
   languageNote?: string | null;
   changedSinceApproval: boolean;
+  /** The relay of the approval this brief was edited after, when an agent recorded it. */
+  previousRelay?: { role: string; actor: string; tool: string };
   legacy: boolean;
   sections: Section[];
   findings: Finding[];
   counts: { blockers: number; advisories: number };
   approvable: boolean;
+}
+
+/** An approved brief whose approval an agent recorded for the human (0.32). */
+export interface RelayedBrief {
+  changeId: string;
+  brief: string;
+  approval: string;
+  relay: { role: string; actor: string; tool: string };
 }
 
 export const EMPTY_MESSAGE = "No brief awaits approval";
@@ -274,7 +284,7 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
           )
         : null,
       h("p", { class: "brief-language" }, languageText(brief)),
-      brief.changedSinceApproval ? h("p", { class: "brief-changed" }, "Edited since it was approved: the approval no longer covers it.") : null,
+      brief.changedSinceApproval ? h("p", { class: "brief-changed" }, "Edited since it was approved: the approval no longer covers it.", brief.previousRelay ? ` (that approval was ${relayText(brief.previousRelay)})` : "") : null,
       blockers > 0 ? h("p", { class: "approve-blocked" }, `Not approvable yet: ${blockers} blocker${blockers === 1 ? "" : "s"} to clear in the brief.`) : null,
     ),
     brief.sections.length > 0 ? brief.sections.map(renderSection) : h("pre", { class: "brief-raw" }, brief.text),
@@ -313,4 +323,20 @@ export function advisoryTotal(briefs: Pick<Brief, "counts">[]): string {
 export function renderBriefs(briefs: Brief[], handlers: BriefHandlers): VNode {
   if (briefs.length === 0) return h("p", { class: "empty briefs-empty" }, EMPTY_MESSAGE);
   return h("div", { class: "briefs-list" }, h("p", { class: "briefs-total" }, advisoryTotal(briefs)), renderApproveBar(handlers), briefs.map((brief) => renderBrief(brief, handlers)));
+}
+
+/** "relayed by planner `impl-1` via ask": how an agent recorded the human's answer. */
+export function relayText(relay: { role: string; actor: string; tool: string }): string {
+  return `relayed by ${relay.role} \`${relay.actor}\` via ${relay.tool}`;
+}
+
+/** The approved briefs an agent recorded the approval of, so the human can tell them from their own answers. */
+export function renderRelayed(relayed: RelayedBrief[]): VNode | null {
+  if (relayed.length === 0) return null;
+  return h(
+    "section",
+    { class: "panel briefs-relayed" },
+    h("h2", {}, "Approved through an agent"),
+    h("ul", { class: "relayed-list" }, relayed.map((one) => h("li", { "data-change": one.changeId }, h("strong", {}, one.changeId), ` · ${one.brief} · ${relayText(one.relay)}`))),
+  );
 }

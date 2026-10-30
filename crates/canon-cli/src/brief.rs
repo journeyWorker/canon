@@ -37,6 +37,12 @@
 //! answer. A line with no digest (written before 0.19) stays approved
 //! ([`BriefStatus::legacy_approval`]); status advises re-approving it.
 //!
+//! # A relayed approval (0.32)
+//! An agent may record the human's answer for them ([`crate::relay`]); the
+//! line then carries `(relayed by <role> <actor> via <tool>)` before the
+//! digest, outside it, and [`BriefStatus::relay`] reads it back. A line
+//! without the marker is the human's own.
+//!
 //! # Canon never writes into an external plan (0.17 D3)
 //! The approval is read only from that canon `brief.md`. A change
 //! `canon change new` wrote has its brief there already. A change
@@ -208,6 +214,10 @@ pub struct BriefStatus {
     /// The approval line's text after `Approved:`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval: Option<String>,
+    /// Set when an agent recorded the approval for the human (0.32): the
+    /// `(relayed by …)` marker of the approval line, read back.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay: Option<canon_model::ApprovalRelay>,
     /// The brief changed after its approval (0.19 D3): the line's digest
     /// no longer matches, so it is not approved and `canon brief approve`
     /// must run again.
@@ -327,6 +337,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             brief_exists: false,
             source: None,
             approval: None,
+            relay: None,
             changed: false,
             legacy_approval: false,
             findings: None,
@@ -351,6 +362,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief: Some(rel(repo, &path)),
                 brief_exists: true,
                 source: field(&text, "Source:").map(str::to_string),
+                relay: approval.as_deref().and_then(crate::relay::parse_marker),
                 approval,
                 changed: matches!(verdict, Approval::Changed { .. }),
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
@@ -370,6 +382,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: Some(rel(repo, &proposal)),
                 approval: None,
+                relay: None,
                 changed: false,
                 legacy_approval: false,
                 findings: None,
@@ -387,6 +400,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 brief_exists: false,
                 source: None,
                 approval: None,
+                relay: None,
                 changed: false,
                 legacy_approval: false,
                 findings: None,

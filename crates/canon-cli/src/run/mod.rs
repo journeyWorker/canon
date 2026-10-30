@@ -98,7 +98,11 @@ pub fn run(cli: Cli) -> ExitCode {
             };
             run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language, dry_run: dry_run.dry_run }, json)
         }
-        Command::Migrate(MigrateArgs { repo, safety, json, revert, backup, .. }) => ExitCode::from(if revert { crate::migrate_names::run_revert(&repo, backup.as_deref(), &safety.mode(), json) } else { crate::migrate::run(&repo, &safety.mode(), json) }),
+        Command::Migrate(MigrateArgs { repo, safety, json, revert, backup, relayed_via, actor, approver, note, .. }) => ExitCode::from(if revert {
+            crate::migrate_names::run_revert(&repo, backup.as_deref(), &safety.mode(), json)
+        } else {
+            crate::migrate::run(&repo, &safety.mode(), crate::migrate::RelayArgs { via: relayed_via, actor, approver, note }, json)
+        }),
         Command::Retrieve(RetrieveArgs { for_role, regime, domain, subject_id, limit, repo, json }) => run_retrieve(&repo, &for_role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), limit, json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json, .. }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::Selftest(SelftestArgs { suite, json }) => crate::selftest::run_selftest(suite.as_deref(), json),
@@ -123,21 +127,4 @@ fn record_role(flag: Option<RoleId>, repo: &std::path::Path, command: &str, json
                 .emit(command, json),
         )),
     }
-}
-
-/// Human-only acts (0.28 D10): `brief approve`, `policy approve` and
-/// `divergence accept` record a human's decision, so every declared agent
-/// role (`--as` / `CANON_ROLE`) is refused. The hint tells the agent to relay
-/// `human_call` (the exact call, ids filled in) to the human and wait: the
-/// agent never unsets its role to run it. No flag grants it. Without a
-/// declared role (the human's own shell) the leaf runs as before.
-fn human_only(command: &str, human_call: &str, json: bool) -> Result<(), ExitCode> {
-    use crate::role::Role;
-    let Some(role) = Role::current(None) else { return Ok(()) };
-    Err(ExitCode::from(
-        CliError::refused("HUMAN_ONLY", format!("`{command}` records a human's decision and is not available to the {role} role"))
-            .field("--as")
-            .hint(format!("report this exact call to the human and wait; the human runs it in their own shell: `{human_call}`; never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself"))
-            .emit(command, json),
-    ))
 }

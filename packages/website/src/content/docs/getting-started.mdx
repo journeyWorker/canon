@@ -88,7 +88,8 @@ is attributed, and is fresh — never on a self-report. See
      names it, and `canon status` shows it. The gate grades the work
      against the policy, so a human approves it, in the same answer that
      approves a subject's brief, and the agent records that answer with one
-     call, `canon brief approve --approver <the human> --note "<their words>"`,
+     call, `canon brief approve --approver <the human> --note "<their words>"
+     --relayed-via <the question tool>` (the record says an agent relayed it),
      which records both; until then `canon gate check` and `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
@@ -133,11 +134,17 @@ is attributed, and is fresh — never on a self-report. See
    desired outcome, a user flow of steps `F1`, `F2`, …, step detail,
    acceptance, questions and assumptions, out of scope. The agent fills it
    in and runs `canon brief check` until it has no blockers and each prose
-   advisory is fixed or waived with a reason, then stops and reports it to
-   the human in that language. When the human approves it,
-   the agent records the answer with `canon brief approve add-login
-   --approver <the human> --note "<their words>"`, which writes the `Approved:`
-   line, bound to the brief's text, and the policy approval together. A
+   advisory is fixed or waived with a reason, then shows it to the human with
+   `canon brief show add-login --body` (the brief as it is, and its digest) and
+   asks, in that language, with the harness's question tool (`ask` in omp,
+   `AskUserQuestion` in Claude Code, otherwise in the chat). Only an explicit
+   approval counts; a question or a condition is a revision request. When the
+   human approves it, the agent records the answer with `canon brief approve
+   add-login --approver <the human> --note "<their words>" --relayed-via <the
+   question tool> --digest add-login=<the digest shown>`, which writes the
+   `Approved:` line, bound to the brief's text and marked as relayed, and the
+   policy approval together. `approval: { relay: deny }` in `canon.yaml`
+   refuses that, and the human runs the command. A
    brief edited afterwards is no longer approved until the human answers
    again. Each scenario points at the step it proves
    (`canon scenario new --flow F1`), and `canon status` lists each step

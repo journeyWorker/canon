@@ -285,7 +285,17 @@ fn index_changes(repo: &Path, plan: &Plan, names: &migrate_names::Plan) -> bool 
 /// exactly that plan. Exit `0` previewed, migrated or nothing to do, `1`
 /// migrated but the index rebuild found the corpus unclean, `2` refused or
 /// failed.
-pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
+/// The options of a relayed commit (0.32): an agent recording the human's
+/// answer to a plan that re-binds `Approved:` lines.
+#[derive(Debug, Default)]
+pub struct RelayArgs {
+    pub via: Option<String>,
+    pub actor: Option<String>,
+    pub approver: Option<String>,
+    pub note: Option<String>,
+}
+
+pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json: bool) -> u8 {
     let mut log = crate::json_out::Log::new(json);
     let base = safety::command("migrate", &[], repo);
     let repo = resolve_repo_root(repo);
@@ -367,9 +377,14 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     listed.extend(briefs.effects());
     let safe_plan = safety::Plan::new(listed);
     // A plan that re-binds an `Approved:` line or a review pin is the human's to commit.
+    let mut relay = None;
     if matches!(mode, Mode::Commit(_)) && briefs.rebinds() {
-        if let Some(error) = migrate_briefs::human_only("canon migrate", &format!("{base} --commit --plan-digest {}", safe_plan.plan_digest)) {
-            return error.emit("canon migrate", json);
+        let human_call = format!("{base} --commit --plan-digest {}", safe_plan.plan_digest);
+        let relay_call = format!("{human_call} --approver <their name> --note \"<their own words>\" --relayed-via <the question tool> --actor <your actor id>");
+        let call = crate::relay::Call { via: relay_args.via.as_deref(), actor: relay_args.actor.as_deref(), approver: relay_args.approver.as_deref(), note: relay_args.note.as_deref() };
+        match crate::relay::authorize("canon migrate", &human_call, &relay_call, &repo, call) {
+            Ok(found) => relay = found.map(|found| canon_model::ApprovalRelay { approver: relay_args.approver.as_ref().map(|a| a.trim().to_string()), answer: relay_args.note.as_ref().map(|n| n.trim().to_string()), ..found }),
+            Err(error) => return error.emit("canon migrate", json),
         }
     }
     let commit = match safe_plan.gate(mode, &base) {
@@ -446,7 +461,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         log.line(format!("canon migrate: renamed {} record file(s) to the 0.30 rule (kind=<kind>/<components>_<digest8>.json)", names.moves.len()));
     }
     if let Some(dir) = backup_path.as_ref() {
-        if let Err(e) = migrate_briefs::apply(&repo, &briefs, dir) {
+        if let Err(e) = migrate_briefs::apply(&repo, &briefs, dir, relay.as_ref()) {
             return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest"))
                 .hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/")
                 .emit("canon migrate", json);

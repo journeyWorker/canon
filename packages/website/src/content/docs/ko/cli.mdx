@@ -458,9 +458,13 @@ postgres, 객체 저장소의 레코드는 읽지 않고 `data.index.unreadStore
 설정하지 않으면 모든 명령이 전과 같이 동작합니다. `CANON_ROLE`은 `schema`, `context`,
 `skills show`를 거르거나 실패시키지 않습니다(잘못된 값은 경고일 뿐입니다).
 
-`brief approve`, `policy approve`, `divergence accept`는 사람만 할 수 있습니다:
-에이전트 역할로는 `retryable: false`로 거부되고, hint가 사람이 줄 옵션(`--approver`,
-`--note`)을 알려 줍니다. 거부를 넘어서 진행해야 할 때의 유일한 옵션은
+`brief approve`, `policy approve`, `divergence accept`와 `Approved:` 줄을 다시 묶는
+`migrate --commit`은 사람의 결정입니다: 에이전트 역할은 `--relayed-via <도구>` 없이는
+`retryable: false`로 거부되고, hint가 먼저 대리 절차(`canon brief show <change> --body`로
+보여 주기, 하네스의 질문 도구로 묻기, 명시적 승인만 세기, `--relayed-via`로 기록하기)를,
+다음에 사람이 직접 칠 명령을 알려 줍니다. 대리 기록은 사람의 이름과 답, 대리한 에이전트의
+역할과 actor, 질문에 쓴 도구를 남기며, `canon.yaml`의 `approval: { relay: deny }`로 끌 수
+있습니다(끄면 `HUMAN_ONLY`). 거부를 넘어서 진행해야 할 때의 유일한 옵션은
 `--override-reason <TEXT>`이며(`--force`는 없습니다) 넘긴 사유는 기록에 남고
 `data.overrides[]`와 `canon status`에 보입니다.
 

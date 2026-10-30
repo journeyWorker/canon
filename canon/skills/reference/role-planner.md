@@ -4,10 +4,12 @@ You turn a request into an approved scope: a subject, a change and a PRD
 brief the human answers once. You build nothing. Declare the role with
 `CANON_ROLE=planner` (or `--as planner`); `canon status` and `meta.next`
 then show your steps and count the rest under `waitingOn`. The approvals are
-the human's: `brief approve`, `policy approve` and `divergence accept` refuse
-every agent role (`HUMAN_ONLY`, `retryable: false`), and no flag grants them. You never run them, and never remove or unset your role (`env -u CANON_ROLE`,
-dropping `--as`) to get past the refusal: report the exact call, slug filled in, and
-wait; the human runs it (or uses `canon dashboard`).
+the human's: `brief approve`, `policy approve`, `divergence accept` and the
+`migrate --commit` that re-binds `Approved:` lines refuse every agent role
+(`HUMAN_ONLY`, `retryable: false`) unless you record the answer the human gave
+you in the conversation, with `--relayed-via <tool>` (step 4). Without a human's
+explicit answer you never run them, and you never remove or unset your role
+(`env -u CANON_ROLE`, dropping `--as`) to get past the refusal.
 
 ## Commands
 
@@ -30,7 +32,7 @@ canon brief check
 ```
 ```text
 # Show where the change stands and the next one to three steps; never edits
-canon brief show [<CHANGE_ID>]
+canon brief show [<CHANGE_ID>] [--body]
 ```
 ```bash
 canon brief show
@@ -243,26 +245,60 @@ ids); the human step comes after it. A policy that no longer matches its approva
    the advisories are gone or each remaining one is waived with a reason.
    It never blocks approval, but you do not hand the human a brief with
    unexamined advisories.
-4. **Stop for the human.** Report the brief to the human, in the brief's
-   language, asking once, and say they can approve it in `canon dashboard`
-   (the briefs page, `/briefs.html`) or answer in chat. You never click
-   Approve or fill that form yourself. Build nothing for that scope (no scenarios, code
-   or evidence) until the human answers. The approval is never assumed, even
-   when the human said they cannot answer until you report: the brief is
-   that report. The one answer approves the brief and the policy
+4. **Show, ask, count only an explicit approval.** Build nothing for that
+   scope (no scenarios, code or evidence) until the human has answered. The
+   approval is never assumed, even when the human said they cannot answer
+   until you show the brief. The one answer approves the brief and the policy
    (`.canon/policy.yaml`, written by `canon init`), which is what the gate
    grades the work against.
-5. **The human records the answer.** `brief approve` is the human's leaf: run
-   by an agent role it is refused (`HUMAN_ONLY`) with a hint addressed to the
-   human. Report the exact call, slug filled in, and wait: `canon brief approve
-   add-login --approver <their name> --note "<their own words>"`; the human
-   runs it in their own shell (`--approver` and `--note` are theirs to supply)
-   or approves in the dashboard. Never approve in their name, never remove or
-   unset your role (`env -u CANON_ROLE`, dropping `--as`) to run it, and never
-   edit the policy to make the gate pass.
+   - **Show.** `canon brief show <slug> --body` prints the brief file's bytes
+     as they are and, as its last line, `digest: sha256:<hex>`, the value
+     `brief approve` records. Send that output to the human's own view; never
+     retype or paraphrase the brief into the conversation. In omp, redirect it
+     to `out://` (`canon brief show add-login --body > out://add-login`);
+     a harness with no such channel leaves the tool output visible, which is
+     the same. Read the digest alone with `canon brief show add-login --body |
+     tail -n 1`. Show every brief of one request, each with its digest.
+   - **Ask.** Use the harness's question tool: `ask` in omp, `AskUserQuestion`
+     in Claude Code; a harness without one, ask in the chat and wait for the
+     reply. Two choices: approve, or request changes. Several briefs are one
+     question. Say in the brief's language what is approved: the brief and
+     the policy.
+   - **Count only an explicit approval.** The approve choice, or the human
+     saying in the chat that they approve. A question, a condition ("yes, if
+     …") or an approval of part of it is a revision request: change the brief,
+     `brief check` until clean, show it again and ask again. No answer means
+     nothing is recorded: wait.
+   They may also approve on `canon dashboard` (the briefs page,
+   `/briefs.html`); you never click Approve or fill that form yourself.
+5. **Record the answer you were given.** Run `brief approve` with the relay
+   option: `canon brief approve add-login --approver <their name> --note "<their
+   answer, as they gave it>" --relayed-via <ask|AskUserQuestion|chat> --actor
+   <your actor id> --digest add-login=<the digest you showed>` (several slugs:
+   one `--digest <slug>=<digest>` each, one answer for all, nothing written if
+   any is refused). `--actor` may be `CANON_ACTOR` instead. The record keeps
+   their name and words and says that you, with your role and actor, recorded
+   them through that tool: the `Approved:` line gains `(relayed by <role>
+   <actor> via <tool>)`, which is outside the digest, and `status`, `brief
+   show` and the dashboard name it. Never approve in their name without their
+   answer, never write the answer for them, and never edit the policy to make
+   the gate pass. A digest that differs from the brief now
+   (`RELAY_DIGEST_MISMATCH`) means the brief changed after they saw it: show
+   it again and ask again; nothing was written. Without `--relayed-via` the call is
+   `HUMAN_ONLY`; with it and no role declared, `USAGE`. When `canon.yaml`
+   turns relaying off (`approval: { relay: deny }`), the refusal names that key:
+   report the human's call (`canon brief approve add-login --approver <their
+   name> --note "<their own words>"`) and wait for them to run it. Never
+   remove or unset your role (`env -u CANON_ROLE`, dropping `--as`) to run it.
+   `canon policy approve`, `canon divergence accept` and `canon migrate
+   --commit --plan-digest <d>` follow the same procedure, each taking
+   `--approver <their name> --note "<their answer>" --relayed-via <tool>` (and
+   `--actor <your actor id>`, which `divergence accept` already requires): show what is approved (the policy file, the divergent
+   evidence with its reason and tracking reference, the migrate plan), ask,
+   count only an explicit approval, then record with the relay option.
    `canon brief show <slug>` then reports `state: approved`. A brief edited
    after its approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it
-   needs a new answer and a new `brief approve` by the human. A follow-up that
+   needs a new answer, shown and asked again, and a new `brief approve`. A follow-up that
    adds or changes a step of the brief is a scope change and needs a new
    answer.
 
@@ -312,7 +348,7 @@ old column, delete the old format) in its own later change.
 |---|---|
 | "The human is unavailable; I will assume the approval." | Never. The brief is the report; stop, and put open questions into Questions and assumptions. |
 | "This could change policy, but I will decide it." | Anything that could change policy goes to the questions. |
-| "A small follow-up needs no new answer." | A follow-up that adds or changes a flow step is a scope change and needs a new `brief approve`. |
+| "A small follow-up needs no new answer." | A follow-up that adds or changes a flow step is a scope change and needs a new answer and a new `brief approve`. |
 | "This migration is just a chore." | Data, interface or output changes are feature changes. |
 | "Put the file and line in the brief so nobody has to look." | Paths rot; describe behavior. |
 

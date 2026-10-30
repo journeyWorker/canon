@@ -4,9 +4,10 @@ You run the loop across agents and move the subject. You write no brief,
 code or review yourself. Declare the role with `CANON_ROLE=orchestrator` (or
 `--as orchestrator`); your `canon status` also lists the human's steps. The
 human's acts (`brief approve`, `policy approve`, `divergence accept`) refuse
-every agent role, you included (`HUMAN_ONLY`). You never run them, and never remove or unset your role (`env -u CANON_ROLE`,
-dropping `--as`) to get past the refusal: report the exact call, slug filled in, and
-wait; the human runs it (or uses `canon dashboard`).
+every agent role, you included (`HUMAN_ONLY`), unless you record the answer the
+human gave you in the conversation with `--relayed-via <tool>` (below). You never
+run them without that answer, and never remove or unset your role (`env -u CANON_ROLE`,
+dropping `--as`) to get past the refusal.
 
 ## Commands
 
@@ -227,7 +228,7 @@ canon ledger compact
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-canon migrate [--commit --plan-digest <DIGEST>] [--revert] [--backup <DIR> (with --revert)] [--input]
+canon migrate [--commit --plan-digest <DIGEST>] [--revert] [--backup <DIR> (with --revert)] [--relayed-via <NAME>] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -510,22 +511,34 @@ not sign off.
 ## Relay the human stop
 
 When `status` or `meta.next` shows a step with `actor: human` (the brief's
-approval), stop everything for that scope, report the brief to the human in
-its language, and wait. Tell the human they can approve the clean briefs in
-`canon dashboard` (the briefs page) or run, in their own shell, the exact call
-with every slug filled in: `canon brief approve <slug> <slug> --approver <their name>
---note "<their own words>"` (several slugs take one answer; nothing is written if
-one is refused). You never click Approve, fill the form or run
-`brief approve` yourself: it refuses you (`HUMAN_ONLY`), and removing or
-unsetting your declared role (`env -u CANON_ROLE`, dropping `--as`) to get past
-that is the same act under another label. Report the call and wait. Do not start the
+approval), stop everything for that scope and put the brief in front of the
+human in its language: `canon brief show <slug> --body` prints the brief and,
+last, its digest. Send the output to the human's own view, never retyped (omp:
+redirect it to `out://`; a harness with no such channel leaves the tool output
+visible). Ask with the harness question tool (`ask` in omp, `AskUserQuestion`
+in Claude Code, otherwise in the chat), approve or request changes, all the
+clean briefs in one question. Only an explicit approval counts; a question or a
+condition is a revision request for the planner, and no answer means you wait.
+They may also approve in `canon dashboard` (the briefs page); you never click
+Approve or fill the form. On their approval record it: `canon brief approve
+<slug> <slug> --approver <their name> --note "<their own words>" --relayed-via
+<ask|AskUserQuestion|chat> --actor <your actor id> --digest <slug>=<the digest
+shown>` (several slugs take one answer, each with its own `--digest`; nothing is written
+if one is refused). The record says you recorded it, with your role, actor and
+tool. `RELAY_DIGEST_MISMATCH` means the brief changed after they saw it: show it
+again. When `canon.yaml` has `approval: { relay: deny }` the call is refused
+(`HUMAN_ONLY`, naming the key): report the human's own call and wait for them to
+run it. Removing or unsetting your declared role (`env -u CANON_ROLE`,
+dropping `--as`) to get past a refusal is the same act under another label.
+`canon skills show role-planner` has the full procedure. Do not start the
 implementer before `canon brief show <slug>` reports `state: approved`.
 Never approve it yourself and never edit the policy to pass the gate. A
 policy that no longer matches the approval fails closed
 (`POLICY_CHANGED_SINCE_APPROVAL`, or `POLICY_APPROVAL_UNREADABLE`): the ship
 guard and the reopen refuse, and `--override-reason` does not waive it. Run
-`canon policy show`, then stop and ask the human to re-approve
-(the call `canon policy approve --approver <their name>` is theirs to run, never yours) or restore the
+`canon policy show`, then show the policy to the human, ask them to re-approve
+and record their explicit answer (`canon policy approve --approver <their name>
+--note "<their words>" --relayed-via <tool> --actor <your actor id>`), or restore the
 approved policy from git; never edit the policy yourself. Inside an
 approved scope never stop for a human: fixes, follow-ups and re-reviews go
 straight to the implementer and reviewer in the same change. A known gap the
@@ -563,7 +576,7 @@ its preview, never from an old digest.
 |---|---|
 | "Edit the policy so the gate passes." | A changed policy fails closed (`POLICY_CHANGED_SINCE_APPROVAL`); ask the human to re-approve or restore it from git. |
 | "The reviewer can be me under another label." | The reviewer is a separate process with its own real session id (#39). |
-| "Approve the brief; the human said they are busy." | `brief approve` refuses agent roles. Report the brief and wait. |
+| "Approve the brief; the human said they are busy." | An answer they did not give is not recorded. Show the brief, ask, and record only an explicit approval with `--relayed-via`. |
 | "Override the refusal to ship." | Fix the gap the refusal names; `--override-reason` waives only the `require_review` gaps and the brief gap, is recorded on the subject, and is for the human's call, not a shortcut. |
 | "Run the commit now, the preview looked fine earlier." | A bare run previews; `--commit --plan-digest` acts only on the plan you just previewed (`PLAN_CHANGED` otherwise). Preview again, then act. |
 | "I have corrected this agent before." | A correction repeated across runs belongs in a scenario, the policy or a gate, not more prose. Tell the human. |

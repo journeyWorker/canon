@@ -163,10 +163,13 @@ refused brief): nothing is written and the page says to read it again. A request
 naming one brief the old way (`changeId`, `sha256`) is still accepted. The server is localhost only and
 refuses requests from other origins (`DASHBOARD_ORIGIN_REFUSED`).
 
-For an agent the human stop is unchanged: when clean briefs are waiting,
-tell the human they can approve them in `canon dashboard` (briefs page) or
-answer in chat. An agent never clicks Approve or fills the form, and runs
-`canon brief approve` only from the human's own words.
+For an agent: when clean briefs are waiting, show them (`canon brief show
+<slug> --body`), ask with the harness question tool, and tell the human they
+can approve them in `canon dashboard` (briefs page) instead. An agent never
+clicks Approve or fills the form; it runs `canon brief approve` only from the
+human's explicit answer, with `--relayed-via`. The page lists the approvals an
+agent recorded for the human under "Approved through an agent" (`relayed` in
+`GET /api/briefs`), with the role, actor and tool of each.
 
 The dashboard renders SEVEN panels — trust matrix, session costs, role
 memory, flywheel funnel, review burn-down, review rounds, review totals.

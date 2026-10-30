@@ -235,7 +235,7 @@ pub fn run_in(repo: &Path, ledger_root: Option<&Path>, old: &OldWorld, apply: bo
         else {
             continue;
         };
-        let DivergenceStatus::Accepted { reason, tracking, expiry, checks: None, evidence } = &latest.status else { continue };
+        let DivergenceStatus::Accepted { reason, tracking, expiry, checks: None, evidence, relay } = &latest.status else { continue };
         let mut pinned_files = evidence.clone();
         pinned_files.sort();
         if pinned_files != legacy_evidence_pins(&ctx, scenario, &file_digests) {
@@ -244,7 +244,7 @@ pub fn run_in(repo: &Path, ledger_root: Option<&Path>, old: &OldWorld, apply: bo
         }
         report.acceptances += 1;
         let mut pinned = latest.clone();
-        pinned.status = DivergenceStatus::Accepted { reason: reason.clone(), tracking: tracking.clone(), expiry: *expiry, checks: Some(current_checks(&ctx, scenario)), evidence: Vec::new() };
+        pinned.status = DivergenceStatus::Accepted { reason: reason.clone(), tracking: tracking.clone(), expiry: *expiry, checks: Some(current_checks(&ctx, scenario)), evidence: Vec::new(), relay: relay.clone() };
         report.rewrites.push(rewrite(&prefix, &on_disk, latest, &pinned, RecordKind::Divergence)?);
         if !apply {
             continue;

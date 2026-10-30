@@ -260,3 +260,79 @@ fn divergence_status_counts_the_acceptance() {
     assert_eq!(body["data"]["scenarios"][0]["state"], "accepted", "{body}");
     assert_eq!(body["data"]["scenarios"][0]["tracking"], TRACKING, "{body}");
 }
+
+/// `accept` as an agent role (`CANON_ROLE`), with the flags a relay needs on top of the defaults.
+fn accept_as(repo: &Path, role: &str, overrides: &[(&str, &str)]) -> Output {
+    let mut flags: Vec<(&str, &str)> = vec![("--project", "demo"), ("--reason", "the engine drops the event"), ("--tracking", TRACKING), ("--role", "reviewer"), ("--actor", "agent-7"), ("--session", "agent-session")];
+    for (flag, value) in overrides {
+        match flags.iter_mut().find(|(f, _)| f == flag) {
+            Some(slot) => slot.1 = value,
+            None => flags.push((flag, value)),
+        }
+    }
+    let mut args = vec!["divergence", "accept", SCENARIO, "--json"];
+    for (flag, value) in &flags {
+        args.extend([*flag, *value]);
+    }
+    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env("CANON_ROLE", role).env_remove("CANON_ACTOR").output().expect("spawn canon binary")
+}
+
+/// The accepted divergence records on the ledger, as JSON.
+fn accepted_records(repo: &Path) -> Vec<Value> {
+    use canon_store::tier::TierQuery;
+    ledger(repo).read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.into_iter().map(|r| r.0).filter(|r| r["status"].get("accepted").is_some()).collect()
+}
+
+/// divergence.lifecycle.14: an agent role records the acceptance with the relay
+/// option and the human's name and answer; the record carries the relay, the
+/// approver and the answer, and the human's own call leaves no relay.
+#[test]
+fn divergence_lifecycle_14_a_relayed_acceptance_records_the_relay_the_approver_and_the_answer() {
+    let dir = repo();
+    let r = dir.path();
+    let out = accept_as(r, "planner", &[("--relayed-via", "AskUserQuestion"), ("--approver", "Ana"), ("--note", "Yes, accept the gap.")]);
+    assert!(out.status.success(), "{}", out_text(&out));
+    let records = accepted_records(r);
+    assert_eq!(records.len(), 1, "{records:?}");
+    let accepted = &records[0]["status"]["accepted"];
+    assert_eq!(accepted["relay"], serde_json::json!({ "role": "planner", "actor": "agent-7", "tool": "AskUserQuestion", "approver": "Ana", "answer": "Yes, accept the gap." }), "{accepted}");
+    assert_eq!(records[0]["actor"]["role"], "reviewer", "the record is still the reviewer's act");
+    assert!(canon(r, &["subject", "move", "demo-subject", "--to", "shipped"]).status.success(), "the relayed acceptance ships the subject like any other");
+
+    let human = repo();
+    assert!(accept(human.path(), &[]).status.success());
+    let human_records = accepted_records(human.path());
+    assert!(human_records[0]["status"]["accepted"].get("relay").is_none(), "{human_records:?}");
+}
+
+/// divergence.lifecycle.15: a relayed acceptance needs the human's name and
+/// answer, is refused with relay denied, and an agent role without the option
+/// is `HUMAN_ONLY`; nothing is written by any of them.
+#[test]
+fn divergence_lifecycle_15_a_relayed_acceptance_without_name_or_answer_or_with_relay_denied_writes_nothing() {
+    let dir = repo();
+    let r = dir.path();
+    let refused = |out: &Output, code: &str| {
+        assert_eq!(out.status.code(), Some(2), "{}", out_text(out));
+        let doc: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(doc["error"]["code"], code, "{doc}");
+        doc
+    };
+    refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--note", "ok")]), "USAGE");
+    refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana")]), "USAGE");
+    refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana"), ("--note", "  ")]), "USAGE");
+    let plain = refused(&accept_as(r, "planner", &[]), "HUMAN_ONLY");
+    assert!(plain["error"]["hint"].as_str().unwrap().contains("--relayed-via"), "{plain}");
+    let human = canon(r, &["divergence", "accept", SCENARIO, "--project", "demo", "--reason", "r", "--tracking", TRACKING, "--actor", "a", "--role", "reviewer", "--relayed-via", "ask"]);
+    assert_eq!(human.status.code(), Some(2), "{}", out(&human));
+    assert!(out(&human).contains("no agent role"), "{}", out(&human));
+    let yaml = std::fs::read_to_string(r.join("canon.yaml")).unwrap();
+    std::fs::write(r.join("canon.yaml"), format!("{yaml}approval:\n  relay: deny\n")).unwrap();
+    let denied = refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana"), ("--note", "ok")]), "HUMAN_ONLY");
+    assert!(denied["error"]["message"].as_str().unwrap().contains("approval.relay"), "{denied}");
+    assert!(accepted_records(r).is_empty(), "nothing was written");
+}
+
+fn out_text(o: &Output) -> String {
+    out(o)
+}

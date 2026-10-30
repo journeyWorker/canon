@@ -26,18 +26,32 @@ a feature, a one-line request included. A human is needed once per scope:
 
 - **The approval** (step 1). For a new subject or a scope change, the
   human must approve the brief. Write the brief,
-  run `canon brief check` until it reports no blockers, then stop and
-  report the brief to the human: build nothing for that scope (no
+  run `canon brief check` until it reports no blockers, then show it, ask and
+  record the answer: build nothing for that scope (no
   scenarios, code or evidence) before the human answers. The approval is
   the one thing you never assume, even when the human said they cannot
-  answer until you report: the brief is that report. The one answer
+  answer until you show it. The one answer
   approves the brief and the policy, `.canon/policy.yaml`, which is what
   the gate grades the work against. The human may also approve it on the `canon dashboard` briefs page; you never use that form.
-  The human records the answer, never you:
-  `canon brief approve <slug> <slug> --approver <their name> --note "<their words>"`
-  (one or more slugs, one answer for all, nothing written if any is refused)
-  refuses every agent role (`HUMAN_ONLY`). Report that exact call, every slug filled in, and
-  wait; never remove or unset your role (`env -u CANON_ROLE`, dropping `--as`) to run it yourself.
+  1. **Show** with `canon brief show <slug> --body`: the brief file's bytes and,
+     last, `digest: sha256:<hex>`. Send it to the human's own view without
+     retyping it (omp: redirect it to `out://`; a harness with no such channel
+     leaves the tool output visible).
+  2. **Ask** with the harness question tool (`ask` in omp, `AskUserQuestion` in
+     Claude Code, otherwise in the chat): approve or request changes, several
+     briefs in one question.
+  3. **Count only an explicit approval.** A question or a condition is a
+     revision request (change the brief, check, show and ask again); no answer
+     records nothing.
+  4. **Record it** with the relay option:
+     `canon brief approve <slug> <slug> --approver <their name> --note "<their words>" --relayed-via <ask|AskUserQuestion|chat> --actor <your actor id> --digest <slug>=<digest shown>`
+     (one or more slugs, each with its own `--digest`, one answer for all, nothing written if any is refused).
+     The `Approved:` line then carries `(relayed by <role> <actor> via <tool>)`.
+     A digest that no longer matches the brief is `RELAY_DIGEST_MISMATCH`: show
+     it again. Without `--relayed-via` an agent role gets `HUMAN_ONLY`, and so
+     does a repo whose `canon.yaml` says `approval: { relay: deny }`: then the
+     human runs the call themselves. Never remove or unset your role
+     (`env -u CANON_ROLE`, dropping `--as`) to run it yourself.
   Never edit the policy to make the gate pass: a policy that differs from
   the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not
   waivable); stop and ask the human. A brief edited after its
@@ -224,9 +238,12 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   `query`, `finding list`, `divergence list`, `context`).
 - `--override-reason <text>` is the only way to proceed past a waivable
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`
-  for the human. There is no `--force`. `brief approve`, `policy approve` and
-  `divergence accept` are human-only and refuse every agent role: report the
-  exact call, ids filled in, and wait; never unset your role to run one.
+  for the human. There is no `--force`. `brief approve`, `policy approve`,
+  `divergence accept` and the `migrate --commit` that re-binds `Approved:`
+  lines record a human's decision and refuse every agent role (`HUMAN_ONLY`)
+  unless they record the explicit answer the human gave you, with
+  `--relayed-via <tool>` (show, ask, record, as for the brief; `canon skills
+  show role-planner`); never unset your role to run one.
 
 ### Many records at once: `--input`
 

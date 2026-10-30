@@ -2064,7 +2064,24 @@ pub struct BriefShowReport<'a> {
     /// The sections that hold nothing yet, each with its guidance in the brief's language.
     empty_sections: Vec<EmptySection>,
     next: Vec<Step>,
+    /// Set when an agent recorded the brief's approval for the human (0.32).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    relay: Option<canon_model::ApprovalRelay>,
 }
+
+/// The `brief show --body` report: the brief file as it is and the digest an approval of it records.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefBodyReport<'a> {
+    change: &'a str,
+    brief: &'a str,
+    /// The brief file's text, byte for byte.
+    body: &'a str,
+    /// What `canon brief approve` records for this text (`sha256:<hex>`).
+    digest: &'a str,
+}
+
+impl Report for BriefBodyReport<'_> {}
 
 /// A section not yet written and what goes in it.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -2076,6 +2093,36 @@ pub struct EmptySection {
 }
 
 impl Report for BriefShowReport<'_> {}
+
+/// `canon brief show --body [<change>] [--json]` (0.32): the brief file's
+/// bytes as they are, then a last line `digest: sha256:<hex>` (a newline is
+/// added first when the file does not end in one): what a human reads before
+/// answering, and the digest `canon brief approve` records for it. Read-only.
+pub fn run_body(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
+    use std::io::Write;
+    let repo = resolve_repo_root(repo);
+    let (change, path) = match resolve_change(&repo, change) {
+        Ok(found) => found,
+        Err(e) => return fail("canon brief show", json, &e),
+    };
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(e) => return fail("canon brief show", json, &CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(&repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again")),
+    };
+    let Ok(text) = String::from_utf8(bytes) else {
+        return fail("canon brief show", json, &CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: it is not UTF-8", rel(&repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"));
+    };
+    let digest = crate::brief_approve::approval_digest(&text);
+    if json {
+        let brief = rel(&repo, &path);
+        crate::json_out::data("brief show", &BriefBodyReport { change: change.as_str(), brief: &brief, body: &text, digest: &digest });
+        return 0;
+    }
+    let mut out = std::io::stdout().lock();
+    let tail = if text.ends_with('\n') || text.is_empty() { "" } else { "\n" };
+    let _ = writeln!(out, "{text}{tail}digest: {digest}");
+    0
+}
 
 /// `canon brief show [<change>] [--json]`: state and next steps.
 pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
@@ -2100,10 +2147,19 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let next = next_steps(ev);
     let empty_sections: Vec<EmptySection> = ev.empty_sections.iter().map(|key| EmptySection { key: key.clone(), heading: heading_of(key), guidance: guidance(&checked.language, key) }).collect();
     if json {
-        let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, empty_sections, next };
+        let relay = match &ev.approval {
+            crate::brief::Approval::Bound { line } | crate::brief::Approval::Unbound { line } | crate::brief::Approval::Changed { line, .. } => crate::relay::parse_marker(line),
+            crate::brief::Approval::Missing => None,
+        };
+        let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, empty_sections, next, relay };
         crate::json_out::data("brief show", &body);
     } else {
         println!("canon brief show: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
+        if let crate::brief::Approval::Bound { line } | crate::brief::Approval::Unbound { line } | crate::brief::Approval::Changed { line, .. } = &ev.approval {
+            if let Some(relay) = crate::relay::parse_marker(line) {
+                println!("  approval: {}", crate::relay::describe(&relay));
+            }
+        }
         for section in &empty_sections {
             println!("  empty: ## {} — {}", section.heading, section.guidance);
         }
