@@ -221,13 +221,13 @@ fn repo_file(path: &str) -> String {
     std::fs::read_to_string(root.join(path)).unwrap_or_else(|e| panic!("{path}: {e}"))
 }
 
-/// skills.install.73: the skills, README, status help and schema documentation
+/// skills.install.73: the skills, CHANGELOG, status help and schema documentation
 /// state the governing-change rule, the `briefs` list and the several-id call.
 #[test]
 fn skills_install_73_the_docs_state_the_governing_change_rule_and_the_briefs_list() {
-    let readme = repo_file("README.md");
-    let upgrading = readme.split("## 0.31.0 release").nth(1).and_then(|section| section.split("## 0.30.0 release").next()).expect("a 0.31.0 section");
-    assert!(upgrading.contains("### Upgrading") && upgrading.contains("`statusVersion` is `4`") && upgrading.contains("`brief` object is\ngone; read `briefs` instead"), "{upgrading}");
+    let changelog = repo_file("CHANGELOG.md");
+    let release = changelog.split("## 0.31.0 — ").nth(1).and_then(|section| section.split("## 0.30.0 — ").next()).expect("a 0.31.0 section");
+    assert!(release.contains("### Upgrading") && release.contains("`statusVersion` is `4`") && release.contains("`brief` object is gone; read `briefs` instead"), "{release}");
 
     for (file, needles) in [
         ("canon/skills/reference/canon-subject.md", &["A subject answers for the changes it tags, approved or adopted as chores", "`briefs` is present", "pending draft", "takes one or more slugs"][..]),

@@ -5,7 +5,7 @@
 //! One data table, three consumers: [`crate::removed`] reads it to turn an old
 //! spelling into a usage error (exit 2, `error.hint` names the replacement,
 //! `error.expected` lists it), [`crate::spec`] emits it as the spec's `removed`
-//! section, and the README's Upgrading list is generated from that section.
+//! section, and the CHANGELOG's Upgrading tables are generated from that section.
 //! It mirrors the 0.27 → 0.28 sections of `docs/design/cli-commands-0.28.md`;
 //! the 0.24 option renames the 0.25 hints already covered stay here too
 //! (`since`), so one lookup answers every removed spelling.

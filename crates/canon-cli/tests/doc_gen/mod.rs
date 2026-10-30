@@ -13,7 +13,7 @@
 //! - `cli-<group>` (`cli-top` for the top-level leaves): one table per command
 //!   group (`packages/website/src/content/docs/{,ko/}cli.mdx`);
 //! - `removed`: the 0.27 → 0.28 table, and `removed-031`: the 0.30 → 0.31 table of id options that became bare nouns
-//!   (`README.md`).
+//!   (`CHANGELOG.md`, in the Upgrading section of 0.28.0 and 0.31.0).
 //!
 //! `tests/docs_generated.rs` rewrites (`CANON_BLESS_DOCS=1`) or drift-checks
 //! every file; `tests/docs_lint.rs` lints the result.
@@ -31,7 +31,7 @@ pub fn repo_root() -> PathBuf {
 /// Every text file that may carry generated blocks, repo-relative and sorted.
 pub fn doc_files() -> Vec<PathBuf> {
     let root = repo_root();
-    let mut out = vec![root.join("README.md")];
+    let mut out = vec![root.join("CHANGELOG.md")];
     walk(&root.join("canon/skills"), "md", &mut out);
     walk(&root.join("packages/website/src/content/docs"), "mdx", &mut out);
     walk(&root.join("examples"), "md", &mut out);
@@ -302,7 +302,7 @@ pub fn role_commands(spec: &Value, role: &str) -> String {
     out
 }
 
-/// The removed-spellings table of the README's Upgrading list: the rows of release `since` (`0.28.0` or `0.31.0`).
+/// The removed-spellings table of the CHANGELOG's Upgrading steps: the rows of release `since` (`0.28.0` or `0.31.0`).
 pub fn removed_table(spec: &Value, since: &str) -> String {
     let (old_release, new_release) = if since == "0.28.0" { ("0.27", "0.28") } else { ("0.30", "0.31") };
     let mut out = format!("| {old_release} spelling | {new_release} spelling | What changed |\n|---|---|---|\n");
@@ -382,7 +382,7 @@ pub fn required_blocks(spec: &Value, rel: &str) -> Vec<String> {
     if rel.ends_with("docs/cli.mdx") {
         return groups(spec).iter().map(|g| format!("cli-{g}")).collect();
     }
-    if rel == "README.md" {
+    if rel == "CHANGELOG.md" {
         return vec!["removed".into(), "removed-031".into()];
     }
     Vec::new()
