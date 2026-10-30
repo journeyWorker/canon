@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-changelog",
+    "role": "reviewer",
+    "session_id": "s-0-32-changelog-rev"
+  },
+  "at": "2026-10-30T14:38:22.579368Z",
+  "change_id": "canon-0-32-changelog-just",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md:349-370,407-440,603-697",
+  "introduced_by": "96990f59d027366bc6e9b4a58f334900e57b8f7d",
+  "kind": "finding",
+  "reviewed_sha": "a54e36a653a2753f34cb5826f38bf44db99207b5",
+  "reviewer": "rev-changelog",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Other long entries repeat the same pattern (checked 0.17.0, 0.23.0, 0.30.0 against the old notes; content complete, dates right): 0.17.0 has 19 bullets, 8 Upgrading steps and nested 7-line refusal/migrate sub-lists (the per-command 'refused with canon migrate' list, the `canon migrate` step-by-step effects); condense to: layout moved (`canon migrate`), approvals only in `.canon/changes/<change>/brief.md`, `statusVersion` 3, init/skills prompts. 0.23.0 spends ~35 lines on exit-code tables for new commands (`ledger compact`, `artifacts verify`, `artifacts migrate`) and archive internals; keep the 5 Upgrading steps, the Breaking list and one line per new command. 0.30.0's first Breaking bullet is a 600-char path naming grammar (`kind=<kind>/<key components joined by _>_<digest8>.json`, escape rules) - say 'ledger files are renamed, run `canon migrate`' and keep the example path only. 0.16.0 averages 330 chars/bullet over 22 bullets (the longest in the file), and 0.14-0.22 average 200-260 chars/bullet; give each version the same pass: one user-visible change per line, no field inventories. Whole file is 870 lines (old notes 3,940), which meets the README/CHANGELOG split but not the human's ~20-line-per-version sample for the big releases.",
+  "worktree_dirty": true
+}

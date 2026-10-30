@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-changelog",
+    "role": "reviewer",
+    "session_id": "s-0-32-changelog-rev"
+  },
+  "at": "2026-10-30T14:38:27.157394Z",
+  "change_id": "canon-0-32-changelog-just",
+  "code_tree": "dc8a8ee496e0f17aced60b646abf641bbc659a8c",
+  "disposition": "open",
+  "file_ref": "justfile",
+  "introduced_by": "0a923d322837afe9bb8209357a5d416abdd8e7db",
+  "kind": "finding",
+  "reviewed_sha": "a54e36a653a2753f34cb5826f38bf44db99207b5",
+  "reviewer": "rev-changelog",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "Brief Check not met: 'every recipe except live is run once locally and the result recorded in evidence'. The only implementer evidence for this chore is the nextest junit report (target/0-32-changelog-junit.xml, 434 records + 63 per-test records); no record or commit message states a run of release-check, lint, gate, docs, conformance, launcher, platformer, dashboard, man or bench, and no note says live/bench were not run (live needs docker; bench reads /proc so is Linux-only). Reviewer re-ran on HEAD: release-check OK (12 tests), lint OK, docs no diff, gate red only on unreviewed-promotion, launcher 5 pass, dashboard build OK; platformer fails on this machine (Node 26: 'Cannot read properties of undefined (reading clear)' from localStorage in the tests, not from the justfile or this change; CI pins its own toolchain); man, bench, conformance, live not run by me. Implementer should add the recipe-run results (and the not-run reasons) to the evidence. Blast radius: the recipes are not exercised by CI, so a wrong flag in an unrun recipe goes unnoticed until a contributor hits it.",
+  "worktree_dirty": true
+}
