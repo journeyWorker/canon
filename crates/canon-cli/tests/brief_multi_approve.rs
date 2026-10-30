@@ -227,7 +227,7 @@ fn repo_file(path: &str) -> String {
 fn skills_install_73_the_docs_state_the_governing_change_rule_and_the_briefs_list() {
     let changelog = repo_file("CHANGELOG.md");
     let release = changelog.split("## 0.31.0 — ").nth(1).and_then(|section| section.split("## 0.30.0 — ").next()).expect("a 0.31.0 section");
-    assert!(release.contains("### Upgrading") && release.contains("`statusVersion` is `4`") && release.contains("`brief` object is gone; read `briefs` instead"), "{release}");
+    assert!(release.contains("### Upgrading") && release.contains("`statusVersion` is `4`") && release.contains("`brief` object is replaced by `briefs`"), "{release}");
 
     for (file, needles) in [
         ("canon/skills/reference/canon-subject.md", &["A subject answers for the changes it tags, approved or adopted as chores", "`briefs` is present", "pending draft", "takes one or more slugs"][..]),
