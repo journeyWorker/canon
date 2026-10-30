@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { advisoryTotal, approvalRequest, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, renderRelayed, relayText, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, renderRelayed, renderBriefsPage, relayText, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
 import { elements, escapeHtml, toHtml } from "../src/vnode";
 
 const handlers: BriefHandlers = { onChange: () => {}, onApprove: () => {} };
@@ -267,4 +267,15 @@ test("subject.lifecycle.52: the page lists the approvals an agent recorded for t
   expect(html).toContain("relayed by planner");
   const edited = toHtml(renderBrief(brief({ changedSinceApproval: true, previousRelay: relay }), handlers));
   expect(edited).toContain("that approval was relayed by planner");
+});
+
+test("subject.lifecycle.52: the relayed panel stays on the page when the last waiting brief is approved", () => {
+  const relayed = [{ changeId: "add-login", brief: ".canon/changes/add-login/brief.md", approval: "Ana", relay: { role: "planner", actor: "plan-1", tool: "ask" } }];
+  const html = (nodes: ReturnType<typeof renderBriefsPage>) => nodes.map((n) => toHtml(n)).join("");
+  const waiting = html(renderBriefsPage([brief()], relayed, handlers));
+  const afterLast = html(renderBriefsPage([], relayed, handlers));
+  expect(waiting).toContain("Approved through an agent");
+  expect(afterLast).toContain(EMPTY_MESSAGE);
+  expect(afterLast).toContain("Approved through an agent");
+  expect(afterLast).toContain("add-login");
 });

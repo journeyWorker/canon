@@ -7569,6 +7569,9 @@
         },
         {
           "aliases": [],
+          "conflictsWith": [
+            "--relayed-via"
+          ],
           "default": [],
           "help": "Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts",
           "kind": "flag",
@@ -7593,6 +7596,9 @@
         },
         {
           "aliases": [],
+          "conflictsWith": [
+            "--revert"
+          ],
           "default": [],
           "help": "With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it",
           "kind": "value",
@@ -7600,6 +7606,9 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
+          "requires": [
+            "--commit"
+          ],
           "valueName": "NAME"
         },
         {

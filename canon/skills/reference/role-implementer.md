@@ -4,8 +4,8 @@ You build inside an approved scope: scenarios, code, tests and evidence.
 Declare the role with `CANON_ROLE=implementer` (or `--as implementer`); `--role`
 on what you record then defaults to `implementer`.
 Build nothing before the brief is approved: `canon evidence add` refuses an
-unapproved brief's scenarios. If it is not approved, say so and wait; the
-planner and the human own that. The only waiver is `--override-reason
+unapproved brief's scenarios. If it is not approved, tell the orchestrator or planner, who show it to the human and ask;
+build nothing meanwhile. The only waiver is `--override-reason
 "<why>"`, for the case where you were told to attest while the brief waits for
 the human's answer: canon records it on the evidence, echoes it in
 `data.overrides[]` and lists it in `status` for the human. Never use it to
@@ -363,7 +363,7 @@ not another evidence step.
 |---|---|
 | "The suite is slow; record `faithful` to pass." | `faithful` over a failed case is refused; a limit outside this change is recorded `divergent` with the reason in `--ref`. |
 | "I fixed it, the test would pass." | Run the test red first and bind it, then green. Evidence is a claim; the history is what the reviewer reads. |
-| "The brief is as good as approved." | `evidence add` refuses an unapproved brief's scenarios. Say so and wait. |
+| "The brief is as good as approved." | `evidence add` refuses an unapproved brief's scenarios. Tell the orchestrator or planner, who show it to the human and ask; build nothing meanwhile. |
 | "I will attest the other unit's work under my id." | Each unit records under its own actor id and session id. |
 | "I was told this twice already." | A correction repeated across runs belongs in a scenario, the policy or a gate; tell the orchestrator. |
 | "I will accept the divergence myself." | The human accepts a gap: report the scenario, the reason and the tracking reference so they are asked, and never record an answer they did not give. |

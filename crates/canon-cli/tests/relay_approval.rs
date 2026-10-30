@@ -286,21 +286,32 @@ fn subject_lifecycle_54_a_relayed_approval_without_name_answer_actor_or_role_is_
     assert_eq!(snapshot(r), before, "the refused calls wrote nothing");
 }
 
-/// subject.lifecycle.55: an agent role without the relay option is refused
-/// `HUMAN_ONLY`, the hint naming the relay procedure before the human's call.
+/// subject.lifecycle.55: each agent role without the relay option is refused `HUMAN_ONLY` on
+/// brief approve, policy approve and divergence accept, the hint naming the relay procedure
+/// before the human's call; nothing is written.
 #[test]
 fn subject_lifecycle_55_an_agent_role_without_the_relay_option_is_human_only_and_the_hint_names_the_procedure() {
     let dir = repo();
     let r = dir.path();
     let before = snapshot(r);
-    for role in ["planner", "implementer", "reviewer", "orchestrator"] {
-        let out = run_as(r, Some(role), &["brief", "approve", "a", "--approver", "Ana", "--note", "ok", "--json"]);
-        assert_eq!(out.status.code(), Some(2), "{role}: {}", text(&out));
-        assert_eq!(code(&out), "HUMAN_ONLY");
-        let hint = json(&out)["error"]["hint"].as_str().unwrap().to_string();
-        let (relay, human) = (hint.find("--relayed-via").expect(&hint), hint.find("their own shell").expect(&hint));
-        assert!(relay < human, "the relay procedure comes first: {hint}");
-        assert!(hint.contains("canon brief show") && hint.contains("--body") && hint.contains("question tool") && hint.contains("--digest a="), "{hint}");
+    let leaves: [(&str, &[&str]); 3] = [
+        ("brief approve", &["brief", "approve", "a", "--approver", "Ana", "--note", "ok", "--json"]),
+        ("policy approve", &["policy", "approve", "--approver", "Ana", "--note", "ok", "--json"]),
+        ("divergence accept", &["divergence", "accept", "s.x.01", "--actor", "agent-1", "--reason", "r", "--tracking", "https://example.com/1", "--role", "reviewer", "--json"]),
+    ];
+    for (leaf, args) in leaves {
+        for role in ["planner", "implementer", "reviewer", "orchestrator"] {
+            let out = run_as(r, Some(role), args);
+            assert_eq!(out.status.code(), Some(2), "{leaf} as {role}: {}", text(&out));
+            assert_eq!(code(&out), "HUMAN_ONLY", "{leaf} as {role}");
+            let hint = json(&out)["error"]["hint"].as_str().unwrap().to_string();
+            let (relay, human) = (hint.find("--relayed-via").expect(&hint), hint.find("their own shell").expect(&hint));
+            assert!(relay < human, "{leaf}: the relay procedure comes first: {hint}");
+            assert!(hint.contains("question tool") && hint.contains(leaf), "{leaf}: {hint}");
+            if leaf == "brief approve" {
+                assert!(hint.contains("canon brief show") && hint.contains("--body") && hint.contains("--digest a="), "{hint}");
+            }
+        }
     }
     assert_eq!(snapshot(r), before);
 }
@@ -385,6 +396,12 @@ fn subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key(
         assert!(doc["error"]["hint"].as_str().unwrap().contains("canon "), "the hint carries the human's call: {doc}");
     }
     assert_eq!(snapshot(r), before);
+    // `migrate --commit` is refused the same way, whether or not its plan re-binds an `Approved:` line.
+    let preview = ok(r, &["migrate", "--json"]);
+    let digest = json(&preview)["data"]["planDigest"].as_str().unwrap().to_string();
+    let migrate = run_as(r, Some("planner"), &["migrate", "--commit", "--plan-digest", &digest, "--relayed-via", "ask", "--actor", "plan-1", "--approver", "Ana", "--note", "ok", "--json"]);
+    assert_eq!((migrate.status.code(), code(&migrate).as_str()), (Some(2), "HUMAN_ONLY"), "{}", text(&migrate));
+    assert!(json(&migrate)["error"]["message"].as_str().unwrap().contains("approval.relay"), "{}", text(&migrate));
     // The human's own call is not affected.
     ok(r, &["brief", "approve", "a", "--approver", "Ana", "--note", "ok"]);
     // A malformed section is refused rather than read as allow.
@@ -418,48 +435,109 @@ fn guide(name: &str) -> String {
     std::fs::read_to_string(skills_root().join(name)).unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 
-/// The sentences the old procedure ended on.
-const OLD_STOPS: [&str; 4] = ["Report that exact call", "report the exact call, slug filled in, and\nwait", "Report the call and wait", "the human runs it in their own shell (`--approver`"];
+/// Every guide the binary ships: the skill source and each reference.
+fn all_guides() -> Vec<(String, String)> {
+    let mut out = vec![("SKILL.src.md".to_string(), guide("SKILL.src.md"))];
+    let mut names: Vec<String> = std::fs::read_dir(skills_root().join("reference")).unwrap().filter_map(Result::ok).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.ends_with(".md")).collect();
+    names.sort();
+    for name in names {
+        let text = guide(&format!("reference/{name}"));
+        out.push((name, text));
+    }
+    out
+}
 
-/// subject.lifecycle.50: the skill and the planner guide say to show the
-/// brief with `brief show --body`, ask with the harness question tool, count
-/// only an explicit approval and record with `--relayed-via`.
+/// The sentences of `text` (blank lines and `. ` end one; single line breaks do not).
+fn sentences(text: &str) -> Vec<String> {
+    text.split("\n\n").flat_map(|para| para.replace('\n', " ").split(". ").map(|s| s.trim().to_string()).collect::<Vec<_>>()).filter(|s| !s.is_empty()).collect()
+}
+
+/// Whether `sentence` tells an agent to hand the brief to the human and stop, or to report and wait.
+fn stops_and_hands_off(sentence: &str) -> bool {
+    let s = sentence.to_lowercase();
+    // The refusal path of `approval: { relay: deny }` names the human's own call by design.
+    if s.contains("approval.relay") || s.contains("relay: deny") {
+        return false;
+    }
+    let report_verb = ["report the brief", "report the exact call", "report the command", "report that exact call"];
+    ["stops for the human", "stop for the human", "handed to the human", "is the report;", "stop and report", "stops and reports", "stop, report", "say so and wait", "report and wait", "stop and wait"]
+        .iter()
+        .any(|p| s.contains(p))
+        || report_verb.iter().any(|p| s.contains(p))
+        || s.match_indices("report").any(|(at, _)| s[at..].chars().take(60).collect::<String>().contains(" and wait"))
+}
+
+/// subject.lifecycle.50: every guide that describes recording a relayed answer names the
+/// show / ask / count-only-explicit steps (or points at the planner guide that does), and the
+/// planner, skill and orchestrator guides carry the whole procedure, `out://` fallbacks and
+/// the subagent rule included.
 #[test]
 fn subject_lifecycle_50_the_guides_show_ask_and_record_with_the_relay_option() {
-    let skill = guide("SKILL.src.md");
-    let planner = guide("reference/role-planner.md");
-    let orchestrator = guide("reference/role-orchestrator.md");
-    for (name, body) in [("SKILL.src.md", &skill), ("role-planner.md", &planner), ("role-orchestrator.md", &orchestrator)] {
-        for needle in ["brief show", "--body", "out://", "`ask`", "AskUserQuestion", "--relayed-via", "explicit approval", "--digest"] {
-            assert!(body.contains(needle), "{name} lacks `{needle}`");
+    let guides = all_guides();
+    let procedure = ["SKILL.src.md", "role-planner.md", "role-orchestrator.md"];
+    for (name, body) in &guides {
+        if procedure.contains(&name.as_str()) {
+            for needle in ["brief show", "--body", "out://", "64 KiB", "subagent", "`ask`", "AskUserQuestion", "--relayed-via", "explicit approval", "--digest"] {
+                assert!(body.contains(needle), "{name} lacks `{needle}`");
+            }
+        } else if body.contains("--relayed-via") {
+            assert!(body.contains("role-planner") || body.contains("AskUserQuestion") || body.contains("question tool"), "{name} mentions the relay option without the procedure or a pointer to it");
         }
     }
-    for needle in ["divergence accept", "migrate --commit", "policy approve"] {
+    let planner = guide("reference/role-planner.md");
+    for needle in ["divergence accept", "migrate\n   --commit", "policy approve"] {
         assert!(planner.contains(needle), "role-planner.md lacks the same procedure for `{needle}`");
     }
     assert!(guide("reference/role-reviewer.md").contains("--relayed-via") && guide("reference/role-reviewer.md").contains("AskUserQuestion"));
-    // The stub every harness reads names the procedure too.
     assert!(canon_cli::guide::stub("canon/SKILL.md", "0.0.0").contains("--relayed-via"), "the installed stub");
 }
 
-/// subject.lifecycle.51: a conditional answer is a revision request, no
-/// answer records nothing, and no sentence tells the planner to report the
-/// command and wait; `canon skills check` is clean once installed.
+/// subject.lifecycle.51: a conditional answer is a revision request, no answer records
+/// nothing, and no sentence of any guide tells an agent to report to the human and stop
+/// or wait; `canon skills check` is clean once installed.
 #[test]
-fn subject_lifecycle_51_conditional_answers_are_revisions_and_the_report_and_wait_stop_is_gone() {
-    let skill = guide("SKILL.src.md");
+fn subject_lifecycle_51_conditional_answers_are_revisions_and_no_guide_says_report_and_wait() {
     let planner = guide("reference/role-planner.md");
     assert!(planner.contains("A question, a condition") && planner.contains("revision request"), "role-planner.md");
     assert!(planner.contains("No answer means\n     nothing is recorded: wait."), "role-planner.md");
-    assert!(skill.contains("A question or a condition is a\n     revision request"), "SKILL.src.md");
-    for (name, body) in [("SKILL.src.md", skill), ("role-planner.md", planner), ("role-orchestrator.md", guide("reference/role-orchestrator.md")), ("role-implementer.md", guide("reference/role-implementer.md")), ("role-reviewer.md", guide("reference/role-reviewer.md"))] {
-        for old in OLD_STOPS {
-            assert!(!body.contains(old), "{name} still says `{old}`");
+    assert!(guide("SKILL.src.md").contains("A question or a condition is a\n     revision request"), "SKILL.src.md");
+    let mut found = Vec::new();
+    for (name, body) in all_guides() {
+        for sentence in sentences(&body) {
+            if stops_and_hands_off(&sentence) {
+                found.push(format!("{name}: {sentence}"));
+            }
         }
-        assert!(!body.contains("Stop for the human"), "{name}");
     }
+    assert!(found.is_empty(), "sentences that still hand the brief over and stop:\n{}", found.join("\n"));
+    // The scanner would catch the sentences the old guides held.
+    for old in ["The brief is handed to the human and you stop.", "The brief is the report; stop, and put open questions in.", "Report the exact call, slug filled in, and wait.", "The agent checks it, then stops and reports it.", "Say so and wait."] {
+        assert!(stops_and_hands_off(old), "{old}");
+    }
+    assert!(!stops_and_hands_off("Show the brief, ask, and record an explicit approval."));
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--providers", "claude", "--no-agents-md"]);
     let check = run(dir.path(), &["skills", "check"]);
     assert!(check.status.success(), "{}", text(&check));
+}
+
+/// subject.lifecycle.57 (never silently ignored): `migrate --relayed-via` with no role declared is
+/// `USAGE`, without `--commit` is `USAGE`, and a plan that re-binds nothing still honours the option.
+#[test]
+fn subject_lifecycle_57_the_relay_option_of_migrate_is_never_ignored() {
+    let dir = repo();
+    let r = dir.path();
+    let digest = json(&ok(r, &["migrate", "--json"]))["data"]["planDigest"].as_str().unwrap().to_string();
+    let relayed = ["--relayed-via", "ask", "--actor", "plan-1", "--approver", "Ana", "--note", "ok", "--json"];
+    let commit = ["migrate", "--commit", "--plan-digest", digest.as_str()];
+    let no_role = run(r, &[&commit[..], &relayed[..]].concat());
+    assert_eq!((no_role.status.code(), code(&no_role).as_str()), (Some(2), "USAGE"), "{}", text(&no_role));
+    assert!(json(&no_role)["error"]["message"].as_str().unwrap().contains("no agent role"), "{}", text(&no_role));
+    let preview = run_as(r, Some("planner"), &[&["migrate"][..], &relayed[..]].concat());
+    assert_eq!((preview.status.code(), code(&preview).as_str()), (Some(2), "USAGE"), "{}", text(&preview));
+    let yaml = std::fs::read_to_string(r.join("canon.yaml")).unwrap();
+    std::fs::write(r.join("canon.yaml"), format!("{yaml}approval:\n  relay: deny\n")).unwrap();
+    let digest = json(&ok(r, &["migrate", "--json"]))["data"]["planDigest"].as_str().unwrap().to_string();
+    let denied = run_as(r, Some("planner"), &[&["migrate", "--commit", "--plan-digest", digest.as_str()][..], &relayed[..]].concat());
+    assert_eq!((denied.status.code(), code(&denied).as_str()), (Some(2), "HUMAN_ONLY"), "{}", text(&denied));
 }

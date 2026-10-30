@@ -207,8 +207,8 @@ the transition, not the check.
 
 This refusal is a backstop, and so is the evidence one: shipping is not
 the first thing an unapproved brief stops. The agent writes the brief,
-runs `canon brief check` until it has no blockers, then stops and reports
-it, and nothing is built or attested for the subject until the human
+runs `canon brief check` until it has no blockers, then shows it to the
+human and asks, and nothing is built or attested for the subject until the human
 answers. `canon evidence add` refuses (exit 1, nothing staged) a
 scenario whose `@subject` owner, or a task whose change
 an adopting subject, has an enforced, unapproved brief, through the same
@@ -547,7 +547,7 @@ warn, and a command that writes and judges it is refused
   human answers again and `approve` runs again. Run it only from the
   human's answer, with their words as `--note`.
 
-The optional refinement passes that fix findings before the human stop are
+The optional refinement passes that fix findings before the approval step are
 listed in `role-planner.md` in this directory.
 
 A **chore** (`canon change new --change-kind chore`) changes how the subject is

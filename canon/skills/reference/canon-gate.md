@@ -299,9 +299,9 @@ never rides along into a confirming audit. `--drop-attachment` and
 
 ### Nothing is attested before the brief is approved (`--override-reason`)
 
-The approval is never assumed: the agent writes the brief, stops and
-reports it, and builds nothing for that scope until the human answers.
-`canon evidence add` is the backstop for that stop (0.16 M7). It
+The approval is never assumed: the agent writes the brief, shows it to the
+human and asks, and builds nothing for that scope until the human answers.
+`canon evidence add` is the backstop for that rule (0.16 M7). It
 refuses (exit `1`, nothing staged or stored) while a subject the record
 attests for has an enforced, unapproved brief: a change the record
 answers to (below) has a canon `.canon/changes/<change>/brief.md` with no `Approved:`

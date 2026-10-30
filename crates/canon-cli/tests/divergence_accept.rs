@@ -297,6 +297,8 @@ fn divergence_lifecycle_14_a_relayed_acceptance_records_the_relay_the_approver_a
     let accepted = &records[0]["status"]["accepted"];
     assert_eq!(accepted["relay"], serde_json::json!({ "role": "planner", "actor": "agent-7", "tool": "AskUserQuestion", "approver": "Ana", "answer": "Yes, accept the gap." }), "{accepted}");
     assert_eq!(records[0]["actor"]["role"], "reviewer", "the record is still the reviewer's act");
+    let status = out_text(&canon(r, &["status"]));
+    assert!(status.contains(&format!("accepted-divergence {SCENARIO} — {TRACKING} (no expiry) (relayed by planner agent-7 via AskUserQuestion)")), "status shows the relay: {status}");
     assert!(canon(r, &["subject", "move", "demo-subject", "--to", "shipped"]).status.success(), "the relayed acceptance ships the subject like any other");
 
     let human = repo();

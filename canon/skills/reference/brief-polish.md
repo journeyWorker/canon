@@ -2,7 +2,7 @@
 
 Make the brief something a human reads once and understands. Run it whenever
 `canon brief check` reports `prose.*` advisories; `canon status` and
-`meta.next` name it before the human stop. It never blocks approval, and it
+`meta.next` name it before the approval step. It never blocks approval, and it
 is not finished by silencing rules: it is finished when the brief reads
 plainly and each advisory is gone or waived with a reason.
 
@@ -218,7 +218,7 @@ uses the section key `brief`.
 1. Fix the mode problems above, then the findings, section by section.
 2. Run `canon brief check <slug> --json`: the findings are in `data.findings[]`.
 3. Repeat until no advisory remains, or each remaining one is waived with a reason.
-4. Stop and report to the human, in the brief's language. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
+4. Stop polishing and show the brief to the human (`canon brief show <slug> --body`), in the brief's language, and ask. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
 
 ## NEVER
 

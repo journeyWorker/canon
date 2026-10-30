@@ -378,7 +378,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let safe_plan = safety::Plan::new(listed);
     // A plan that re-binds an `Approved:` line or a review pin is the human's to commit.
     let mut relay = None;
-    if matches!(mode, Mode::Commit(_)) && briefs.rebinds() {
+    if matches!(mode, Mode::Commit(_)) && (briefs.rebinds() || relay_args.via.is_some()) {
         let human_call = format!("{base} --commit --plan-digest {}", safe_plan.plan_digest);
         let relay_call = format!("{human_call} --approver <their name> --note \"<their own words>\" --relayed-via <the question tool> --actor <your actor id>");
         let call = crate::relay::Call { via: relay_args.via.as_deref(), actor: relay_args.actor.as_deref(), approver: relay_args.approver.as_deref(), note: relay_args.note.as_deref() };

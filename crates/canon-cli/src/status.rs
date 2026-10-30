@@ -1244,7 +1244,7 @@ fn subject_steps(
                 next.push(NextStep {
                     actor: StepActor::Human,
                     role: None,
-                    command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
+                    command: format!("show the pending draft's brief in {} to the human and ask; {id} is not blocked meanwhile", brief.report_in()),
                     why: format!(
                         "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship do not read it until the human approves it or a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; {}",
                         brief.unanswered(),

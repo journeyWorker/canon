@@ -179,7 +179,7 @@ fn status_json(repo: &Path) -> Value {
         match step["actor"].as_str() {
             Some("agent") => {}
             Some("human") => assert!(
-                step["command"].as_str().unwrap().starts_with(BRIEF_STEP_PREFIX) || step["command"].as_str().unwrap().starts_with("report the pending draft's brief in "),
+                step["command"].as_str().unwrap().starts_with(BRIEF_STEP_PREFIX) || step["command"].as_str().unwrap().starts_with("show the pending draft's brief in "),
                 "the brief is the only step status addresses to a human: {step}"
             ),
             _ => panic!("every step names its actor: {step}"),
@@ -725,7 +725,7 @@ fn context_status_60_status_reads_the_approval_from_the_changes_brief() {
     );
     assert!(subject(&report, "early-subject").get("briefs").is_none(), "a specced subject carries no briefs field");
     assert_eq!(human_steps(&report), ["demo-subject"], "only the pending draft is reported to the human: {report}");
-    assert!(report["next"].as_array().unwrap().iter().any(|n| n["actor"] == "human" && n["command"].as_str().unwrap().starts_with("report the pending draft's brief")), "{report}");
+    assert!(report["next"].as_array().unwrap().iter().any(|n| n["actor"] == "human" && n["command"].as_str().unwrap().starts_with("show the pending draft's brief")), "{report}");
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains(&format!("      brief: approved in .canon/changes/c-second/brief.md — {words}\n")), "{text}");
     assert!(text.contains(&format!("      brief: approved in .canon/changes/c-done-subject/brief.md — {words}\n")), "{text}");

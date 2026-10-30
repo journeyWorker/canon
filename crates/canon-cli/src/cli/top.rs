@@ -51,7 +51,7 @@ pub struct MigrateArgs {
     #[arg(long, value_name = "DIR", requires = "revert")]
     pub backup: Option<PathBuf>,
     /// With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", requires = "commit", conflicts_with = "revert")]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
     #[arg(long, value_name = "ACTOR_ID", requires = "relayed_via")]

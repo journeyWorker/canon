@@ -255,9 +255,10 @@ ids); the human step comes after it. A policy that no longer matches its approva
      as they are and, as its last line, `digest: sha256:<hex>`, the value
      `brief approve` records. Send that output to the human's own view; never
      retype or paraphrase the brief into the conversation. In omp, redirect it
-     to `out://` (`canon brief show add-login --body > out://add-login`);
-     a harness with no such channel leaves the tool output visible, which is
-     the same. Read the digest alone with `canon brief show add-login --body |
+     to `out://` (`canon brief show add-login --body > out://add-login`).
+     `out://` is off for subagents and non-TUI sessions (the redirect then
+     errors) and caps a reply at 64 KiB: there, and in a harness with no such
+     channel, leave the tool output visible, which is the same. Read the digest alone with `canon brief show add-login --body |
      tail -n 1`. Show every brief of one request, each with its digest.
    - **Ask.** Use the harness's question tool: `ask` in omp, `AskUserQuestion`
      in Claude Code; a harness without one, ask in the chat and wait for the
@@ -269,6 +270,8 @@ ids); the human step comes after it. A policy that no longer matches its approva
      …") or an approval of part of it is a revision request: change the brief,
      `brief check` until clean, show it again and ask again. No answer means
      nothing is recorded: wait.
+   A subagent has no question tool and no human in front of it: the
+   orchestrator (the session talking to the human) shows, asks and records.
    They may also approve on `canon dashboard` (the briefs page,
    `/briefs.html`); you never click Approve or fill that form yourself.
 5. **Record the answer you were given.** Run `brief approve` with the relay
@@ -309,17 +312,17 @@ approval.
 
 **Done when:** `canon brief check add-login` exits 0 (no blockers, and the
 prose advisories are gone or waived with a reason) and `canon brief show
-add-login` reports `state: ready`: the brief is handed to the human and you
-stop. The scope is approved when the same command reports `state:
-approved`; read it in `data.state` of `canon brief show add-login --json`.
-Nothing else starts before that.
+add-login` reports `state: ready`: show it to the human and ask (step 4). The scope is approved
+when you have recorded their explicit approval (step 5) and the same command
+reports `state: approved`; read it in `data.state` of `canon brief show
+add-login --json`. Nothing else starts before that.
 
 ## Non-behavior work is a chore
 
 A refactor, dependency, build, CI or infra change that alters nothing a user
 can observe: `change new --change-kind chore`. Its brief is short (intent,
 category, invariants, checks, out of scope) and approved like any brief, one
-human stop. A chore adds no scenarios: the
+human answer. A chore adds no scenarios: the
 implementer runs the subject's suite again where the code changed and binds
 it with `canon evidence add --all-scenarios` (a docs-only chore changes no
 code and needs no new evidence), then the reviewer records one
@@ -346,7 +349,7 @@ old column, delete the old format) in its own later change.
 
 | The thought | The reality |
 |---|---|
-| "The human is unavailable; I will assume the approval." | Never. The brief is the report; stop, and put open questions into Questions and assumptions. |
+| "The human is unavailable; I will assume the approval." | Never. Show the brief and ask; without an explicit answer nothing is recorded and nothing is built. Put open questions into Questions and assumptions. |
 | "This could change policy, but I will decide it." | Anything that could change policy goes to the questions. |
 | "A small follow-up needs no new answer." | A follow-up that adds or changes a flow step is a scope change and needs a new answer and a new `brief approve`. |
 | "This migration is just a chore." | Data, interface or output changes are feature changes. |

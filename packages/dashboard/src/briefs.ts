@@ -1,6 +1,6 @@
 import "./style.css";
 import { renderNav } from "./nav";
-import { advisoryTotal, approvalRequest, approveDisabled, refusedIds, renderApproveError, renderBriefs, renderRelayed, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, refusedIds, renderApproveError, renderBriefsPage, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
 import { h, toDom } from "./vnode";
 
 // The briefs page: the changes whose brief awaits the human, and the form
@@ -116,10 +116,12 @@ const handlers: BriefHandlers = {
 
 let shown: Brief[] = [];
 
-function render(briefs: Brief[], relayed: RelayedBrief[] = []): void {
+let relayedShown: RelayedBrief[] = [];
+
+function render(briefs: Brief[], relayed: RelayedBrief[] = relayedShown): void {
   shown = briefs;
-  const relayedPanel = renderRelayed(relayed);
-  main!.replaceChildren(toDom(renderBriefs(briefs, handlers)), ...(relayedPanel ? [toDom(relayedPanel)] : []));
+  relayedShown = relayed;
+  main!.replaceChildren(...renderBriefsPage(briefs, relayed, handlers).map(toDom));
 }
 
 async function load(): Promise<void> {

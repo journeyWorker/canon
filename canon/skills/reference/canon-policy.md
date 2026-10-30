@@ -78,7 +78,7 @@ loop). `canon brief approve` records both in one call. `canon policy
 approve` is a human's decision: with a role declared (`--as` or `CANON_ROLE`)
 it is refused with `HUMAN_ONLY` (exit 2, not retryable) unless it records the
 answer the human gave in the conversation: show them `.canon/policy.yaml`, ask,
-and on an explicit approval run it with `--relayed-via <tool>`, `--actor`,
+and on an explicit approval run it (the steps are in `canon skills show role-planner`) with `--relayed-via <tool>`, `--actor`,
 `--approver` and `--note` (their name and words); the file then carries `relay`
 (role, actor, tool). The human may run it themselves, for a policy-only change
 or after the brief answer, supplying `--approver` and `--note`. It

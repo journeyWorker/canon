@@ -228,7 +228,7 @@ canon ledger compact
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-canon migrate [--commit --plan-digest <DIGEST>] [--revert] [--backup <DIR> (with --revert)] [--relayed-via <NAME>] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
+canon migrate [--commit --plan-digest <DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -492,14 +492,14 @@ text.
 | Harness | In-harness subagents | Isolation | Ask the human | Hooks | Skipped |
 |---|---|---|---|---|---|
 | claude (`.claude`) | yes, a subagent tool; a child shares your environment, so pass the role in the task | a subagent can run in its own git worktree | yes, a question tool | yes, in the harness settings; `scripts/canon-retrieve-pre-dispatch.sh` is a sidecar, not installed | none |
-| codex (`.agents`) | `verify`: none when #39 was filed; start the reviewer as a new `codex exec` run | none from canon: use a separate worktree you create | no in `codex exec`; stop and report | `verify` | in-harness spawn, unless a newer version provides it |
+| codex (`.agents`) | `verify`: none when #39 was filed; start the reviewer as a new `codex exec` run | none from canon: use a separate worktree you create | no in `codex exec`; ask in the chat | `verify` | in-harness spawn, unless a newer version provides it |
 | omp (`.omp`) | yes, the task tool | `verify` | yes, an ask tool | yes | none |
 | pi (`.pi`) | `verify`: assume none; start a new `pi` process | none from canon | `verify` | `verify` | in-harness spawn, isolation |
 
 Where a harness has no subagent tool, the reviewer is still a separate
 process with its own session id: start it from the shell with its own
-`CANON_ROLE=reviewer`. A harness that cannot ask the human means you stop
-and report in your final message; you never assume the answer.
+`CANON_ROLE=reviewer`. A harness that cannot ask the human means you ask
+in the chat and record only the reply; you never assume the answer.
 
 The reviewer is a separate process with its own session id, never your
 session or the implementer's under another label. Start it as a new process
@@ -508,14 +508,16 @@ implementer's context, and have it record its real session id as
 `--session` (#39). A reviewer that cannot run the tests says so and does
 not sign off.
 
-## Relay the human stop
+## Relay the human's answer
 
 When `status` or `meta.next` shows a step with `actor: human` (the brief's
 approval), stop everything for that scope and put the brief in front of the
 human in its language: `canon brief show <slug> --body` prints the brief and,
 last, its digest. Send the output to the human's own view, never retyped (omp:
-redirect it to `out://`; a harness with no such channel leaves the tool output
-visible). Ask with the harness question tool (`ask` in omp, `AskUserQuestion`
+redirect it to `out://`, off for subagents and non-TUI sessions and capped at
+64 KiB; there, and where there is no such channel, leave the tool output
+visible). You are the session that talks to the human: a subagent has no
+question tool, so you show, ask and record for it. Ask with the harness question tool (`ask` in omp, `AskUserQuestion`
 in Claude Code, otherwise in the chat), approve or request changes, all the
 clean briefs in one question. Only an explicit approval counts; a question or a
 condition is a revision request for the planner, and no answer means you wait.

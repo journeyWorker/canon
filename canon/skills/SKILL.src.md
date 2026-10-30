@@ -35,8 +35,10 @@ a feature, a one-line request included. A human is needed once per scope:
   the gate grades the work against. The human may also approve it on the `canon dashboard` briefs page; you never use that form.
   1. **Show** with `canon brief show <slug> --body`: the brief file's bytes and,
      last, `digest: sha256:<hex>`. Send it to the human's own view without
-     retyping it (omp: redirect it to `out://`; a harness with no such channel
-     leaves the tool output visible).
+     retyping it (omp: redirect it to `out://`, which is off for subagents and
+     non-TUI sessions and caps at 64 KiB; there, and in a harness with no such
+     channel, leave the tool output visible). A subagent has no question tool:
+     the orchestrator shows, asks and records.
   2. **Ask** with the harness question tool (`ask` in omp, `AskUserQuestion` in
      Claude Code, otherwise in the chat): approve or request changes, several
      briefs in one question.
@@ -88,7 +90,7 @@ a feature, a one-line request included. A human is needed once per scope:
   so in your report. That covers the brief's questions and work inside an
   approved scope, never the approval itself.
 
-1. **Brief.** The planner writes the PRD brief (`.canon/changes/<slug>/brief.md`), checks it with `canon brief check`, and stops for the human. `canon skills show role-planner`
+1. **Brief.** The planner writes the PRD brief (`.canon/changes/<slug>/brief.md`), checks it with `canon brief check`, shows it to the human, asks, and records their explicit approval. `canon skills show role-planner`
 2. **Subject.** `canon subject new`, then `canon change new` (`--change-kind chore` for work that alters no behavior); the change writes the brief skeleton. `canon skills show role-planner`
 3. **Scenarios.** `canon scenario new --flow <F-id> --case <case>` per behavior of a flow step, failure paths (`--case failure`) included; many at once with `--input` (below). `canon skills show role-implementer`
 4. **Units.** Split the work; one unit is one flow step's slice with a named verify command, and each unit has its own actor id and session id, passed on everything it records. A unit never attests another unit's work.
@@ -231,7 +233,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   (`canon subject move <id> --to verifying`, `canon change new <slug>`), and
   `--kind` values carry no `_record` suffix (`--kind evidence`).
 - `canon status` sends the planner to write the brief while `brief check`
-  has blockers; the human stop appears only when the brief is clean and
+  has blockers; the approval step appears only when the brief is clean and
   unapproved.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
   for everything), and project fields with `--fields a,b` (`status`, `export`,
@@ -360,7 +362,7 @@ current step needs.
 | Name | What it is for |
 | --- | --- |
 | `canon` | This core guide: the loop, driving the CLI, routing. |
-| `role-planner` | Planner steps 1–2: subject, change, PRD brief, the human stop. |
+| `role-planner` | Planner steps 1–2: subject, change, PRD brief, the approval. |
 | `role-implementer` | Implementer steps 3–6: scenarios, units, code, evidence. |
 | `role-reviewer` | Reviewer step 7: findings and signed reviews in a separate session. |
 | `role-orchestrator` | Orchestrator step 8: dispatch, transitions, resuming, upgrading. |

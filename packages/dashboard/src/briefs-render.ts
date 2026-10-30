@@ -340,3 +340,9 @@ export function renderRelayed(relayed: RelayedBrief[]): VNode | null {
     h("ul", { class: "relayed-list" }, relayed.map((one) => h("li", { "data-change": one.changeId }, h("strong", {}, one.changeId), ` · ${one.brief} · ${relayText(one.relay)}`))),
   );
 }
+
+/** The whole page body: the waiting briefs (or the empty message), then the relayed approvals. The relayed panel stays when the last waiting brief is approved. */
+export function renderBriefsPage(briefs: Brief[], relayed: RelayedBrief[], handlers: BriefHandlers): VNode[] {
+  const panel = renderRelayed(relayed);
+  return [renderBriefs(briefs, handlers), ...(panel ? [panel] : [])];
+}
