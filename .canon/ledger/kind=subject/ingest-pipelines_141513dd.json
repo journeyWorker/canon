@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-30T22:25:59.711633Z",
+  "change_ids": [
+    "canon-0-30-plans-cutover",
+    "canon-0-30-rust-sweep",
+    "canon-0-33-atip-l0"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "ingest-pipelines",
+  "summary": "",
+  "title": "Ingest: sessions, artifacts, and foreign plan dialects"
+}
