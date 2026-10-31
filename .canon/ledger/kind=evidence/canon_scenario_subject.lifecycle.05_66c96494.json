@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T14:17:03.299820Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib any_non_retired_state_may_retire_but_retired_is_terminal"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 342,
+  "scenario_id": "subject.lifecycle.05",
+  "schema": 1,
+  "staging_id": "318d7fc7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

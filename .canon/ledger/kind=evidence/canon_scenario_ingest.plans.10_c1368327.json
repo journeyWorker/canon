@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T14:14:54.388208Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest a_repository_root_source_ignores_trees_outside_openspec_changes; cargo test -p canon-ingest source_files_at_a_repository_root_never_leave_openspec_changes"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 63,
+  "scenario_id": "ingest.plans.10",
+  "schema": 1,
+  "staging_id": "38966e79",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

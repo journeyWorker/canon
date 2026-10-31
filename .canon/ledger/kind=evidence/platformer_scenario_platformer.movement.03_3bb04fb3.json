@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T14:17:30.705336Z",
+  "attachments": [
+    {
+      "case": "platformer.movement.03: No double jump; coyote and buffered jumps fire",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "74af776e96e8ef00ee6084d435fa8f18c216c4c1b09c1bf96b6d3d88ce9173ff"
+    }
+  ],
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "platformer",
+  "run_seq": 25,
+  "scenario_id": "platformer.movement.03",
+  "schema": 1,
+  "staging_id": "6c09ec24",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

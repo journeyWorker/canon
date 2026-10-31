@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T14:15:03.807880Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib ingest::tests::routed_policy_persists_through_canon_store_git_tier"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 72,
+  "scenario_id": "ingest.sessions.08",
+  "schema": 1,
+  "staging_id": "5d812720",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
