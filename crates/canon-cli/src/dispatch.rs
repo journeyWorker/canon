@@ -118,7 +118,7 @@ use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::{render_json, resolve_canon_yaml, resolve_repo_root, resolve_surface, ContextOptions};
 use crate::context_pack::{create_dispatch_pack, load_manifest_spec, ContextPackError, ContextPackSpec, PromptBundleSelection};
 

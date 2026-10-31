@@ -35,7 +35,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 
-use crate::cli_error::{CliError, ErrorBody};
+use crate::cli_error::{CliErrorExt as _, CliError, ErrorBody};
 use crate::reports::Report;
 
 /// The most bytes one document may hold; larger is refused before it is read further.
@@ -705,7 +705,7 @@ pub enum Expanded {
 /// A command line without `--input`, or naming no leaf that takes it, is
 /// returned as it is.
 pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
-    let json = crate::run::entry::argv_wants_json();
+    let json = atip::argv_wants_json();
     let Some(tokens) = args.iter().skip(1).map(|a| a.to_str().map(str::to_string)).collect::<Option<Vec<String>>>() else {
         return Expanded::Argv(args);
     };

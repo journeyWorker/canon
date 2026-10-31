@@ -1,5 +1,6 @@
 //! `canon context-pack` — the handlers of the group.
 
+use crate::cli_error::CliErrorExt as _;
 use crate::cli::context_pack::{ContextPackCommand, ContextPackShowArgs, ContextPackVerifyArgs, ContextPackAddArgs};
 use std::process::ExitCode;
 

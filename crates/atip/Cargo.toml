@@ -1,0 +1,18 @@
+[package]
+name = "atip"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The atip/1 contract pieces a command-line tool shares: the error value and its redaction, the error-code row type, JSON-mode detection and the one-line envelope output, and the shell quoting and splitting of next-step commands. Depends on no canon crate, so it can move to the atip repository unchanged."
+
+[lib]
+name = "atip"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = "1.2.1"
+
+[lints]
+workspace = true

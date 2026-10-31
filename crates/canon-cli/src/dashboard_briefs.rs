@@ -28,7 +28,7 @@ use serde_json::Value;
 use crate::brief::approval_of;
 use crate::brief_approve::{approval_blockers, sha256_hex};
 use crate::brief_check::{check_text, parse_sections};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// The code for an approval whose brief differs from the page's copy.
 pub const CHANGED_SINCE_PAGE_LOAD: &str = "BRIEF_CHANGED_SINCE_PAGE_LOAD";

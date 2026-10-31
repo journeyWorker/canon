@@ -198,7 +198,7 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
 /// Read-only queries are not checked: a filter on an id no root carries
 /// matches nothing and writes nothing.
 pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
-    use crate::cli_error::CliError;
+    use crate::cli_error::{CliError, CliErrorExt as _};
     let roots = load_spec_roots(&repo.join("canon.yaml")).map_err(|e| {
         CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
     })?;
@@ -207,7 +207,7 @@ pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crat
 
 /// [`require_spec_root`] over roots already loaded.
 pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
-    use crate::cli_error::CliError;
+    use crate::cli_error::{CliError, CliErrorExt as _};
     if roots.iter().any(|root| &root.id == project_id) {
         return Ok(());
     }
@@ -230,7 +230,7 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
 /// roots and none given the leaf refuses with `code`, naming the roots. The
 /// id given is not checked here ([`require_spec_root`] does that).
 pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, u8> {
-    use crate::cli_error::CliError;
+    use crate::cli_error::{CliError, CliErrorExt as _};
     if let Some(id) = given {
         return Ok(id.clone());
     }

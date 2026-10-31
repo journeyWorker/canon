@@ -23,7 +23,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::cli::top::{SearchArgs, TraceArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::json_out::Report;
 use index::{snippet, Index, IndexError, IndexInfo, Seed};
 use inputs::{Corpus, InputError};

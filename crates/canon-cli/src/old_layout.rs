@@ -20,7 +20,7 @@ use std::process::ExitCode;
 
 use canon_store::partition::{is_old_stem, LEGACY_KIND_DIR};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::status::{NextStep, StepActor};
 
 /// The leaves that write but touch no ledger record, so a 0.29 repo may run

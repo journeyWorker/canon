@@ -22,7 +22,7 @@ use std::path::Path;
 
 use canon_model::{paths, ChangeId};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::status::{NextStep, StepActor};
 
 /// The code of the refusal.

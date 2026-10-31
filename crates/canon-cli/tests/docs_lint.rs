@@ -475,7 +475,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
         let scratch = TempDir::new().unwrap();
         let cwd = scratch.path().join("repo");
         copy_dir(base.path(), &cwd);
-        let mut argv: Vec<String> = canon_cli::next::split_argv(leaf["examples"][0].as_str().expect("example"));
+        let mut argv: Vec<String> = atip::split_argv(leaf["examples"][0].as_str().expect("example"));
         argv.remove(0);
         argv.push("--json".into());
         let output = run(&cwd, home.path(), &argv);

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/atip",
     "crates/canon-model",
     "crates/canon-store",
     "crates/canon-ingest",
@@ -22,6 +23,7 @@ repository = "https://github.com/journeyWorker/canon"
 
 [workspace.dependencies]
 # Internal crates
+atip = { path = "crates/atip" }
 canon-model = { path = "crates/canon-model" }
 canon-store = { path = "crates/canon-store" }
 canon-ingest = { path = "crates/canon-ingest" }

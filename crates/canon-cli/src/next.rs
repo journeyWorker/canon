@@ -55,68 +55,9 @@ pub struct NextEntry {
 
 impl From<&NextStep> for NextEntry {
     fn from(step: &NextStep) -> Self {
-        let argv = if step.actor == StepActor::Agent && step.command.starts_with("canon ") && !has_placeholder(&step.command) { split_argv(&step.command) } else { Vec::new() };
+        let argv = if step.actor == StepActor::Agent && step.command.starts_with("canon ") && !atip::has_placeholder(&step.command) { atip::split_argv(&step.command) } else { Vec::new() };
         Self { command: step.command.clone(), argv, why: step.why.clone(), actor: step.actor, role: step.role }
     }
-}
-
-/// Whether `command` still holds a `<placeholder>`: a `<` opening a word and a later `>`.
-pub fn has_placeholder(command: &str) -> bool {
-    command.match_indices('<').any(|(at, _)| command[at + 1..].starts_with(|c: char| c.is_ascii_alphabetic()) && command[at..].contains('>'))
-}
-
-/// `command` split into words the way a POSIX shell would: whitespace
-/// separates, single quotes keep everything, double quotes keep everything but
-/// `\"` and `\\`.
-pub fn split_argv(command: &str) -> Vec<String> {
-    let mut words = Vec::new();
-    let mut word = String::new();
-    let mut started = false;
-    let mut chars = command.chars();
-    while let Some(c) = chars.next() {
-        match c {
-            c if c.is_whitespace() => {
-                if started {
-                    words.push(std::mem::take(&mut word));
-                    started = false;
-                }
-            }
-            '\'' => {
-                started = true;
-                for q in chars.by_ref() {
-                    if q == '\'' {
-                        break;
-                    }
-                    word.push(q);
-                }
-            }
-            '"' => {
-                started = true;
-                while let Some(q) = chars.next() {
-                    match q {
-                        '"' => break,
-                        '\\' => match chars.next() {
-                            Some(e @ ('"' | '\\')) => word.push(e),
-                            Some(other) => {
-                                word.push('\\');
-                                word.push(other);
-                            }
-                            None => word.push('\\'),
-                        },
-                        other => word.push(other),
-                    }
-                }
-            }
-            other => {
-                started = true;
-                word.push(other);
-            }
-        }
-    }
-    if started {
-        words.push(word);
-    }
-    words
 }
 
 /// What a write touched, to narrow the status steps to it.

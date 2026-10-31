@@ -2,7 +2,7 @@
 
 use canon_model::envelope::RecordKind;
 use crate::cli::adapter::{AdapterCommand, AdapterValidateArgs, AdapterAuthorizeArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use std::process::ExitCode;
 
 pub fn run(cmd: AdapterCommand) -> ExitCode {

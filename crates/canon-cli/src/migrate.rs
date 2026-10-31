@@ -70,7 +70,7 @@ use canon_model::{paths, ChangeId, RecordKind};
 use canon_store::tier::TierQuery;
 use serde_yaml::Value;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::json_out::Report;
 use crate::migrate_briefs;

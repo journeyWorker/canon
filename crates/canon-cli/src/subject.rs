@@ -123,7 +123,7 @@ use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::{resolve_canon_yaml, resolve_repo_root};
 use crate::tiers::{self, TierCliError};
 

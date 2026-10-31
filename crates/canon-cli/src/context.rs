@@ -60,7 +60,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::json_out::Report;
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// The authoring-surface CAPABILITY version — `canon context`'s own
 /// outline/JSON contract version, deliberately NOT any record kind's

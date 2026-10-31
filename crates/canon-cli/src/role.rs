@@ -18,7 +18,7 @@ use clap::ValueEnum;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// The environment variable that declares the role.
 pub const ENV: &str = "CANON_ROLE";

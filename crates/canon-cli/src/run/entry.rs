@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// Rust starts with SIGPIPE ignored, so every write to a stdout whose reader
 /// has gone (`canon status | head`) fails and `println!` panics (exit 101).
@@ -30,7 +30,7 @@ pub fn set_sigpipe(_default: bool) {}
 /// unless `--json` is in argv: then it is the shared `USAGE` error, so a
 /// caller that asked for JSON gets JSON on stdout.
 pub fn usage_error(error: &clap::Error) -> ExitCode {
-    let json = argv_wants_json();
+    let json = atip::argv_wants_json();
     // A removed spelling (the removed-spellings table): the refusal names its replacement.
     if error.use_stderr() {
         let args: Vec<String> = std::env::args().skip(1).collect();
@@ -185,13 +185,7 @@ pub fn record_context(parsed: &clap::ArgMatches) {
     if let Some(repo) = leaf.try_get_one::<PathBuf>("repo").ok().flatten() {
         crate::json_out::set_repo(repo.clone());
     }
-    crate::json_out::set_json_mode(leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false));
-}
-
-/// Whether the command line asked for `--json`, read from argv because the
-/// parse may not have produced a command yet.
-pub fn argv_wants_json() -> bool {
-    std::env::args().skip(1).take_while(|arg| arg != "--").any(|arg| arg == "--json")
+    atip::set_json_mode(leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false));
 }
 
 /// Whether the leaf at `names` (`["gate", "check"]`) declares a `--repo` option. Asked of the command tree, not

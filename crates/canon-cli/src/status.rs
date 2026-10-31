@@ -118,6 +118,7 @@ use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::cli_error::CliErrorExt as _;
 use crate::json_out::Report;
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
 use crate::brief::BriefStatus;

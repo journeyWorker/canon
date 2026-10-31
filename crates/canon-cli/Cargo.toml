@@ -23,6 +23,7 @@ name = "canon"
 path = "src/main.rs"
 
 [dependencies]
+atip.workspace = true
 canon-fmt.workspace = true
 canon-gate.workspace = true
 canon-ingest.workspace = true

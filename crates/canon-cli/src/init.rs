@@ -54,7 +54,7 @@ use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::policy::{BackendConfig, TierPolicy};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::policy_level::{starter_policy, PolicyLevel};
 use crate::skills::{self, Provider};
 

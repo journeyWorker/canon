@@ -3,12 +3,17 @@
 //! A refusal or an operational failure is a [`CliError`]: a stable
 //! SCREAMING_SNAKE `code` (the thing a caller branches on), a `message`, an
 //! optional `hint` (a working invocation or the next step), whether a retry
-//! can succeed, and the process exit code. The exit code and `retryable` are
-//! not chosen at the site that builds the error: they come from the code's row
-//! in the registry ([`all_codes`]), so one code has one exit everywhere. The
-//! few sites with a documented per-site exit say so with
-//! [`CliError::with_exit`].
-//! [`CliError::emit`] is the single rendering path:
+//! can succeed, and the process exit code. The error value, its builder, the
+//! redaction of `received`, the row type [`CodeInfo`] and the exit constants
+//! are the `atip` crate's; this module keeps canon's side of the contract:
+//! the table of rows ([`all_codes`]) and the rendering that needs canon's
+//! envelope ([`CliErrorExt`]).
+//!
+//! The exit code and `retryable` are not chosen at the site that builds the
+//! error: they come from the code's row in the registry ([`all_codes`]), so
+//! one code has one exit everywhere. The few sites with a documented per-site
+//! exit say so with [`CliError::with_exit`].
+//! [`CliErrorExt::emit`] is the single rendering path:
 //!
 //! - human mode, on stderr: `canon <command path>: <CODE> — <message>`, then
 //!   an optional `hint: <hint>` line;
@@ -28,193 +33,74 @@
 //! [`all_codes`] is the registry of every code with its meaning, exit and
 //! retryability; a test keeps it in step with the codes the sources
 //! construct.
+//!
+//! The methods of [`CliErrorExt`] are called as methods of [`CliError`]; a file
+//! that builds or renders an error imports the trait (`CliErrorExt as _` when it
+//! does not name it).
 
-use schemars::JsonSchema;
-use serde::Serialize;
 use serde_json::Value;
+
+pub use atip::{redact, CliError, CodeInfo, ErrorBody, EXIT_FAILED, EXIT_REFUSED};
 
 use crate::json_out::Report;
 
-/// A finding, a failed check or an operational failure.
-pub const EXIT_FAILED: u8 = 1;
-/// A refusal or a usage error.
-pub const EXIT_REFUSED: u8 = 2;
-
-/// One refusal or operational failure.
-///
-/// The members every error has stay inline; the optional ones that most errors
-/// leave empty live in one boxed [`CliErrorDetail`], so the `Err` side of a
-/// `Result<_, CliError>` stays small.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CliError {
-    pub code: &'static str,
-    pub message: String,
-    /// Whether running the same command again, unchanged, can succeed
-    /// (the code's registry row).
-    pub retryable: bool,
-    /// The process exit code, `0..=255` (the code's registry row unless a site overrides it).
-    pub exit: u8,
-    detail: Option<Box<CliErrorDetail>>,
-}
-
-/// The optional members of a [`CliError`], read through its accessors and set
-/// through its builder methods.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct CliErrorDetail {
-    hint: Option<String>,
-    /// The argument or record field that was refused (`--to`, `--kind`).
-    field: Option<String>,
-    /// The values `field` accepts, when the refusal is about a closed set.
-    expected: Option<Vec<String>>,
-    /// The refused value as given; redacted when it is rendered ([`redact`]).
-    received: Option<String>,
-    /// The nearest valid words, closest first ([`crate::suggest`]).
-    suggestions: Vec<String>,
-}
-
-/// The `error` member of a failure envelope. Field order is the document
-/// order: `code` first.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ErrorBody {
-    /// Stable SCREAMING_SNAKE code, listed by `canon schema --errors`.
-    pub code: String,
-    pub message: String,
-    /// The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub field: Option<String>,
-    /// The valid values of `field`, when it takes a closed set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expected: Option<Vec<String>>,
-    /// The value that was refused, with secrets redacted.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub received: Option<String>,
-    /// The nearest valid commands, options or values (a destructive command only within edit distance 1).
-    pub suggestions: Vec<String>,
-    /// A working invocation or the next step; `null` when there is none.
-    pub hint: Option<String>,
-    /// True only where running the same command again can succeed.
-    pub retryable: bool,
-}
-
-impl CliError {
-    fn new(code: &'static str, message: impl Into<String>) -> Self {
-        let (exit, retryable) = code_info(code).map_or((EXIT_REFUSED, false), |info| (info.exit, info.retryable));
-        Self { code, message: message.into(), retryable, exit, detail: None }
-    }
-
+/// What canon adds to [`CliError`]: the constructors that read canon's code
+/// table, and the renderings that print canon's envelope.
+pub trait CliErrorExt {
     /// The command was understood and declined. The exit comes from the
-    /// code's registry row, as for [`CliError::failed`]; the two names say
+    /// code's registry row, as for [`CliErrorExt::failed`]; the two names say
     /// what the site means.
-    pub fn refused(code: &'static str, message: impl Into<String>) -> Self {
-        Self::new(code, message)
-    }
+    fn refused(code: &'static str, message: impl Into<String>) -> CliError;
 
     /// The command could not do its work. The exit comes from the code's
     /// registry row.
-    pub fn failed(code: &'static str, message: impl Into<String>) -> Self {
-        Self::new(code, message)
-    }
-
-    fn detail_mut(&mut self) -> &mut CliErrorDetail {
-        self.detail.get_or_insert_with(Box::default)
-    }
-
-    /// The hint, if the error has one.
-    pub fn hint_text(&self) -> Option<&str> {
-        self.detail.as_deref()?.hint.as_deref()
-    }
-
-    /// The refused argument or field, if the error names one.
-    pub fn field_name(&self) -> Option<&str> {
-        self.detail.as_deref()?.field.as_deref()
-    }
-
-    /// The next step the caller can take.
-    pub fn hint(mut self, hint: impl Into<String>) -> Self {
-        self.detail_mut().hint = Some(hint.into());
-        self
-    }
-
-    /// Names the refused argument or field (`--to`, `--kind`).
-    pub fn field(mut self, field: impl Into<String>) -> Self {
-        self.detail_mut().field = Some(field.into());
-        self
-    }
-
-    /// Lists the values the refused field accepts.
-    pub fn expected<I, S>(mut self, expected: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        self.detail_mut().expected = Some(expected.into_iter().map(Into::into).collect());
-        self
-    }
-
-    /// The value that was refused. It is redacted when rendered.
-    pub fn received(mut self, received: impl Into<String>) -> Self {
-        self.detail_mut().received = Some(received.into());
-        self
-    }
-
-    /// Replaces the nearest-word suggestions.
-    pub fn suggestions<I, S>(mut self, suggestions: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        self.detail_mut().suggestions = suggestions.into_iter().map(Into::into).collect();
-        self
-    }
-
-    /// Overrides the registry's exit for one documented site: a batch whose
-    /// validation refuses (`2`) and whose write fails later (`1`) is one code
-    /// with two exits (`EVIDENCE_BATCH_REFUSED`).
-    pub fn with_exit(mut self, exit: u8) -> Self {
-        self.exit = exit;
-        self
-    }
-
-    /// The stderr text: `canon <command>: <CODE> — <message>` and an
-    /// optional `hint:` line. `command` is the full prefix, e.g.
-    /// `canon evidence add`.
-    pub fn human(&self, command: &str) -> String {
-        match self.hint_text() {
-            Some(hint) => format!("{command}: {} — {}\nhint: {hint}", self.code, self.message),
-            None => format!("{command}: {} — {}", self.code, self.message),
-        }
-    }
+    fn failed(code: &'static str, message: impl Into<String>) -> CliError;
 
     /// The `error` member of the failure envelope.
-    pub fn body(&self) -> ErrorBody {
-        let detail = self.detail.as_deref();
-        let field = detail.and_then(|d| d.field.as_deref());
-        let suggestions = match detail {
-            Some(CliErrorDetail { expected: Some(expected), received: Some(received), suggestions, .. }) if suggestions.is_empty() => crate::suggest::nearest(received, expected.iter().map(String::as_str)),
-            Some(d) => d.suggestions.clone(),
-            None => Vec::new(),
-        };
-        ErrorBody {
-            code: self.code.to_string(),
-            message: self.message.clone(),
-            field: field.map(|field| crate::input::field_for_body(field).into_owned()),
-            expected: detail.and_then(|d| d.expected.clone()),
-            received: detail.and_then(|d| d.received.as_deref()).map(|received| redact(field, received)),
-            suggestions,
-            hint: detail.and_then(|d| d.hint.clone()),
-            retryable: self.retryable,
-        }
-    }
+    fn body(&self) -> ErrorBody;
 
     /// The failure envelope for `command`, as a value: for a caller that
     /// answers over a socket instead of stdout.
-    pub fn envelope(&self, command: &str) -> Value {
+    fn envelope(&self, command: &str) -> Value;
+
+    /// Renders the error (see the module docs) and returns the exit code.
+    fn emit(&self, command: &str, json: bool) -> u8;
+
+    /// [`CliErrorExt::emit`] for a failure that also has a report worth reading,
+    /// such as the violations a failed gate found. The caller has already
+    /// printed that report in its human form, so human mode adds nothing: the
+    /// exit code is the whole signal there. In JSON mode the one document
+    /// carries `error` (the branch point), `data` (the report) and `meta`.
+    fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> u8;
+
+    /// [`CliErrorExt::emit_with_data`] with extra `meta` keys beside `command`
+    /// (`coverage`, …).
+    fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: Value) -> u8;
+}
+
+impl CliErrorExt for CliError {
+    fn refused(code: &'static str, message: impl Into<String>) -> CliError {
+        CliError::from_row(code, message, code_info(code))
+    }
+
+    fn failed(code: &'static str, message: impl Into<String>) -> CliError {
+        CliError::from_row(code, message, code_info(code))
+    }
+
+    fn body(&self) -> ErrorBody {
+        let suggestions = match (self.expected_values(), self.received_value()) {
+            (Some(expected), Some(received)) if self.suggested().is_empty() => crate::suggest::nearest(received, expected.iter().map(String::as_str)),
+            _ => self.suggested().to_vec(),
+        };
+        let field = self.field_name().map(|field| crate::input::field_for_body(field).into_owned());
+        self.body_with(field, suggestions)
+    }
+
+    fn envelope(&self, command: &str) -> Value {
         crate::json_out::failure_value::<crate::json_out::NoData>(command, self, None)
     }
 
-    /// Renders the error (see the module docs) and returns the exit code.
-    pub fn emit(&self, command: &str, json: bool) -> u8 {
+    fn emit(&self, command: &str, json: bool) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             crate::json_out::print_failure::<crate::json_out::NoData>(command, self, None);
@@ -224,69 +110,16 @@ impl CliError {
         self.exit
     }
 
-    /// [`CliError::emit`] for a failure that also has a report worth reading,
-    /// such as the violations a failed gate found. The caller has already
-    /// printed that report in its human form, so human mode adds nothing: the
-    /// exit code is the whole signal there. In JSON mode the one document
-    /// carries `error` (the branch point), `data` (the report) and `meta`.
-    pub fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> u8 {
-        self.emit_with_data_and_meta(command, json, data, serde_json::Value::Null)
+    fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> u8 {
+        self.emit_with_data_and_meta(command, json, data, Value::Null)
     }
 
-    /// [`CliError::emit_with_data`] with extra `meta` keys beside `command`
-    /// (`coverage`, …).
-    pub fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: serde_json::Value) -> u8 {
+    fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: Value) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             crate::json_out::print_failure_with_meta(command, self, Some(data), extra_meta);
         }
         self.exit
-    }
-}
-
-/// `<CODE>: <message>`: the form for logs and `?` chains, without the command
-/// prefix or the hint. Every user-visible rendering goes through
-/// [`CliError::human`] or the envelope ([`CliError::body`]) instead, never
-/// through this.
-impl std::fmt::Display for CliError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.code, self.message)
-    }
-}
-
-impl std::error::Error for CliError {}
-
-/// What a `received` value may keep: argument names that carry secrets lose the
-/// whole value, `NAME=value` environment assignments keep only the name, and a
-/// token-shaped word (a well-known prefix, or 24 or more mixed-case letters and
-/// digits) is replaced. A digest is lowercase hex and passes.
-pub fn redact(field: Option<&str>, received: &str) -> String {
-    const SECRET_NAMES: [&str; 8] = ["token", "secret", "password", "passwd", "key", "signature", "credential", "auth"];
-    const TOKEN_PREFIXES: [&str; 9] = ["sk-", "ghp_", "gho_", "ghs_", "github_pat_", "xoxb-", "xoxp-", "AKIA", "eyJ"];
-    const REDACTED: &str = "<redacted>";
-    if let Some(field) = field {
-        let field = field.to_ascii_lowercase();
-        // A flag or key *named* for a secret; `--signature-file` names a path, which is not one.
-        if SECRET_NAMES.iter().any(|name| field.contains(name)) && !field.ends_with("file") {
-            return REDACTED.to_string();
-        }
-    }
-    if let Some((name, value)) = received.split_once('=') {
-        let env_name = name.starts_with(|c: char| c.is_ascii_uppercase()) && name.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
-        if env_name && !value.is_empty() {
-            return format!("{name}={REDACTED}");
-        }
-    }
-    let word = received.trim();
-    let bearer = word.get(..7).is_some_and(|prefix| prefix.eq_ignore_ascii_case("bearer "));
-    let token_alphabet = word.len() >= 24 && word.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '+' | '=' | '/'));
-    let mixed = word.chars().any(|c| c.is_ascii_digit()) && word.chars().any(|c| c.is_ascii_uppercase()) && word.chars().any(|c| c.is_ascii_lowercase());
-    if bearer || TOKEN_PREFIXES.iter().any(|prefix| word.starts_with(prefix)) || (token_alphabet && mixed) {
-        return REDACTED.to_string();
-    }
-    match received.char_indices().nth(200) {
-        Some((end, _)) => format!("{}…", &received[..end]),
-        None => received.to_string(),
     }
 }
 
@@ -307,22 +140,9 @@ fn is_registered(code: &str) -> bool {
     code_info(code).is_some()
 }
 
-/// One row of the error registry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CodeInfo {
-    pub code: &'static str,
-    pub meaning: &'static str,
-    /// The process exit code the code carries (`1` or `2`).
-    pub exit: u8,
-    /// True only where running the same command again can succeed.
-    pub retryable: bool,
-    /// One imperative sentence telling the caller what to do about the code.
-    pub fix: &'static str,
-}
-
 /// The registry row of `code`, if it has one.
 pub fn code_info(code: &str) -> Option<&'static CodeInfo> {
-    CODES.binary_search_by(|info| info.code.cmp(code)).ok().map(|index| &CODES[index])
+    atip::find_code(CODES, code)
 }
 
 /// Every error code a command can emit, with its meaning, exit and
@@ -522,19 +342,5 @@ mod fix_tests {
             assert_eq!(info.fix, info.fix.trim_end(), "{} fix ends in whitespace", info.code);
             assert!(!info.fix.contains("...") && !info.fix.contains('\u{2026}'), "{} fix has an ellipsis", info.code);
         }
-    }
-}
-
-#[cfg(test)]
-mod display_tests {
-    use super::CliError;
-
-    #[test]
-    fn display_is_code_and_message_only_and_leaves_the_human_form_alone() {
-        let error = CliError::refused("USAGE", "bad flag").hint("pass --x");
-        assert_eq!(error.to_string(), "USAGE: bad flag");
-        assert_eq!(error.human("canon x"), "canon x: USAGE — bad flag\nhint: pass --x");
-        let as_error: &dyn std::error::Error = &error;
-        assert!(as_error.source().is_none());
     }
 }

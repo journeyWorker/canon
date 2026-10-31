@@ -61,7 +61,7 @@ use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 
 /// clap `value_parser` for the positional `<strategy_id>` — a ULID

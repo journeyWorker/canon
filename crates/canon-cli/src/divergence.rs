@@ -34,7 +34,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 pub use crate::review::{parse_project_id, parse_scenario_id};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::timestamp::TimestampError;
 

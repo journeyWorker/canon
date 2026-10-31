@@ -2,7 +2,7 @@
 
 use canon_model::{RunId};
 use crate::cli::ingest::{IngestCommand, IngestSessionsArgs, IngestRecordsArgs, IngestPlansArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use std::path::PathBuf;
 use std::process::ExitCode;
 

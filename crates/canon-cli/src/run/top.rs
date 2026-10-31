@@ -1,7 +1,7 @@
 //! Handlers of the top-level leaf commands.
 
 use canon_model::{RegimeKey, RoleId, SubjectId, regime_key};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::cli::top::QueryArgs;
 use std::process::ExitCode;
 

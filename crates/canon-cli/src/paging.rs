@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use clap::Args;
 use serde_json::{json, Value};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// Records per page when neither `--limit` nor `--all` is given.
 pub const DEFAULT_LIMIT: usize = 100;

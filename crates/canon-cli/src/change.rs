@@ -41,7 +41,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use canon_model::{paths, Change, ChangeId, SubjectId, SubjectStatus};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::brief_template::ChangeKind;
 

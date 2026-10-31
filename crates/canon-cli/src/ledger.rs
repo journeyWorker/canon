@@ -26,7 +26,7 @@ use canon_store::git_tier::GitTier;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::json_out::Report;
 use crate::safety::{Effect, Mode, Plan};
 use crate::context::resolve_repo_root;

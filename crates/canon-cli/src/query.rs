@@ -36,7 +36,7 @@ use crate::json_out::{LedgerRecord, Report};
 
 use crate::context::resolve_canon_yaml;
 use crate::paging::{self, Page, PageMeta};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::tiers::{self, TierCliError};
 
 #[derive(Debug, thiserror::Error)]

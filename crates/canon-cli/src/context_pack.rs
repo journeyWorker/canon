@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::json_out::Report;
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 pub const CONTEXT_PACK_FORMAT_VERSION: u32 = 1;
 pub const CONTEXT_PACK_DIR: &str = ".canon/context-packs";

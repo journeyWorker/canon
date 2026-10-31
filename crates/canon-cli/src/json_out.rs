@@ -31,7 +31,7 @@ use serde_json::{json, Map, Value};
 
 pub use crate::reports::Report;
 
-use crate::cli_error::{CliError, ErrorBody};
+use crate::cli_error::{CliError, CliErrorExt as _, ErrorBody};
 use crate::next::{After, NextEntry};
 
 static UNCHANGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -197,24 +197,13 @@ impl<R: JsonSchema> JsonSchema for Projected<R> {
 impl<R: JsonSchema + serde::Serialize> Report for Projected<R> {}
 
 static REPO: OnceLock<PathBuf> = OnceLock::new();
-static JSON_MODE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static WARNINGS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 static FIRST_NEXT: std::sync::Mutex<Vec<crate::status::NextStep>> = std::sync::Mutex::new(Vec::new());
-
-/// Marks the process as running in JSON mode: stderr stays empty ([`human_err!`], [`warn_err!`]).
-pub fn set_json_mode(json: bool) {
-    JSON_MODE.store(json, std::sync::atomic::Ordering::Relaxed);
-}
-
-/// Whether the command runs with `--json`.
-pub fn json_mode() -> bool {
-    JSON_MODE.load(std::sync::atomic::Ordering::Relaxed)
-}
 
 /// Says a warning: on stderr in human mode; in JSON mode it waits for the
 /// document and travels in `meta.warnings`.
 pub fn warn(message: String) {
-    if json_mode() {
+    if atip::json_mode() {
         let mut warnings = WARNINGS.lock().expect("the warnings list is not poisoned");
         if !warnings.contains(&message) {
             warnings.push(message);
@@ -343,7 +332,7 @@ fn build_meta(command: &str, schema_version: &str, after: Option<&After>, extra:
 
 fn success_text<R: Report>(command: &str, data: &R, after: Option<&After>, extra: Value) -> String {
     let document = Success { ok: true, data, meta: build_meta(command, R::SCHEMA_VERSION, after, extra) };
-    let text = serde_json::to_string(&document).expect("a report serializes");
+    let text = atip::line(&document);
     #[cfg(debug_assertions)]
     validate::<R>(&text);
     text
@@ -351,7 +340,7 @@ fn success_text<R: Report>(command: &str, data: &R, after: Option<&After>, extra
 
 /// Prints the success envelope for `command` on stdout.
 pub fn data<R: Report>(command: &str, data: &R) {
-    println!("{}", success_text(command, data, None, Value::Null));
+    atip::print_line(&success_text(command, data, None, Value::Null));
 }
 
 /// Prints a write's success envelope with the steps that follow it ([`crate::next`]).
@@ -361,12 +350,12 @@ pub fn data_with_next<R: Report>(command: &str, data: &R, after: &After) {
 
 /// [`data_with_next`] with extra `meta` keys (a page's `nextCursor`, …).
 pub fn data_with_next_and_meta<R: Report>(command: &str, data: &R, after: &After, extra_meta: Value) {
-    println!("{}", success_text(command, data, Some(after), extra_meta));
+    atip::print_line(&success_text(command, data, Some(after), extra_meta));
 }
 
 /// [`data`] with extra `meta` keys beside `command` (`unchanged`, …).
 pub fn data_with_meta<R: Report>(command: &str, data: &R, extra_meta: Value) {
-    println!("{}", success_text(command, data, None, extra_meta));
+    atip::print_line(&success_text(command, data, None, extra_meta));
 }
 
 /// The success envelope [`data`] prints, as a value: for a caller that answers
@@ -383,7 +372,7 @@ pub fn envelope_with_next<R: Report>(command: &str, data: &R, after: &After, ext
 fn failure_text<R: Report>(command: &str, error: &CliError, data: Option<&R>, extra_meta: Value) -> String {
     let schema_version = if data.is_some() { R::SCHEMA_VERSION } else { DEFAULT_SCHEMA_VERSION };
     let document = Failure { ok: false, error: error.body(), data, meta: build_meta(command, schema_version, None, extra_meta) };
-    let text = serde_json::to_string(&document).expect("an error serializes");
+    let text = atip::line(&document);
     #[cfg(debug_assertions)]
     validate::<R>(&text);
     text
@@ -397,7 +386,7 @@ pub fn print_failure<R: Report>(command: &str, error: &CliError, data: Option<&R
 
 /// [`print_failure`] with extra `meta` keys beside `command` (`coverage`, …).
 pub fn print_failure_with_meta<R: Report>(command: &str, error: &CliError, data: Option<&R>, extra_meta: Value) {
-    println!("{}", failure_text(command, error, data, extra_meta));
+    atip::print_line(&failure_text(command, error, data, extra_meta));
 }
 
 /// The failure envelope as a value.
@@ -528,11 +517,11 @@ macro_rules! say_err {
 }
 
 /// Narration for a human: `eprintln!` unless the command runs in JSON mode
-/// ([`json_mode`]), where stderr stays empty and the document carries the result.
+/// ([`atip::json_mode`]), where stderr stays empty and the document carries the result.
 #[macro_export]
 macro_rules! human_err {
     ($($arg:tt)*) => {
-        if !$crate::json_out::json_mode() { eprintln!($($arg)*); }
+        if !::atip::json_mode() { eprintln!($($arg)*); }
     };
 }
 

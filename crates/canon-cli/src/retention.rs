@@ -11,7 +11,7 @@ use canon_store::tier::{raw_record_at, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_canon_yaml;
 use crate::json_out::Report;
 use crate::safety::{Effect, Mode, Plan};

@@ -30,7 +30,7 @@ use sha2::{Digest, Sha256};
 use crate::json_out::Report;
 use crate::brief::brief_digest;
 use crate::brief_check::{check, Severity};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::policy_approval::ApprovalState;
 use canon_ingest::markdown::{field, without_field};

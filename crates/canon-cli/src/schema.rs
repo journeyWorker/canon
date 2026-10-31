@@ -32,6 +32,7 @@
 use clap::Command;
 use serde::Serialize;
 
+use crate::cli_error::CliErrorExt as _;
 use crate::role::Role;
 use crate::spec::{self, Node};
 

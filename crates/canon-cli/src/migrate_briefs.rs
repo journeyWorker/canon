@@ -51,6 +51,7 @@ use canon_store::tier::{StoredRecord, Tier, TierQuery};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::cli_error::CliErrorExt as _;
 use crate::safety::Effect;
 
 /// The `HUMAN_ONLY` refusal of `command` for a declared agent role (a plan that

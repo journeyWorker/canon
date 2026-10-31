@@ -4,6 +4,9 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Changed
+- The error value (`CliError` and its builder), `redact`, the error-code row type, JSON-mode detection, the one-line envelope output and the shell quoting and splitting of next-step commands moved into a new workspace crate, `atip`, that depends on no canon crate. Output, exit codes and the command spec file are byte-identical to 0.32.0.
+
 ## 0.32.0 — 2026-10-31
 
 An agent can record the approval a human gave in the conversation, and release notes move from the README to this file.

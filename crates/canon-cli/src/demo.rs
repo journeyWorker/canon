@@ -21,7 +21,7 @@ use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, 
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 
 /// The one scenario the demo's evidence loop is keyed to — `<area>.

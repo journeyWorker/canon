@@ -2,7 +2,7 @@
 
 use crate::cli::inventory::{InventoryCommand, InventorySyncArgs};
 use super::top::with_provenance_fix;
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use std::process::ExitCode;
 
 pub fn run(cmd: InventoryCommand) -> ExitCode {

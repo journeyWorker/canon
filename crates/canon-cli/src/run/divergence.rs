@@ -1,7 +1,7 @@
 //! `canon divergence` — the handlers of the group.
 
 use crate::cli::divergence::{DivergenceCliCommand, DivergenceResolveArgs, DivergenceDeferArgs, DivergenceAcceptArgs, DivergenceListArgs, DivergenceAddArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use canon_model::ProjectId;
 use std::path::Path;
 use std::process::ExitCode;

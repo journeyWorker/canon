@@ -20,7 +20,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::cli::SafetyArgs;
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::json_out::Report;
 use crate::next::After;
 use crate::role::Role;
@@ -168,24 +168,15 @@ pub fn effect_line(effect: &Effect) -> String {
     }
 }
 
-/// `arg` as one shell word: itself when it has only safe characters, else single-quoted.
-pub fn quote(arg: &str) -> String {
-    if !arg.is_empty() && arg.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_./:=@,+".contains(&b)) {
-        arg.to_string()
-    } else {
-        format!("'{}'", arg.replace('\'', "'\\''"))
-    }
-}
-
 /// The command line a destructive leaf was run as, without its safety flags:
 /// `canon <leaf>` plus `parts`, plus `--repo <dir>` when one was typed.
 pub fn command(leaf: &str, parts: &[(&str, String)], repo: &crate::cli::RepoArgs) -> String {
     let mut line = format!("canon {leaf}");
     for (flag, value) in parts {
-        line.push_str(&format!(" {flag} {}", quote(value)));
+        line.push_str(&format!(" {flag} {}", atip::quote(value)));
     }
     if let Some(dir) = repo.given() {
-        line.push_str(&format!(" --repo {}", quote(&dir.display().to_string())));
+        line.push_str(&format!(" --repo {}", atip::quote(&dir.display().to_string())));
     }
     line
 }
@@ -209,12 +200,5 @@ mod tests {
         assert!(!plan.gate(&Mode::Preview, "canon x").unwrap());
         assert!(plan.gate(&Mode::Commit(plan.plan_digest.clone()), "canon x").unwrap());
         assert_eq!(plan.gate(&Mode::Commit("0".into()), "canon x").unwrap_err().code, "PLAN_CHANGED");
-    }
-
-    #[test]
-    fn quote_leaves_safe_words_and_quotes_the_rest() {
-        assert_eq!(quote("2026-01-01T00:00:00+00:00"), "2026-01-01T00:00:00+00:00");
-        assert_eq!(quote("a b"), "'a b'");
-        assert_eq!(quote("it's"), "'it'\\''s'");
     }
 }

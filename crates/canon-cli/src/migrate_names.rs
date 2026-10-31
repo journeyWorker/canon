@@ -1316,12 +1316,12 @@ pub fn revert_apply(repo: &Path, plan: &RevertPlan) -> Result<(), String> {
 
 /// `canon migrate --revert [--backup <DIR>] [--commit --plan-digest D]`: preview, then act.
 pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode: &crate::safety::Mode, json: bool) -> u8 {
-    use crate::cli_error::CliError;
+    use crate::cli_error::{CliError, CliErrorExt as _};
     use crate::migrate::MigrateReport;
     use crate::safety;
     let mut base = format!("{} --revert", safety::command("migrate", &[], repo_args));
     if let Some(dir) = backup {
-        base.push_str(&format!(" --backup {}", safety::quote(&dir.display().to_string())));
+        base.push_str(&format!(" --backup {}", atip::quote(&dir.display().to_string())));
     }
     let repo = crate::context::resolve_repo_root(repo_args);
     let refused = |message: String| CliError::refused("MIGRATE_REFUSED", message).hint("run `canon migrate --revert` in a repo `canon migrate --commit` ran in, or name its backup with `--backup .canon/migrate-backup/<timestamp>`").emit("canon migrate", json);

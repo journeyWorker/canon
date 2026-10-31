@@ -109,7 +109,7 @@ use serde::Serialize;
 
 use crate::json_out::Report;
 use crate::brief_template::{guidance, heading_of, ChangeKind, Role, CHORE_CATEGORIES};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Resolved, Shipped, Tally};
 

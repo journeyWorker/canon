@@ -62,7 +62,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::reports::Report;
 use crate::context::resolve_repo_root;
 use crate::inventory::{SpecRoot, SyncCtx};
