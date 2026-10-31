@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:49.684375Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-store/tests/git_tier_all_kinds.rs:105",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "resolution_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "review.add.04",
+    "query.read.04"
+  ],
+  "schema": 2,
+  "seq": 10,
+  "severity": "should_fix",
+  "summary": "Spec fidelity: both scenario sentences say the pin is part of the review's natural key (two pins, two keys, a review query returns both), and both bound tests assert the opposite (R2: same key, default `query --kind review` returns 1, both only with --history; git_tier_all_kinds.rs:105, query.rs:73). One of the sentence and the test is stale. Not signed. Blast radius: the evidence says faithful for a scenario whose Then it contradicts.",
+  "worktree_dirty": false
+}

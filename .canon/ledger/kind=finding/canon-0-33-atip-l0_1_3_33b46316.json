@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:47.744882Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/cli_error.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "resolution_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "atip.l0.23",
+    "atip.l0.25"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (F7, contract 8.2/8.3): `MIGRATE_STOPPED` (\"stopped partway; running it again finishes the rest\") and `CHANGE_ADOPTION_INCOMPLETE` (\"the change was written but its subject link was not\") stay registered exit 2, though both describe work that began; the contract reserves exit 2 for a refusal where nothing changed and puts anything after the work started at exit 1. The CHANGELOG says they were outside the thirteen and are unchanged, so the decision was made without being asked. Blast radius: a caller branching on exit sees `refused, nothing changed` for a half-written repo.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:48.593281Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=ingest/sessions.feature:180",
+  "introduced_by": "f5ffd46512ada25b709226102b2fd3bce513814e",
+  "kind": "finding",
+  "resolution_code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "resolution_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "ingest.sessions.16"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "F8 (scenario sentences): ingest.sessions.16 still says the subject leaves carry `meta.hotStore`; 0.33 moved it to `meta.x-canon.hotStore` (subject.rs:309, CHANGELOG row). The sentence was not updated and the scenario was not in the re-sign set, so its digest and review stay as they were.",
+  "worktree_dirty": false
+}
