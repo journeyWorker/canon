@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T14:50:10.332752Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/canon-subject.md:755",
+  "introduced_by": "f5ffd46512ada25b709226102b2fd3bce513814e",
+  "kind": "finding",
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "atip.l0.27",
+    "atip.l0.12"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "F8 (no old shape left in guidance): the guide the binary carries shows `meta.next` entries in two wrong shapes. canon-subject.md:757 keeps the flat `\"actor\": \"agent\", \"role\": \"planner\"` of 0.32 (now `x-canon`), and line 755 prints `\"x-canon\": {\"actor\": \"human\", \"role\": null}` where canon omits the absent role and never prints null. The website example (packages/website/src/content/docs/cli.mdx:398 and ko/cli.mdx:393) prints `\"schemaVersion\": 1`, a number; the contract schema requires the string `\"1.0\"`. The old-name test lists no `meta.next[].actor` or null-role pattern, so nothing catches these. Blast radius: agents copy these samples when parsing next steps; the embedded guide is `canon skills show` output.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T14:50:05.968583Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/subject.rs",
+  "introduced_by": "f5ffd46512ada25b709226102b2fd3bce513814e",
+  "kind": "finding",
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "atip.l0.24"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (F7 acceptance: a command writing to an unwritable target is exit 2 with a precondition code and changes nothing): only the commands the CHANGELOG lists check up front. With `.canon` read-only I verified exit 2 WRITE_UNAVAILABLE and no change for change new, feature new, scenario new, divergence add, finding add, evidence add, gate install-hooks, policy approve and review scenario. But `subject new` and `subject move` exit 1 WRITE_FAILED (message `io: Permission denied (os error 13)`, no path), `inventory sync` exit 1 INVENTORY_FAILED, `ingest plans` exit 1 INGEST_FAILED and `report build` exit 1 REPORT_FAILED, each with nothing changed. Blast radius: every other writer not in the CHANGELOG list (ingest records/sessions, dispatch, strategy, context-pack, prompt, artifacts store, plugin sync) is untested; the bound test covers only `gate install-hooks`.",
+  "worktree_dirty": false
+}
