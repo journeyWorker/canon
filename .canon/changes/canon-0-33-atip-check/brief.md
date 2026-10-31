@@ -170,4 +170,4 @@ atip/1 계약은 규칙만 있고, 빌드된 바이너리를 밖에서 대어 �
 - 계약 문서, 스키마, 예시의 수정. 사본을 읽기만 한다.
 - canon의 출력을 계약에 맞추는 일(`canon-0-33-atip-l0`).
 
-Approved: Journey Hwang 2026-10-31T10:46:20Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:e83d8889b3af0a38d408f3d13272bf72727d129d86dbf3560b34017027bc42c8)
+Approved: Journey Hwang 2026-10-31T14:55:58Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:116a2f39f66bdba1a5292e05fee0f410670abb3937526fc45d17b45a52151987)
