@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "release-033",
+    "role": "implementer",
+    "session_id": "s-0-33-release"
+  },
+  "at": "2026-10-31T17:08:51.979973Z",
+  "attachments": [
+    {
+      "case": "a_task_flip_keeps_the_changes_adopted_subject",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-release-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    },
+    {
+      "case": "plan_adapters::openspec::tests::parse_change_reads_only_the_named_change",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-release-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    }
+  ],
+  "code_tree": "2616408e752dd411da5f323b89a338187e1be450",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change a_task_flip_keeps_the_changes_adopted_subject; cargo test -p canon-ingest parse_change_reads_only_the_named_change"
+  },
+  "evidence_note": {
+    "summary": "0.33 release: nextest workspace run re-attested"
+  },
+  "evidence_sha": "5ad830fb6be196dce5a0df1ef54d9c304f858d81",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 66,
+  "scenario_id": "gate.task.10",
+  "schema": 1,
+  "staging_id": "d461d91a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

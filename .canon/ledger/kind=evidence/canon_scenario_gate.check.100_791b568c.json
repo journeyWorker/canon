@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "release-033",
+    "role": "implementer",
+    "session_id": "s-0-33-release"
+  },
+  "at": "2026-10-31T17:07:16.460776Z",
+  "attachments": [
+    {
+      "case": "gate_check_in_a_directory_without_canon_yaml_refuses_instead_of_reporting_clean",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-release-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    },
+    {
+      "case": "gate_check_with_a_repo_that_has_no_canon_yaml_refuses_even_inside_a_canon_repo",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-release-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    }
+  ],
+  "code_tree": "2616408e752dd411da5f323b89a338187e1be450",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test repo_discovery gate_check_"
+  },
+  "evidence_note": {
+    "summary": "0.33 release: nextest workspace run re-attested"
+  },
+  "evidence_sha": "5ad830fb6be196dce5a0df1ef54d9c304f858d81",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 308,
+  "scenario_id": "gate.check.100",
+  "schema": 1,
+  "staging_id": "80c93084",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

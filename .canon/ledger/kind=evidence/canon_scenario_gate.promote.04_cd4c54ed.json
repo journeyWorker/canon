@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "release-033",
+    "role": "implementer",
+    "session_id": "s-0-33-release"
+  },
+  "at": "2026-10-31T17:08:24.666339Z",
+  "attachments": [
+    {
+      "case": "promote::tests::promote_refuses_a_candidate_with_no_derivable_partition_key",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-release-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    }
+  ],
+  "code_tree": "2616408e752dd411da5f323b89a338187e1be450",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib promote::tests::promote_refuses_a_candidate_with_no_derivable_partition_key"
+  },
+  "evidence_note": {
+    "summary": "0.33 release: nextest workspace run re-attested"
+  },
+  "evidence_sha": "5ad830fb6be196dce5a0df1ef54d9c304f858d81",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 36,
+  "scenario_id": "gate.promote.04",
+  "schema": 1,
+  "staging_id": "16b791e2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
