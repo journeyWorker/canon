@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T15:17:19.322077Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "reason": "the forced-pass and switch-off hooks exist only with test-support (app::check_binary_mutated); atip_check_56 and 36 run the per-id tests against a check that never fails",
+  "resolution_code_tree": "0faddef99fed86099eaaa46412800489070ede4b",
+  "resolution_sha": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.36"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "Standards pass: atip_check_36 proves that seeded_verdict rejects a check forced to pass (run_l0 and check_binary_forcing take a forced_pass list that only tests use, in the public API); it does not run the per-id proves() tests against a check that never fails. My real mutations of checks.rs (always-pass after-dashdash, contract, text-error-form, version-format, no-env-switch-text) were each caught by the per-id tests, so the claim holds for the triggers they plant (see finding 2.1 for those they do not).",
+  "worktree_dirty": false
+}

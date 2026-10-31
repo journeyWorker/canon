@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T16:05:27.028206Z",
+  "attachments": [
+    {
+      "case": "cli::tests::atip_check_06_a_complete_check_line_parses_with_either_option_spelling",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r1-junit.xml",
+      "sha256": "d66bd66d924b834fca528bafc10412959803df45e02be9cfe6beddc467502f6c"
+    },
+    {
+      "case": "cli::tests::atip_check_06_the_root_answers_a_missing_or_unknown_command_with_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r1-junit.xml",
+      "sha256": "d66bd66d924b834fca528bafc10412959803df45e02be9cfe6beddc467502f6c"
+    },
+    {
+      "case": "cli::tests::atip_check_06_a_malformed_check_line_is_a_usage_error_naming_the_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r1-junit.xml",
+      "sha256": "d66bd66d924b834fca528bafc10412959803df45e02be9cfe6beddc467502f6c"
+    },
+    {
+      "case": "app::tests::atip_check_06_a_panic_is_an_internal_failure_with_exit_1_and_a_way_to_report_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r1-junit.xml",
+      "sha256": "d66bd66d924b834fca528bafc10412959803df45e02be9cfe6beddc467502f6c"
+    },
+    {
+      "case": "output::tests::atip_check_06_the_registry_is_sorted_and_each_code_reads_its_own_row",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r1-junit.xml",
+      "sha256": "d66bd66d924b834fca528bafc10412959803df45e02be9cfe6beddc467502f6c"
+    },
+    {
+      "case": "atip_check_06_a_malformed_atip_command_line_is_refused_naming_the_argument_at_fault",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r1-junit.xml",
+      "sha256": "d66bd66d924b834fca528bafc10412959803df45e02be9cfe6beddc467502f6c"
+    }
+  ],
+  "code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-l0-r1-junit.xml"
+  },
+  "evidence_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 92,
+  "scenario_id": "atip.check.06",
+  "schema": 1,
+  "staging_id": "0bfca6ac",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:14.084581Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.37",
+    "atip.check.05"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Standards pass: atip exits 101 when stdout is a closed pipe. 'atip --help | true', 'atip check ... --json | true' and a failed-level text run all exit 101 (println! panics on EPIPE, outside the catch_unwind in app::main), while 'canon --version | true' exits 141 (default SIGPIPE restored). The brief says atip's exit codes are 0, 1 and 2 only and the checker follows L0 itself (spec 8.4 restores SIGPIPE, 8.6 allows no other exit); atip check run on atip does not see it because the self-check never closes the pipe. Fix: restore the default SIGPIPE disposition at start (as canon does), plus a test that closes the reader before the write.",
+  "worktree_dirty": false
+}

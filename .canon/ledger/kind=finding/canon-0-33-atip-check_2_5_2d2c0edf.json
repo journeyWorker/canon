@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T15:17:18.943194Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "reason": "atip-fake-tool is behind the test-support feature (required-features); atip_check_55 asserts cargo metadata, so build, install and the CI job do not build it",
+  "resolution_code_tree": "0faddef99fed86099eaaa46412800489070ede4b",
+  "resolution_sha": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.01"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "atip-fake-tool ships as a second [[bin]] of atip-check (Cargo.toml, no publish = false): cargo install, cargo build -p atip-check, the CI job atip-l0 and just atip all build or install it next to atip, and it goes with the crate when it moves to the atip repository. It must be a bin of this package for CARGO_BIN_EXE_atip-fake-tool. Suggest publish = false on the crate until it moves, or a separate unpublished workspace crate for the fake tool.",
+  "worktree_dirty": false
+}

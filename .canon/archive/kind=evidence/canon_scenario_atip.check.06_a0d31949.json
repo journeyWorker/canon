@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T14:05:56.956058Z",
+  "attachments": [
+    {
+      "case": "cli::tests::atip_check_06_a_complete_check_line_parses_with_either_option_spelling",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "cli::tests::atip_check_06_the_root_answers_a_missing_or_unknown_command_with_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "cli::tests::atip_check_06_a_malformed_check_line_is_a_usage_error_naming_the_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "app::tests::atip_check_06_a_panic_is_an_internal_failure_with_exit_1_and_a_way_to_report_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "output::tests::atip_check_06_the_registry_is_sorted_and_each_code_reads_its_own_row",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "atip_check_06_a_malformed_atip_command_line_is_refused_naming_the_argument_at_fault",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    }
+  ],
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check; cargo nextest run -p canon-cli --test atip_check"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 49,
+  "scenario_id": "atip.check.06",
+  "schema": 1,
+  "staging_id": "07537074",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
