@@ -1,6 +1,6 @@
 import "./style.css";
 import { renderNav } from "./nav";
-import { advisoryTotal, approvalRequest, approveDisabled, refusedIds, renderApproveError, renderBriefsPage, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, approveFailure, refusedIds, renderApproveError, renderBriefsPage, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
 import { h, toDom } from "./vnode";
 
 // The briefs page: the changes whose brief awaits the human, and the form
@@ -10,7 +10,7 @@ import { h, toDom } from "./vnode";
 // never prefilled, never stored.
 
 interface ApiError {
-  error: { code: string; message: string; hint: string | null };
+  error: { code: string; message: string; hint?: string };
 }
 
 const main = document.querySelector<HTMLElement>("#briefs");
@@ -92,10 +92,9 @@ async function approve(): Promise<void> {
     const response = await fetch("/api/briefs/approve", { method: "POST", headers: { "content-type": "application/json" }, body });
     const json = (await response.json()) as { data?: ApprovalsData & { refused?: Refusal[] } } & Partial<ApiError>;
     if (response.ok && json.data && json.data.approvals) return afterApproval(json.data);
-    const error = json.error ?? { code: "UNKNOWN", message: `the server answered ${response.status}`, hint: null };
-    const failure = { ...error, refused: json.data?.refused ?? [] };
+    const failure = approveFailure(json, response.status);
     for (const id of refusedIds(failure)) main!.querySelector(`.brief[data-change="${CSS.escape(id)}"]`)?.classList.add("brief-refused");
-    const stale = failure.refused.length > 0 || error.code === "BRIEF_CHANGED_SINCE_PAGE_LOAD";
+    const stale = failure.refused.length > 0 || failure.code === "BRIEF_CHANGED_SINCE_PAGE_LOAD";
     say(renderApproveError(failure, stale ? withReload() : null));
   } catch (e) {
     say(h("div", { class: "approve-error", role: "alert" }, h("p", {}, `The request failed: ${e instanceof Error ? e.message : String(e)}`)));

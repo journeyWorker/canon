@@ -157,6 +157,10 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     }
 
     let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
+    // Where the change and its staging copy will be written: refused before either is created.
+    if let Some(code) = crate::write_mode::refuse_unwritable(&[&dir, &staging_path], "canon change new", json) {
+        return code;
+    }
     let staging = Created(Some(first_missing_ancestor(&staging_path)));
     let change = match stage_change(&staging_path, slug, kind, title) {
         Ok(change) => change,
@@ -173,7 +177,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     drop(staging);
 
     let shipped = subject.status == SubjectStatus::Shipped;
-    let warnings: Vec<String> = crate::brief::adoption_warning(&repo, &subject, slug)
+    let warnings: Vec<crate::json_out::Warning> = crate::brief::adoption_warning(&repo, &subject, slug)
         .into_iter()
         .collect();
     if let Err(e) = crate::subject::persist_adoption(&repo, change, subject) {
@@ -207,7 +211,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         crate::say!(json, "{}", hot.line());
     }
     for warning in &warnings {
-        crate::human_err!("canon change new: warning: {warning}");
+        crate::human_err!("canon change new: warning: {}", warning.message);
     }
     // A shipped subject stays shipped until reopened: say how, once the
     // brief is approved (the reopen refuses an unapproved one).

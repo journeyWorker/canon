@@ -129,7 +129,8 @@ fn skills_install_69_one_call_approves_several_changes_with_one_answer_and_one_t
     let doc: Value = serde_json::from_str(&stdout(&again)).unwrap();
     let outcomes: Vec<&str> = doc["data"]["approvals"].as_array().unwrap().iter().map(|a| a["outcome"].as_str().unwrap()).collect();
     assert_eq!(outcomes, ["unchanged"; 3], "{doc}");
-    assert_eq!(doc["meta"]["unchanged"], true, "{doc}");
+    assert_eq!(doc["data"]["unchanged"], true, "{doc}");
+    assert!(doc["meta"].get("unchanged").is_none(), "`unchanged` is a report member, not a flat `meta` one: {doc}");
     let after: Vec<String> = ["a", "b", "c"].iter().map(|c| std::fs::read_to_string(brief_path(many.path(), c)).unwrap()).collect();
     assert_eq!(before, after);
     assert_eq!(policy_before, std::fs::read_to_string(many.path().join(".canon/policy.approval.json")).unwrap());
@@ -258,7 +259,10 @@ fn skills_install_73_the_docs_state_the_governing_change_rule_and_the_briefs_lis
 
 /// skills.install.72: a disk error while writing exits 1, leaves the ids written
 /// before it approved, marks the failed id and skips the rest; a rerun after the
-/// fix reports the written ones unchanged.
+/// fix reports the written ones unchanged. A brief known unwritable before the
+/// first write (no write bit at all) is refused up front instead, with exit 2 and
+/// nothing written for any id; mode 0464 passes that check (a group may write) yet
+/// the owner cannot, so the write begins and fails.
 #[test]
 #[cfg(unix)]
 fn skills_install_72_a_write_failure_keeps_earlier_ids_and_skips_the_rest() {
@@ -271,6 +275,19 @@ fn skills_install_72_a_write_failure_keeps_earlier_ids_and_skips_the_rest() {
         eprintln!("skipping: the files are writable despite mode 0444 (running as root)");
         return;
     }
+    // No write bit at all: known before anything is written, so the whole call is refused.
+    let refused = run(repo, &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
+    assert_eq!(refused.status.code(), Some(2), "{}", stdout(&refused));
+    let doc: Value = serde_json::from_str(&stdout(&refused)).unwrap();
+    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
+    assert_eq!(doc["data"]["refused"][0]["changeId"], "b", "{doc}");
+    assert_eq!(doc["data"]["refused"][0]["code"], "WRITE_UNAVAILABLE", "{doc}");
+    for change in ["a", "b", "c"] {
+        assert!(!std::fs::read_to_string(brief_path(repo, change)).unwrap().contains("Approved:"), "{change}: nothing was written");
+    }
+
+    // A group-writable bit passes that check; the owner still cannot write.
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o464)).unwrap();
     let out = run(repo, &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
     assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
     let doc: Value = serde_json::from_str(&stdout(&out)).unwrap();

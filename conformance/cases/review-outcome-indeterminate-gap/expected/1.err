@@ -1,3 +1,3 @@
 canon review scenario: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
-canon review scenario: REVIEW_SCENARIO_NOT_INDEXED — no scenario record for `cart.add.99` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`)
-hint: run `canon inventory sync`, then run `canon review scenario` again
+canon: REVIEW_SCENARIO_NOT_INDEXED: no scenario record for `cart.add.99` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`)
+  hint: run `canon inventory sync`, then run `canon review scenario` again

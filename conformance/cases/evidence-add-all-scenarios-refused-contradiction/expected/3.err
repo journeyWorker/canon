@@ -1,2 +1,2 @@
-canon evidence add: EVIDENCE_INVALID_ARGUMENT — --scenario name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario and without --all-scenarios
-hint: `canon schema evidence add` lists the accepted arguments and their forms
+canon: EVIDENCE_INVALID_ARGUMENT: --scenario name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario and without --all-scenarios
+  hint: `canon schema evidence add` lists the accepted arguments and their forms

@@ -6,25 +6,27 @@
 //! succeed, and the process exit code. The exit code and `retryable` are not
 //! chosen at the site that builds the error: they come from the code's row in
 //! the tool's table of [`CodeInfo`] rows ([`CliError::from_row`]), so one code
-//! has one exit everywhere. The few sites with a documented per-site exit say
-//! so with [`CliError::with_exit`].
+//! has one exit everywhere and nothing overrides it at a call site (spec 7.3.2).
+//! A situation that needs another exit needs another code.
 //!
 //! The crate owns the shape and the tool owns the table: which codes exist,
 //! what they mean, which exit each carries, and how a tool turns an error into
 //! its failure envelope.
 //!
-//! - human mode, on stderr: [`CliError::human`], `<command>: <CODE> — <message>`,
-//!   then an optional `hint: <hint>` line;
+//! - text mode, on stderr: [`CliError::human`], `<tool>: <CODE>: <message>`,
+//!   then indented `field:`, `expected:`, `suggestions:` and `hint:` lines
+//!   for the members the error has (spec 7.4);
 //! - JSON mode: [`CliError::body_with`], the failure envelope's `error` member
-//!   ([`ErrorBody`]): `code`, `message`, then `field` (the argument or JSON
-//!   pointer refused), `expected` (the valid set when there is one), `received`
-//!   (the refused value, secrets redacted), `suggestions`, `hint` (`null` when
-//!   there is none) and `retryable`.
+//!   ([`ErrorBody`]): `code`, `message`, `retryable`, then `field` (the argument
+//!   or JSON pointer refused), `expected` (the valid set when there is one),
+//!   `received` (the refused value, secrets redacted), `suggestions` and
+//!   `hint`. A member with no value is absent, never `null` and never `[]`
+//!   (spec 6.5).
 //!
-//! Exit codes: `0` ok; `1` the command's finding, a failed check or an
-//! operational failure ([`EXIT_FAILED`]); `2` a refusal: usage, a missing
-//! config, an id or file that does not exist, unreadable input, an invalid
-//! argument ([`EXIT_REFUSED`]).
+//! Exit codes: `0` ok; `1` the command ran and its answer is negative or
+//! incomplete ([`EXIT_FAILED`]); `2` the command refused to run
+//! ([`EXIT_REFUSED`]). Nothing else is a registry exit; a signal exit (128+n)
+//! is outside the registry.
 
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -64,7 +66,7 @@ pub struct CliError {
     /// Whether running the same command again, unchanged, can succeed
     /// (the code's table row).
     pub retryable: bool,
-    /// The process exit code, `0..=255` (the code's table row unless a site overrides it).
+    /// The process exit code: the code's table row, `1` or `2`.
     pub exit: u8,
     detail: Option<Box<CliErrorDetail>>,
 }
@@ -85,13 +87,16 @@ struct CliErrorDetail {
 }
 
 /// The `error` member of a failure envelope. Field order is the document
-/// order: `code` first.
+/// order: `code` first. An optional member with no value is left out of the
+/// document, so the body validates against the contract's error schema.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorBody {
-    /// Stable SCREAMING_SNAKE code, listed by `canon schema --errors`.
+    /// Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.
     pub code: String,
     pub message: String,
+    /// True only where running the same command again can succeed; equal to the registry row's.
+    pub retryable: bool,
     /// The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
@@ -101,12 +106,12 @@ pub struct ErrorBody {
     /// The value that was refused, with secrets redacted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub received: Option<String>,
-    /// The nearest valid commands, options or values (a destructive command only within edit distance 1).
+    /// The nearest valid commands, options or values.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub suggestions: Vec<String>,
-    /// A working invocation or the next step; `null` when there is none.
+    /// A working invocation or the next step.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
-    /// True only where running the same command again can succeed.
-    pub retryable: bool,
 }
 
 impl CliError {
@@ -184,21 +189,25 @@ impl CliError {
         self
     }
 
-    /// Overrides the table's exit for one documented site: a batch whose
-    /// validation refuses (`2`) and whose write fails later (`1`) is one code
-    /// with two exits (`EVIDENCE_BATCH_REFUSED`).
-    pub fn with_exit(mut self, exit: u8) -> Self {
-        self.exit = exit;
-        self
-    }
-
-    /// The stderr text: `<command>: <CODE> — <message>` and an optional
-    /// `hint:` line. `command` is the full prefix, e.g. `canon evidence add`.
-    pub fn human(&self, command: &str) -> String {
-        match self.hint_text() {
-            Some(hint) => format!("{command}: {} — {}\nhint: {hint}", self.code, self.message),
-            None => format!("{command}: {} — {}", self.code, self.message),
+    /// The stderr text: `<tool>: <CODE>: <message>`, then one indented line for
+    /// each of `field`, `expected`, `suggestions` and `hint` the error has
+    /// (spec 7.4.1). `tool` is the executable name (`canon`). `field` is the
+    /// name as the tool states it in the document (see [`CliError::body_with`]).
+    pub fn human(&self, tool: &str, field: Option<&str>, suggestions: &[String]) -> String {
+        let mut text = format!("{tool}: {}: {}", self.code, self.message);
+        if let Some(field) = field {
+            text.push_str(&format!("\n  field: {field}"));
         }
+        if let Some(expected) = self.expected_values().filter(|expected| !expected.is_empty()) {
+            text.push_str(&format!("\n  expected: {}", expected.join(", ")));
+        }
+        if !suggestions.is_empty() {
+            text.push_str(&format!("\n  suggestions: {}", suggestions.join(", ")));
+        }
+        if let Some(hint) = self.hint_text() {
+            text.push_str(&format!("\n  hint: {hint}"));
+        }
+        text
     }
 
     /// The `error` member of the failure envelope, with the `field` as the
@@ -209,12 +218,12 @@ impl CliError {
         ErrorBody {
             code: self.code.to_string(),
             message: self.message.clone(),
+            retryable: self.retryable,
             field,
-            expected: self.expected_values().map(<[String]>::to_vec),
+            expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
             received: self.received_value().map(|received| redact(self.field_name(), received)),
             suggestions,
             hint: self.hint_text().map(str::to_string),
-            retryable: self.retryable,
         }
     }
 }
@@ -276,10 +285,11 @@ mod tests {
     ];
 
     #[test]
-    fn display_is_code_and_message_only_and_leaves_the_human_form_alone() {
-        let error = CliError::from_row("USAGE", "bad flag", find_code(TABLE, "USAGE")).hint("pass --x");
+    fn display_is_code_and_message_only_and_the_human_form_has_its_own_lines() {
+        let error = CliError::from_row("USAGE", "bad flag", find_code(TABLE, "USAGE")).hint("pass --x").expected(["--x", "--y"]);
         assert_eq!(error.to_string(), "USAGE: bad flag");
-        assert_eq!(error.human("canon x"), "canon x: USAGE — bad flag\nhint: pass --x");
+        assert_eq!(error.human("canon", Some("--z"), &["--x".to_string()]), "canon: USAGE: bad flag\n  field: --z\n  expected: --x, --y\n  suggestions: --x\n  hint: pass --x");
+        assert_eq!(CliError::from_row("USAGE", "bad", None).human("canon", None, &[]), "canon: USAGE: bad");
         let as_error: &dyn std::error::Error = &error;
         assert!(as_error.source().is_none());
     }
@@ -291,7 +301,7 @@ mod tests {
         assert!(CliError::from_row("LOCKED", "x", find_code(TABLE, "LOCKED")).retryable);
         let unlisted = CliError::from_row("NOPE", "x", find_code(TABLE, "NOPE"));
         assert_eq!((unlisted.exit, unlisted.retryable), (EXIT_REFUSED, false), "a code with no row is a refusal that cannot be retried");
-        assert_eq!(CliError::from_row("USAGE", "x", None).with_exit(EXIT_FAILED).exit, EXIT_FAILED);
+        assert!(!CliError::from_row("USAGE", "x", None).retryable);
     }
 
     #[test]
@@ -302,9 +312,9 @@ mod tests {
         assert_eq!(error.received_value(), Some("hunter2"));
         assert_eq!(error.suggested(), ["a"]);
         let body = error.body_with(Some("/apiToken".to_string()), vec!["b".to_string()]);
-        assert_eq!(serde_json::to_string(&body).expect("a body serializes"), r#"{"code":"USAGE","message":"bad","field":"/apiToken","expected":["a","b"],"received":"<redacted>","suggestions":["b"],"hint":"try a","retryable":false}"#);
+        assert_eq!(serde_json::to_string(&body).expect("a body serializes"), r#"{"code":"USAGE","message":"bad","retryable":false,"field":"/apiToken","expected":["a","b"],"received":"<redacted>","suggestions":["b"],"hint":"try a"}"#);
         let bare = CliError::from_row("USAGE", "bad", None).body_with(None, Vec::new());
-        assert_eq!(serde_json::to_string(&bare).expect("a body serializes"), r#"{"code":"USAGE","message":"bad","suggestions":[],"hint":null,"retryable":false}"#);
+        assert_eq!(serde_json::to_string(&bare).expect("a body serializes"), r#"{"code":"USAGE","message":"bad","retryable":false}"#, "a member with no value is absent, never null or empty");
         assert!(CliError::from_row("USAGE", "bad", None).suggested().is_empty());
     }
 

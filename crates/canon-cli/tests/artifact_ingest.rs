@@ -45,7 +45,7 @@ use serde_json::Value;
 /// `data` of a `--json` result: `{ "data", "meta" }` on one stdout document.
 fn data_of(stdout: &str) -> Value {
     let body: Value = serde_json::from_str(stdout.trim()).expect("--json prints one JSON document");
-    assert!(body["meta"]["command"].is_string() && body["meta"]["next"].is_array(), "a write answers data and meta.next: {body}");
+    assert!(body["meta"]["command"].is_string() && body["meta"]["contract"] == "atip/1", "a write answers data and the atip/1 meta: {body}");
     body["data"].clone()
 }
 use uuid::Uuid;

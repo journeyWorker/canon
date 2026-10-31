@@ -1,3 +1,3 @@
 this repo's ledger is laid out by canon 0.29 (1 record file(s) named by the 0.29 rule, e.g. `kind=evidence_record/cart.add.02__bc24e7fea2f9.json`); canon 0.30 does not use those files for any judgement. Hint: run `canon migrate --json` to preview the move (a bare run only previews; `--commit --plan-digest <digest>` applies it)
-canon gate check: CONFIG_UNREADABLE — parsing `<repo>/canon.yaml`: canon.yaml TierPolicy: did not find expected ',' or ']' at line 3 column 6, while parsing a flow sequence at line 2 column 10
-hint: fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again
+canon: CONFIG_UNREADABLE: parsing `<repo>/canon.yaml`: canon.yaml TierPolicy: did not find expected ',' or ']' at line 3 column 6, while parsing a flow sequence at line 2 column 10
+  hint: fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again

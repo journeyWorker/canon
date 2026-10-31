@@ -119,7 +119,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::cli_error::CliErrorExt as _;
-use crate::json_out::Report;
+use crate::json_out::{Report, Warning};
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
 use crate::brief::BriefStatus;
 use crate::role::Role;
@@ -156,6 +156,9 @@ pub struct StatusReport {
     /// One line per condition that makes the counts below incomplete or
     /// the gate weaker than it looks.
     pub warnings: Vec<String>,
+    /// The same warnings with their codes: `meta.warnings` of the envelope. Not part of `data`.
+    #[serde(skip)]
+    pub coded_warnings: Vec<Warning>,
     /// Lifecycle order (proposed → retired), then subject id.
     pub subjects: Vec<SubjectSummary>,
     /// Scenario ids (latest generation) whose `@subject:` tag is absent.
@@ -390,19 +393,24 @@ pub enum StepActor {
 /// nothing), or the section is invalid (the gate refuses) — saying which.
 /// `None` when a well-formed section is in force.
 pub fn policy_warning(policy: &PolicyResolution) -> Option<String> {
+    policy_diagnosis(policy).map(|warning| warning.message)
+}
+
+/// [`policy_warning`] with the code of the situation it names.
+fn policy_diagnosis(policy: &PolicyResolution) -> Option<Warning> {
     const NOTHING: &str = "`canon gate check` requires no evidence, failure cases or review here";
     for diagnostic in &policy.diagnostics {
         match diagnostic {
-            PolicyDiagnostic::Missing { .. } => return Some(format!("no policy: .canon/policy.yaml not found, so {NOTHING}")),
+            PolicyDiagnostic::Missing { .. } => return Some(Warning::new("POLICY_MISSING", format!("no policy: .canon/policy.yaml not found, so {NOTHING}"))),
             PolicyDiagnostic::Malformed { detail, .. } => {
-                return Some(format!("policy unreadable: .canon/policy.yaml ({detail}) falls back to defaults, so {NOTHING}"))
+                return Some(Warning::new("POLICY_UNREADABLE", format!("policy unreadable: .canon/policy.yaml ({detail}) falls back to defaults, so {NOTHING}")))
             }
             _ => {}
         }
     }
     match &policy.spec_coverage {
-        None => Some(format!("policy has no `spec_coverage` section, so {NOTHING}")),
-        Some(SpecCoverage::Invalid { detail }) => Some(format!("policy's `spec_coverage` section is unusable ({detail}); `canon gate check` refuses until it is fixed")),
+        None => Some(Warning::new("POLICY_SPEC_COVERAGE_ABSENT", format!("policy has no `spec_coverage` section, so {NOTHING}"))),
+        Some(SpecCoverage::Invalid { detail }) => Some(Warning::new("POLICY_SPEC_COVERAGE_INVALID", format!("policy's `spec_coverage` section is unusable ({detail}); `canon gate check` refuses until it is fixed"))),
         Some(SpecCoverage::Active { .. }) => None,
     }
 }
@@ -424,7 +432,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
     let error = unverifiable.then(|| crate::coverage::unverifiable_error("canon status", "nothing: canon.yaml or the ledger could not be read", "fix what `warnings` names (`canon init --check` reports what is wrong in canon.yaml), then run `canon status` again"));
     if json {
         let after = crate::next::After::of_status(&report);
-        let mut meta = crate::json_out::warnings_meta(&report.warnings);
+        let mut meta = crate::json_out::warnings_meta(&report.coded_warnings);
         if !meta.is_object() {
             meta = serde_json::json!({});
         }
@@ -443,7 +451,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
     } else {
         print!("{}", render(&report));
         if let Some(error) = &error {
-            eprintln!("{}", error.human("canon status"));
+            eprintln!("{}", error.human_text());
         }
     }
     if let Some(error) = error {
@@ -540,7 +548,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     let mut next = Vec::new();
 
     if !repo.join("canon.yaml").is_file() {
-        warnings.push(format!("no canon.yaml at {} — canon is not set up in this repo", repo.display()));
+        warnings.push(Warning::new("CONFIG_MISSING", format!("no canon.yaml at {} — canon is not set up in this repo", repo.display())));
         next.push(NextStep { command: "canon init".into(), why: "set canon up here".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
     }
 
@@ -550,9 +558,9 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         Err(e) => {
             // The ledger cannot be read, so nothing below can be counted.
             let policy = PolicyResolution::resolve(repo, &registry);
-            warnings.extend(policy_warning(&policy));
+            warnings.extend(policy_diagnosis(&policy));
             warnings.extend(crate::policy_approval::advisory(repo));
-            warnings.push(format!("cannot read this repo's ledger: {e}"));
+            warnings.push(Warning::new("LEDGER_UNREADABLE", format!("cannot read this repo's ledger: {e}")));
             next.push(NextStep { command: "canon init --check".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
             let mut report = finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
             report.examined = false;
@@ -563,7 +571,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     if pending_index {
         crate::inventory::overlay_stale_index(&mut ctx);
     }
-    warnings.extend(policy_warning(&ctx.policy));
+    warnings.extend(policy_diagnosis(&ctx.policy));
     warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
         .unreadable_kinds
@@ -572,17 +580,17 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         .map(|kind| kind.as_str())
         .collect();
     for kind in &routed_away {
-        warnings.push(format!("`{kind}` routes away from the `local` rung status reads, so its records are not counted"));
+        warnings.push(Warning::new("LEDGER_KIND_ROUTED_AWAY", format!("`{kind}` routes away from the `local` rung status reads, so its records are not counted")));
     }
     let old_layout = ctx.violations.iter().chain(ctx.corpus_violations.iter().map(|(_, v)| v)).filter(|v| v.class == canon_model::FailureClass::OldLayout).count();
     if old_layout > 0 {
-        warnings.push(format!("{old_layout} ledger record file(s) are named by the 0.29 rule and are not counted; run `canon migrate --json` to preview the rename, then `canon migrate --commit --plan-digest <digest>`"));
+        warnings.push(Warning::new("OLD_LAYOUT_FOUND", format!("{old_layout} ledger record file(s) are named by the 0.29 rule and are not counted; run `canon migrate --json` to preview the rename, then `canon migrate --commit --plan-digest <digest>`")));
     }
     // The always-on ledger check names what is in `violations`; a corpus-kind file is named by the gate only
     // as a layout violation under a `spec_coverage` section that judges the corpus. `canon query` reports all.
     let named = ctx.violations.len() - ctx.violations.iter().filter(|v| v.class == canon_model::FailureClass::OldLayout).count();
     if named > 0 {
-        warnings.push(format!("{named} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+        warnings.push(Warning::new("LEDGER_RECORDS_UNREADABLE", format!("{named} ledger record(s) could not be read and are not counted; `canon gate check` names them")));
     }
     let corpus: Vec<_> = ctx.corpus_violations.iter().filter(|(_, v)| v.class != canon_model::FailureClass::OldLayout).collect();
     if !corpus.is_empty() {
@@ -595,13 +603,13 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         } else {
             format!("`canon gate check` does not judge them without a `spec_coverage` section; {queries} reports each")
         };
-        warnings.push(format!("{} ledger record(s) of kind {} could not be read and are not counted; {who}", corpus.len(), kinds.join(", ")));
+        warnings.push(Warning::new("LEDGER_RECORDS_UNREADABLE", format!("{} ledger record(s) of kind {} could not be read and are not counted; {who}", corpus.len(), kinds.join(", "))));
     }
     if let Some(note) = canon_gate::review_gate::unmigrated_review_note(&ctx) {
-        warnings.push(note);
+        warnings.push(Warning::new("REVIEW_RECORDS_UNMIGRATED", note));
     }
-    warnings.extend(crate::brief::override_lines(&ctx));
-    warnings.extend(crate::subject::override_lines(&ctx));
+    warnings.extend(crate::brief::override_lines(&ctx).into_iter().map(|line| Warning::new("BRIEF_OVERRIDE_ON_RECORD", line)));
+    warnings.extend(crate::subject::override_lines(&ctx).into_iter().map(|line| Warning::new("SUBJECT_OVERRIDE_ON_RECORD", line)));
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
@@ -610,7 +618,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     let plan_roots: Vec<PathBuf> = match crate::brief::plan_roots(repo) {
         Ok(roots) => roots,
         Err(e) => {
-            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check` names the problem"));
+            warnings.push(Warning::new("CONFIG_UNREADABLE", format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check` names the problem")));
             Vec::new()
         }
     };
@@ -655,11 +663,11 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         let quote = |roots: &[&crate::inventory::UnrefreshableRoot]| roots.iter().map(|root| format!("`{}`", root.id.as_str())).collect::<Vec<_>>().join(", ");
         let (old, stale): (Vec<_>, Vec<_>) = unrefreshable.iter().partition(|root| root.pre_0_17.is_some());
         if scenarios.is_empty() {
-            warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
+            warnings.push(Warning::new("LEDGER_NO_SCENARIOS", "the ledger holds no scenario records, so every subject reads as owning none"));
         }
         if !old.is_empty() {
             let ids = quote(&old);
-            warnings.push(format!("spec root(s) {ids} are on the pre-0.17 layout (`features/kind=feature/`), which canon no longer reads, so `canon gate check` fails and no subject is suggested to move on"));
+            warnings.push(Warning::new("LAYOUT_MIGRATION_REQUIRED", format!("spec root(s) {ids} are on the pre-0.17 layout (`features/kind=feature/`), which canon no longer reads, so `canon gate check` fails and no subject is suggested to move on")));
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Orchestrator),
@@ -670,7 +678,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         if !stale.is_empty() {
             let ids = quote(&stale);
             let (violations, errors) = stale.iter().fold((0, 0), |(v, e), root| (v + root.violations, e + root.sync_errors));
-            warnings.push(format!("the scenario index for spec root(s) {ids} is stale and could not be refreshed, so `canon gate check` fails and no subject is suggested to move on"));
+            warnings.push(Warning::new("SCENARIO_INDEX_NOT_REFRESHED", format!("the scenario index for spec root(s) {ids} is stale and could not be refreshed, so `canon gate check` fails and no subject is suggested to move on")));
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Orchestrator),
@@ -701,7 +709,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         _ => false,
     };
     for (id, tagged) in &dangling {
-        warnings.push(format!("{} scenario(s) are tagged `@subject:{id}` but no subject `{id}` exists (first: {})", tagged.len(), tagged[0]));
+        warnings.push(Warning::new("SCENARIO_SUBJECT_UNKNOWN", format!("{} scenario(s) are tagged `@subject:{id}` but no subject `{id}` exists (first: {})", tagged.len(), tagged[0])));
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
@@ -731,7 +739,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     let promote_manual = !matches!(crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")), Ok(crate::write_mode::PromoteMode::Auto));
     let mut owners: Vec<(std::ops::Range<usize>, String)> = Vec::new();
     if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
-        warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
+        warnings.push(Warning::new("LEDGER_NO_SCENARIOS", "the ledger holds no scenario records, so every subject reads as owning none"));
         next.push(NextStep {
             command: "canon inventory sync".into(),
             why: "the .feature files hold scenarios but the index holds none, so the automatic refresh could not index them; this names each format violation or duplicate id to fix".into(),
@@ -800,7 +808,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
 fn finish(
     repo: &Path,
     policy: &PolicyResolution,
-    warnings: Vec<String>,
+    warnings: Vec<Warning>,
     subjects: Vec<SubjectSummary>,
     unowned: Vec<String>,
     audits: Option<AuditSummary>,
@@ -817,7 +825,8 @@ fn finish(
             spec_coverage: spec_coverage_surface(policy),
             level: crate::policy_level::detect(repo, policy),
         },
-        warnings,
+        warnings: warnings.iter().map(|warning| warning.message.clone()).collect(),
+        coded_warnings: warnings,
         subjects,
         unowned,
         audits,
@@ -835,11 +844,11 @@ fn finish(
 
 /// The references of the ledger's findings, evidence and subjects that no committed source holds
 /// ([`crate::references`]). `None`, with a warning, when the sources cannot be read.
-fn dangling_references(repo: &Path, ctx: &GateContext, warnings: &mut Vec<String>) -> Option<crate::references::DanglingSummary> {
+fn dangling_references(repo: &Path, ctx: &GateContext, warnings: &mut Vec<Warning>) -> Option<crate::references::DanglingSummary> {
     let sources = match crate::references::Sources::load(repo) {
         Ok(sources) => sources,
         Err(error) => {
-            warnings.push(format!("references to missing sources were not checked: {error}"));
+            warnings.push(Warning::new("REFERENCES_UNCHECKED", format!("references to missing sources were not checked: {error}")));
             return None;
         }
     };

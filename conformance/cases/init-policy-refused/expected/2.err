@@ -1,5 +1,4 @@
-error: the argument '--policy <LEVEL>' cannot be used with '--no-policy'
-
-Usage: canon init --policy <LEVEL>
-
-For more information, try '--help'.
+canon: USAGE: the argument '--policy <LEVEL>' cannot be used with '--no-policy'
+  field: --policy
+  expected: light, standard, strict
+  hint: a working call: canon init; `canon schema init` lists every argument

@@ -186,7 +186,7 @@ variable, and an unknown value is refused (`UNKNOWN_ROLE`).
 - **A role is set, or you were spawned as one:** load only
   `canon skills show role-<role>` and do that role's steps. `canon status`
   and `meta.next` then show only your role's steps, and count the others in
-  `waitingOn`; `canon schema --as <role>` lists only your role's commands.
+  `data.waitingOn`; `canon schema --as <role>` lists only your role's commands.
   Do not load another role's guide.
 - **No role (one agent doing everything):** follow `canon status` and load
   each role guide as its phase starts: planner for steps 1–2,
@@ -201,8 +201,11 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 
 - Start a session with `canon status`: where each subject stands and the next
   commands. After that, do not call it only to learn the next step: every
-  write returns `meta.next` (`[{command, argv, why, actor, role}]`), the same
-  steps `status` would give, narrowed to what the write touched. `actor: human`
+  write returns `meta.next` (`[{command, argv, reason, x-canon: {actor, role}}]`), the same
+  steps `status` would give, narrowed to what the write touched. Each entry is
+  runnable: `argv` is the command without `canon` (with `--json` when you
+  called in JSON mode). Guidance that needs a value you must fill in is not a
+  next entry; it is in the error `hint` or the report text. `x-canon.actor: human`
   marks a step only the human takes.
 - Your role guide's **Commands** block (`canon skills show role-<role>`) is
   your complete command set, every option of every leaf included. Run `canon schema <command> --json` only for a
@@ -211,20 +214,25 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - Pass `--json` and read stdout as one document, nothing on stderr. Success is
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in
-  `data`). `meta` carries `command`, `schemaVersion`, `canonVersion`, `next`,
-  `warnings` and, for a repeated write that changed nothing, `unchanged: true`.
+  `data`). `meta` carries `tool`, `toolVersion`, `contract` (`atip/1`), `schemaVersion`,
+  `command`, and when present `next`, `warnings` (`[{code, message}]`) and
+  `page`; a repeated write that changed nothing reports `data.unchanged: true`.
+  Absent members are omitted, never `null` or `[]`. A paged list puts
+  `meta.page.nextCursor` on the call's `meta.next` as `--cursor <nextCursor>`;
+  no `nextCursor` means no more.
   On failure branch on `error.code`, fix the option `error.field` names
   using the `error.expected` values (`field` is an option name, or a JSON
   pointer such as `/items/2/scenario` into an `--input` document), and
   follow `error.hint`: every refusal carries a working invocation. The codes
   are stable; `canon schema --errors --json` lists them and
   `canon schema --error <CODE>` explains one.
-- **Exit codes:** 0 ok; 1 the command's own finding (a failed check, a
-  violation, or `unverifiable` when nothing was examined); 2 refused (usage,
+- **Exit codes:** only 0, 1 and 2 exist: 0 ok; 1 the command ran and its answer
+  is negative or incomplete (a failed check, a violation, `unverifiable` when
+  nothing was examined, a partly failed batch); 2 refused to run (usage,
   `CONFIG_MISSING`, an id or file that does not exist, an invalid argument).
   A refusal leaves the tree unchanged.
 - Repeating a write is safe: a record that already exists with identical
-  content is reported `unchanged` (`meta.unchanged`), not duplicated.
+  content is reported `unchanged` (`data.unchanged`), not duplicated.
 - An option that takes an id is the bare noun (`--change add-login`,
   `--scenario auth.login.01`, `--actor reviewer-1`, `--project root`,
   `--session s-1`), and an `--input` document key is that name without `Id`
@@ -257,8 +265,8 @@ from a file or stdin) is a batch, run in order and answered with
 `skipped`, and that element's `data` or `error`). A batch is validated whole
 before anything is written: an invalid element writes nothing and exits 2,
 `error.field` pointing at `/items/<i>/<key>`; a write that fails stops there
-(exit 1) and re-running the same batch reports the finished elements
-`unchanged`. A typo in a key is refused (`INPUT_UNKNOWN_FIELD`), never dropped.
+(exit 1, `BATCH_INCOMPLETE`) and re-running the same batch reports the finished elements
+`unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped.
 `canon schema <command> --json` shows the leaf's input schema and an example.
 
 ```text
@@ -276,7 +284,7 @@ The five commands that delete or rewrite existing data (`canon purge`,
 `canon tier age`, `canon ledger compact`, `canon artifacts move`,
 `canon migrate`) act in two steps. The bare run previews: it writes nothing,
 exits 0 and prints the effects and a `planDigest`. Read the effects, then act
-with `--commit --plan-digest <planDigest>`. It refuses (`PLAN_CHANGED`) when
+with `--commit --plan-digest <planDigest>`. It refuses (`PLAN_STALE`) when
 the plan differs from the one you previewed, so run the preview again. Appends
 and state transitions (`gate promote`, `subject move`) run directly. Where a
 preview helps elsewhere (`init`, `skills install`, `export`, `inventory sync`,

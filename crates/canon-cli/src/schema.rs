@@ -113,7 +113,7 @@ const REFUSABLE: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused: CONFIG_MI
 /// The same for a leaf that reads or writes no canon state.
 const REFUSABLE_NO_REPO: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused: an argument or input that is missing, unreadable or invalid; nothing is written")];
 /// A destructive leaf: the bare run previews, `--commit --plan-digest` acts.
-const DESTRUCTIVE_EXITS: &[ExitMeta] = &[exit(0, "previewed, or committed, or nothing to do"), exit(2, "refused: CONFIG_MISSING, an invalid input, or PLAN_CHANGED; nothing is removed")];
+const DESTRUCTIVE_EXITS: &[ExitMeta] = &[exit(0, "previewed, or committed, or nothing to do"), exit(2, "refused: CONFIG_MISSING, an invalid input, or PLAN_STALE; nothing is removed")];
 
 use Effect::{Destructive, Read, Write};
 use Role::{Implementer as I, Orchestrator as O, Planner as P, Reviewer as R};
@@ -124,14 +124,14 @@ const HUMAN: &[Role] = &[];
 /// One row per leaf command, canonical path first.
 pub const META: &[CommandMeta] = &[
     row_exits("adapter authorize", Read, &[exit(0, "authorized"), exit(1, "not authorized (ADAPTER_EXECUTION_NOT_AUTHORIZED): the report stays in data; the only exit 1"), exit(2, "refused (ADAPTER_REFUSED): the response file is missing or unreadable, its envelope breaks a rule, or the policy file is broken; fix the file and run again")], &[O]),
-    row_exits("adapter validate", Read, &[exit(0, "valid envelope"), exit(1, "invalid envelope (ADAPTER_REFUSED): the envelope breaks a rule"), exit(2, "refused (ADAPTER_REFUSED): the response file is missing or unreadable")], &[O]),
+    row_exits("adapter validate", Read, &[exit(0, "valid envelope"), exit(1, "invalid envelope (ADAPTER_RESPONSE_INVALID): the envelope breaks a rule"), exit(2, "refused (ADAPTER_REFUSED): the response file is missing or unreadable")], &[O]),
     row_exits("artifacts move", Destructive, DESTRUCTIVE_EXITS, &[O]),
     row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached")], &[O]),
     row_exits("brief approve", Write, REFUSABLE, HUMAN),
     row_exits("brief show", Read, REFUSABLE, &[P, R]),
     row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "blocker findings"), exit(2, "refused: no such change, no live change (NO_BRIEF), or CONFIG_MISSING")], &[P, R]),
     row_exits("change new", Write, REFUSABLE, &[P]),
-    row_exits("context", Read, &[exit(0, "success: it describes what can be authored and never gates"), exit(2, "refused: UNKNOWN_FIELD")], EVERYONE),
+    row_exits("context", Read, &[exit(0, "success: it describes what can be authored and never gates"), exit(2, "refused: USAGE (an unknown --fields name)")], EVERYONE),
     row_exits("context-pack add", Write, REFUSABLE, &[O, I]),
     row_exits("context-pack show", Read, &[exit(0, "shown"), exit(1, "the pack is tampered (CONTEXT_PACK_TAMPERED)"), exit(2, "refused: CONFIG_MISSING, a pack id that is not sha256: and 64 lower-case hex digits (USAGE), or no such pack")], &[O, I]),
     row_exits("context-pack verify", Read, &[exit(0, "verified"), exit(1, "the pack is tampered"), exit(2, "refused: CONFIG_MISSING, a pack id that is not sha256: and 64 lower-case hex digits (USAGE), or no such pack")], &[O, I]),
@@ -169,7 +169,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("strategy promote", Write, &[exit(0, "promoted, or a dry run"), exit(1, "promotion blocked: the report names why"), exit(2, "refused: CONFIG_MISSING, or an argument error")], &[O]),
     row_exits("strategy rollback", Write, &[exit(0, "rolled back"), exit(1, "LEARN_ROLLBACK_FAILED: the signature does not verify, or the rollback could not be recorded"), exit(2, "refused: CONFIG_MISSING, an unknown strategy id (LEARN_STRATEGY_NOT_FOUND, checked first), or an input that is missing, unreadable or invalid; nothing is written")], &[O]),
     row_exits("ledger compact", Destructive, DESTRUCTIVE_EXITS, &[O]),
-    row_exits("migrate", Destructive, &[exit(0, "previewed, migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused: an invalid input, PLAN_CHANGED, or uncommitted changes under a moved path; nothing is written")], &[O]),
+    row_exits("migrate", Destructive, &[exit(0, "previewed, migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused: an invalid input, PLAN_STALE, or uncommitted changes under a moved path; nothing is written")], &[O]),
     row_exits("plugin sync", Write, &[exit(0, "synced, or deduped"), exit(1, "per-candidate write errors (PLUGIN_SYNC_ERRORS)"), exit(2, "refused: CONFIG_MISSING, or the plugin does not resolve")], &[O]),
     row_exits("policy approve", Write, REFUSABLE, HUMAN),
     row_exits("policy show", Read, REFUSABLE, &[O]),
@@ -194,7 +194,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("skills doctor", Read, &[exit(0, "every diagnosis, healthy or not: diagnostics only"), exit(2, "refused: an unknown provider or a malformed `skills:` section")], &[O]),
     row_exits("skills install", Write, REFUSABLE, &[O]),
     row_exits("skills show", Read, REFUSABLE_NO_REPO, EVERYONE),
-    row_exits("status", Read, &[exit(0, "success, whatever it finds"), exit(1, "unverifiable: nothing was examined"), exit(2, "refused: CONFIG_MISSING, or UNKNOWN_FIELD")], EVERYONE),
+    row_exits("status", Read, &[exit(0, "success, whatever it finds"), exit(1, "unverifiable: nothing was examined"), exit(2, "refused: CONFIG_MISSING, or USAGE (an unknown --fields name)")], EVERYONE),
     row_exits("subject adopt", Write, REFUSABLE, &[P, O]),
     row_exits("subject new", Write, REFUSABLE, &[P, O]),
     row_exits("subject show", Read, &[exit(0, "shown"), exit(2, "refused: an unknown subject (SUBJECT_NOT_FOUND), or CONFIG_MISSING")], &[O]).note("refreshes stale scenario-index records first"),

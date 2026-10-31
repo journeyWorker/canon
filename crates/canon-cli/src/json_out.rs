@@ -1,22 +1,32 @@
-//! The `--json` output contract (0.20 D2, 0.28 D3).
+//! The `--json` output contract: atip/1 L0 (0.33).
 //!
 //! In JSON mode stdout carries exactly one document and stderr nothing:
 //!
 //! - success `{"ok":true,"data":<report>,"meta":{…}}` ([`data`] and friends);
 //! - failure `{"ok":false,"error":{…},"meta":{…}}`, plus `data` when the
 //!   command keeps a partial report on exit 1
-//!   ([`crate::cli_error::CliError::emit_with_data`]).
+//!   ([`crate::cli_error::CliErrorExt::emit_with_data`]).
 //!
-//! `meta` holds `command` (the schema id; flags never change it),
-//! `schemaVersion`, `canonVersion`, `context` (role, actor, repo relative to
-//! the current directory), `next` (each step with its `argv`), `warnings`,
-//! paging, and the few keys a command adds (`unchanged`, `provenance`).
-//! Keys are camelCase; ledger records embedded verbatim keep their own schema.
+//! `meta` holds only the members the contract defines and canon's own
+//! `x-canon` ([`Meta`]): `schemaVersion`, `tool`, `toolVersion`, `contract`,
+//! `command` (the resolved command id; absent when not even the first word
+//! resolved), `output` (the report's name, when the command declares several),
+//! `context` (the context options a command took: `repo`), `next` (runnable
+//! steps with their `argv`), `warnings` (`{code, message}`), `coverage` and
+//! `page` (`returned`, `total`, `nextCursor`). A member with no value is
+//! absent, never `null` and never `[]`. Keys are camelCase; ledger records
+//! embedded verbatim keep their own schema.
+//!
+//! What used to be flat `meta` keys is the report's: a write's `unchanged`
+//! (a repeat found its work done), `waitingOn` and `nextOmitted` are members of
+//! `data` ([`Report::STATE_IN_DATA`]). A report that is a stored record, or is
+//! not an object, cannot take them, so they travel in `meta.x-canon`.
 //!
 //! A report is a [`Report`]: a struct with a derived JSON Schema, so an output
 //! without a schema does not compile. In debug builds every document is
-//! validated against the envelope schema and, when typed, the report's schema;
-//! a mismatch panics, so the whole test suite is a check (T7).
+//! validated against the vendored contract schemas ([`atip::envelope_problems`])
+//! and, when typed, the report's schema; a mismatch panics, so the whole test
+//! suite is a check (T7).
 //!
 //! Human lines a command would print are said by [`say!`]: on stdout in human
 //! mode, nowhere in JSON mode (the document carries the same account).
@@ -35,81 +45,102 @@ use crate::cli_error::{CliError, CliErrorExt as _, ErrorBody};
 use crate::next::{After, NextEntry};
 
 static UNCHANGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static BATCH_INPUT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// A write that found its work already done with identical content (a repeat
 /// of a `replay-safe` or `content-keyed` leaf, D10) says so with this before
-/// it prints its report: the success envelope then carries
-/// `meta.unchanged: true`, and a batch reports the element `unchanged`.
+/// it prints its report: the success envelope then carries `unchanged: true`
+/// in `data` (in `meta.x-canon` for a report that cannot take it), and a batch
+/// reports the element `unchanged`.
 pub fn mark_unchanged() {
     UNCHANGED.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
-/// `meta.schemaVersion` of a document that carries no typed report (a failure without `data`).
+/// Records that the run's `--input` was a batch, so a failure without `data`
+/// names the batch output's version (spec 6.11).
+pub fn set_batch_input(batch: bool) {
+    BATCH_INPUT.store(batch, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// `meta.schemaVersion` before a command is resolved.
 pub const DEFAULT_SCHEMA_VERSION: &str = "1.0";
 
-/// `meta.context`: what canon resolved about where and as whom it ran.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+/// `meta.tool`: the executable's name.
+pub const TOOL: &str = "canon";
+
+/// `meta.contract`: the contract the output follows.
+pub const CONTRACT: &str = "atip/1";
+
+/// `meta.context`: the context options a command took, with the value it used.
+/// canon's only context option is `--repo`.
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Context {
-    /// The declared role (`--as` or `CANON_ROLE`); `null` when none.
-    pub role: Option<String>,
-    /// The declared actor (`CANON_ACTOR`); `null` when none.
-    pub actor: Option<String>,
     /// The repo root canon worked in, as a path relative to the current directory (`.` for it).
     pub repo: String,
 }
 
-/// The `meta` member of every envelope.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+/// One entry of `meta.warnings`: a condition that makes the result weaker than
+/// it looks. The code is registered like an error code ([`crate::cli_error::all_codes`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, JsonSchema)]
+pub struct Warning {
+    pub code: String,
+    pub message: String,
+    /// The argument or field the warning is about.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+}
+
+impl Warning {
+    pub fn new(code: &str, message: impl Into<String>) -> Self {
+        Self { code: code.to_string(), message: message.into(), field: None }
+    }
+}
+
+/// `meta.page`: where a page stands (spec 6.9).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageInfo {
+    pub returned: usize,
+    /// Present exactly when more items follow.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    /// Every record the command matched, across all pages.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<usize>,
+}
+
+/// The `meta` member of every envelope. Every member but the first four is
+/// absent when it has no value.
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Meta {
-    /// The command's schema id (`gate check`); flags never change it.
-    pub command: String,
-    /// `"<major>.<minor>"` of the report in `data` (`"1.0"` in 0.28).
+    /// The command's id (`gate check`); flags never change it. Absent when not even the first word resolved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    /// `"<major>.<minor>"` of the report in `data`.
     pub schema_version: String,
-    pub canon_version: String,
-    pub context: Context,
-    /// The steps that follow, most useful first; present on a command that writes.
+    pub tool: &'static str,
+    pub tool_version: String,
+    pub contract: &'static str,
+    /// The name of the output `data` follows, when the command declares more than one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<Context>,
+    /// The steps that follow, most useful first.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<Vec<NextEntry>>,
-    /// How many further steps were left out past the limit.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub next_omitted: Option<usize>,
-    /// With a declared role: how many steps each other owner holds.
+    pub warnings: Option<Vec<Warning>>,
+    /// What a check or listing examined.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub waiting_on: Option<BTreeMap<String, usize>>,
-    /// Conditions that make the result weaker than it looks.
+    pub coverage: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub warnings: Option<Vec<String>>,
-    /// `true` when a repeat found its record already present with identical
-    /// content and wrote nothing (D10; a batch item's `unchanged` status).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unchanged: Option<bool>,
-    /// Command-specific keys: paging (`returned`, `total`, `hasMore`, `nextCursor`), `unchanged`, `provenance`.
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
-}
-
-/// `{ok: true, data, meta}`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct SuccessEnvelope {
-    /// Always `true`.
-    pub ok: bool,
-    /// The command's report, named by `meta.command` in the spec's `outputs`. A ledger record inside it keeps the record's own schema (camelCase is the report's, not the record's).
-    pub data: Value,
-    pub meta: Meta,
-}
-
-/// `{ok: false, error, meta}` plus `data` when the command keeps a partial report on exit 1.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct FailureEnvelope {
-    /// Always `false`.
-    pub ok: bool,
-    pub error: ErrorBody,
-    /// The partial report (gate violations, a blocked task, a refused promotion).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<Value>,
-    pub meta: Meta,
+    pub page: Option<PageInfo>,
+    /// canon's own metadata: what `data` cannot hold.
+    #[serde(rename = "x-canon", skip_serializing_if = "Option::is_none")]
+    pub x_canon: Option<Map<String, Value>>,
 }
 
 #[derive(Serialize)]
@@ -126,6 +157,19 @@ struct Failure<'a, R: ?Sized> {
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<&'a R>,
     meta: Meta,
+}
+
+/// A write's report with the members canon adds to it (see the module docs).
+#[derive(Serialize)]
+struct WithState<'a, R: ?Sized> {
+    #[serde(flatten)]
+    report: &'a R,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unchanged: Option<bool>,
+    #[serde(rename = "waitingOn", skip_serializing_if = "Option::is_none")]
+    waiting_on: Option<&'a BTreeMap<String, usize>>,
+    #[serde(rename = "nextOmitted", skip_serializing_if = "Option::is_none")]
+    next_omitted: Option<usize>,
 }
 
 /// A ledger record embedded verbatim in a report: a JSON object that keeps its
@@ -164,7 +208,9 @@ impl JsonSchema for NoData {
     }
 }
 
-impl Report for NoData {}
+impl Report for NoData {
+    const STATE_IN_DATA: bool = false;
+}
 
 /// A `--fields` projection of a typed report: some of its top-level members. It
 /// serializes as the projected value and validates against the report's schema
@@ -194,19 +240,33 @@ impl<R: JsonSchema> JsonSchema for Projected<R> {
     }
 }
 
-impl<R: JsonSchema + serde::Serialize> Report for Projected<R> {}
+impl<R: Report> Report for Projected<R> {
+    const SCHEMA_VERSION: &'static str = R::SCHEMA_VERSION;
+}
 
-static REPO: OnceLock<PathBuf> = OnceLock::new();
-static WARNINGS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+/// `Some(Some(dir))`: the leaf took `--repo dir`; `Some(None)`: it takes `--repo` and was not given one;
+/// `None` (never set, or [`set_repo_unused`]): the command names no repo, so `meta.context` is absent.
+static REPO: OnceLock<Option<Option<PathBuf>>> = OnceLock::new();
+static WARNINGS: std::sync::Mutex<Vec<Warning>> = std::sync::Mutex::new(Vec::new());
 static FIRST_NEXT: std::sync::Mutex<Vec<crate::status::NextStep>> = std::sync::Mutex::new(Vec::new());
+static INVOCATION: OnceLock<Vec<String>> = OnceLock::new();
 
 /// Says a warning: on stderr in human mode; in JSON mode it waits for the
-/// document and travels in `meta.warnings`.
-pub fn warn(message: String) {
+/// document and travels in `meta.warnings`. `code` is registered in
+/// [`crate::cli_error::all_codes`]; one situation is one code, and the same
+/// code with the same message is said once.
+pub fn warn(code: &'static str, message: String) {
+    warn_at(code, None, message);
+}
+
+/// [`warn`] naming the argument or field the warning is about.
+pub fn warn_at(code: &'static str, field: Option<&str>, message: String) {
+    debug_assert!(crate::cli_error::code_info(code).is_some(), "warning code {code} is not in cli_error::all_codes()");
     if atip::json_mode() {
+        let warning = Warning { code: code.to_string(), message, field: field.map(str::to_string) };
         let mut warnings = WARNINGS.lock().expect("the warnings list is not poisoned");
-        if !warnings.contains(&message) {
-            warnings.push(message);
+        if !warnings.contains(&warning) {
+            warnings.push(warning);
         }
     } else {
         eprintln!("{message}");
@@ -216,15 +276,28 @@ pub fn warn(message: String) {
 /// Puts `step` first in the `meta.next` of whatever envelope this run prints, a failure's included
 /// (0.28 D9: `status`, `gate check` and `context` lead a 0.27-era repo to `canon migrate --json`).
 /// An envelope without `next` gets one; one with the limit reached drops its last step into
-/// `nextOmitted`. A plain `canon migrate` step already in the list is replaced by this one.
+/// `data.nextOmitted`. A plain `canon migrate` step already in the list is replaced by this one.
 pub fn prepend_next(step: crate::status::NextStep) {
     FIRST_NEXT.lock().expect("the first-step list is not poisoned").push(step);
 }
 
-/// Remembers the `--repo` the command was given, so `meta.context.repo` can say
-/// which repo it worked in. Called once by `main`, after the parse.
-pub fn set_repo(repo: PathBuf) {
-    let _ = REPO.set(repo);
+/// Remembers what the parse resolved about where the command works, so
+/// `meta.context` can say which repo it worked in: `Some(--repo as given)` for
+/// a leaf that takes `--repo`, `None` for one that takes no context option.
+/// Called once by `main`, after the parse.
+pub fn set_repo(repo: Option<PathBuf>) {
+    let _ = REPO.set(Some(repo));
+}
+
+/// Records that the command takes no context option: `meta.context` is absent.
+pub fn set_repo_unused() {
+    let _ = REPO.set(None);
+}
+
+/// The argv the run was parsed from (after `--input` expansion): the words
+/// after the program name. The next-page step repeats it with a new `--cursor`.
+pub fn set_invocation(args: Vec<String>) {
+    let _ = INVOCATION.set(args);
 }
 
 /// `command` as the schema id: `canon gate check`, `gate check` and `canon report check` are `gate check` and `report`.
@@ -268,13 +341,10 @@ pub fn relative_to_cwd(path: &Path) -> String {
     }
 }
 
-fn context() -> Context {
-    let repo = crate::context::resolve_repo_root(REPO.get().map_or(Path::new("."), PathBuf::as_path));
-    Context {
-        role: crate::role::Role::current(None).map(|role| role.as_str().to_string()),
-        actor: std::env::var("CANON_ACTOR").ok().map(|actor| actor.trim().to_string()).filter(|actor| !actor.is_empty()),
-        repo: relative_to_cwd(&repo),
-    }
+fn context() -> Option<Context> {
+    let given = REPO.get()?.as_ref()?;
+    let repo = crate::context::resolve_repo_root(given.as_deref().unwrap_or(Path::new(".")));
+    Some(Context { repo: relative_to_cwd(&repo) })
 }
 
 /// Whether `command` (a canonical path) writes, per [`crate::schema::META`].
@@ -282,60 +352,218 @@ fn writes(command: &str) -> bool {
     crate::schema::META.iter().any(|row| row.path == command && row.effect != crate::schema::Effect::Read)
 }
 
-/// The `meta` for `command`: its steps (a command that writes always carries
-/// `next`, empty when it has no next step), then `extra`'s keys. `extra`'s
-/// `warnings` become `meta.warnings`.
-fn build_meta(command: &str, schema_version: &str, after: Option<&After>, extra: Value) -> Meta {
-    let command = match command_id(command) {
-        id if id.is_empty() => "canon".to_string(),
-        id => id,
+/// Whether the reports of `command` carry `unchanged`, `waitingOn` and `nextOmitted`
+/// beside their own members: every write, and `status`, which names its steps.
+pub fn carries_state(command: &str) -> bool {
+    command == "status" || writes(command)
+}
+
+/// The members a write's report gains, as schema properties (they are optional).
+pub fn state_properties() -> Map<String, Value> {
+    let Value::Object(map) = json!({
+        "unchanged": { "type": "boolean", "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise" },
+        "waitingOn": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 }, "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)" },
+        "nextOmitted": { "type": "integer", "minimum": 1, "description": "How many further `meta.next` steps were left out past the limit" }
+    }) else {
+        unreachable!("a JSON object literal")
     };
-    let mut extra = match extra {
-        Value::Object(map) => map,
-        _ => Map::new(),
-    };
-    let mut warnings = extra.remove("warnings").and_then(|value| serde_json::from_value::<Vec<String>>(value).ok()).unwrap_or_default();
+    map
+}
+
+/// `schema` with the members of [`state_properties`] added to its root.
+pub fn with_state_properties(mut schema: Value) -> Value {
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        for (name, property) in state_properties() {
+            properties.entry(name).or_insert(property);
+        }
+    }
+    schema
+}
+
+/// `base` with its minor raised by one: a report that gained members.
+pub fn bumped(base: &str) -> String {
+    match base.split_once('.') {
+        Some((major, minor)) => match minor.parse::<u64>() {
+            Ok(minor) => format!("{major}.{}", minor + 1),
+            Err(_) => base.to_string(),
+        },
+        None => base.to_string(),
+    }
+}
+
+/// The `meta.schemaVersion` of report `R` for `command`: the report's own
+/// version, one minor higher where `command` adds the members of [`state_properties`].
+pub fn schema_version_of<R: Report>(command: &str) -> String {
+    if R::STATE_IN_DATA && carries_state(command) {
+        bumped(R::SCHEMA_VERSION)
+    } else {
+        R::SCHEMA_VERSION.to_string()
+    }
+}
+
+/// What a write adds to its report, read off the run.
+#[derive(Debug, Default)]
+struct State {
+    unchanged: bool,
+    waiting_on: Option<BTreeMap<String, usize>>,
+    next_omitted: usize,
+}
+
+impl State {
+    fn of(after: Option<&After>) -> Self {
+        Self {
+            unchanged: UNCHANGED.load(std::sync::atomic::Ordering::Relaxed),
+            waiting_on: after.and_then(|after| after.waiting_on.clone()),
+            next_omitted: after.map_or(0, |after| after.omitted),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        !self.unchanged && self.waiting_on.is_none() && self.next_omitted == 0
+    }
+
+    fn into_x_canon(self, x_canon: &mut Map<String, Value>) {
+        if self.unchanged {
+            x_canon.insert("unchanged".to_string(), json!(true));
+        }
+        if let Some(waiting_on) = self.waiting_on {
+            x_canon.insert("waitingOn".to_string(), json!(waiting_on));
+        }
+        if self.next_omitted > 0 {
+            x_canon.insert("nextOmitted".to_string(), json!(self.next_omitted));
+        }
+    }
+}
+
+/// The extra `meta` members a call passes: the keys it may hold are
+/// `warnings`, `coverage`, `page` and `x-canon`.
+struct Extra {
+    warnings: Vec<Warning>,
+    coverage: Option<Value>,
+    page: Option<PageInfo>,
+    x_canon: Map<String, Value>,
+}
+
+fn split_extra(extra: Value) -> Extra {
+    let mut out = Extra { warnings: Vec::new(), coverage: None, page: None, x_canon: Map::new() };
+    let Value::Object(map) = extra else { return out };
+    for (key, value) in map {
+        match key.as_str() {
+            "warnings" => out.warnings = serde_json::from_value(value).expect("`warnings` holds `{code, message}` objects"),
+            "coverage" => out.coverage = Some(value),
+            "page" => out.page = Some(PageInfo { returned: value["returned"].as_u64().map_or(0, |n| usize::try_from(n).unwrap_or(usize::MAX)), next_cursor: value["nextCursor"].as_str().map(str::to_string), total: value["total"].as_u64().map(|n| usize::try_from(n).unwrap_or(usize::MAX)) }),
+            "x-canon" => {
+                if let Value::Object(object) = value {
+                    out.x_canon.extend(object);
+                }
+            }
+            other => {
+                debug_assert!(false, "`{other}` is not a meta member: use `x-canon` or put it in `data`");
+                out.x_canon.insert(other.to_string(), value);
+            }
+        }
+    }
+    out
+}
+
+/// The `--cursor` step of a page: the same invocation with the next cursor.
+fn next_page_step(cursor: &str) -> Option<NextEntry> {
+    let invocation = INVOCATION.get()?;
+    let mut argv: Vec<String> = Vec::with_capacity(invocation.len() + 2);
+    let mut words = invocation.iter().peekable();
+    let mut inserted = false;
+    while let Some(word) = words.next() {
+        if word == "--" && !inserted {
+            argv.extend(["--cursor".to_string(), cursor.to_string()]);
+            inserted = true;
+        }
+        if word == "--cursor" {
+            words.next();
+            continue;
+        }
+        if word.starts_with("--cursor=") {
+            continue;
+        }
+        argv.push(word.clone());
+    }
+    if !inserted {
+        argv.extend(["--cursor".to_string(), cursor.to_string()]);
+    }
+    NextEntry::runnable(argv, "the next page of this listing", None)
+}
+
+/// The `meta` for `command`: its steps, then `extra`'s members. `extra`'s
+/// `warnings` and every warning said so far become `meta.warnings`. The second
+/// value counts the steps a lead step ([`prepend_next`]) pushed past the limit.
+fn build_meta(command: &str, schema_version: String, output: Option<String>, after: Option<&After>, extra: Value) -> (Meta, usize) {
+    let command = Some(command_id(command)).filter(|id| !id.is_empty());
+    let Extra { mut warnings, coverage, page, x_canon } = split_extra(extra);
     for said in std::mem::take(&mut *WARNINGS.lock().expect("the warnings list is not poisoned")) {
         if !warnings.contains(&said) {
             warnings.push(said);
         }
     }
-    let warnings = (!warnings.is_empty()).then_some(warnings);
-    let unchanged = (extra.remove("unchanged").and_then(|v| v.as_bool()).unwrap_or(false) | UNCHANGED.load(std::sync::atomic::Ordering::Relaxed)).then_some(true);
-    let (mut next, mut next_omitted, waiting_on) = match after {
-        Some(after) => (Some(after.entries()), (after.omitted > 0).then_some(after.omitted), after.waiting_on.clone()),
-        None => (writes(&command).then(Vec::new), None, None),
-    };
+    let mut next: Vec<NextEntry> = after.map(After::entries).unwrap_or_default();
+    let mut pushed_out = 0;
     let first = std::mem::take(&mut *FIRST_NEXT.lock().expect("the first-step list is not poisoned"));
     if !first.is_empty() {
-        let mut entries: Vec<NextEntry> = first.iter().map(NextEntry::from).collect();
+        let mut entries: Vec<NextEntry> = first.iter().filter_map(NextEntry::from_step).collect();
         let lead = entries.len();
-        entries.extend(next.take().unwrap_or_default().into_iter().filter(|entry| entry.command != "canon migrate"));
-        let over = entries.len().saturating_sub(crate::status::NEXT_LIMIT.max(lead));
-        entries.truncate(entries.len() - over);
-        next_omitted = (next_omitted.unwrap_or(0) + over > 0).then_some(next_omitted.unwrap_or(0) + over);
-        next = Some(entries);
+        entries.extend(next.drain(..).filter(|entry| entry.command != "canon migrate"));
+        let kept = crate::status::NEXT_LIMIT.max(lead);
+        pushed_out = entries.len().saturating_sub(kept);
+        entries.truncate(kept);
+        next = entries;
     }
-    Meta {
+    if let Some(step) = page.as_ref().and_then(|page| page.next_cursor.as_deref()).and_then(next_page_step) {
+        next.insert(0, step);
+    }
+    let meta = Meta {
         command,
-        schema_version: schema_version.to_string(),
-        canon_version: env!("CARGO_PKG_VERSION").to_string(),
+        schema_version,
+        tool: TOOL,
+        tool_version: env!("CARGO_PKG_VERSION").to_string(),
+        contract: CONTRACT,
+        output,
         context: context(),
-        next,
-        next_omitted,
-        waiting_on,
-        warnings,
-        unchanged,
-        extra,
-    }
+        next: (!next.is_empty()).then_some(next),
+        warnings: (!warnings.is_empty()).then_some(warnings),
+        coverage,
+        page,
+        x_canon: (!x_canon.is_empty()).then_some(x_canon),
+    };
+    (meta, pushed_out)
 }
 
 fn success_text<R: Report>(command: &str, data: &R, after: Option<&After>, extra: Value) -> String {
-    let document = Success { ok: true, data, meta: build_meta(command, R::SCHEMA_VERSION, after, extra) };
-    let text = atip::line(&document);
+    let id = command_id(command);
+    let mut state = State::of(after);
+    let output = output_of::<R>(&id);
+    let (mut meta, pushed_out) = build_meta(command, schema_version_of::<R>(&id), output, after, extra);
+    state.next_omitted += pushed_out;
+    let in_data = R::STATE_IN_DATA && carries_state(&id);
+    let text = if in_data && !state.is_empty() {
+        let wrapped = WithState { report: data, unchanged: state.unchanged.then_some(true), waiting_on: state.waiting_on.as_ref(), next_omitted: (state.next_omitted > 0).then_some(state.next_omitted) };
+        atip::line(&Success { ok: true, data: &wrapped, meta })
+    } else {
+        if !state.is_empty() {
+            state.into_x_canon(meta.x_canon.get_or_insert_with(Map::new));
+        }
+        atip::line(&Success { ok: true, data, meta })
+    };
     #[cfg(debug_assertions)]
-    validate::<R>(&text);
+    validate::<R>(&id, &text);
     text
+}
+
+/// The name of the output `data` follows: the batch output for a batch `--input` (whose elements the
+/// binary carries as plain JSON), else the output of `R`; only when the command declares several.
+fn output_of<R: Report>(command: &str) -> Option<String> {
+    if BATCH_INPUT.load(std::sync::atomic::Ordering::Relaxed) {
+        crate::reports::batch_output_name(command)
+    } else {
+        crate::reports::output_name::<R>(command)
+    }
 }
 
 /// Prints the success envelope for `command` on stdout.
@@ -348,12 +576,12 @@ pub fn data_with_next<R: Report>(command: &str, data: &R, after: &After) {
     data_with_next_and_meta(command, data, after, Value::Null);
 }
 
-/// [`data_with_next`] with extra `meta` keys (a page's `nextCursor`, …).
+/// [`data_with_next`] with extra `meta` members (a page, `coverage`, …).
 pub fn data_with_next_and_meta<R: Report>(command: &str, data: &R, after: &After, extra_meta: Value) {
     atip::print_line(&success_text(command, data, Some(after), extra_meta));
 }
 
-/// [`data`] with extra `meta` keys beside `command` (`unchanged`, …).
+/// [`data`] with extra `meta` members beside `command` (`page`, `coverage`, `warnings`).
 pub fn data_with_meta<R: Report>(command: &str, data: &R, extra_meta: Value) {
     atip::print_line(&success_text(command, data, None, extra_meta));
 }
@@ -370,11 +598,15 @@ pub fn envelope_with_next<R: Report>(command: &str, data: &R, after: &After, ext
 }
 
 fn failure_text<R: Report>(command: &str, error: &CliError, data: Option<&R>, extra_meta: Value) -> String {
-    let schema_version = if data.is_some() { R::SCHEMA_VERSION } else { DEFAULT_SCHEMA_VERSION };
-    let document = Failure { ok: false, error: error.body(), data, meta: build_meta(command, schema_version, None, extra_meta) };
+    let id = command_id(command);
+    let (schema_version, output) = match data {
+        Some(_) => (schema_version_of::<R>(&id), output_of::<R>(&id)),
+        None => (crate::reports::declared_version(&id, BATCH_INPUT.load(std::sync::atomic::Ordering::Relaxed)).unwrap_or_else(|| DEFAULT_SCHEMA_VERSION.to_string()), None),
+    };
+    let document = Failure { ok: false, error: error.body(), data, meta: build_meta(command, schema_version, output, None, extra_meta).0 };
     let text = atip::line(&document);
     #[cfg(debug_assertions)]
-    validate::<R>(&text);
+    validate::<R>(&id, &text);
     text
 }
 
@@ -384,7 +616,7 @@ pub fn print_failure<R: Report>(command: &str, error: &CliError, data: Option<&R
     print_failure_with_meta(command, error, data, Value::Null);
 }
 
-/// [`print_failure`] with extra `meta` keys beside `command` (`coverage`, …).
+/// [`print_failure`] with extra `meta` members beside `command` (`coverage`, …).
 pub fn print_failure_with_meta<R: Report>(command: &str, error: &CliError, data: Option<&R>, extra_meta: Value) {
     atip::print_line(&failure_text(command, error, data, extra_meta));
 }
@@ -394,10 +626,10 @@ pub fn failure_value<R: Report>(command: &str, error: &CliError, data: Option<&R
     serde_json::from_str(&failure_text(command, error, data, Value::Null)).expect("the envelope is JSON")
 }
 
-/// The `meta` member a command's warnings travel in (0.25): `{ "warnings":
-/// [<line>, …] }`, or null when there is none. A warning is also said on
-/// stderr in human mode by the command that raises it.
-pub fn warnings_meta(warnings: &[String]) -> Value {
+/// The `meta` member a command's warnings travel in: `{ "warnings":
+/// [{code, message}, …] }`, or null when there is none. A warning is also said
+/// on stderr in human mode by the command that raises it.
+pub fn warnings_meta(warnings: &[Warning]) -> Value {
     if warnings.is_empty() {
         Value::Null
     } else {
@@ -406,43 +638,49 @@ pub fn warnings_meta(warnings: &[String]) -> Value {
 }
 
 /// Splits a payload that carries its own page `meta` ([`crate::paging`]'s
-/// `total`, `returned`, `nextCursor`) into `(data, meta)`, so the page
-/// state lands in `meta` beside `command` instead of inside `data`.
+/// `page`) into `(data, meta)`, so the page state lands in `meta` beside
+/// `command` instead of inside `data`.
 pub fn split_meta(mut payload: Value) -> (Value, Value) {
     let meta = payload.as_object_mut().and_then(|object| object.remove("meta")).unwrap_or(Value::Null);
     (payload, meta)
 }
 
-/// Debug builds check every document against the envelope schema and the
-/// report's own schema (T7). A mismatch is a bug in canon, not in the caller.
+/// Debug builds check every document against the contract's envelope schema
+/// and the report's own schema (T7). A mismatch is a bug in canon, not in the caller.
 #[cfg(debug_assertions)]
-fn validate<R: Report>(text: &str) {
+fn validate<R: Report>(command: &str, text: &str) {
     use std::collections::HashMap;
     use std::sync::{LazyLock, Mutex};
 
     use jsonschema::Validator;
 
-    static ENVELOPES: LazyLock<(Validator, Validator)> = LazyLock::new(|| {
-        let schemas = crate::reports::envelope_schemas();
-        let compile = |key: &str| jsonschema::validator_for(&schemas[key]).unwrap_or_else(|e| panic!("the {key} envelope schema does not compile: {e}"));
-        (compile("success"), compile("failure"))
-    });
-    type ReportValidators = Mutex<HashMap<&'static str, Option<std::sync::Arc<Validator>>>>;
+    type ReportValidators = Mutex<HashMap<(String, &'static str), Option<std::sync::Arc<Validator>>>>;
     static REPORTS: LazyLock<ReportValidators> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
     let document: Value = serde_json::from_str(text).expect("a document is JSON");
     witness::<R>(&document);
     let ok = document["ok"].as_bool().unwrap_or(false);
-    let envelope = if ok { &ENVELOPES.0 } else { &ENVELOPES.1 };
-    let problems: Vec<String> = envelope.iter_errors(&document).map(|e| format!("{} at {}", e, e.instance_path())).collect();
-    assert!(problems.is_empty(), "JSON document breaks the {} envelope schema: {problems:?}\n{text}", if ok { "success" } else { "failure" });
+    let problems = atip::envelope_problems(&document);
+    assert!(problems.is_empty(), "JSON document breaks the atip/1 envelope schema: {problems:?}\n{text}");
+    let registered = |code: &str| crate::cli_error::code_info(code).is_some();
+    if !ok {
+        let code = document["error"]["code"].as_str().unwrap_or_default();
+        assert!(registered(code), "error code {code} is not in cli_error::all_codes()");
+    }
+    for warning in document["meta"]["warnings"].as_array().into_iter().flatten() {
+        let code = warning["code"].as_str().unwrap_or_default();
+        assert!(registered(code), "warning code {code} is not in cli_error::all_codes()");
+    }
     let Some(data) = document.get("data") else { return };
     let validator = REPORTS
         .lock()
         .expect("the validator cache is not poisoned")
-        .entry(std::any::type_name::<R>())
+        .entry((command.to_string(), std::any::type_name::<R>()))
         .or_insert_with(|| {
-            let schema = crate::reports::schema_of::<R>();
+            let mut schema = crate::reports::schema_of::<R>();
+            if R::STATE_IN_DATA && carries_state(command) {
+                schema = with_state_properties(schema);
+            }
             (schema != Value::Bool(true)).then(|| std::sync::Arc::new(jsonschema::validator_for(&schema).unwrap_or_else(|e| panic!("the schema of {} does not compile: {e}", std::any::type_name::<R>()))))
         })
         .clone();
@@ -526,9 +764,11 @@ macro_rules! human_err {
 }
 
 /// A warning: `eprintln!` in human mode, an entry of `meta.warnings` in JSON mode.
+/// The first argument is the registered warning code ([`crate::cli_error::all_codes`]);
+/// the rest is the message, as for `format!`.
 #[macro_export]
 macro_rules! warn_err {
-    ($($arg:tt)*) => {
-        $crate::json_out::warn(format!($($arg)*))
+    ($code:expr, $($arg:tt)*) => {
+        $crate::json_out::warn($code, format!($($arg)*))
     };
 }

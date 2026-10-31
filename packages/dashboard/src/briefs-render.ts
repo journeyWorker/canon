@@ -216,9 +216,20 @@ export interface Refusal {
 export interface ApproveFailure {
   code: string;
   message: string;
-  hint: string | null;
+  /** Absent when the server had no hint (atip/1 omits the member; `null` is tolerated). */
+  hint?: string | null;
   /** The briefs a multi-brief call refused, each with its own code. */
   refused: Refusal[];
+}
+
+/** The failure an approve answer carries: `error` of the atip/1 envelope
+ * (`hint` absent when there is none) and the refused briefs in `data.refused`. */
+export function approveFailure(
+  json: { error?: { code: string; message: string; hint?: string | null }; data?: { refused?: Refusal[] } },
+  status: number,
+): ApproveFailure {
+  const error = json.error ?? { code: "UNKNOWN", message: `the server answered ${status}` };
+  return { code: error.code, message: error.message, hint: error.hint ?? undefined, refused: json.data?.refused ?? [] };
 }
 
 /** What a refused approval shows: the server's message and hint, and each

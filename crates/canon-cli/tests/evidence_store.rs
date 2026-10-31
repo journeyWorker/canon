@@ -256,7 +256,7 @@ fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
     let stderr = String::from_utf8_lossy(&refused.stderr).into_owned();
     let lines: Vec<&str> = stderr.lines().collect();
     assert_eq!(lines.len(), 3, "one line per finding, then the hint: {stderr}");
-    assert!(lines[0].starts_with("canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("hint: "), "{stderr}");
+    assert!(lines[0].starts_with("canon: EVIDENCE_FABRICATED: fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("  hint: "), "{stderr}");
     assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
     assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
     let staged = repo.join(".canon/ledger/_staging/kind=evidence");

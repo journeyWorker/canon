@@ -188,7 +188,7 @@ fn an_unbindable_review_artifact_is_refused_and_nothing_is_written() {
     ] {
         let out = review(repo, "reviewer-2", &args);
         assert_eq!(out.status.code(), Some(2), "{args:?}: {}", text(&out));
-        assert!(text(&out).contains("canon review scenario: REVIEW_ARTIFACT_REFUSED —") && text(&out).contains(expected), "{args:?}: {}", text(&out));
+        assert!(text(&out).starts_with("canon: REVIEW_ARTIFACT_REFUSED: ") && text(&out).contains("\n  field: --artifact\n") && text(&out).contains(expected), "{args:?}: {}", text(&out));
         assert_eq!(store_snapshot(repo), before, "{args:?}: a refused review add stores no bytes at all");
     }
     assert!(reviews(repo).is_empty(), "a refused review add writes nothing");

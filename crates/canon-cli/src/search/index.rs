@@ -89,8 +89,8 @@ enum Existing {
 }
 
 /// Open the index for `corpus`: reuse the file when its fingerprint is the corpus's, else build it.
-/// Warnings (a corrupt file, an unwritable directory) are appended to `warnings`.
-pub fn open(repo: &Path, corpus: &Corpus, warnings: &mut Vec<String>) -> Result<Index, IndexError> {
+/// Warnings (a corrupt file, an unwritable directory) are appended to `warnings` as `(code, message)`.
+pub fn open(repo: &Path, corpus: &Corpus, warnings: &mut Vec<(&'static str, String)>) -> Result<Index, IndexError> {
     let dir = repo.join(paths::INDEX_DIR);
     let file = repo.join(paths::INDEX_FILE);
     let unread_stores = corpus.unread.clone();
@@ -111,7 +111,7 @@ pub fn open(repo: &Path, corpus: &Corpus, warnings: &mut Vec<String>) -> Result<
     let (nodes, edges) = (graph.nodes.len(), graph.edges.len());
     if let Some(reason) = broken {
         match std::fs::remove_file(&file) {
-            Ok(()) => warnings.push(format!("the index file `{}` is not a usable database ({reason}); deleted it and rebuilt it", paths::INDEX_FILE)),
+            Ok(()) => warnings.push(("SEARCH_INDEX_REBUILT", format!("the index file `{}` is not a usable database ({reason}); deleted it and rebuilt it", paths::INDEX_FILE))),
             Err(error) => return in_memory(&graph, corpus, warnings, &format!("the index file `{}` is not a usable database ({reason}) and cannot be deleted ({error})", paths::INDEX_FILE), info(nodes, edges, true, true)),
         }
     }
@@ -125,10 +125,10 @@ pub fn open(repo: &Path, corpus: &Corpus, warnings: &mut Vec<String>) -> Result<
     }
 }
 
-fn in_memory(graph: &Graph, corpus: &Corpus, warnings: &mut Vec<String>, why: &str, info: IndexInfo) -> Result<Index, IndexError> {
+fn in_memory(graph: &Graph, corpus: &Corpus, warnings: &mut Vec<(&'static str, String)>, why: &str, info: IndexInfo) -> Result<Index, IndexError> {
     let conn = Connection::open_in_memory()?;
     populate(&conn, graph, corpus)?;
-    warnings.push(format!("{why}; built the index in memory for this run"));
+    warnings.push(("SEARCH_INDEX_IN_MEMORY", format!("{why}; built the index in memory for this run")));
     Ok(Index { conn, info })
 }
 

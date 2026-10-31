@@ -129,7 +129,7 @@ Feature: divergence lifecycle
   Scenario: Divergence list refuses an invalid timestamp, a zero limit or a cursor canon did not issue with exit 2
     Given a repo with no divergences
     When canon divergence list runs with --as-of bogus, with --limit 0, with --cursor zzz, and with both --limit and --all
-    Then --as-of bogus, --limit 0 and the combined flags each exit 2 with USAGE naming the option, and --cursor zzz exits 2 with INVALID_CURSOR
+    Then --as-of bogus, --limit 0 and the combined flags each exit 2 with USAGE naming the option, and --cursor zzz exits 2 with CURSOR_INVALID
     And no file in the repo changed
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:39Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}

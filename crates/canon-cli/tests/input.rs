@@ -225,7 +225,7 @@ fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
         for variant in batch {
             let report = variant["report"].as_str().unwrap();
             assert!(report.starts_with("Batch") && report.ends_with("Report"), "{report}");
-            assert_eq!(variant["schemaVersion"], "1.0");
+            assert_eq!(variant["schemaVersion"], "1.1");
             assert!(schemas.get(report).is_some(), "{report} is published");
         }
     }
@@ -439,14 +439,14 @@ fn text_that_is_neither_one_json_value_nor_ndjson_is_input_invalid() {
     std::fs::write(repo.join("half.ndjson"), "{\"operands\":[\"a\"],\"domain\":\"dev\",\"title\":\"A\"}\nnot json\n").unwrap();
     std::fs::write(repo.join("empty.ndjson"), "# only a comment\n\n").unwrap();
     let before = tree(repo);
-    for (what, args, stdin, expected) in [
-        ("inline text that is not JSON", vec!["--input", "{not json"], None, "INPUT_INVALID"),
-        ("a file that is not JSON", vec!["--input", "bad.txt"], None, "INPUT_INVALID"),
-        ("an NDJSON file with a bad line", vec!["--input", "half.ndjson"], None, "INPUT_INVALID"),
-        ("an NDJSON file with no line", vec!["--input", "empty.ndjson"], None, "INPUT_INVALID"),
-        ("stdin that is not JSON", vec!["--input", "-"], Some("nope"), "INPUT_INVALID"),
-        ("an array whose element is not an object", vec!["--input", "[1]"], None, "INPUT_INVALID_TYPE"),
-        ("a path that is no file", vec!["--input", "7"], None, "INPUT_UNREADABLE"),
+    for (what, args, stdin, expected, fragment) in [
+        ("inline text that is not JSON", vec!["--input", "{not json"], None, "INPUT_INVALID", "not valid JSON"),
+        ("a file that is not JSON", vec!["--input", "bad.txt"], None, "INPUT_INVALID", "neither one JSON value nor NDJSON"),
+        ("an NDJSON file with a bad line", vec!["--input", "half.ndjson"], None, "INPUT_INVALID", "line 2 is not JSON"),
+        ("an NDJSON file with no line", vec!["--input", "empty.ndjson"], None, "INPUT_INVALID", "holds no JSON value"),
+        ("stdin that is not JSON", vec!["--input", "-"], Some("nope"), "INPUT_INVALID", "line 1 is not JSON"),
+        ("an array whose element is not an object", vec!["--input", "[1]"], None, "INPUT_INVALID", "must be an object"),
+        ("a path that is no file", vec!["--input", "7"], None, "INPUT_INVALID", "could not be opened"),
     ] {
         let mut argv = vec!["subject", "new"];
         argv.extend(args.iter().copied());
@@ -454,6 +454,7 @@ fn text_that_is_neither_one_json_value_nor_ndjson_is_input_invalid() {
         let out = canon(repo, home.path(), &argv, stdin);
         let body = json_of(&out);
         assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some(expected)), "{what}: {body}");
+        assert!(body["error"]["message"].as_str().is_some_and(|m| m.contains(fragment)), "{what}: the distinction is in the message (`{fragment}`): {body}");
     }
     let after = tree(repo);
     let differing: Vec<&String> = after.keys().chain(before.keys()).filter(|k| after.get(*k) != before.get(*k)).collect();
@@ -478,34 +479,35 @@ fn unknown_keys_null_conflicts_and_the_flags_only_options_are_refused() {
 
     let (code, body) = run(&["--input", r#"{"operands":["a"],"domain":"dev","title":"A","titl":"x"}"#], None);
     assert_eq!(code, Some(2));
-    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("INPUT_UNKNOWN_FIELD"), Some("/titl")), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("INPUT_INVALID"), Some("/titl")), "{body}");
+    assert!(body["error"]["message"].as_str().is_some_and(|m| m.contains("is not an option")), "{body}");
     let expected: Vec<&str> = body["error"]["expected"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
     assert!(expected.contains(&"title") && expected.contains(&"operands") && !expected.contains(&"repo"), "{expected:?}");
     assert!(body["error"]["suggestions"].as_array().unwrap().iter().any(|s| s == "title"), "{body}");
 
     // A plural of a valid key is refused with the singular as the first suggestion and in the hint.
     let (code, body) = run(&["--input", r#"{"operands":["a"],"domain":"dev","titles":"x"}"#], None);
-    assert_eq!((code, body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{body}");
+    assert_eq!((code, body["error"]["code"].as_str()), (Some(2), Some("INPUT_INVALID")), "{body}");
     assert_eq!(body["error"]["suggestions"][0], "title", "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("\"title\""), "{body}");
     let out = canon(repo, home.path(), &["finding", "add", "--input", r#"[{"change":"c","round":1,"seq":1,"severity":"note","actor":"a","summary":"s","scenarios":["a.b.01"]}]"#, "--json"], None);
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_INVALID")), "{body}");
     assert_eq!(body["error"]["suggestions"][0], "scenario", "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("\"scenario\": [...]"), "{body}");
 
     for key in ["repo", "as", "json", "commit", "planDigest"] {
         let doc = format!(r#"{{"operands":["a"],"domain":"dev","title":"A","{key}":"x"}}"#);
         let (code, body) = run(&["--input", &doc], None);
-        assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD"), Some(format!("/{key}").as_str())), "{key}: {body}");
+        assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some(format!("/{key}").as_str())), "{key}: {body}");
     }
 
     let (code, body) = run(&["--input", r#"{"operands":["a"],"domain":"dev","title":null}"#], None);
-    assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID_TYPE"), Some("/title")), "{body}");
+    assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some("/title")), "{body}");
     let (code, body) = run(&["--input", r#"{"operands":["a"],"domain":"dev","title":["x"]}"#], None);
-    assert_eq!((code, body["error"]["code"].as_str()), (Some(2), Some("INPUT_INVALID_TYPE")), "{body}");
+    assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some("/title")), "{body}");
     let (code, body) = run(&["--input", r#"{"operands":"a","domain":"dev","title":"A"}"#], None);
-    assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID_TYPE"), Some("/operands")), "{body}");
+    assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some("/operands")), "{body}");
 
     // a flag and the same key: different is refused, equal is fine
     let (code, body) = run(&["--title", "Other", "--input", r#"{"operands":["a"],"domain":"dev","title":"A"}"#], None);
@@ -536,7 +538,7 @@ fn stdin_conflicts_and_oversize_documents_are_refused() {
 
     let out = canon(repo, home.path(), &["evidence", "add", "--input", "-", "--report", "junit:-", "--json"], Some(r#"{"scenario":"auth.login.01","class":"test-run","ref":"x","role":"implementer"}"#));
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_STDIN_CONFLICT")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("--input")), "{body}");
 
     // over 8 MiB: refused from the file's size, before it is read
     let big = repo.join("big.ndjson");
@@ -627,8 +629,9 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     assert_eq!(body["ok"], false);
     let statuses: Vec<&str> = body["data"]["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect();
     assert_eq!(statuses, ["written", "written", "failed", "skipped"], "{body}");
-    assert!(body["data"]["items"][2]["error"]["code"].is_string(), "{body}");
-    assert_eq!(body["error"]["code"], body["data"]["items"][2]["error"]["code"]);
+    assert_eq!(body["data"]["items"][2]["error"]["code"], "TASK_NOT_FOUND", "the failed element keeps its own error: {body}");
+    assert_eq!(body["error"]["code"], "BATCH_INCOMPLETE", "{body}");
+    assert_eq!(body["error"]["field"], "/items/2", "{body}");
     assert!(body["data"]["items"][0]["data"]["records"].is_array(), "{body}");
     assert_eq!(body["meta"]["command"], "evidence add");
     validates(&schemas, "BatchEvidenceAddReport", &body["data"]);
@@ -678,8 +681,10 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     assert_eq!(out.status.code(), Some(1), "{body}");
     let statuses: Vec<&str> = body["data"]["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect();
     assert_eq!(statuses, ["written", "failed", "skipped"], "{body}");
-    assert_eq!(body["error"]["code"], "SCENARIO_TAG_EXISTS", "{body}");
+    assert_eq!(body["error"]["code"], "BATCH_INCOMPLETE", "{body}");
     assert_eq!(body["error"]["field"], "/items/1/operands", "the runtime refusal points into the batch: {body}");
+    assert_eq!(body["data"]["items"][1]["error"]["code"], "SCENARIO_TAG_EXISTS", "the failed element keeps its own error: {body}");
+    assert_eq!(body["data"]["items"][1]["error"]["field"], "/items/1/operands", "{body}");
     let feature = std::fs::read_to_string(batch.join(".canon/specs/kind=feature/area=auth/login.feature")).unwrap();
     assert!(feature.contains("auth.login.03") && !feature.contains("auth.login.04"), "{feature}");
 }
@@ -718,12 +723,14 @@ fn the_destructive_leaves_take_one_object_and_never_a_commit() {
             let out = canon(repo, home.path(), &argv.iter().map(String::as_str).collect::<Vec<_>>(), None);
             let body = json_of(&out);
             // `{}\n{}` is not one JSON value inline: it is invalid there, a batch only from a file
-            let want = if doc == "[{}]" { "INPUT_BATCH_UNSUPPORTED" } else { "INPUT_INVALID" };
-            assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some(want)), "{leaf} {doc}: {body}");
+            assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_INVALID")), "{leaf} {doc}: {body}");
+            if doc == "[{}]" {
+                assert!(body["error"]["message"].as_str().is_some_and(|m| m.contains("takes one object")), "{leaf} {doc}: a destructive leaf takes no batch: {body}");
+            }
         }
         std::fs::write(repo.join("two.ndjson"), "{}\n{}\n").unwrap();
         let out = canon(repo, home.path(), &[words.as_slice(), &["--input", "two.ndjson", "--json"]].concat(), None);
-        assert_eq!((out.status.code(), json_of(&out)["error"]["code"].as_str().map(str::to_string)), (Some(2), Some("INPUT_BATCH_UNSUPPORTED".to_string())), "{leaf}");
+        assert_eq!((out.status.code(), json_of(&out)["error"]["code"].as_str().map(str::to_string)), (Some(2), Some("INPUT_INVALID".to_string())), "{leaf}");
         std::fs::remove_file(repo.join("two.ndjson")).unwrap();
 
         for key in ["commit", "planDigest"] {
@@ -731,7 +738,7 @@ fn the_destructive_leaves_take_one_object_and_never_a_commit() {
             let argv = doc_args(&doc);
             let out = canon(repo, home.path(), &argv.iter().map(String::as_str).collect::<Vec<_>>(), None);
             let body = json_of(&out);
-            assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{leaf} {key}: {body}");
+            assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some(format!("/{key}").as_str())), "{leaf} {key}: {body}");
         }
     }
     assert_eq!(tree(repo), before);

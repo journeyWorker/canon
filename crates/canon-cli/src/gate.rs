@@ -199,7 +199,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
         crate::say_raw!(json, "{}", format_coverage_off_advisory(count));
         advisories.push(advisory("spec_coverage_off", format!("{count} scenario(s) are not checked for evidence; see .canon/policy.yaml"), Vec::new()));
     }
-    if let Some(line) = crate::policy_approval::advisory(&repo).filter(|_| crate::policy_approval::closed_failure(&repo).is_none()) {
+    if let Some(line) = crate::policy_approval::advisory(&repo).map(|warning| warning.message).filter(|_| crate::policy_approval::closed_failure(&repo).is_none()) {
         crate::say_raw!(json, "\nadvisory: {line}\n");
         advisories.push(advisory("policy_approval", line, Vec::new()));
     }
@@ -630,12 +630,15 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
 
     match decision {
         TaskFlipDecision::Approved { .. } => {
+            if let Some(code) = crate::write_mode::refuse_unwritable(&[&document_path], "canon task done", json) {
+                return code;
+            }
             if let Err(e) = std::fs::write(&document_path, &flip.document) {
                 return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon task done", json);
             }
             crate::say!(json, "canon task done: {task_id} flipped — {}", crate::write_mode::DIRECT);
             if let Some(warning) = canon_command_proof_warning(&task_id, &raw_records) {
-                crate::warn_err!("{warning}");
+                crate::warn_err!("TASK_PROOF_IS_CANON_COMMAND", "{warning}");
             }
             refresh_task_status(&repo, &task_id.change_id());
             let change = crate::next::Scope::Change(task_id.change_id().as_str().to_string());
@@ -683,8 +686,8 @@ fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> O
 fn refresh_task_status(repo: &Path, change_id: &ChangeId) {
     match crate::plans::refresh_change(repo, change_id) {
         Ok(refresh) if refresh.changes_parsed > 0 && refresh.malformed == 0 => {}
-        Ok(_) => crate::warn_err!("canon task done: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
-        Err(e) => crate::warn_err!("canon task done: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
+        Ok(_) => crate::warn_err!("TASK_REIMPORT_INCOMPLETE", "canon task done: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
+        Err(e) => crate::warn_err!("TASK_STATUS_NOT_REFRESHED", "canon task done: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
     }
 }
 
@@ -1239,7 +1242,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let repo = resolve_repo_root(repo);
     if !repo.is_dir() {
         let what = if repo.exists() { "is not a directory" } else { "does not exist" };
-        return CliError::refused("HOOKS_INSTALL_FAILED", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+        return CliError::refused("HOOKS_INSTALL_REFUSED", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
     }
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -1252,13 +1255,21 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
 
     // Every target is checked before the first is written: a refusal on a later one leaves the earlier ones as they were.
     for path in [&claude_path, &codex_path] {
-        if let Err(e) = install_into(path, &entry, true) {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+        match install_into(path, &entry, true) {
+            Ok(InstallOutcome::Installed) => {
+                if let Err(e) = crate::write_mode::check_writable(path) {
+                    return crate::write_mode::unavailable(path, &e).emit("canon gate install-hooks", json);
+                }
+            }
+            Ok(_) => {}
+            Err(e) => {
+                return CliError::refused("HOOKS_INSTALL_REFUSED", e.to_string()).hint("check that the hook file under .claude / .codex is a readable JSON file and that its directory can be created, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+            }
         }
     }
     if writes_script {
-        if let Err(e) = crate::write_mode::check_creatable(&script_path, true) {
-            return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
+        if let Err(e) = crate::write_mode::check_creatable(&script_path, true).and_then(|()| crate::write_mode::check_writable(&script_path)) {
+            return crate::write_mode::unavailable(&script_path, &e).emit("canon gate install-hooks", json);
         }
     }
 

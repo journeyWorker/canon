@@ -371,7 +371,8 @@ fn subject_lifecycle_58_old_approved_lines_read_as_before_and_the_marker_is_outs
     assert!(run_as(r, Some("planner"), &args).status.success());
     let first = read(r, "b");
     let again = run_as(r, Some("planner"), &[&args[..], &["--json"]].concat());
-    assert_eq!(json(&again)["meta"]["unchanged"], true, "{}", text(&again));
+    assert_eq!(json(&again)["data"]["unchanged"], true, "{}", text(&again));
+    assert!(json(&again)["meta"].get("unchanged").is_none(), "`unchanged` is a report member, not a flat `meta` one: {}", text(&again));
     assert_eq!(read(r, "b"), first);
 }
 

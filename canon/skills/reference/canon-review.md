@@ -122,7 +122,7 @@ Many findings at once: `--input` takes inline JSON, a file or `-`; an array
 (or NDJSON) is a batch validated before any write. Keys are the option
 names in camelCase (`change`, `actor`, `resolutionRev`); `canon schema
 finding add --json` shows the input schema and an example. An identical
-repeat is `unchanged` (`meta.unchanged`) and writes nothing; a different
+repeat is `unchanged` (`data.unchanged`) and writes nothing; a different
 finding under an occupied key is `FINDING_SEQ_OCCUPIED`.
 
 ### A defect the author found in its own work
@@ -198,7 +198,7 @@ allowed, and the commit made from it has the same code tree, so committing it
 afterwards leaves the review as it was: a review is judged by its pins (the
 scenario and what its evidence says), not by the commit. Outside git, or
 with no commit, the write is refused with `NO_COMMIT`. An identical review
-written again is `unchanged` (`meta.unchanged` under `--json`) and adds no
+written again is `unchanged` (`data.unchanged` under `--json`) and adds no
 record.
 
 **Done when:** `canon gate check` reports no `unreviewed-promotion` for the

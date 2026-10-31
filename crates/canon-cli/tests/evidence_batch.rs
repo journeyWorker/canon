@@ -214,14 +214,14 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
     let out = attest_all(repo, "junit:reports/junit.xml", &[]);
     assert_eq!(out.status.code(), Some(1), "{}{}", stdout(&out), stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("canon evidence add: BRIEF_UNAPPROVED — unreviewed-promotion demo — evidence for shop.cart.01: brief not approved"), "{err}");
-    assert!(err.contains("hint: no record of the batch is written"), "{err}");
+    assert!(err.contains("canon: BRIEF_UNAPPROVED: unreviewed-promotion demo — evidence for shop.cart.01: brief not approved"), "{err}");
+    assert!(err.contains("  hint: no record of the batch is written"), "{err}");
     assert!(evidence_files(repo).is_empty(), "shop.cart.02 is not attested either");
 
     write(repo, ".canon/changes/c-demo/brief.md", "## Why\n\nSeeded brief.\n\nApproved: Journey 2026-10-12 — \"go\"\n");
     let out = attest_all(repo, "junit:reports/junit.xml", &["--summary", "would pass"]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains("canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: EVIDENCE_FABRICATED: fabricated-evidence"), "{}", stderr(&out));
     assert!(evidence_files(repo).is_empty(), "a fabricated summary writes nothing");
 
     let before = evidence_files(repo);

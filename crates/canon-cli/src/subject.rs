@@ -127,12 +127,6 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::{resolve_canon_yaml, resolve_repo_root};
 use crate::tiers::{self, TierCliError};
 
-/// Exit code for the `verifying → shipped` evidence-gate block: the
-/// transition is well-formed but the linked scenarios are not covered
-/// by non-`Divergent` verdicts — record unchanged, fail closed
-/// (contract: "violations print by failure class, exit 1").
-const EXIT_GATED: u8 = 1;
-
 /// `<id>` / `--subject`'s `clap` value parser — grammar-level
 /// [`SubjectId::parse`] (kebab-case slug).
 pub fn parse_subject_id(s: &str) -> Result<SubjectId, canon_model::ids::JoinKeyError> {
@@ -293,7 +287,7 @@ fn report_subject_warning(
     written: Option<bool>,
     json: bool,
     human: &str,
-    warnings: &[String],
+    warnings: &[crate::json_out::Warning],
 ) {
     // `written`: `None` for a dry run, else whether a record was written. Where the record went, when that is the hot store:
     // `new` and `move` write the subject only; `adopt` and `unadopt` also rewrite the change's subject list.
@@ -312,11 +306,11 @@ fn report_subject_warning(
             serde_json::Value::Object(object) => object,
             _ => serde_json::Map::new(),
         };
-        object.insert("hotStore".to_string(), serde_json::Value::String(hot.location()));
+        object.insert("x-canon".to_string(), serde_json::json!({ "hotStore": hot.location() }));
         meta = serde_json::Value::Object(object);
     }
     for warning in warnings {
-        crate::human_err!("canon subject {verb}: warning: {warning}");
+        crate::human_err!("canon subject {verb}: warning: {}", warning.message);
     }
     let scope = crate::next::Scope::Subject(subject.subject_id.as_str().to_string());
     if dry_run {
@@ -335,7 +329,9 @@ fn report_subject_warning(
 #[serde(transparent)]
 pub struct SubjectReport<'a>(pub &'a Subject);
 
-impl crate::json_out::Report for SubjectReport<'_> {}
+impl crate::json_out::Report for SubjectReport<'_> {
+    const STATE_IN_DATA: bool = false;
+}
 
 /// One line per subject that stands in its status under a waiver (D12):
 /// who waived which refusals, when, and why. `canon status` lists them as
@@ -565,7 +561,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
                 crate::json_out::mark_unchanged();
                 format!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
-            let warnings: Vec<String> = crate::brief::adoption_warning(repo, &subject, change_id)
+            let warnings: Vec<crate::json_out::Warning> = crate::brief::adoption_warning(repo, &subject, change_id)
                 .into_iter()
                 .collect();
             report_subject_warning(repo, &subject, "adopt", (!dry_run).then_some(wrote), json, &human, &warnings);
@@ -978,7 +974,7 @@ pub fn run_move(
                 crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
                 crate::policy_approval::Closed::Changed => CliError::failed("POLICY_CHANGED_SINCE_APPROVAL", detail).hint(crate::policy_approval::REAPPROVE_HINT),
             };
-            return error.with_exit(EXIT_GATED).emit("canon subject move", json);
+            return error.emit("canon subject move", json);
         }
     }
     // A reopen moves a subject back to fix its gaps, so the review guard
@@ -1054,7 +1050,7 @@ pub fn run_move(
         }
         if readable {
             if let Some(note) = canon_gate::review_gate::unmigrated_review_note(ctx) {
-                crate::warn_err!("canon subject move: advisory: {note}");
+                crate::warn_err!("REVIEW_RECORDS_UNMIGRATED", "canon subject move: advisory: {note}");
             }
         }
     }
@@ -1080,7 +1076,7 @@ pub fn run_move(
             hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
         }
         hints.extend(pending_note.iter().cloned());
-        return CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED).hint(hints.join("; ")).emit("canon subject move", json);
+        return CliError::failed("SUBJECT_GATE_VIOLATION", lines).hint(hints.join("; ")).emit("canon subject move", json);
     }
 
     // A waiver, a reopen note, and a transition reason belong to the
@@ -1113,7 +1109,6 @@ pub fn run_move(
                 fixes.push("record evidence again for the scenarios named with `canon evidence add --project <root> --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`, one each (a review stays current while the verdicts and checks are the same)".to_string());
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
-                .with_exit(EXIT_GATED)
                 .hint(format!(
                     "{}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}{}",
                     fixes.join("; "),
@@ -1123,17 +1118,18 @@ pub fn run_move(
                 .emit("canon subject move", json);
         };
         for v in &waivable {
-            crate::warn_err!("canon subject move: waived {}", v.line());
+            crate::warn_err!("OVERRIDE_REFUSAL_WAIVED", "canon subject move: waived {}", v.line());
         }
         let waived: std::collections::BTreeSet<WaivedViolation> =
             waivable.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect();
         let count = waived.len();
         subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: crate::role::attributed(actor_id, None, session) });
         crate::warn_err!(
+            "OVERRIDE_RECORDED",
             "canon subject move: override recorded by `{actor_id}` for the {count} violation(s) above: {reason}; a gap that appears later is not covered"
         );
     } else if override_reason.is_some() {
-        crate::warn_err!("canon subject move: --override-reason not recorded — no review check refused this transition");
+        crate::warn_err!("OVERRIDE_REASON_UNUSED", "canon subject move: --override-reason not recorded — no review check refused this transition");
     }
     if let (true, Some(reason)) = (reopens, reason) {
         let change = judged.last().cloned();
@@ -1142,6 +1138,7 @@ pub fn run_move(
             None => "keep the follow-up in its change".to_string(),
         };
         crate::warn_err!(
+            "SUBJECT_REOPENED",
             "canon subject move: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
             subject_id.as_str()
         );
@@ -1156,7 +1153,8 @@ pub fn run_move(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject_warning(&repo, &subject, "move", Some(true), json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
+            let pending: Vec<crate::json_out::Warning> = pending_note.iter().map(|note| crate::json_out::Warning::new("BRIEF_DRAFT_PENDING", note.clone())).collect();
+            report_subject_warning(&repo, &subject, "move", Some(true), json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending);
             0
         }
         Err(e) => {
@@ -1207,7 +1205,7 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
     let rr: &RequireReview = match &policy.spec_coverage {
         Some(SpecCoverage::Active { require_review: Some(rr), .. }) => rr,
         Some(SpecCoverage::Invalid { .. }) => {
-            crate::warn_err!("canon subject move: review guard skipped — policy.yaml's `spec_coverage` section is invalid, so whether review is required cannot be read; `canon gate check` reports why");
+            crate::warn_err!("POLICY_SPEC_COVERAGE_INVALID", "canon subject move: review guard skipped — policy.yaml's `spec_coverage` section is invalid, so whether review is required cannot be read; `canon gate check` reports why");
             return;
         }
         _ => return,
@@ -1444,7 +1442,7 @@ fn brief_gap(repo: &Path, subject: &Subject, judged: &[ChangeId], transition: &s
             (None, Some(change)) => format!("its adopted change `{change}` has no brief (no {}/{change}/brief.md, no openspec proposal.md)", canon_model::paths::CHANGES_DIR),
             (None, None) => format!("{id} adopts no change"),
         };
-        crate::warn_err!("canon subject move: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and {verb} is not refused");
+        crate::warn_err!("BRIEF_UNAPPROVED_NOT_ENFORCED", "canon subject move: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and {verb} is not refused");
     }
     if blockers.is_empty() {
         return None;

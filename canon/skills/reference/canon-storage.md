@@ -104,7 +104,8 @@ canon query --kind handoff --since 2026-06-01T00:00:00Z
 canon query --kind trajectory --json
 
 # Page a long result and keep only the fields you need; `meta` carries
-# returned, total, hasMore and nextCursor (`--all` returns everything).
+# `page` = {returned, total, nextCursor}; a present `nextCursor` means more, and
+# `meta.next` repeats the call with `--cursor <nextCursor>` (`--all` returns everything).
 canon query --kind trajectory --json --limit 50 --fields at,kind
 canon query --kind trajectory --json --limit 50 --cursor <nextCursor>
 ```
@@ -189,7 +190,7 @@ section listing them and emits a matching stderr `WARN`.
 `canon purge --kind <kind> --before <RFC3339> [--commit --plan-digest <planDigest>] [--repo <dir>] [--json]`
 is the canonical data-lifecycle boundary: the bare run previews: it prints the removal set and
 its `planDigest` and deletes nothing; `--commit --plan-digest <planDigest>` deletes only if
-the plan recomputed now has the same digest (`PLAN_CHANGED`, exit 2, when the
+the plan recomputed now has the same digest (`PLAN_STALE`, exit 2, when the
 data moved). The only purgeable kinds are
 `session`, `run`, `event`, and `trajectory`; the cutoff applies to every
 routed rung and every configured aging destination, including retained
@@ -210,7 +211,7 @@ arguments previews an empty removal set.
 With `--json`, `purge` and `export` answer `{ "data", "meta" }` like every other
 command: `data` is the plan or manifest, `meta.next` the step after (a plan's is the
 human's review and `--commit --plan-digest`), and an export's page state (`total`, `returned`,
-`nextCursor`) sits in `meta`. `export --json --output <file>` writes the manifest to the
+`nextCursor`) sits in `meta.page`. `export --json --output <file>` writes the manifest to the
 file and answers with `data: { output, kind, recordCount }`; `--dry-run`
 answers with what it would write and writes nothing.
 

@@ -1,2 +1,4 @@
-canon subject move: SUBJECT_INVALID_TRANSITION — invalid transition proposed → shipped (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)
-hint: follow the chain proposed → specced → building → verifying → shipped; `canon subject move <id>` shows where the subject stands
+canon: SUBJECT_INVALID_TRANSITION: invalid transition proposed → shipped (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)
+  field: --to
+  expected: specced, retired
+  hint: follow the chain proposed → specced → building → verifying → shipped; `canon subject move <id>` shows where the subject stands

@@ -358,8 +358,8 @@ fn compile(schema: &Value) -> jsonschema::Validator {
     jsonschema::validator_for(schema).unwrap_or_else(|e| panic!("a schema of the spec does not compile: {e}"))
 }
 
-/// What `canon --json` printed must be: an envelope (`ok`, `data`/`error`, `meta`) whose `data`
-/// is one of the reports its leaf declares in `outputs`. Returns the problems, empty when valid.
+/// What `canon --json` printed must be: an atip/1 envelope (`atip::envelope_problems`, the vendored contract
+/// schema) whose `data` is one of the reports its leaf declares in `outputs`. Returns the problems, empty when valid.
 pub fn validate_document(document: &Value) -> Vec<String> {
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -371,10 +371,8 @@ pub fn validate_document(document: &Value) -> Vec<String> {
 
     let mut problems = Vec::new();
     let ok = document["ok"].as_bool();
-    let envelope = if ok == Some(true) { "success" } else { "failure" };
-    let schema = &spec()["envelopes"][envelope];
-    for e in validator(&format!("envelope:{envelope}"), schema).iter_errors(document) {
-        problems.push(format!("the {envelope} envelope: {e} at {}", e.instance_path()));
+    for problem in atip::envelope_problems(document) {
+        problems.push(format!("the envelope: {problem}"));
     }
     let Some(command) = document["meta"]["command"].as_str() else {
         problems.push("meta.command is missing".into());

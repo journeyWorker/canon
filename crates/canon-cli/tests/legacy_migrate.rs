@@ -153,10 +153,10 @@ fn migrate_previews_the_027_effects_and_writes_nothing() {
     assert!(!paths.iter().any(|path| path == ".canon/scripts/canon-gate-pre-commit.sh"), "the 0.27 pre-commit script already calls only spellings 0.28 keeps");
     // The stale 0.27 guide on disk is called out by the preview itself: it names the replacement route.
     let warnings = preview["meta"]["warnings"].as_array().unwrap_or_else(|| panic!("the preview warns: {}", preview["meta"]));
-    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("canon migrate --json") && w.contains("canon skills show canon"))), "{warnings:?}");
+    assert!(warnings.iter().any(|w| w["message"].as_str().is_some_and(|w| w.contains("canon migrate --json") && w.contains("canon skills show canon"))), "{warnings:?}");
     let digest = preview["data"]["planDigest"].as_str().unwrap();
     let step = &preview["meta"]["next"][0];
-    assert_eq!(step["argv"], serde_json::json!(["canon", "migrate", "--commit", "--plan-digest", digest, "--json"]));
+    assert_eq!(step["argv"], serde_json::json!(["migrate", "--commit", "--plan-digest", digest, "--json"]));
 }
 
 /// D9: the commit rewrites each file, backs up the originals, and a second run has nothing left.
@@ -228,7 +228,7 @@ fn migrate_with_a_stale_digest_writes_nothing() {
     let before = tree(repo);
     let out = canon(repo, &["migrate", "--commit", "--plan-digest", "0000", "--json"]);
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(json(&out)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(json(&out)["error"]["code"], "PLAN_STALE");
     assert_eq!(tree(repo), before);
 }
 
@@ -241,10 +241,10 @@ fn migrate_detection_status_gate_check_and_context_put_migrate_first() {
         let out = canon(repo, args);
         let document = json(&out);
         let step = &document["meta"]["next"][0];
-        assert_eq!(step["argv"], serde_json::json!(["canon", "migrate", "--json"]), "{args:?}: {}", document["meta"]);
+        assert_eq!(step["argv"], serde_json::json!(["migrate", "--json"]), "{args:?}: {}", document["meta"]);
         let warnings = document["meta"]["warnings"].as_array().unwrap_or_else(|| panic!("{args:?} has warnings: {}", document["meta"]));
-        assert!(warnings.iter().any(|warning| warning.as_str().unwrap().contains("canon migrate")), "{args:?}: {warnings:?}");
-        assert!(warnings.iter().any(|warning| warning.as_str().unwrap().contains("canon skills show canon")), "the stale guide is named: {args:?}: {warnings:?}");
+        assert!(warnings.iter().any(|warning| warning["message"].as_str().unwrap().contains("canon migrate")), "{args:?}: {warnings:?}");
+        assert!(warnings.iter().any(|warning| warning["message"].as_str().unwrap().contains("canon skills show canon")), "the stale guide is named: {args:?}: {warnings:?}");
     }
     commit(repo);
     for args in [&["status", "--json"][..], &["context", "--json"][..]] {
@@ -264,7 +264,7 @@ fn migrate_detection_a_gate_task_hook_entry_alone_is_detected_and_rewritten() {
     assert!(clean["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| !step["command"].as_str().unwrap().starts_with("canon migrate"))));
     put(repo, ".codex/hooks.json", &fixture("repo/.codex/hooks.json"));
     let document = json(&ok(repo, &["status", "--json"]));
-    assert_eq!(document["meta"]["next"][0]["argv"], serde_json::json!(["canon", "migrate", "--json"]));
+    assert_eq!(document["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--json"]));
     let committed = json(&commit(repo));
     assert_eq!(committed["data"]["committed"], true);
     let settings: Value = serde_json::from_slice(&read(repo, ".codex/hooks.json")).unwrap();
@@ -316,7 +316,7 @@ fn an_old_agents_block_alone_is_detected_and_migrated() {
     ok(repo, &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
     put(repo, "AGENTS.md", &fixture("repo/AGENTS.md"));
     let status = json(&canon(repo, &["status", "--json"]));
-    assert_eq!(status["meta"]["next"][0]["argv"], serde_json::json!(["canon", "migrate", "--json"]), "{}", status["meta"]);
+    assert_eq!(status["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--json"]), "{}", status["meta"]);
     let preview = json(&ok(repo, &["migrate", "--json"]));
     assert_eq!(effect_paths(&preview), ["AGENTS.md", ".canon/migrate-backup/"], "the rewrite and the backup copy of the file it rewrites");
     commit(repo);

@@ -175,7 +175,7 @@ pub fn migrate_step(found: &Found) -> NextStep {
 /// `canon migrate --json` first in `meta.next` (the 0.27 announcement already does when it speaks).
 pub fn announce(repo: &Path, lead: bool) {
     if let Some(found) = detect(repo) {
-        crate::json_out::warn(found.message());
+        crate::json_out::warn("OLD_LAYOUT_FOUND", found.message());
         if lead {
             crate::json_out::prepend_next(migrate_step(&found));
         }

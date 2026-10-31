@@ -201,7 +201,7 @@ fn gate_install_hooks_dry_run_refuses_like_the_real_run() {
     let dir = repo_with(LOCAL_TIER);
     // A file where the settings directory must go: the write cannot happen.
     std::fs::write(dir.path().join(".claude"), "not a directory").unwrap();
-    assert_eq!(bad_preview(&["gate", "install-hooks"], dir.path(), &[dir.path()]), "HOOKS_INSTALL_FAILED");
+    assert_eq!(bad_preview(&["gate", "install-hooks"], dir.path(), &[dir.path()]), "HOOKS_INSTALL_REFUSED");
 }
 
 // ── inventory sync ──
@@ -217,7 +217,7 @@ fn inventory_sync_dry_run_counts_the_records_it_would_write() {
 #[test]
 fn inventory_sync_dry_run_refuses_like_the_real_run() {
     let dir = repo_with(&format!("{LOCAL_TIER}specs: 5\n"));
-    assert_eq!(bad_preview(&["inventory", "sync"], dir.path(), &[dir.path()]), "INVENTORY_FAILED");
+    assert_eq!(bad_preview(&["inventory", "sync"], dir.path(), &[dir.path()]), "INVENTORY_REFUSED");
 }
 
 // ── plugin sync ──
@@ -383,8 +383,8 @@ fn export_dry_run_leaves_no_output_file() {
 #[test]
 fn export_dry_run_refuses_like_the_real_run() {
     let dir = export_repo();
-    assert_eq!(bad_preview(&["export", "--kind", "change", "--include-sensitive"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_FAILED");
-    assert_eq!(bad_preview(&["export", "--kind", "change", "--output", "missing-dir/out.json"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_FAILED");
+    assert_eq!(bad_preview(&["export", "--kind", "change", "--include-sensitive"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_REFUSED");
+    assert_eq!(bad_preview(&["export", "--kind", "change", "--output", "missing-dir/out.json"], dir.path(), &[dir.path()]), "WRITE_UNAVAILABLE");
 }
 
 // ── subject adopt / unadopt ──

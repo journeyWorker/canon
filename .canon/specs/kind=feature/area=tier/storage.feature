@@ -103,7 +103,7 @@ Feature: tier storage
     Given a preview of canon tier age that printed a plan digest
     And another record past the threshold landed after that preview
     When canon tier age is run with --commit and the old digest
-    Then it exits 2 with PLAN_CHANGED
+    Then it exits 2 with PLAN_STALE
     And no record moved, so the source rung still holds every record and the destination none
     And previewing again prints a new digest that commits
 
@@ -138,7 +138,7 @@ Feature: tier storage
     Given a preview of canon ledger compact that printed a plan digest
     And another superseded version landed after that preview
     When canon ledger compact is run with --commit and the old digest
-    Then it exits 2 with PLAN_CHANGED and nothing moved
+    Then it exits 2 with PLAN_STALE and nothing moved
     And --commit without --plan-digest exits 2 naming --plan-digest and nothing moved
     And a repo whose ledger root is a custom directory exits 2 with LEDGER_ARCHIVE_UNAVAILABLE
 
@@ -187,6 +187,6 @@ Feature: tier storage
   Scenario: Purge refuses a stale digest, a kind outside its four, and a missing cutoff, and deletes nothing
     Given the same repo with a preview of canon purge that printed a plan digest
     When canon purge is run with --commit and that digest but a later --before, with --kind change, with no --before, or with --commit and no --plan-digest
-    Then the stale digest exits 2 with PLAN_CHANGED
+    Then the stale digest exits 2 with PLAN_STALE
     And the other three exit 2 as usage errors, the kind one listing session, run, event and trajectory as the only kinds
     And no record was deleted and the tree is unchanged

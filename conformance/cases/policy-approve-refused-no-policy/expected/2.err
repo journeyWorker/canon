@@ -1,2 +1,2 @@
-canon policy approve: POLICY_APPROVAL_FAILED — <repo>/.canon/policy.yaml does not exist, so there is no policy to approve; `canon init` writes a starter policy
-hint: with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again
+canon: POLICY_APPROVAL_REFUSED: <repo>/.canon/policy.yaml does not exist, so there is no policy to approve; `canon init` writes a starter policy
+  hint: with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again

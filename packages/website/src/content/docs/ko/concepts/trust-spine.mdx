@@ -243,7 +243,7 @@ canon evidence add --scenario cart.add.01 --class test-run --ref "npm test" --ro
 여럿이면 `canon evidence add --all-scenarios --report <리포트> --report <리포트>
 --role implementer`가 시나리오마다 반복하는 대신 한 번에 기록합니다. 시나리오별로
 서로 다른 값을 쓸 때는 `--input` 배열(키는 옵션 이름의 camelCase)로 보내며,
-전부 검증된 뒤에야 쓰기 시작합니다. 같은 입력을 반복하면 `meta.unchanged`입니다.
+전부 검증된 뒤에야 쓰기 시작합니다. 같은 입력을 반복하면 `data.unchanged`입니다.
 
 리포트 케이스는 시나리오 id가 그 케이스 자신의 id일 때 묶입니다. 전체
 이름(classname, 그다음 name)에서 처음 나오는 시나리오 id 형태의 토큰이

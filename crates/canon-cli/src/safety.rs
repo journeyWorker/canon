@@ -5,7 +5,7 @@
 //! over them, `committed: false`, exit 0, nothing written (no audit line
 //! either). `--commit --plan-digest <DIGEST>` computes the plan again and acts
 //! only when its digest is the one given; a plan that changed since is
-//! `PLAN_CHANGED` (exit 2) and nothing is written. The flags are
+//! `PLAN_STALE` (exit 2) and nothing is written. The flags are
 //! [`SafetyArgs`](crate::cli::SafetyArgs), read as a [`Mode`].
 //!
 //! A handler builds its `Vec<Effect>`, wraps it in [`Plan::new`], asks
@@ -107,14 +107,14 @@ impl Plan {
     }
 
     /// Whether the run acts: `Ok(false)` for a preview, `Ok(true)` when
-    /// `mode` commits this very plan, `PLAN_CHANGED` when it commits another.
+    /// `mode` commits this very plan, `PLAN_STALE` when it commits another.
     /// `base` is the command line without the safety flags (see [`command`]),
     /// for the hint.
     pub fn gate(&self, mode: &Mode, base: &str) -> Result<bool, CliError> {
         match mode {
             Mode::Preview => Ok(false),
             Mode::Commit(given) if *given == self.plan_digest => Ok(true),
-            Mode::Commit(given) => Err(CliError::refused("PLAN_CHANGED", format!("the plan digest {given} no longer matches the plan (now {}); nothing was written", self.plan_digest))
+            Mode::Commit(given) => Err(CliError::refused("PLAN_STALE", format!("the plan digest {given} no longer matches the plan (now {}); nothing was written", self.plan_digest))
                 .hint(format!("run `{base}` again, review the new plan, then commit it with the digest it prints"))),
         }
     }
@@ -199,6 +199,6 @@ mod tests {
         let plan = Plan::new(vec![Effect::path("delete", "a")]);
         assert!(!plan.gate(&Mode::Preview, "canon x").unwrap());
         assert!(plan.gate(&Mode::Commit(plan.plan_digest.clone()), "canon x").unwrap());
-        assert_eq!(plan.gate(&Mode::Commit("0".into()), "canon x").unwrap_err().code, "PLAN_CHANGED");
+        assert_eq!(plan.gate(&Mode::Commit("0".into()), "canon x").unwrap_err().code, "PLAN_STALE");
     }
 }

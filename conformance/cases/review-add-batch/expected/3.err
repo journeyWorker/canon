@@ -1,2 +1,2 @@
-canon review scenario: REVIEW_SCENARIO_NOT_INDEXED — no scenario record for `cart.add.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)
-hint: run `canon inventory sync`, then run `canon review scenario` again
+canon: REVIEW_SCENARIO_NOT_INDEXED: no scenario record for `cart.add.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)
+  hint: run `canon inventory sync`, then run `canon review scenario` again

@@ -1,2 +1,2 @@
-canon dashboard: DASHBOARD_NOT_BUILT — the dashboard app is not built: this canon binary embeds none, and `packages/dashboard/dist` under <repo> is not a build of canon's dashboard
-hint: install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout
+canon: DASHBOARD_NOT_BUILT: the dashboard app is not built: this canon binary embeds none, and `packages/dashboard/dist` under <repo> is not a build of canon's dashboard
+  hint: install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout

@@ -522,7 +522,7 @@ pub fn announce(repo: &Path) {
     crate::old_briefs::announce(repo);
     if let Some(found) = legacy {
         let stale = if found.skill { format!("; {STALE_GUIDE}") } else { "; run `canon migrate --json` to preview the upgrade".to_string() };
-        crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));
+        crate::json_out::warn("LEGACY_STATE_FOUND", format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));
         crate::json_out::prepend_next(migrate_step(&found));
     }
 }
@@ -530,7 +530,7 @@ pub fn announce(repo: &Path) {
 /// For the `migrate` preview: the stale-guide warning when the 0.27 skill projection is still installed.
 pub fn warn_stale_guide(repo: &Path) {
     if skills::has_full_projection(repo) {
-        crate::json_out::warn(STALE_GUIDE.to_string());
+        crate::json_out::warn("LEGACY_GUIDE_STALE", STALE_GUIDE.to_string());
     }
 }
 

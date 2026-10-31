@@ -223,11 +223,12 @@ fn evidence_add_108_a_repeat_writes_nothing_and_is_reported_unchanged() {
     let r = f.path();
     let args = ["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
     let first = f.ok(&args);
-    assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first add writes");
+    assert!(json_of(&first)["data"].get("unchanged").is_none() && json_of(&first)["meta"].get("unchanged").is_none(), "the first add writes");
     let before = tree(r);
 
     let again = f.ok(&args);
-    assert_eq!(json_of(&again)["meta"]["unchanged"], true);
+    assert_eq!(json_of(&again)["data"]["unchanged"], true);
+    assert!(json_of(&again)["meta"].get("unchanged").is_none(), "unchanged is the report's, not meta's");
     assert_eq!(tree(r), before, "a repeat writes nothing");
     assert_eq!(committed(r, "evidence").len(), 1);
 
@@ -461,12 +462,13 @@ fn review_scenario_95_a_repeat_writes_nothing_and_is_reported_unchanged() {
     let r = f.path();
     let doc = review_doc(&["auth.login.01"]).to_string();
     let first = f.ok(&["review", "scenario", "--input", &doc, "--json"]);
-    assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first review writes");
+    assert!(json_of(&first)["data"].get("unchanged").is_none() && json_of(&first)["meta"].get("unchanged").is_none(), "the first review writes");
     let before = tree(r);
 
     let again = f.ok(&["review", "scenario", "--input", &doc, "--json"]);
     let body = json_of(&again);
-    assert_eq!(body["meta"]["unchanged"], true, "{body}");
+    assert_eq!(body["data"]["unchanged"], true, "{body}");
+    assert!(body["meta"].get("unchanged").is_none(), "unchanged is the report's, not meta's: {body}");
     assert_eq!(tree(r), before, "a repeat writes nothing");
     assert_eq!(committed(r, "review").len(), 1);
 

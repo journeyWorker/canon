@@ -168,11 +168,27 @@ fn subject_json(repo: &Path) -> Value {
     serde_json::from_str::<Value>(&stdout(&out)).unwrap()["data"]["records"][0].clone()
 }
 
+/// The steps `canon status` lists about this subject, from its human form
+/// (`{actor, command, why}`): a step that holds a `<placeholder>` is not a
+/// `meta.next` entry in JSON mode, so the printed `next:` block is the full list.
 fn status_steps(repo: &Path) -> Vec<Value> {
-    let out = run(repo, &["status", "--json"]);
+    let out = run(repo, &["status"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    let report: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    report["meta"]["next"].as_array().unwrap().iter().filter(|s| s["why"].as_str().unwrap_or("").starts_with("demo-subject")).cloned().collect()
+    let text = stdout(&out);
+    let Some((_, block)) = text.split_once("\nnext:\n") else { return Vec::new() };
+    let mut steps = Vec::new();
+    let mut why = None;
+    for line in block.lines() {
+        if let Some(reason) = line.strip_prefix("  # ") {
+            why = Some(reason.to_string());
+        } else if let (Some(command), Some(reason)) = (line.strip_prefix("  "), why.take()) {
+            let (actor, command) = command.strip_prefix("human: ").map_or(("agent", command), |rest| ("human", rest));
+            if reason.starts_with("demo-subject") {
+                steps.push(serde_json::json!({"actor": actor, "command": command, "why": reason}));
+            }
+        }
+    }
+    steps
 }
 
 fn ship(repo: &Path) -> Output {
@@ -202,7 +218,7 @@ fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewe
     let err = stderr(&out);
     assert!(err.contains("open-blocker c-demo#1.1"), "{err}");
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("`world.demo.01`") && err.contains("`world.demo.02`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("canon evidence add --all-scenarios") && err.contains("stays current"), "{err}");
+    assert!(err.contains("\n  hint: ") && err.contains("canon evidence add --all-scenarios") && err.contains("stays current"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
     let gate = run(r, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "gate check reports the same: {}", stdout(&gate));
@@ -277,15 +293,19 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     let out = run(r, &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "chore bump-client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let reopened: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    let next = reopened["meta"]["next"].as_array().unwrap();
-    assert!(next[0]["command"].as_str().unwrap().starts_with("canon evidence add --project demo --all-scenarios"), "after the reopen: {next:?}");
-    assert!(next.iter().all(|s| !s["command"].as_str().unwrap().contains("--to shipped")), "not ship: {next:?}");
+    // The evidence step holds placeholders (`<unit>`, `<session>`, `<test command>`), so it is a
+    // `next:` line of the human form and no `meta.next` entry.
+    let next = reopened["meta"].get("next").map(|n| n.as_array().unwrap().clone()).unwrap_or_default();
+    assert!(next.iter().all(|s| !s["command"].as_str().unwrap().contains("evidence add") && !s["command"].as_str().unwrap().contains("--to shipped")), "not ship: {next:?}");
+    let steps = status_steps(r);
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon evidence add --project demo --all-scenarios"), "after the reopen: {steps:?}");
+    assert!(steps.iter().all(|s| !s["command"].as_str().unwrap().contains("--to shipped")), "not ship: {steps:?}");
 
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("chore change `bump-client` approved") && err.contains("`world.demo.01`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("--all-scenarios"), "{err}");
+    assert!(err.contains("\n  hint: ") && err.contains("--all-scenarios"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
 
     // The suite again, same verdict: the scenario review stays current, and
@@ -407,7 +427,8 @@ fn evidence_recorded_after_the_chore_approval_satisfies_it_and_a_feature_approva
 }
 
 /// #77: `change new` on a shipped subject names the reopen, in its output
-/// and in `meta.next`.
+/// and as a `next:` step. The reopen holds a `<why it reopens>` placeholder,
+/// so `meta.next` (runnable commands only) does not carry it.
 #[test]
 fn change_new_on_a_shipped_subject_names_the_reopen() {
     let dir = repo();
@@ -423,7 +444,12 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let value: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = value["meta"]["next"].as_array().unwrap();
-    assert!(next.iter().any(|s| s["command"].as_str().unwrap().starts_with(reopen)), "{next:?}");
+    assert!(next.iter().all(|s| !s["command"].as_str().unwrap().starts_with(reopen)), "a step with a placeholder is no entry: {next:?}");
+    assert_eq!(next.iter().map(|s| s["command"].as_str().unwrap()).collect::<Vec<_>>(), ["canon brief check bump-client --json", "canon brief check bump-again --json"], "{next:?}");
+    assert!(next.iter().all(|s| s["x-canon"]["actor"] == "agent" && s.get("why").is_none()), "{next:?}");
+    // The human form counts it among the steps after the first one.
+    let human = stdout(&run(r, &["change", "new", "bump-third", "--subject", "demo-subject", "--change-kind", "chore", "--title", "Bump third"]));
+    assert!(human.lines().last().unwrap().starts_with("next: canon brief check bump-client — ") && human.lines().last().unwrap().ends_with(" more)"), "{human}");
 
     // A subject that is not shipped gets no reopen step.
     let dir = repo();

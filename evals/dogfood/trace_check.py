@@ -57,10 +57,10 @@ RENAMED = re.compile(r"(?:--[\w-]+(?: \S+)?) was (?:renamed (?:--[\w-]+(?: \S+)?
 
 
 def error_code(output):
-    """The canon error code in a result text: JSON `"code":"X"` or human `canon <path>: X —` / `error[X]`."""
+    """The canon error code in a result text: JSON `"code":"X"` or the text-mode first stderr line `canon: X: <message>`."""
     for pattern in (r'"error"\s*:\s*\{[^{}]*?"code"\s*:\s*"([A-Z][A-Z0-9_]+)"',
-                    r"canon [^:\n]+: ([A-Z][A-Z0-9_]+) \u2014", r"error\[([A-Z][A-Z0-9_]+)\]"):
-        match = re.search(pattern, output)
+                    r"^canon: ([A-Z][A-Z0-9_]+): "):
+        match = re.search(pattern, output, re.M)
         if match:
             return match[1]
     return None
@@ -90,7 +90,7 @@ def classify_failure(output):
 HUMAN_ONLY = {("brief", "approve"), ("policy", "approve"), ("divergence", "accept")}
 ROLE_VARIABLE = "CANON_ROLE"
 # `error.code`s of a call whose shape the CLI refused: a wrong or unknown option, operand or input key.
-SHAPE_CODES = {"USAGE", "UNKNOWN_FIELD"}
+SHAPE_CODES = {"USAGE", "UNKNOWN_COMMAND", "COMMAND_REQUIRED"}
 NO_ENV = {"assigned": {}, "unset": set(), "clear": False}
 
 
@@ -99,7 +99,7 @@ def is_shape_code(code):
 
 
 def failure_envelopes(output):
-    """Every 0.28 JSON failure envelope (`{"ok":false,"error":{...},"meta":{...}}`) in a result text.
+    """Every atip/1 JSON failure envelope (`{"ok":false,"error":{...},"meta":{...}}`) in a result text.
 
     A document cut short by `head -c` or `cut -c` is still read: its code, message, hint and
     `meta.command` are pulled out by pattern, so a truncated refusal is not lost."""
@@ -750,9 +750,9 @@ def guess_call(calls, matched, envelope):
 def classify_calls(calls, output, event):
     """Attribute the failures in one tool result to its canon calls (`calls` may grow).
 
-    A 0.28 JSON failure envelope names its command (`meta.command`), so it is matched to the call
+    An atip/1 JSON failure envelope names its command (`meta.command`), so it is matched to the call
     with that leaf, and counts as a wrong shape when its code is a shape code (`USAGE`,
-    `UNKNOWN_FIELD`, `INPUT_*`); any other code is a refusal, not a mis-shaped call. An envelope no
+    `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INPUT_*`); any other code is a refusal, not a mis-shaped call. An envelope no
     call explains (a canon run the parser cannot see) becomes a call of its own. Without an
     envelope, a clap usage error or a non-zero exit the call is known to own is a wrong shape."""
     wrong, refusals, matched = [], [], set()

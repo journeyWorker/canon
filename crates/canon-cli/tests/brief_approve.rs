@@ -147,16 +147,17 @@ fn the_same_approval_repeated_is_unchanged_and_a_different_one_is_written() {
         serde_json::from_slice::<Value>(&out.stdout).unwrap()
     };
     let first = approve_json("Go.");
-    assert!(first["meta"].get("unchanged").is_none(), "{first}");
+    assert!(first["data"].get("unchanged").is_none() && first["meta"].get("unchanged").is_none(), "{first}");
     let (brief, approval) = (std::fs::read(brief_path(repo)).unwrap(), std::fs::read(repo.join(".canon/policy.approval.json")).unwrap());
 
     let again = approve_json("Go.");
-    assert_eq!(again["meta"]["unchanged"], true, "{again}");
+    assert_eq!(again["data"]["unchanged"], true, "{again}");
+    assert!(again["meta"].get("unchanged").is_none(), "`unchanged` is a report member, not a flat `meta` one: {again}");
     assert_eq!(std::fs::read(brief_path(repo)).unwrap(), brief, "the repeat leaves the brief alone");
     assert_eq!(std::fs::read(repo.join(".canon/policy.approval.json")).unwrap(), approval, "and the policy approval");
 
     let other = approve_json("Go, with a changed answer.");
-    assert!(other["meta"].get("unchanged").is_none(), "{other}");
+    assert!(other["data"].get("unchanged").is_none() && other["meta"].get("unchanged").is_none(), "{other}");
     assert_ne!(std::fs::read(brief_path(repo)).unwrap(), brief, "another answer is a new approval");
 }
 

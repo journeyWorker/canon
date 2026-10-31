@@ -108,6 +108,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("schema.rs", &[]),
     ("status.rs", &["status"]),
     ("subject.rs", &["subject"]),
+    // `unavailable`: the up-front refusal of a target that cannot be written, made by every command that checks it before its first write.
+    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo", "divergence", "evidence add", "evidence audit", "finding", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "brief approve", "policy approve", "export", "review scenario", "review change"]),
 ];
 
 /// An `emit(&format!("canon <prefix> {verb}"), …)` shared by several commands:
@@ -124,12 +126,25 @@ const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), (
 /// Files whose `.emit(command, …)` takes the command from the caller, and the
 /// leaves that caller is: `run_report` serves the three `report` leaves.
 // `open_index` takes the command of the leaf that calls it.
-const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"]), ("search/mod.rs", &["search", "trace"])];
+const CALLER_LEAVES: &[(&str, &[&str])] = &[
+    ("run/top.rs", &["report build", "report check", "report snapshot"]),
+    ("search/mod.rs", &["search", "trace"]),
+    // `write_mode::refuse_unwritable`: the up-front refusal of a target that cannot be written, made for the command that checks it.
+    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo init", "demo review", "divergence add", "divergence accept", "evidence add", "evidence audit", "finding add", "finding close", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "brief approve", "policy approve", "export", "review scenario", "review change"]),
+];
 
 /// The leaves that record a human's decision and refuse every agent role.
 const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept", "migrate"];
 
-const GLOBAL: &[&str] = &["USAGE", "UNKNOWN_ROLE"];
+/// A code on one of these lines is a warning (`meta.warnings`), not an error a command ends with: it is
+/// in the registry but belongs to no command's error list.
+const WARNING_SITES: &[&str] = &["warn_err!(", "json_out::warn(", "warn_at(", "Warning::new(", "warnings.push(("];
+
+/// Codes of the parse: the command word is wrong, or missing. No leaf ends with them (the parse fails
+/// before any leaf is known); `canon schema` has its own `UNKNOWN_COMMAND` for a path it is asked about.
+const PARSER_CODES: &[&str] = &["UNKNOWN_COMMAND", "COMMAND_REQUIRED"];
+
+const GLOBAL: &[&str] = &["INTERNAL", "USAGE", "UNKNOWN_ROLE"];
 
 fn src_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
@@ -186,6 +201,12 @@ fn needs_config_leaves() -> Vec<&'static str> {
 }
 
 fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
+    derive_with_warnings().0
+}
+
+/// The table, and the codes that appear at a warning site.
+fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BTreeSet<&'static str>) {
+    let mut warned: BTreeSet<&'static str> = BTreeSet::new();
     let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
     let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
@@ -213,6 +234,13 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         let mut file_has_codes = false;
         for (i, line) in lines.iter().enumerate() {
             for code in codes.iter().filter(|c| line.contains(&format!("\"{c}\""))) {
+                if WARNING_SITES.iter().any(|marker| line.contains(marker)) {
+                    warned.insert(code);
+                    continue;
+                }
+                if PARSER_CODES.contains(code) && name == "run/entry.rs" {
+                    continue;
+                }
                 file_has_codes = true;
                 let window = &lines[i..(i + 1 + EMIT_WINDOW).min(lines.len())];
                 let spliced = SPLICED.iter().find(|(c, _)| c == code).map(|(_, command)| command.to_string());
@@ -255,10 +283,11 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     // leaf that takes the option, and a batch is refused only where it is unsupported.
     for leaf in META.iter().filter(|m| m.effect != canon_cli::schema::Effect::Read) {
         for info in all_codes().iter().filter(|c| c.code.starts_with("INPUT_")) {
-            if info.code == "INPUT_BATCH_UNSUPPORTED" && canon_cli::input::batch_supported(leaf.path) {
-                continue;
-            }
             table.get_mut(leaf.path).expect("leaf has a row").insert(info.code);
+        }
+        // `BATCH_INCOMPLETE` (`input.rs`): a batch that stops during execution, on every leaf that takes one.
+        if canon_cli::input::batch_supported(leaf.path) {
+            table.get_mut(leaf.path).expect("leaf has a row").insert("BATCH_INCOMPLETE");
         }
     }
     // `OLD_LAYOUT` (`old_layout::refuse_write`, run by `main` before the command): every leaf that writes records.
@@ -275,7 +304,7 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
-    table
+    (table, warned)
 }
 
 fn render(table: &BTreeMap<&str, BTreeSet<&str>>) -> String {
@@ -310,9 +339,9 @@ fn the_schema_error_codes_are_the_codes_the_sources_emit() {
 
 #[test]
 fn every_registered_code_is_emitted_by_some_command() {
-    let table = derive();
+    let (table, warned) = derive_with_warnings();
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
-    let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !AWAITING_WIRING.contains(c)).collect();
+    let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !warned.contains(c) && !PARSER_CODES.contains(c) && !AWAITING_WIRING.contains(c)).collect();
     assert!(orphans.is_empty(), "registered but attributed to no command: {orphans:?}");
 }
 

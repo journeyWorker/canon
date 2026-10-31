@@ -697,7 +697,7 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 ///   refuse (exit `2`) before anything is written.
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
-///   exits `2` naming the retry. A rerun never asks and never installs.
+///   exits `1` naming the retry. A rerun never asks and never installs.
 pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> u8 {
     run_init_in(repo, options, json, true)
 }
@@ -707,9 +707,6 @@ pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> u8 {
 pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> u8 {
     let dry_run = options.dry_run;
     let mut log = InitLog::new(json, dry_run, emit_data);
-    if let Err(e) = (!dry_run).then(|| fs::create_dir_all(repo)).transpose() {
-        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
-    }
     let agents_path = repo.join("AGENTS.md");
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
@@ -746,6 +743,29 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             }
         }
     };
+
+    // Everything this run will write is checked before the first write (the repo directory included): an unwritable target refuses with nothing changed.
+    let (gitignore_path, policy_path) = (repo.join(".gitignore"), repo.join(paths::POLICY_FILE));
+    let fresh = !canon_yaml_path.exists();
+    let mut targets: Vec<&Path> = Vec::new();
+    if fresh {
+        targets.push(&canon_yaml_path);
+        if options.policy.is_some() {
+            targets.push(&policy_path);
+        }
+    }
+    if !missing_gitignore_lines(repo).is_empty() {
+        targets.push(&gitignore_path);
+    }
+    if agents.as_ref().is_some_and(|(existing, merged)| existing.as_deref() != Some(merged.as_str())) {
+        targets.push(&agents_path);
+    }
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, log.command(), json) {
+        return code;
+    }
+    if let Err(e) = (!dry_run).then(|| fs::create_dir_all(repo)).transpose() {
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
+    }
     let created = if dry_run {
         if canon_yaml_path.exists() { Err(std::io::ErrorKind::AlreadyExists.into()) } else { Ok(None) }
     } else {

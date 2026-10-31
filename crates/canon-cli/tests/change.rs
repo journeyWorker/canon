@@ -203,7 +203,9 @@ fn change_new_leaves_nothing_behind_when_publishing_the_change_dir_fails() {
 
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert!(stderr(&out).contains("failed to create `.canon/changes/add-login`"), "{}", stderr(&out));
+    // Known unwritable before anything is written: `WRITE_UNAVAILABLE`, exit 2.
+    assert!(stderr(&out).starts_with("canon: WRITE_UNAVAILABLE: cannot write `"), "{}", stderr(&out));
+    assert!(stderr(&out).contains(".canon/changes/add-login`") && stderr(&out).contains(".canon/changes` is not a directory"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
     assert_eq!(std::fs::read_to_string(dir.path().join(".canon/changes")).unwrap(), "not a directory\n");
     assert_nothing_left(dir.path());
@@ -252,7 +254,9 @@ fn change_new_leaves_nothing_behind_when_the_first_record_write_fails() {
     }
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     make_writable(&ledger_subject);
-    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    // The write began and failed (the directory's mode is no preflight target): exit 1, not a refusal.
+    assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
+    assert!(stderr(&out).starts_with("canon: "), "{}", stderr(&out));
     assert!(stderr(&out).contains("failed to record the adoption") && stderr(&out).contains("nothing was written"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
     assert!(!dir.path().join(".canon/changes").exists(), "the changes dir this run created is removed again");

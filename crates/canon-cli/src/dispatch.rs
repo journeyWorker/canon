@@ -870,7 +870,7 @@ pub struct DispatchDiffReport<'a> {
     pub counts: EdgeCounts,
     /// The union of both sides, one entry per distinct edge, in task order.
     pub edges: Vec<EdgeEntry<'a>>,
-    pub notes: &'a [String],
+    pub notes: Vec<&'a str>,
 }
 
 impl crate::reports::Report for DispatchDiffReport<'_> {}
@@ -931,6 +931,7 @@ pub fn run_begin(
             // the one degrade a dispatch can carry.
             if let Some(reason) = begun.tier.degrade_reason() {
                 crate::warn_err!(
+                    "DISPATCH_TIER_NOT_PERSISTED",
                     "canon dispatch begin: run {} was NOT persisted to its routed tier ({reason}) — the manifest at {} is its only home; `canon dispatch diff` still reads it from there",
                     begun.run_id,
                     begun.manifest_path.display()
@@ -1395,6 +1396,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
             crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, json, &report);
             if let Some(reason) = ended.tier.degrade_reason() {
                 crate::warn_err!(
+                    "DISPATCH_TIER_NOT_PERSISTED",
                     "canon dispatch end: the close of run {} was NOT persisted to its routed tier ({reason}) — the tier still holds whatever `dispatch begin` left there (the `running` version, or nothing if that write degraded too); the closed manifest at {} is the current record",
                     ended.run_id,
                     ended.manifest_path.display()
@@ -1498,11 +1500,11 @@ pub struct PlanActualDiff {
     /// NARROWS a side and a divergence narrows nothing at all; none
     /// is an error, and [`run_diff`] prints them on stderr and still
     /// exits `0`.
-    pub notes: Vec<String>,
+    pub notes: Vec<crate::json_out::Warning>,
 }
 
 impl PlanActualDiff {
-    fn new(declared: BTreeSet<TaskEdge>, observed: BTreeSet<TaskEdge>, notes: Vec<String>) -> Self {
+    fn new(declared: BTreeSet<TaskEdge>, observed: BTreeSet<TaskEdge>, notes: Vec<crate::json_out::Warning>) -> Self {
         Self { declared: declared.len(), observed: observed.len(), edges: classify(&declared, &observed), notes }
     }
 
@@ -1659,11 +1661,11 @@ fn observed_edges(runs: &[Value]) -> BTreeSet<TaskEdge> {
 /// corpus is still a useful report, and aborting would turn a
 /// read-only surface into a failure mode over a condition it does not
 /// own.
-fn read_kind(repo: &Path, kind: RecordKind, notes: &mut Vec<String>) -> Vec<Value> {
+fn read_kind(repo: &Path, kind: RecordKind, notes: &mut Vec<crate::json_out::Warning>) -> Vec<Value> {
     match crate::query::run(repo, kind, None, None, None, None, false) {
         Ok(outcome) => outcome.records.into_iter().map(|record| record.0).collect(),
         Err(err) => {
-            notes.push(format!("`{}` records unavailable ({err}) — that side of the diff is empty", kind.as_str()));
+            notes.push(crate::json_out::Warning::new("DISPATCH_DIFF_RECORDS_UNAVAILABLE", format!("`{}` records unavailable ({err}) — that side of the diff is empty", kind.as_str())));
             Vec::new()
         }
     }
@@ -1710,15 +1712,15 @@ fn read_kind(repo: &Path, kind: RecordKind, notes: &mut Vec<String>) -> Vec<Valu
 /// misfiled `run_id` — is skipped WITH a note. Notes reach stderr via
 /// [`run_diff`]; the report itself still succeeds, because this is a
 /// read-only surface that degrades rather than gates.
-fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<String>) -> Vec<Value> {
+fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<crate::json_out::Warning>) -> Vec<Value> {
     let dir = repo.join(DISPATCH_DIR);
     let entries = match std::fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
         Err(e) => {
-            notes.push(format!(
-                "dispatch side-channel {} could not be listed ({e}) — no live dispatch run contributes an observed edge",
-                dir.display()
+            notes.push(crate::json_out::Warning::new(
+                "DISPATCH_MANIFEST_UNREADABLE",
+                format!("dispatch side-channel {} could not be listed ({e}) — no live dispatch run contributes an observed edge", dir.display()),
             ));
             return Vec::new();
         }
@@ -1742,30 +1744,29 @@ fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<String>) -> Vec<Value> {
     }
     paths.sort();
     entry_errors.sort();
-    notes.append(&mut entry_errors);
+    notes.extend(entry_errors.into_iter().map(|note| crate::json_out::Warning::new("DISPATCH_MANIFEST_UNREADABLE", note)));
 
     let mut runs = Vec::with_capacity(paths.len());
     for path in paths {
         let text = match std::fs::read_to_string(&path) {
             Ok(text) => text,
             Err(e) => {
-                notes.push(format!("unreadable dispatch manifest {} ({e}) — skipped", path.display()));
+                notes.push(crate::json_out::Warning::new("DISPATCH_MANIFEST_UNREADABLE", format!("unreadable dispatch manifest {} ({e}) — skipped", path.display())));
                 continue;
             }
         };
         let run: Run = match serde_json::from_str(&text) {
             Ok(run) => run,
             Err(e) => {
-                notes.push(format!("dispatch manifest {} is not a readable Run record ({e}) — skipped", path.display()));
+                notes.push(crate::json_out::Warning::new("DISPATCH_MANIFEST_UNREADABLE", format!("dispatch manifest {} is not a readable Run record ({e}) — skipped", path.display())));
                 continue;
             }
         };
         let filed_under = path.file_stem().and_then(|stem| stem.to_str()).and_then(|stem| RunId::parse(stem).ok());
         if filed_under != Some(run.run_id) {
-            notes.push(format!(
-                "dispatch manifest {} records run_id `{}` but is not filed under that id — skipped rather than counted as an observed run",
-                path.display(),
-                run.run_id
+            notes.push(crate::json_out::Warning::new(
+                "DISPATCH_MANIFEST_MISMATCH",
+                format!("dispatch manifest {} records run_id `{}` but is not filed under that id — skipped rather than counted as an observed run", path.display(), run.run_id),
             ));
             continue;
         }
@@ -1775,7 +1776,7 @@ fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<String>) -> Vec<Value> {
             // string-keyed), but a `.expect()` on artifact-derived
             // content is exactly what this read-only surface must not
             // do — degrade with a note instead.
-            Err(e) => notes.push(format!("dispatch manifest {} will not re-serialize ({e}) — skipped", path.display())),
+            Err(e) => notes.push(crate::json_out::Warning::new("DISPATCH_MANIFEST_UNREADABLE", format!("dispatch manifest {} will not re-serialize ({e}) — skipped", path.display()))),
         }
     }
     runs
@@ -1821,7 +1822,7 @@ fn read_dispatch_manifests(repo: &Path, notes: &mut Vec<String>) -> Vec<Value> {
 /// likewise, since a manifest is filed under (and re-checked against)
 /// its own `run_id`. A duplicate arriving anyway keeps the FIRST and
 /// notes the rest, rather than letting scan order pick.
-fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<String>) -> Vec<Value> {
+fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<crate::json_out::Warning>) -> Vec<Value> {
     /// One `run_id`'s winning record plus the source it came from —
     /// named so the divergence note can say WHICH copy is being
     /// reported, rather than a bare bool.
@@ -1864,7 +1865,7 @@ fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<Strin
     // Sorted: `divergences` is built in (tier, then manifest) scan
     // order, which is `BTreeMap` order for neither source.
     divergences.sort();
-    notes.append(&mut divergences);
+    notes.extend(divergences.into_iter().map(|note| crate::json_out::Warning::new("DISPATCH_RUN_COPIES_DIVERGE", note)));
 
     let mut runs: Vec<Value> = by_run.into_values().map(|winner| winner.record).collect();
     runs.append(&mut unkeyed);
@@ -1975,7 +1976,7 @@ fn diff_report(diff: &PlanActualDiff) -> DispatchDiffReport<'_> {
             observed_not_declared: diff.count(EdgeClass::ObservedNotDeclared),
         },
         edges: diff.edges.iter().map(|classified| EdgeEntry { from: classified.edge.from.as_str(), to: classified.edge.to.as_str(), class: classified.class.as_str() }).collect(),
-        notes: &diff.notes,
+        notes: diff.notes.iter().map(|note| note.message.as_str()).collect(),
     }
 }
 
@@ -2005,11 +2006,12 @@ fn diff_report(diff: &PlanActualDiff) -> DispatchDiffReport<'_> {
 pub fn run_diff(repo: &Path, json: bool) -> ExitCode {
     let report = diff(repo);
     if json {
-        crate::json_out::data_with_meta("dispatch diff", &diff_report(&report), crate::json_out::warnings_meta(&report.notes.iter().map(|note| format!("canon dispatch diff: {note}")).collect::<Vec<_>>()));
+        let coded: Vec<crate::json_out::Warning> = report.notes.iter().map(|note| crate::json_out::Warning::new(&note.code, format!("canon dispatch diff: {}", note.message))).collect();
+        crate::json_out::data_with_meta("dispatch diff", &diff_report(&report), crate::json_out::warnings_meta(&coded));
         return ExitCode::SUCCESS;
     }
     for note in &report.notes {
-        crate::human_err!("canon dispatch diff: {note}");
+        crate::human_err!("canon dispatch diff: {}", note.message);
     }
     println!("{}", format_human(&report));
     ExitCode::SUCCESS
@@ -2316,7 +2318,7 @@ mod tests {
         assert!(runs.is_empty(), "a bare four-string object is not a Run: {runs:?}");
         assert!(observed_edges(&runs).is_empty(), "non-Run JSON must not mint an edge");
         assert_eq!(notes.len(), 2, "each rejected file is named: {notes:?}");
-        assert!(notes.iter().all(|note| note.contains("not a readable Run record")), "{notes:?}");
+        assert!(notes.iter().all(|note| note.message.contains("not a readable Run record")), "{notes:?}");
     }
 
     /// The filename is this side-channel's only index ([`end`] resolves
@@ -2339,7 +2341,7 @@ mod tests {
         assert_eq!(runs.len(), 1, "only the correctly-filed manifest is admitted: {runs:?}");
         assert!(observed_edges(&runs).is_empty(), "the misfiled child must contribute no edge");
         assert_eq!(notes.len(), 1, "the misfiled manifest is named: {notes:?}");
-        assert!(notes[0].contains("is not filed under that id"), "{}", notes[0]);
+        assert!(notes[0].message.contains("is not filed under that id"), "{}", notes[0].message);
     }
 
     /// A directory that cannot be listed is NOT the same fact as a
@@ -2368,7 +2370,7 @@ mod tests {
         let runs = read_dispatch_manifests(dir.path(), &mut notes);
         assert!(runs.is_empty());
         assert_eq!(notes.len(), 1, "an unlistable side-channel is reported, never silent: {notes:?}");
-        assert!(notes[0].contains("could not be listed"), "{}", notes[0]);
+        assert!(notes[0].message.contains("could not be listed"), "{}", notes[0].message);
     }
 }
 
@@ -3387,7 +3389,7 @@ mod tier_tests {
         let runs = reconcile_runs(vec![tier.clone()], vec![manifest], &mut notes);
         assert_eq!(runs, vec![tier], "the tier copy is the one the report reads");
         assert_eq!(notes.len(), 1, "exactly one divergence note: {notes:?}");
-        let note = &notes[0];
+        let note = &notes[0].message;
         assert!(note.contains(&run_id), "the note must name the run: {note}");
         assert!(note.contains("at, ended_at, status"), "the differing fields, sorted and named: {note}");
         assert!(note.contains("(used)") && note.contains("(ignored)"), "the note must say which copy the report used: {note}");
@@ -3441,7 +3443,7 @@ mod tier_tests {
             .expect("rewriting the manifest by hand");
 
         let report = diff(tmp.path());
-        let divergences: Vec<&String> = report.notes.iter().filter(|note| note.contains("differs between")).collect();
+        let divergences: Vec<&str> = report.notes.iter().map(|note| note.message.as_str()).filter(|note| note.contains("differs between")).collect();
         assert_eq!(divergences.len(), 1, "the disagreement must be reported, never hidden: {:?}", report.notes);
         assert!(divergences[0].contains(&begun.run_id.to_string()), "the note names the run: {}", divergences[0]);
         assert!(divergences[0].contains("ended_at"), "and the fields that moved: {}", divergences[0]);

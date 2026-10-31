@@ -333,7 +333,7 @@ fn divergence_lifecycle_13_list_refuses_an_invalid_timestamp_a_zero_limit_or_a_c
     assert_eq!(json(&zero)["error"]["field"], "--limit");
     let cursor = canon(repo.path(), &["divergence", "list", "--cursor", "zzz", "--json"]);
     assert_eq!(cursor.status.code(), Some(2));
-    assert_eq!(error_code(&cursor), "INVALID_CURSOR");
+    assert_eq!(error_code(&cursor), "CURSOR_INVALID");
     let both = canon(repo.path(), &["divergence", "list", "--limit", "1", "--all", "--json"]);
     assert_eq!(both.status.code(), Some(2));
     assert_eq!(error_code(&both), "USAGE");

@@ -249,6 +249,7 @@ fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[S
 /// deletes only when the plan recomputed now has the digest given. `base` is
 /// the command line without the `--commit`/`--plan-digest` flags.
 pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
+    let deleting = std::cell::Cell::new(false);
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind, true)?;
         let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
@@ -258,6 +259,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
         let plan = Plan::new(purge_effects(&preflight, &keys, learn_keys.as_deref()));
         let commit = plan.gate(mode, base).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        deleting.set(commit);
         // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
         let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
@@ -308,7 +310,9 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             if matched > 0 || deleted > 0 {
                 let _ = append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
             }
-            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
+            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, a failure is a failure during the work (exit 1).
+            let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { "RETENTION_PURGE_REFUSED" };
+            let error = CliError::refused(code, err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
                     Some(partial_purge_report(kind, before, *matched, *deleted, &err.to_string()))
@@ -318,7 +322,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             match partial {
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
-                    crate::human_err!("{}", error.human("canon purge"));
+                    crate::human_err!("{}", error.human_text());
                     error.emit_with_data("canon purge", true, &manifest)
                 }
                 _ => error.emit("canon purge", json_output),
@@ -441,9 +445,10 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
     let fields = fields.as_deref();
     let dry_run = dry_run.dry_run;
     let mut next_cursor_line = None;
+    let mut writing = false;
     let result = (|| -> Result<(), ExportFailure> {
         if let Some(requested) = fields {
-            crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Cursor)?;
+            crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Refused)?;
         }
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind, true)?;
@@ -460,7 +465,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
             },
             page,
         )
-        .map_err(ExportFailure::Cursor)?;
+        .map_err(ExportFailure::Refused)?;
         let records: Vec<ExportRecord> = rows.iter().map(|raw| ExportRecord::of(kind, raw)).collect();
         let content_digests = records.iter().map(|m| m.digest.clone()).collect();
         let records = match fields {
@@ -482,11 +487,11 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
             meta: Some(meta.clone()),
         };
         let encoded = serde_json::to_vec_pretty(&manifest)?;
+        // The destination is checked before anything is written, for a preview as for a run: an output that cannot be created refuses with nothing written and no audit line.
+        if let Some(path) = out.filter(|path| !fs::read(path).is_ok_and(|held| held == encoded)) {
+            crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(path, &e)))?;
+        }
         if dry_run {
-            // The same refusal an unwritable `--out` would meet, with nothing written and no audit line.
-            if let Some(path) = out {
-                crate::write_mode::check_creatable(path, false)?;
-            }
             if json_output {
                 let data = ExportReport::Preview(ExportPreview { dry_run: true, output: out.map(|p| p.display().to_string()), kind: kind.as_str(), record_count: rows.len() });
                 crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
@@ -496,6 +501,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
             next_cursor_line = meta.human_line();
             return Ok(());
         }
+        writing = true;
         if out.is_some_and(|path| fs::read(path).is_ok_and(|held| held == encoded)) {
             // The file already holds exactly this manifest: left alone (the access audit
             // line is still appended, O7), and the run is unchanged.
@@ -537,19 +543,22 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
             0
         }
         // A refused export read and wrote nothing: no audit line (O7).
-        Err(ExportFailure::Cursor(err)) => {
+        Err(ExportFailure::Refused(err)) => {
             err.emit("canon export", json_output)
         }
         Err(ExportFailure::Retention(err)) => {
-            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
+            // The ledger is read and the destination is checked before anything is written (exit 2); once the manifest is being written the same errors are a failure during the work (exit 1).
+            let code = if writing { "RETENTION_EXPORT_FAILED" } else { "RETENTION_EXPORT_REFUSED" };
+            CliError::refused(code, err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
         }
     }
 }
 
-/// Why an export stopped: a bad `--cursor`, or the retention failures
-/// `RETENTION_EXPORT_FAILED` has always covered.
+/// Why an export stopped: an error that is already a [`CliError`] (a bad
+/// `--cursor`, an output that cannot be written), or a retention failure that
+/// is refused before the output is touched and fails after.
 enum ExportFailure {
-    Cursor(CliError),
+    Refused(CliError),
     Retention(RetentionError),
 }
 

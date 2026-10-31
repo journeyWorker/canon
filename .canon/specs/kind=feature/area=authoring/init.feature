@@ -54,7 +54,7 @@ Feature: authoring init
   Scenario: A rerun with nothing to refresh leaves canon.yaml alone and reports unchanged
     Given a repo that already has canon.yaml
     When canon init runs with --no-agents-md
-    Then there is nothing left to refresh, so it exits 0 and, with --json, reports meta.unchanged
+    Then there is nothing left to refresh, so it exits 0 and, with --json, reports data.unchanged
     And canon.yaml is byte-identical and no AGENTS.md is written
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}

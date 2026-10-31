@@ -814,7 +814,7 @@ Feature: evidence add
     Given a preview of canon artifacts move --tier cold that printed a plan digest
     And another artifact was bound by new evidence after that preview
     When canon artifacts move is run with --commit and the old digest
-    Then it exits 2 with PLAN_CHANGED
+    Then it exits 2 with PLAN_STALE
     And nothing was uploaded and the tree is unchanged
     And previewing again prints a new digest that commits
 

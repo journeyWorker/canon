@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { advisoryTotal, approvalRequest, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, renderRelayed, renderBriefsPage, relayText, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, approveFailure, EMPTY_MESSAGE, groupAdvisories, inline, refusedIds, renderApproveError, renderBody, renderBrief, renderBriefs, renderRelayed, renderBriefsPage, relayText, selectionText, type Brief, type BriefHandlers } from "../src/briefs-render";
 import { elements, escapeHtml, toHtml } from "../src/vnode";
 
 const handlers: BriefHandlers = { onChange: () => {}, onApprove: () => {} };
@@ -174,6 +174,25 @@ test("report.dashboard.14: refusal text from the server is shown as text, never 
   const html = toHtml(renderApproveError({ code: "X", message: HOSTILE, hint: HOSTILE, refused: [{ changeId: HOSTILE, code: "C", message: HOSTILE }] }, null));
   expect(html).not.toContain("<script>");
   expect(html).toContain(escapeHtml(HOSTILE));
+});
+
+test("atip/1: an error without a hint member has no hint, and a null hint is tolerated", () => {
+  const absent = approveFailure({ error: { code: "BRIEF_APPROVE_REFUSED", message: "none approved" }, data: { refused: [{ changeId: "b", code: "C", message: "m" }] } }, 409);
+  expect(absent.hint).toBeUndefined();
+  expect(absent.refused).toEqual([{ changeId: "b", code: "C", message: "m" }]);
+  expect(toHtml(renderApproveError(absent, null))).not.toContain("finding-hint");
+  const nulled = approveFailure({ error: { code: "X", message: "m", hint: null } }, 400);
+  expect(nulled.hint).toBeUndefined();
+  expect(toHtml(renderApproveError(nulled, null))).not.toContain("finding-hint");
+  expect(approveFailure({ error: { code: "X", message: "m", hint: "reload" } }, 400).hint).toBe("reload");
+  expect(approveFailure({}, 502)).toEqual({ code: "UNKNOWN", message: "the server answered 502", hint: undefined, refused: [] });
+});
+
+test("atip/1: no dashboard source reads an old canon JSON key", () => {
+  const old = /canonVersion|hasMore|nextCursor|\.why\b|PLAN_CHANGED|INVALID_CURSOR|INPUT_ELEMENT_FAILED|meta\.(unchanged|waitingOn|nextOmitted|returned|total|context)/;
+  for (const file of ["briefs.ts", "briefs-render.ts", "status.ts", "banner.ts", "snapshot.ts", "main.ts"]) {
+    expect(readFileSync(join(import.meta.dir, "..", "src", file), "utf-8")).not.toMatch(old);
+  }
 });
 
 test("the selection boxes are empty on load and the fields hold no value, autofill off", () => {

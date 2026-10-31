@@ -60,7 +60,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
             for msg in &plugin_outcome.diagnostics {
                 crate::say_err!(json, "canon query --plugin {plugin_id}: {msg}");
             }
-            let diagnostics: Vec<String> = plugin_outcome.diagnostics.iter().map(|msg| format!("canon query --plugin {plugin_id}: {msg}")).collect();
+            let diagnostics: Vec<crate::json_out::Warning> = plugin_outcome.diagnostics.iter().map(|msg| crate::json_out::Warning::new("QUERY_PLUGIN_DIAGNOSTIC", format!("canon query --plugin {plugin_id}: {msg}"))).collect();
             if plugin_outcome.projections.is_empty() {
                 if json {
                     print_query(&crate::query::report(&outcome, include_sensitive), outcome.page.as_ref(), &diagnostics);
@@ -217,7 +217,7 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
     match crate::retrieve::run_scoped(repo, role, regime, domain, subject, k) {
         Ok(o) => {
             if json {
-                let warnings = crate::retrieve::serving_note(&o).map(|note| vec![note]).unwrap_or_default();
+                let warnings: Vec<crate::json_out::Warning> = crate::retrieve::serving_note(&o).map(|note| crate::json_out::Warning::new("RETRIEVE_REGIME_FELL_BACK", note)).into_iter().collect();
                 crate::json_out::data_with_meta("retrieve", &crate::retrieve::RetrieveReport(&o.guidance), crate::json_out::warnings_meta(&warnings));
             } else {
                 print!("{}", crate::retrieve::format_human_scoped(role, &o));
@@ -295,7 +295,7 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     let mut report_warnings = Vec::new();
     if let Some(msg) = canon_report::tier_boundary::warn_line(&kinds_not_read_directly) {
         crate::say_err!(json, "canon report: WARN {msg}");
-        report_warnings.push(format!("canon report: WARN {msg}"));
+        report_warnings.push(crate::json_out::Warning::new("REPORT_TIER_NOT_READ_DIRECTLY", format!("canon report: WARN {msg}")));
     }
 
     if let Some(dir) = snapshot_dir {
@@ -371,7 +371,7 @@ pub(crate) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
             if let crate::dashboard::SnapshotState::Unavailable { reason, fix } = &bound.snapshot {
                 let warning = format!("{reason}; the panels page says so instead of showing panels; to fix it: {fix}");
                 crate::say_err!(json, "canon dashboard: warning: {warning}");
-                warnings.push(warning);
+                warnings.push(crate::json_out::Warning::new("DASHBOARD_SNAPSHOT_UNAVAILABLE", warning));
             }
             crate::say!(json, "canon dashboard: briefs    = {}", bound.briefs_url());
             crate::say!(json, "canon dashboard: serving {}", bound.url());
@@ -395,13 +395,13 @@ pub(crate) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
 
 /// Prints one query document as the envelope: the page state goes into `meta`,
 /// beside the command's `warnings`.
-fn print_query(report: &crate::query::QueryReport, page: Option<&crate::paging::PageMeta>, warnings: &[String]) {
+fn print_query(report: &crate::query::QueryReport, page: Option<&crate::paging::PageMeta>, warnings: &[crate::json_out::Warning]) {
     let mut meta = serde_json::Map::new();
     if let Some(page) = page {
         page.insert_into(&mut meta);
     }
     if !warnings.is_empty() {
-        meta.insert("warnings".to_string(), serde_json::to_value(warnings).expect("strings serialize"));
+        meta.insert("warnings".to_string(), serde_json::to_value(warnings).expect("warnings serialize"));
     }
     let meta = if meta.is_empty() { serde_json::Value::Null } else { serde_json::Value::Object(meta) };
     crate::json_out::data_with_meta("query", report, meta);

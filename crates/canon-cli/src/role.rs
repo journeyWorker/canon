@@ -152,7 +152,7 @@ pub fn warn_if_unknown(role: &canon_model::RoleId, repo: &std::path::Path) {
         Some(closest) => format!("role `{value}` is not a known role (planner, implementer, reviewer, orchestrator, or one the policy names); did you mean `{closest}`?"),
         None => format!("role `{value}` is not a known role (planner, implementer, reviewer, orchestrator, or one the policy names); it is recorded as given"),
     };
-    crate::json_out::warn(message);
+    crate::json_out::warn("ROLE_UNKNOWN_RECORDED", message);
 }
 
 /// Resolve the declared role once, at startup. The `--as` flag wins over

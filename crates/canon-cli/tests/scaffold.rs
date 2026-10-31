@@ -249,7 +249,7 @@ fn inventory_sync_materializes_exactly_the_tagged_scenario_identical_to_a_hand_a
 // ── the provenance lines survive filling in a scenario (#64) ──
 
 /// `scenario new` says to keep the `# canon:` lines: on stdout for a human,
-/// in `meta.note` for `--json`.
+/// in `data.note` for `--json`.
 #[test]
 fn scenario_new_says_to_keep_the_provenance_lines() {
     let dir = tempfile::tempdir().unwrap();
@@ -259,7 +259,8 @@ fn scenario_new_says_to_keep_the_provenance_lines() {
 
     let json = run_canon(&["scenario", "new", "world.checkout.02", "--title", "Pay", "--json"], dir.path());
     let envelope: Value = serde_json::from_str(&stdout(&json)).unwrap();
-    assert!(envelope["meta"]["note"].as_str().is_some_and(|note| note.contains("keep the `# canon: {...}` provenance lines")), "{envelope}");
+    assert!(envelope["data"]["note"].as_str().is_some_and(|note| note.contains("keep the `# canon: {...}` provenance lines")), "{envelope}");
+    assert!(envelope["meta"].get("note").is_none(), "`note` is a report member, not a flat `meta` one: {envelope}");
 }
 
 /// A scenario file whose provenance line was edited away aborts

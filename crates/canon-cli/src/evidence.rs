@@ -1129,18 +1129,26 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         crate::say!(args.json, "canon evidence add: unchanged — an identical record for {subject} ({outcome}) is already {}; nothing written", existing.describe());
         if args.json {
             let entry = EvidenceRecordEntry { landing: existing.landing(), subject: subject.clone(), outcome: outcome.clone(), next: Some(next.clone()), unchanged: None };
-            crate::json_out::data_with_meta(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals) }, serde_json::json!({ "unchanged": true }));
+            crate::json_out::mark_unchanged();
+            crate::json_out::data(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals) });
         }
         return 0;
     }
     let stale_reviews = stale_review_notices(&mut gate_context, std::slice::from_ref(&record));
+
+    // The staging directory (and, with --promote, the ledger) must be writable before a bound blob is stored.
+    let staging_dir = evidence_staging_dir(&ledger_root);
+    let targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), ledger_root.as_path()] } else { vec![staging_dir.as_path()] };
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, &args.full(), args.json) {
+        return code;
+    }
 
     // Store the bound bytes before staging (module doc): every refusal
     // is behind us, and a record must never name a blob the store lacks.
     let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
         Ok(stored) => stored,
         Err((file, e)) => {
-            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit(&args.full(), args.json);
+            return CliError::refused(crate::artifacts::evidence_store_code(&e), format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit(&args.full(), args.json);
         }
     };
     if !bound.files.is_empty() {
@@ -1235,7 +1243,7 @@ fn record_body(record: &EvidenceRecord, args: &EvidenceArgs) -> serde_json::Valu
 fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Result<(), CliError> {
     if refusals.is_empty() {
         if args.override_reason.is_some() {
-            crate::warn_err!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
+            crate::warn_err!("OVERRIDE_REASON_UNUSED", "canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
         }
         return Ok(());
     }
@@ -1245,9 +1253,9 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Resu
         return Err(CliError::failed(code, lines).hint(BRIEF_STOP));
     };
     for refusal in refusals {
-        crate::warn_err!("canon evidence add: waived {}", refusal.violation.line());
+        crate::warn_err!("OVERRIDE_REFUSAL_WAIVED", "canon evidence add: waived {}", refusal.violation.line());
     }
-    crate::warn_err!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
+    crate::warn_err!("OVERRIDE_RECORDED", "canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
     Ok(())
 }
 
@@ -1446,10 +1454,8 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
         unzip3(records.into_iter().zip(all_bodies).zip(scenario_ids).zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(((record, body), id), _)| (record, body, id)));
     if records.is_empty() {
         if args.json {
-            crate::json_out::data_with_meta(
-                "evidence add",
-                &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals.concat()) },
-                serde_json::json!({ "unchanged": true }));
+            crate::json_out::mark_unchanged();
+            crate::json_out::data("evidence add", &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals.concat()) });
         }
         return 0;
     }
@@ -1457,12 +1463,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
 
     let landed = match land_batch(repo, &ledger_root, &batch.files, bodies, promote, &mut |tier, write| tier.write(write)) {
         Ok(landed) => landed,
-        Err((error, code)) => {
-            return CliError::failed("EVIDENCE_BATCH_REFUSED", error.clone())
-                .hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed")
-                .with_exit(code)
-                .emit("canon evidence add", args.json);
-        }
+        Err(error) => return error.emit("canon evidence add", args.json),
     };
     let json = args.json;
     crate::say!(json, "{}", crate::evidence_attach::stored_line(repo, "canon evidence add", batch.files.len(), landed.stored));
@@ -1537,7 +1538,8 @@ fn land_batch(
     bodies: Vec<serde_json::Value>,
     promote: bool,
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
-) -> Result<LandedBatch, (String, u8)> {
+) -> Result<LandedBatch, CliError> {
+    let rolled_back = |code: &'static str, message: String| CliError::refused(code, message).hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed");
     let staging_root = evidence_staging_dir(ledger_root);
     let kind_dir = format!("kind={}", RecordKind::Evidence.as_str());
     let mut destinations = vec![staging_root.join(&kind_dir)];
@@ -1546,15 +1548,16 @@ fn land_batch(
     }
     for dir in &destinations {
         let writable = std::fs::create_dir_all(dir).and_then(|()| std::fs::metadata(dir)).map(|m| !m.permissions().readonly());
+        let unwritable = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint("make the evidence directory writable, then run the command again; nothing was written");
         match writable {
             Ok(true) => {}
-            Ok(false) => return Err((format!("{} is read-only", dir.display()), 2)),
-            Err(e) => return Err((format!("cannot prepare {}: {e}", dir.display()), 2)),
+            Ok(false) => return Err(unwritable(format!("{} is read-only", dir.display()))),
+            Err(e) => return Err(unwritable(format!("cannot prepare {}: {e}", dir.display()))),
         }
     }
 
     let held = crate::evidence_attach::store_files_held(repo, files)
-        .map_err(|(file, e)| (format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint()), 2))?;
+        .map_err(|(file, e)| rolled_back(crate::artifacts::evidence_store_code(&e), format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint())))?;
     let staging = GitTier::new(&staging_root);
     let mut locations: Vec<BatchLocation> = Vec::new();
     let rollback = |locations: &[BatchLocation], held: crate::evidence_attach::HeldStore| {
@@ -1575,7 +1578,7 @@ fn land_batch(
             Err(e) => {
                 let error = format!("staging record {} of the batch failed: {e}", locations.len() + 1);
                 rollback(&locations, held);
-                return Err((error, 2));
+                return Err(rolled_back("WRITE_FAILED", error));
             }
         }
     }
@@ -1591,7 +1594,7 @@ fn land_batch(
                     let why = if refusal.lines.trim().is_empty() { refusal.error.message.clone() } else { refusal.lines.trim_end().to_string() };
                     let error = format!("promoting record {} of the batch ({}) was refused: {why}", index + 1, locations[index].staged);
                     rollback(&locations, held);
-                    return Err((error, 1));
+                    return Err(rolled_back("EVIDENCE_BATCH_REFUSED", error));
                 }
             }
         }
@@ -1757,7 +1760,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     // Read under the lock, like every writer (`store_files_held`).
     let store = match ArtifactStore::open(&repo) {
         Ok(store) => store,
-        Err(e) => return CliError::refused("ARTIFACTS_STORE_FAILED", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon artifacts store", json),
+        Err(e) => return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon artifacts store", json),
     };
     // The lock guards the local store only; an object store is not held
     // against other writers for the length of its uploads.
@@ -1765,7 +1768,9 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     for (path, sha256) in &files {
         let observed = store.observe(&repo, sha256, false);
         if let Observed::Unavailable(why) = &observed {
-            return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not check {}: {why}", store.display(sha256)))
+            // Nothing written yet: the store is a prerequisite that is not there; after a blob was written it is a failure during the work.
+            let code = if !dry_run && !stored.is_empty() { "ARTIFACTS_STORE_FAILED" } else { "ARTIFACTS_STORE_UNREACHABLE" };
+            return CliError::refused(code, format!("could not check {}: {why}", store.display(sha256)))
                 .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
                 .emit("canon artifacts store", json);
         }
@@ -2228,17 +2233,17 @@ mod tests {
             }
             tier.write(write)
         };
-        let Err((error, code)) = land_batch(repo, &ledger_root, &files, bodies(), true, &mut failing_second) else { panic!("the second write fails") };
-        assert_eq!(code, 2, "{error}");
-        assert!(error.contains("staging record 2 of the batch failed: ") && error.contains("disk full"), "{error}");
+        let Err(error) = land_batch(repo, &ledger_root, &files, bodies(), true, &mut failing_second) else { panic!("the second write fails") };
+        assert_eq!((error.code, error.exit), ("WRITE_FAILED", 1), "{}", error.message);
+        assert!(error.message.contains("staging record 2 of the batch failed: ") && error.message.contains("disk full"), "{}", error.message);
         assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "nothing staged, committed or stored");
 
         // Both stage; the second's promotion is refused (it has no role)
         // after the first was committed.
         let refused = vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", Actor::new_unattributed("legacy-writer"))];
-        let Err((error, code)) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second promotion is refused") };
-        assert_eq!(code, 1, "{error}");
-        assert!(error.contains("promoting record 2 of the batch"), "{error}");
+        let Err(error) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second promotion is refused") };
+        assert_eq!((error.code, error.exit), ("EVIDENCE_BATCH_REFUSED", 1), "{}", error.message);
+        assert!(error.message.contains("promoting record 2 of the batch"), "{}", error.message);
         assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "the first committed record is removed too");
 
         // A read-only destination is refused before anything is written.
@@ -2249,7 +2254,7 @@ mod tests {
         std::fs::set_permissions(&staging_kind, readonly).unwrap();
         let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
         std::fs::set_permissions(&staging_kind, original).unwrap();
-        assert!(matches!(&outcome, Err((e, 2)) if e.contains("is read-only")), "{:?}", outcome.as_ref().err());
+        assert!(matches!(&outcome, Err(e) if e.code == "WRITE_UNAVAILABLE" && e.exit == 2 && e.message.contains("is read-only")), "{:?}", outcome.as_ref().err());
         assert_eq!(blobs(), 0);
 
         let landed = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write)).unwrap();

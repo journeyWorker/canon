@@ -566,7 +566,7 @@ fn gate_task_flip_succeeds_with_clean_evidence() {
     let second = run_canon(&["task", "done", "it-task-flip-ok#1", "--repo", ".", "--json"], dir.path());
     assert!(second.status.success());
     let shown: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
-    assert_eq!(shown["meta"]["unchanged"], true, "{shown}");
+    assert_eq!(shown["data"]["unchanged"], true, "{shown}");
     assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), flipped, "a second gate_task call on an already-flipped row must be a byte-identical no-op");
 }
 

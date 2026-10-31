@@ -216,6 +216,11 @@ pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate:
         }
         return 0;
     }
+    let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
+    let targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), gate_ctx.ledger_root.as_path()] } else { vec![staging_dir.as_path()] };
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon divergence add", json) {
+        return code;
+    }
     let location = match stage(&gate_ctx.ledger_root, &candidate) {
         Ok(location) => location,
         Err(e) => {
@@ -450,6 +455,9 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         actor = actor.with_session(session.clone());
     }
     let at = Utc::now();
+    if let Some(code) = crate::write_mode::refuse_unwritable(&[&crate::gate::evidence_staging_dir(&context.ctx.ledger_root), &context.ctx.ledger_root], CMD, args.json) {
+        return code;
+    }
     let mut wrote: Vec<(String, std::path::PathBuf)> = Vec::new();
     for scenario in &scenarios {
         let record = candidate(CandidateSpec {

@@ -522,8 +522,8 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     assert_eq!(report["subjects"][0]["status"], "verifying", "a refused ship leaves the subject: {report}");
     let next = doc["meta"]["next"].as_array().unwrap();
     assert_eq!(next.len(), 1, "the sync is the only step: {report}");
-    assert_eq!(next[0]["command"], "canon inventory sync");
-    assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
+    assert_eq!(next[0]["command"], "canon inventory sync --json");
+    assert!(next[0]["reason"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
 
     std::fs::write(&feature, &clean).unwrap();
     let gate = canon(repo, &["gate", "check"]);

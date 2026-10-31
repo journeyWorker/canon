@@ -6,7 +6,8 @@
 //!   and the `CANON_*` variables the crates read are accounted for in
 //!   `tests/cli_spec.rs`);
 //! - `canon schema --error <CODE>` explains every code, and `--errors` lists them all;
-//! - every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits 2 (D4);
+//! - every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits 2 (D4), but `POLICY_APPROVAL_UNREADABLE`
+//!   (0.33: an unreadable approval is a closed gate, exit 1);
 //! - every code and exit a leaf lists is a registered code and a row of the exit table.
 
 mod harness;
@@ -78,7 +79,7 @@ fn every_code_a_source_builds_is_registered() {
 fn not_found_unreadable_and_invalid_argument_exit_2() {
     let mut checked = 0;
     for info in all_codes() {
-        if ["_NOT_FOUND", "_UNREADABLE", "_INVALID_ARGUMENT"].iter().any(|suffix| info.code.ends_with(suffix)) {
+        if ["_NOT_FOUND", "_UNREADABLE", "_INVALID_ARGUMENT"].iter().any(|suffix| info.code.ends_with(suffix)) && info.code != "POLICY_APPROVAL_UNREADABLE" {
             checked += 1;
             assert_eq!(info.exit, 2, "{} must exit 2 (D4)", info.code);
         }

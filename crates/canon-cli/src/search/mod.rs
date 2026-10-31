@@ -138,7 +138,7 @@ fn gitignore_warning(repo: &std::path::Path) -> Option<String> {
 /// Read the inputs and bring the index up to date; the failure is the exit code already emitted.
 fn open_index(command: &str, repo: &std::path::Path, json: bool) -> Result<Index, ExitCode> {
     if let Some(gap) = gitignore_warning(repo) {
-        crate::json_out::warn(format!("{command}: {gap}"));
+        crate::json_out::warn("SEARCH_GITIGNORE_MISSING", format!("{command}: {gap}"));
     }
     let corpus: Corpus = match inputs::load(repo) {
         Ok(corpus) => corpus,
@@ -151,11 +151,11 @@ fn open_index(command: &str, repo: &std::path::Path, json: bool) -> Result<Index
     };
     let mut warnings = Vec::new();
     let opened = index::open(repo, &corpus, &mut warnings);
-    for warning in warnings {
-        crate::json_out::warn(format!("{command}: {warning}"));
+    for (code, warning) in warnings {
+        crate::json_out::warn(code, format!("{command}: {warning}"));
     }
     if let Some(why) = &corpus.references_unchecked {
-        crate::json_out::warn(format!("{command}: the references of the records were not checked, so the index holds no placeholder node ({why})"));
+        crate::json_out::warn("REFERENCES_UNCHECKED", format!("{command}: the references of the records were not checked, so the index holds no placeholder node ({why})"));
     }
     opened.map_err(|error| ExitCode::from(CliError::failed("SEARCH_INDEX_FAILED", error.to_string()).hint("delete `.canon/index` and run the command again; the index is rebuilt from the records").emit(command, json)))
 }

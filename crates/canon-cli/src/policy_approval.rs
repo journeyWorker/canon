@@ -93,22 +93,27 @@ pub fn approval_state(repo: &Path) -> ApprovalState {
     }
 }
 
-/// The one advisory line `canon gate check` and `canon status` print, or
+/// The one advisory `canon gate check` and `canon status` print, or
 /// `None` when there is nothing to say (no policy, or an approval that
-/// still matches). Each line names the command that resolves it.
-pub fn advisory(repo: &Path) -> Option<String> {
+/// still matches). Each line names the command that resolves it; the
+/// code says which of the three situations it is.
+pub fn advisory(repo: &Path) -> Option<crate::json_out::Warning> {
     const FIX: &str = "a human reviews it and runs `canon policy approve --approver <who>`";
+    let warning = |code: &str, message: String| Some(crate::json_out::Warning::new(code, message));
     match approval_state(repo) {
         ApprovalState::NoPolicy | ApprovalState::Approved(_) => None,
-        ApprovalState::Unapproved => Some(format!("policy not approved: {} has no approval record ({}); {FIX}", paths::POLICY_FILE, paths::POLICY_APPROVAL_FILE)),
-        ApprovalState::Changed { approval, current_digest } => Some(format!(
-            "policy changed since approval: {} is {current_digest}, but `{}` approved {} at {}; {FIX}",
-            paths::POLICY_FILE,
-            approval.approved_by,
-            approval.policy_digest,
-            approval.approved_at
-        )),
-        ApprovalState::Unreadable { detail } => Some(format!("policy approval unreadable: {} ({detail}); {FIX}", paths::POLICY_APPROVAL_FILE)),
+        ApprovalState::Unapproved => warning("POLICY_NOT_APPROVED", format!("policy not approved: {} has no approval record ({}); {FIX}", paths::POLICY_FILE, paths::POLICY_APPROVAL_FILE)),
+        ApprovalState::Changed { approval, current_digest } => warning(
+            "POLICY_CHANGED_SINCE_APPROVAL",
+            format!(
+                "policy changed since approval: {} is {current_digest}, but `{}` approved {} at {}; {FIX}",
+                paths::POLICY_FILE,
+                approval.approved_by,
+                approval.policy_digest,
+                approval.approved_at
+            ),
+        ),
+        ApprovalState::Unreadable { detail } => warning("POLICY_APPROVAL_UNREADABLE", format!("policy approval unreadable: {} ({detail}); {FIX}", paths::POLICY_APPROVAL_FILE)),
     }
 }
 
@@ -329,12 +334,17 @@ pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str, r
 }
 
 /// `canon policy approve`. Returns the process exit code: `0` written,
-/// `2` refused (no policy to approve, an empty `--approver`, or a write
-/// failure).
+/// `2` refused (no policy to approve, an empty `--approver`, or an approval
+/// file that cannot be written), `1` when the write of the approval failed.
 pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&ApprovalRelay>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let existing = matching_approval(&repo, by, note, relay);
     let unchanged = existing.is_some();
+    if !unchanged && !by.trim().is_empty() && repo.join(paths::POLICY_FILE).is_file() {
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[&repo.join(paths::POLICY_APPROVAL_FILE)], "canon policy approve", json) {
+            return code;
+        }
+    }
     match existing.map_or_else(|| record(&repo, by, note, relay), Ok) {
         Ok(approval) => {
             if unchanged {
@@ -356,7 +366,9 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&App
             0
         }
         Err(e) => {
-            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
+            // A missing or unreadable policy and a blank approver are refused before anything is written; a failed write of the approval is a failure during the work.
+            let code = if matches!(e, PolicyApprovalError::WriteApproval { .. }) { "POLICY_APPROVAL_FAILED" } else { "POLICY_APPROVAL_REFUSED" };
+            CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
         }
     }
 }
@@ -395,7 +407,7 @@ mod tests {
 
         fs::write(dir.path().join(paths::POLICY_FILE), "spec_coverage: { require_evidence: true }\n").unwrap();
         assert!(matches!(approval_state(dir.path()), ApprovalState::Changed { .. }));
-        assert!(advisory(dir.path()).is_some_and(|line| line.starts_with("policy changed since approval")));
+        assert!(advisory(dir.path()).is_some_and(|warning| warning.code == "POLICY_CHANGED_SINCE_APPROVAL" && warning.message.starts_with("policy changed since approval")));
     }
 
     #[test]

@@ -89,7 +89,7 @@ fn the_validator_rejects_a_document_that_breaks_a_rule() {
     version["meta"]["schemaVersion"] = json!("9.9");
     assert!(!validate_document(&version).is_empty(), "a version the report does not declare");
 
-    let failure = json!({"ok": false, "error": {"code": "USAGE", "message": "m", "suggestions": [], "hint": "h", "retryable": false}, "meta": good["meta"]});
+    let failure = json!({"ok": false, "error": {"code": "USAGE", "message": "m", "hint": "h", "retryable": false}, "meta": good["meta"]});
     assert!(validate_document(&failure).is_empty(), "a bare failure envelope is valid: {:?}", validate_document(&failure));
     let unspecified = json!({"ok": false, "meta": good["meta"]});
     assert!(!validate_document(&unspecified).is_empty(), "a failure without an error");

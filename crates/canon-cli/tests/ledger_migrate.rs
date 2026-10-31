@@ -293,7 +293,7 @@ fn assert_unchanged_strictly(before: &Snapshot, repo: &Repo, what: &str) {
 }
 
 fn warnings(doc: &Value) -> Vec<String> {
-    doc["meta"]["warnings"].as_array().map(|a| a.iter().filter_map(|w| w.as_str().map(str::to_string)).collect()).unwrap_or_default()
+    doc["meta"]["warnings"].as_array().map(|a| a.iter().filter_map(|w| w["message"].as_str().map(str::to_string)).collect()).unwrap_or_default()
 }
 
 fn steps(doc: &Value) -> Vec<String> {
@@ -862,7 +862,7 @@ fn ledger_migrate_13_stale_stays_stale_and_the_undecidable_one_is_pinned_and_cou
 // ledger.migrate.08
 
 /// ledger.migrate.08 -- Then: `migrate --commit` with a digest that is not the preview's is
-/// refused PLAN_CHANGED and the tree, the sqlite file and the config are unchanged.
+/// refused PLAN_STALE and the tree, the sqlite file and the config are unchanged.
 #[test]
 fn ledger_migrate_08_another_digest_is_refused_plan_changed() {
     let repo = Repo::old();
@@ -870,7 +870,7 @@ fn ledger_migrate_08_another_digest_is_refused_plan_changed() {
     for wrong in ["a".repeat(64), "0".repeat(64)] {
         let (doc, out) = repo.json(&["migrate", "--commit", "--plan-digest", &wrong]);
         assert!(!out.status.success() && doc["ok"] == false, "{doc}");
-        assert_eq!(doc["error"]["code"], "PLAN_CHANGED", "{doc}");
+        assert_eq!(doc["error"]["code"], "PLAN_STALE", "{doc}");
         assert_unchanged(&before, &repo, "the refused commit");
     }
     assert_eq!(repo.snapshot(false).get(Path::new(".canon/hot.db")), before.get(Path::new(".canon/hot.db")));

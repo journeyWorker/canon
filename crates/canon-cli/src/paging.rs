@@ -3,12 +3,13 @@
 //! `query`, `finding list`, `divergence list` and `export` return at most
 //! `--limit` records (default [`DEFAULT_LIMIT`]); `--all` lifts the bound and
 //! `--cursor` resumes after the last record of the previous page. The JSON
-//! `meta` carries `returned`, `total`, `hasMore` and `nextCursor`; human mode
-//! ends with a line naming the next cursor when more remain.
+//! `meta.page` carries `returned`, `total` and, while more remain,
+//! `nextCursor` (and `meta.next` the same call with it); human mode ends with
+//! a line naming the next cursor when more remain.
 //!
 //! A cursor is opaque to the caller. It names the command and kind it came
 //! from (`scope`) and the key of the last record it returned, so it stays
-//! valid while the result set is unchanged and is refused (`INVALID_CURSOR`)
+//! valid while the result set is unchanged and is refused (`CURSOR_INVALID`)
 //! when handed to a different listing or when that record is gone.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,23 +65,20 @@ pub struct PageMeta {
     pub returned: usize,
     /// Every record the command matched, across all pages.
     pub total: usize,
-    pub has_more: bool,
+    /// Present exactly when more records follow.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<String>,
 }
 
 impl PageMeta {
-    /// The fields `meta` carries in JSON mode.
-    pub fn insert_into(&self, meta: &mut serde_json::Map<String, Value>) {
-        meta.insert("returned".to_string(), json!(self.returned));
-        meta.insert("total".to_string(), json!(self.total));
-        meta.insert("hasMore".to_string(), json!(self.has_more));
-        meta.insert("nextCursor".to_string(), json!(self.next_cursor));
+    /// The extra `meta` a listing passes to the envelope: `{"page": {returned, total, nextCursor?}}`.
+    pub fn to_json(&self) -> Value {
+        json!({ "page": self })
     }
 
-    pub fn to_json(&self) -> Value {
-        let mut meta = serde_json::Map::new();
-        self.insert_into(&mut meta);
-        Value::Object(meta)
+    /// `meta.page` added to the extra `meta` members in `meta`.
+    pub fn insert_into(&self, meta: &mut serde_json::Map<String, Value>) {
+        meta.insert("page".to_string(), json!(self));
     }
 
     /// The last line of a human listing, when more records remain.
@@ -109,7 +107,7 @@ pub fn cursor_key(cursor: &str) -> Option<String> {
 }
 
 fn invalid_cursor(why: &str) -> CliError {
-    CliError::refused("INVALID_CURSOR", why.to_string()).hint("drop --cursor to start from the first page, or pass the `nextCursor` this same command returned")
+    CliError::refused("CURSOR_INVALID", why.to_string()).field("--cursor").hint("drop --cursor to start from the first page, or pass the `nextCursor` this same command returned")
 }
 
 /// Cuts one page out of `items`, which must already be in their final,
@@ -151,13 +149,12 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
     };
 
     let end = page.limit.map_or(total, |limit| start.saturating_add(limit).min(total));
-    let has_more = end < total;
-    let next_cursor = has_more.then(|| {
+    let next_cursor = (end < total).then(|| {
         extend_to(end, &mut keys);
         encode(scope, &keys[end - 1])
     });
     let slice: Vec<T> = items.into_iter().skip(start).take(end - start).collect();
-    let meta = PageMeta { returned: slice.len(), total, has_more, next_cursor };
+    let meta = PageMeta { returned: slice.len(), total, next_cursor };
     Ok((slice, meta))
 }
 
@@ -167,7 +164,7 @@ pub fn normalize(name: &str) -> String {
     name.chars().filter(|c| *c != '_' && *c != '-').flat_map(char::to_lowercase).collect()
 }
 
-/// Refuses (`UNKNOWN_FIELD`) any requested `--fields` name that `known` does not hold, in either case
+/// Refuses (`USAGE`, `field` `--fields`) any requested `--fields` name that `known` does not hold, in either case
 /// style (`scenarioId` or `scenario_id`); `suggestions` carries the nearest known fields.
 pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String>) -> Result<(), CliError> {
     let normal: Vec<(String, &String)> = known.iter().map(|k| (normalize(k), k)).collect();
@@ -188,7 +185,7 @@ pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String
         }
     }
     suggestions.truncate(3);
-    Err(CliError::refused("UNKNOWN_FIELD", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", ")))
+    Err(CliError::refused("USAGE", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", ")))
         .hint(format!("known fields: {list} (a comma list; camelCase or snake_case both match)"))
         .field("--fields")
         .expected(known.iter().cloned())
@@ -252,7 +249,7 @@ mod tests {
         let cursor = meta.next_cursor.unwrap();
         for bad in [cursor.clone(), "zz".to_string(), String::new()] {
             let err = paginate("query:run", items.clone(), std::string::ToString::to_string, &page(Some(1), Some(bad))).unwrap_err();
-            assert_eq!(err.code, "INVALID_CURSOR");
+            assert_eq!(err.code, "CURSOR_INVALID");
         }
     }
 }

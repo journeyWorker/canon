@@ -167,10 +167,10 @@ Feature: canon migrate
   @subject:authoring-scaffold
   @case:failure
   @authoring.migrate.16
-  Scenario: A commit whose plan digest no longer matches the repo is refused PLAN_CHANGED and writes nothing
+  Scenario: A commit whose plan digest no longer matches the repo is refused PLAN_STALE and writes nothing
     Given a repo whose migrate preview gave a digest, and the repo changed afterwards so the plan differs
     When canon migrate --commit --plan-digest runs with the old digest
-    Then it exits 2 with PLAN_CHANGED and nothing is written
+    Then it exits 2 with PLAN_STALE and nothing is written
     And a fresh preview gives a new digest that commits
 
   # canon: {"schema":1,"at":"2026-10-23T11:48:42Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -248,7 +248,7 @@ Feature: canon migrate
   Scenario: A changed plan digest is refused with nothing written, and a brief edited after its approval stays changed
     Given a plan previewed and then a brief changed
     When canon migrate --commit runs with the old digest
-    Then it is refused with PLAN_CHANGED and nothing is written
+    Then it is refused with PLAN_STALE and nothing is written
     And a brief edited after its approval is rewritten and still reads BRIEF_CHANGED_SINCE_APPROVAL
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:55Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}

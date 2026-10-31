@@ -220,7 +220,7 @@ canon trace add-login_1_1
 <!-- canon:generated commands-implementer end -->
 
 After the first `status`, follow `meta.next` of each write; do not call
-`canon status` again to learn the next step. Every record you write takes
+`canon status` again to learn the next step. Each `meta.next` entry is runnable: run `canon` + its `argv`; guidance that needs a value you must fill in is in the error `hint` or the report text, not in `meta.next`. Every record you write takes
 the commit it is about from `--rev` (default `HEAD`, any git revision). You
 need not commit first: code that is not committed yet is recorded with its
 `codeTree` and `worktreeDirty: true`, never refused. Outside git, or in a
@@ -371,7 +371,7 @@ not another evidence step.
 ## Retry safety
 
 `evidence add` is content-keyed: repeating it with identical input returns
-the existing record with `meta.unchanged: true` instead of a duplicate (a
+the existing record with `data.unchanged: true` instead of a duplicate (a
 batch reports that element `unchanged`). After a timeout or a lost
 response, run the same command again. `scenario new` is not: an existing
 scenario id is refused (`SCENARIO_TAG_EXISTS`) and nothing changes, so check

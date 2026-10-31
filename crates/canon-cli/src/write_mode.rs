@@ -22,6 +22,8 @@
 
 use std::path::Path;
 
+use crate::cli_error::{CliError, CliErrorExt as _};
+
 /// A record staged for `canon gate promote` (`evidence add`, `finding
 /// add`, `finding close`).
 pub const STAGED_FOR_GATE_PROMOTE: &str = "run `canon gate promote` to commit it";
@@ -143,6 +145,45 @@ pub fn check_creatable(path: &Path, create_parents: bool) -> std::io::Result<()>
         Some(dir) => Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("`{}` does not exist", dir.display()))),
         None => Ok(()),
     }
+}
+
+/// Whether a real run could write `path` (a file it creates or replaces, or a
+/// directory it fills): the nearest ancestor that exists is a directory whose
+/// permissions allow writing, and `path` itself, when it exists, is not a
+/// read-only file or a directory that forbids writing. What a write command
+/// asks before it changes anything, so a target that cannot be written is
+/// refused up front ([`unavailable`]) instead of failing after the first write.
+pub fn check_writable(path: &Path) -> std::io::Result<()> {
+    let permission_denied = |what: &Path| std::io::Error::new(std::io::ErrorKind::PermissionDenied, format!("`{}` is read-only", what.display()));
+    if path.exists() {
+        let meta = std::fs::metadata(path)?;
+        return if meta.permissions().readonly() { Err(permission_denied(path)) } else { Ok(()) };
+    }
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    match parent.ancestors().find(|ancestor| ancestor.exists()) {
+        Some(dir) if dir.is_dir() => {
+            if std::fs::metadata(dir)?.permissions().readonly() {
+                Err(permission_denied(dir))
+            } else {
+                Ok(())
+            }
+        }
+        Some(dir) => Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, format!("`{}` is not a directory", dir.display()))),
+        None => Ok(()),
+    }
+}
+
+/// The refusal for a target [`check_writable`] found unwritable: known before
+/// the first write, so exit 2 (`WRITE_UNAVAILABLE`) and nothing changed. A
+/// write that began and failed is `WRITE_FAILED` (exit 1).
+pub fn unavailable(path: &Path, cause: &std::io::Error) -> CliError {
+    CliError::refused("WRITE_UNAVAILABLE", format!("cannot write `{}`: {cause}", path.display())).hint("make the target writable (its permissions, a mounted volume, a missing parent), then run the command again; nothing was changed")
+}
+
+/// [`check_writable`] over every target a command writes, refused as
+/// [`unavailable`] under `command`. `None` when all can be written.
+pub fn refuse_unwritable(targets: &[&Path], command: &str, json: bool) -> Option<u8> {
+    targets.iter().find_map(|target| check_writable(target).err().map(|cause| unavailable(target, &cause).emit(command, json)))
 }
 
 #[cfg(test)]

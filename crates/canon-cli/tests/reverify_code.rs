@@ -114,9 +114,27 @@ fn ship(repo: &Path) -> Output {
     canon(repo, &["subject", "move", "demo", "--to", "shipped"])
 }
 
+/// The steps `canon status` lists about this subject, from its human form
+/// (`{actor, command, why}`): a step that holds a `<placeholder>` is not a
+/// `meta.next` entry in JSON mode, so the printed `next:` block is the full list.
 fn status_steps(repo: &Path) -> Vec<Value> {
-    let report: Value = serde_json::from_str(&ok(repo, &["status", "--json"])).unwrap();
-    report["meta"]["next"].as_array().unwrap().iter().filter(|s| s["why"].as_str().unwrap_or("").starts_with("demo")).cloned().collect()
+    let out = canon(repo, &["status"]);
+    assert!(out.status.success(), "{}", text(&out.stderr));
+    let text = text(&out.stdout);
+    let Some((_, block)) = text.split_once("\nnext:\n") else { return Vec::new() };
+    let mut steps = Vec::new();
+    let mut why = None;
+    for line in block.lines() {
+        if let Some(reason) = line.strip_prefix("  # ") {
+            why = Some(reason.to_string());
+        } else if let (Some(command), Some(reason)) = (line.strip_prefix("  "), why.take()) {
+            let (actor, command) = command.strip_prefix("human: ").map_or(("agent", command), |rest| ("human", rest));
+            if reason.starts_with("demo") {
+                steps.push(serde_json::json!({"actor": actor, "command": command, "why": reason}));
+            }
+        }
+    }
+    steps
 }
 
 fn subject_status(repo: &Path) -> String {
@@ -160,13 +178,20 @@ fn a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_c
     assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
     let err = text(&out.stderr);
     assert!(err.contains("no evidence recorded after") && err.contains("`shop.cart.01`") && err.contains("`shop.cart.02`"), "{err}");
-    let hint = err.lines().find(|l| l.starts_with("hint: ")).unwrap_or_else(|| panic!("a refusal carries a hint: {err}"));
+    let hint = err.lines().find(|l| l.starts_with("  hint: ")).unwrap_or_else(|| panic!("a refusal carries a hint: {err}"));
     assert!(hint.contains(&format!("`{BATCH}`")), "the hint leads with the generated batch command: {hint}");
     assert!(!err.contains("--scenario"), "never a per-scenario loop: {err}");
 
     let steps = status_steps(r);
     assert_eq!(steps[0]["command"], BATCH, "{steps:?}");
     assert_eq!(steps.iter().filter(|s| s["command"].as_str().unwrap().starts_with("canon evidence add")).count(), 1, "one batch step: {steps:?}");
+    // The batch command holds no placeholder: it is a `meta.next` entry too, with `--json` and its role in `x-canon`.
+    let status: Value = serde_json::from_str(&ok(r, &["status", "--json"])).unwrap();
+    let entry = &status["meta"]["next"][0];
+    assert_eq!(entry["command"], format!("{BATCH} --json"), "{status}");
+    assert_eq!(entry["argv"], serde_json::json!(BATCH.split(' ').skip(1).chain(["--json"]).collect::<Vec<_>>()), "{entry}");
+    assert_eq!(entry["x-canon"]["actor"], "agent", "{entry}");
+    assert!(entry["reason"].is_string() && entry.get("why").is_none(), "{entry}");
 
     // The command runs as written.
     let words: Vec<&str> = BATCH.split(' ').skip(1).collect();

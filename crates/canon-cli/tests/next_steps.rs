@@ -35,17 +35,65 @@ fn json_of(out: &Output, what: &str) -> Value {
     serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{what}: stdout is not one JSON value ({e}): {}", String::from_utf8_lossy(&out.stdout)))
 }
 
-/// `status --json` as one report: `data` plus the `meta.next` / `meta.waitingOn` it carries.
+/// `status --json` as one report: `data` (with its `waitingOn` and
+/// `nextOmitted`) plus the `meta.next` it carries, `[]` when absent. A step
+/// that holds a `<placeholder>` is not an entry, so see [`status_text`].
 fn status_report(repo: &Path, role: Option<&str>) -> Value {
     let doc = json_of(&canon(repo, &["status", "--json"], role), "status");
     assert_eq!(doc["ok"], true, "{doc}");
     let mut report = doc["data"].clone();
-    for key in ["next", "nextOmitted", "waitingOn"] {
-        if !doc["meta"][key].is_null() {
-            report[key] = doc["meta"][key].clone();
+    report["next"] = meta_next_of(&doc);
+    report
+}
+
+/// A response's `meta.next`, `[]` when the member is absent (never `[]` on the wire).
+fn meta_next_of(doc: &Value) -> Value {
+    doc["meta"].get("next").cloned().unwrap_or_else(|| serde_json::json!([]))
+}
+
+/// The steps of `canon status` as its human form lists them (`# why` over the
+/// command; `human:` before the human's step), under `role`. Each is
+/// `{actor, command, why}`; the role is not printed.
+fn status_text(repo: &Path, role: Option<&str>) -> Vec<Value> {
+    let out = canon(repo, &["status"], role);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let Some((_, block)) = text.split_once("\nnext:\n") else { return Vec::new() };
+    let mut steps = Vec::new();
+    let mut why = None;
+    for line in block.lines() {
+        if let Some(reason) = line.strip_prefix("  # ") {
+            why = Some(reason.to_string());
+        } else if let (Some(command), Some(reason)) = (line.strip_prefix("  "), why.take()) {
+            let (actor, command) = command.strip_prefix("human: ").map_or(("agent", command), |rest| ("human", rest));
+            steps.push(serde_json::json!({"actor": actor, "command": command, "why": reason}));
         }
     }
-    report
+    steps
+}
+
+/// The last `next: <command> — <why>` line of a write's human output.
+fn next_line(text: &str) -> Option<(String, String)> {
+    let line = text.lines().last()?.strip_prefix("next: ")?;
+    let (command, why) = line.split_once(" — ")?;
+    let why = why.rsplit_once(" (+").filter(|(_, count)| count.ends_with(" more)")).map_or(why, |(why, _)| why);
+    Some((command.to_string(), why.to_string()))
+}
+
+/// What `canon status` names first for `subject`, as a write's human `next:` line prints it.
+fn status_first(repo: &Path, subject: &str) -> (String, String) {
+    let steps = status_text(repo, None);
+    let step = steps.iter().find(|step| step["why"].as_str().unwrap().starts_with(subject)).unwrap_or_else(|| panic!("status names no step for {subject}: {steps:?}"));
+    let command = step["command"].as_str().unwrap();
+    (if step["actor"] == "human" { format!("human: {command}") } else { command.to_string() }, step["why"].as_str().unwrap().to_string())
+}
+
+/// A write run in human mode: its output, which must end in the `next:` line `status` names for `subject`.
+fn text_write_names_status_step(repo: &Path, args: &[&str], subject: &str, what: &str) {
+    let out = canon(repo, args, None);
+    assert!(out.status.success(), "{what}: {}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    assert_eq!(next_line(&text), Some(status_first(repo, subject)), "{what}: {text}");
 }
 
 fn ok(repo: &Path, args: &[&str]) -> Value {
@@ -78,12 +126,12 @@ fn repo_with_change() -> (TempDir, Value) {
     (dir, created)
 }
 
-/// `status --json`'s first step about `subject`.
-fn status_step(repo: &Path, subject: &str) -> Value {
-    let report = status_report(repo, None);
-    report["next"].as_array().unwrap().iter().find(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().unwrap_or_else(|| panic!("status names no step for {subject}: {}", report["next"]))
+/// What `status --json` lists as `meta.next` for `subject`: the entries whose reason starts with it.
+fn status_entries(repo: &Path, subject: &str) -> Vec<Value> {
+    status_report(repo, None)["next"].as_array().unwrap().iter().filter(|step| step["reason"].as_str().unwrap_or("").starts_with(subject)).cloned().collect()
 }
 
+/// A response's `meta.next` entries, which must be there.
 fn meta_next(out: &Value) -> Vec<Value> {
     out["meta"]["next"].as_array().unwrap_or_else(|| panic!("no meta.next in {out}")).clone()
 }
@@ -132,40 +180,52 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let repo = dir.path();
 
     // `change new`: the brief is still a skeleton with blockers, so the
-    // subject's step is the planner's, not the human's (0.22 D4).
+    // subject's step is the planner's, not the human's (0.22 D4). It is a
+    // runnable command, so it is a `meta.next` entry: `argv` without the
+    // executable and with `--json`, `reason`, and who takes it in `x-canon`.
     let steps = meta_next(&created);
-    assert_eq!(steps[0]["actor"], "agent");
-    assert_eq!(steps[0]["role"], "planner");
-    assert_eq!(steps[0]["command"], "canon brief check add-login");
-    assert!(steps[0]["why"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
+    assert_eq!(steps[0]["x-canon"], serde_json::json!({"actor": "agent", "role": "planner"}), "{}", steps[0]);
+    assert_eq!(steps[0]["command"], "canon brief check add-login --json");
+    assert_eq!(steps[0]["argv"], serde_json::json!(["brief", "check", "add-login", "--json"]));
+    assert!(steps[0]["reason"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
+    assert!(steps[0].get("why").is_none() && steps[0].get("actor").is_none() && steps[0].get("role").is_none(), "{}", steps[0]);
 
-    // Once the brief is written clean, the one human stop is the subject's only step.
-    let step = status_step(repo, "demo");
-    assert_eq!(step["actor"], "human");
-    assert!(step["role"].is_null());
+    // Once the brief is written clean, the one human stop is the subject's only step:
+    // not a canon command, so not a `meta.next` entry; the human form lists it
+    // and a declared role counts it as the human's.
+    let human = status_text(repo, None);
+    assert_eq!(human.len(), 1, "{human:?}");
+    assert_eq!(human[0]["actor"], "human");
+    assert!(human[0]["command"].as_str().unwrap().starts_with("show the brief in "), "{human:?}");
+    assert!(status_entries(repo, "demo").is_empty());
+    assert!(json_of(&canon(repo, &["status", "--json"], None), "status")["meta"].get("next").is_none(), "no entry, no member");
+    assert_eq!(status_report(repo, Some("planner"))["waitingOn"], serde_json::json!({"human": 1}));
 
     let approved = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
-    assert_eq!(meta_next(&approved)[0], status_step(repo, "demo"), "brief approve");
-    assert_eq!(meta_next(&approved)[0]["actor"], "agent");
+    assert_eq!(meta_next_of(&approved), meta_next_of(&json_of(&canon(repo, &["status", "--json"], None), "status")), "brief approve");
+    assert_eq!(status_first(repo, "demo").0.split(' ').take(3).collect::<Vec<_>>(), ["canon", "scenario", "new"]);
+    assert!(approved["meta"].get("next").is_none(), "the scenario step holds placeholders, so it is not an entry: {approved}");
 
-    let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
-    assert_eq!(meta_next(&scenario)[0], status_step(repo, "demo"), "scenario new");
+    // Every later write ends its human output with the step `status` names.
+    let args = ["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1"];
+    text_write_names_status_step(repo, &args, "demo", "scenario new");
 
-    let moved = ok(repo, &["subject", "move", "demo", "--to", "specced", "--json"]);
-    assert_eq!(meta_next(&moved)[0], status_step(repo, "demo"), "subject status");
+    text_write_names_status_step(repo, &["subject", "move", "demo", "--to", "specced"], "demo", "subject status");
 
     ok(repo, &["subject", "move", "demo", "--to", "building", "--json"]);
-    let evidence = ok(
+    text_write_names_status_step(
         repo,
-        &["evidence", "add", "--scenario", "auth.login.01", "--project", "root", "--class", "test-run", "--role", "implementer", "--actor", "agent-a", "--session", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
+        &["evidence", "add", "--scenario", "auth.login.01", "--project", "root", "--class", "test-run", "--role", "implementer", "--actor", "agent-a", "--session", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote"],
+        "demo",
+        "evidence add",
     );
-    assert_eq!(meta_next(&evidence)[0], status_step(repo, "demo"), "evidence add");
 
-    let review = ok(
+    text_write_names_status_step(
         repo,
-        &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "rev", "--session", "s2", "--role", "reviewer", "--original-spec-ref", "login.feature", "--json"],
+        &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "rev", "--session", "s2", "--role", "reviewer", "--original-spec-ref", "login.feature"],
+        "demo",
+        "review add",
     );
-    assert_eq!(meta_next(&review)[0], status_step(repo, "demo"), "review add");
 }
 
 #[test]
@@ -180,7 +240,9 @@ fn a_staged_write_names_the_promote_that_makes_it_count() {
     );
     let steps = meta_next(&staged);
     assert_eq!(steps.len(), 1, "{steps:?}");
-    assert_eq!(steps[0]["command"], "canon gate promote");
+    assert_eq!(steps[0]["command"], "canon gate promote --json");
+    assert_eq!(steps[0]["argv"], serde_json::json!(["gate", "promote", "--json"]));
+    assert_eq!(steps[0]["x-canon"], serde_json::json!({"actor": "agent", "role": "implementer"}), "{}", steps[0]);
 }
 
 #[test]
@@ -195,20 +257,27 @@ fn human_mode_ends_with_one_next_line_and_a_count_of_the_rest() {
     assert!(last.contains(" — "), "{last}");
 }
 
+/// Runs `args` in human mode and returns its output.
+fn text(repo: &Path, args: &[&str]) -> String {
+    let out = canon(repo, args, None);
+    assert!(out.status.success(), "{args:?}: {}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
+/// The steps hold `<placeholder>` words an agent fills, which `meta.next`
+/// never carries (it lists runnable commands only), so the walk follows the
+/// human form's `next:` line, which names the same step.
 #[test]
 fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
-    let (dir, created) = repo_with_change();
+    let (dir, _) = repo_with_change();
     let repo = dir.path();
     // The human answers; everything after that is the next step each write names.
-    let mut last = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
-    let _ = created;
+    let mut last = text(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go."]);
     let mut ran = vec!["canon brief approve --by Ana --note Go.".to_string()];
     for _ in 0..24 {
-        let steps = meta_next(&last);
-        let Some(step) = steps.first() else { break };
-        assert_eq!(step["actor"], "agent", "{step}");
-        let command = step["command"].as_str().unwrap();
-        let mut args = words(command);
+        let Some((command, why)) = next_line(&last) else { break };
+        assert!(!command.starts_with("human:"), "a human step ends the walk: {command} — {why}");
+        let mut args = words(&command);
         assert_eq!(args.remove(0), "canon", "{command}");
         // The record steps carry what only the run knows: the spec root and the flow.
         let mut args: Vec<String> = args.into_iter().map(|a| if a == "<root-id>" { "root".to_string() } else { a }).collect();
@@ -219,15 +288,16 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
             args.push("--promote".to_string());
         }
         ran.push(format!("canon {}", args.join(" ")));
-        args.push("--json".to_string());
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
-        last = ok(repo, &refs);
+        last = text(repo, &refs);
     }
     println!("{}", ran.join("\n"));
     let status = status_report(repo, None);
     let demo = status["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo").unwrap();
     assert_eq!(demo["status"], "shipped", "ran:\n{}\n{status}", ran.join("\n"));
-    assert!(meta_next(&last).is_empty(), "a shipped subject has no step: {last}");
+    assert_eq!(next_line(&last), None, "a shipped subject has no step: {last}");
+    assert_eq!(status["next"], serde_json::json!([]), "{status}");
+    assert!(status_text(repo, None).is_empty());
 }
 
 /// Strict repo where scenario 01 is evidenced and awaits review while 02
@@ -252,26 +322,37 @@ fn a_declared_role_keeps_its_steps_and_counts_the_rest() {
     let dir = two_roles_waiting();
     let repo = dir.path();
 
+    // Both open steps hold `<placeholder>` words, so no entry is in `meta.next`;
+    // the human form lists them. No declared role, no counts.
     let unset = status_report(repo, None);
     assert!(unset.get("waitingOn").is_none(), "no role, no counts");
-    assert!(unset["next"].as_array().unwrap().iter().all(|s| s.get("role").is_some()), "every step carries its role");
-    let roles: Vec<&str> = unset["next"].as_array().unwrap().iter().filter_map(|s| s["role"].as_str()).collect();
-    assert!(roles.contains(&"reviewer") && roles.contains(&"implementer"), "{roles:?}");
+    assert_eq!(unset["next"], serde_json::json!([]), "{unset}");
+    let commands: Vec<String> = status_text(repo, None).iter().map(|s| s["command"].as_str().unwrap().to_string()).collect();
+    assert!(commands.iter().any(|c| c.starts_with("canon review scenario")) && commands.iter().any(|c| c.starts_with("canon evidence add")), "{commands:?}");
 
     let reviewer = status_report(repo, Some("reviewer"));
-    let steps = reviewer["next"].as_array().unwrap();
-    assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
-    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review scenario"), "{steps:?}");
-    assert_eq!(reviewer["waitingOn"]["implementer"], 1, "{reviewer}");
+    let steps = status_text(repo, Some("reviewer"));
+    assert!(!steps.is_empty() && steps.iter().all(|s| s["command"].as_str().unwrap().starts_with("canon review scenario")), "{steps:?}");
+    assert_eq!(reviewer["waitingOn"], serde_json::json!({"implementer": 1}), "{reviewer}");
+    let implementer = status_report(repo, Some("implementer"));
+    let steps = status_text(repo, Some("implementer"));
+    assert!(!steps.is_empty() && steps.iter().all(|s| s["command"].as_str().unwrap().starts_with("canon evidence add")), "{steps:?}");
+    assert_eq!(implementer["waitingOn"], serde_json::json!({"reviewer": 1}), "{implementer}");
 
     let text = canon(repo, &["status"], Some("reviewer"));
     assert!(String::from_utf8_lossy(&text.stdout).contains("waiting on implementer: 1"));
 
-    // A write under a role gets the same filter in `meta.next`.
+    // A write under a role gets the same filter: the count is in the report's `data`
+    // (never in `meta`), the human form ends with the role's `next:` line and the count.
     let wrote = json_of(&canon(repo, &["scenario", "new", "auth.login.03", "--title", "Edge", "--subject", "demo", "--case", "edge", "--flow", "F1", "--json"], Some("reviewer")), "scenario new as reviewer");
-    let steps = meta_next(&wrote);
-    assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
-    assert_eq!(wrote["meta"]["waitingOn"]["implementer"], 1, "{wrote}");
+    assert_eq!(wrote["data"]["waitingOn"], serde_json::json!({"implementer": 1}), "{wrote}");
+    assert!(wrote["meta"].get("waitingOn").is_none() && wrote["meta"].get("next").is_none(), "{wrote}");
+    let out = canon(repo, &["scenario", "new", "auth.login.04", "--title", "Edge two", "--subject", "demo", "--case", "edge", "--flow", "F1"], Some("reviewer"));
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines[lines.len() - 2].starts_with("next: canon review scenario "), "{text}");
+    assert_eq!(lines[lines.len() - 1], "waiting on implementer: 1", "{text}");
 }
 
 /// [`brief`] with a second flow step, `F2`.
@@ -282,10 +363,16 @@ fn brief_with_two_flows() -> String {
         .replace("set a session cookie.\n\n", "set a session cookie.\n- F2: signing out clears the cookie.\n\n")
 }
 
-/// The step `status` names for `demo` that carries `--flow <flow>`.
-fn flow_step_of(repo: &Path, flow: &str) -> Option<Value> {
-    let report = status_report(repo, None);
-    report["next"].as_array().unwrap().iter().find(|step| step["command"].as_str().unwrap_or("").contains(&format!("--flow {flow} "))).cloned()
+/// The step `status` names for `demo` that carries `--flow <flow>`, as its
+/// human form lists it (the step holds `<placeholder>` words, so `meta.next`
+/// has no entry for it), under `role` when given.
+fn flow_step_of(repo: &Path, flow: &str, role: Option<&str>) -> Option<Value> {
+    status_text(repo, role).into_iter().find(|step| step["command"].as_str().unwrap_or("").contains(&format!("--flow {flow} ")))
+}
+
+/// The roles that carry `step`: it appears in `status` under that role.
+fn roles_of(repo: &Path, flow: &str) -> Vec<&'static str> {
+    ["planner", "implementer", "reviewer", "orchestrator"].into_iter().filter(|role| flow_step_of(repo, flow, Some(role)).is_some()).collect()
 }
 
 #[test]
@@ -299,22 +386,24 @@ fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its
 
     // F2 has no scenario yet: the step is the happy case. Scenarios are the
     // implementer's (the planner reference writes none).
-    let none = flow_step_of(repo, "F2").expect("a step for F2");
+    let none = flow_step_of(repo, "F2", None).expect("a step for F2");
     let command = none["command"].as_str().unwrap();
     assert!(command.starts_with("canon scenario new auth.login.03 --subject demo --case happy --flow F2 --title "), "{none}");
-    assert_eq!(none["role"], "implementer", "{none}");
+    assert_eq!(roles_of(repo, "F2"), ["implementer"], "{none}");
+    // Placeholders keep the step out of `meta.next`.
+    assert!(status_report(repo, None)["next"].as_array().unwrap().iter().all(|entry| !entry["command"].as_str().unwrap().contains("--flow F2 ")));
 
-    // F2 gains only its happy scenario: the same step now asks for the failure case.
-    let wrote = ok(repo, &["scenario", "new", "auth.login.03", "--title", "Sign out", "--subject", "demo", "--case", "happy", "--flow", "F2", "--json"]);
-    for step in [flow_step_of(repo, "F2").expect("status names F2's failure case"), meta_next(&wrote).into_iter().find(|s| s["command"].as_str().unwrap().contains("--flow F2 ")).expect("meta.next names it too")] {
-        let command = step["command"].as_str().unwrap();
-        assert!(command.starts_with("canon scenario new auth.login.04 --subject demo --case failure --flow F2 --title "), "{step}");
-        assert_eq!(step["role"], "implementer", "{step}");
-    }
+    // F2 gains only its happy scenario: the same step now asks for the failure case,
+    // and the write's own `next:` line is the step status names first.
+    text_write_names_status_step(repo, &["scenario", "new", "auth.login.03", "--title", "Sign out", "--subject", "demo", "--case", "happy", "--flow", "F2"], "demo", "scenario new");
+    let step = flow_step_of(repo, "F2", None).expect("status names F2's failure case");
+    let command = step["command"].as_str().unwrap();
+    assert!(command.starts_with("canon scenario new auth.login.04 --subject demo --case failure --flow F2 --title "), "{step}");
+    assert_eq!(roles_of(repo, "F2"), ["implementer"], "{step}");
 
     // Once F2 has a failure scenario, no step asks for it again.
     ok(repo, &["scenario", "new", "auth.login.04", "--title", "Sign out twice", "--subject", "demo", "--case", "failure", "--flow", "F2", "--json"]);
-    assert!(flow_step_of(repo, "F2").is_none(), "F2 is covered");
+    assert!(flow_step_of(repo, "F2", None).is_none(), "F2 is covered");
 }
 
 /// The fixture brief with its acceptance key sentence removed: no blockers,
@@ -323,15 +412,15 @@ fn brief_with_an_advisory() -> String {
     brief().replace(" ==**F1 is the happy path.**==", "")
 }
 
-/// The steps `status --json` gives about `subject`.
+/// The steps `status` gives about `subject`, as its human form lists them
+/// (`{actor, command, why}`; the human's step is not a `meta.next` entry).
 fn status_steps(repo: &Path, subject: &str) -> Vec<Value> {
-    let report = status_report(repo, None);
-    report["next"].as_array().unwrap().iter().filter(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().collect()
+    status_text(repo, None).into_iter().filter(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).collect()
 }
 
 /// context.status.81: a brief with no blockers and advisories left gets the
 /// planner's polish step first, naming the count and the rule ids, then the
-/// human stop; `meta.next` of a write says the same.
+/// human stop; a write's `next:` line says the same.
 #[test]
 fn context_status_81_the_polish_step_comes_before_the_human_stop() {
     let (dir, _) = repo_with_change();
@@ -340,22 +429,36 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
 
     let steps = status_steps(repo, "demo");
     assert_eq!(steps.len(), 2, "{steps:?}");
-    assert_eq!((steps[0]["actor"].as_str(), steps[0]["role"].as_str()), (Some("agent"), Some("planner")), "{}", steps[0]);
+    assert_eq!(steps[0]["actor"], "agent", "{}", steps[0]);
     let command = steps[0]["command"].as_str().unwrap();
     assert!(command.contains("canon skills show brief-polish") && command.contains("`canon brief check add-login`"), "{command}");
     let why = steps[0]["why"].as_str().unwrap();
     assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence"), "{why}");
-    assert_eq!((steps[1]["actor"].as_str(), steps[1]["role"].is_null()), (Some("human"), true), "{}", steps[1]);
+    assert_eq!(steps[1]["actor"], "human", "{}", steps[1]);
+    // The planner's step is the planner's; the human's is counted for the human.
+    assert_eq!(status_steps_under(repo, "planner"), [steps[0].clone()]);
+    assert_eq!(status_report(repo, Some("planner"))["waitingOn"], serde_json::json!({"human": 1}));
 
-    let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1", "--json"]);
-    let next = meta_next(&scenario);
-    assert_eq!(&next[..2], &*steps, "meta.next names the same two steps");
+    let out = canon(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy", "--flow", "F1"], None);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    assert_eq!(next_line(&text), Some((command.to_string(), why.to_string())), "the write names the polish step first");
+    assert!(text.lines().last().unwrap().ends_with(" (+1 more)"), "and counts the human stop: {text}");
 
     // Blockers still win: only the check step, no polish and no human step.
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory().replace("## Out of scope\n\nSocial sign-in.", "## Out of scope\n\nTBD")).unwrap();
     let blocked = status_steps(repo, "demo");
     assert_eq!(blocked.len(), 1, "{blocked:?}");
     assert_eq!(blocked[0]["command"], "canon brief check add-login");
+    // That step is a runnable command: the JSON form carries it as an entry.
+    let entries = status_entries(repo, "demo");
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    assert_eq!(entries[0]["command"], "canon brief check add-login --json");
+}
+
+/// `status_steps` under a declared `role`.
+fn status_steps_under(repo: &Path, role: &str) -> Vec<Value> {
+    status_text(repo, Some(role)).into_iter().filter(|step| step["why"].as_str().unwrap_or("").starts_with("demo")).collect()
 }
 
 /// context.status.83: with no advisories the human stop is the only step,
@@ -371,6 +474,7 @@ fn context_status_83_no_advisories_keeps_the_human_stop_and_approve_ignores_advi
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory()).unwrap();
     assert_eq!(status_steps(repo, "demo").len(), 2);
     let approved = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
-    assert_eq!(meta_next(&approved)[0]["actor"], "agent");
-    assert!(status_steps(repo, "demo").iter().all(|s| !s["command"].as_str().unwrap().contains("brief-polish")), "an approved brief is not polished");
+    assert_eq!(approved["data"]["policyApproved"], true, "{approved}");
+    let after = status_steps(repo, "demo");
+    assert!(after.iter().all(|s| s["actor"] == "agent" && !s["command"].as_str().unwrap().contains("brief-polish")), "an approved brief is not polished: {after:?}");
 }

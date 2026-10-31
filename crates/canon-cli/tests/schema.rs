@@ -67,10 +67,11 @@ fn exits_follow_each_commands_own_contract() {
         args.push("--json");
         json(&args)["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect::<Vec<_>>()
     };
-    assert_eq!(exits(&["context"]), [0, 2]);
-    assert_eq!(exits(&["dispatch", "diff"]), [0, 2]);
-    assert_eq!(exits(&["finding", "list"]), [0, 2]);
-    // A batch whose element fails exits 1 (INPUT_ELEMENT_FAILED, D7).
+    // Every leaf can end with `INTERNAL` (a bug in canon), which is exit 1: the three read leaves below declare it and nothing else.
+    assert_eq!(exits(&["context"]), [0, 1, 2]);
+    assert_eq!(exits(&["dispatch", "diff"]), [0, 1, 2]);
+    assert_eq!(exits(&["finding", "list"]), [0, 1, 2]);
+    // A batch whose element fails exits 1 (BATCH_INCOMPLETE, D7).
     assert_eq!(exits(&["artifacts", "store"]), [0, 1, 2]);
     assert_eq!(exits(&["gate", "check"]), [0, 1, 2]);
     assert_eq!(exits(&["brief", "check"]), [0, 1, 2]);

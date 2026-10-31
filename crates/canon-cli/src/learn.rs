@@ -158,7 +158,7 @@ pub fn run_promote_with_evidence(
                         if let Err(error) = demote_strategy(&strategy_store, *strategy_id, contradiction.id, &git_tier_root, demotion_policy) {
                             demotion_failure = Some(error.to_string());
                         } else {
-                            crate::warn_err!("canon strategy promote: later contradictory evidence demoted {strategy_id}");
+                            crate::warn_err!("STRATEGY_DEMOTED", "canon strategy promote: later contradictory evidence demoted {strategy_id}");
                         }
                     }
                 }

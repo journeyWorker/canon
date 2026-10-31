@@ -1,7 +1,7 @@
 //! The write commands that printed their own JSON shape answer `{ data, meta }`
 //! like every other (0.21): `export`, `learn approve` and `learn rollback`
 //! (`purge`, `dispatch`, `ingest` are covered where their other behavior is).
-//! A write names what follows in `meta.next`.
+//! A write names what follows in `meta.next` (absent when nothing follows).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -38,11 +38,14 @@ fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
     let out = canon(repo, &["export", "--kind", "evidence", "--json"]);
     let shown = body(&out);
     assert_eq!(shown["meta"]["command"], "export", "{shown}");
-    assert!(shown["meta"]["next"].is_array(), "a write carries meta.next: {shown}");
+    for step in shown["meta"].get("next").map_or(&Vec::new(), |next| next.as_array().unwrap_or_else(|| panic!("meta.next is a list when present: {shown}"))) {
+        assert!(step["command"].as_str().is_some_and(|c| c.starts_with("canon ")) && step["argv"].is_array() && step["reason"].is_string(), "a next step is {{command, argv, reason}}: {shown}");
+    }
     assert_eq!(shown["data"]["schema"], "canon.retention.export", "{shown}");
     assert!(shown["data"]["records"].is_array(), "{shown}");
     assert!(shown["data"].get("meta").is_none(), "the page state moved to meta: {shown}");
-    assert!(shown["meta"]["total"].is_number() && shown["meta"]["returned"].is_number(), "{shown}");
+    assert!(shown["meta"]["page"]["total"].is_number() && shown["meta"]["page"]["returned"].is_number(), "{shown}");
+    assert!(shown["meta"].get("total").is_none() && shown["meta"].get("returned").is_none() && shown["meta"].get("hasMore").is_none(), "the page state is meta.page: {shown}");
     assert!(shown.get("records").is_none(), "the old top-level keys are gone: {shown}");
 
     // With --out the manifest is the file; stdout names it.
@@ -120,8 +123,9 @@ fn strategy_approval_payload_json_is_the_payload_as_data_and_the_signing_is_a_hu
     assert_eq!(shown["data"]["subject"], format!("strategy:{}", candidate.id), "{shown}");
     assert!(shown["data"]["payloadHex"].as_str().is_some_and(|hex| !hex.is_empty()), "{shown}");
     let step = &shown["meta"]["next"][0];
-    assert_eq!(step["actor"], "human", "signing is the human's: {shown}");
+    assert_eq!(step["x-canon"]["actor"], "human", "signing is the human's: {shown}");
     assert!(step["command"].as_str().unwrap().contains("canon strategy promote"), "{shown}");
+    assert_eq!(step["argv"][0], "strategy", "{shown}");
     assert!(shown.get("payloadHex").is_none(), "the old top-level keys are gone: {shown}");
 
     // The human form stays the bare payload a signer reads.

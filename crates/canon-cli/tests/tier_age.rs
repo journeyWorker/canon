@@ -41,7 +41,7 @@ fn the_bare_run_previews_the_candidates_and_performs_no_writes() {
     assert_eq!(data["rules"][0]["candidates"], 1, "{body}");
     assert_eq!(data["rules"][0]["moved"], 0, "{body}");
     let digest = data["planDigest"].as_str().expect("a preview carries a planDigest");
-    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["canon", "tier", "age", "--repo", fixture.root.path().display().to_string(), "--commit", "--plan-digest", digest, "--json"]), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["tier", "age", "--repo", fixture.root.path().display().to_string(), "--commit", "--plan-digest", digest, "--json"]), "{body}");
 
     // A preview must never write or delete anything.
     assert_eq!(fixture.git_file_count(), 2, "the preview moved a file out of the git tier");
@@ -86,7 +86,7 @@ fn a_stale_digest_moves_nothing_and_a_fresh_preview_commits() {
     let stale = commit(&fixture, &digest);
     assert_eq!(stale.status.code(), Some(2));
     let stale_body: serde_json::Value = serde_json::from_str(&support::stdout(&stale)).unwrap();
-    assert_eq!(stale_body["error"]["code"], "PLAN_CHANGED", "{stale_body}");
+    assert_eq!(stale_body["error"]["code"], "PLAN_STALE", "{stale_body}");
     assert_eq!(fixture.git_file_count(), 3, "a stale digest moves nothing");
     assert_eq!(fixture.r2_file_count(), 0);
 

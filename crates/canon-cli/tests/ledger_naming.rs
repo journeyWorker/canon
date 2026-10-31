@@ -340,7 +340,7 @@ fn ledger_naming_04_escaping_is_only_in_the_name_and_git_and_r2_agree() {
     second["session_id"] = json!("Sess/Two_B");
     git.write(&raw(&second)).unwrap();
     let paged = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]));
-    let cursor = paged["meta"]["nextCursor"].as_str().expect("a second page exists");
+    let cursor = paged["meta"]["page"]["nextCursor"].as_str().expect("a second page exists");
     let decoded = String::from_utf8(cursor.as_bytes().chunks(2).map(|c| u8::from_str_radix(std::str::from_utf8(c).unwrap(), 16).unwrap()).collect()).unwrap();
     assert!(decoded.contains("Sess/One_A") && !decoded.contains("+2f"), "the cursor key names the value, not the escaped form: {decoded:?}");
 }
@@ -571,7 +571,7 @@ fn ledger_naming_10_query_shows_the_id_before_escaping() {
     // `--json`: page through the sessions one at a time; each cursor names the raw value.
     let first = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]));
     assert_eq!(first["data"]["records"][0]["session_id"], "Sess/One_A");
-    let cursor = first["meta"]["nextCursor"].as_str().expect("a second page");
+    let cursor = first["meta"]["page"]["nextCursor"].as_str().expect("a second page");
     let key = hex_decode(cursor);
     let (scope, key) = key.split_once('\u{1f}').unwrap();
     assert_eq!(scope, "query:session");
@@ -805,7 +805,7 @@ fn ledger_naming_15_an_overlay_record_is_named_by_its_join_key_values() {
     let body: Value = serde_json::from_slice(&std::fs::read(repo.join(".canon/ledger/kind=porting.coverage").join(&files[0])).unwrap()).unwrap();
     assert_eq!(files[0], format!("root_auth.login.01_{}.json", d8(&body)), "`kind=<namespace>.<kind>/<project>_<scenario>_<digest8>.json`");
     let doc = overlay_query(repo);
-    assert!(doc["meta"]["warnings"].as_array().is_none_or(|w| w.iter().all(|m| !m.as_str().unwrap().contains("overlay scan violation"))), "the matching file is accepted: {doc}");
+    assert!(doc["meta"]["warnings"].as_array().is_none_or(|w| w.iter().all(|m| !m["message"].as_str().unwrap().contains("overlay scan violation"))), "the matching file is accepted: {doc}");
     assert_eq!(doc["data"]["records"][0]["overlay"]["porting.coverage"]["covered"], true);
 
     // A file whose name components are not the body's join key values is reported.
@@ -829,7 +829,7 @@ fn ledger_naming_20_overlay_files_that_do_not_match_are_reported_and_skipped() {
     std::fs::copy(overlay_dir.join(&good), overlay_dir.join("root__auth.login.01__0123456789ab.json")).unwrap();
 
     let doc = overlay_query(repo);
-    let warnings: Vec<String> = doc["meta"]["warnings"].as_array().unwrap().iter().map(|w| w.as_str().unwrap().to_string()).collect();
+    let warnings: Vec<String> = doc["meta"]["warnings"].as_array().unwrap().iter().map(|w| w["message"].as_str().unwrap().to_string()).collect();
     let mismatch = warnings.iter().find(|w| w.contains("root_zz.surface.09_")).unwrap_or_else(|| panic!("the mismatched key is reported: {warnings:?}"));
     assert!(mismatch.contains("overlay scan violation"), "{mismatch}");
     let old = warnings.iter().find(|w| w.contains("root__auth.login.01__0123456789ab.json")).unwrap_or_else(|| panic!("the 0.29-named file is reported: {warnings:?}"));
@@ -1027,7 +1027,7 @@ fn hex_encode(text: &str) -> String {
 }
 
 /// ledger.naming.19: a cursor `canon query` issued in 0.29 names a record by its 0.29 id and 12-hex
-/// digest; it is refused INVALID_CURSOR, and the hint says to drop `--cursor` and start from the first page.
+/// digest; it is refused CURSOR_INVALID, and the hint says to drop `--cursor` and start from the first page.
 #[test]
 fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     let dir = repo30(1);
@@ -1041,14 +1041,14 @@ fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     let out = canon_in(repo, &["query", "--kind", "finding", "--json", "--limit", "1", "--cursor", &cursor_029], &[]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let doc = json_of(&out);
-    assert_eq!(doc["error"]["code"], "INVALID_CURSOR", "{doc}");
+    assert_eq!(doc["error"]["code"], "CURSOR_INVALID", "{doc}");
     let message = doc["error"]["message"].as_str().unwrap();
     assert!(message.contains("0.29") && message.contains("names"), "the message says the cursor names records by 0.29 names: {message}");
     let hint = doc["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("drop --cursor") && hint.contains("first page"), "{hint}");
     // Starting over works, and the cursor 0.30 issues is accepted.
     let first = json_of(&canon_in(repo, &["query", "--kind", "finding", "--json", "--limit", "1"], &[]));
-    let next = first["meta"]["nextCursor"].as_str().unwrap();
+    let next = first["meta"]["page"]["nextCursor"].as_str().unwrap();
     let second = canon_in(repo, &["query", "--kind", "finding", "--json", "--limit", "1", "--cursor", next], &[]);
     assert!(second.status.success(), "{}", text(&second));
 }
@@ -1137,7 +1137,7 @@ fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_m
     assert!(o.status.success(), "{}", text(&o));
     let doc = json_of(&o);
     let warnings = doc["meta"]["warnings"].as_array().expect("a warning");
-    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("`evidence_record` spelled the 0.29 way"))), "{doc}");
+    assert!(warnings.iter().any(|w| w["message"].as_str().is_some_and(|w| w.contains("`evidence_record` spelled the 0.29 way"))), "{doc}");
     assert_eq!(doc["meta"]["next"][0]["command"], "canon migrate --json", "{doc}");
 
     let before = files(&repo.join(".canon"));

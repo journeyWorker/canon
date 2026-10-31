@@ -436,7 +436,7 @@ fn too_large(what: &str) -> CliError {
 #[expect(clippy::map_err_ignore, reason = "`refused` takes a message and a hint, no source; the message already says the input is not UTF-8")]
 fn read_capped(reader: impl Read, what: &str) -> Result<String, CliError> {
     let mut bytes = Vec::new();
-    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| refused("INPUT_UNREADABLE", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
+    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| refused("INPUT_INVALID", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
     if bytes.len() as u64 > MAX_BYTES {
         return Err(too_large(what));
     }
@@ -452,14 +452,14 @@ fn load(value: &str) -> Result<(String, Source), CliError> {
     }
     if value == "-" {
         if std::io::stdin().is_terminal() {
-            return Err(refused("INPUT_STDIN_TTY", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file").field("--input"));
+            return Err(refused("INPUT_INVALID", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file").field("--input"));
         }
         return Ok((read_capped(std::io::stdin().lock(), "stdin")?, Source::Stdin));
     }
     if value.is_empty() {
         return Err(refused("INPUT_INVALID", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin").field("--input"));
     }
-    let file = std::fs::File::open(value).map_err(|e| refused("INPUT_UNREADABLE", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin").field("--input"))?;
+    let file = std::fs::File::open(value).map_err(|e| refused("INPUT_INVALID", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin").field("--input"))?;
     if file.metadata().is_ok_and(|m| m.len() > MAX_BYTES) {
         return Err(too_large(&format!("`{value}`")));
     }
@@ -518,12 +518,12 @@ fn scalar(value: &Value, pointer: &str, expected: &str) -> Result<String, CliErr
         Value::String(s) => Ok(s.clone()),
         Value::Number(n) => Ok(n.to_string()),
         Value::Null => Err(null_refusal(pointer)),
-        other => Err(refused("INPUT_INVALID_TYPE", format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+        other => Err(refused("INPUT_INVALID", format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
     }
 }
 
 fn null_refusal(pointer: &str) -> CliError {
-    refused("INPUT_INVALID_TYPE", format!("`{pointer}` is null: canon has no clear-to-default, so omit the key"), "drop the key to get the option's default").field(pointer)
+    refused("INPUT_INVALID", format!("`{pointer}` is null: canon has no clear-to-default, so omit the key"), "drop the key to get the option's default").field(pointer)
 }
 
 fn type_name(value: &Value) -> &'static str {
@@ -568,7 +568,7 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
             let items = match value {
                 Value::Array(items) => items,
                 Value::Null => return Err(null_refusal(&pointer)),
-                other => return Err(refused("INPUT_INVALID_TYPE", format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+                other => return Err(refused("INPUT_INVALID", format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             };
             let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string")).collect::<Result<Vec<_>, _>>()?;
             out.push(Setting { key: name.clone(), long: None, values, flag: None, negatable: false, count: false });
@@ -587,19 +587,19 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
                 }
                 (false, None) => SCHEMA_HINT.to_string(),
             };
-            return Err(CliError::refused("INPUT_UNKNOWN_FIELD", message).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
+            return Err(CliError::refused("INPUT_INVALID", message).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
         };
         let setting = match (key.kind, value) {
             (_, Value::Null) => return Err(null_refusal(&pointer)),
             (Kind::Flag, Value::Bool(on)) => Setting { key: name.clone(), long: Some(key.long.clone()), values: Vec::new(), flag: Some(*on), negatable: key.negatable, count: false },
-            (Kind::Flag, other) => return Err(refused("INPUT_INVALID_TYPE", format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Flag, other) => return Err(refused("INPUT_INVALID", format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Count, Value::Number(n)) if n.as_u64().is_some() => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![n.to_string()], flag: None, negatable: false, count: true },
-            (Kind::Count, other) => return Err(refused("INPUT_INVALID_TYPE", format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Count, other) => return Err(refused("INPUT_INVALID", format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Value, Value::Array(items)) if key.repeatable => {
                 let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string or number")).collect::<Result<Vec<_>, _>>()?;
                 Setting { key: name.clone(), long: Some(key.long.clone()), values, flag: None, negatable: false, count: false }
             }
-            (Kind::Value, other) if key.repeatable => return Err(refused("INPUT_INVALID_TYPE", format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Value, other) if key.repeatable => return Err(refused("INPUT_INVALID", format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Value, other) => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![scalar(other, &pointer, if key.integer { "a number" } else { "a string or number" })?], flag: None, negatable: false, count: false },
         };
         out.push(setting);
@@ -741,8 +741,8 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     };
     if value == "-" {
         if let Some(other) = lexed.opts.iter().find(|o| o.long.as_deref() != Some("input") && o.value.as_deref().is_some_and(|v| v == "-" || v.ends_with(":-"))) {
-            let field = other.long.as_deref().map(|l| format!("--{l}")).unwrap_or_default();
-            return fail(refused("INPUT_STDIN_CONFLICT", format!("`--input -` and `{field}` both read stdin"), "read one of them from a file").field(field));
+            let other_option = other.long.as_deref().map(|l| format!("--{l}")).unwrap_or_default();
+            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field("--input").expected(["a file path for one of them"]));
         }
     }
     let (text, source) = match load(value) {
@@ -755,7 +755,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     };
     drop(text);
     if matches!(document, Document::Batch(_)) && !batch_supported(&command_name["canon ".len()..]) {
-        return fail(refused("INPUT_BATCH_UNSUPPORTED", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan").field("--input"));
+        return fail(refused("INPUT_INVALID", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan").field("--input"));
     }
 
     // The command line without `--input`.
@@ -782,7 +782,10 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
             let _ = ACTIVE.set(map);
             Expanded::Argv(std::iter::once(program).chain(argv.into_iter().map(OsString::from)).collect())
         }
-        Document::Batch(items) => run_batch(root, &leaf, &base, &map, &lexed, items, json),
+        Document::Batch(items) => {
+            crate::json_out::set_batch_input(true);
+            run_batch(root, &leaf, &base, &map, &lexed, items, json)
+        }
     }
 }
 
@@ -801,7 +804,7 @@ fn pointed(error: CliError, map: &DocMap, prefix: &str) -> CliError {
 /// The error of a child's failure envelope, `field` pointed into the batch.
 fn error_of(envelope: &Value, map: &DocMap, prefix: &str) -> CliError {
     let body = &envelope["error"];
-    let code = body["code"].as_str().and_then(crate::cli_error::code_info).map_or("INPUT_ELEMENT_FAILED", |info| info.code);
+    let code = body["code"].as_str().and_then(crate::cli_error::code_info).map_or("INTERNAL", |info| info.code);
     let mut error = CliError::failed(code, body["message"].as_str().unwrap_or("the element failed without a message")).hint(body["hint"].as_str().unwrap_or("run the element on its own to see its output"));
     if let Some(field) = body["field"].as_str() {
         error = error.field(field);
@@ -835,10 +838,21 @@ fn spawn(exe: &std::path::Path, argv: &[String], extra: &[&str]) -> Child {
     }
 }
 
-/// The error of a child that produced no failure document.
+/// The error of a child that produced no failure document: a bug in canon, whatever the element was.
 fn crashed(child: &Child) -> CliError {
     let message = if child.stderr.is_empty() { format!("the element's run ended with exit {} and no error document", child.exit) } else { format!("the element's run ended with exit {}: {}", child.exit, child.stderr) };
-    CliError::failed("INPUT_ELEMENT_FAILED", message).hint("run the element on its own to see its output")
+    CliError::failed("INTERNAL", message).hint("run the element on its own to see its output, and report what it prints at https://github.com/journeyWorker/canon/issues")
+}
+
+/// The error of a batch that stopped at element `index`: `BATCH_INCOMPLETE`, which says where and why,
+/// while `data.items[index].error` keeps the element's own error (its code, `field` as a pointer into the document).
+fn incomplete(element: &CliError, index: usize) -> CliError {
+    let mut error = CliError::failed("BATCH_INCOMPLETE", format!("the batch stopped at element {index}: {}: {}; the elements before it were applied and the ones after it were skipped", element.code, element.message))
+        .hint("`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)");
+    if let Some(field) = element.field_name() {
+        error = error.field(field);
+    }
+    error
 }
 
 fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: &Lexed, items: Vec<Value>, json: bool) -> Expanded {
@@ -846,7 +860,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     let exit_refused = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let exe = match std::env::current_exe() {
         Ok(exe) => exe,
-        Err(e) => return exit_refused(CliError::failed("INPUT_ELEMENT_FAILED", format!("canon cannot find its own executable to run the batch: {e}")).hint("run the elements one by one instead")),
+        Err(e) => return exit_refused(CliError::failed("INTERNAL", format!("canon cannot find its own executable to run the batch: {e}")).hint("run the elements one by one instead")),
     };
     let wants_json = has_flag(lexed, "json");
     let dry_run_given = has_flag(lexed, "dry-run");
@@ -856,7 +870,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     for (i, item) in items.iter().enumerate() {
         let prefix = format!("/items/{i}");
         let Some(object) = item.as_object() else {
-            return exit_refused(refused("INPUT_INVALID_TYPE", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).field(prefix).received(item.to_string()));
+            return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).field(prefix).received(item.to_string()));
         };
         let argv = match settings(leaf, object, &prefix).and_then(|s| assemble(base, &s, &prefix)) {
             Ok(argv) => argv,
@@ -876,7 +890,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                     Some(envelope) if envelope["ok"] == false => error_of(envelope, map, &prefix),
                     _ => crashed(&child),
                 };
-                return exit_refused(error.with_exit(2));
+                return exit_refused(error);
             }
         }
         argvs.push(argv);
@@ -894,7 +908,9 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         let prefix = format!("/items/{i}");
         match &child.envelope {
             Some(envelope) if envelope["ok"] == true && child.exit == 0 => {
-                let status = if envelope["meta"]["unchanged"] == true { ItemStatus::Unchanged } else { ItemStatus::Written };
+                // `unchanged` is a member of the report, or of `meta.x-canon` for a report that cannot take one.
+                let unchanged = envelope["data"]["unchanged"] == true || envelope["meta"]["x-canon"]["unchanged"] == true;
+                let status = if unchanged { ItemStatus::Unchanged } else { ItemStatus::Written };
                 report.push(BatchItem { index: i, status, data: Some(envelope["data"].clone()), error: None });
             }
             envelope => {
@@ -903,7 +919,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                     _ => crashed(&child),
                 };
                 report.push(BatchItem { index: i, status: ItemStatus::Failed, data: envelope.as_ref().and_then(|e| e.get("data")).cloned(), error: Some(serde_json::to_value(error.body()).expect("an error body serializes")) });
-                failure = Some(error.with_exit(1));
+                failure = Some(incomplete(&error, i));
             }
         }
     }
@@ -927,7 +943,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     }
     match failure {
         Some(error) => {
-            eprintln!("{}", error.human(&command_name));
+            eprintln!("{}", error.human_text());
             Expanded::Exit(ExitCode::from(error.exit))
         }
         None => Expanded::Exit(ExitCode::SUCCESS),

@@ -108,7 +108,7 @@ fn digest_of(preview: &Output) -> String {
 }
 
 /// authoring.migrate.16 (D6): a commit with the digest of an earlier plan, after the repo
-/// changed so the plan differs, is refused PLAN_CHANGED and writes nothing; a fresh preview
+/// changed so the plan differs, is refused PLAN_STALE and writes nothing; a fresh preview
 /// gives a digest that commits.
 #[test]
 fn migrate_16_a_digest_of_a_plan_the_repo_has_since_changed_is_refused() {
@@ -129,7 +129,7 @@ fn migrate_16_a_digest_of_a_plan_the_repo_has_since_changed_is_refused() {
     let before = tree(repo);
     let refused = canon(repo, &["migrate", "--commit", "--plan-digest", &old, "--json"]);
     assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
-    assert_eq!(json(&refused)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(json(&refused)["error"]["code"], "PLAN_STALE");
     assert_eq!(tree(repo), before, "a refused commit writes nothing");
 
     let fresh = digest_of(&ok(repo, &["migrate", "--json"]));
@@ -232,7 +232,7 @@ fn skills_install_22_the_write_commands_do_their_own_bookkeeping() {
         &["evidence", "add", "--scenario", "demo.login.02", "--class", "test-run", "--ref", "cargo test 2", "--role", "implementer", "--actor", "impl", "--no-promote", "--json"],
     ));
     assert!(held["data"]["records"][0]["committed"].is_null(), "{held}");
-    assert_eq!(held["meta"]["next"][0]["argv"], serde_json::json!(["canon", "gate", "promote"]), "{held}");
+    assert_eq!(held["meta"]["next"][0]["argv"], serde_json::json!(["gate", "promote", "--json"]), "{held}");
     assert!(text(&canon(repo, &["gate", "check"])).contains("uncovered-cell demo.login.02"));
     ok(repo, &["gate", "promote"]);
     assert!(!text(&canon(repo, &["gate", "check"])).contains("uncovered-cell demo.login.02"));

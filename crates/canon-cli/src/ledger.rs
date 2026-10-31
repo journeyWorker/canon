@@ -212,6 +212,6 @@ pub fn migrate_lines(repo: &Path, dry_run: bool) -> Result<Vec<String>, CliError
 /// append; it never turns the writer's own error into a different one.
 pub(crate) fn restore_after_rollback(ledger_root: &Path, kind: canon_model::RecordKind) {
     if let Err(e) = GitTier::new(ledger_root).restore_unsuperseded(kind) {
-        crate::warn_err!("canon: rolled back, but could not restore the archived {} version(s) the rolled-back records had replaced ({e}); copy them back from the archive beside the ledger", kind.as_str());
+        crate::warn_err!("LEDGER_ROLLBACK_NOT_RESTORED", "canon: rolled back, but could not restore the archived {} version(s) the rolled-back records had replaced ({e}); copy them back from the archive beside the ledger", kind.as_str());
     }
 }

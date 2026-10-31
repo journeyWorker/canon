@@ -176,7 +176,7 @@ fn the_revert_preview_lists_the_undone_moves_and_a_wrong_digest_writes_nothing()
 
     let wrong = canon(repo, &["migrate", "--revert", "--commit", "--plan-digest", "0000", "--json"]);
     assert_eq!(wrong.status.code(), Some(2), "{}", text(&wrong));
-    assert!(text(&wrong).contains("PLAN_CHANGED"), "{}", text(&wrong));
+    assert!(text(&wrong).contains("PLAN_STALE"), "{}", text(&wrong));
     assert_eq!(tree(repo), migrated, "a plan digest that does not match writes nothing");
 }
 

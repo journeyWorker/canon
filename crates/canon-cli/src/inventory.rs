@@ -1185,13 +1185,13 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     let Ok(roots) = ctx.spec_roots(None) else { return };
     let (old, roots) = split_pre_0_17(&ctx.repo, roots);
     for (_, detail) in &old {
-        crate::warn_err!("{command}: {detail}; its scenario index is NOT refreshed");
+        crate::warn_err!("LAYOUT_MIGRATION_REQUIRED", "{command}: {detail}; its scenario index is NOT refreshed");
     }
     let tier = GitTier::new(&ctx.ledger_root);
     let checked = |tier: &GitTier| match stale_roots(tier, &roots) {
         Ok(stale) => Some(stale),
         Err(e) => {
-            crate::warn_err!("{command}: could not check the scenario index for staleness: {e}");
+            crate::warn_err!("SCENARIO_INDEX_CHECK_FAILED", "{command}: could not check the scenario index for staleness: {e}");
             None
         }
     };
@@ -1202,7 +1202,7 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     let _lock = match lock_index(&ctx.repo) {
         Ok(lock) => lock,
         Err(e) => {
-            crate::warn_err!("{command}: the scenario index is stale but was not refreshed: {e}");
+            crate::warn_err!("SCENARIO_INDEX_NOT_REFRESHED", "{command}: the scenario index is stale but was not refreshed: {e}");
             return;
         }
     };
@@ -1250,7 +1250,11 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     if diagnostics > 0 || !refused.is_empty() {
         line.push_str(" — `canon inventory sync` lists them");
     }
-    crate::warn_err!("{line}");
+    if refused.is_empty() {
+        crate::warn_err!("SCENARIO_INDEX_REFRESHED", "{line}");
+    } else {
+        crate::warn_err!("SCENARIO_INDEX_NOT_REFRESHED", "{line}");
+    }
 }
 
 /// A configured spec root every grading reader must refuse: its scenario
