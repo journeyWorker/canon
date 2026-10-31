@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:54.957237Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "kind": "review",
+  "pin": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_23_a_failing_should_check_is_an_advisory_the_level_is_still_met_and_the_exit_is_0"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "96cb1e6c62086ccba00c2ba4bb715141fb7920257a7359025b3eae9f849f6e6f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-check/brief.md"
+  },
+  "review_id": "01M696HXRD8XNXX3630HR94J8Y",
+  "reviewer": "rev-atip-check",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.check.23",
+  "schema": 2,
+  "worktree_dirty": false
+}

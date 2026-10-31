@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:54.957237Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "kind": "review",
+  "pin": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_35_a_failure_envelope_that_breaks_the_registry_is_rejected_by_the_rule_that_names_it",
+          "junit:atip_check_35_every_invalid_envelope_example_is_rejected_and_the_l1_and_l2_only_ones_are_skipped_with_a_reason"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "9f927d24cb61791940cb1fe200792f3dcb9ba89568cf20be234d106bb92b980b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-check/brief.md"
+  },
+  "review_id": "01M696HXRD8XNXX3630HR94J8Y",
+  "reviewer": "rev-atip-check",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.check.35",
+  "schema": 2,
+  "worktree_dirty": false
+}
