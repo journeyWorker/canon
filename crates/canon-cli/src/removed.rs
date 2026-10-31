@@ -42,6 +42,12 @@ pub struct Removed {
 }
 
 impl Removed {
+    /// Whether this is a group run with no command (`canon brief`): the contract's `COMMAND_REQUIRED`,
+    /// with this removal as its hint, not a removed option or command.
+    pub fn is_bare(&self) -> bool {
+        self.used.ends_with(" without a subcommand")
+    }
+
     /// The usage error's message.
     pub fn message(&self) -> String {
         format!("{} was removed in {}", self.used, self.since)
@@ -198,6 +204,8 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
     let mut path: Vec<String> = Vec::new();
     let mut path_at: Vec<usize> = Vec::new();
     let mut hits: Vec<Hit> = Vec::new();
+    // A word that is no subcommand of the group it follows: the call is not a bare group.
+    let mut stray = false;
     let mut i = 0;
     while i < args.len() {
         let token = args[i].as_str();
@@ -257,6 +265,7 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
             path_at.push(i);
             cmd = sub;
         } else if cmd.has_subcommands() {
+            stray = true;
             let following: Vec<&str> = args[i + 1..].iter().map(String::as_str).take_while(|a| !a.starts_with('-')).collect();
             if let Some(row) = command_row(&here, token, &following) {
                 if hits.is_empty() {
@@ -290,7 +299,7 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
         return Some(Removed::from_row(row, command, used.clone(), used));
     }
     let here = path.join(" ");
-    if cmd.has_subcommands() {
+    if cmd.has_subcommands() && !stray {
         if let Some(row) = ROWS.iter().find(|row| row.kind == Kind::Bare && row.old == here) {
             return Some(Removed::from_row(row, here.clone(), format!("canon {here} without a subcommand"), here));
         }

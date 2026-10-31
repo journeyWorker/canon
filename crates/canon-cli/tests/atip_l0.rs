@@ -145,7 +145,6 @@ fn atip_l0_05_a_member_with_no_value_is_absent() {
         vec!["query", "--kind", "evidence", "--json"],
         vec!["nosuch", "--json"],
         vec!["status", "--bogus", "--json"],
-        vec!["finding", "list", "--change", "nosuch", "--json"],
         vec!["schema", "--json"],
     ];
     let mut found = Vec::new();
@@ -536,16 +535,17 @@ fn atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_
     assert_eq!(document["error"]["code"], "USAGE", "{document}");
     assert_eq!(document["error"]["field"], "--input");
     // On a terminal `--input -` has nothing to read.
-    let Some(text) = canon_on_a_terminal(repo.path(), &["scenario", "new", "--input", "-", "--json"]).or(None) else {
-        eprintln!("skipped the terminal case: no `script` command");
-        return;
+    // A terminal stdin needs a pty: `script` makes one. Without it the case cannot run, and that is said, not passed over.
+    let Some(text) = canon_on_a_terminal(repo.path(), &["scenario", "new", "--input", "-", "--json"]) else {
+        panic!("atip.l0.22 needs the `script` command to give canon a terminal on stdin; install it or run the case on a machine that has it");
     };
-    let tty = text.lines().find(|line| line.trim_start().starts_with('{'));
-    if let Some(line) = tty {
-        let document: Value = serde_json::from_str(line.trim()).unwrap();
-        assert_eq!(document["error"]["code"], "INPUT_INVALID", "{document}");
-        assert_eq!(document["error"]["field"], "--input");
-    }
+    // The pty echoes its own control characters ahead of the document: take it from the first `{"ok"`.
+    let at = text.find("{\"ok\"").unwrap_or_else(|| panic!("no JSON document from the terminal run: {text:?}"));
+    let document: Value = serde_json::from_str(text[at..].lines().next().unwrap().trim()).unwrap();
+    assert_eq!(document["error"]["code"], "INPUT_INVALID", "{document}");
+    assert_eq!(document["error"]["field"], "--input");
+    assert_eq!(document["error"]["x-canon"]["reason"], "tty", "{document}");
+    assert!(atip::envelope_problems(&document).is_empty());
 }
 
 #[test]
@@ -571,4 +571,107 @@ fn atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract() {
         }
     }
     assert!(envelopes > 30, "the corpus holds {envelopes} envelopes");
+}
+
+#[test]
+fn atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract() {
+    let repo = scratch_repo();
+    let version = String::from_utf8(canon(repo.path(), &["--version"]).stdout).unwrap();
+    for args in [vec!["status", "--bogus", "--json"], vec!["nosuch", "--json"], vec!["--json"], vec!["query", "--kind", "subject", "--cursor", "zz", "--json"]] {
+        let out = canon(repo.path(), &args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        let document = json(&out);
+        assert_eq!(document["ok"], false);
+        let meta = &document["meta"];
+        assert_eq!(meta["tool"], "canon", "{args:?}");
+        assert_eq!(meta["contract"], "atip/1");
+        assert_eq!(format!("canon {}", meta["toolVersion"].as_str().unwrap()), version.trim());
+        assert!(meta["schemaVersion"].is_string());
+        assert!(document["error"]["retryable"].is_boolean());
+        assert!(meta.get("canonVersion").is_none());
+    }
+}
+
+#[test]
+fn atip_l0_29_input_twice_or_without_a_value_is_usage_on_input() {
+    let repo = scratch_repo();
+    let before = std::fs::read_to_string(repo.path().join(".canon/specs/kind=feature/area=auth/login.feature")).unwrap();
+    let twice = canon(repo.path(), &["scenario", "new", "--input", "{}", "--input", "{}", "--json"]);
+    let bare = canon(repo.path(), &["scenario", "new", "--json", "--input"]);
+    for out in [&twice, &bare] {
+        assert_eq!(out.status.code(), Some(2));
+        let document = json(out);
+        assert_eq!(document["error"]["code"], "USAGE", "{document}");
+        assert_eq!(document["error"]["field"], "--input");
+        assert!(document["error"].get("x-canon").is_none(), "a shape fault has no reason: {document}");
+        assert!(atip::envelope_problems(&document).is_empty());
+    }
+    assert_eq!(before, std::fs::read_to_string(repo.path().join(".canon/specs/kind=feature/area=auth/login.feature")).unwrap(), "nothing was written");
+}
+
+#[test]
+fn atip_l0_30_the_framing_faults_of_input_carry_a_reason_and_a_document_fault_a_pointer() {
+    let repo = scratch_repo();
+    let missing = repo.path().join("no-such-file.json");
+    let cases: Vec<(Vec<String>, &str)> = vec![
+        (vec!["--input".into(), missing.display().to_string()], "unreadable"),
+        (vec!["--input".into(), String::new()], "empty"),
+        (vec!["--input".into(), "{ not json".into()], "syntax"),
+    ];
+    for (input, reason) in cases {
+        let mut args: Vec<String> = vec!["scenario".to_string(), "new".to_string()];
+        args.extend(input);
+        args.push("--json".into());
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        let out = canon(repo.path(), &refs);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        let document = json(&out);
+        let error = &document["error"];
+        assert_eq!(error["code"], "INPUT_INVALID", "{args:?}: {document}");
+        assert_eq!(error["field"], "--input", "{args:?}");
+        assert_eq!(error["x-canon"]["reason"], reason, "{args:?}: {document}");
+        assert!(atip::error_problems(error).is_empty(), "{args:?}: {:?}", atip::error_problems(error));
+    }
+    // An array to a command that takes one object.
+    let array = json(&canon(repo.path(), &["purge", "--input", r#"[{"repo":"."}]"#, "--json"]));
+    assert_eq!(array["error"]["code"], "INPUT_INVALID", "{array}");
+    assert_eq!(array["error"]["x-canon"]["reason"], "batch-unsupported", "{array}");
+    // A document that breaks its fragment schema: a pointer, and no reason.
+    let fragment = json(&canon(repo.path(), &["scenario", "new", "--input", r#"{"operands":["auth.login.51"],"title":"t","nosuch":1}"#, "--json"]));
+    assert_eq!(fragment["error"]["code"], "INPUT_INVALID", "{fragment}");
+    assert_eq!(fragment["error"]["field"], "/nosuch", "{fragment}");
+    assert!(fragment["error"].get("x-canon").is_none(), "{fragment}");
+}
+
+#[test]
+fn atip_l0_31_every_error_object_passes_the_contract_error_schema() {
+    let repo = scratch_repo();
+    let runs: Vec<Vec<&str>> = vec![
+        vec!["status", "--bogus", "--json"],
+        vec!["status", "--fields", "nosuch", "--json"],
+        vec!["nosuch", "--json"],
+        vec!["brief", "--json"],
+        vec!["report", "nosuch", "--json"],
+        vec!["--json"],
+        vec!["scenario", "new", "--json"],
+        vec!["scenario", "new", "--json", "--input"],
+        vec!["scenario", "new", "--input", "{ nope", "--json"],
+        vec!["query", "--kind", "subject", "--cursor", "zz", "--json"],
+        vec!["subject", "show", "nosuch", "--json"],
+        vec!["retrieve", "--for-role", "reviewer", "--json"],
+    ];
+    for args in &runs {
+        let out = canon(repo.path(), args);
+        let document = json(&out);
+        assert_eq!(document["ok"], false, "{args:?}: {document}");
+        let problems = atip::error_problems(&document["error"]);
+        assert!(problems.is_empty(), "{args:?}: {problems:?}\n{document}");
+        let mut found = Vec::new();
+        voids(&document["error"], "error", &mut found);
+        assert!(found.is_empty(), "{args:?}: {found:?}");
+    }
+    // The in-process error value, with the fields a tool sets.
+    let error = CliError::refused("USAGE", "m").hint("").field("").received("");
+    let body = serde_json::to_value(error.body_with(None, Vec::new())).unwrap();
+    assert!(atip::error_problems(&body).is_empty(), "empty members are left out: {body}");
 }

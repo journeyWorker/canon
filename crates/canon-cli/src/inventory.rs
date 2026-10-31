@@ -90,6 +90,10 @@ pub enum InventoryError {
     /// longer than a writer waits ([`lock_index`]).
     #[error("{0}")]
     Locked(String),
+    /// A store the sync writes cannot be written, known before anything was
+    /// changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(crate::cli_error::CliError),
 }
 
 /// `canon.yaml`'s `specs:` section, parsed STRICTLY
@@ -418,6 +422,12 @@ pub fn preview_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome
 fn sync_repo(repo: &Path, spec_root: Option<&Path>, dry_run: bool) -> Result<SyncOutcome, InventoryError> {
     let repo = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo)?;
+    if !dry_run {
+        // The first things a sync writes: the index lock, then the scenario records. Refused before either.
+        for target in [ctx.repo.join(paths::SCENARIO_INDEX_LOCK_FILE), ctx.ledger_root.join(format!("kind={}", RecordKind::Scenario.as_str()))] {
+            crate::write_mode::check_writable(&target).map_err(|cause| InventoryError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
+        }
+    }
     let _lock = if dry_run { None } else { Some(lock_index(&ctx.repo)?) };
     sync_with_ctx(&ctx, spec_root, dry_run)
 }

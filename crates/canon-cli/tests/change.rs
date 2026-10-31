@@ -242,11 +242,12 @@ fn ledger_file_count(repo: &Path) -> usize {
     walk(&repo.join(".canon/ledger"))
 }
 
-/// The first record write (the subject) fails: nothing has been written,
-/// so the change dir is taken back and nothing remains.
+/// The subject's store cannot take a record: refused before anything is
+/// written (`WRITE_UNAVAILABLE`, exit 2), so the change dir is never made
+/// and nothing remains.
 #[cfg(unix)]
 #[test]
-fn change_new_leaves_nothing_behind_when_the_first_record_write_fails() {
+fn change_new_leaves_nothing_behind_when_the_subject_store_is_read_only() {
     let dir = inited_repo_with_subject();
     let ledger_subject = dir.path().join(".canon/ledger/kind=subject");
     if !make_read_only(&ledger_subject) {
@@ -254,29 +255,31 @@ fn change_new_leaves_nothing_behind_when_the_first_record_write_fails() {
     }
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     make_writable(&ledger_subject);
-    // The write began and failed (the directory's mode is no preflight target): exit 1, not a refusal.
-    assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
-    assert!(stderr(&out).starts_with("canon: "), "{}", stderr(&out));
-    assert!(stderr(&out).contains("failed to record the adoption") && stderr(&out).contains("nothing was written"), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(stderr(&out).starts_with("canon: WRITE_UNAVAILABLE: cannot write `"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("kind=subject"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
-    assert!(!dir.path().join(".canon/changes").exists(), "the changes dir this run created is removed again");
+    assert!(!dir.path().join(".canon/changes").exists(), "no change dir was started");
     assert_nothing_left(dir.path());
 }
 
 /// The second record write (the change) fails after the subject was
-/// written: the subject record and the change dir stay, and the printed
-/// repair completes the link and is a no-op when run again.
+/// written: the subject record and the change dir stay, the run is exit 1
+/// (`CHANGE_ADOPTION_INCOMPLETE`, a failure after the work began), and the
+/// printed repair completes the link and is a no-op when run again. A file
+/// where the change store's directory belongs passes the up-front check (it
+/// is not read-only) and fails the write itself.
 #[cfg(unix)]
 #[test]
 fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_link() {
     let dir = inited_repo_with_subject();
     let ledger_change = dir.path().join(".canon/ledger/kind=change");
-    if !make_read_only(&ledger_change) {
-        return;
-    }
+    let _ = std::fs::remove_dir_all(&ledger_change);
+    std::fs::write(&ledger_change, "not a directory\n").unwrap();
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
-    make_writable(&ledger_change);
-    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    std::fs::remove_file(&ledger_change).unwrap();
+    assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
+    assert!(stderr(&out).starts_with("canon: CHANGE_ADOPTION_INCOMPLETE: "), "{}", stderr(&out));
     assert!(
         stderr(&out).contains("subject `auth` now lists change `add-login`, but the change record could not be written")
             && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt auth --change add-login`"),

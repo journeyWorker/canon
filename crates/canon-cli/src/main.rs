@@ -53,6 +53,10 @@ fn install_panic_hook() {
 /// `--json` anywhere before the first `--` is moved to the end of the words before it, so the leaf
 /// that takes it sees it wherever the caller put it (`canon --json status`, `canon status --json`).
 fn relocate_json(args: Vec<OsString>) -> Vec<OsString> {
+    // `canon help <command>` explains a command in text; `--json` there is not a word to explain.
+    if args.iter().skip(1).take_while(|arg| *arg != "--").find(|arg| !arg.to_string_lossy().starts_with('-')).is_some_and(|word| word == "help") {
+        return args.into_iter().filter(|arg| arg != "--json").collect();
+    }
     let end = args.iter().skip(1).position(|arg| arg == "--").map_or(args.len(), |at| at + 1);
     if !args[1..end].iter().any(|arg| arg == "--json") {
         return args;

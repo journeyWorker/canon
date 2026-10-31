@@ -32,6 +32,7 @@ fn compile(text: &str) -> Validator {
 }
 
 static ENVELOPE: LazyLock<Validator> = LazyLock::new(|| compile(ENVELOPE_SCHEMA));
+static ERROR: LazyLock<Validator> = LazyLock::new(|| compile(ERROR_SCHEMA));
 static REGISTRY_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(REGISTRY_ENTRY_SCHEMA));
 
 fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
@@ -42,6 +43,11 @@ fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
 /// empty when the document is a conforming envelope.
 pub fn envelope_problems(document: &Value) -> Vec<String> {
     problems_of(&ENVELOPE, document)
+}
+
+/// What breaks the error-object schema in `error` (the `error` member of a failure envelope), empty when it conforms.
+pub fn error_problems(error: &Value) -> Vec<String> {
+    problems_of(&ERROR, error)
 }
 
 /// What breaks the registry-entry schema in `row`, empty when it conforms.
@@ -63,17 +69,31 @@ mod tests {
     /// The digests of the files as the atip repository published them. A
     /// changed copy fails here; re-vendoring updates the file and its digest
     /// together.
+    const ENVELOPE_DIGEST: &str = "055ace2ffb10eddba2c62fdff63155a83be4a8c1ba6ece73f6922f561ac8b299";
+    const ERROR_DIGEST: &str = "49afaa3bf93d848b1e477b19b3969680b4a0818e46dbdc6c54db248d4ecfdcfb";
+    const REGISTRY_ENTRY_DIGEST: &str = "411228ac4a2cc79ef4079161e9d015c5352bca49953aa33bf7007d0b100daedc";
+
     #[test]
     fn atip_l0_07_the_vendored_schemas_are_the_published_bytes() {
-        assert_eq!(digest(ENVELOPE_SCHEMA), "055ace2ffb10eddba2c62fdff63155a83be4a8c1ba6ece73f6922f561ac8b299");
-        assert_eq!(digest(ERROR_SCHEMA), "49afaa3bf93d848b1e477b19b3969680b4a0818e46dbdc6c54db248d4ecfdcfb");
-        assert_eq!(digest(REGISTRY_ENTRY_SCHEMA), "411228ac4a2cc79ef4079161e9d015c5352bca49953aa33bf7007d0b100daedc");
+        assert_eq!(digest(ENVELOPE_SCHEMA), ENVELOPE_DIGEST);
+        assert_eq!(digest(ERROR_SCHEMA), ERROR_DIGEST);
+        assert_eq!(digest(REGISTRY_ENTRY_SCHEMA), REGISTRY_ENTRY_DIGEST);
+    }
+
+    /// A copy with one character changed no longer matches the pin: the pin test above would fail on it.
+    #[test]
+    fn atip_l0_07_one_changed_character_fails_the_pin() {
+        let changed = ENVELOPE_SCHEMA.replacen("atip/1 envelope", "atip/1 envelopf", 1);
+        assert_ne!(changed, ENVELOPE_SCHEMA, "the edit changed the copy");
+        assert_ne!(digest(&changed), ENVELOPE_DIGEST);
     }
 
     #[test]
-    fn atip_l0_07_one_changed_character_changes_the_digest() {
-        let changed = ENVELOPE_SCHEMA.replacen("atip/1 envelope", "atip/1 envelopf", 1);
-        assert_ne!(digest(&changed), digest(ENVELOPE_SCHEMA));
+    fn an_error_object_with_a_tool_extension_passes_and_one_with_an_empty_member_does_not() {
+        let with_extension = json!({ "code": "INPUT_INVALID", "message": "m", "retryable": false, "field": "--input", "x-canon": { "reason": "tty" } });
+        assert_eq!(error_problems(&with_extension), Vec::<String>::new());
+        assert!(!error_problems(&json!({ "code": "USAGE", "message": "m", "retryable": false, "hint": "" })).is_empty());
+        assert!(!error_problems(&json!({ "code": "USAGE", "message": "m", "retryable": false, "unknown": 1 })).is_empty());
     }
 
     fn meta() -> Value {

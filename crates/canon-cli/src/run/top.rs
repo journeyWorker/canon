@@ -225,7 +225,16 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
             ExitCode::SUCCESS
         }
         Err(e) => {
-            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --role and --regime (`canon regime show` prints a valid key) and that the ledger is readable").emit("canon retrieve", json))
+            use crate::retrieve::RetrieveCliError as E;
+            // How the call scopes the retrieval is its usage; only a regime key that cannot be derived is the retrieval's own failure.
+            let error = match &e {
+                E::NoScope => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>, or --regime <KEY> (`canon regime show` prints a valid key)"),
+                E::ScopeConflict => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("pass --regime or --domain, not both"),
+                E::SubjectWithoutDomain => CliError::refused("USAGE", e.to_string()).field("--subject").hint("add --domain <DOMAIN>, or drop --subject"),
+                E::RoleRegimeMismatch { regime_role, .. } => CliError::refused("USAGE", e.to_string()).field("--regime").received(regime_role.clone()).hint("pass the same role to --for-role and --regime (`canon regime show` prints a valid key)"),
+                E::DerivationFailed { .. } => CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name"),
+            };
+            ExitCode::from(error.emit("canon retrieve", json))
         }
     }
 }
@@ -299,6 +308,10 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     }
 
     if let Some(dir) = snapshot_dir {
+        // The snapshot is written into `dir` (created when absent): a directory that cannot take it is refused first.
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[dir], "canon report snapshot", json) {
+            return ExitCode::from(code);
+        }
         return match crate::report::snapshot(&inputs, dir) {
             Ok(manifest) => {
                 crate::say!(json, "canon report snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
@@ -350,6 +363,7 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
             }
             ExitCode::SUCCESS
         }
+        Err(crate::report::BuildError::Unavailable(error)) => ExitCode::from(error.emit("canon report build", json)),
         Err(err) => {
             ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report build", json))
         }

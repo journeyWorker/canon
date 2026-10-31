@@ -97,6 +97,7 @@ fn context_keeps_only_the_named_sections() {
 
     let out = run(dir.path(), &["context", "--json", "--fields", "nope"]);
     assert_eq!((out.status.code(), body(&out)["error"]["code"].clone()), (Some(2), Value::from("USAGE")));
+    assert_eq!(body(&out)["error"]["field"], "--fields", "the refusal names the option");
 
     // Without --json the refusal is the same exit code.
     let out = run(dir.path(), &["context", "--fields", "nope"]);

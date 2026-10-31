@@ -16,7 +16,7 @@ use std::path::Path;
 use std::process::Command;
 
 use canon_learn::{
-    demote_strategy, manifest_guidance_for_replay, retrieve_guidance, DemotionPolicy, ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields,
+    demote_strategy, manifest_guidance_for_replay, DemotionPolicy, ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields,
     StrategyStore, TrajectoryId,
 };
 use canon_model::ids::{RegimeKey, RoleId};
@@ -101,22 +101,40 @@ fn a_recorded_manifest_replays_verbatim_even_after_the_source_is_demoted() {
 
     let summary = dispatch_begin(dir.path());
     let manifest_path = summary["manifest"].as_str().unwrap().to_string();
-    let run: Run = serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    let before_bytes = std::fs::read(&manifest_path).unwrap();
+    let run: Run = serde_json::from_slice(&before_bytes).unwrap();
     assert_eq!(run.injected_guidance.len(), 1, "guidance recorded at dispatch time");
+
+    // Before the demotion the CLI retrieval returns the strategy.
+    let retrieve = |repo: &Path| -> Vec<serde_json::Value> {
+        let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+            .args(["retrieve", "--for-role", "dev", "--regime", REGIME, "--json", "--repo"])
+            .arg(repo)
+            .output()
+            .expect("spawn canon retrieve");
+        assert!(output.status.success(), "canon retrieve must exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
+        let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("one JSON document");
+        body["data"].as_array().expect("data is the guidance array").clone()
+    };
+    assert_eq!(retrieve(dir.path()).len(), 1, "before the demotion the live store returns the strategy");
 
     // Mutate the store AFTER the dispatch: demote the source strategy.
     let store = strategy_store(dir.path());
     let git_tier_root = dir.path().join(".canon").join("strategies");
     demote_strategy(&store, id, TrajectoryId::new(), &git_tier_root, DemotionPolicy::SOFT_FLAG).unwrap();
 
-    // 4.3 new-retrieval half: a FRESH retrieval now excludes the demoted strategy.
-    let fresh = retrieve_guidance(&store, &RoleId::parse("dev").unwrap(), &RegimeKey::parse(REGIME).unwrap(), None);
-    assert!(fresh.is_empty(), "a fresh retrieval must exclude the demoted strategy, got {fresh:?}");
+    // 4.3 new-retrieval half: a FRESH retrieval through the CLI now excludes the demoted strategy.
+    let fresh = retrieve(dir.path());
+    assert!(fresh.is_empty(), "a fresh `canon retrieve` must exclude the demoted strategy, got {fresh:?}");
 
-    // 4.2 + 4.3 old-manifest half: the recorded manifest still replays it verbatim.
-    let replayed = manifest_guidance_for_replay(&run);
-    assert_eq!(replayed, run.injected_guidance, "replay returns the recorded snapshot unchanged");
-    assert_eq!(replayed.len(), 1, "the demotion never perturbs an already-written manifest");
+    // 4.2 + 4.3 old-manifest half: re-read the manifest from disk AFTER the demotion.
+    let after_bytes = std::fs::read(&manifest_path).unwrap();
+    assert_eq!(after_bytes, before_bytes, "the demotion never perturbs a manifest already written (byte-identical on disk)");
+    let reread: Run = serde_json::from_slice(&after_bytes).unwrap();
+    let replayed = manifest_guidance_for_replay(&reread);
+    assert_eq!(replayed, run.injected_guidance, "replay of the re-read manifest returns the recorded snapshot unchanged");
+    assert_eq!(serde_json::to_value(&replayed).unwrap(), summary["injectedGuidance"], "and it equals what dispatch reported");
+    assert_eq!(replayed.len(), 1, "still one item");
     assert_eq!(replayed[0].content, "prefer the boring, correct option");
 }
 

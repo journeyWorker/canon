@@ -259,6 +259,18 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
         let plan = Plan::new(purge_effects(&preflight, &keys, learn_keys.as_deref()));
         let commit = plan.gate(mode, base).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        // Deleting touches every rung the kind lives in, and a committed run appends an audit line: each must take the change before the first removal. A plan that removes nothing writes nothing and is not refused.
+        if commit && (preflight.rungs.iter().any(|rung| rung.matched > 0) || learn_preflight.unwrap_or(0) > 0) {
+            let mut targets = crate::write_mode::resident_targets(&yaml, kind);
+            targets.extend(audit_path(repo));
+            if learn_store.is_some() {
+                let learn = LearnConfig::from_manifest(&fs::read_to_string(&yaml).unwrap_or_default()).ok();
+                targets.extend(learn.map(|config| yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(repo).join(&config.root).join("trajectories")));
+            }
+            for target in &targets {
+                crate::write_mode::check_writable(target).map_err(|cause| RetentionError::Refusal(Box::new(crate::write_mode::unavailable(target, &cause))))?;
+            }
+        }
         deleting.set(commit);
         // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
         let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
@@ -490,6 +502,10 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         // The destination is checked before anything is written, for a preview as for a run: an output that cannot be created refuses with nothing written and no audit line.
         if let Some(path) = out.filter(|path| !fs::read(path).is_ok_and(|held| held == encoded)) {
             crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(path, &e)))?;
+        }
+        // A real run appends one audit line; a repo whose audit file cannot take it is refused the same way. A preview appends none.
+        if let Some(path) = audit_path(repo).filter(|_| !dry_run) {
+            crate::write_mode::check_writable(&path).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(&path, &e)))?;
         }
         if dry_run {
             if json_output {

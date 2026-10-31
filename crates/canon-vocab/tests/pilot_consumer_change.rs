@@ -62,6 +62,16 @@ fn the_pilot_atom_compiles_to_the_s1_task_model_and_round_trips() {
 /// domain, not merely "some string" — the whole point of design.md D4.
 #[test]
 fn the_pilot_atoms_declared_evidence_kind_is_in_the_real_policy_derived_domain() {
-    let (snapshot, _) = canon_vocab::resolve_snapshot(&repo_root(), None);
-    assert!(snapshot.evidence_kinds.contains(&"test-run".to_string()), "evidence_kinds: {:?}", snapshot.evidence_kinds);
+    let (snapshot, diags) = canon_vocab::resolve_snapshot(&repo_root(), None);
+    assert!(diags.is_empty(), "the real repo's vocabulary must resolve clean: {diags:?}");
+
+    // What the pilot atom declares, read from the atom file itself.
+    let atoms = canon_vocab::atom::parse_atoms_file(&pilot_atoms_file()).expect("the pilot's tasks.vocab.yaml parses");
+    assert_eq!(atoms.len(), 1);
+    let evidence = atoms[0].attrs.get("evidence").expect("the pilot atom declares an evidence requirement");
+    let kind = evidence.get("kind").and_then(serde_yaml::Value::as_str).expect("the evidence requirement names a kind").to_string();
+    assert!(!kind.is_empty());
+    assert_eq!(evidence.get("ref").and_then(serde_yaml::Value::as_str), Some("cargo test -p canon-vocab policy_bridge"), "the requirement also carries its ref");
+
+    assert!(snapshot.evidence_kinds.contains(&kind), "the pilot's declared evidence kind `{kind}` must be in the policy-derived domain: {:?}", snapshot.evidence_kinds);
 }

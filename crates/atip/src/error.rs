@@ -28,8 +28,11 @@
 //! ([`EXIT_REFUSED`]). Nothing else is a registry exit; a signal exit (128+n)
 //! is outside the registry.
 
+use std::collections::BTreeMap;
+
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde_json::Value;
 
 /// A finding, a failed check or an operational failure.
 pub const EXIT_FAILED: u8 = 1;
@@ -84,6 +87,8 @@ struct CliErrorDetail {
     received: Option<String>,
     /// The nearest valid words, closest first.
     suggestions: Vec<String>,
+    /// Tool extension members of the error object (`x-<tool>`, spec 7.1): name and value.
+    extensions: BTreeMap<String, Value>,
 }
 
 /// The `error` member of a failure envelope. Field order is the document
@@ -112,6 +117,10 @@ pub struct ErrorBody {
     /// A working invocation or the next step.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
+    /// The tool's own members (`x-canon`); the contract's error schema allows any `x-<tool>` member.
+    #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, Value>,
 }
 
 impl CliError {
@@ -179,6 +188,17 @@ impl CliError {
         self
     }
 
+    /// Sets the tool extension member `name` (`x-canon`) of the error object to `value`.
+    pub fn extension(mut self, name: impl Into<String>, value: Value) -> Self {
+        self.detail_mut().extensions.insert(name.into(), value);
+        self
+    }
+
+    /// The tool extension members the error carries, by name.
+    pub fn extensions(&self) -> Option<&BTreeMap<String, Value>> {
+        self.detail.as_deref().map(|detail| &detail.extensions).filter(|extensions| !extensions.is_empty())
+    }
+
     /// Replaces the nearest-word suggestions.
     pub fn suggestions<I, S>(mut self, suggestions: I) -> Self
     where
@@ -219,11 +239,12 @@ impl CliError {
             code: self.code.to_string(),
             message: self.message.clone(),
             retryable: self.retryable,
-            field,
+            field: field.filter(|field| !field.is_empty()),
             expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
-            received: self.received_value().map(|received| redact(self.field_name(), received)),
+            received: self.received_value().filter(|received| !received.is_empty()).map(|received| redact(self.field_name(), received)),
             suggestions,
-            hint: self.hint_text().map(str::to_string),
+            hint: self.hint_text().filter(|hint| !hint.is_empty()).map(str::to_string),
+            extensions: self.extensions().cloned().unwrap_or_default(),
         }
     }
 }

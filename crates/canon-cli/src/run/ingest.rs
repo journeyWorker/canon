@@ -69,6 +69,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
             Err(err) => {
                 let error = match &err {
                     crate::ingest::IngestError::Config(message) => CliError::refused("CONFIG_UNREADABLE", message.clone()).hint("fix the `ingest:` section of canon.yaml the message names, then run the command again"),
+                    crate::ingest::IngestError::Unavailable(error) => error.clone(),
                     _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
                 };
                 return ExitCode::from(error.emit("canon ingest sessions", json));
@@ -105,7 +106,11 @@ fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, d
                 }
             }
             Err(err) => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest records", json));
+                let error = match &err {
+                    crate::artifact_ingest::ArtifactIngestError::Unavailable(error) => error.clone(),
+                    _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
+                };
+                return ExitCode::from(error.emit("canon ingest records", json));
             }
         }
         if !watch {
@@ -166,7 +171,11 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
             if outcome.non_clean_sources.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest plans", json))
+            let error = match &err {
+                crate::plans::PlansError::Unavailable(error) => error.clone(),
+                _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
+            };
+            ExitCode::from(error.emit("canon ingest plans", json))
         }
     }
 }

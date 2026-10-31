@@ -445,7 +445,8 @@ fn context_capability_37_a_bare_group_is_exit_two_with_the_leaf_to_run() {
         assert_eq!(out.status.code(), Some(2), "{args:?}");
         assert!(stderr(&out).is_empty(), "{args:?}: {}", stderr(&out));
         let error = json_of(&out)["error"].clone();
-        assert_eq!(error["code"], if replacement.is_empty() { "COMMAND_REQUIRED" } else { "USAGE" }, "{error}");
+        // A group is never runnable bare: COMMAND_REQUIRED, with the 0.28 replacement in the hint where there was one.
+        assert_eq!(error["code"], "COMMAND_REQUIRED", "{error}");
         if replacement.is_empty() {
             // A group that never ran bare asks for its command: still exit 2, still a hint, and the commands it has.
             assert!(error["hint"].as_str().is_some_and(|h| !h.is_empty()), "{error}");
@@ -455,6 +456,7 @@ fn context_capability_37_a_bare_group_is_exit_two_with_the_leaf_to_run() {
         }
         let named = calls(error["hint"].as_str().unwrap_or_default());
         assert!(named.iter().any(|c| c == replacement), "{args:?}: the hint names `{replacement}`: {error}");
+        assert_eq!(error["field"], "command", "{error}");
         parses(dir.path(), replacement);
     }
 }

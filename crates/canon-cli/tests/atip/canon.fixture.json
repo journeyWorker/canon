@@ -157,9 +157,9 @@
     },
     {
       "code": "CHANGE_ADOPTION_INCOMPLETE",
-      "exit": 2,
-      "fix": "Run the repair command named in the hint to link the change to its subject.",
-      "meaning": "the change was written but its subject link was not; the hint names the repair",
+      "exit": 1,
+      "fix": "Run the repair command named in the hint to finish the link between the change and its subject.",
+      "meaning": "an adoption or unlink stopped between its two records, after the first was written, so the subject and the change disagree about their link; the hint names the command that finishes it",
       "retryable": false
     },
     {
@@ -698,7 +698,7 @@
       "code": "INPUT_INVALID",
       "exit": 2,
       "fix": "Pass one JSON object, a JSON array, or a file or `-` with one object per line, using only the keys `canon schema <command> --json` lists under `inputs`; `canon schema <command> --json` shows an example.",
-      "meaning": "`--input` cannot be read or framed (empty, not JSON or NDJSON, a file or stdin that cannot be read, stdin a terminal, an array on a leaf that takes one object) or the document breaks its fragment schema (an unknown key, a value of the wrong type, null); `field` and the message say which",
+      "meaning": "`--input` cannot be read or framed (empty, not JSON or NDJSON, a file or stdin that cannot be read, stdin a terminal, an array on a leaf that takes one object) or the document breaks its fragment schema (an unknown key, a value of the wrong type, null); `field` is `--input` for a fault in the value itself and carries `x-canon.reason` (`unreadable`, `tty`, `empty`, `syntax` or `batch-unsupported`), and is a JSON pointer with no reason for a fault in the document",
       "retryable": false
     },
     {
@@ -899,9 +899,9 @@
     },
     {
       "code": "MIGRATE_STOPPED",
-      "exit": 2,
+      "exit": 1,
       "fix": "Run `canon migrate` again to finish the rest.",
-      "meaning": "`migrate` stopped partway; running it again finishes the rest",
+      "meaning": "`migrate` stopped partway, after it had begun changing the repo; running it again finishes the rest",
       "retryable": false
     },
     {
@@ -1194,8 +1194,8 @@
     {
       "code": "RETRIEVE_FAILED",
       "exit": 2,
-      "fix": "Check --role and --regime (`canon regime show` prints a valid key), or pass exactly one of --regime and --domain, then run the retrieval again.",
-      "meaning": "`retrieve` could not start: --role disagrees with --regime, the scope flags conflict or are missing, or the domain/subject cannot be turned into a regime; a store outage is not an error here, it serves empty guidance (exit 0)",
+      "fix": "Check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name, then run the retrieval again.",
+      "meaning": "`retrieve` could not start: the domain/subject cannot be turned into a regime key (the scope flags that conflict, are missing or disagree with --role are `USAGE`); a store outage is not an error here, it serves empty guidance (exit 0)",
       "retryable": false
     },
     {
@@ -1552,7 +1552,7 @@
       "code": "USAGE",
       "exit": 2,
       "fix": "Run the command with --help and correct the argument `field` names; `expected` lists the valid values when there is a closed set.",
-      "meaning": "the command line did not parse or breaks a constraint: an unknown option, a missing or malformed value, an unexpected operand, a `--fields` name that cannot be selected, `--input -` beside another option that reads stdin; `field` names the argument",
+      "meaning": "the command line did not parse or breaks a constraint: an unknown option, a missing or malformed value, an unexpected operand, a `--fields` name that cannot be selected, `--input` given twice or without a value, `--input -` beside another option that reads stdin, a retrieval scoped by neither or both of `--regime` and `--domain`; `field` names the argument",
       "retryable": false
     },
     {

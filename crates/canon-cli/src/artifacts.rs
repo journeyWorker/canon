@@ -86,6 +86,17 @@ pub(crate) fn evidence_store_code(e: &ArtifactStoreError) -> &'static str {
     }
 }
 
+/// What a store of bound files writes first: the repo's artifact-store lock and,
+/// for the local store, the blob directory. An object store has no local
+/// directory; reaching it is [`store_error`]'s `ARTIFACTS_STORE_UNREACHABLE`.
+pub(crate) fn store_targets(repo: &Path) -> Vec<PathBuf> {
+    let mut targets = vec![repo.join(canon_model::paths::ARTIFACT_STORE_LOCK_FILE)];
+    if ArtifactStore::open(repo).is_ok_and(|store| store.is_local()) {
+        targets.push(store_dir(repo));
+    }
+    targets
+}
+
 /// `canon artifacts verify`.
 pub fn run_verify(repo: &Path, full: bool, json: bool) -> u8 {
     const CMD: &str = "canon artifacts verify";
@@ -349,7 +360,9 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     // A commit rewrites canon.yaml and .gitignore after its uploads: refuse a read-only one before anything is uploaded.
     if matches!(mode, Mode::Commit(_)) {
         let (yaml, gitignore) = (repo.join("canon.yaml"), repo.join(".gitignore"));
-        let mut targets: Vec<&Path> = Vec::new();
+        // The move also takes the store lock and removes the local blobs after uploading them.
+        let (lock, blobs) = (repo.join(canon_model::paths::ARTIFACT_STORE_LOCK_FILE), store_dir(&repo));
+        let mut targets: Vec<&Path> = vec![lock.as_path(), blobs.as_path()];
         if new_yaml.is_some() {
             targets.push(&yaml);
         }

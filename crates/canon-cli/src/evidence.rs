@@ -1138,7 +1138,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
 
     // The staging directory (and, with --promote, the ledger) must be writable before a bound blob is stored.
     let staging_dir = evidence_staging_dir(&ledger_root);
-    let targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), ledger_root.as_path()] } else { vec![staging_dir.as_path()] };
+    let store_targets = if bound.files.is_empty() { Vec::new() } else { crate::artifacts::store_targets(&repo) };
+    let mut targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), ledger_root.as_path()] } else { vec![staging_dir.as_path()] };
+    targets.extend(store_targets.iter().map(PathBuf::as_path));
     if let Some(code) = crate::write_mode::refuse_unwritable(&targets, &args.full(), args.json) {
         return code;
     }
@@ -1748,6 +1750,14 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     let max_bytes = max_artifact_mib.saturating_mul(MIB);
     let (mut stored, mut already) = (Vec::new(), 0usize);
     let mut missing = Vec::new();
+    // The lock and (for the local store) the blob directory must take a blob before the lock file is created: refused first, nothing changed.
+    if !files.is_empty() && !dry_run {
+        let targets = crate::artifacts::store_targets(&repo);
+        let targets: Vec<&Path> = targets.iter().map(PathBuf::as_path).collect();
+        if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon artifacts store", json) {
+            return code;
+        }
+    }
     // One hold of the store lock for the whole pass, so "already
     // stored" is never decided while another writer may still roll back.
     // Nothing to store takes no lock.

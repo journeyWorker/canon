@@ -191,6 +191,8 @@ fn evidence_add_refuses_a_bound_file_over_the_size_limit_and_names_the_override(
     assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
     assert!(text(&refused).contains("--max-artifact-mib"), "{}", text(&refused));
     assert!(committed_records(repo).is_empty() && !repo.join(".canon/artifacts").exists(), "a refused add writes nothing");
+    let staged = repo.join(".canon/ledger/_staging");
+    assert!(!staged.exists() || std::fs::read_dir(&staged).unwrap().next().is_none(), "a refused add stages nothing");
 
     let raised = attest(repo, &["--artifact", "trace.bin", "--max-artifact-mib", "2"]);
     assert!(raised.status.success(), "{}", text(&raised));

@@ -199,17 +199,57 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     assert_eq!(store.find_by_id(&id).unwrap().unwrap().lifecycle, Some(StrategyLifecycle::Active), "the warm-tier candidate is now active");
 }
 
+/// Every file under `root`, relative and sorted, with its length: a before/after listing.
+fn listing(root: &Path) -> Vec<(std::path::PathBuf, u64)> {
+    fn walk(base: &Path, dir: &Path, out: &mut Vec<(std::path::PathBuf, u64)>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(base, &path, out);
+            } else {
+                out.push((path.strip_prefix(base).unwrap().to_path_buf(), std::fs::metadata(&path).unwrap().len()));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, root, &mut out);
+    out.sort();
+    out
+}
+
 #[test]
 fn dry_run_previews_without_writing_the_git_tier_file() {
     let dir = tempfile::tempdir().unwrap();
-    let id = seed_strategy(dir.path(), "no side effects on a dry run");
+    let private_key = pin_approval_signer(dir.path());
+    let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
+    let candidate = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: fixture_regime(), role: dev_role(), title: "review guidance".into(), description: "one-liner".into(), content: "no side effects on a dry run".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
+    .with_lifecycle(StrategyLifecycle::Quarantined);
+    store.append(&candidate).expect("seed strategy");
+    let id = candidate.id;
     seed_proven_regime(dir.path());
+    let target = git_tier_file(dir.path(), &id);
+    let before = listing(dir.path());
+    assert!(before.iter().any(|(path, _)| path.starts_with(".canon/learn")), "the seeded warm-tier state is in the listing: {before:?}");
 
     let output = run_promote(dir.path(), &id, &["--dry-run"]);
     assert!(output.status.success(), "dry-run must exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
 
-    assert!(!git_tier_file(dir.path(), &id).exists(), "--dry-run must NOT write the git-tier file");
-    assert!(String::from_utf8_lossy(&output.stdout).contains("[dry-run]"), "dry-run output is labeled");
+    // It shows what it would write: the exact git-tier path.
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    assert_eq!(stdout.trim(), format!("[dry-run] would promote {id} -> {}", target.display()), "dry-run names the file it would write");
+    // And writes nothing: no git-tier file or directory, and the whole tree is unchanged.
+    assert!(!target.exists(), "--dry-run must NOT write the git-tier file");
+    assert!(!dir.path().join(".canon").join("strategies").exists(), "no git-tracked strategies tier was created");
+    assert_eq!(listing(dir.path()), before, "the repo listing is identical before and after the dry run");
+
+    // The Given holds: with its paired evaluation and verified approval (the gate's other half) the same
+    // strategy is promoted, and the real run writes exactly the file the preview named.
+    let (evaluation_path, approval_path, _, _) = write_approved_bundle(dir.path(), &candidate, &private_key);
+    let real = run_promote(dir.path(), &id, &["--evaluation", evaluation_path.to_str().unwrap(), "--approval", approval_path.to_str().unwrap()]);
+    assert!(real.status.success(), "the same strategy passes the gate without --dry-run; stderr: {}", String::from_utf8_lossy(&real.stderr));
+    assert_eq!(String::from_utf8_lossy(&real.stdout).trim(), format!("promoted {id} -> {}", target.display()));
+    assert!(target.is_file(), "the real run wrote the previewed file");
 }
 
 #[test]

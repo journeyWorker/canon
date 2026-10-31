@@ -37,11 +37,11 @@ Every report of a command that writes, and `canon status`, gained the optional m
 | Call | 0.32 | 0.33 |
 |---|---|---|
 | an unknown command | `USAGE` (clap's text in text mode) | `UNKNOWN_COMMAND`, `field` `command`, `expected` the valid words, `received`, `suggestions` |
-| no command (`canon`, `canon finding`) | `USAGE` | `COMMAND_REQUIRED`, `expected` the commands of that level |
+| no command (`canon`, `canon finding`, `canon brief`, `canon report`) | `USAGE` | `COMMAND_REQUIRED`, `expected` the commands of that level (for `brief` and `report` the 0.28 removed-spelling message is the hint) |
 | an unknown option, a missing value, a bad `--fields` name | `USAGE`, or `UNKNOWN_FIELD` for `--fields` | `USAGE`, `field` the argument; a bad `--fields` name lists the selectable fields in `expected` |
 | a bug (panic) | exit 101 | `INTERNAL`, exit 1, the message says how to report it; a closed stdout still ends the process by SIGPIPE (a signal exit, outside the registry) |
 
-In text mode every error leaves stdout empty and opens stderr with `canon: <CODE>: <message>`, then indented `field:`, `expected:`, `suggestions:` and `hint:` lines (it was `canon <command path>: <CODE> — <message>` and `hint: …`).
+In text mode every refusal leaves stdout empty and opens stderr with `canon: <CODE>: <message>`, then indented `field:`, `expected:`, `suggestions:` and `hint:` lines (it was `canon <command path>: <CODE> — <message>` and `hint: …`). A failure that carries a human report (exit 1: `canon gate check` red, `canon brief check` with blockers) still prints that report on stdout and no error line, since the report is the answer; the contract's 7.4.1 form is RECOMMENDED, not required.
 
 **Error codes.** The old names are deleted.
 
@@ -49,8 +49,9 @@ In text mode every error leaves stdout empty and opens stderr with `canon: <CODE
 |---|---|---|
 | `PLAN_CHANGED` | `PLAN_STALE` | 2 |
 | `INPUT_ELEMENT_FAILED` | `BATCH_INCOMPLETE` (data shape and pointers unchanged; a crashed element's own error is `INTERNAL`) | 1 |
-| `INPUT_BATCH_UNSUPPORTED`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`, `INPUT_UNREADABLE`, `INPUT_STDIN_TTY` | `INPUT_INVALID` (the difference stays in `message` and `field`; `field` of a terminal stdin is `--input`) | 2 |
+| `INPUT_BATCH_UNSUPPORTED`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`, `INPUT_UNREADABLE`, `INPUT_STDIN_TTY` | `INPUT_INVALID`. A fault in the value of `--input` itself has `field` `--input` and `error.x-canon.reason`: `unreadable`, `tty`, `empty`, `syntax` or `batch-unsupported` (the contract's one code cannot say which; splitting the code is an atip/2 candidate). A fault in the document against its fragment schema has a JSON pointer `field` and no reason | 2 |
 | `INPUT_STDIN_CONFLICT` | `USAGE`, `field` `--input` | 2 |
+| `--input` given twice or without a value (was `INPUT_INVALID`) | `USAGE`, `field` `--input` | 2 |
 | `INPUT_INVALID`, `INPUT_CONFLICT`, `INPUT_TOO_LARGE` | unchanged | 2 |
 | `INVALID_CURSOR` | `CURSOR_INVALID` (`field` `--cursor`) | 2 |
 | `UNKNOWN_FIELD` | `USAGE`, `field` `--fields` | 2 |
@@ -61,9 +62,9 @@ In text mode every error leaves stdout empty and opens stderr with `canon: <CODE
 
 **Exit codes** now come from the code's registry row alone (`canon schema --errors --json`); nothing sets an exit at a call site, and only 0, 1 and 2 exist (signal exits 128+n are outside the registry). Exit 1: the command ran and its answer is negative or incomplete; exit 2: it refused to run. `canon subject move` blocked by a gate violation, `canon brief approve` and `canon evidence add` batches, `canon adapter` and the batch runner no longer compute an exit. `POLICY_APPROVAL_UNREADABLE` is exit 1 (it was registered 2 but `subject move` returned 1). `BRIEF_UNREADABLE` read during `canon brief approve`'s check is exit 2 (it was 1).
 
-`WRITE_FAILED` is exit 1 (a write that began and failed). The same failure known before the first write (a target that cannot be written) is the new `WRITE_UNAVAILABLE`, exit 2, with nothing changed; `change new`, `feature new`, `scenario new`, `demo review`, `divergence add`/`accept`, `evidence add`, `finding add`/`close`, `task done`, `gate install-hooks`, `init`, `migrate`, `artifacts move`, `brief approve`, `policy approve`, `export` and `review` check it up front.
+`WRITE_FAILED` is exit 1 (a write that began and failed). The same failure known before the first write (a target that cannot be written) is the new `WRITE_UNAVAILABLE`, exit 2, with nothing changed, and the message names the path. Every command that writes checks it up front (the helper is `write_mode.rs`): `subject new/move/adopt/unadopt`, `change new`, `feature new`, `scenario new`, `inventory sync`, `ingest plans/sessions/records`, `report build/snapshot`, `dispatch begin/end`, `context-pack add`, `prompt add`, `plugin sync`, `gate promote`, `gate install-hooks`, `divergence add/accept/defer/resolve`, `ledger compact`, `tier age`, `purge`, `export`, `strategy promote/rollback`, `artifacts store/move`, `skills install`, `evidence add`/`audit`, `finding add/close`, `review`, `task done`, `init`, `demo init/review`, `migrate`, `brief approve` and `policy approve`. A store with its own precondition code keeps it (`ARTIFACTS_STORE_UNREACHABLE`, `EVIDENCE_STORE_UNAVAILABLE`). `ingest plans` now refuses on a read-only repo even when it would have written nothing, because opening its store creates `hot.db`. `canon retrieve` scoped by neither or both of `--regime` and `--domain` (and a `--for-role` that disagrees with `--regime`) is `USAGE` with `field` now; `RETRIEVE_FAILED` stays for a regime key that cannot be derived.
 
-The thirteen exit-2 codes named for a failure during the work, decided one by one (a: the same failure can happen before and during the work, so the code is split; b: only before, stays exit 2; c: only during, becomes exit 1):
+The thirteen exit-2 codes named for a failure during the work (and `WRITE_FAILED`, the fourteenth row), decided one by one (a: the same failure can happen before and during the work, so the code is split; b: only before, stays exit 2; c: only during, becomes exit 1):
 
 | Code | Decision | Split into | Exit |
 |---|---|---|---|
@@ -82,7 +83,7 @@ The thirteen exit-2 codes named for a failure during the work, decided one by on
 | `RETRIEVE_FAILED` | b | only usage and derivation errors; a store outage still degrades to empty guidance and exit 0 | 2 |
 | `WRITE_FAILED` | a | `WRITE_UNAVAILABLE` (2) before, `WRITE_FAILED` (1) during | 2 → 1 |
 
-`MIGRATE_STOPPED` and `CHANGE_ADOPTION_INCOMPLETE` (exit 2, a failure after the work began) were outside the thirteen and are unchanged.
+`MIGRATE_STOPPED` and `CHANGE_ADOPTION_INCOMPLETE` describe work that began, so they are exit 1 now (they were 2): a caller that sees exit 2 may assume nothing changed. A failure between the two records of `canon subject adopt` / `unadopt` is `CHANGE_ADOPTION_INCOMPLETE` (it was `SUBJECT_ADOPT_REFUSED`, exit 2).
 
 **Warning codes.** New, registered with `exit` 1 or 2 and `retryable` false like error codes: `BRIEF_ADOPTION_UNAPPROVED`, `BRIEF_DRAFT_PENDING`, `BRIEF_OVERRIDE_ON_RECORD`, `BRIEF_UNAPPROVED_NOT_ENFORCED`, `DASHBOARD_SNAPSHOT_UNAVAILABLE`, `DISPATCH_DIFF_RECORDS_UNAVAILABLE`, `DISPATCH_RUN_COPIES_DIVERGE`, `DISPATCH_TIER_NOT_PERSISTED`, `LEDGER_KIND_ROUTED_AWAY`, `LEDGER_NO_SCENARIOS`, `LEDGER_RECORDS_UNREADABLE`, `LEDGER_ROLLBACK_NOT_RESTORED`, `LEDGER_UNREADABLE`, `LEGACY_GUIDE_STALE`, `LEGACY_STATE_FOUND`, `OLD_BRIEF_FORMAT_FOUND`, `OLD_LAYOUT_FOUND`, `OVERRIDE_REASON_UNUSED`, `OVERRIDE_RECORDED`, `OVERRIDE_REFUSAL_WAIVED`, `POLICY_MISSING`, `POLICY_NOT_APPROVED`, `POLICY_SPEC_COVERAGE_ABSENT`, `POLICY_SPEC_COVERAGE_INVALID`, `POLICY_UNREADABLE`, `QUERY_PLUGIN_DIAGNOSTIC`, `REFERENCES_UNCHECKED`, `REPORT_TIER_NOT_READ_DIRECTLY`, `RETRIEVE_REGIME_FELL_BACK`, `REVIEW_RECORDS_UNMIGRATED`, `ROLE_UNKNOWN_RECORDED`, `SCENARIO_INDEX_CHECK_FAILED`, `SCENARIO_INDEX_NOT_REFRESHED`, `SCENARIO_INDEX_REFRESHED`, `SCENARIO_SUBJECT_UNKNOWN`, `SEARCH_GITIGNORE_MISSING`, `SEARCH_INDEX_IN_MEMORY`, `SEARCH_INDEX_REBUILT`, `STRATEGY_DEMOTED`, `SUBJECT_OVERRIDE_ON_RECORD`, `SUBJECT_REOPENED`, `TASK_PROOF_IS_CANON_COMMAND`, `TASK_REIMPORT_INCOMPLETE`, `TASK_STATUS_NOT_REFRESHED`, `UNKNOWN_ROLE_IGNORED`, plus the existing `CONFIG_MISSING`, `CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE`, `LAYOUT_MIGRATION_REQUIRED`, `POLICY_APPROVAL_UNREADABLE` and `POLICY_CHANGED_SINCE_APPROVAL` where the same situation was a warning.
 

@@ -410,6 +410,15 @@ fn refused(code: &'static str, message: impl Into<String>, hint: impl Into<Strin
     CliError::refused(code, message).hint(hint)
 }
 
+/// An `INPUT_INVALID` for a fault in the value of `--input` itself (spec of the contract 11.7 steps 1-2):
+/// `field` is `--input`, and `x-canon.reason` says which of the five framing faults it is
+/// (`unreadable`, `tty`, `empty`, `syntax`, `batch-unsupported`), because the contract's one code
+/// cannot tell a caller to re-read a file from fixing JSON. A fault in the document against its fragment
+/// schema has a pointer `field` and no reason.
+fn framing(reason: &'static str, message: impl Into<String>, hint: impl Into<String>) -> CliError {
+    refused("INPUT_INVALID", message, hint).field("--input").extension("x-canon", serde_json::json!({ "reason": reason }))
+}
+
 const SCHEMA_HINT: &str = "`canon schema <command> --json` shows the document keys under `inputs` with an example";
 
 // ---------------------------------------------------------------- the document
@@ -436,11 +445,11 @@ fn too_large(what: &str) -> CliError {
 #[expect(clippy::map_err_ignore, reason = "`refused` takes a message and a hint, no source; the message already says the input is not UTF-8")]
 fn read_capped(reader: impl Read, what: &str) -> Result<String, CliError> {
     let mut bytes = Vec::new();
-    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| refused("INPUT_INVALID", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
+    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| framing("unreadable", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
     if bytes.len() as u64 > MAX_BYTES {
         return Err(too_large(what));
     }
-    String::from_utf8(bytes).map_err(|_| refused("INPUT_INVALID", format!("{what} is not UTF-8 text"), "write the document as UTF-8 JSON"))
+    String::from_utf8(bytes).map_err(|_| framing("unreadable", format!("{what} is not UTF-8 text"), "write the document as UTF-8 JSON"))
 }
 
 fn load(value: &str) -> Result<(String, Source), CliError> {
@@ -452,14 +461,14 @@ fn load(value: &str) -> Result<(String, Source), CliError> {
     }
     if value == "-" {
         if std::io::stdin().is_terminal() {
-            return Err(refused("INPUT_INVALID", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file").field("--input"));
+            return Err(framing("tty", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file"));
         }
         return Ok((read_capped(std::io::stdin().lock(), "stdin")?, Source::Stdin));
     }
     if value.is_empty() {
-        return Err(refused("INPUT_INVALID", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin").field("--input"));
+        return Err(framing("empty", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin"));
     }
-    let file = std::fs::File::open(value).map_err(|e| refused("INPUT_INVALID", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin").field("--input"))?;
+    let file = std::fs::File::open(value).map_err(|e| framing("unreadable", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin"))?;
     if file.metadata().is_ok_and(|m| m.len() > MAX_BYTES) {
         return Err(too_large(&format!("`{value}`")));
     }
@@ -472,8 +481,8 @@ fn frame(text: &str, source: Source) -> Result<Document, CliError> {
         Ok(Value::Object(object)) => Ok(Document::One(object)),
         Ok(Value::Array(items)) if items.len() > MAX_ELEMENTS => Err(too_large(&format!("the array ({} elements)", items.len()))),
         Ok(Value::Array(items)) => Ok(Document::Batch(items)),
-        Ok(_) => Err(refused("INPUT_INVALID", "the document is JSON but not an object or an array of objects", SCHEMA_HINT).field("--input")),
-        Err(error) if source == Source::Inline => Err(refused("INPUT_INVALID", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)").field("--input")),
+        Ok(_) => Err(framing("syntax", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
+        Err(error) if source == Source::Inline => Err(framing("syntax", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")),
         Err(_) => {
             let mut items = Vec::new();
             for (n, line) in text.lines().enumerate() {
@@ -486,11 +495,11 @@ fn frame(text: &str, source: Source) -> Result<Document, CliError> {
                 }
                 match serde_json::from_str::<Value>(line) {
                     Ok(value) => items.push(value),
-                    Err(error) => return Err(refused("INPUT_INVALID", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array").field("--input")),
+                    Err(error) => return Err(framing("syntax", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array")),
                 }
             }
             if items.is_empty() {
-                return Err(refused("INPUT_INVALID", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT).field("--input"));
+                return Err(framing("empty", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT));
             }
             Ok(Document::Batch(items))
         }
@@ -734,15 +743,16 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     let command_name = leaf.command();
     let fail = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let [input] = inputs.as_slice() else {
-        return fail(refused("INPUT_INVALID", "`--input` was given more than once", "give one `--input`; a batch is one array or NDJSON file").field("--input"));
+        return fail(refused("USAGE", "`--input` was given more than once", "give one `--input`; a batch is one array or NDJSON file").field("--input"));
     };
-    let Some(value) = input.value.as_deref() else {
-        return fail(refused("INPUT_INVALID", "`--input` needs a value", "pass inline JSON, a file path, or `-` for stdin").field("--input"));
+    // `--json` is relocated to the end of the line, so an `--input` with no value is followed by it: that is no value.
+    let Some(value) = input.value.as_deref().filter(|value| *value != "--json") else {
+        return fail(refused("USAGE", "`--input` needs a value", "pass inline JSON, a file path, or `-` for stdin").field("--input"));
     };
     if value == "-" {
         if let Some(other) = lexed.opts.iter().find(|o| o.long.as_deref() != Some("input") && o.value.as_deref().is_some_and(|v| v == "-" || v.ends_with(":-"))) {
             let other_option = other.long.as_deref().map(|l| format!("--{l}")).unwrap_or_default();
-            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field("--input").expected(["a file path for one of them"]));
+            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field("--input"));
         }
     }
     let (text, source) = match load(value) {
@@ -755,7 +765,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     };
     drop(text);
     if matches!(document, Document::Batch(_)) && !batch_supported(&command_name["canon ".len()..]) {
-        return fail(refused("INPUT_INVALID", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan").field("--input"));
+        return fail(framing("batch-unsupported", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan"));
     }
 
     // The command line without `--input`.

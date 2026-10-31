@@ -302,7 +302,9 @@ fn contract_view(transcript: &str) -> String {
                 view.insert("data".into(), data);
             }
             if let Some(error) = doc.get("error") {
-                view.insert("error".into(), serde_json::json!({ "code": error["code"], "message": error["message"] }));
+                // 0.33 names the missing arguments after the colon of clap's "required arguments were not provided:".
+                let message = error["message"].as_str().map(|m| m.split_once("required arguments were not provided:").map_or(m, |(head, _)| &m[..head.len() + "required arguments were not provided:".len()]).to_string());
+                view.insert("error".into(), serde_json::json!({ "code": error["code"], "message": message }));
             }
             out.push_str(&Value::Object(view).to_string());
         } else if let Some(rest) = line.strip_prefix("canon: ") {
@@ -540,6 +542,20 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     let fixed = doc.replace("scenarioId", "scenario");
     let out = ok(repo, &["evidence", "add", "--input", &fixed, "--json"]);
     assert_eq!(json(&out)["ok"], true);
+
+    // The scenario the sentence names: `canon scenario new --input`, second element keeping `subjectId`.
+    let dir = repo_with_change();
+    let repo = dir.path();
+    let before = harness::tree(repo);
+    let doc = r#"[{"operands":["demo.login.01"],"title":"One","subject":"demo"},{"operands":["demo.login.02"],"title":"Two","subjectId":"demo"}]"#;
+    let out = canon(repo, &["scenario", "new", "--input", doc, "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
+    let body = json(&out);
+    assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
+    assert_eq!(body["error"]["field"], "/items/1/subjectId", "{body}");
+    assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "subject"), "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("use \"subject\""), "{body}");
+    unchanged(repo, &before, "a refused scenario batch, its first element included");
 }
 
 // ── F4 ───────────────────────────────────────────────────────────────────

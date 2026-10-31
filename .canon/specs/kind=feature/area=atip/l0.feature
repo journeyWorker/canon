@@ -270,3 +270,43 @@ Feature: ATIP L0 output contract
     Given the guides, the website, the dashboard and the eval scripts
     When the old-name check runs, and a consumer reads an old key
     Then it passes on the new text, fails when one old name is restored, and the dashboard and launcher tests fail on an old key
+
+  # canon: {"schema":1,"at":"2026-10-31T15:01:06Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-33-atip-l0.F1
+  @atip.l0.28
+  Scenario: A failure envelope names the tool, its version and the contract in meta, even when no command resolved
+    Given a repo, and a call whose command does not resolve
+    When canon status --bogus and canon nosuch run with --json
+    Then each failure envelope's meta holds tool canon, toolVersion, contract atip/1 and schemaVersion, and the failures keep error.retryable
+
+  # canon: {"schema":1,"at":"2026-10-31T15:01:10Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-33-atip-l0.F6
+  @atip.l0.29
+  Scenario: --input given twice or with no value is USAGE with field --input and changes nothing
+    Given a repo
+    When canon scenario new runs with --input given twice, and with --input and no value, each with --json
+    Then both exit 2 with USAGE and field --input, and nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-31T15:01:13Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
+  @subject:atip-contract
+  @case:edge
+  @flow:canon-0-33-atip-l0.F6
+  @atip.l0.30
+  Scenario: The five faults of the value of --input are INPUT_INVALID with field --input and x-canon.reason, and a fault in the document has a pointer field and no reason
+    Given a repo
+    When --input names a file that cannot be read, `-` on a terminal, an empty value, text that is not JSON, and an array given to a command that takes one object
+    Then each is INPUT_INVALID with exit 2 and field --input, and x-canon.reason is unreadable, tty, empty, syntax and batch-unsupported in that order; a document that breaks its fragment schema is INPUT_INVALID with a pointer field and no reason
+
+  # canon: {"schema":1,"at":"2026-10-31T15:01:17Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
+  @subject:atip-contract
+  @case:happy
+  @flow:canon-0-33-atip-l0.F6
+  @atip.l0.31
+  Scenario: Every error object canon prints passes the contract's error schema
+    Given the failures of every code path the tests drive: usage, unknown command, input, cursor, refusals and a panic
+    When each error object is validated against the vendored error schema
+    Then every one passes, and none has an empty or null member

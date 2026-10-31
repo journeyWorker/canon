@@ -115,6 +115,8 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
         "divergence accept" | "divergence add" | "divergence defer" | "divergence resolve" | "dispatch begin" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
         "evidence add" => vec!["--role".into(), "reviewer".into(), "--class".into(), "test-run".into(), "--ref".into(), "npm test".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
+        // The scope of a retrieval: without one the call is a usage error, not a command run.
+        "retrieve" => vec!["--domain".into(), "dev".into()],
         "skills install" | "skills check" | "skills doctor" => vec!["--repo".into(), path("skills-target"), "--skills-source".into(), path("no-skills-source")],
         _ => Vec::new(),
     }

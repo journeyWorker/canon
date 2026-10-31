@@ -162,6 +162,10 @@ pub enum PlansError {
     Policy(#[from] TierPolicyError),
     #[error(transparent)]
     Store(#[from] StoreError),
+    /// A store the import writes cannot be written, known before anything was
+    /// changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(crate::cli_error::CliError),
 }
 
 /// [`crate::tiers::build_lenient_tiers`]'s relocated error type
@@ -340,6 +344,10 @@ fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: 
     }
     validate_source_roots(&sources)?;
 
+    // Opening the store attaches the hot db (creating it), and an import persists changes and tasks: the stores they land in must take a write before the store is opened, so a refusal changes nothing.
+    if !dry_run {
+        crate::write_mode::check_kinds_writable(&canon_yaml_path, &[RecordKind::Change, RecordKind::Task]).map_err(PlansError::Unavailable)?;
+    }
     let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
 
     // F2 / design note: the digest below must never include this

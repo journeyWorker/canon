@@ -957,6 +957,11 @@ pub struct GatePromoteReport {
 
 impl crate::reports::Report for GatePromoteReport {}
 
+/// Whether `dir` holds a file at any depth (an absent directory holds none).
+fn holds_a_file(dir: &Path) -> bool {
+    std::fs::read_dir(dir).is_ok_and(|entries| entries.flatten().any(|entry| if entry.path().is_dir() { holds_a_file(&entry.path()) } else { true }))
+}
+
 /// `canon gate promote [--repo] [--dry-run]` (task 2.2/2.3's CLI wiring;
 /// s43 extends it to every kind in `canon_gate::STAGED_KINDS`):
 /// `_staging/` → committed, with a monotonic per-(role, surface)
@@ -974,6 +979,13 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate promote", json);
         }
     };
+    // Something staged is about to move into the ledger: both directories must take it before the first record moves. An empty staging area writes nothing and is not refused.
+    let staging_dir = evidence_staging_dir(&ctx.ledger_root);
+    if !dry_run && holds_a_file(&staging_dir) {
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[staging_dir.as_path(), ctx.ledger_root.as_path()], "canon gate promote", json) {
+            return code;
+        }
+    }
     let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
     let committed = GitTier::new(ctx.ledger_root.clone());
     let promoted = match kind {

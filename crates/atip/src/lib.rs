@@ -24,5 +24,5 @@ pub mod shell;
 pub use argv::{argv_wants_json, json_mode, set_json_mode, wants_json};
 pub use envelope::{line, print_line};
 pub use error::{find_code, redact, CliError, CodeInfo, ErrorBody, EXIT_FAILED, EXIT_REFUSED};
-pub use schema::{envelope_problems, registry_entry_problems, ENVELOPE_SCHEMA, ERROR_SCHEMA, REGISTRY_ENTRY_SCHEMA};
+pub use schema::{envelope_problems, error_problems, registry_entry_problems, ENVELOPE_SCHEMA, ERROR_SCHEMA, REGISTRY_ENTRY_SCHEMA};
 pub use shell::{has_placeholder, quote, split_argv};

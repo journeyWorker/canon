@@ -172,7 +172,7 @@ pub struct StatusReport {
     /// checked: a run that stopped early, or sources that could not be read (a warning says).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dangling_references: Option<crate::references::DanglingSummary>,
-    /// The next steps, role-filtered: carried in `meta.next` (with `nextOmitted` and `waitingOn`), not in `data`.
+    /// The next steps, role-filtered: carried in `meta.next`, not in `data`; `nextOmitted` and `waitingOn` are in `data`.
     #[serde(skip)]
     #[schemars(skip)]
     pub next: Vec<NextStep>,

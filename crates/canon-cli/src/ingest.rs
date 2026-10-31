@@ -84,6 +84,10 @@ pub enum IngestError {
     /// default roots (which would ingest the wrong corpus).
     #[error("{0}")]
     Config(String),
+    /// A local store the pass writes cannot be written, known before
+    /// anything was changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(crate::cli_error::CliError),
 }
 
 /// Per-adapter scan counts for the run summary (task 5.2).
@@ -677,6 +681,11 @@ fn run_pass(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bo
         }
         Err(other) => return Err(other.into()),
     };
+
+    // A local store the pass would write cannot be written: refused before the first record, nothing changed. This runs ahead of the degrade paths below, which are for a store that cannot be reached (a network rung), not one that is read-only here.
+    if !dry_run && !normalized.sessions.is_empty() {
+        crate::write_mode::check_kinds_writable(canon_yaml, &SESSION_KINDS).map_err(IngestError::Unavailable)?;
+    }
 
     // Check every kind this ingest writes is actually routed BEFORE
     // persisting anything, so a policy gap (e.g. `event` unrouted while

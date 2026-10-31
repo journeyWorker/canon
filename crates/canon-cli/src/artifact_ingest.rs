@@ -393,6 +393,10 @@ pub enum ArtifactIngestError {
     /// `main.rs` as a nonzero exit exactly like `Learn`/`RegimeKey`.
     #[error("canon.yaml artifacts config: {0}")]
     ConfigXor(String),
+    /// A store the pass writes cannot be written, known before anything was
+    /// changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(crate::cli_error::CliError),
     /// `--run <RunId>` (s42 (`close-the-open-loops`) task 3.2) names a
     /// run this repo has no dispatch manifest for — rejected by
     /// [`resolve_dispatched_run`] BEFORE any adapter read runs.
@@ -2529,7 +2533,14 @@ fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifa
     for (regime_key, evidence) in by_regime {
         let verdict_count = evidence.rows.len();
         let existing = trajectory_store.query_by_regime_key(&regime_key)?;
-        let (trajectory, superseded) = match plan_trajectory(&existing, &regime_key, &evidence, run_id)? {
+        let plan = plan_trajectory(&existing, &regime_key, &evidence, run_id)?;
+        // The trajectory and strategy stores are local files: refused before the first write, nothing changed.
+        if !dry_run && !matches!(plan, PersistPlan::SkipDuplicate) {
+            for target in [learn_root.join("trajectories"), learn_root.join("strategies")] {
+                crate::write_mode::check_writable(&target).map_err(|cause| ArtifactIngestError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
+            }
+        }
+        let (trajectory, superseded) = match plan {
             PersistPlan::SkipDuplicate => {
                 trajectories_skipped_duplicate += 1;
                 continue;

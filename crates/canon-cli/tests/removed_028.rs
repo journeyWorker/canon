@@ -69,9 +69,16 @@ fn every_removed_spelling_exits_2_with_a_hint_naming_its_replacement() {
             assert!(out.stderr.is_empty(), "canon {shown}: JSON mode writes nothing on stderr");
             let body: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("canon {shown}: stdout is not JSON ({e})"));
             assert_eq!(body["ok"], Value::Bool(false), "canon {shown}: {body}");
-            assert_eq!(body["error"]["code"], "USAGE", "canon {shown}: {body}");
             let hint = body["error"]["hint"].as_str().unwrap_or_default();
             let expected: Vec<&str> = body["error"]["expected"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+            // A group that once ran bare is the contract's COMMAND_REQUIRED, with the replacement in its hint.
+            if row.kind == Kind::Bare {
+                assert_eq!(body["error"]["code"], "COMMAND_REQUIRED", "canon {shown}: {body}");
+                assert!(hint.contains(row.new), "canon {shown}: hint lacks {:?}: {hint}", row.new);
+                exercised += 1;
+                continue;
+            }
+            assert_eq!(body["error"]["code"], "USAGE", "canon {shown}: {body}");
             if row.operand {
                 // The typed leaf when it is one the row applies to, else the row's replacement.
                 let typed = argv[..argv.len() - 2].join(" ");

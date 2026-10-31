@@ -196,6 +196,9 @@ fn init_refuses_an_agents_md_with_an_unclosed_canon_block_and_writes_nothing() {
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(stderr(&out).contains("<!-- canon:end -->"), "{}", stderr(&out));
     assert!(!dir.path().join("canon.yaml").exists(), "a refused init writes nothing");
+    let mut names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    names.sort();
+    assert_eq!(names, ["AGENTS.md"], "no other file or directory exists after the refusal");
     assert_eq!(std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap(), "<!-- canon:begin -->\nno end marker\n");
 }
 
@@ -265,6 +268,8 @@ fn init_starter_policy_makes_the_gate_report_an_unevidenced_scenario() {
     let empty = run_canon(&["gate", "check"], dir.path());
     assert_eq!(empty.status.code(), Some(1), "{}{}", stdout(&empty), stderr(&empty));
     assert!(!stdout(&empty).contains("violation(s)"), "an empty corpus has no violation, it is unverifiable: {}", stdout(&empty));
+    assert!(!stdout(&empty).contains("is not a known top-level policy.yaml key"), "the loader reports no unknown-key diagnostic on the starter policy: {}", stdout(&empty));
+    assert!(!format!("{}{}", stdout(&empty), stderr(&empty)).contains("policy unreadable"), "the starter policy is readable: {}{}", stdout(&empty), stderr(&empty));
 
     let scenario = run_canon(&["scenario", "new", "cart.add.01", "--title", "An out-of-stock item is refused", "--case", "failure"], dir.path());
     assert!(scenario.status.success(), "{}", stderr(&scenario));

@@ -51,7 +51,7 @@ Feature: authoring change
   Scenario: A change whose second record write fails keeps one record and prints the repair
     Given a repo where the subject record can be written but the change record cannot
     When canon change new is run
-    Then it exits 2, keeping the change dir and the subject record that now lists the change
+    Then it exits 1 with CHANGE_ADOPTION_INCOMPLETE, keeping the change dir and the subject record that now lists the change
     And it prints the command that completes the link: canon ingest plans, then canon subject adopt <subject> --change <slug>
     And running that command completes the link, and running the adopt again writes nothing
 

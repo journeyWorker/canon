@@ -177,4 +177,4 @@ Feature: ingest sessions
     When canon ingest plans, ingest records and dispatch begin run, and canon subject new, subject move, subject adopt, subject unadopt and change new write records that are routed to the hot rung
     Then each output names the hot store path
     And the --json documents of ingest plans carry it as `hotStore`
-    And the --json documents of change new carry it as `hotStore`, and those of the subject leaves as `meta.hotStore`
+    And the --json documents of change new carry it as `hotStore`, and those of the subject leaves as `meta.x-canon.hotStore`

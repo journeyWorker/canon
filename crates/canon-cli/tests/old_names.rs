@@ -11,6 +11,31 @@ const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATC
 /// `meta` keys 0.33 deleted, each a whole word or dotted path.
 const OLD_KEYS: &[&str] = &["canonVersion", "hasMore", "meta.unchanged", "meta.waitingOn", "meta.nextOmitted", "meta.hotStore", "meta.context.role", "meta.context.actor", "meta.next[].why"];
 
+/// Old SHAPES a guide or page can show without spelling an old key: a snippet that prints what canon no
+/// longer prints. Each is a line-level check, `(what, test on one line)`.
+/// A test on one line of a document.
+type LineTest = fn(&str) -> bool;
+
+const OLD_SHAPES: &[(&str, LineTest)] = &[
+    ("a null where canon leaves the member out", |line| ["role", "hint", "field", "next", "warnings", "context", "suggestions", "expected"].iter().any(|name| line.contains(&format!("\"{name}\": null")))),
+    ("a schemaVersion that is a number, not the string \"1.0\"", |line| line.contains("\"schemaVersion\": 1,") || line.contains("\"schemaVersion\":1,")),
+    ("a next entry with a flat actor/role (they are `x-canon`)", |line| line.contains("\"argv\"") && (line.contains("\"actor\":") || line.contains("\"role\":")) && !line.contains("x-canon")),
+    ("a next entry with `why` (it is `reason`)", |line| line.contains("\"argv\"") && line.contains("\"why\":")),
+];
+
+/// Every old shape a line of `text` shows.
+fn old_shapes_in(text: &str) -> Vec<&'static str> {
+    let mut found: Vec<&'static str> = Vec::new();
+    for line in text.lines() {
+        for (what, test) in OLD_SHAPES {
+            if test(line) && !found.contains(what) {
+                found.push(what);
+            }
+        }
+    }
+    found
+}
+
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -61,6 +86,9 @@ fn consumers() -> Vec<PathBuf> {
     collect(&root.join("packages/cli/src"), &["ts", "js"], &skip, &mut files);
     collect(&root.join("evals"), &["py", "jsonl", "md", "json", "sh"], &skip, &mut files);
     collect(&root.join("docs/design"), &["md"], &skip, &mut files);
+    // The scenarios of this change (`area=atip`) name the old keys to say they are gone.
+    let spec_skip = [skip.as_slice(), &["area=atip"]].concat();
+    collect(&root.join(".canon/specs"), &["feature"], &spec_skip, &mut files);
     files.extend(["README.md", "ARCHITECTURE.md"].iter().map(|name| root.join(name)));
     files
 }
@@ -75,6 +103,9 @@ fn atip_l0_27_no_guide_page_dashboard_or_eval_script_spells_an_old_name() {
         for old in old_names_in(&text) {
             hits.push(format!("{} spells `{old}`", file.strip_prefix(repo_root()).unwrap_or(file).display()));
         }
+        for shape in old_shapes_in(&text) {
+            hits.push(format!("{} shows {shape}", file.strip_prefix(repo_root()).unwrap_or(file).display()));
+        }
     }
     assert!(hits.is_empty(), "old names left in consumers: {hits:#?}");
 }
@@ -87,4 +118,14 @@ fn atip_l0_27_the_check_catches_an_old_name_that_comes_back() {
     assert_eq!(old_names_in("meta.canonVersion is gone"), ["canonVersion"], "the meta key is old whatever path it is written in");
     assert_eq!(old_names_in(r#"{ "canonVersion": "0.29.0" } is the status report's member"#), Vec::<&str>::new());
     assert_eq!(old_names_in("CONTEXT_INPUT_MISSING is a different code"), Vec::<&str>::new());
+}
+
+#[test]
+fn atip_l0_27_the_check_catches_an_old_shape_that_comes_back() {
+    assert_eq!(old_shapes_in(r#"{ "reason": "r", "x-canon": { "actor": "human" } }"#), Vec::<&str>::new());
+    assert_eq!(old_shapes_in(r#"{ "argv": ["a"], "x-canon": { "actor": "human", "role": null } }"#).len(), 1, "a null role");
+    assert_eq!(old_shapes_in(r#""schemaVersion": 1,"#).len(), 1, "a numeric schemaVersion");
+    assert_eq!(old_shapes_in(r#""schemaVersion": "1.0","#), Vec::<&str>::new());
+    assert_eq!(old_shapes_in(r#"{ "argv": ["a"], "reason": "r", "actor": "agent", "role": "planner" }"#).len(), 1, "a flat actor and role");
+    assert_eq!(old_shapes_in(r#"{ "argv": ["a"], "why": "r" }"#).len(), 1, "why");
 }

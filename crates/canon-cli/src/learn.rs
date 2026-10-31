@@ -145,6 +145,13 @@ pub fn run_promote_with_evidence(
             return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json));
         }
     };
+    // A promotion writes the strategy store and the strategy files: refused before the first write. A blocked or already-recorded one writes nothing here.
+    if !dry_run && decision.as_ref().is_some_and(canon_learn::PromotionDecision::is_promote) && !already_promoted(&strategy_store, strategy_id, &git_tier_root, evidence.as_ref()) {
+        let strategy_dir = repo.join(&learn_config.root).join("strategies");
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[strategy_dir.as_path(), git_tier_root.as_path()], "canon strategy promote", json) {
+            return ExitCode::from(code);
+        }
+    }
     let blocked = decision.as_ref().is_some_and(|d| !d.is_promote());
     let mut demotion_failure: Option<String> = None;
     if blocked && !dry_run {
@@ -433,6 +440,13 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
         }
     };
     let was_rolled_back = matches!(store.find_by_id(strategy_id), Ok(Some(item)) if item.lifecycle == Some(StrategyLifecycle::RolledBack));
+    // A rollback that is not already recorded writes the strategy store and the strategy files: refused before the first write.
+    if !was_rolled_back {
+        let (strategy_dir, files_dir) = (repo.join(&config.root).join("strategies"), repo.join(&config.strategies_root));
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[strategy_dir.as_path(), files_dir.as_path()], "canon strategy rollback", json) {
+            return ExitCode::from(code);
+        }
+    }
     match rollback_strategy_authenticated(AuthenticatedRollback { strategy_store: &store, strategy_id: *strategy_id, reason, actor, contradicting_trajectory_id: contradicting, git_tier_root: &repo.join(&config.strategies_root), signature: &signature, approved_at }) {
         Ok(record) => {
             if was_rolled_back {

@@ -171,6 +171,7 @@ fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
 fn skills_error(err: &crate::skills::SkillsError) -> CliError {
     use crate::skills::SkillsError;
     match err {
+        SkillsError::Unavailable(error) => error.clone(),
         SkillsError::InvalidProvider(value) => CliError::refused("SKILLS_INVALID_ARGUMENT", err.to_string())
             .field("--providers")
             .received(value.clone())

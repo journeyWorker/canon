@@ -998,16 +998,25 @@ fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second
 fn authoring_migrate_23_a_changed_plan_is_refused_and_a_brief_edited_after_approval_stays_changed() {
     let dir = old_repo();
     let r = dir.path();
+    // A plan previewed, then a brief changed: the old digest no longer names the plan.
+    let (_, old_digest) = plan(r);
+    let edited = read_brief(r, "a").replace("Social sign-in.", "Social sign-in and email links.");
+    write_brief(r, "a", &edited);
+    commit_all(r);
     let before = tree(r);
-    let out = commit(r, None, &"0".repeat(64));
+    let out = commit(r, None, &old_digest);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
     assert!(out_text(&out).contains("PLAN_STALE"), "{}", out_text(&out));
     assert_eq!(tree(r), before, "nothing changed");
 
-    let edited = read_brief(r, "a").replace("Social sign-in.", "Social sign-in and email links.");
-    write_brief(r, "a", &edited);
-    commit_all(r);
+    // A zero digest is refused the same way.
+    let zero = commit(r, None, &"0".repeat(64));
+    assert_eq!(zero.status.code(), Some(2), "{}", out_text(&zero));
+    assert!(out_text(&zero).contains("PLAN_STALE"), "{}", out_text(&zero));
+    assert_eq!(tree(r), before, "nothing changed");
+
     let (_, digest) = plan(r);
+    assert_ne!(digest, old_digest, "the brief changed, so the plan's digest did");
     let out = commit(r, None, &digest);
     assert!(out.status.success(), "{}", out_text(&out));
     assert!(!read_brief(r, "a").contains("<!--"));

@@ -510,7 +510,7 @@ fn latest_change(repo: &Path, id: &str) -> serde_json::Value {
 
 /// authoring.migrate.09: canon.yaml is written whole or not at all. A run
 /// whose canon.yaml write fails after the corpus and the change moved
-/// leaves canon.yaml byte-identical and exits 2; the rerun sees the root
+/// leaves canon.yaml byte-identical and exits 1 (it stopped after it had begun); the rerun sees the root
 /// already at `.canon/specs` while canon.yaml still names `specs`, writes
 /// the `root:`/`former_roots` edit and the source removal, and re-imports
 /// the change that was moved but not re-imported.
@@ -521,7 +521,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     // The temp file canon.yaml is written through cannot be created.
     std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
     let out = commit(repo);
-    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out));
     assert!(text(&out).contains("canon: MIGRATE_STOPPED: failed to write"), "{}", text(&out));
     assert!(text(&out).contains("canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "never half-written");
@@ -544,7 +544,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
 
 /// authoring.migrate.10: when a pointer brief cannot be written, the
 /// openspec source that still holds the approval stays configured and the
-/// run exits 2; the rerun writes the brief and only then removes the
+/// run exits 1 (it stopped after it had begun); the rerun writes the brief and only then removes the
 /// source canon init wrote.
 #[test]
 fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_approval() {
@@ -563,7 +563,7 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
 
     let out = commit(repo);
     set_mode(&repo.join(".canon/changes"), 0o755);
-    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out));
     assert!(text(&out).contains("canon: MIGRATE_STOPPED: failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());

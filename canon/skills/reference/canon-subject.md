@@ -752,9 +752,9 @@ first, with `data.nextOmitted` counting what was cut and `data.waitingOn`
 
 ```json
 "next": [
-  { "command": "canon brief show c-promo --json", "argv": ["brief", "show", "c-promo", "--json"], "reason": "promo: the brief is not approved; build and attest nothing for promo until the human answers", "x-canon": { "actor": "human", "role": null } },
+  { "command": "canon brief show c-promo --json", "argv": ["brief", "show", "c-promo", "--json"], "reason": "promo: the brief is not approved; build and attest nothing for promo until the human answers", "x-canon": { "actor": "human" } },
   { "command": "canon gate check --json", "argv": ["gate", "check", "--json"], "reason": "cart: 1 open blocker finding(s); fix it, commit, then close it with `canon finding close`", "x-canon": { "actor": "agent", "role": "implementer" } },
-  { "command": "canon status --json", "argv": ["status", "--json"], "reason": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again", "actor": "agent", "role": "planner" }
+  { "command": "canon status --json", "argv": ["status", "--json"], "reason": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again", "x-canon": { "actor": "agent", "role": "planner" } }
 ]
 ```
 

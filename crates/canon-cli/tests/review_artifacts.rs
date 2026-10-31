@@ -126,9 +126,31 @@ fn a_missing_or_altered_review_artifact_is_stale_evidence_naming_the_review() {
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}", text(&gate));
     let out = text(&gate);
-    let stale = |file: &str| out.lines().any(|l| l.contains("game.title.01") && l.contains(file) && l.contains("reviewer-2"));
-    assert!(stale("reports/title.png"), "a missing blob with a changed working-tree file is stale:\n{out}");
-    assert!(stale("reports/hud.webm"), "an altered blob is stale:\n{out}");
+    let at = chrono::DateTime::parse_from_rfc3339(reviews(repo)[0]["at"].as_str().unwrap()).unwrap().with_timezone(&chrono::Utc).format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let line_of = |file: &str| -> String {
+        let lines: Vec<&str> = out.lines().filter(|l| l.contains("stale-evidence") && l.contains("game.title.01") && l.contains(&format!("`{file}`"))).collect();
+        assert_eq!(lines.len(), 1, "exactly one stale-evidence line for {file}:\n{out}");
+        lines[0].to_string()
+    };
+    let title_blob = format!(".canon/artifacts/sha256/{}", sha(TITLE));
+    let hud_blob = format!(".canon/artifacts/sha256/{}", sha(HUD));
+
+    // The missing blob whose working-tree file changed: the review, its actor and time, the path,
+    // the recorded digest, and what the store (missing) and the working tree (the later capture) hold.
+    let title = line_of("reports/title.png");
+    assert!(title.contains("review by `reviewer-2` (actor `reviewer-2`, "), "{title}");
+    assert!(title.contains(&format!("actor `reviewer-2`, {at})")), "the review's own time `{at}`: {title}");
+    assert!(title.contains(&format!("recorded sha256 {}", sha(TITLE))), "{title}");
+    assert!(title.contains(&format!("stored blob {title_blob}: missing")), "{title}");
+    assert!(title.contains(&format!("working tree: {}", sha(b"a later capture"))), "{title}");
+
+    // The altered blob while the working-tree file still matches: stale all the same.
+    let hud = line_of("reports/hud.webm");
+    assert!(hud.contains(&format!("actor `reviewer-2`, {at})")), "{hud}");
+    assert!(hud.contains(&format!("recorded sha256 {}", sha(HUD))), "{hud}");
+    assert!(hud.contains(&format!("stored blob {hud_blob}: {}", sha(b"tampered"))), "the store holds the tampered bytes' digest: {hud}");
+    assert!(hud.contains(&format!("working tree: {}", sha(HUD))), "the working tree still matches the recorded digest: {hud}");
+    assert!(out.contains("stale-evidence (2)"), "exactly the two files: {out}");
     assert!(!out.contains("canon artifacts store"), "neither file is vouched for by the working tree:\n{out}");
 }
 

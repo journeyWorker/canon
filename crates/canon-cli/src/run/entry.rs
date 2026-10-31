@@ -38,12 +38,19 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
     }
     // A removed spelling (the removed-spellings table): the refusal names its replacement.
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if let Some(removed) = crate::removed::find(&crate::cli::command(), &args) {
+    let removed = crate::removed::find(&crate::cli::command(), &args);
+    if let Some(removed) = removed.as_ref().filter(|removed| !removed.is_bare()) {
         let command = format!("canon {}", removed.command);
         return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.expected()]).emit(command.trim(), json));
     }
     let root = crate::cli::command();
-    let (path, usage) = usage_parts(error, &root);
+    let (path, mut usage) = usage_parts(error, &root);
+    // A group that once ran bare (`canon brief`): still the contract's COMMAND_REQUIRED, and the hint names what replaced it.
+    if let Some(removed) = removed {
+        if usage.code == "COMMAND_REQUIRED" {
+            usage = usage.hint(removed.hint());
+        }
+    }
     ExitCode::from(usage.emit(&format!("canon {path}"), json))
 }
 
@@ -93,6 +100,12 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
         _ => {
             if let Some(arg) = string(ContextKind::InvalidArg).map(first_word) {
                 usage = usage.field(arg);
+            }
+            if error.kind() == ErrorKind::MissingRequiredArgument {
+                if let Some(ContextValue::Strings(names)) = error.get(ContextKind::InvalidArg) {
+                    let names: Vec<&str> = names.iter().map(|name| name.split_whitespace().next().unwrap_or_default()).collect();
+                    usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(names.first().copied().unwrap_or_default());
+                }
             }
             if let Some(value) = string(ContextKind::InvalidValue) {
                 usage = usage.received(value);

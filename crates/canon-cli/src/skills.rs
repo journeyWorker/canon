@@ -375,6 +375,10 @@ pub enum SkillsError {
         #[source]
         source: std::io::Error,
     },
+    /// A file or directory the install writes cannot be written, known before
+    /// anything was changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(crate::cli_error::CliError),
 }
 
 fn read_bytes(path: &Path) -> Result<Vec<u8>, SkillsError> {
@@ -1652,6 +1656,16 @@ pub fn install_canonical(
     if changed && dry_run {
         (pruned, kept) = preview_prune(orphans);
     } else if changed {
+        // Every file the install rewrites, its directory, and the lock and config it writes must take the change before the first write.
+        let mut targets: Vec<PathBuf> = vec![manifest_path(target_dir)];
+        targets.extend(rewritten.iter().cloned());
+        targets.extend(config.iter().map(|(path, _)| path.clone()));
+        for target in targets {
+            let directory = target.parent().filter(|parent| !parent.as_os_str().is_empty()).map(Path::to_path_buf);
+            for path in std::iter::once(target).chain(directory) {
+                crate::write_mode::check_writable(&path).map_err(|cause| SkillsError::Unavailable(crate::write_mode::unavailable(&path, &cause)))?;
+            }
+        }
         for (path, bytes) in writes {
             write_bytes_under(target_dir, &path, &bytes)?;
         }

@@ -23,10 +23,14 @@
 //! and any directory created for it: nothing is left behind. The two
 //! records (subject, then change; see
 //! [`crate::subject::persist_adoption`] for the order) cannot be written
-//! atomically, so a failure between them keeps the change dir and the
+//! atomically, so a failure between them (exit `1`,
+//! `CHANGE_ADOPTION_INCOMPLETE`: the work began) keeps the change dir and the
 //! subject record and prints the command that completes the link,
 //! `canon ingest plans && canon subject adopt <id> --change <slug>`,
-//! which is safe to rerun.
+//! which is safe to rerun. A store that is known unwritable (a read-only
+//! directory) is refused before the change dir is made (`WRITE_UNAVAILABLE`,
+//! exit `2`); only a failure the check cannot foresee (an object store, a
+//! full disk) reaches the half-written state.
 //!
 //! # Refusals (exit `2`, nothing written)
 //! - an unknown subject;
@@ -127,7 +131,8 @@ pub struct ChangeNewReport<'a> {
 impl crate::reports::Report for ChangeNewReport<'_> {}
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
-/// refused or failed with nothing left behind.
+/// refused with nothing changed (a store that cannot be written is
+/// `WRITE_UNAVAILABLE`), `1` a write that began and failed.
 pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     // The brief no longer carries the language, but a `canon.yaml` canon cannot read is still refused here.
@@ -161,6 +166,10 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     if let Some(code) = crate::write_mode::refuse_unwritable(&[&dir, &staging_path], "canon change new", json) {
         return code;
     }
+    // The adoption writes the subject and the change record: their stores must take them before the change dir exists.
+    if let Some(code) = crate::write_mode::refuse_unwritable_kinds(&crate::context::resolve_canon_yaml(&repo), &[canon_model::envelope::RecordKind::Subject, canon_model::envelope::RecordKind::Change], "canon change new", json) {
+        return code;
+    }
     let staging = Created(Some(first_missing_ancestor(&staging_path)));
     let change = match stage_change(&staging_path, slug, kind, title) {
         Ok(change) => change,
@@ -188,7 +197,9 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
             published.keep();
         }
         let message = e.describe(slug, subject_id, &repair);
-        let error = if e.subject_written {
+        let error = if let Some(refusal) = e.unavailable {
+            refusal
+        } else if e.subject_written {
             CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
         } else {
             CliError::refused("WRITE_FAILED", message).hint("check that the path is writable and the disk has room, then run the command again")

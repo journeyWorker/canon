@@ -35,13 +35,13 @@ Feature: review scenario
   @subject:review-attestation
   @case:edge
   @review.add.04
-  Scenario: The pinned commit is part of a review's identity
+  Scenario: The pinned commit stays in a review's body, not in its storage key
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a review of one scenario in one project at one pin
     When its storage coordinate is resolved
-    Then the natural key is the project, the scenario and the pin joined
-    And a review of that same scenario at a different pin therefore resolves a different key
-    And two attestations at two commits are two records, never two versions of one
+    Then the natural key is the project, the scenario kind and the scenario id joined, without the pin
+    And a review of that same scenario at a different pin resolves the same key prefix
+    And two attestations at two commits are two committed files told apart by digest, and both read back from the tier
 
   @subject:review-attestation
   @case:edge

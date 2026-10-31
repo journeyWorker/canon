@@ -270,6 +270,13 @@ fn project_id_is_optional_with_one_spec_root_and_required_with_several() {
         let out = run(r);
         assert!(out.status.success(), "{name}: {}{}", stdout(&out), stderr(&out));
         assert_ne!(written(r), before, "{name} wrote a record");
+        let new: Vec<PathBuf> = written(r).into_iter().filter(|p| !before.contains(p) && p.extension().is_some_and(|e| e == "json")).collect();
+        assert!(!new.is_empty(), "{name} wrote a json record");
+        for path in new {
+            let record: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            assert_eq!(record["project_id"], "game", "{name}: the one spec root is the inferred project id: {record}");
+            assert_eq!(record["scenario_id"], "cart.add.01", "{name}: {record}");
+        }
     }
 
     let two = repo(&["game", "ui"]);

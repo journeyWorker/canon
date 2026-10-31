@@ -144,6 +144,11 @@ pub enum DispatchError {
     #[error("--skill-digest requires --skill — declare the skill id, or omit the digest")]
     SkillDigestWithoutId,
 
+    /// A directory the run is written into cannot be written, known before
+    /// anything was changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(CliError),
+
     /// The dispatch record could not be written to the side-channel.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -270,6 +275,7 @@ impl DispatchError {
         match self {
             Self::RoleRegimeMismatch { .. }
             | Self::SkillDigestWithoutId
+            | Self::Unavailable(_)
             | Self::TaskNotFound { .. }
             | Self::NoPlanSources { .. }
             | Self::PlanCorpus { .. }
@@ -299,6 +305,7 @@ impl DispatchError {
             Self::SkillDigestWithoutId => "DISPATCH_INVALID_ARGUMENT",
             Self::Io(_) => "WRITE_FAILED",
             Self::Serialize(_) => "SERIALIZE_FAILED",
+            Self::Unavailable(_) => "WRITE_UNAVAILABLE",
             Self::ContextPack(inner) => inner.to_cli_error().code,
             Self::TaskNotFound { .. } => "TASK_NOT_FOUND",
             Self::NoPlanSources { .. } => "PLAN_SOURCES_MISSING",
@@ -315,6 +322,7 @@ impl DispatchError {
             Self::SkillDigestWithoutId => "pass --skill <id> with --skill-digest, or drop the digest".to_string(),
             Self::Io(_) => "check that the repository's .canon directory is writable, then run the command again".to_string(),
             Self::Serialize(_) => "this is a canon bug: report it together with the command line that produced it".to_string(),
+            Self::Unavailable(error) => error.hint_text().unwrap_or_default().to_string(),
             Self::ContextPack(inner) => inner.to_cli_error().hint_text().unwrap_or_default().to_string(),
             Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
             Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task can resolve against it".to_string(),
@@ -754,6 +762,9 @@ pub fn begin(
     if let Some(task_id) = &binding.task_id {
         validate_task_binding(&repo, task_id)?;
     }
+    // The manifest directory must take the run before the context pack or the manifest is written.
+    let dispatch_dir = repo.join(DISPATCH_DIR);
+    crate::write_mode::check_writable(&dispatch_dir).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unavailable(&dispatch_dir, &cause)))?;
     let store = open_strategy_store(&repo);
     let guidance = retrieve_guidance(&store, role, regime_key, None);
     // Capture guidance inside the immutable pack before minting the run. A
@@ -1313,6 +1324,10 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
             return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
         }
         Err(e) => return Err(DispatchError::Io(e)),
+    }
+    // The close rewrites the manifest (a temp file beside it, then a rename) and takes a lock beside it: the directory and the manifest must take them.
+    for target in [repo.join(DISPATCH_DIR), manifest_path.clone()] {
+        crate::write_mode::check_writable(&target).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
     }
     let _lock = EndLock::acquire(&manifest_path, run_id)?;
 
