@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "data": {
+    "team": "core",
+    "members": [
+      {
+        "id": 1,
+        "profile": {
+          "name": "Ada"
+        },
+        "owners": [
+          {
+            "email": "lead@example.org"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "profile": {
+          "name": "Grace"
+        },
+        "owners": []
+      }
+    ]
+  },
+  "meta": {
+    "command": "member list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "fields": [
+      "id",
+      "profile.name",
+      "owners[].email"
+    ],
+    "page": {
+      "returned": 2,
+      "nextCursor": "bWVtYmVyOjI",
+      "total": 5
+    },
+    "next": [
+      {
+        "command": "acme member show 1 --json",
+        "argv": [
+          "member",
+          "show",
+          "1",
+          "--json"
+        ],
+        "reason": "the first member in full"
+      },
+      {
+        "command": "acme member list -t core --fields 'profile.name,owners[].email' --limit 2 --cursor bWVtYmVyOjI --json",
+        "argv": [
+          "member",
+          "list",
+          "-t",
+          "core",
+          "--fields",
+          "profile.name,owners[].email",
+          "--limit",
+          "2",
+          "--cursor",
+          "bWVtYmVyOjI",
+          "--json"
+        ],
+        "reason": "the next page"
+      }
+    ]
+  }
+}

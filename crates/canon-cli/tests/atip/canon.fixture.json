@@ -1,0 +1,1578 @@
+{
+  "probe": "status",
+  "registry": [
+    {
+      "code": "ADAPTER_EXECUTION_NOT_AUTHORIZED",
+      "exit": 1,
+      "fix": "Have the adapter return a response that authorizes execution, or do not run the command through this adapter.",
+      "meaning": "the adapter response did not authorize execution",
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_REFUSED",
+      "exit": 2,
+      "fix": "Fix the response file, or the policy file `.canon/policy.yaml` when the message names it, then run the command again; `adapter validate` re-checks a response.",
+      "meaning": "`adapter validate` could not read the response file, or `adapter authorize` refused: its response is unreadable, breaks a rule, or the policy file is broken",
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_RESPONSE_INVALID",
+      "exit": 1,
+      "fix": "Fix the response envelope the message names, then run `canon adapter validate` again.",
+      "meaning": "`adapter validate` read the response and it breaks a rule of the envelope: the check's negative answer",
+      "retryable": false
+    },
+    {
+      "code": "APPROVAL_INCOMPLETE",
+      "exit": 2,
+      "fix": "Pass a single-line, non-empty --approver and --note to `canon brief approve`.",
+      "meaning": "`brief approve` got an empty or multi-line --by or --note",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_MOVE_REFUSED",
+      "exit": 2,
+      "fix": "Target an s3 tier, restore any local blob whose content does not match its name, and replace the bad object-store copy named in the error.",
+      "meaning": "`artifacts move` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_FAILED",
+      "exit": 1,
+      "fix": "Check that the artifact store is writable and reachable and has space, then run the command again.",
+      "meaning": "writing or uploading a blob to the artifact store failed after the command started writing; what was already stored stays, and a second run resumes",
+      "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_STORE_UNREACHABLE",
+      "exit": 2,
+      "fix": "Check the artifact store tier's endpoint and credentials in canon.yaml, then run the command again.",
+      "meaning": "the artifact store cannot be opened, attached or reached before any blob is written, so no blob can be verified or uploaded",
+      "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_VERIFY_FAILED",
+      "exit": 1,
+      "fix": "Restore or re-store each file listed in data.problems, then run `canon artifacts verify` again.",
+      "meaning": "a bound file is missing from the artifact store or altered; data.problems names each",
+      "retryable": false
+    },
+    {
+      "code": "BATCH_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read data.items to see which elements were written, fix the failed element, then run the batch again; elements already written are reported `unchanged`.",
+      "meaning": "a batch stopped during execution: an element failed after the batch passed its preflight; data.items gives each element's status and the failed one's error, and the elements after it were skipped",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_ADOPTION_UNAPPROVED",
+      "exit": 1,
+      "fix": "Have the human approve the brief with `canon brief approve`, or take the adoption back with `canon subject unadopt`.",
+      "meaning": "a change was adopted into a building, verifying or shipped subject while its brief is not approved; the subject's existing scenarios keep accepting evidence, but scenarios tagged for the change wait for the approval",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_APPROVE_REFUSED",
+      "exit": 2,
+      "fix": "Resolve what each refused id names (`canon brief check` lists blocker findings), then ask the human to approve again.",
+      "meaning": "`brief approve` was refused because a brief has blocker findings, or, for several ids, because at least one id was refused (a blocker, no brief, a brief that cannot carry the line); data.refused names each with its own code; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_CHANGED_SINCE_APPROVAL",
+      "exit": 1,
+      "fix": "Review the edited brief and have the human run `canon brief approve` again.",
+      "meaning": "the brief was edited after the human approved it, so it reads as not approved until approved again",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_CHANGED_SINCE_PAGE_LOAD",
+      "exit": 2,
+      "fix": "Reload the dashboard page to see the current brief, then approve it again.",
+      "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_DRAFT_PENDING",
+      "exit": 1,
+      "fix": "Tag a scenario for the draft change or have the human approve its brief if it belongs to this transition; otherwise ignore the note.",
+      "meaning": "a subject transition ran while a change of the subject is a pending draft (never approved, not a chore, no scenario tagged for it), so the transition does not judge that change",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_HAS_BLOCKERS",
+      "exit": 1,
+      "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
+      "meaning": "`brief check` found blocker findings; data.findings names each",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of a change that has a brief; `canon status` lists the changes.",
+      "meaning": "the named change has no brief",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_OVERRIDE_ON_RECORD",
+      "exit": 1,
+      "fix": "Have the human approve the brief with `canon brief approve`, then attest the evidence again.",
+      "meaning": "an evidence record was attested while its brief was not approved, under `--override-reason`; the waiver stays on the record",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_UNAPPROVABLE",
+      "exit": 2,
+      "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
+      "meaning": "the brief's text cannot take an `Approved:` line (for example an open code fence)",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_UNAPPROVED",
+      "exit": 1,
+      "fix": "Have the human approve the subject's brief with `canon brief approve` before attesting.",
+      "meaning": "an attestation was refused because the subject's brief has no human approval",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_UNAPPROVED_NOT_ENFORCED",
+      "exit": 1,
+      "fix": "Give the change a brief with `canon change new`, or fix the `plans:` section of canon.yaml, then have the human approve the brief.",
+      "meaning": "a subject moved past a brief that is not approved but cannot be enforced (the change has no brief canon reads, or the `plans:` section is unreadable)",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_UNREADABLE",
+      "exit": 2,
+      "fix": "Check that the brief file exists and is readable, then run the command again.",
+      "meaning": "the brief file could not be read",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_WRITE_FAILED",
+      "exit": 1,
+      "fix": "Check that the brief file and its directory are writable, then run the command again.",
+      "meaning": "the brief file could not be written",
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_ADOPTION_INCOMPLETE",
+      "exit": 2,
+      "fix": "Run the repair command named in the hint to link the change to its subject.",
+      "meaning": "the change was written but its subject link was not; the hint names the repair",
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_AMBIGUOUS",
+      "exit": 2,
+      "fix": "Pass the id of the change you mean as the operand.",
+      "meaning": "several live changes have a brief; pass the change id as the operand",
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_EXISTS",
+      "exit": 2,
+      "fix": "Choose a different slug for the new change, or work on the existing one.",
+      "meaning": "a change (or its archive) already uses that slug",
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the arguments to `canon change new` so a brief can be built from them.",
+      "meaning": "`change new` could not build a brief from the given arguments",
+      "retryable": false
+    },
+    {
+      "code": "COMMAND_REQUIRED",
+      "exit": 2,
+      "fix": "Run one of the commands `expected` lists; `canon schema` lists every command.",
+      "meaning": "the bare tool or a command group was run without a command; `expected` lists the commands of that level",
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Fix each section `data.sections` marks FAIL, then run `canon init --check` again.",
+      "meaning": "`init --check` ran and a present canon.yaml section fails its loader",
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_MISSING",
+      "exit": 2,
+      "fix": "Run `canon init` or pass --repo <DIR> to a directory holding canon.yaml.",
+      "meaning": "canon.yaml does not exist",
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_UNREADABLE",
+      "exit": 2,
+      "fix": "Fix the canon.yaml, policy or setting named in the error, then run `canon init --check` to confirm.",
+      "meaning": "canon.yaml, policy or a setting it carries could not be read or is invalid",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_GIT_UNAVAILABLE",
+      "exit": 1,
+      "fix": "Run the command inside a git checkout with a resolvable HEAD and git on the PATH.",
+      "meaning": "a context pack needs a git identity that is not available",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_INPUT_MISSING",
+      "exit": 2,
+      "fix": "Create the selected context input or drop it from the selection.",
+      "meaning": "a selected context input does not exist",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_MANIFEST_INVALID",
+      "exit": 2,
+      "fix": "Rewrite the context input manifest with a supported version.",
+      "meaning": "the context input manifest has an unsupported version",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_OBJECT_CONFLICT",
+      "exit": 1,
+      "fix": "Do not overwrite the immutable context object; build a new pack from the current inputs.",
+      "meaning": "an immutable context object already holds different bytes",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_PACK_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of an existing context pack; `canon context list` shows them.",
+      "meaning": "no context pack with that well-formed id (a malformed id is USAGE)",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_PACK_TAMPERED",
+      "exit": 1,
+      "fix": "Discard the stale or altered pack and build a new one.",
+      "meaning": "a context pack is stale or was changed after it was created",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_SECRET_DETECTED",
+      "exit": 2,
+      "fix": "Remove the plaintext secret from the selected input or deselect it, then build the pack again.",
+      "meaning": "a selected context input contains plaintext secret material",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_UNSAFE_PATH",
+      "exit": 2,
+      "fix": "Select only repository-relative paths that stay inside the repository and contain no symlink.",
+      "meaning": "a selected path is absolute, leaves the repository, or contains a symlink",
+      "retryable": false
+    },
+    {
+      "code": "CURSOR_INVALID",
+      "exit": 2,
+      "fix": "Restart the listing without --cursor and page with the cursor it returns.",
+      "meaning": "`--cursor` is not one this listing issued, or the record it points after is gone",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_BAD_REQUEST",
+      "exit": 2,
+      "fix": "Send requests only through the briefs page the dashboard serves.",
+      "meaning": "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_CONFIG_INVALID",
+      "exit": 2,
+      "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
+      "meaning": "the dashboard's canon.yaml section is present but unusable",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_FAILED",
+      "exit": 1,
+      "fix": "Read the I/O error in the message, fix its cause, then start the dashboard again.",
+      "meaning": "the dashboard could not start for a reason that is not one of the other DASHBOARD_ codes (an I/O failure)",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_NOT_BUILT",
+      "exit": 1,
+      "fix": "Use a canon binary that embeds the dashboard app, or build the dashboard into the repo.",
+      "meaning": "this canon binary embeds no dashboard app and the repo holds no build of canon's own",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_ORIGIN_REFUSED",
+      "exit": 2,
+      "fix": "Open the dashboard at the exact address it is bound to.",
+      "meaning": "a dashboard request came with a Host or Origin that is not the bound address, so it was refused before anything was read",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_PORT_IN_USE",
+      "exit": 1,
+      "fix": "Stop the process holding the port or choose another port, then start the dashboard again.",
+      "meaning": "the dashboard's port is already bound by another process",
+      "retryable": true
+    },
+    {
+      "code": "DASHBOARD_SNAPSHOT_UNAVAILABLE",
+      "exit": 1,
+      "fix": "Run `canon report snapshot` for the repo, or pass a readable --snapshot directory, then start the dashboard again.",
+      "meaning": "the dashboard started without a readable panels snapshot, so its panels page shows the reason instead of panels",
+      "retryable": false
+    },
+    {
+      "code": "DEMO_NOT_INITIALIZED",
+      "exit": 2,
+      "fix": "Run `canon demo init` before `canon demo review`.",
+      "meaning": "`demo review` ran before `demo init`",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_ALREADY_ENDED",
+      "exit": 2,
+      "fix": "Nothing to do: the run is already ended; start a new dispatch run if more work is needed.",
+      "meaning": "the dispatch run was already ended",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_DIFF_RECORDS_UNAVAILABLE",
+      "exit": 1,
+      "fix": "Fix the tier routing or store the message names, then run `canon dispatch diff` again.",
+      "meaning": "`dispatch diff` could not read the task or run records of a tier, so that side of the diff is empty",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_END_IN_PROGRESS",
+      "exit": 1,
+      "fix": "Wait a moment and run `canon dispatch end` again.",
+      "meaning": "another process is closing the run; retry",
+      "retryable": true
+    },
+    {
+      "code": "DISPATCH_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Remove the conflicting dispatch flags; see `canon schema` for the command's options.",
+      "meaning": "a dispatch flag combination is invalid",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_MANIFEST_MISMATCH",
+      "exit": 2,
+      "fix": "Rename the manifest to match its run id, or correct the run id inside it.",
+      "meaning": "the manifest's run id differs from its file name",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_MANIFEST_UNREADABLE",
+      "exit": 2,
+      "fix": "Restore the dispatch manifest as a readable run record.",
+      "meaning": "the dispatch manifest is not a readable run record",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_NOT_RUNNING",
+      "exit": 2,
+      "fix": "Close only runs whose recorded status is running; inspect the manifest for this run's status.",
+      "meaning": "the run's recorded status cannot be closed",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_ROLE_REGIME_MISMATCH",
+      "exit": 2,
+      "fix": "Pass a --role that matches the --regime's role, or change the --regime.",
+      "meaning": "--role does not match the --regime's role",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_RUN_COPIES_DIVERGE",
+      "exit": 1,
+      "fix": "Run `canon dispatch end` or `canon ingest sessions` to bring the two copies back together.",
+      "meaning": "a run's tier copy and its dispatch manifest differ; the tier copy is used",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_RUN_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of an existing dispatch run.",
+      "meaning": "no dispatch manifest for that run id",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_TIER_NOT_PERSISTED",
+      "exit": 1,
+      "fix": "Fix the tier the message names, then run `canon ingest sessions` so the tier holds the run.",
+      "meaning": "a dispatch begin or end could not be persisted to the run's routed tier; the manifest file is the only home of the record",
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_ACCEPT_REFUSED",
+      "exit": 2,
+      "fix": "Accept only divergent evidence as a reviewer whose actor and session did not attest it; `canon divergence list` shows candidates.",
+      "meaning": "a divergence acceptance was refused: not a reviewer, the evidence is not divergent, or it was attested by the accepting actor or session",
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the divergence flag value; see `canon schema` for the command's options.",
+      "meaning": "a divergence flag value is invalid",
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_REFUSED",
+      "exit": 1,
+      "fix": "Resolve the gate rule the error names, then run `canon gate promote --kind divergence` again.",
+      "meaning": "a divergence candidate was refused by a gate rule",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_APPROVAL_INVALID",
+      "exit": 2,
+      "fix": "Attach a well-formed human approval that verifies against the brief.",
+      "meaning": "the human approval attached to an attestation is missing, malformed or fails verification",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BATCH_REFUSED",
+      "exit": 1,
+      "fix": "Fix the entry the error names and submit the whole batch again; nothing was kept.",
+      "meaning": "a batch attestation was refused by the gate while its records were being promoted; every record and blob the run wrote was removed",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BIND_REFUSED",
+      "exit": 2,
+      "fix": "Pass a --report or --file that exists inside the repository and passes the binding rules named in the error.",
+      "meaning": "a --report or --file binding was refused",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_CONTRACT_MISMATCH",
+      "exit": 1,
+      "fix": "Record evidence whose kind and ref match the task's typed evidence contract.",
+      "meaning": "the record's kind and ref differ from the task's typed evidence contract",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_FABRICATED",
+      "exit": 1,
+      "fix": "Rewrite the note to state only what was actually run, without fabrication markers or unsupported verified claims.",
+      "meaning": "the note carries a fabrication marker or an unsupported verified claim",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the `canon evidence add` arguments so none is empty, malformed or contradictory.",
+      "meaning": "an `evidence add` argument is empty, malformed or contradicts another",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_REFUSED",
+      "exit": 2,
+      "fix": "Satisfy the evidence rule named in the error, then attest again.",
+      "meaning": "an attestation was refused by an evidence rule",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_REPORT_CONTRADICTION",
+      "exit": 1,
+      "fix": "Re-run the check so the report supports the verdict, or change the verdict to match the report.",
+      "meaning": "the bound report contradicts the verdict",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_SCENARIO_NOT_INDEXED",
+      "exit": 2,
+      "fix": "Run `canon inventory sync` so the scenario is indexed, or pass the id of a scenario the spec root declares.",
+      "meaning": "`evidence approval-payload` names a scenario the scenario index does not hold, so there are no bytes to sign",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_STORE_FAILED",
+      "exit": 1,
+      "fix": "Check the artifact store is reachable and writable, then run the command again.",
+      "meaning": "a bound file could not be written to the artifact store after the store was opened; the batch or record was rolled back",
+      "retryable": true
+    },
+    {
+      "code": "EVIDENCE_STORE_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Check the artifact store tier's endpoint and credentials in canon.yaml, or wait for the other canon process, then run the command again.",
+      "meaning": "the artifact store could not be used for a bound file before anything was written: the tier is not attached, the `artifact_store:` block is unusable, or another process holds the store lock",
+      "retryable": true
+    },
+    {
+      "code": "FEATURE_EXISTS",
+      "exit": 2,
+      "fix": "Choose a different feature path or edit the existing file.",
+      "meaning": "the feature file already exists",
+      "retryable": false
+    },
+    {
+      "code": "FEATURE_OUTSIDE_SPEC_ROOTS",
+      "exit": 2,
+      "fix": "Place the feature under a specs.roots entry in canon.yaml, or add a root that covers it.",
+      "meaning": "the feature path is under no configured specs.roots entry",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_INTRODUCED_REQUIRED",
+      "exit": 2,
+      "fix": "Pass --introduced-rev <rev> when the introducing commit was established, or --introduced-unknown when it was not; a note needs neither.",
+      "meaning": "a new blocker or should-fix finding names no introducing commit and does not say it is unknown",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the `canon finding` argument that is empty, malformed or out of range.",
+      "meaning": "a `finding` argument is empty, malformed or out of range",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the change, round and seq of a committed finding; `canon finding list` shows them.",
+      "meaning": "no committed finding at that change, round and seq",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_REASON_REQUIRED",
+      "exit": 2,
+      "fix": "Pass a one-line --reason when closing a finding as rejected or deferred.",
+      "meaning": "closing a finding as rejected or deferred needs a one-line --reason",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+      "exit": 2,
+      "fix": "Drop --resolution-rev, or close the finding as fixed.",
+      "meaning": "--resolution-rev was given with a disposition other than fixed",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_REVIEW_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids.",
+      "meaning": "--review names no review in the ledger or the archive",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_SEQ_OCCUPIED",
+      "exit": 2,
+      "fix": "Choose an unused seq for that change and round.",
+      "meaning": "a finding already holds that change, round and seq",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_STAGED",
+      "exit": 2,
+      "fix": "Commit the staged finding, then close it.",
+      "meaning": "the finding is still staged and cannot be closed until committed",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_UNKNOWN_SCENARIO",
+      "exit": 2,
+      "fix": "Pass a --scenario that the scenario index knows; run `canon inventory sync` if the scenario is new.",
+      "meaning": "--scenario names a scenario the index does not know",
+      "retryable": false
+    },
+    {
+      "code": "FORMAT_VIOLATIONS",
+      "exit": 1,
+      "fix": "Fix each violation listed in data.violations, then run `canon format` again.",
+      "meaning": "`format` found spec-corpus violations; data.violations names each",
+      "retryable": false
+    },
+    {
+      "code": "GATE_TASK_BLOCKED",
+      "exit": 1,
+      "fix": "Attach the evidence the task requires, then run `canon task done` again.",
+      "meaning": "`task done` refused to flip the task: its evidence does not support it",
+      "retryable": false
+    },
+    {
+      "code": "GATE_TASK_EVIDENCE_INVALID",
+      "exit": 1,
+      "fix": "Correct the task's evidence or typed atom named in the error, then run `canon task done` again.",
+      "meaning": "the evidence or typed atom for the task is invalid",
+      "retryable": false
+    },
+    {
+      "code": "GATE_TASK_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Pass a well-formed task id to `canon task done`.",
+      "meaning": "the task id is malformed",
+      "retryable": false
+    },
+    {
+      "code": "GATE_TASK_UNSUPPORTED",
+      "exit": 2,
+      "fix": "Mark the task done by hand in the plan document; this plan dialect cannot be flipped by canon.",
+      "meaning": "the plan dialect cannot flip this task",
+      "retryable": false
+    },
+    {
+      "code": "GATE_VIOLATIONS",
+      "exit": 1,
+      "fix": "Fix each violation listed in data.violations, then run the gate again.",
+      "meaning": "the evidence gate found violations; data.violations names each",
+      "retryable": false
+    },
+    {
+      "code": "HOOKS_INSTALL_FAILED",
+      "exit": 1,
+      "fix": "Check that the hook file and its directory are writable, then run `canon gate install-hooks` again.",
+      "meaning": "a hook file could not be written after the install began",
+      "retryable": false
+    },
+    {
+      "code": "HOOKS_INSTALL_REFUSED",
+      "exit": 2,
+      "fix": "Pass --repo naming an existing directory and check that the hook files under .claude and .codex are valid JSON, then run the install again.",
+      "meaning": "a hook install could not start: --repo is not an existing directory, or a hook file is unreadable or conflicting; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "HUMAN_ONLY",
+      "exit": 2,
+      "fix": "Show the human what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on their explicit approval run the call again with --relayed-via <tool>, --actor, --approver and --note (a brief also takes --digest <change>=<shown digest>). Where canon.yaml says `approval: { relay: deny }`, the human runs the call in their own shell (or on the dashboard for a brief). Never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself.",
+      "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`, a `migrate --commit` that re-binds `Approved:` lines), so an agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused unless it relays the human's explicit answer with --relayed-via, and a repo whose canon.yaml says `approval: { relay: deny }` refuses that too",
+      "retryable": false
+    },
+    {
+      "code": "INGEST_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix the named source or input, then run the ingest again.",
+      "meaning": "an ingest command failed",
+      "retryable": false
+    },
+    {
+      "code": "INGEST_SOURCE_UNUSABLE",
+      "exit": 1,
+      "fix": "Fix the malformed plan source under its configured root, then run `canon ingest plans` again.",
+      "meaning": "an `ingest plans` source was malformed and persisted nothing; check its root",
+      "retryable": false
+    },
+    {
+      "code": "INIT_AGENTS_MD_CONFLICT",
+      "exit": 2,
+      "fix": "Move or merge the conflicting AGENTS.md content by hand, then run `canon init` again.",
+      "meaning": "AGENTS.md cannot take the canon block without overwriting content",
+      "retryable": false
+    },
+    {
+      "code": "INIT_CONFIG_EXISTS",
+      "exit": 2,
+      "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it, or `canon demo init` in a directory without one.",
+      "meaning": "canon.yaml already exists and there is nothing else to refresh; `demo init` refuses any directory that holds one",
+      "retryable": false
+    },
+    {
+      "code": "INIT_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Pass a supported language and skill providers to `canon init`.",
+      "meaning": "an `init` option is invalid (language or skill providers)",
+      "retryable": false
+    },
+    {
+      "code": "INIT_SKILL_INSTALL_FAILED",
+      "exit": 1,
+      "fix": "Fix the skill install target the error names, then run `canon skills install`.",
+      "meaning": "canon.yaml was written but the canon skill was not installed",
+      "retryable": false
+    },
+    {
+      "code": "INPUT_CONFLICT",
+      "exit": 2,
+      "fix": "Give the value once: drop the flag or the key, or make the two equal.",
+      "meaning": "a flag on the command line and the same key in `--input` disagree",
+      "retryable": false
+    },
+    {
+      "code": "INPUT_INVALID",
+      "exit": 2,
+      "fix": "Pass one JSON object, a JSON array, or a file or `-` with one object per line, using only the keys `canon schema <command> --json` lists under `inputs`; `canon schema <command> --json` shows an example.",
+      "meaning": "`--input` cannot be read or framed (empty, not JSON or NDJSON, a file or stdin that cannot be read, stdin a terminal, an array on a leaf that takes one object) or the document breaks its fragment schema (an unknown key, a value of the wrong type, null); `field` and the message say which",
+      "retryable": false
+    },
+    {
+      "code": "INPUT_TOO_LARGE",
+      "exit": 2,
+      "fix": "Split the batch into several runs, each under the limit.",
+      "meaning": "the `--input` document is over 8 MiB or a batch is over 10000 elements",
+      "retryable": false
+    },
+    {
+      "code": "INTERNAL",
+      "exit": 1,
+      "fix": "Report it at https://github.com/journeyWorker/canon/issues with the command line and this error; it cannot be fixed from the command line.",
+      "meaning": "a bug in canon: a panic or a state canon did not expect; nothing about the command line is at fault",
+      "retryable": false
+    },
+    {
+      "code": "INVENTORY_ABORTED",
+      "exit": 1,
+      "fix": "Fix the violations or duplicate scenarios listed in data.roots, then run `canon inventory sync` again.",
+      "meaning": "`inventory sync` aborted a spec root on violations or duplicate scenarios; data.roots names each",
+      "retryable": false
+    },
+    {
+      "code": "INVENTORY_FAILED",
+      "exit": 1,
+      "fix": "Fix the store problem the error names, then run `canon inventory sync` again.",
+      "meaning": "the scenario index could not be built: the record store failed while `inventory sync` was reading or writing records",
+      "retryable": false
+    },
+    {
+      "code": "INVENTORY_REFUSED",
+      "exit": 2,
+      "fix": "Fix the `specs:` section or canon.yaml the error names, or wait for the other canon process, then run `canon inventory sync` again.",
+      "meaning": "`inventory sync` could not start: the `specs:` section or canon.yaml is unusable, or another process holds the index lock; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "LAYOUT_MIGRATION_REQUIRED",
+      "exit": 2,
+      "fix": "Run `canon migrate` to move the spec root to the current layout.",
+      "meaning": "the spec root uses a pre-0.17 layout; run `canon migrate`",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_DEMOTION_FAILED",
+      "exit": 1,
+      "fix": "Run `canon strategy rollback` on the still-active strategy, then retry the promotion.",
+      "meaning": "promotion is blocked and the demotion a contradicting trajectory triggered also failed; the strategy is still active",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_EVALUATION_REJECTED",
+      "exit": 1,
+      "fix": "Supply an evaluation file that fits the candidate strategy, then run `canon strategy promote` again.",
+      "meaning": "the promotion evaluation does not fit the candidate strategy",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the `canon strategy` flag value; see `canon schema` for the command's options.",
+      "meaning": "a `strategy` flag value is invalid",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_INVALID_INPUT",
+      "exit": 2,
+      "fix": "Fix the evaluation or approval file so it parses and matches its schema.",
+      "meaning": "a `strategy` evaluation or approval file is invalid",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_PROMOTION_BLOCKED",
+      "exit": 1,
+      "fix": "Resolve what the promotion gate reports for this strategy, then run `canon strategy promote` again.",
+      "meaning": "the promotion gate blocks this strategy",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_PROMOTION_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon strategy promote` again.",
+      "meaning": "the strategy could not be promoted",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_ROLLBACK_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause (sign the rollback again if the signature failed), then run `canon strategy rollback` again.",
+      "meaning": "the strategy exists but could not be rolled back: its signature does not verify, or the rollback could not be recorded",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_SIGNATURE_UNREADABLE",
+      "exit": 2,
+      "fix": "Pass the path of a readable detached signature file.",
+      "meaning": "the detached signature file could not be read",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_STRATEGY_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of an existing strategy.",
+      "meaning": "no strategy with that id; `strategy rollback` and `strategy approval-payload` look the id up first",
+      "retryable": false
+    },
+    {
+      "code": "LEARN_TRAJECTORY_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of a trajectory that exists, or omit the contradicting trajectory.",
+      "meaning": "the contradicting trajectory does not exist",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_ARCHIVE_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Point --ledger-root at a directory named `ledger`, or rename the ledger directory so it has an archive.",
+      "meaning": "`ledger compact` found no archive: the ledger root is not a directory named `ledger`",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_COMPACT_FAILED",
+      "exit": 1,
+      "fix": "Fix the file-system problem the error names, then run `canon ledger compact` again to move the rest.",
+      "meaning": "a superseded version could not be moved to the archive; what moved stays moved",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_KIND_ROUTED_AWAY",
+      "exit": 1,
+      "fix": "Route the kind to the `local` rung in canon.yaml, then run `canon status` again.",
+      "meaning": "a record kind is routed away from the `local` rung that status reads, so its records are not counted",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_NO_SCENARIOS",
+      "exit": 1,
+      "fix": "Run `canon inventory sync` to index the scenarios the .feature files hold.",
+      "meaning": "the ledger holds no scenario records, so every subject reads as owning none",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_RECORDS_UNREADABLE",
+      "exit": 2,
+      "fix": "Run `canon gate check` to name the unreadable records, then repair or rename them.",
+      "meaning": "ledger record files could not be read and are not counted",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_ROLLBACK_NOT_RESTORED",
+      "exit": 1,
+      "fix": "Copy the archived versions back from the archive beside the ledger.",
+      "meaning": "a batch write was rolled back but the archived versions its records had replaced were not put back",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_UNREADABLE",
+      "exit": 2,
+      "fix": "Run `canon init --check` to see what is wrong in canon.yaml, fix it, then run the command again.",
+      "meaning": "the repo's ledger could not be read, so nothing could be counted",
+      "retryable": false
+    },
+    {
+      "code": "LEGACY_GUIDE_STALE",
+      "exit": 1,
+      "fix": "Do not follow the old skill files; run `canon migrate --json`, then read `canon skills show canon`.",
+      "meaning": "the installed canon skill files are the 0.27 guide and name commands later versions removed",
+      "retryable": false
+    },
+    {
+      "code": "LEGACY_STATE_FOUND",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the upgrade, then apply it as the preview says.",
+      "meaning": "the repo holds 0.27-era canon state that later versions do not read",
+      "retryable": false
+    },
+    {
+      "code": "MIGRATE_INDEX_FAILED",
+      "exit": 1,
+      "fix": "Run `canon inventory sync` to rebuild the scenario index.",
+      "meaning": "files moved but the scenario index was not rebuilt; run `canon inventory sync`",
+      "retryable": false
+    },
+    {
+      "code": "MIGRATE_PINS_FAILED",
+      "exit": 1,
+      "fix": "Run `canon migrate` again to pin the reviews to their evidence.",
+      "meaning": "files moved but the reviews were not pinned to what their evidence says; run `canon migrate` again",
+      "retryable": false
+    },
+    {
+      "code": "MIGRATE_REFUSED",
+      "exit": 2,
+      "fix": "Fix the layout or config problem the error names, then run `canon migrate` again.",
+      "meaning": "`migrate` refused: the repository's layout or config cannot be moved safely",
+      "retryable": false
+    },
+    {
+      "code": "MIGRATE_STOPPED",
+      "exit": 2,
+      "fix": "Run `canon migrate` again to finish the rest.",
+      "meaning": "`migrate` stopped partway; running it again finishes the rest",
+      "retryable": false
+    },
+    {
+      "code": "MIGRATE_UNCOMMITTED",
+      "exit": 2,
+      "fix": "Commit or stash the uncommitted changes under the paths migrate moves, then run `canon migrate` again.",
+      "meaning": "`migrate` refused because paths it moves have uncommitted changes",
+      "retryable": false
+    },
+    {
+      "code": "NO_BRIEF",
+      "exit": 2,
+      "fix": "Run `canon change new` to create a change with a brief.",
+      "meaning": "no live change has a brief",
+      "retryable": false
+    },
+    {
+      "code": "NO_COMMIT",
+      "exit": 2,
+      "fix": "Run the command inside a git work tree that has at least one commit.",
+      "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
+      "retryable": false
+    },
+    {
+      "code": "OLD_BRIEF_FORMAT",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the rewrite; the human runs `canon migrate --commit --plan-digest <digest>` when the plan re-binds an `Approved:` line.",
+      "meaning": "a command that writes and judges a change brief was refused because that brief is in the format canon 0.30 and earlier wrote (`canon:` comments or shipped Korean headings); nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "OLD_BRIEF_FORMAT_FOUND",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the rewrite, then apply it as the preview says.",
+      "meaning": "a read command found briefs in the format canon 0.30 and earlier wrote; the commands that write and judge them are refused until they are rewritten",
+      "retryable": false
+    },
+    {
+      "code": "OLD_LAYOUT",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "OLD_LAYOUT_FOUND",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "a read command found a ledger laid out by canon 0.29, so the records named by the old rule are not counted and writes are refused",
+      "retryable": false
+    },
+    {
+      "code": "OVERRIDE_REASON_UNUSED",
+      "exit": 1,
+      "fix": "Drop --override-reason; the command needed no override.",
+      "meaning": "`--override-reason` was given but nothing was refused, so no override was recorded",
+      "retryable": false
+    },
+    {
+      "code": "OVERRIDE_RECORDED",
+      "exit": 1,
+      "fix": "Have the human review the recorded waiver and close the gap it names.",
+      "meaning": "a refusal was waived under `--override-reason` and the waiver is recorded; a gap that appears later is not covered",
+      "retryable": false
+    },
+    {
+      "code": "OVERRIDE_REFUSAL_WAIVED",
+      "exit": 1,
+      "fix": "Close the gap the waived refusal names, so the waiver is no longer needed.",
+      "meaning": "a refusal was waived under `--override-reason`",
+      "retryable": false
+    },
+    {
+      "code": "PLAN_CORPUS_UNREADABLE",
+      "exit": 2,
+      "fix": "Fix the plan sources configured in canon.yaml so every document can be read.",
+      "meaning": "the plan corpus could not be read to resolve a task",
+      "retryable": false
+    },
+    {
+      "code": "PLAN_SOURCES_MISSING",
+      "exit": 2,
+      "fix": "Configure plan sources in canon.yaml, then run the command again.",
+      "meaning": "the repository configures no plan sources",
+      "retryable": false
+    },
+    {
+      "code": "PLAN_STALE",
+      "exit": 2,
+      "fix": "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <DIGEST>`.",
+      "meaning": "the plan recomputed under `--commit` no longer has the `--plan-digest` the preview printed; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "PLUGIN_SYNC_ERRORS",
+      "exit": 1,
+      "fix": "Fix each error listed in data.roots, then run `canon plugin sync` again.",
+      "meaning": "`plugin sync` could not write some candidates; data.roots names each error",
+      "retryable": false
+    },
+    {
+      "code": "PLUGIN_SYNC_FAILED",
+      "exit": 2,
+      "fix": "Check that the plugin is installed and declares an overlay, and that canon.yaml parses, then run `canon plugin sync` again.",
+      "meaning": "`plugin sync` could not start: canon.yaml or its `specs:` section is unusable, the plugin is not installed under `.canon/plugins/`, no overlay source is registered for it, or it declares no overlay; nothing was written (a candidate that cannot be written is PLUGIN_SYNC_ERRORS)",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_FAILED",
+      "exit": 1,
+      "fix": "Check that .canon is writable, then have the human run `canon policy approve` again.",
+      "meaning": "the policy approval could not be written: the write of `.canon/policy.approval.json` failed",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_REFUSED",
+      "exit": 2,
+      "fix": "Write a policy with `canon init`, make `.canon/policy.yaml` readable, and pass --approver <name>, then have the human run `canon policy approve` again.",
+      "meaning": "`policy approve` could not start: there is no policy file, the policy cannot be read, or --approver is blank; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_UNREADABLE",
+      "exit": 1,
+      "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
+      "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 1), and `--override-reason` does not waive it",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_CHANGED_SINCE_APPROVAL",
+      "exit": 1,
+      "fix": "Restore `.canon/policy.yaml` to the approved bytes, or have the human run `canon policy approve` again.",
+      "meaning": "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_MISSING",
+      "exit": 1,
+      "fix": "Write `.canon/policy.yaml` with a `spec_coverage` section and have the human approve it.",
+      "meaning": "`.canon/policy.yaml` does not exist, so the gate requires no evidence, failure cases or review",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_NOT_APPROVED",
+      "exit": 1,
+      "fix": "Have a human review the policy and run `canon policy approve --approver <who>`.",
+      "meaning": "`.canon/policy.yaml` has no approval record",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_SPEC_COVERAGE_ABSENT",
+      "exit": 1,
+      "fix": "Add a `spec_coverage` section to `.canon/policy.yaml` and have the human approve it.",
+      "meaning": "the policy has no `spec_coverage` section, so the gate requires no evidence, failure cases or review",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_SPEC_COVERAGE_INVALID",
+      "exit": 2,
+      "fix": "Fix the `spec_coverage` section of `.canon/policy.yaml`; `canon gate check` reports what is wrong.",
+      "meaning": "the policy's `spec_coverage` section is unusable, so the gate refuses and the review guard cannot read whether review is required",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_UNREADABLE",
+      "exit": 2,
+      "fix": "Fix `.canon/policy.yaml` so it parses, then have the human approve it.",
+      "meaning": "`.canon/policy.yaml` cannot be read and falls back to defaults, so the gate requires no evidence, failure cases or review",
+      "retryable": false
+    },
+    {
+      "code": "PROMOTE_FAILED",
+      "exit": 1,
+      "fix": "Fix the ledger problem the error names, then run `canon gate promote` again.",
+      "meaning": "a staged record was written but promoting it to the ledger failed",
+      "retryable": false
+    },
+    {
+      "code": "PROMOTE_REFUSED",
+      "exit": 1,
+      "fix": "Fix each record listed in data.refused, then run `canon gate promote` again.",
+      "meaning": "`gate promote` refused one or more staged records; data.refused names each",
+      "retryable": false
+    },
+    {
+      "code": "PROMPT_BUNDLE_INVALID",
+      "exit": 2,
+      "fix": "Fix the prompt bundle so it parses and matches its schema.",
+      "meaning": "a prompt bundle is invalid",
+      "retryable": false
+    },
+    {
+      "code": "QUERY_FAILED",
+      "exit": 1,
+      "fix": "Check that the ledger is readable, then run the query again.",
+      "meaning": "the query could not read the ledger",
+      "retryable": false
+    },
+    {
+      "code": "QUERY_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Remove the flag that does not apply to this kind; see `canon schema` for its options.",
+      "meaning": "a query flag is invalid for this kind",
+      "retryable": false
+    },
+    {
+      "code": "QUERY_PLUGIN_DIAGNOSTIC",
+      "exit": 1,
+      "fix": "Read the diagnostic in the message and fix the plugin or the record it names.",
+      "meaning": "a `query --plugin` projection reported a diagnostic; the records are listed without that projection where it failed",
+      "retryable": false
+    },
+    {
+      "code": "REFERENCES_UNCHECKED",
+      "exit": 1,
+      "fix": "Make the sources readable (the message names the cause), then run the command again.",
+      "meaning": "the sources that records refer to could not be read, so references to missing sources were not checked",
+      "retryable": false
+    },
+    {
+      "code": "REGIME_KEY_INVALID",
+      "exit": 2,
+      "fix": "Pass a well-formed regime key; every part must be non-empty and valid.",
+      "meaning": "a regime key part is malformed",
+      "retryable": false
+    },
+    {
+      "code": "RELAY_DIGEST_MISMATCH",
+      "exit": 2,
+      "fix": "Run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw.",
+      "meaning": "a relayed brief approval names a digest that is not the brief's digest now, so the human was shown a different brief than the one on disk; nothing was recorded",
+      "retryable": false
+    },
+    {
+      "code": "REPORT_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon report build` or `canon report check` again.",
+      "meaning": "the report could not be built or checked",
+      "retryable": false
+    },
+    {
+      "code": "REPORT_STALE",
+      "exit": 1,
+      "fix": "Run `canon report build` or `canon report snapshot` to refresh the report.",
+      "meaning": "`report check` found the report missing or out of date",
+      "retryable": false
+    },
+    {
+      "code": "REPORT_TIER_NOT_READ_DIRECTLY",
+      "exit": 1,
+      "fix": "Route the kinds the message names to a rung the report reads, then run the report again.",
+      "meaning": "a report was built from a ledger where some record kinds are not read directly from their routed tier",
+      "retryable": false
+    },
+    {
+      "code": "REPO_UNREADABLE",
+      "exit": 2,
+      "fix": "Check that --repo points at a readable repository and that the named input file exists.",
+      "meaning": "the repository, its ledger or an input file could not be read",
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_EXPORT_FAILED",
+      "exit": 1,
+      "fix": "Check that the export destination is writable and has space, then run the export again.",
+      "meaning": "the export failed once it started writing: the output file or the access audit line could not be written",
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_EXPORT_REFUSED",
+      "exit": 2,
+      "fix": "Check that the ledger is readable and the tiers resolve, then run the export again.",
+      "meaning": "the export could not start: the ledger or its tiers could not be read, `--include-sensitive` was not allowed; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_PURGE_FAILED",
+      "exit": 1,
+      "fix": "Fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
+      "meaning": "the purge stopped after it began deleting: what was deleted stays deleted (`data` names the counts)",
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_PURGE_REFUSED",
+      "exit": 2,
+      "fix": "Fix the tier or ledger problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
+      "meaning": "the purge could not start, or it was only a preview: the tiers could not be opened or read, nothing was deleted",
+      "retryable": false
+    },
+    {
+      "code": "RETRIEVE_FAILED",
+      "exit": 2,
+      "fix": "Check --role and --regime (`canon regime show` prints a valid key), or pass exactly one of --regime and --domain, then run the retrieval again.",
+      "meaning": "`retrieve` could not start: --role disagrees with --regime, the scope flags conflict or are missing, or the domain/subject cannot be turned into a regime; a store outage is not an error here, it serves empty guidance (exit 0)",
+      "retryable": false
+    },
+    {
+      "code": "RETRIEVE_REGIME_FELL_BACK",
+      "exit": 1,
+      "fix": "Pass the regime that holds the guidance you want with --regime, or record guidance under the requested regime.",
+      "meaning": "`retrieve` served guidance from a regime derived by fallback instead of the one asked for",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_REFUSED",
+      "exit": 2,
+      "fix": "Bind an artifact that exists inside the repository and passes the rules named in the error.",
+      "meaning": "a review's artifact binding was refused",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Add the missing `canon review` argument or drop the one that contradicts another.",
+      "meaning": "a `review scenario` or `review change` argument is missing or contradicts another",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_RECORDS_UNMIGRATED",
+      "exit": 1,
+      "fix": "Run `canon migrate` to rewrite the old reviews to what the evidence says.",
+      "meaning": "scenarios have a review that predates review pinning and does not count until it is rewritten",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_SCENARIO_NOT_INDEXED",
+      "exit": 2,
+      "fix": "Run `canon inventory sync`, then review the scenario again.",
+      "meaning": "a reviewed scenario has no indexed record; run `canon inventory sync`",
+      "retryable": false
+    },
+    {
+      "code": "ROLE_UNKNOWN_RECORDED",
+      "exit": 1,
+      "fix": "Pass planner, implementer, reviewer, orchestrator or a role the policy names.",
+      "meaning": "`--as` or `--role` names a role that is not a known role or one the policy names; the command runs and records the value as given",
+      "retryable": false
+    },
+    {
+      "code": "SCAFFOLD_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the scaffold argument named in the error.",
+      "meaning": "a scaffold argument is invalid",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_INDEX_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Run `canon inventory sync` and read the error it names.",
+      "meaning": "whether the scenario index is stale could not be checked",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_INDEX_NOT_REFRESHED",
+      "exit": 1,
+      "fix": "Run `canon inventory sync`; it names each format violation, duplicate id or lock problem to fix.",
+      "meaning": "the scenario index is stale and could not be refreshed, so graded answers may describe specs the files no longer say",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_INDEX_REFRESHED",
+      "exit": 1,
+      "fix": "Run `canon inventory sync` to list any tag diagnostics the refresh found.",
+      "meaning": "a read command refreshed a stale scenario index from changed .feature files and reports what it wrote",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_SUBJECT_UNKNOWN",
+      "exit": 1,
+      "fix": "Create the subject with `canon subject new`, or correct the `@subject` tag.",
+      "meaning": "scenarios are tagged `@subject:<id>` but no subject with that id exists",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_TAG_EXISTS",
+      "exit": 2,
+      "fix": "Choose a tag that is not already used, or edit the existing scenario.",
+      "meaning": "the scenario tag already exists",
+      "retryable": false
+    },
+    {
+      "code": "SEARCH_GITIGNORE_MISSING",
+      "exit": 1,
+      "fix": "Run `canon init` or `canon migrate` to add the line to .gitignore.",
+      "meaning": "the repo's .gitignore lacks the line of the search index directory",
+      "retryable": false
+    },
+    {
+      "code": "SEARCH_INDEX_FAILED",
+      "exit": 1,
+      "fix": "Fix or restore what the message names (an unreadable store, a record file), then run the command again; the index is derived, so deleting `.canon/index` is always safe.",
+      "meaning": "`search` or `trace` could not read the records the index is built from, or could not build or read the index",
+      "retryable": false
+    },
+    {
+      "code": "SEARCH_INDEX_IN_MEMORY",
+      "exit": 1,
+      "fix": "Make `.canon/index` writable, then run the command again.",
+      "meaning": "the search index file could not be written or deleted, so the index was built in memory for this run",
+      "retryable": false
+    },
+    {
+      "code": "SEARCH_INDEX_REBUILT",
+      "exit": 1,
+      "fix": "Nothing to do; if it recurs, check the disk and permissions of `.canon/index`.",
+      "meaning": "the search index file was not a usable database, so it was deleted and rebuilt",
+      "retryable": false
+    },
+    {
+      "code": "SEARCH_QUERY_EMPTY",
+      "exit": 2,
+      "fix": "Pass the text to find, e.g. `canon search timeout`.",
+      "meaning": "`search` was given an empty text or one of only spaces",
+      "retryable": false
+    },
+    {
+      "code": "SELFTEST_FAILED",
+      "exit": 1,
+      "fix": "Read the failing suite or fixture in the output and fix the behavior it checks.",
+      "meaning": "a selftest suite or fixture did not match its expected result",
+      "retryable": false
+    },
+    {
+      "code": "SERIALIZE_FAILED",
+      "exit": 1,
+      "fix": "Report this canon bug with the command you ran; it cannot be fixed from the command line.",
+      "meaning": "the result could not be serialized",
+      "retryable": false
+    },
+    {
+      "code": "SKILLS_DRIFT",
+      "exit": 1,
+      "fix": "Run `canon skills install` to refresh the installed skills.",
+      "meaning": "`skills check` found an installed skill missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version",
+      "retryable": false
+    },
+    {
+      "code": "SKILLS_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause, then run the skills command again.",
+      "meaning": "a skills command failed",
+      "retryable": false
+    },
+    {
+      "code": "SKILLS_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Name providers from claude, codex, omp, pi (or none), and keep the canon.yaml `skills:` section a mapping whose `providers` is a list of those names.",
+      "meaning": "a skill provider is unknown, the `skills:` section of canon.yaml is malformed, or the `--skills-source` directory does not exist",
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOTS_UNREADABLE",
+      "exit": 2,
+      "fix": "Make the scenario files the brief's flow steps point at readable, or correct the paths.",
+      "meaning": "the scenario files a brief's flow steps point at could not be read",
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOT_UNRESOLVED",
+      "exit": 2,
+      "fix": "Pass --project with the id of the spec root to use.",
+      "meaning": "no single spec root could be chosen; pass --project",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_DEMOTED",
+      "exit": 1,
+      "fix": "Review the contradicting trajectory before promoting the strategy again.",
+      "meaning": "later contradictory evidence demoted an active strategy while its promotion was blocked",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_ADOPT_REFUSED",
+      "exit": 2,
+      "fix": "Fix the problem the error names, then run `canon subject adopt` again.",
+      "meaning": "the change could not be adopted by the subject",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_EXISTS",
+      "exit": 2,
+      "fix": "Choose a different subject id, or use the existing subject (`canon subject show`).",
+      "meaning": "a subject with that id already exists",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_GATE_VIOLATION",
+      "exit": 1,
+      "fix": "Fix each gate violation reported, then run `canon subject move` again.",
+      "meaning": "the status transition is blocked by gate violations",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_INVALID_ARGUMENT",
+      "exit": 2,
+      "fix": "Correct the malformed `canon subject` argument.",
+      "meaning": "a `subject` argument is malformed",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_INVALID_TRANSITION",
+      "exit": 2,
+      "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
+      "meaning": "the status change is not an allowed transition",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of an existing subject; `canon status` lists the subjects.",
+      "meaning": "no subject with that id",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_OVERRIDE_ON_RECORD",
+      "exit": 1,
+      "fix": "Close the gaps the waiver names, then move the subject again without an override.",
+      "meaning": "a subject stands in its status under a recorded `--override-reason` waiver of gate refusals",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_REASON_REQUIRED",
+      "exit": 2,
+      "fix": "Pass --reason when reopening a shipped subject with `canon subject move`.",
+      "meaning": "reopening a shipped subject needs --reason",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_REOPENED",
+      "exit": 1,
+      "fix": "Keep the follow-up in its change, then scenario, evidence and review, before shipping again.",
+      "meaning": "a shipped subject was reopened for a follow-up change; shipping again runs every guard",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_UNADOPT_REFUSED",
+      "exit": 2,
+      "fix": "Leave the change adopted, or remove its approved brief and the `@flow:<change>.*` scenario tags first.",
+      "meaning": "the change carries an approved brief, or a scenario the subject owns is tagged `@flow:<change>.*`, so it stays adopted",
+      "retryable": false
+    },
+    {
+      "code": "TASK_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass a task id that exists in the plan corpus.",
+      "meaning": "the task id names no task in the plan corpus",
+      "retryable": false
+    },
+    {
+      "code": "TASK_PROOF_IS_CANON_COMMAND",
+      "exit": 1,
+      "fix": "Bind the artifact or report that proves the task with `canon evidence add --artifact <path>`.",
+      "meaning": "a task was flipped on evidence that binds no file and cites a canon command, which reports on canon's own records and proves nothing",
+      "retryable": false
+    },
+    {
+      "code": "TASK_REIMPORT_INCOMPLETE",
+      "exit": 1,
+      "fix": "Run `canon ingest plans` to see why the change did not import.",
+      "meaning": "a task was flipped but its change did not re-import cleanly, so the task status record may disagree with the plan",
+      "retryable": false
+    },
+    {
+      "code": "TASK_ROW_NOT_FOUND",
+      "exit": 2,
+      "fix": "Restore the task's row in its plan document, then run `canon task done` again.",
+      "meaning": "the task's row is missing from its plan document",
+      "retryable": false
+    },
+    {
+      "code": "TASK_STATUS_NOT_REFRESHED",
+      "exit": 1,
+      "fix": "Run `canon ingest plans` so the task records match the plan.",
+      "meaning": "a task was flipped but its status record was not refreshed, so `canon query --kind task` may not match the plan",
+      "retryable": false
+    },
+    {
+      "code": "TIER_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause, then run tier aging again.",
+      "meaning": "tier aging failed",
+      "retryable": false
+    },
+    {
+      "code": "TRACE_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the key of a finding (`canon query --kind finding`), a review id a review printed, or enough characters of a commit sha to name one commit.",
+      "meaning": "no record says the id `trace` was given, or the sha prefix fits more than one commit",
+      "retryable": false
+    },
+    {
+      "code": "TRACE_OPERAND_INVALID",
+      "exit": 2,
+      "fix": "Pass a review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`).",
+      "meaning": "`trace` was given something that is none of a review id, a commit sha or a finding key (a placeholder node's id is not one)",
+      "retryable": false
+    },
+    {
+      "code": "TYPED_ATOMS_INVALID",
+      "exit": 2,
+      "fix": "Fix the change's typed-atoms file so it parses.",
+      "meaning": "the typed-atoms file for the change does not parse",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_COMMAND",
+      "exit": 2,
+      "fix": "Run one of the commands `expected` lists; `canon schema` lists every command path.",
+      "meaning": "a command word is not in canon's command tree, or `canon schema` was given a path canon does not have; `expected` lists the valid words at that level",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_ERROR_CODE",
+      "exit": 2,
+      "fix": "Run `canon schema --errors` to list every code.",
+      "meaning": "`canon schema --error <CODE>` was given a code canon does not have",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_ROLE",
+      "exit": 2,
+      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
+      "meaning": "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_ROLE_IGNORED",
+      "exit": 2,
+      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
+      "meaning": "`CANON_ROLE` holds a value that is not a role and was ignored, because the command (`schema`, `context`, `skills show`) does not depend on the role",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_SPEC_ROOT",
+      "exit": 2,
+      "fix": "Pass a --project that names a spec root configured in canon.yaml.",
+      "meaning": "`--project` names no spec root configured in canon.yaml, so nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "UNVERIFIABLE",
+      "exit": 1,
+      "fix": "Widen the check so it examines something; meta.coverage says what was looked at.",
+      "meaning": "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at",
+      "retryable": false
+    },
+    {
+      "code": "USAGE",
+      "exit": 2,
+      "fix": "Run the command with --help and correct the argument `field` names; `expected` lists the valid values when there is a closed set.",
+      "meaning": "the command line did not parse or breaks a constraint: an unknown option, a missing or malformed value, an unexpected operand, a `--fields` name that cannot be selected, `--input -` beside another option that reads stdin; `field` names the argument",
+      "retryable": false
+    },
+    {
+      "code": "WRITE_FAILED",
+      "exit": 1,
+      "fix": "Check that the target path is writable and has space, then run the command again.",
+      "meaning": "a write began and failed: a file or ledger record could not be written after the command started changing things; what an earlier step wrote stays, and the message says which",
+      "retryable": false
+    },
+    {
+      "code": "WRITE_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Make the target writable (its permissions, a mounted volume, a missing parent), then run the command again.",
+      "meaning": "a target the command writes cannot be written, known before anything was changed: it is read-only, its directory is missing or not a directory; nothing was written",
+      "retryable": false
+    }
+  ],
+  "setup": [
+    [
+      "init"
+    ]
+  ]
+}

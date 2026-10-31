@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "data": {
+    "team": "core",
+    "members": [
+      {
+        "id": 1,
+        "profile": {
+          "name": "Ada",
+          "email": "ada@example.org",
+          "timezone": "UTC"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "command": "member list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "fields": [
+      "id",
+      "profile",
+      "profile.name"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "error": {
+    "code": "FINDING_REASON_REQUIRED",
+    "message": "--disposition rejected needs --reason",
+    "field": "--reason",
+    "hint": "canon finding close add-login --round 1 --seq 2 --disposition rejected --reason <TEXT> --json",
+    "retryable": true
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.1",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

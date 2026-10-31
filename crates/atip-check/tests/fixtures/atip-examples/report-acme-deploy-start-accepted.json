@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "data": {
+    "deployment": "d-7f3a",
+    "environment": "staging",
+    "state": "accepted"
+  },
+  "meta": {
+    "command": "deploy start",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "next": [
+      {
+        "command": "acme deploy status d-7f3a --wait --json",
+        "argv": [
+          "deploy",
+          "status",
+          "d-7f3a",
+          "--wait",
+          "--json"
+        ],
+        "reason": "wait for the deployment to end"
+      }
+    ]
+  }
+}

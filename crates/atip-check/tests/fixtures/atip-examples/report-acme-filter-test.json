@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "data": {
+    "matched": 5
+  },
+  "meta": {
+    "command": "filter test",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "ok": false,
+  "error": {
+    "code": "BATCH_INCOMPLETE",
+    "message": "item 0 of 2 failed (FINDING_NOT_FOUND): nothing written, 1 skipped",
+    "field": "/0",
+    "retryable": false
+  },
+  "data": {
+    "items": [
+      {
+        "index": 0,
+        "status": "failed",
+        "error": {
+          "code": "FINDING_NOT_FOUND",
+          "message": "no committed finding add-login round 1 seq 9",
+          "retryable": false
+        }
+      },
+      {
+        "index": 1,
+        "status": "skipped"
+      }
+    ]
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "output": "BatchFindingCloseReport"
+  }
+}

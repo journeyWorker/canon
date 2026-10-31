@@ -1,0 +1,19 @@
+{
+  "ok": false,
+  "error": {
+    "code": "FINDING_REASON_REQUIRED",
+    "message": "item 1: --disposition deferred needs --reason",
+    "field": "/1/reason",
+    "retryable": false
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

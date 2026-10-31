@@ -1,0 +1,40 @@
+[package]
+name = "atip-check"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "atip check: runs a built binary and checks the atip/1 contract from outside (argv in; stdout, stderr, exit status and file-system changes out). It knows nothing about the tool's source or framework, and it follows the contract itself. Depends on no canon crate, so it can move to the atip repository unchanged."
+autobins = false
+
+[lib]
+name = "atip_check"
+path = "src/lib.rs"
+
+# The checker. Its bin is `atip`; `atip check` is its one command.
+[[bin]]
+name = "atip"
+path = "src/main.rs"
+
+# A small program whose behaviour is a JSON configuration: the checker's tests
+# run `atip check` against it, once conforming and once per seeded violation
+# (approaches/checker.md 7.2). Not part of the checker.
+[[bin]]
+name = "atip-fake-tool"
+path = "fake-tool/main.rs"
+test = false
+
+[dependencies]
+atip = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tempfile = "3"
+# Schemas are validated with JSON Schema 2020-12; `format` is an annotation only (no format assertions).
+jsonschema = { version = "0.47.0", default-features = false }
+
+[target.'cfg(unix)'.dependencies]
+# A pseudo-terminal for the checks that need stdout on a terminal, and the kill of a timed-out process group.
+nix = { version = "0.31", default-features = false, features = ["term", "signal", "poll"] }
+
+[lints]
+workspace = true

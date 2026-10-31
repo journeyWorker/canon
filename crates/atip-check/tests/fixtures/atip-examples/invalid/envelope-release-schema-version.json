@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "data": {},
+  "meta": {
+    "command": "check",
+    "schemaVersion": "0.48.0.check",
+    "tool": "lute",
+    "toolVersion": "0.52.0"
+  }
+}

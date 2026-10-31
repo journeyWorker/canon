@@ -368,6 +368,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "atip-check"
+version = "0.32.0"
+dependencies = [
+ "atip",
+ "jsonschema",
+ "nix",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -521,6 +534,7 @@ name = "canon-cli"
 version = "0.32.0"
 dependencies = [
  "atip",
+ "atip-check",
  "base64",
  "canon-fmt",
  "canon-gate",

@@ -1,0 +1,48 @@
+{
+  "ok": false,
+  "error": {
+    "code": "INPUT_INVALID",
+    "message": "2 problems in --input",
+    "field": "/reasn",
+    "retryable": false,
+    "details": [
+      {
+        "code": "INPUT_INVALID",
+        "message": "unknown key reasn",
+        "field": "/reasn",
+        "expected": [
+          "actor",
+          "disposition",
+          "noPromote",
+          "operands",
+          "promote",
+          "reason",
+          "resolutionRev",
+          "role",
+          "round",
+          "seq",
+          "session"
+        ],
+        "suggestions": [
+          "reason"
+        ]
+      },
+      {
+        "code": "INPUT_INVALID",
+        "message": "round must be an integer",
+        "field": "/round",
+        "received": "one"
+      }
+    ]
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.1",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

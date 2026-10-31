@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "session",
+    "before": "2020-01-01T00:00:00Z",
+    "planDigest": "sha256:9f2c4e1b7a03d5c8e6f41b2a7d9c0e3f5a8b1c4d7e0f2a3b6c9d1e4f7a0b3c5d",
+    "committed": false,
+    "effects": [
+      {
+        "action": "delete",
+        "path": ".canon/ledger/sessions/2019-11.jsonl",
+        "record": null,
+        "detail": "412 records"
+      },
+      {
+        "action": "delete",
+        "path": ".canon/ledger/sessions/2019-12.jsonl",
+        "record": null,
+        "detail": "388 records"
+      }
+    ]
+  },
+  "meta": {
+    "command": "purge",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "next": [
+      {
+        "command": "canon purge --kind session --before 2020-01-01T00:00:00Z --commit --plan-digest <DIGEST> --json",
+        "argv": [
+          "purge",
+          "--kind",
+          "session",
+          "--before",
+          "2020-01-01T00:00:00Z",
+          "--commit",
+          "--plan-digest",
+          "<DIGEST>",
+          "--json"
+        ]
+      }
+    ]
+  }
+}

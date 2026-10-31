@@ -1,0 +1,26 @@
+{
+  "ok": false,
+  "error": {
+    "code": "UNKNOWN_COMMAND",
+    "message": "unrecognized subcommand 'nosuch'",
+    "field": "command",
+    "received": "nosuch",
+    "expected": [
+      "finding",
+      "purge",
+      "schema",
+      "skills"
+    ],
+    "hint": "canon schema --json",
+    "retryable": false
+  },
+  "meta": {
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

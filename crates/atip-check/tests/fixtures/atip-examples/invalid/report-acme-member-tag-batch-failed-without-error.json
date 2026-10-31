@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "error": {
+    "code": "BATCH_INCOMPLETE",
+    "message": "item 0 failed",
+    "field": "/0",
+    "retryable": false
+  },
+  "data": {
+    "items": [
+      {
+        "index": 0,
+        "status": "failed"
+      }
+    ]
+  },
+  "meta": {
+    "command": "member tag",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "output": "BatchMemberTagReport"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "ok": false,
+  "error": {
+    "code": "USAGE",
+    "message": "invalid value 'closed' for '--disposition <DISPOSITION>'",
+    "field": "--disposition",
+    "expected": [
+      "open",
+      "fixed",
+      "rejected",
+      "deferred"
+    ],
+    "received": "closed",
+    "hint": "canon schema finding close --json",
+    "retryable": false
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.1",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

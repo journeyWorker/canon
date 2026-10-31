@@ -70,6 +70,8 @@ libc = "0.2"
 flate2 = { workspace = true }
 
 [dev-dependencies]
+# `atip check`, run in-process against the canon binary (tests/atip_check.rs).
+atip-check = { workspace = true }
 tempfile = "3"
 uuid = { version = "1.23.4", features = ["v4"] }
 

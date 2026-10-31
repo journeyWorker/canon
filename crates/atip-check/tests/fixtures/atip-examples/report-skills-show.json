@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "data": {
+    "name": "canon",
+    "text": "# canon\n\nRecord what a change claims and what proves it.\n",
+    "guides": [
+      "canon",
+      "role-implementer",
+      "role-reviewer"
+    ],
+    "full": true
+  },
+  "meta": {
+    "command": "skills show",
+    "contract": "atip/1",
+    "schemaVersion": "2.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0"
+  }
+}
