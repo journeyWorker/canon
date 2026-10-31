@@ -177,12 +177,12 @@ pub struct StatusReport {
     #[schemars(skip)]
     pub next: Vec<NextStep>,
     /// How many further `next` entries the rules produced past
-    /// [`NEXT_LIMIT`]: `meta.nextOmitted`.
+    /// [`NEXT_LIMIT`]: `data.nextOmitted`.
     #[serde(skip)]
     #[schemars(skip)]
     pub next_omitted: usize,
     /// With a declared role: how many steps each other owner holds
-    /// (`human` for the steps only the human takes): `meta.waitingOn`.
+    /// (`human` for the steps only the human takes): `data.waitingOn`.
     #[serde(skip)]
     #[schemars(skip)]
     pub waiting_on: Option<BTreeMap<String, usize>>,

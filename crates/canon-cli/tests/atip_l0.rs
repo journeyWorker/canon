@@ -349,7 +349,8 @@ fn atip_l0_15_an_unknown_command_answers_unknown_command() {
 #[test]
 fn atip_l0_16_a_bare_tool_or_group_answers_command_required() {
     let dir = TempDir::new().unwrap();
-    for (args, level) in [(vec!["--json"], "status"), (vec!["finding", "--json"], "list"), (vec!["--json", "finding"], "close")] {
+    // Every group answers the same, including `brief` and `report`, which once had their own removed-spelling error.
+    for (args, level) in [(vec!["--json"], "status"), (vec!["finding", "--json"], "list"), (vec!["--json", "finding"], "close"), (vec!["brief", "--json"], "show"), (vec!["--json", "brief"], "approve"), (vec!["report", "--json"], "build"), (vec!["--json", "report"], "snapshot")] {
         let out = canon(dir.path(), &args);
         assert_eq!(out.status.code(), Some(2), "{args:?}");
         assert!(out.stderr.is_empty());
@@ -357,6 +358,13 @@ fn atip_l0_16_a_bare_tool_or_group_answers_command_required() {
         assert_eq!(document["error"]["code"], "COMMAND_REQUIRED", "{args:?}: {document}");
         let expected: Vec<&str> = document["error"]["expected"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
         assert!(expected.contains(&level), "{args:?}: {expected:?}");
+    }
+    // A word that is no command of a group is UNKNOWN_COMMAND for every group.
+    for group in ["finding", "brief", "report"] {
+        let document = json(&canon(dir.path(), &[group, "nosuch", "--json"]));
+        assert_eq!(document["error"]["code"], "UNKNOWN_COMMAND", "{group}: {document}");
+        assert_eq!(document["error"]["received"], "nosuch");
+        assert_eq!(document["meta"]["command"], group);
     }
 }
 
