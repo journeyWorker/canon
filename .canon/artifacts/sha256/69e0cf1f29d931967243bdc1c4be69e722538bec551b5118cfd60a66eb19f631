@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="51" skipped="0" failures="0" errors="0" uuid="2e7aed50-1abd-4ac8-8375-68e319c87697" timestamp="2026-11-01T01:32:31.648+09:00" time="42.924">
+    <testsuite name="canon-cli::atip_l0" tests="26" skipped="0" errors="0" failures="0">
+        <testcase name="atip_l0_03_an_unresolved_command_leaves_command_out_and_a_half_resolved_one_names_the_path" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="2.400"/>
+        <testcase name="atip_l0_02_an_output_is_named_when_the_command_declares_several" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="2.809"/>
+        <testcase name="atip_l0_01_status_json_names_the_tool_its_version_and_the_contract" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.192"/>
+        <testcase name="atip_l0_05_a_member_with_no_value_is_absent" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.276"/>
+        <testcase name="atip_l0_10_projected_and_paged_output_holds_only_defined_meta_members" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.345"/>
+        <testcase name="atip_l0_15_an_unknown_command_answers_unknown_command" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:35.924+09:00" time="0.142"/>
+        <testcase name="atip_l0_06_every_envelope_the_binary_prints_passes_the_contract_schema" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.560"/>
+        <testcase name="atip_l0_08_a_page_is_in_meta_page_with_a_next_step_for_the_next_one" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.657"/>
+        <testcase name="atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.306+09:00" time="0.049"/>
+        <testcase name="atip_l0_16_a_bare_tool_or_group_answers_command_required" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:35.993+09:00" time="0.448"/>
+        <testcase name="atip_l0_04_context_holds_only_the_context_options_with_relative_paths" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.811"/>
+        <testcase name="atip_l0_20_a_panic_answers_internal_with_exit_one_never_101" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.355+09:00" time="0.143"/>
+        <testcase name="atip_l0_11_a_cursor_canon_did_not_issue_is_refused_with_cursor_invalid" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="4.884"/>
+        <testcase name="atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:34.457+09:00" time="2.279"/>
+        <testcase name="atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.498+09:00" time="0.344"/>
+        <testcase name="atip_l0_12_next_entries_are_runnable_with_reason_and_json" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:34.050+09:00" time="2.889"/>
+        <testcase name="atip_l0_14_guidance_with_a_placeholder_is_not_a_next_entry" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:35.841+09:00" time="1.510"/>
+        <testcase name="atip_l0_18_a_text_error_opens_stderr_with_the_tool_code_and_message" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.210+09:00" time="1.347"/>
+        <testcase name="atip_l0_17_an_unknown_option_a_missing_value_or_an_unknown_field_name_is_usage" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.066+09:00" time="1.564"/>
+        <testcase name="atip_l0_09_a_repeated_write_reports_unchanged_in_data_and_the_role_split_in_data" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:31.648+09:00" time="6.041"/>
+        <testcase name="atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.532+09:00" time="1.308"/>
+        <testcase name="atip_l0_21_a_closed_stdout_is_a_signal_exit_outside_the_registry" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.441+09:00" time="1.548"/>
+        <testcase name="atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_input_invalid" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.459+09:00" time="1.558"/>
+        <testcase name="atip_l0_29_input_twice_or_without_a_value_is_usage_on_input" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.737+09:00" time="1.396"/>
+        <testcase name="atip_l0_30_the_framing_faults_of_input_carry_a_reason_and_a_document_fault_a_pointer" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.842+09:00" time="1.746"/>
+        <testcase name="atip_l0_31_every_error_object_passes_the_contract_error_schema" classname="canon-cli::atip_l0" timestamp="2026-11-01T01:32:36.940+09:00" time="2.090"/>
+    </testsuite>
+    <testsuite name="canon-cli::record_links" tests="25" skipped="0" errors="0" failures="0">
+        <testcase name="authoring_init_101_init_check_shows_where_the_hot_store_is" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.351+09:00" time="0.092"/>
+        <testcase name="authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_names_a_hot_store_it_cannot_open" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.443+09:00" time="0.071"/>
+        <testcase name="finding_add_41_a_new_blocker_or_should_fix_with_no_introducing_commit_and_no_unknown_mark_is_refused" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.989+09:00" time="1.656"/>
+        <testcase name="hand_written_finding_add_blocker_and_should_fix_examples_name_the_introducing_commit" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:39.645+09:00" time="0.028"/>
+        <testcase name="finding_add_43_an_introducing_commit_together_with_the_unknown_mark_is_refused" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:38.133+09:00" time="1.705"/>
+        <testcase name="ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:39.838+09:00" time="0.590"/>
+        <testcase name="finding_add_39_a_review_id_that_no_review_has_is_refused_and_the_ledger_is_unchanged" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.690+09:00" time="2.792"/>
+        <testcase name="finding_close_89_a_blocker_written_before_0_30_with_neither_field_still_closes_and_reopens" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:39.030+09:00" time="1.479"/>
+        <testcase name="context_status_85_a_gitignored_derived_record_is_not_a_source_and_gate_check_is_unchanged" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.557+09:00" time="2.952"/>
+        <testcase name="ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:40.482+09:00" time="0.280"/>
+        <testcase name="context_status_84_status_counts_references_to_missing_sources_per_kind_and_gives_the_same_json_on_every_checkout_of_one_commit" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.514+09:00" time="3.315"/>
+        <testcase name="finding_add_38_a_finding_added_with_a_review_id_points_at_that_review_and_a_query_shows_the_id" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.630+09:00" time="3.396"/>
+        <testcase name="finding_add_40_the_id_of_a_review_that_moved_to_the_archive_is_still_accepted" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:37.841+09:00" time="3.405"/>
+        <testcase name="finding_add_42_a_new_defect_finding_is_recorded_with_an_introducing_commit_or_the_unknown_mark_and_a_note_needs_neither" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:38.017+09:00" time="3.462"/>
+        <testcase name="finding_close_88_closing_or_reopening_a_finding_copies_its_review_id_and_its_unknown_mark" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:38.588+09:00" time="3.355"/>
+        <testcase name="inventory_sync_53_a_scenario_index_record_holds_the_steps_in_source_order_with_inherited_ones_marked" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:40.509+09:00" time="1.549"/>
+        <testcase name="inventory_sync_55_an_edited_step_replaces_the_record_and_the_old_record_goes_to_the_archive" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:40.762+09:00" time="1.403"/>
+        <testcase name="inventory_sync_54_a_0_29_index_record_without_steps_is_rewritten_with_them_on_the_next_sync" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:40.510+09:00" time="1.764"/>
+        <testcase name="ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:40.428+09:00" time="1.906"/>
+        <testcase name="query_read_83_a_query_marks_a_reference_to_a_source_that_is_not_committed_and_counts_them" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:41.026+09:00" time="2.091"/>
+        <testcase name="review_add_101_one_review_run_gives_every_scenario_it_writes_the_same_review_id" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:41.479+09:00" time="1.838"/>
+        <testcase name="ledger_migrate_16_a_review_keeps_its_review_id_through_canon_migrate" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:40.829+09:00" time="2.826"/>
+        <testcase name="query_read_84_a_query_whose_references_all_resolve_marks_nothing_and_counts_zero" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:41.246+09:00" time="4.845"/>
+        <testcase name="review_add_102_running_the_same_review_again_writes_nothing_and_shows_the_earlier_review_ids" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:41.943+09:00" time="4.480"/>
+        <testcase name="ingest_sessions_15_a_command_that_writes_hot_records_prints_the_hot_store_location" classname="canon-cli::record_links" timestamp="2026-11-01T01:32:39.673+09:00" time="34.898"/>
+    </testsuite>
+</testsuites>
