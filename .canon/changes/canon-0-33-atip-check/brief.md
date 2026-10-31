@@ -140,3 +140,5 @@ atip/1 계약은 규칙만 있고, 빌드된 바이너리를 밖에서 대어 �
 - lute 같은 다른 도구에 대한 실행.
 - 계약 문서, 스키마, 예시의 수정. 사본을 읽기만 한다.
 - canon의 출력을 계약에 맞추는 일(`canon-0-33-atip-l0`).
+
+Approved: Journey Hwang 2026-10-31T10:46:20Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:e83d8889b3af0a38d408f3d13272bf72727d129d86dbf3560b34017027bc42c8)

@@ -41,3 +41,5 @@ refactor
 - `spec`, `schema`, `input`, `safety`, `stream`, `skills` 모듈의 추출. L1(0.34)과 L2(0.35)에서 한다.
 - `atip check` 검사기(`canon-0-33-atip-check`).
 - crates.io 게시, atip 레포로의 이동, lute 전환.
+
+Approved: Journey Hwang 2026-10-31T10:46:20Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:f0f0f5f477d882e23fb46b115cc11b430ed3f2c33ee14e1418c8a9cbf4e73e15)
