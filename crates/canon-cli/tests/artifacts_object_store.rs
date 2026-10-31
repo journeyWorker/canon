@@ -234,7 +234,7 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
     let mut args = vec!["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/other.json"];
     args.push("--json");
     let add = repo.canon_s3(&args, &env);
-    assert_eq!(add.status.code(), Some(2), "{}", text(&add));
+    assert_eq!(add.status.code(), Some(1), "the store was opened and the upload failed: {}", text(&add));
     let body = stdout_json(&add);
     assert_eq!(body["error"]["code"], "EVIDENCE_STORE_FAILED");
     assert!(body["error"]["hint"].as_str().unwrap().contains("reachable"), "{body}");
@@ -247,7 +247,7 @@ fn an_artifacts_block_naming_no_s3_tier_is_refused_where_it_is_used() {
     write_report(&repo, V1);
     let add = repo.attest(&["--artifact", "reports/smoke.json"]);
     assert_eq!(add.status.code(), Some(2), "{}", text(&add));
-    assert!(text(&add).contains("EVIDENCE_STORE_FAILED") && text(&add).contains("which is not an object store"), "{}", text(&add));
+    assert!(text(&add).contains("EVIDENCE_STORE_UNAVAILABLE") && text(&add).contains("which is not an object store"), "{}", text(&add));
     assert!(text(&add).contains("`artifact_store: { backend: local }`"), "the hint names the way out: {}", text(&add));
 }
 
@@ -297,7 +297,7 @@ fn migrate_moves_verifies_removes_local_copies_and_is_idempotent_and_resumable()
     assert!(repo.attest(&["--artifact", "reports/third.json"]).status.success());
     let stale = repo.canon(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
-    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_STALE");
     assert!(repo.local_blob(V1).exists() && repo.local_blob(v3).exists() && !repo.object(V1).exists() && repo.canon_yaml() == yaml_before, "a stale digest changes nothing");
 
     let run = repo.move_to("cold");

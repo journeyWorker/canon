@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T14:50:20.904353Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/tier_age.rs:101",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "tier.storage.11"
+  ],
+  "schema": 2,
+  "seq": 12,
+  "severity": "should_fix",
+  "summary": "Spec fidelity: the Given (a record past its threshold) is not set up and 'nothing was written' is not asserted; the test only checks exit 2 for three bad invocations. Not signed.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:48.014416Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/exit_registry.rs:237",
+  "introduced_by": "f5ffd46512ada25b709226102b2fd3bce513814e",
+  "kind": "finding",
+  "resolution_code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "resolution_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "atip.l0.24"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity: scenario atip.l0.24's second Then (a failure after the first write is exit 1 WRITE_FAILED) is not in the bound test, which only makes a directory read-only and runs `gate install-hooks`. That half is proven by `evidence_add_115_a_batch_that_fails_partway_leaves_nothing_behind` (evidence.rs:2215) and the review.rs:660 test; I ran the whole suite and both pass, but neither is bound to the scenario.",
+  "worktree_dirty": false
+}

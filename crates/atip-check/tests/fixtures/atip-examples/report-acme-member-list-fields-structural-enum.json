@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "data": {
+    "team": "core",
+    "members": [
+      {
+        "id": 1,
+        "badge": {
+          "kind": "gold"
+        }
+      },
+      {
+        "id": 2
+      }
+    ]
+  },
+  "meta": {
+    "command": "member list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "fields": [
+      "id",
+      "badge"
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "data": {
+    "changeId": "add-login",
+    "round": 1,
+    "seq": 2,
+    "disposition": "rejected",
+    "from": "open",
+    "staged": null,
+    "committed": "7f3c2a9e",
+    "unchanged": false
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.1",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "output": "FindingCloseReport",
+    "next": [
+      {
+        "command": "canon finding list --change add-login --open --json",
+        "argv": [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--open",
+          "--json"
+        ],
+        "reason": "the findings still open"
+      }
+    ]
+  }
+}

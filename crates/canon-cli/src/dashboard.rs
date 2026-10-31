@@ -56,7 +56,7 @@ use std::time::Duration;
 use canon_model::paths;
 use serde_json::Value;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::dashboard_briefs::{bad_request, Reply};
 use crate::report::resolve_inputs;
 

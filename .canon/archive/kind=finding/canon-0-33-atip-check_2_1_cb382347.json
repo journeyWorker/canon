@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:08.360064Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.07",
+    "atip.check.09",
+    "atip.check.10",
+    "atip.check.12",
+    "atip.check.14",
+    "atip.check.16",
+    "atip.check.20"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards pass: the seeded-violation tests pin one trigger per check, so MUST rules of the 16 checks are unproven. A mutation run on a scratch copy of 25d198e7 left the whole atip-check suite green for each of: L0.version without the exit-0 test; L0.version without the non-empty-stdout test; L0.unknown-command without the exit-2 test, the ok:false test, the no-meta.command test, the no-data test, the non-empty-expected test; L0.bare without the exit-2 test; L0.unknown-command-text without the exit-2 test; L0.ok-exit without 'ok is true exactly when exit 0'; L0.json-mode-preparse reading only the --json --bogus-xyz order; L0.no-env-switch comparing no 'ok'. Scenario 07's title promises 'exits non-zero, prints nothing' but atip_check_07 plants only versionStderr. I read each of these against checker.md and the code is right; the tests do not hold it. Blast radius: 0.34 and 0.35 extend these checks, and canon and lute will use a green run as their L0 claim. Fix: one seeded config per trigger (the fake tool already has versionFormat 'empty') and a unit test per unknown_command_problems branch.",
+  "worktree_dirty": false
+}

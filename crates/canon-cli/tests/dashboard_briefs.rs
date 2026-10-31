@@ -633,11 +633,11 @@ fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let warnings = live.startup["meta"]["warnings"].as_array().expect("meta.warnings");
-    assert!(warnings.len() == 1 && warnings[0].as_str().unwrap().contains("duckdb"), "{}", live.startup);
+    assert!(warnings.len() == 1 && warnings[0]["message"].as_str().unwrap().contains("duckdb"), "{}", live.startup);
     assert_eq!(live.startup["data"]["snapshotAvailable"], false);
     let stderr = std::fs::read_to_string(&live.stderr).unwrap();
     assert!(stderr.is_empty(), "JSON mode writes nothing to stderr: {stderr:?}");
-    let warning = warnings[0].as_str().unwrap();
+    let warning = warnings[0]["message"].as_str().unwrap();
     assert!(warning.contains("duckdb") && warning.contains("the panels page says so instead of showing panels") && warning.contains("install DuckDB"), "{warning}");
 
     let status = get(&live, "/api/status");

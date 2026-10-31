@@ -71,7 +71,7 @@ canon subject new subject-domain-loop \
   NDJSON) is a batch validated before any write, with `operands` holding the
   id and the other keys the option names in camelCase (`canon schema subject
   new --json` shows the schema and an example). Writing an identical subject
-  again is a no-op reported `unchanged` (`meta.unchanged`).
+  again is a no-op reported `unchanged` (`data.unchanged`).
 
 ### 2. Retrieve subject-scoped strategy memory BEFORE working
 
@@ -747,21 +747,23 @@ Status fails closed rather than suggest progress the gate would refuse:
 ```
 
 The steps that follow are not in `data`: they are `meta.next`, most useful
-first, with `meta.nextOmitted` counting what was cut and `meta.waitingOn`
+first, with `data.nextOmitted` counting what was cut and `data.waitingOn`
 (with a declared role, `--as`) counting the steps each other owner holds:
 
 ```json
 "next": [
-  { "command": "show the brief in openspec/changes/c-promo/proposal.md; build and attest nothing for promo until the human answers; then record their words with `canon brief approve c-promo --approver <the human> --note \"<their words>\"`", "argv": [], "why": "promo: the brief is not approved", "actor": "human", "role": null },
-  { "command": "canon finding close c-cart --round 1 --seq 1 --disposition fixed --actor <unit> --session <session>", "argv": [], "why": "cart: 1 open blocker finding(s); fix it, commit, then close it", "actor": "agent", "role": "implementer" },
-  { "command": "canon status", "argv": ["canon", "status"], "why": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again", "actor": "agent", "role": "planner" }
+  { "command": "canon brief show c-promo --json", "argv": ["brief", "show", "c-promo", "--json"], "reason": "promo: the brief is not approved; build and attest nothing for promo until the human answers", "x-canon": { "actor": "human" } },
+  { "command": "canon gate check --json", "argv": ["gate", "check", "--json"], "reason": "cart: 1 open blocker finding(s); fix it, commit, then close it with `canon finding close`", "x-canon": { "actor": "agent", "role": "implementer" } },
+  { "command": "canon status --json", "argv": ["status", "--json"], "reason": "1 scenario(s) carry no @subject tag (first: cart.promo.01); add `@subject:<id>` above each in its .feature file, then check again", "x-canon": { "actor": "agent", "role": "planner" } }
 ]
 ```
 
-`argv` is the command split into words, and is empty when the command still
-holds a `<placeholder>` for what only the agent knows (or is not a canon
-command at all). On a repository that still holds 0.27 canon state,
-`canon status` warns (`data.warnings`, `meta.warnings`) and puts `canon
+`argv` is the command without the executable (`canon` + `argv` is the call),
+and carries `--json` when you called in JSON mode. Every next entry is
+runnable as it stands: guidance that needs a value only you know (an actor id,
+a session, the human's words) is not a next entry, it is in the error `hint`
+or the report text. On a repository that still holds 0.27 canon state,
+`canon status` warns (`data.warnings`, `meta.warnings` as `[{code, message}]`) and puts `canon
 migrate --json` first in `meta.next`: run `canon migrate`, then `canon
 migrate --commit --plan-digest <digest from the preview>`, then `canon
 skills install`.
@@ -792,14 +794,14 @@ only the pending drafts, and `flow` lists each flow step of every tagged
 change as `{ "id", "change", "scenarios": [{ id, title, failure, evidenced,
 review }], "gaps" }`.
 
-Each `meta.next` entry's `actor` is `agent` (its `command` is a canon command
-line) or `human` (its `command` says what to get from the human).
+Each `meta.next` entry's `x-canon.actor` is `agent` or `human` (a step only the
+human takes; its `reason` says what to get from them).
 
 `policy.spec_coverage` has the shape `canon context --json` prints
 (`null` when absent, `{"invalid": …}` when unusable). `statusVersion`
 changes only when a field changes meaning or is removed. It became `2`
 in 0.16, when `next[].command` stopped always being a command line
-(`actor` tells which), and `brief` was added alongside. It is `3` since
+(`actor` told which), and `brief` was added alongside. It is `3` since
 0.17, when `brief.proposal` was removed: the canon `brief.md` is
 `brief.brief`, with `briefExists` and `source`. It is `4` since 0.31, when the
 `brief` object became the `briefs` list.

@@ -355,7 +355,9 @@ pub fn format_human(role: &RoleId, regime_key: &RegimeKey, guidance: &[StrategyR
 #[serde(transparent)]
 pub struct RetrieveReport<'a>(pub &'a [StrategyRef]);
 
-impl crate::json_out::Report for RetrieveReport<'_> {}
+impl crate::json_out::Report for RetrieveReport<'_> {
+    const STATE_IN_DATA: bool = false;
+}
 
 /// `canon regime-key`: the validated key (`RegimeShowReport`).
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]

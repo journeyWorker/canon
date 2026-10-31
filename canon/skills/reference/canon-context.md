@@ -35,7 +35,7 @@ and what to run next. `--json` prints the `{ok, data, meta}` envelope: the
 header adds no field, and `policy.spec_coverage`/`policy.diagnostics`
 already carry the same fact. `--fields <list>` keeps only the named
 top-level fields (`kinds`, `enums`, `policy`, `review`, …); an unknown name is
-`UNKNOWN_FIELD` (exit 2).
+`USAGE` (exit 2; `field` is `--fields`, `expected` lists the selectable fields).
 
 On a repository that still holds 0.27 canon state, `canon context` warns
 and puts `canon migrate --json` first in `meta.next`: run `canon migrate`

@@ -455,7 +455,8 @@ fn inventory_sync_54_a_0_29_index_record_without_steps_is_rewritten_with_them_on
     assert_eq!(stepless(&synced), stepless_before, "the record of a scenario with no steps is not rewritten");
     assert!(!archive(repo, "scenario").iter().any(|(_, v)| v["scenario_id"] == "cart.empty.01"), "nor archived");
     let again = json(&canon(&["inventory", "sync", "--json"], repo));
-    assert_eq!(again["meta"]["unchanged"], true, "a second sync writes nothing: {again}");
+    assert_eq!(again["data"]["unchanged"], true, "a second sync writes nothing: {again}");
+    assert!(again["meta"].get("unchanged").is_none(), "`unchanged` is a report member, not a flat `meta` one: {again}");
 }
 
 #[test]
@@ -802,7 +803,9 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
         ],
         repo,
     ));
-    assert_eq!(new_json["meta"]["hotStore"], ".canon/hot.db", "{new_json}");
+    // A subject record is the report verbatim, so the extra rides in `meta.x-canon`.
+    assert_eq!(new_json["meta"]["x-canon"]["hotStore"], ".canon/hot.db", "{new_json}");
+    assert!(new_json["meta"].get("hotStore").is_none(), "{new_json}");
     let change = canon(
         &[
             "change",
@@ -860,7 +863,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
         repo,
     );
     assert_eq!(
-        json(&unadopt)["meta"]["hotStore"],
+        json(&unadopt)["meta"]["x-canon"]["hotStore"],
         ".canon/hot.db",
         "{}",
         text(&unadopt)
@@ -989,5 +992,5 @@ fn ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_
     assert!(new.status.success(), "{}", text(&new));
     assert!(!text(&new).contains("hot store:"), "{}", text(&new));
     let new_json = json(&canon(&["subject", "new", "other", "--domain", "d", "--title", "T", "--actor", "a", "--json"], repo));
-    assert!(new_json["meta"].get("hotStore").is_none(), "{new_json}");
+    assert!(new_json["meta"].get("hotStore").is_none() && new_json["meta"]["x-canon"].get("hotStore").is_none(), "{new_json}");
 }

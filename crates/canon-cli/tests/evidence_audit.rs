@@ -247,7 +247,9 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     let run = report["data"]["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "run").unwrap();
     assert_eq!((run["evidenced"].as_u64(), run["divergent"].as_u64()), (Some(1), Some(0)), "an audit never becomes the declared verdict: {report}");
     assert_eq!(report["data"]["audits"]["refuted"][0]["scenario"], "game.run.01", "{report}");
-    assert!(report["meta"]["next"].as_array().unwrap().iter().any(|n| n["command"].as_str().unwrap().contains("evidence audit game.run.01")), "{report}");
+    // The step carries `<placeholder>` words, so it is not a `meta.next` entry in JSON mode; text mode still names it.
+    let status_text = text(&ok(repo, &["status"]));
+    assert!(status_text.contains("evidence audit game.run.01"), "{status_text}");
 
     let ship = canon(repo, &["subject", "move", "run", "--to", "shipped", "--actor", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "{}", text(&ship));

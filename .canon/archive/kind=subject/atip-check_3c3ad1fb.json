@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-10-30T22:25:33.725897Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "atip-check",
+  "summary": "A binary that runs a tool's built binary and checks it against atip/1",
+  "title": "ATIP: the atip check conformance checker"
+}

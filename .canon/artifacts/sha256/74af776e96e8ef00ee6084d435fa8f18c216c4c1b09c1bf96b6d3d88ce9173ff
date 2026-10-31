@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="19" failures="0" errors="0" time="2.551417374">
+    <testsuite name="tests/enemy.test.tsx" timestamp="2026-10-30T16:40:54.700Z" hostname="journeyMac16.local" tests="2" failures="0" errors="0" skipped="0" time="0.122508625">
+        <testcase classname="tests/enemy.test.tsx" name="platformer.enemy.01: Pinecone contact costs a heart and grants brief invulnerability" time="0.020051833">
+        </testcase>
+        <testcase classname="tests/enemy.test.tsx" name="platformer.enemy.02: Losing every heart shows game over and returns to menu" time="0.101848917">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/hud.test.tsx" timestamp="2026-10-30T16:40:54.707Z" hostname="journeyMac16.local" tests="3" failures="0" errors="0" skipped="0" time="0.2446905">
+        <testcase classname="tests/hud.test.tsx" name="platformer.hud.01: Pause freezes the simulation and resume continues it" time="0.079946375">
+        </testcase>
+        <testcase classname="tests/hud.test.tsx" name="platformer.hud.02: HUD reflects hearts acorns and level in real time" time="0.147612209">
+        </testcase>
+        <testcase classname="tests/hud.test.tsx" name="platformer.hud.03: The pause key opens no pause menu outside play" time="0.01481125">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/levels.test.tsx" timestamp="2026-10-30T16:40:54.709Z" hostname="journeyMac16.local" tests="3" failures="0" errors="0" skipped="0" time="1.377897708">
+        <testcase classname="tests/levels.test.tsx" name="platformer.levels.01: Completing a level unlocks the next in the menu" time="0.073776459">
+        </testcase>
+        <testcase classname="tests/levels.test.tsx" name="platformer.levels.02: Best acorns and time persist per level across reloads" time="1.2989875">
+        </testcase>
+        <testcase classname="tests/levels.test.tsx" name="platformer.levels.03: Corrupted saved progress falls back to a fresh start without breaking the menu" time="0.004031208">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/movement.test.ts" timestamp="2026-10-30T16:40:54.710Z" hostname="journeyMac16.local" tests="4" failures="0" errors="0" skipped="0" time="0.0101245">
+        <testcase classname="tests/movement.test.ts" name="platformer.movement.01: Left world edge clamps the player" time="0.005250708">
+        </testcase>
+        <testcase classname="tests/movement.test.ts" name="platformer.movement.02: Ceiling contact cancels upward motion without sticking" time="0.000647542">
+        </testcase>
+        <testcase classname="tests/movement.test.ts" name="platformer.movement.03: No double jump; coyote and buffered jumps fire" time="0.002500333">
+        </testcase>
+        <testcase classname="tests/movement.test.ts" name="platformer.movement.04: Falling into a pit respawns without touching score" time="0.001167541">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/moving.test.ts" timestamp="2026-10-30T16:40:54.711Z" hostname="journeyMac16.local" tests="3" failures="0" errors="0" skipped="0" time="0.051133041">
+        <testcase classname="tests/moving.test.ts" name="platformer.moving.01: A moving platform carries the standing player" time="0.026154291">
+        </testcase>
+        <testcase classname="tests/moving.test.ts" name="platformer.moving.02: Stepping off a platform edge drops cleanly" time="0.003643042">
+        </testcase>
+        <testcase classname="tests/moving.test.ts" name="platformer.moving.03: A player standing on the ground under a moving platform is not carried by it" time="0.020156">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/session.test.tsx" timestamp="2026-10-30T16:40:54.713Z" hostname="journeyMac16.local" tests="4" failures="0" errors="0" skipped="0" time="0.745063">
+        <testcase classname="tests/session.test.tsx" name="platformer.session.01: Collecting every acorn shows a full counter" time="0.01317775">
+        </testcase>
+        <testcase classname="tests/session.test.tsx" name="platformer.session.02: Win overlay freezes gameplay input" time="0.048479458">
+        </testcase>
+        <testcase classname="tests/session.test.tsx" name="platformer.session.03: R restarts to a clean initial state" time="0.020475791">
+        </testcase>
+        <testcase classname="tests/session.test.tsx" name="platformer.session.04: Idle and resize sessions stay error-free" time="0.66237075">
+        </testcase>
+    </testsuite>
+</testsuites>

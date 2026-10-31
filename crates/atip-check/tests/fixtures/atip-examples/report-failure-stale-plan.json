@@ -1,0 +1,35 @@
+{
+  "ok": false,
+  "error": {
+    "code": "PLAN_STALE",
+    "message": "the plan changed since the preview: 3 more session records match; nothing was written",
+    "field": "--plan-digest",
+    "received": "sha256:9f2c4e1b7a03d5c8e6f41b2a7d9c0e3f5a8b1c4d7e0f2a3b6c9d1e4f7a0b3c5d",
+    "hint": "canon purge --kind session --before 2020-01-01T00:00:00Z --json",
+    "retryable": false
+  },
+  "meta": {
+    "command": "purge",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "next": [
+      {
+        "command": "canon purge --kind session --before 2020-01-01T00:00:00Z --json",
+        "argv": [
+          "purge",
+          "--kind",
+          "session",
+          "--before",
+          "2020-01-01T00:00:00Z",
+          "--json"
+        ],
+        "reason": "preview again for a new digest"
+      }
+    ]
+  }
+}

@@ -493,26 +493,28 @@ fn an_identical_finding_add_is_unchanged_and_writes_nothing() {
 
     let first = add(repo, &args);
     assert!(first.status.success(), "{}", stdout(&first));
-    assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first add writes");
+    assert!(json_of(&first)["data"].get("unchanged").is_none(), "the first add writes");
 
     let before = tree(repo);
     let staged_repeat = add(repo, &args);
     assert_eq!(staged_repeat.status.code(), Some(0), "{}", stderr(&staged_repeat));
-    assert_eq!(json_of(&staged_repeat)["meta"]["unchanged"], true);
+    let repeat = json_of(&staged_repeat);
+    assert_eq!(repeat["data"]["unchanged"], true, "{repeat}");
+    assert!(repeat["meta"].get("unchanged").is_none(), "`unchanged` is a report member, not a flat `meta` one: {repeat}");
     assert_eq!(tree(repo), before, "a repeat of a staged finding writes nothing");
 
     assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
     let before = tree(repo);
     let committed_repeat = add(repo, &args);
     assert_eq!(committed_repeat.status.code(), Some(0), "{}", stderr(&committed_repeat));
-    assert_eq!(json_of(&committed_repeat)["meta"]["unchanged"], true);
+    assert_eq!(json_of(&committed_repeat)["data"]["unchanged"], true);
     assert_eq!(tree(repo), before, "a repeat of a committed finding writes nothing");
 
     let other = add(repo, &["--round", "4", "--seq", "1", "--actor", "r", "--summary", "another finding", "--json"]);
     assert_eq!(other.status.code(), Some(2), "{}", stdout(&other));
 }
 
-/// Closing a finding to the disposition it already has (`fixed` and `rejected` alike) writes nothing and is `meta.unchanged`.
+/// Closing a finding to the disposition it already has (`fixed` and `rejected` alike) writes nothing and is `data.unchanged`.
 #[test]
 fn closing_a_finding_to_its_current_disposition_is_unchanged() {
     let dir = repo();
@@ -527,13 +529,13 @@ fn closing_a_finding_to_its_current_disposition_is_unchanged() {
 
         let first = run_canon(&close, repo);
         assert!(first.status.success(), "{disposition}: {}", stdout(&first));
-        assert!(json_of(&first)["meta"].get("unchanged").is_none(), "{disposition}: the first close writes");
+        assert!(json_of(&first)["data"].get("unchanged").is_none(), "{disposition}: the first close writes");
         assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
 
         let before = tree(repo);
         let again = run_canon(&close, repo);
         assert_eq!(again.status.code(), Some(0), "{disposition}: {}", stderr(&again));
-        assert_eq!(json_of(&again)["meta"]["unchanged"], true, "{disposition}");
+        assert_eq!(json_of(&again)["data"]["unchanged"], true, "{disposition}");
         assert_eq!(tree(repo), before, "{disposition}: a repeated close writes nothing");
     }
 }
@@ -1323,10 +1325,11 @@ fn finding_list_json_carries_the_same_rows() {
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let json: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("stdout is one JSON document");
     assert_eq!(json["ok"], true, "{json}");
-    assert_eq!(json["meta"]["returned"], 2);
-    assert_eq!(json["meta"]["total"], 2);
-    assert_eq!(json["meta"]["hasMore"], false);
-    assert!(json["meta"]["nextCursor"].is_null());
+    assert_eq!(json["meta"]["page"], serde_json::json!({"returned": 2, "total": 2}), "a last page has no `nextCursor`: {json}");
+    for flat in ["returned", "total", "hasMore", "nextCursor"] {
+        assert!(json["meta"].get(flat).is_none(), "`{flat}` is not a flat `meta` member any more: {json}");
+    }
+    assert!(json["meta"].get("next").is_none(), "no next page, no `meta.next`: {json}");
     assert_eq!(
         json["data"],
         serde_json::json!({

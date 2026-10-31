@@ -2,7 +2,7 @@
 
 use canon_model::envelope::RecordKind;
 use crate::cli::adapter::{AdapterCommand, AdapterValidateArgs, AdapterAuthorizeArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use std::process::ExitCode;
 
 pub fn run(cmd: AdapterCommand) -> ExitCode {
@@ -23,9 +23,9 @@ fn run_adapter_validate(response: &std::path::Path, repo: &std::path::Path, json
             let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
             let message = error.to_string();
             let error = if refused {
-                CliError::refused("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_REFUSED).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
+                CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
             } else {
-                CliError::failed("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_FAILED).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
+                CliError::failed("ADAPTER_RESPONSE_INVALID", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
             };
             return ExitCode::from(error.emit("canon adapter validate", json));
         }
@@ -69,7 +69,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
                 crate::adapter::AdapterError::Policy(_) => "fix the policy file `.canon/policy.yaml` (its adapter_capabilities section), then run `canon adapter authorize` again",
                 _ => "fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it",
             };
-            let error = CliError::refused("ADAPTER_REFUSED", error.to_string()).with_exit(crate::cli_error::EXIT_REFUSED).hint(hint);
+            let error = CliError::refused("ADAPTER_REFUSED", error.to_string()).hint(hint);
             return ExitCode::from(error.emit("canon adapter authorize", json));
         }
     };

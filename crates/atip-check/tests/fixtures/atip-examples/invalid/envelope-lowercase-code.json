@@ -1,0 +1,13 @@
+{
+  "ok": false,
+  "error": {
+    "code": "validation",
+    "message": "Unknown subcommand",
+    "retryable": false
+  },
+  "meta": {
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

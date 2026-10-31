@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-crate",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-crate"
+  },
+  "at": "2026-10-31T11:29:48.411653Z",
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib resolve_surface_never_fails_with_no_vocab_directory_at_all"
+  },
+  "evidence_note": {
+    "summary": "lib: 1 passed, 0 failed, 497 filtered out @ 48824ebe"
+  },
+  "evidence_sha": "48824ebef2c708ffedff3e293f91d60cecb522e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 372,
+  "scenario_id": "context.capability.09",
+  "schema": 1,
+  "staging_id": "b41dcf6a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

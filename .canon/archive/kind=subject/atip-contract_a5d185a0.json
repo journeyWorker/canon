@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-10-30T22:25:31.726987Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "atip-contract",
+  "summary": "Output selection, envelope, errors, registry and exit codes of canon follow atip/1 L0",
+  "title": "ATIP: canon's atip/1 L0 output contract"
+}

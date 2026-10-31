@@ -381,25 +381,65 @@ always matches the installed binary.
 
 **`--json` envelope.** stdout is exactly one JSON document, nothing goes to
 stderr: `{"ok": true, "data": …, "meta": …}` on success and
-`{"ok": false, "error": …, "meta": …}` on failure. `meta` carries `command`,
-`schemaVersion` and `canonVersion`, plus `next` and `unchanged` where they
-apply.
+`{"ok": false, "error": …, "meta": …}` on failure (an exit 1 partial report
+also carries `data`). The envelope follows atip/1. `meta` carries
+`schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`) and the
+resolved `command`, plus `output` (the report name, for a command that
+declares several), `context` (`{repo}`), `next`, `warnings`, `coverage`, `page`
+and `x-canon` (canon-only extras) where they apply. A member with no value is
+absent, never `null` and never `[]`. `--json` is accepted anywhere before `--`,
+including at the root and on a group (`canon --json`, `canon finding --json`).
 
-**Errors.** Every failure prints `canon <command>: CODE — message` and a
-`hint:` line. With `--json`, `error` is `{code, message, hint, retryable}`,
-plus `field` (the option at fault) and `expected` (its valid values) when a
-usage error or an input check can name them. Codes are stable strings; a
-command-line parse error is `USAGE`, and an old 0.27 spelling is a usage error
-whose hint names the replacement. Exit `2` means the invocation or its inputs
-are wrong and fixable (nothing was written); exit `1` is an operational
-failure or a blocking finding the command reports.
+```json
+{
+  "ok": true,
+  "data": { "unchanged": true, "…": "…" },
+  "meta": {
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.33.0",
+    "contract": "atip/1",
+    "command": "evidence add",
+    "context": { "repo": "." },
+    "next": [
+      {
+        "command": "canon gate check --json",
+        "argv": ["gate", "check", "--json"],
+        "reason": "check the gate once every scenario has evidence",
+        "x-canon": { "actor": "agent", "role": "reviewer" }
+      }
+    ]
+  }
+}
+```
+
+**Errors.** Every failure prints `canon: CODE: message` as the first stderr
+line, then indented `field:`, `expected:` and `hint:` lines; in text mode
+stdout stays empty. With `--json`, `error` is `{code, message, retryable}`,
+plus `hint`, `field` (the option at fault), `expected` (its valid values),
+`received` and `suggestions` when canon can name them; `retryable` is always
+present, the rest are absent otherwise. Codes are stable strings. A
+command-line parse error is `USAGE`, an unknown command is `UNKNOWN_COMMAND`
+(`expected` lists the valid words at that level), a call with no command at all
+(`canon --json`, `canon finding --json`) is `COMMAND_REQUIRED`, and a panic in
+JSON mode is `INTERNAL`. An old 0.27 spelling is a usage error whose hint names
+the replacement. Only exits `0`, `1` and `2` exist, and each code's exit is the
+one in its row of `canon schema --errors --json`: `2` means canon refused to
+run because the invocation or its inputs are wrong and fixable (nothing was
+written); `1` means it ran and the answer is negative or incomplete (an
+operational failure, a blocking finding, an unverifiable check).
 
 **`--input` for writes.** Every write command takes `--input`: its arguments
 as one JSON object, inline, as a file path, or `-` for stdin. Keys are the
 option names in camelCase, and `operands` is an array. A JSON array or NDJSON
 is a batch: it is validated whole before anything is written, and the report
 has one entry per element in `data.items[]` (`written`, `unchanged`, `failed`
-or `skipped`). `canon schema <command> --json` shows the input schema.
+or `skipped`); a batch where an element failed is `BATCH_INCOMPLETE` (exit 1).
+An input canon cannot use (an unknown key, a wrong type, an unreadable file,
+`-` on a terminal, a batch the command does not take) is `INPUT_INVALID`, with
+the distinction in `message` and `field`; `-` together with another stdin
+reader is `USAGE` with `field` `--input`. `canon schema <command> --json` shows
+the input schema.
 
 ```text
 canon evidence add --input <JSON|FILE|->
@@ -416,10 +456,12 @@ same. Outside git, or with no commit, the command refuses with `NO_COMMIT`.
 **Paging and fields.** `canon query`, `canon finding list`,
 `canon divergence list` and `canon export` return at most `--limit`
 records (default 100). `--all` returns everything; `--cursor <nextCursor>`
-continues. `--json` adds `meta: {returned, total, hasMore, nextCursor}`.
-`canon query` and `canon finding list` also take `--fields a,b,c` to
-project records; an unknown field is `UNKNOWN_FIELD` and the hint lists the
-known ones.
+continues. `--json` adds `meta.page` = `{returned, total, nextCursor}`: a
+`nextCursor` means more records follow, and `meta.next`
+holds the same call plus `--cursor <nextCursor>`; a bad cursor is
+`CURSOR_INVALID`. `canon query` and `canon finding list` also take
+`--fields a,b,c` to project records; an unknown field is `USAGE` with `field`
+`--fields` and `expected` listing the selectable fields.
 
 **Search and trace.** `canon search "<text>"` finds records, brief sections and
 flow steps, and scenario text, and lists each hit with its neighbors in the
@@ -444,14 +486,17 @@ names the stores.
 
 **`meta.next` after a write.** A write that succeeds names the next step
 itself, so an agent does not call `canon status` just to find it: `--json`
-adds `meta.next` (`[{command, why, actor, role}]`, at most five, with
-`meta.nextOmitted` counting the rest), and human output ends with one
-`next: <command> — <why>` line. These are `canon status`'s own steps, narrowed
-to the subject the write touched; `actor: human` marks a step only a human
-takes. canon never runs a step.
+adds `meta.next` (`[{command, argv, reason, x-canon}]`, at most five;
+`data.nextOmitted` counts the rest). `argv` is the command without the
+executable and carries `--json` when the call was in JSON mode; the `actor` and
+`role` of a step sit in `x-canon`. Human output ends with one
+`next: <command> — <reason>` line. These are `canon status`'s own steps,
+narrowed to the subject the write touched; `x-canon.actor: human` marks a step
+only a human takes. canon never runs a step.
 
 **Retry safety.** Repeating `evidence add` or `review scenario` with identical
-input returns the existing record with `meta.unchanged: true`.
+input returns the existing record with `data.unchanged: true` (a report that
+is a stored record verbatim carries it as `meta.x-canon.unchanged`).
 
 ### Roles
 
@@ -459,7 +504,7 @@ An agent can declare a role: `planner`, `implementer`, `reviewer` or
 `orchestrator`. Pass `--as <role>` or set `CANON_ROLE=<role>` (the flag wins);
 an unknown value is `UNKNOWN_ROLE`. A role is guidance, not enforcement:
 `canon schema` lists the role's commands, `canon status` and `meta.next` keep
-only the role's steps and count the rest in `waitingOn` (the orchestrator also
+only the role's steps and count the rest in `data.waitingOn` (the orchestrator also
 sees the human's steps), and `--role` on `evidence add` and `review scenario`
 defaults to it. Unset, every command behaves as before.
 
@@ -478,7 +523,7 @@ small.
 `purge`, `tier age`, `ledger compact`, `artifacts move` and `migrate` change or
 delete data. Run bare, each prints a report with `planDigest` and `effects[]`
 and changes nothing. `--commit --plan-digest <planDigest>` acts only if the
-plan recomputed now has the same digest (`PLAN_CHANGED`, exit `2`, otherwise).
+plan recomputed now has the same digest (`PLAN_STALE`, exit `2`, otherwise).
 `--dry-run` is gone from these five, and a document given to `--input` can
 never carry `--commit` or `--plan-digest`.
 

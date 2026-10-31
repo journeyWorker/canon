@@ -36,7 +36,7 @@ use crate::json_out::{LedgerRecord, Report};
 
 use crate::context::resolve_canon_yaml;
 use crate::paging::{self, Page, PageMeta};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::tiers::{self, TierCliError};
 
 #[derive(Debug, thiserror::Error)]
@@ -559,7 +559,7 @@ pub fn page_outcome(mut outcome: QueryOutcome, page: &Page, fields: Option<Vec<S
     }
     let kind = outcome.kind;
     if page.cursor.as_deref().and_then(paging::cursor_key).is_some_and(|key| names_a_029_record(&key)) {
-        return Err(CliError::refused("INVALID_CURSOR", "the cursor names records by 0.29 names (an id with `__` parts and a 12-hex digest), which canon 0.30 no longer uses").hint("drop --cursor and start from the first page"));
+        return Err(CliError::refused("CURSOR_INVALID", "the cursor names records by 0.29 names (an id with `__` parts and a 12-hex digest), which canon 0.30 no longer uses").hint("drop --cursor and start from the first page"));
     }
     let (records, meta) = paging::paginate(&format!("query:{}", kind.as_str()), std::mem::take(&mut outcome.records), |raw| record_key(kind, raw), page)?;
     outcome.records = records;

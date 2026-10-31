@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/registry-entry.schema.json",
+  "title": "atip/1 error registry entry",
+  "description": "One row of a tool's error registry (spec section 7.3). The exit of an error is fixed here, never at the call site.",
+  "type": "object",
+  "required": ["code", "exit", "retryable", "meaning", "fix"],
+  "properties": {
+    "code": { "$ref": "error.schema.json#/$defs/code" },
+    "exit": {
+      "description": "1: the command ran and the answer is negative or incomplete. 2: refused before doing it. Signal exits (128+n) are not registry entries.",
+      "enum": [1, 2]
+    },
+    "retryable": {
+      "description": "true only when repeating the same invocation unchanged can succeed.",
+      "type": "boolean"
+    },
+    "meaning": { "type": "string", "minLength": 1 },
+    "fix": {
+      "description": "What the caller does next, in one or two sentences; a runnable command when there is one.",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "patternProperties": {
+    "^x-[a-z][a-z0-9-]*$": true
+  },
+  "additionalProperties": false
+}

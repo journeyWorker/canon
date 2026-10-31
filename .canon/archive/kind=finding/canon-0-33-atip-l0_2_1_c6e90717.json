@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:44.116702Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/record_links.rs:755",
+  "introduced_by": "9342db524690e0b9002844541b8bb69b528373e5",
+  "kind": "finding",
+  "reviewed_sha": "d5356aea98f659feff613127e9cf403be61f671a",
+  "reviewer": "rev-atip-l0",
+  "round": 2,
+  "scenario_ids": [
+    "ingest.sessions.16"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity: the sentence of ingest.sessions.16 was corrected to meta.x-canon.hotStore for the subject leaves and data.hotStore for change new, but the only bound case (ingest_sessions_16_the_other_hot_writers…) asserts ingest plans, ingest records and dispatch begin. Those two Then lines are asserted in ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too (passes in my run, asserts meta.x-canon.hotStore and no meta.hotStore), which no evidence binds. Bind 16b to the scenario and re-sign. Not signed.",
+  "worktree_dirty": false
+}

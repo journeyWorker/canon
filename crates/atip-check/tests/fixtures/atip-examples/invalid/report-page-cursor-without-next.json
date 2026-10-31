@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "data": {
+    "changeId": "add-login",
+    "findings": []
+  },
+  "meta": {
+    "command": "finding list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "page": {
+      "returned": 0,
+      "nextCursor": "abc"
+    }
+  }
+}

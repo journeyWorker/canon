@@ -83,7 +83,7 @@ fn leaves_whose_refusals_no_other_test_provokes_answer_with_the_failure_envelope
     for (args, leaf, code) in [
         (vec!["completion", "no-such-shell"], "completion", "USAGE"),
         (vec!["selftest", "--suite", "no-such-suite"], "selftest", "USAGE"),
-        (vec!["demo", "init", "--repo", "canon.yaml"], "demo init", "WRITE_FAILED"),
+        (vec!["demo", "init", "--repo", "canon.yaml"], "demo init", "WRITE_UNAVAILABLE"),
         (vec!["subject", "show", "no-such-subject"], "subject show", "SUBJECT_NOT_FOUND"),
     ] {
         let (exit, body) = run(&repo, home.path(), &args);

@@ -1,0 +1,52 @@
+{
+  "ok": false,
+  "error": {
+    "code": "BATCH_INCOMPLETE",
+    "message": "item 1 of 3 failed (FINDING_NOT_FOUND): 1 written, 1 skipped",
+    "field": "/1",
+    "hint": "canon finding list --change add-login --json",
+    "retryable": false
+  },
+  "data": {
+    "items": [
+      {
+        "index": 0,
+        "status": "written",
+        "data": {
+          "changeId": "add-login",
+          "round": 1,
+          "seq": 1,
+          "disposition": "fixed",
+          "from": "open",
+          "staged": null,
+          "committed": "7f3c2a9e",
+          "unchanged": false
+        }
+      },
+      {
+        "index": 1,
+        "status": "failed",
+        "error": {
+          "code": "FINDING_NOT_FOUND",
+          "message": "no committed finding add-login round 1 seq 7",
+          "retryable": false
+        }
+      },
+      {
+        "index": 2,
+        "status": "skipped"
+      }
+    ]
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "output": "BatchFindingCloseReport"
+  }
+}

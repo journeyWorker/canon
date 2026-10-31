@@ -295,7 +295,7 @@ use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::gate::evidence_staging_dir;
 
@@ -741,6 +741,11 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
         }
     }
 
+    let (staging_dir, ledger_dir) = (evidence_staging_dir(&ledger_root), ledger_root.as_path());
+    let targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), ledger_dir] } else { vec![staging_dir.as_path()] };
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon finding add", args.json) {
+        return code;
+    }
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
             let settled = crate::gate::promote_after_stage("canon finding add", &ledger_root, &receipt.location, promote, args.json);
@@ -1034,6 +1039,11 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     );
 
     let body = serde_json::to_value(&transitioned).expect("a Finding always serializes");
+    let (staging_dir, ledger_dir) = (evidence_staging_dir(&ledger_root), ledger_root.as_path());
+    let targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), ledger_dir] } else { vec![staging_dir.as_path()] };
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon finding close", args.json) {
+        return code;
+    }
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
             let settled = crate::gate::promote_after_stage("canon finding close", &ledger_root, &receipt.location, promote, args.json);

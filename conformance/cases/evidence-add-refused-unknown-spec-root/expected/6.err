@@ -1,2 +1,4 @@
-canon divergence add: UNKNOWN_SPEC_ROOT — `--project root` names no spec root configured in canon.yaml (`specs.roots[]`: game); nothing was written
-hint: the only spec root canon.yaml configures is `game`; pass `--project game`
+canon: UNKNOWN_SPEC_ROOT: `--project root` names no spec root configured in canon.yaml (`specs.roots[]`: game); nothing was written
+  field: --project
+  expected: game
+  hint: the only spec root canon.yaml configures is `game`; pass `--project game`

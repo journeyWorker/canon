@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-10-31T16:43:14.550890Z",
+  "change_ids": [
+    "canon-0-33-atip-check"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-33-orch"
+    },
+    "reason": "0.33 ATIP L0: changes reviewed, gate clean"
+  },
+  "subject_id": "atip-check",
+  "summary": "A binary that runs a tool's built binary and checks it against atip/1",
+  "title": "ATIP: the atip check conformance checker"
+}

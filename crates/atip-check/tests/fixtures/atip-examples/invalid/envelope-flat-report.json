@@ -1,0 +1,7 @@
+{
+  "command": "status",
+  "schemaVersion": "1.0",
+  "toolVersion": "0.31.1",
+  "ok": true,
+  "gateway": "<gateway-url>"
+}

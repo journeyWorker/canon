@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T13:42:45.674210Z",
+  "attachments": [
+    {
+      "case": "atip_l0_23_every_registry_row_is_exit_1_or_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    },
+    {
+      "case": "atip_l0_23_no_call_site_overrides_an_exit_and_no_literal_exit_is_outside_0_1_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    },
+    {
+      "case": "atip_l0_23_the_scan_reads_literals_and_leaves_variables_alone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    }
+  ],
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-l0-junit.xml"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 23,
+  "scenario_id": "atip.l0.23",
+  "schema": 1,
+  "staging_id": "bc0f6e6c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

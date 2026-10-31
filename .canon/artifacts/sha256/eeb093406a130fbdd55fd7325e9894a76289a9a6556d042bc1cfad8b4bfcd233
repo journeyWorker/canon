@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="5" skipped="0" failures="0" errors="0" uuid="568c6105-3e63-45ab-9e69-4b7d19374408" timestamp="2026-11-01T01:06:25.279+09:00" time="3.181">
+    <testsuite name="canon-cli::atip_check" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon_binary_with_the_same_command" classname="canon-cli::atip_check" timestamp="2026-11-01T01:06:25.279+09:00" time="0.016"/>
+        <testcase name="atip_check_39_the_canon_fixtures_registry_equals_the_one_generated_from_canon_schema_errors" classname="canon-cli::atip_check" timestamp="2026-11-01T01:06:25.279+09:00" time="1.976"/>
+        <testcase name="atip_check_40_a_stale_registry_in_the_canon_fixture_fails_the_generation_test" classname="canon-cli::atip_check" timestamp="2026-11-01T01:06:25.279+09:00" time="1.992"/>
+        <testcase name="atip_check_41_canon_passes_the_19_l0_checks_through_the_committed_fixture" classname="canon-cli::atip_check" timestamp="2026-11-01T01:06:25.279+09:00" time="2.966"/>
+        <testcase name="atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null" classname="canon-cli::atip_check" timestamp="2026-11-01T01:06:25.279+09:00" time="3.181"/>
+    </testsuite>
+</testsuites>

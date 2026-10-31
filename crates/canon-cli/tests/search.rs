@@ -103,8 +103,20 @@ fn without_rebuilt(mut data: Value) -> Value {
     data
 }
 
+/// The messages of `meta.warnings`; each warning is `{code, message}` with a registered code.
 fn warnings(output: &Output) -> Vec<String> {
-    json_of(output)["meta"]["warnings"].as_array().map(|w| w.iter().map(|s| s.as_str().unwrap().to_string()).collect()).unwrap_or_default()
+    json_of(output)["meta"]["warnings"]
+        .as_array()
+        .map(|w| {
+            w.iter()
+                .map(|warning| {
+                    let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning carries a code: {warning}"));
+                    assert!(canon_cli::cli_error::code_info(code).is_some(), "the warning code {code} is registered");
+                    warning["message"].as_str().unwrap().to_string()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn finding(repo: &Path, round: &str, seq: &str, summary: &str, extra: &[&str]) -> Output {

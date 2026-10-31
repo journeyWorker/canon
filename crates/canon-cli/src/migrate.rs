@@ -70,7 +70,7 @@ use canon_model::{paths, ChangeId, RecordKind};
 use canon_store::tier::TierQuery;
 use serde_yaml::Value;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::json_out::Report;
 use crate::migrate_briefs;
@@ -421,6 +421,18 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     }
     if !plan.gitignore.is_empty() && !backed_up.iter().any(|path| path == ".gitignore") {
         backed_up.push(".gitignore".to_string());
+    }
+    // The backup directory, canon.yaml and .gitignore are what the run writes first: refused before any copy is made.
+    let (backup_root, yaml_path, gitignore_path) = (repo.join(canon_model::paths::MIGRATE_BACKUP_DIR), repo.join("canon.yaml"), repo.join(".gitignore"));
+    let mut writes: Vec<&Path> = vec![&backup_root];
+    if config != text {
+        writes.push(&yaml_path);
+    }
+    if !plan.gitignore.is_empty() {
+        writes.push(&gitignore_path);
+    }
+    if let Some(code) = crate::write_mode::refuse_unwritable(&writes, "canon migrate", json) {
+        return code;
     }
     if let Err(e) = migrate_names::prepare_backup(&names) {
         return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that the database file is readable, then run `canon migrate` again").emit("canon migrate", json);

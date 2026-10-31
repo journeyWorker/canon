@@ -136,7 +136,7 @@ fn an_option_says_what_it_conflicts_with_and_requires() {
 fn every_embedded_schema_is_a_self_contained_json_schema() {
     let doc = spec::generate();
     let mut checked = 0;
-    for group in ["schemas", "envelopes"] {
+    for group in ["schemas"] {
         for (name, schema) in doc[group].as_object().unwrap_or_else(|| panic!("`{group}` is an object")) {
             let id = schema["$id"].as_str().unwrap_or_else(|| panic!("{group}.{name} has no $id"));
             assert!(id.starts_with("urn:canon:"), "{group}.{name}: {id}");
@@ -168,10 +168,12 @@ fn an_output_that_names_a_schema_points_at_one() {
 #[test]
 fn the_spec_carries_what_d2_promises() {
     let doc = spec::generate();
-    for key in ["_doNotEdit", "specVersion", "cli", "globalOptions", "envVars", "exitTable", "envelopes", "errors", "commands", "schemas", "records"] {
+    for key in ["_doNotEdit", "specVersion", "cli", "globalOptions", "envVars", "exitTable", "contract", "errors", "commands", "schemas", "records"] {
         assert!(doc.get(key).is_some(), "the spec has no `{key}`");
     }
     assert_eq!(doc["cli"]["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(doc["contract"], "atip/1", "the envelope is the contract's, not a canon schema");
+    assert!(doc.get("envelopes").is_none());
     let env_names: Vec<&str> = doc["envVars"].as_array().expect("envVars").iter().map(|v| v["name"].as_str().expect("name")).collect();
     for name in ["CANON_ROLE", "CANON_ACTOR", "CANON_SKILLS_SOURCE"] {
         assert!(env_names.contains(&name), "{name} is not in the spec");

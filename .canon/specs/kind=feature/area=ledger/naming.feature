@@ -205,7 +205,7 @@ Feature: ledger naming
   Scenario: A cursor from canon 0.29 is refused with a way to start over
     Given a cursor `canon query` issued in 0.29, which names a record by its 0.29 id and 12-hex digest
     When it is passed with `--cursor` to the 0.30 query
-    Then the query is refused INVALID_CURSOR, the message says the cursor names records by 0.29 names, and the hint says to drop `--cursor` and start from the first page
+    Then the query is refused CURSOR_INVALID, the message says the cursor names records by 0.29 names, and the hint says to drop `--cursor` and start from the first page
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:41Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:plugin-overlay

@@ -1,4 +1,4 @@
-error: invalid value 'extreme' for '--policy <LEVEL>'
-  [possible values: light, standard, strict]
-
-For more information, try '--help'.
+canon: USAGE: invalid value 'extreme' for '--policy <LEVEL>'
+  field: --policy
+  expected: light, standard, strict
+  hint: a working call: canon init; `canon schema init` lists every argument

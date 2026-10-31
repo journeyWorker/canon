@@ -1,0 +1,58 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:29:10.912772Z",
+  "code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "kind": "review",
+  "pin": "d5356aea98f659feff613127e9cf403be61f671a",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_l0_24_a_directory_that_cannot_be_written_refuses_with_exit_2_and_changes_nothing",
+          "junit:atip_l0_24_a_write_that_fails_after_the_first_record_is_exit_1_write_failed",
+          "junit:atip_l0_24_artifacts_store_into_a_read_only_blob_directory_is_refused",
+          "junit:atip_l0_24_change_new_refuses_a_read_only_change_store_before_creating_the_change",
+          "junit:atip_l0_24_context_pack_add_into_a_read_only_canon_directory_is_refused",
+          "junit:atip_l0_24_dispatch_begin_into_a_read_only_canon_directory_is_refused",
+          "junit:atip_l0_24_dispatch_end_into_a_read_only_manifest_directory_is_refused",
+          "junit:atip_l0_24_divergence_resolve_and_defer_into_a_read_only_ledger_are_refused",
+          "junit:atip_l0_24_export_into_a_read_only_canon_directory_is_refused",
+          "junit:atip_l0_24_gate_promote_into_a_read_only_ledger_is_refused",
+          "junit:atip_l0_24_ingest_plans_into_a_read_only_change_store_is_refused",
+          "junit:atip_l0_24_ingest_records_into_a_read_only_trajectory_store_is_refused",
+          "junit:atip_l0_24_ingest_sessions_into_a_read_only_hot_store_is_refused",
+          "junit:atip_l0_24_inventory_sync_into_a_read_only_ledger_is_refused",
+          "junit:atip_l0_24_ledger_compact_refuses_a_read_only_ledger_before_moving_a_version",
+          "junit:atip_l0_24_plugin_sync_into_a_read_only_ledger_is_refused",
+          "junit:atip_l0_24_prompt_add_into_a_read_only_canon_directory_is_refused",
+          "junit:atip_l0_24_report_build_into_a_read_only_canon_directory_is_refused",
+          "junit:atip_l0_24_report_snapshot_into_a_read_only_directory_is_refused",
+          "junit:atip_l0_24_skills_install_into_a_read_only_repo_is_refused",
+          "junit:atip_l0_24_subject_adopt_and_unadopt_into_a_read_only_ledger_are_refused",
+          "junit:atip_l0_24_subject_move_into_a_read_only_ledger_is_refused",
+          "junit:atip_l0_24_subject_new_into_a_read_only_ledger_is_refused",
+          "junit:atip_l0_24_tier_age_and_purge_refuse_a_read_only_store_before_moving_or_removing_a_record",
+          "junit:strategy::atip_l0_24_strategy_promote_into_a_read_only_strategy_store_is_refused",
+          "junit:strategy::atip_l0_24_strategy_rollback_into_a_read_only_strategy_store_is_refused"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "3fe6c63b13e66b838b2bb89cf2a976e2998d226ecbdc3f5d2c95e783b3f36b11",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-l0/brief.md"
+  },
+  "review_id": "01M69CPAW0H2CQHCRBKT0W8V9D",
+  "reviewer": "rev-atip-l0",
+  "scenario_id": "atip.l0.24",
+  "schema": 2,
+  "worktree_dirty": false
+}

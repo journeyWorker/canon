@@ -562,9 +562,10 @@ fn context_status_87_the_readers_warn_and_lead_with_canon_migrate() {
     for args in [&["status", "--json"][..], &["gate", "check", "--json"], &["context", "--json"], &["brief", "show", "a", "--json"]] {
         let out = canon(r, args);
         let doc = json(&out);
-        let warnings = doc["meta"]["warnings"].as_array().map(|w| w.iter().map(|x| x.as_str().unwrap().to_string()).collect::<Vec<_>>()).unwrap_or_default();
-        assert!(warnings.iter().any(|w| w.contains("0.30") && w.contains("canon migrate")), "{args:?}: {warnings:?}");
+        let warnings: Vec<Value> = doc["meta"]["warnings"].as_array().cloned().unwrap_or_default();
+        assert!(warnings.iter().any(|w| w["message"].as_str().unwrap().contains("0.30") && w["message"].as_str().unwrap().contains("canon migrate") && w["code"].is_string()), "{args:?}: {warnings:?}");
         assert_eq!(doc["meta"]["next"][0]["command"], "canon migrate --json", "{args:?}: {}", doc["meta"]);
+        assert_eq!(doc["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--json"]), "{args:?}: {}", doc["meta"]);
         assert!(doc["error"].is_null() || doc["error"]["code"] != "CONFIG_UNREADABLE", "{args:?}: {doc}");
     }
     // An approved old brief whose digest matches still reads approved.
@@ -997,16 +998,25 @@ fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second
 fn authoring_migrate_23_a_changed_plan_is_refused_and_a_brief_edited_after_approval_stays_changed() {
     let dir = old_repo();
     let r = dir.path();
-    let before = tree(r);
-    let out = commit(r, None, &"0".repeat(64));
-    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
-    assert!(out_text(&out).contains("PLAN_CHANGED"), "{}", out_text(&out));
-    assert_eq!(tree(r), before, "nothing changed");
-
+    // A plan previewed, then a brief changed: the old digest no longer names the plan.
+    let (_, old_digest) = plan(r);
     let edited = read_brief(r, "a").replace("Social sign-in.", "Social sign-in and email links.");
     write_brief(r, "a", &edited);
     commit_all(r);
+    let before = tree(r);
+    let out = commit(r, None, &old_digest);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    assert!(out_text(&out).contains("PLAN_STALE"), "{}", out_text(&out));
+    assert_eq!(tree(r), before, "nothing changed");
+
+    // A zero digest is refused the same way.
+    let zero = commit(r, None, &"0".repeat(64));
+    assert_eq!(zero.status.code(), Some(2), "{}", out_text(&zero));
+    assert!(out_text(&zero).contains("PLAN_STALE"), "{}", out_text(&zero));
+    assert_eq!(tree(r), before, "nothing changed");
+
     let (_, digest) = plan(r);
+    assert_ne!(digest, old_digest, "the brief changed, so the plan's digest did");
     let out = commit(r, None, &digest);
     assert!(out.status.success(), "{}", out_text(&out));
     assert!(!read_brief(r, "a").contains("<!--"));

@@ -95,10 +95,12 @@ fn session_ids_land_on_evidence_and_review_actors() {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["actor"], serde_json::json!({"agent_id": "impl-unit-1", "role": "implementer", "session_id": "sess-impl"}));
 
-    ok(repo, &[
+    let review = canon(repo, &[
         "review", "scenario", "game.run.01", "--project", "root", "--original-spec-ref",
         "specs/x.feature", "--actor", "reviewer-2", "--role", "reviewer", "--session", "sess-review",
     ]);
+    assert!(review.status.success(), "{}", text(&review));
+    assert!(text(&review).contains("written directly"), "the command says it was written directly: {}", text(&review));
     let reviews = committed(repo, "review");
     assert_eq!(reviews.len(), 1);
     assert_eq!(reviews[0]["actor"]["session_id"], "sess-review");

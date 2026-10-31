@@ -21,6 +21,13 @@ fn body(out: &Output) -> Value {
     serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("stdout is not one JSON document ({e}): {}", String::from_utf8_lossy(&out.stdout)))
 }
 
+/// `unchanged: true` of an answer: a report carries it in `data`, a report that
+/// is a stored record verbatim in `meta.x-canon`; never in `meta` itself.
+fn unchanged(answer: &Value) -> Option<bool> {
+    assert!(answer["meta"].get("unchanged").is_none(), "`unchanged` is not a meta member any more: {answer}");
+    answer["data"].get("unchanged").or_else(|| answer["meta"]["x-canon"].get("unchanged")).map(|v| v.as_bool().unwrap_or_else(|| panic!("`unchanged` is true or absent: {answer}")))
+}
+
 /// A repo with subject `demo`, change `add-login` and scenario `auth.login.01`.
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
@@ -72,7 +79,7 @@ fn status_keeps_only_the_named_fields_and_refuses_an_unknown_one() {
     let out = run(dir.path(), &["status", "--json", "--fields", "subjects,nope"]);
     assert_eq!(out.status.code(), Some(2));
     let error = &body(&out)["error"];
-    assert_eq!(error["code"], "UNKNOWN_FIELD");
+    assert_eq!(error["code"], "USAGE");
     assert_eq!(error["field"], "--fields");
     assert!(error["expected"].as_array().unwrap().iter().any(|f| f == "subjects"), "{error}");
 }
@@ -89,7 +96,8 @@ fn context_keeps_only_the_named_sections() {
     assert_eq!(got, ["enums", "kinds"]);
 
     let out = run(dir.path(), &["context", "--json", "--fields", "nope"]);
-    assert_eq!((out.status.code(), body(&out)["error"]["code"].clone()), (Some(2), Value::from("UNKNOWN_FIELD")));
+    assert_eq!((out.status.code(), body(&out)["error"]["code"].clone()), (Some(2), Value::from("USAGE")));
+    assert_eq!(body(&out)["error"]["field"], "--fields", "the refusal names the option");
 
     // Without --json the refusal is the same exit code.
     let out = run(dir.path(), &["context", "--fields", "nope"]);
@@ -108,7 +116,8 @@ fn divergence_status_projects_each_scenario_row() {
     assert_eq!(shown["data"]["scenarios"], serde_json::json!([{ "scenarioId": "auth.login.01", "state": "open" }]));
     assert_eq!(shown["data"]["summary"], all["data"]["summary"], "the summary is not a row and is kept");
     let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "nope"]);
-    assert_eq!(body(&out)["error"]["code"], "UNKNOWN_FIELD");
+    assert_eq!(body(&out)["error"]["code"], "USAGE");
+    assert_eq!(body(&out)["error"]["field"], "--fields");
 }
 
 #[test]
@@ -125,7 +134,8 @@ fn export_projects_each_record_but_keeps_the_manifest_digests() {
     assert_eq!(shown["contentDigests"], all["contentDigests"], "the manifest's digests do not depend on the projection");
     let out = run(dir.path(), &["export", "--kind", "evidence", "--fields", "nope", "--json"]);
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(body(&out)["error"]["code"], "UNKNOWN_FIELD");
+    assert_eq!(body(&out)["error"]["code"], "USAGE");
+    assert_eq!(body(&out)["error"]["field"], "--fields");
 }
 
 // ---- 2. field and expected on errors --------------------------------------
@@ -223,13 +233,13 @@ fn repeating_evidence_add_returns_the_existing_record_and_writes_nothing() {
     let dir = repo();
     let first = evidence(dir.path(), &[]);
     assert!(first.status.success());
-    assert!(body(&first)["meta"].get("unchanged").is_none(), "the first call writes");
+    assert_eq!(unchanged(&body(&first)), None, "the first call writes");
     assert_eq!(files_under(dir.path(), "evidence"), 1);
 
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success(), "{}", String::from_utf8_lossy(&again.stderr));
     let again = body(&again);
-    assert_eq!(again["meta"]["unchanged"], true, "{again}");
+    assert_eq!(unchanged(&again), Some(true), "{again}");
     assert_eq!(again["data"]["records"][0]["committed"], body(&first)["data"]["records"][0]["committed"], "the existing record is the one returned");
     assert_eq!(files_under(dir.path(), "evidence"), 1, "a repeat writes no second record");
 }
@@ -243,13 +253,13 @@ fn evidence_that_differs_is_a_new_record_and_only_the_latest_one_counts_as_the_r
     assert_eq!(files_under(dir.path(), "evidence"), 2);
     // Faithful again is a change from the latest (divergent), so it is written too...
     let third = evidence(dir.path(), &[]);
-    assert!(body(&third)["meta"].get("unchanged").is_none());
+    assert_eq!(unchanged(&body(&third)), None);
     assert_eq!(files_under(dir.path(), "evidence"), 3);
     // ...and only now is a repeat of the latest.
-    assert_eq!(body(&evidence(dir.path(), &[]))["meta"]["unchanged"], true);
+    assert_eq!(unchanged(&body(&evidence(dir.path(), &[]))), Some(true));
     assert_eq!(files_under(dir.path(), "evidence"), 3);
     // A different summary is a different record.
-    assert!(body(&evidence(dir.path(), &["--summary", "ran the suite"]))["meta"].get("unchanged").is_none());
+    assert_eq!(unchanged(&body(&evidence(dir.path(), &["--summary", "ran the suite"]))), None);
     assert_eq!(files_under(dir.path(), "evidence"), 4);
 }
 
@@ -262,10 +272,10 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
     ok(dir.path(), &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "alice", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success());
-    assert!(body(&again)["meta"].get("unchanged").is_none(), "{}", String::from_utf8_lossy(&again.stdout));
+    assert_eq!(unchanged(&body(&again)), None, "{}", String::from_utf8_lossy(&again.stdout));
     assert_eq!(files_under(dir.path(), "evidence"), 2);
     // Nothing followed that one: repeating it is a retry.
-    assert_eq!(body(&evidence(dir.path(), &[]))["meta"]["unchanged"], true);
+    assert_eq!(unchanged(&body(&evidence(dir.path(), &[]))), Some(true));
     assert_eq!(files_under(dir.path(), "evidence"), 2);
 }
 
@@ -281,14 +291,14 @@ fn repeating_review_add_returns_the_existing_review_and_writes_nothing() {
     assert_eq!(files_under(dir.path(), "review"), 1);
 
     let again = body(&review(dir.path(), "HEAD"));
-    assert_eq!(again["meta"]["unchanged"], true, "{again}");
+    assert_eq!(unchanged(&again), Some(true), "{again}");
     assert_eq!(again["data"]["reviews"][0]["location"], body(&first)["data"]["reviews"][0]["location"]);
     assert_eq!(files_under(dir.path(), "review"), 1);
 
     // A different commit is a new review.
     git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "next"]);
     let other = body(&review(dir.path(), "HEAD"));
-    assert!(other["meta"].get("unchanged").is_none(), "{other}");
+    assert_eq!(unchanged(&other), None, "{other}");
     assert_eq!(files_under(dir.path(), "review"), 2);
 }
 
@@ -319,7 +329,7 @@ fn tree(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
 }
 
 /// Runs `args` (plus `--json`) twice: both exit 0, the second says
-/// `meta.unchanged` and leaves the tree as the first left it.
+/// `unchanged: true` and leaves the tree as the first left it.
 fn repeats_unchanged(dir: &Path, args: &[&str]) {
     let mut argv = args.to_vec();
     argv.push("--json");
@@ -328,7 +338,7 @@ fn repeats_unchanged(dir: &Path, args: &[&str]) {
     let after_first = tree(dir);
     let again = run(dir, &argv);
     assert_eq!(again.status.code(), Some(0), "{args:?} again: {}{}", String::from_utf8_lossy(&again.stdout), String::from_utf8_lossy(&again.stderr));
-    assert_eq!(body(&again)["meta"]["unchanged"], true, "{args:?}: {}", String::from_utf8_lossy(&again.stdout));
+    assert_eq!(unchanged(&body(&again)), Some(true), "{args:?}: {}", String::from_utf8_lossy(&again.stdout));
     let after_again = tree(dir);
     let differing: Vec<&std::path::PathBuf> = after_first.keys().chain(after_again.keys()).filter(|k| after_first.get(*k) != after_again.get(*k)).collect();
     assert!(differing.is_empty(), "{args:?}: the repeat changed the tree: {differing:?}");
@@ -430,17 +440,24 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
     assert!(body(&out)["data"]["counts"].is_object());
 }
 
-/// A leaf that never gates, and one that cannot exit 1, say so in their schema:
-/// the exit rows are the leaf's own, not a shared default.
+/// A leaf that never gates, and one that cannot exit 1 for a finding, say so in
+/// their schema: the exit rows are the leaf's own, not a shared default. Exit 1
+/// is declared for every leaf (a panic is `INTERNAL`, exit 1); on these two it is
+/// the only thing that can answer it.
 #[test]
 fn the_exceptions_declare_only_the_exits_they_have() {
     let dir = TempDir::new().unwrap();
-    for (command, exits) in [(vec!["context"], vec![0, 2]), (vec!["dispatch", "diff"], vec![0, 2]), (vec!["artifacts", "store"], vec![0, 1, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
+    for (command, exits) in [(vec!["context"], vec![0, 1, 2]), (vec!["dispatch", "diff"], vec![0, 1, 2]), (vec!["artifacts", "store"], vec![0, 1, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
         let mut args = vec!["schema"];
         args.extend(&command);
         args.push("--json");
         let schema = body(&run(dir.path(), &args))["data"].clone();
-        let declared: Vec<u64> = schema["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
+        let rows = schema["exits"].as_array().unwrap();
+        let declared: Vec<u64> = rows.iter().map(|e| e["code"].as_u64().unwrap()).collect();
         assert_eq!(declared, exits, "{command:?}");
+        if matches!(command[0], "context" | "dispatch") {
+            let one = rows.iter().find(|e| e["code"] == 1).unwrap()["meaning"].as_str().unwrap();
+            assert_eq!(one, "failed: INTERNAL", "{command:?} cannot gate: exit 1 is only a panic");
+        }
     }
 }

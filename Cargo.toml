@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/atip",
+    "crates/atip-check",
     "crates/canon-model",
     "crates/canon-store",
     "crates/canon-ingest",
@@ -15,13 +17,15 @@ members = [
 ]
 
 [workspace.package]
-version = "0.32.0"
+version = "0.33.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/journeyWorker/canon"
 
 [workspace.dependencies]
 # Internal crates
+atip = { path = "crates/atip" }
+atip-check = { path = "crates/atip-check" }
 canon-model = { path = "crates/canon-model" }
 canon-store = { path = "crates/canon-store" }
 canon-ingest = { path = "crates/canon-ingest" }

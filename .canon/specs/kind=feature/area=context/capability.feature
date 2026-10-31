@@ -214,7 +214,7 @@ Feature: context capability
   Scenario: A scenario batch element with a removed key name refuses the batch and names the key to use
     Given a JSON array for `canon scenario new --input` whose second element uses the key subjectId, changeId or projectId that the id-suffixed options made
     When the batch runs
-    Then it exits 2 with INPUT_UNKNOWN_FIELD and writes nothing, the first element included
+    Then it exits 2 with INPUT_INVALID and writes nothing, the first element included
     And the error's field points at the element and the key, as `/items/1/subjectId`, `expected` lists the valid keys, the key without Id among them, and the hint names it
     And an array using the keys subject, project and change is written
 
@@ -412,7 +412,7 @@ Feature: context capability
   Scenario: Context refuses an unknown field with exit 2
     Given a directory with no canon.yaml
     When canon context is run with --fields naming a section that does not exist, with --json and without
-    Then it exits 2 and, with --json, names UNKNOWN_FIELD
+    Then it exits 2 and, with --json, names USAGE with field --fields
     And the named sections that do exist are the only keys canon context returns when --fields lists them
 
   # canon: {"schema":1,"at":"2026-10-23T11:51:50Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -555,7 +555,7 @@ Feature: context capability
   Scenario: A batch whose second element keeps an old Id key is refused naming that element's key, and writes nothing
     Given a JSON array for `canon scenario new --input` whose second element names the scenario's subject with the key the id-suffixed option made
     When the batch runs
-    Then it exits 2 with INPUT_UNKNOWN_FIELD and the field points at that element's key, as `/items/1/` and the key
+    Then it exits 2 with INPUT_INVALID and the field points at that element's key, as `/items/1/` and the key
     And expected lists the valid keys, the hint names the key without Id, and the first element is not written either
 
   # canon: {"schema":1,"at":"2026-10-27T13:11:14Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}

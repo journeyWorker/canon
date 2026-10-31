@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T14:50:14.703007Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "atip.l0.17"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "USAGE polish: a missing required argument reads `the following required arguments were not provided:` with nothing after the colon (the name is only in `field`, and only the first of several), so text mode prints `canon: USAGE: the following required arguments were not provided:`; `canon status --fields --json` carries `received: \"\"` where the contract leaves a value-less member out; `canon help status --json` and `canon help --json` read the relocated `--json` as the command to explain (UNKNOWN_COMMAND, `--json` is not a command of `canon status`); `retrieve` without --regime/--domain is RETRIEVE_FAILED with a hint about ledger readability instead of USAGE with field.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,169 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "errors",
+    "errors": [
+      {
+        "code": "BATCH_INCOMPLETE",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A batch stopped during execution; data.items says which items ran",
+        "fix": "Fix the failed item and send it and the skipped items again"
+      },
+      {
+        "code": "BUILD_FAILED",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A build step failed after the build started",
+        "fix": "Read the end line's error and the failed step's event, fix the project, build again"
+      },
+      {
+        "code": "COMMAND_REQUIRED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A group or the bare tool was run without a command",
+        "fix": "Pick one of `expected`"
+      },
+      {
+        "code": "CURSOR_INVALID",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The --cursor was not printed by this command with these arguments",
+        "fix": "Start again without --cursor"
+      },
+      {
+        "code": "DEPLOYMENT_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No deployment has this identifier",
+        "fix": "Use the deployment deploy start reported"
+      },
+      {
+        "code": "DEPLOY_FAILED",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "The deployment ran and failed; data.state is failed",
+        "fix": "Read the worker's log for the deployment, fix the cause and start a new deployment"
+      },
+      {
+        "code": "DEPLOY_WAIT_TIMEOUT",
+        "exit": 1,
+        "retryable": true,
+        "meaning": "The deployment had not ended when --timeout passed",
+        "fix": "Wait again with the same command (meta.next)"
+      },
+      {
+        "code": "ENVIRONMENT_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No environment has this name in acme.yaml",
+        "fix": "Use an environment acme.yaml declares"
+      },
+      {
+        "code": "FILE_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A file to lint does not exist",
+        "fix": "Check the path, relative to the working directory"
+      },
+      {
+        "code": "INPUT_CONFLICT",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A --input value differs from the same argument on the command line",
+        "fix": "Give the argument once"
+      },
+      {
+        "code": "INPUT_INVALID",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "--input cannot be read or framed, or a document fails the fragment schema",
+        "fix": "Fix the key `field` points at"
+      },
+      {
+        "code": "INPUT_TOO_LARGE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "--input exceeds input.maxBytes",
+        "fix": "Send a smaller document"
+      },
+      {
+        "code": "INTERNAL",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A bug in acme",
+        "fix": "Report it with the command line and the message"
+      },
+      {
+        "code": "LINT_FAILED",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "The lint ran and found problems; data.files lists them",
+        "fix": "Fix the problems data.files names and lint again"
+      },
+      {
+        "code": "MEMBER_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No member has this number",
+        "fix": "List the members: acme member list --team <TEAM>"
+      },
+      {
+        "code": "OPERATION_REUSED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The operation key was used before with other arguments",
+        "fix": "Use a new key, or repeat the first request's arguments"
+      },
+      {
+        "code": "PAGE_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No page has this slug",
+        "fix": "Check the page slug; it is the last part of the page's address"
+      },
+      {
+        "code": "STORE_UNAVAILABLE",
+        "exit": 2,
+        "retryable": true,
+        "meaning": "The page store could not be reached when the command was to start",
+        "fix": "Try again; if it persists, check the store's address in acme.yaml"
+      },
+      {
+        "code": "TAG_RESERVED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The tag is reserved for the directory (admin, owner)",
+        "fix": "Choose another tag"
+      },
+      {
+        "code": "TEAM_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No team has this name",
+        "fix": "Check the team name"
+      },
+      {
+        "code": "UNKNOWN_COMMAND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A command word is not in the tree",
+        "fix": "Pick one of `expected`"
+      },
+      {
+        "code": "USAGE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The command line does not parse or does not satisfy the command's requirements",
+        "fix": "Run acme schema <COMMAND> --json"
+      }
+    ]
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

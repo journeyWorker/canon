@@ -724,7 +724,7 @@ pub fn attested_briefs<'a>(
 /// the line says what does wait, and how to take the adoption back. `None`
 /// for a proposed or specced subject, an approved brief, or a change with
 /// no brief to answer.
-pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Option<String> {
+pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Option<crate::json_out::Warning> {
     if !matches!(
         subject.status,
         SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped
@@ -735,11 +735,11 @@ pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Op
     let brief = brief_of(repo, &roots, subject, std::slice::from_ref(change))
         .filter(|brief| brief.enforced)?;
     let (change, subject_id) = (change.as_str(), subject.subject_id.as_str());
-    Some(format!(
+    Some(crate::json_out::Warning::new("BRIEF_ADOPTION_UNAPPROVED", format!(
         "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {subject_id} --change {change}`",
         serde_json::to_value(subject.status).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
         brief.unanswered()
-    ))
+    )))
 }
 
 /// One line per evidence record attested under a brief override (0.16

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-crate",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-crate-rev"
+  },
+  "at": "2026-10-31T12:04:10.330047Z",
+  "change_id": "canon-0-33-atip-crate",
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/error.rs:92",
+  "introduced_by": "48824ebef2c708ffedff3e293f91d60cecb522e9",
+  "kind": "finding",
+  "reviewed_sha": "bc73b3a2c0f824de97c7946345d7e98adfb5316e",
+  "reviewer": "rev-atip-crate",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Spec fidelity: the brief says the crate moves to the atip repo with no source change, yet `ErrorBody.code` carries the doc comment \"listed by `canon schema --errors`\" (and `human` docs name `canon evidence add`). The first is kept on purpose: schemars turns it into a description in docs/cli/canon.cli.json, which the brief requires byte-identical. So the moved crate still names a canon command, and the spec file stays the only thing pinning it. L0 (which rewrites that file) should reword it tool-neutrally. No output impact at this commit.",
+  "worktree_dirty": false
+}

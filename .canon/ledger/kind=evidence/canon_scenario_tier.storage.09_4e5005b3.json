@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T14:17:13.649672Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib fold::tests::an_equal_at_tie_goes_to_the_greater_schema_even_when_the_lower_schema_has_the_greater_digest"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 90,
+  "scenario_id": "tier.storage.09",
+  "schema": 1,
+  "staging_id": "8e094640",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

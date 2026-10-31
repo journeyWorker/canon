@@ -1,2 +1,2 @@
-canon evidence add: EVIDENCE_INVALID_ARGUMENT — --artifact `notes/qa.md` would be bound to every scenario's record of the batch; no record is written
-hint: let the report carry per-test attachments (Playwright's JUnit reporter writes `[[ATTACHMENT|<path>]]` per test; Cucumber JSON embeddings do the same), or bind a file to one scenario with `--artifact <scenario-id>=<path>`
+canon: EVIDENCE_INVALID_ARGUMENT: --artifact `notes/qa.md` would be bound to every scenario's record of the batch; no record is written
+  hint: let the report carry per-test attachments (Playwright's JUnit reporter writes `[[ATTACHMENT|<path>]]` per test; Cucumber JSON embeddings do the same), or bind a file to one scenario with `--artifact <scenario-id>=<path>`

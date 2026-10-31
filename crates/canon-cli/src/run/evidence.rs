@@ -1,7 +1,7 @@
 //! `canon evidence` — the handlers of the group.
 
 use crate::cli::evidence::{EvidenceCommand, EvidenceApprovalPayloadArgs, EvidenceAddArgs, EvidenceAuditArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use canon_model::ProjectId;
 use std::path::Path;
 use std::process::ExitCode;

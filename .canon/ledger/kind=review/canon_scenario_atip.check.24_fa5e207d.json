@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:37.748390Z",
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "kind": "review",
+  "pin": "61c14f763172fa46123264154f3994c91556c715",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_24_the_setup_runs_once_and_every_invocation_starts_from_a_fresh_copy_of_its_state",
+          "junit:exec::tests::atip_check_24_every_invocation_runs_in_a_fresh_copy_of_the_setup_state_with_home_inside_it",
+          "junit:snapshot::tests::atip_check_24_a_copy_is_independent_of_its_source"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c293fa44ca9df4ee483c10f7fd173e598789dd621c3561b72c07d60670cde6d1",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-check/brief.md"
+  },
+  "review_id": "01M69DD46M2S0NK4JHKYYZTPMH",
+  "reviewer": "rev-atip-check",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.check.24",
+  "schema": 2,
+  "worktree_dirty": false
+}

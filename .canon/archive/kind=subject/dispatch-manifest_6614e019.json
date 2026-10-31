@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-30T22:26:01.153016Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-fixes",
+    "canon-0-33-atip-l0"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "dispatch-manifest",
+  "summary": "",
+  "title": "Dispatch: run manifests and injected guidance"
+}

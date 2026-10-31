@@ -79,7 +79,7 @@ use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 
 /// `--project`'s `clap` value parser.
@@ -370,7 +370,8 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     if reviews.is_empty() {
         if args.json {
             let wrote: Vec<ReviewEntry> = unchanged.iter().map(|(scenario, stored_id, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), review_id: stored_id.clone(), unchanged: Some(true) }).collect();
-            crate::json_out::data_with_meta(args.command(), &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: 0 }, serde_json::json!({ "unchanged": true }));
+            crate::json_out::mark_unchanged();
+            crate::json_out::data(args.command(), &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: 0 });
         }
         return 0;
     }
@@ -383,10 +384,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
         Ok(landed) => landed,
         Err(error) => {
-            let mut error = CliError::refused("WRITE_FAILED", error.clone()).hint("check that the path is writable and the disk has room, then run the command again");
-            if reviews.len() > 1 {
-                error = error.hint("no review is written: every review and blob this run wrote or stored was removed");
-            }
+            let error = if reviews.len() > 1 && error.code == "WRITE_FAILED" { error.hint("no review is written: every review and blob this run wrote or stored was removed") } else { error };
             return error.emit(&args.full(), args.json);
         }
     };
@@ -448,15 +446,23 @@ fn write_reviews(
     files: &[crate::evidence_attach::BoundFile],
     reviews: &[Review],
     write: &mut dyn FnMut(&GitTier, &Review) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
-) -> Result<(usize, Vec<(String, bool)>), String> {
+) -> Result<(usize, Vec<(String, bool)>), CliError> {
+    const WRITE_HINT: &str = "check that the path is writable and the disk has room, then run the command again";
+    let unwritable = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint("make the review directory writable, then run the command again; nothing was written");
     let dir = ledger_root.join(format!("kind={}", RecordKind::Review.as_str()));
     match std::fs::create_dir_all(&dir).and_then(|()| std::fs::metadata(&dir)) {
-        Ok(meta) if meta.permissions().readonly() => return Err(format!("{} is read-only", dir.display())),
+        Ok(meta) if meta.permissions().readonly() => return Err(unwritable(format!("{} is read-only", dir.display()))),
         Ok(_) => {}
-        Err(e) => return Err(format!("cannot prepare {}: {e}", dir.display())),
+        Err(e) => return Err(unwritable(format!("cannot prepare {}: {e}", dir.display()))),
     }
-    let held = crate::evidence_attach::store_files_held(repo, files)
-        .map_err(|(file, e)| format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint()))?;
+    let held = crate::evidence_attach::store_files_held(repo, files).map_err(|(file, e)| {
+        let code = match &e {
+            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => "REVIEW_ARTIFACT_REFUSED",
+            _ if crate::artifacts::before_first_write(&e) => "ARTIFACTS_STORE_UNREACHABLE",
+            _ => "ARTIFACTS_STORE_FAILED",
+        };
+        CliError::refused(code, format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint())).hint(e.hint())
+    })?;
     let committed = GitTier::new(ledger_root);
     let mut written: Vec<(String, bool)> = Vec::new();
     for review in reviews {
@@ -473,9 +479,9 @@ fn write_reviews(
                 }
                 held.rollback();
                 if reviews.len() == 1 {
-                    return Err(e.to_string());
+                    return Err(CliError::refused("WRITE_FAILED", e.to_string()).hint(WRITE_HINT));
                 }
-                return Err(format!("writing review {} of {} failed: {e}", written.len() + 1, reviews.len()));
+                return Err(CliError::refused("WRITE_FAILED", format!("writing review {} of {} failed: {e}", written.len() + 1, reviews.len())).hint(WRITE_HINT));
             }
         }
     }
@@ -669,7 +675,7 @@ mod tests {
             tier.write(review)
         };
         let error = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut failing_second).unwrap_err();
-        assert!(error.contains("writing review 2 of 2 failed: ") && error.contains("disk full"), "{error}");
+        assert!(error.message.contains("writing review 2 of 2 failed: ") && error.message.contains("disk full"), "{}", error.message);
         assert!(reviews(&dir).is_empty(), "the first review is removed");
         assert_eq!(blobs(), 0, "the blob this call stored is removed");
 
@@ -677,7 +683,8 @@ mod tests {
         // so `run_add` prints `canon review add: <error>` unchanged.
         let disk_full = || canon_store::tier::StoreError::Io(std::io::Error::other("disk full"));
         let single = write_reviews(dir.path(), &ledger_root, &files, &batch[..1], &mut |_, _| Err(disk_full())).unwrap_err();
-        assert_eq!(single, disk_full().to_string(), "a single review's failure keeps its pre-0.18 wording");
+        assert_eq!((single.code, single.exit), ("WRITE_FAILED", 1));
+        assert_eq!(single.message, disk_full().to_string(), "a single review's failure keeps its pre-0.18 wording");
         assert_eq!((reviews(&dir).len(), blobs()), (0, 0));
 
         let review_dir = ledger_root.join("kind=review");
@@ -687,7 +694,9 @@ mod tests {
         std::fs::set_permissions(&review_dir, readonly).unwrap();
         let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
         std::fs::set_permissions(&review_dir, original).unwrap();
-        assert!(refused.unwrap_err().contains("is read-only"));
+        let refused = refused.unwrap_err();
+        assert_eq!((refused.code, refused.exit), ("WRITE_UNAVAILABLE", 2));
+        assert!(refused.message.contains("is read-only"));
         assert_eq!(blobs(), 0);
 
         let (stored, written) = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review)).unwrap();

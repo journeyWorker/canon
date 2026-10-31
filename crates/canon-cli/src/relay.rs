@@ -107,7 +107,7 @@ pub struct Call<'a> {
 /// recording the human's answer, `Err` for every refusal. `human_call` is the
 /// call the human runs, `relay_call` the relayed one, both with ids filled in.
 pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path, call: Call<'_>) -> Result<Option<ApprovalRelay>, crate::cli_error::CliError> {
-    use crate::cli_error::CliError;
+    use crate::cli_error::{CliError, CliErrorExt as _};
     use crate::role::Role;
     let role = Role::current(None);
     let (role, tool) = match (role, call.via) {

@@ -34,7 +34,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 pub use crate::review::{parse_project_id, parse_scenario_id};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::timestamp::TimestampError;
 
@@ -216,6 +216,11 @@ pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate:
         }
         return 0;
     }
+    let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
+    let targets: Vec<&Path> = if promote { vec![staging_dir.as_path(), gate_ctx.ledger_root.as_path()] } else { vec![staging_dir.as_path()] };
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon divergence add", json) {
+        return code;
+    }
     let location = match stage(&gate_ctx.ledger_root, &candidate) {
         Ok(location) => location,
         Err(e) => {
@@ -319,6 +324,11 @@ fn run_commit(verb: &str, status: DivergenceStatus, args: CommitArgs<'_>) -> u8 
     };
     let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
 
+    // The record is staged, then promoted into the ledger: both must take it before the first write.
+    let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
+    if let Some(code) = crate::write_mode::refuse_unwritable(&[staging_dir.as_path(), gate_ctx.ledger_root.as_path()], &format!("canon divergence {verb}"), json) {
+        return code;
+    }
     match stage_and_promote(&gate_ctx.ledger_root, &candidate) {
         Ok(target) => {
             crate::say!(json, "canon divergence {verb}: committed {} — {}", target.display(), crate::write_mode::PROMOTED);
@@ -450,6 +460,9 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         actor = actor.with_session(session.clone());
     }
     let at = Utc::now();
+    if let Some(code) = crate::write_mode::refuse_unwritable(&[&crate::gate::evidence_staging_dir(&context.ctx.ledger_root), &context.ctx.ledger_root], CMD, args.json) {
+        return code;
+    }
     let mut wrote: Vec<(String, std::path::PathBuf)> = Vec::new();
     for scenario in &scenarios {
         let record = candidate(CandidateSpec {

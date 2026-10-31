@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "data": {
+    "member/list": [
+      {
+        "id": 1,
+        "email": "ada@example.org"
+      },
+      {
+        "id": 2,
+        "email": "grace@example.org"
+      }
+    ]
+  },
+  "meta": {
+    "command": "member roster",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "fields": [
+      "id",
+      "email"
+    ]
+  }
+}

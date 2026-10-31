@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-crate",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-crate-rev"
+  },
+  "at": "2026-10-31T12:04:28.738003Z",
+  "change_id": "canon-0-33-atip-crate",
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "kind": "review",
+  "pin": "bc73b3a2c0f824de97c7946345d7e98adfb5316e",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "f0f0f5f477d882e23fb46b115cc11b430ed3f2c33ee14e1418c8a9cbf4e73e15",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-crate/brief.md"
+  },
+  "review_id": "01M68XHMY25F02M6TMK5G7BJSE",
+  "reviewer": "rev-atip-crate",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -41,7 +41,7 @@ fn the_bare_run_previews_the_candidates_and_performs_no_writes() {
     assert_eq!(data["rules"][0]["candidates"], 1, "{body}");
     assert_eq!(data["rules"][0]["moved"], 0, "{body}");
     let digest = data["planDigest"].as_str().expect("a preview carries a planDigest");
-    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["canon", "tier", "age", "--repo", fixture.root.path().display().to_string(), "--commit", "--plan-digest", digest, "--json"]), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["tier", "age", "--repo", fixture.root.path().display().to_string(), "--commit", "--plan-digest", digest, "--json"]), "{body}");
 
     // A preview must never write or delete anything.
     assert_eq!(fixture.git_file_count(), 2, "the preview moved a file out of the git tier");
@@ -86,7 +86,7 @@ fn a_stale_digest_moves_nothing_and_a_fresh_preview_commits() {
     let stale = commit(&fixture, &digest);
     assert_eq!(stale.status.code(), Some(2));
     let stale_body: serde_json::Value = serde_json::from_str(&support::stdout(&stale)).unwrap();
-    assert_eq!(stale_body["error"]["code"], "PLAN_CHANGED", "{stale_body}");
+    assert_eq!(stale_body["error"]["code"], "PLAN_STALE", "{stale_body}");
     assert_eq!(fixture.git_file_count(), 3, "a stale digest moves nothing");
     assert_eq!(fixture.r2_file_count(), 0);
 
@@ -97,12 +97,48 @@ fn a_stale_digest_moves_nothing_and_a_fresh_preview_commits() {
     assert_eq!(fixture.r2_file_count(), 2);
 }
 
+/// Every file under `root` with its bytes, sorted: a whole-repo before/after snapshot.
+fn snapshot(root: &std::path::Path) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+    fn walk(dir: &std::path::Path, out: &mut Vec<(std::path::PathBuf, Vec<u8>)>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else {
+                let bytes = std::fs::read(&path).unwrap();
+                out.push((path, bytes));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, &mut out);
+    out.sort();
+    out
+}
+
 #[test]
 fn the_old_tier_age_flags_are_usage_errors() {
     let fixture = support::Fixture::new(ROUTING, AGING);
+    // The Given: a record past its threshold, so the bare run WOULD have something to move.
+    fixture.plant_trajectory_in_git(Utc::now() - Duration::days(30), 0.3);
+    let candidates = preview(&fixture)["data"]["rules"][0]["candidates"].clone();
+    assert_eq!(candidates, 1, "the fixture holds one record past its threshold");
+
+    let before = snapshot(fixture.root.path());
+    let (git_before, r2_before) = (fixture.git_file_count(), fixture.r2_file_count());
+    assert_eq!(git_before, 1, "the aged record sits in the git tier");
     for args in [&["tier", "age", "--dry-run"][..], &["tier", "age", "--canon-yaml", "x"], &["tier", "age", "--commit"]] {
-        assert_eq!(fixture.run_canon(args).status.code(), Some(2), "{args:?}");
+        let output = fixture.run_canon(args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        assert!(output.stdout.is_empty() || !support::stdout(&output).contains("\"committed\":true"), "{args:?} must not commit");
     }
+    assert_eq!(fixture.git_file_count(), git_before, "nothing was removed from the git tier");
+    assert_eq!(fixture.r2_file_count(), r2_before, "nothing was written to the r2 tier");
+    assert!(snapshot(fixture.root.path()) == before, "no byte of the repo changed across the three refused invocations");
+
+    // And the bare run is the preview: it too writes nothing.
+    let _ = preview(&fixture);
+    assert!(snapshot(fixture.root.path()) == before, "the bare run previews and writes nothing");
 }
 
 #[test]

@@ -4,6 +4,101 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.33.0 — 2026-11-01
+
+### Breaking
+
+canon's `--json` output and error contract now follow atip/1 L0 (https://github.com/journeyWorker/atip, spec sections 4 to 8). The old names below are deleted: there are no aliases, and every consumer in this repository (the guides the binary carries, the website in both languages, the dashboard, the dogfood evals, the conformance corpus, the command spec file) moved in the same release.
+
+**The envelope.** `meta` holds only the members the contract defines and canon's own `x-canon`; a member with no value is absent (never `null`, never `[]`).
+
+| 0.32 | 0.33 |
+|---|---|
+| `meta.canonVersion` | `meta.toolVersion`; new `meta.tool` (`canon`) and `meta.contract` (`atip/1`) on every envelope. `data.canonVersion` of `canon status` is a member of that report and stays |
+| `meta.command` `"canon"` when nothing resolved | `meta.command` is absent when not even the first word resolved; the path resolved so far otherwise (`canon finding nosuch` → `finding`) |
+| `meta.context.role`, `meta.context.actor` (and `null`s) | gone; `meta.context` is `{repo}` (a path relative to the working directory), present for a command that takes `--repo` |
+| `meta.returned`, `meta.total`, `meta.nextCursor`, `meta.hasMore` | `meta.page` = `{returned, total, nextCursor?}`; `nextCursor` present means more follow and `meta.next` holds the same call plus `--cursor <nextCursor>` |
+| `meta.unchanged: true` | `data.unchanged: true` of a write's report (a report that is a stored record, `canon subject new/adopt/move/unadopt`, or not an object: `meta.x-canon.unchanged`) |
+| `meta.waitingOn`, `meta.nextOmitted` | `data.waitingOn`, `data.nextOmitted` (same rule: `meta.x-canon` for a record); `canon status` has them in `data` too |
+| `meta.hotStore` of `canon subject …` | `meta.x-canon.hotStore` (the data is the stored record) |
+| `meta.note` of `canon scenario new` | `data.note` |
+| `meta.warnings: ["text"]` | `meta.warnings: [{"code", "message", "field"?}]`; every warning situation has a registered code (listed below) |
+| `meta.next[].why` | `meta.next[].reason` |
+| `meta.next[].actor`, `.role` | `meta.next[].x-canon.actor`, `.x-canon.role` |
+| `meta.next[]` with `argv: []` for a command holding a `<placeholder>` | not an entry: the guidance is in the error `hint` or the report text (text mode still shows it) |
+| `meta.next[].argv` without `--json` | in JSON mode every entry's `argv` carries `--json` where the command takes it |
+| `meta.next: []` on a write | absent |
+| `error.hint: null`, `error.suggestions: []` | absent |
+| `meta.output` | new: the report's name (`BriefApproveReport`, `InitCheckReport`, `BatchFindingCloseReport`) when the command declares several outputs |
+| the canon-specific envelope schemas (`envelopes` of `docs/cli/canon.cli.json`) | removed; the contract's `envelope.schema.json`, `error.schema.json` and `registry-entry.schema.json` are vendored unchanged in `crates/atip/schema/` and pinned by digest; `docs/cli/canon.cli.json` has `"contract": "atip/1"` |
+
+Every report of a command that writes, and `canon status`, gained the optional members `unchanged`, `waitingOn` and `nextOmitted`, so their `schemaVersion` is `1.1` (`BatchReport` too, which also reports `unchanged` when every element did). `canon scenario new` also gained `data.note`.
+
+**Wrong calls.** `--json` is accepted anywhere before `--`, at the root and on groups too (`canon --json`, `canon finding --json`).
+
+| Call | 0.32 | 0.33 |
+|---|---|---|
+| an unknown command | `USAGE` (clap's text in text mode) | `UNKNOWN_COMMAND`, `field` `command`, `expected` the valid words, `received`, `suggestions` |
+| no command (`canon`, `canon finding`, `canon brief`, `canon report`) | `USAGE` | `COMMAND_REQUIRED`, `expected` the commands of that level (for `brief` and `report` the 0.28 removed-spelling message is the hint) |
+| an unknown option, a missing value, a bad `--fields` name | `USAGE`, or `UNKNOWN_FIELD` for `--fields` | `USAGE`, `field` the argument; a bad `--fields` name lists the selectable fields in `expected` |
+| a bug (panic) | exit 101 | `INTERNAL`, exit 1, the message says how to report it; a closed stdout still ends the process by SIGPIPE (a signal exit, outside the registry) |
+
+In text mode every refusal leaves stdout empty and opens stderr with `canon: <CODE>: <message>`, then indented `field:`, `expected:`, `suggestions:` and `hint:` lines (it was `canon <command path>: <CODE> — <message>` and `hint: …`). A failure that carries a human report (exit 1: `canon gate check` red, `canon brief check` with blockers) still prints that report on stdout and no error line, since the report is the answer; the contract's 7.4.1 form is RECOMMENDED, not required.
+
+**Error codes.** The old names are deleted.
+
+| 0.32 | 0.33 | exit |
+|---|---|---|
+| `PLAN_CHANGED` | `PLAN_STALE` | 2 |
+| `INPUT_ELEMENT_FAILED` | `BATCH_INCOMPLETE` (data shape and pointers unchanged; a crashed element's own error is `INTERNAL`) | 1 |
+| `INPUT_BATCH_UNSUPPORTED`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`, `INPUT_UNREADABLE`, `INPUT_STDIN_TTY` | `INPUT_INVALID`. A fault in the value of `--input` itself has `field` `--input` and `error.x-canon.reason`: `unreadable`, `tty`, `empty`, `syntax` or `batch-unsupported` (the contract's one code cannot say which; splitting the code is an atip/2 candidate). A fault in the document against its fragment schema has a JSON pointer `field` and no reason | 2 |
+| `INPUT_STDIN_CONFLICT` | `USAGE`, `field` `--input` | 2 |
+| `--input` given twice or without a value (was `INPUT_INVALID`) | `USAGE`, `field` `--input` | 2 |
+| `INPUT_INVALID`, `INPUT_CONFLICT`, `INPUT_TOO_LARGE` | unchanged | 2 |
+| `INVALID_CURSOR` | `CURSOR_INVALID` (`field` `--cursor`) | 2 |
+| `UNKNOWN_FIELD` | `USAGE`, `field` `--fields` | 2 |
+| `USAGE` for an unknown command / no command | `UNKNOWN_COMMAND` / `COMMAND_REQUIRED` | 2 |
+| (none) | `INTERNAL` | 1 |
+| `ADAPTER_REFUSED` used with exit 1 and 2 | `ADAPTER_REFUSED` (2); `ADAPTER_RESPONSE_INVALID` (1) for `canon adapter validate` on an envelope that breaks a rule | 2 / 1 |
+| `EVIDENCE_BATCH_REFUSED` used with exit 2 and 1 | `EVIDENCE_BATCH_REFUSED` only for a refused promotion (1); an unwritable directory is `WRITE_UNAVAILABLE` (2), a store problem `EVIDENCE_STORE_UNAVAILABLE` (2) or `EVIDENCE_STORE_FAILED` (1), a write failing after the first record `WRITE_FAILED` (1) | 1 / 2 |
+
+**Exit codes** now come from the code's registry row alone (`canon schema --errors --json`); nothing sets an exit at a call site, and only 0, 1 and 2 exist (signal exits 128+n are outside the registry). Exit 1: the command ran and its answer is negative or incomplete; exit 2: it refused to run. `canon subject move` blocked by a gate violation, `canon brief approve` and `canon evidence add` batches, `canon adapter` and the batch runner no longer compute an exit. `POLICY_APPROVAL_UNREADABLE` is exit 1 (it was registered 2 but `subject move` returned 1). `BRIEF_UNREADABLE` read during `canon brief approve`'s check is exit 2 (it was 1).
+
+`WRITE_FAILED` is exit 1 (a write that began and failed). The same failure known before the first write (a target that cannot be written) is the new `WRITE_UNAVAILABLE`, exit 2, with nothing changed, and the message names the path. Every command that writes checks it up front (the helper is `write_mode.rs`): `subject new/move/adopt/unadopt`, `change new`, `feature new`, `scenario new`, `inventory sync`, `ingest plans/sessions/records`, `report build/snapshot`, `dispatch begin/end`, `context-pack add`, `prompt add`, `plugin sync`, `gate promote`, `gate install-hooks`, `divergence add/accept/defer/resolve`, `ledger compact`, `tier age`, `purge`, `export`, `strategy promote/rollback`, `artifacts store/move`, `skills install`, `evidence add`/`audit`, `finding add/close`, `review`, `task done`, `init`, `demo init/review`, `migrate`, `brief approve` and `policy approve`. A store with its own precondition code keeps it (`ARTIFACTS_STORE_UNREACHABLE`, `EVIDENCE_STORE_UNAVAILABLE`). `ingest plans` now refuses on a read-only repo even when it would have written nothing, because opening its store creates `hot.db`. `canon retrieve` scoped by neither or both of `--regime` and `--domain` (and a `--for-role` that disagrees with `--regime`) is `USAGE` with `field` now; `RETRIEVE_FAILED` stays for a regime key that cannot be derived.
+
+The thirteen exit-2 codes named for a failure during the work (and `WRITE_FAILED`, the fourteenth row), decided one by one (a: the same failure can happen before and during the work, so the code is split; b: only before, stays exit 2; c: only during, becomes exit 1):
+
+| Code | Decision | Split into | Exit |
+|---|---|---|---|
+| `ARTIFACTS_STORE_FAILED` | a | `ARTIFACTS_STORE_UNREACHABLE` (2) before, `ARTIFACTS_STORE_FAILED` (1, retryable) during | 2 → 1 |
+| `ARTIFACTS_STORE_UNREACHABLE` | a | stays for the store that cannot be attached or reached before the work; mid-upload is `ARTIFACTS_STORE_FAILED` | 2 |
+| `EVIDENCE_STORE_FAILED` | a | `EVIDENCE_STORE_UNAVAILABLE` (2, retryable) before, `EVIDENCE_STORE_FAILED` (1) during | 2 → 1 |
+| `HOOKS_INSTALL_FAILED` | a | `HOOKS_INSTALL_REFUSED` (2) before, `HOOKS_INSTALL_FAILED` (1) during | 2 → 1 |
+| `INIT_SKILL_INSTALL_FAILED` | c | raised only after `canon.yaml` was written | 2 → 1 |
+| `INVENTORY_FAILED` | a | `INVENTORY_REFUSED` (2) for configuration and lock problems, `INVENTORY_FAILED` (1) for store errors while syncing | 2 → 1 |
+| `LEDGER_ARCHIVE_UNAVAILABLE` | b | an up-front check that the ledger root is named `ledger` | 2 |
+| `MIGRATE_PINS_FAILED` | c | raised only after files moved and the index was rebuilt | 2 → 1 |
+| `PLUGIN_SYNC_FAILED` | b | every error of the run is a resolution error; write errors are `PLUGIN_SYNC_ERRORS` (1) | 2 |
+| `POLICY_APPROVAL_FAILED` | a | `POLICY_APPROVAL_REFUSED` (2) before, `POLICY_APPROVAL_FAILED` (1) when writing the approval file | 2 → 1 |
+| `RETENTION_EXPORT_FAILED` | a | `RETENTION_EXPORT_REFUSED` (2) before, `RETENTION_EXPORT_FAILED` (1) during | 2 → 1 |
+| `RETENTION_PURGE_FAILED` | a | `RETENTION_PURGE_REFUSED` (2) before, `RETENTION_PURGE_FAILED` (1) once `--commit` is deleting | 2 → 1 |
+| `RETRIEVE_FAILED` | b | only usage and derivation errors; a store outage still degrades to empty guidance and exit 0 | 2 |
+| `WRITE_FAILED` | a | `WRITE_UNAVAILABLE` (2) before, `WRITE_FAILED` (1) during | 2 → 1 |
+
+`MIGRATE_STOPPED` and `CHANGE_ADOPTION_INCOMPLETE` describe work that began, so they are exit 1 now (they were 2): a caller that sees exit 2 may assume nothing changed. A failure between the two records of `canon subject adopt` / `unadopt` is `CHANGE_ADOPTION_INCOMPLETE` (it was `SUBJECT_ADOPT_REFUSED`, exit 2).
+
+**Warning codes.** New, registered with `exit` 1 or 2 and `retryable` false like error codes: `BRIEF_ADOPTION_UNAPPROVED`, `BRIEF_DRAFT_PENDING`, `BRIEF_OVERRIDE_ON_RECORD`, `BRIEF_UNAPPROVED_NOT_ENFORCED`, `DASHBOARD_SNAPSHOT_UNAVAILABLE`, `DISPATCH_DIFF_RECORDS_UNAVAILABLE`, `DISPATCH_RUN_COPIES_DIVERGE`, `DISPATCH_TIER_NOT_PERSISTED`, `LEDGER_KIND_ROUTED_AWAY`, `LEDGER_NO_SCENARIOS`, `LEDGER_RECORDS_UNREADABLE`, `LEDGER_ROLLBACK_NOT_RESTORED`, `LEDGER_UNREADABLE`, `LEGACY_GUIDE_STALE`, `LEGACY_STATE_FOUND`, `OLD_BRIEF_FORMAT_FOUND`, `OLD_LAYOUT_FOUND`, `OVERRIDE_REASON_UNUSED`, `OVERRIDE_RECORDED`, `OVERRIDE_REFUSAL_WAIVED`, `POLICY_MISSING`, `POLICY_NOT_APPROVED`, `POLICY_SPEC_COVERAGE_ABSENT`, `POLICY_SPEC_COVERAGE_INVALID`, `POLICY_UNREADABLE`, `QUERY_PLUGIN_DIAGNOSTIC`, `REFERENCES_UNCHECKED`, `REPORT_TIER_NOT_READ_DIRECTLY`, `RETRIEVE_REGIME_FELL_BACK`, `REVIEW_RECORDS_UNMIGRATED`, `ROLE_UNKNOWN_RECORDED`, `SCENARIO_INDEX_CHECK_FAILED`, `SCENARIO_INDEX_NOT_REFRESHED`, `SCENARIO_INDEX_REFRESHED`, `SCENARIO_SUBJECT_UNKNOWN`, `SEARCH_GITIGNORE_MISSING`, `SEARCH_INDEX_IN_MEMORY`, `SEARCH_INDEX_REBUILT`, `STRATEGY_DEMOTED`, `SUBJECT_OVERRIDE_ON_RECORD`, `SUBJECT_REOPENED`, `TASK_PROOF_IS_CANON_COMMAND`, `TASK_REIMPORT_INCOMPLETE`, `TASK_STATUS_NOT_REFRESHED`, `UNKNOWN_ROLE_IGNORED`, plus the existing `CONFIG_MISSING`, `CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE`, `LAYOUT_MIGRATION_REQUIRED`, `POLICY_APPROVAL_UNREADABLE` and `POLICY_CHANGED_SINCE_APPROVAL` where the same situation was a warning.
+
+**Consumers.** The npm launcher exits 128+n when the binary dies by a signal (it was 1, which canon now uses for a ran-and-found answer). The dashboard reads an absent `error.hint`. The embedded guides, the website (English and Korean), the dogfood evals and `crates/canon-cli/tests/old_names.rs` carry the new names; the conformance corpus was regenerated and differs only by the contract changes above.
+
+### Added
+- `atip check --bin <binary> --level L0 --fixture <file> [--json]`, a new workspace crate `atip-check` with the binary `atip`: it runs a built binary and checks the atip/1 L0 contract from outside (argv in; stdout, stderr, exit status and the files it changes out). It runs 19 L0 checks (15 MUST, 4 SHOULD): the 16 of the contract repository's `approaches/checker.md` and `L0.refusal-effects`, `L0.next` and `L0.page`. Each pass condition belongs to exactly one check, so breaking one rule fails one check. Each invocation runs in its own fresh copy of the fixture state with an environment of only `PATH`, `HOME`, `LANG=C.UTF-8` and the fixture's variables, and every check reports `pass`, `fail`, `unprovided`, `unsupported` (does not apply) or `entailed`. A violation seen is a `fail` even when the fixture lacks the entry; `unprovided` is only for a check that saw nothing wrong and lacked `probe` or `registry`. Every MUST check passing exits 0; a failed level exits 1 with `LEVEL_NOT_MET` and the check list in `data`; a refusal exits 2 (`USAGE`, `BINARY_UNUSABLE`, `FIXTURE_INVALID`, `LEVEL_UNSUPPORTED`) and writes nothing. `--level L1` and `L2` are refused with `LEVEL_UNSUPPORTED` until 0.34 and 0.35. A refusal (exit 2) that changes the working directory or `HOME` fails `L0.refusal-effects` and names the paths. A registry the tool prints with `schema --errors --json` is compared with the fixture's. A probe that waits for input on a terminal fails `L0.no-env-switch`. Output on stderr that carries no error or result is reported as a recommendation, not a failure; a signal exit counts in both forms (wait status, 128+n). `atip` follows the contract at L0 itself, ends by SIGPIPE on a closed stdout, and passes `atip check` on itself.
+- The checker's tests plant one violation per pass condition (about fifty) in a fake tool (`atip-fake-tool`, behaviour set by a JSON configuration; a test-only binary behind the `test-support` feature, not built by `cargo build -p atip-check` or installed by `cargo install`) and require that the condition's owner, and no other check, fails; the same run with the condition switched off must not fail. The examples of the contract repository, pinned at commit `365244c`, are test input (`crates/atip-check/tests/fixtures/atip-examples/TABLE.md`).
+- CI job `atip-l0` and `just atip` run `atip check` at L0 on the canon binary and on `atip`. canon's fixture is `crates/canon-cli/tests/atip/canon.fixture.json`; its `registry` is generated from `canon schema --errors --json` and a test fails when the committed file differs (`CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it).
+
+### Changed
+- The error value (`CliError` and its builder), `redact`, the error-code row type, JSON-mode detection, the one-line envelope output and the shell quoting and splitting of next-step commands moved into a new workspace crate, `atip`, that depends on no canon crate. Output, exit codes and the command spec file are byte-identical to 0.32.0.
+
 ## 0.32.0 — 2026-10-31
 
 An agent can record the approval a human gave in the conversation, and release notes move from the README to this file.

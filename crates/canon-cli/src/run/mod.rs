@@ -37,7 +37,7 @@ use crate::cli::top::{
     RetrieveArgs, SchemaArgs, SelftestArgs, StatusArgs,
 };
 use crate::cli::{Cli, Command};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use canon_model::RoleId;
 use std::process::ExitCode;
 use top::{

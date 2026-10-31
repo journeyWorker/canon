@@ -239,7 +239,7 @@ fn evidence_add_120_artifacts_move_refuses_a_plan_that_changed_since_its_preview
 
     let stale = repo.canon(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
-    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_STALE");
     assert_eq!(snapshot(repo.path()), before, "a stale digest changes nothing");
     assert!(!repo.object(V1).exists(), "nothing was uploaded");
 
@@ -465,7 +465,7 @@ fn tier_storage_13_ledger_compact_refuses_a_plan_that_changed_a_commit_without_a
 
     let stale = canon_in(repo, &["ledger", "compact", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
-    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_STALE");
     assert_eq!(snapshot(repo), before, "a stale digest moves nothing");
 
     let no_digest = canon_in(repo, &["ledger", "compact", "--commit"]);
@@ -520,7 +520,7 @@ fn tier_storage_15_export_refuses_sensitive_records_without_policy_permission_an
     let sensitive = repo.canon(&["export", "--kind", "scenario", "--include-sensitive", "--output", "manifest.json", "--json"]);
     assert_eq!(sensitive.status.code(), Some(2), "{}", text(&sensitive));
     let body = stdout_json(&sensitive);
-    assert_eq!(body["error"]["code"], "RETENTION_EXPORT_FAILED", "{body}");
+    assert_eq!(body["error"]["code"], "RETENTION_EXPORT_REFUSED", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("query.allow_sensitive"), "{body}");
     assert!(!repo.path().join("manifest.json").exists(), "no file is written");
 
@@ -580,12 +580,12 @@ fn tier_storage_17_purge_refuses_a_stale_digest_a_kind_outside_its_four_and_a_mi
 
     let stale = fixture.run_canon(&["purge", "--kind", "session", "--before", "2028-01-01", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", out_text(&stale));
-    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_STALE");
     assert_eq!(snapshot(fixture.root.path()), before, "a stale digest deletes nothing");
 
     let kind = fixture.run_canon(&["purge", "--kind", "change", "--before", "2026-06-01"]);
     assert_eq!(kind.status.code(), Some(2), "{}", out_text(&kind));
-    assert!(out_text(&kind).contains("[possible values: session, run, event, trajectory]"), "{}", out_text(&kind));
+    assert!(out_text(&kind).contains("expected: session, run, event, trajectory"), "{}", out_text(&kind));
 
     let no_cutoff = fixture.run_canon(&["purge", "--kind", "session"]);
     assert_eq!(no_cutoff.status.code(), Some(2), "{}", out_text(&no_cutoff));
@@ -635,7 +635,7 @@ fn gate_check_105_gate_install_hooks_writes_the_hook_commands_and_the_pre_commit
     let second = canon_in(repo, &["gate", "install-hooks", "--json"]);
     assert_eq!(second.status.code(), Some(0), "{}", text(&second));
     let body = stdout_json(&second);
-    assert_eq!((body["data"]["installed"].as_bool(), body["data"]["preCommitScriptWritten"].as_bool(), body["meta"]["unchanged"].as_bool()), (Some(false), Some(false), Some(true)), "{body}");
+    assert_eq!((body["data"]["installed"].as_bool(), body["data"]["preCommitScriptWritten"].as_bool(), body["data"]["unchanged"].as_bool()), (Some(false), Some(false), Some(true)), "{body}");
     assert_eq!(snapshot(repo), after_first, "a second run changes no file");
 
     let custom_dir = hook_repo();
@@ -686,7 +686,7 @@ fn gate_check_107_gate_install_hooks_refuses_a_repo_that_is_no_directory_and_an_
     let not_dir = canon_in(repo, &["gate", "install-hooks", "--repo", "afile", "--json"]);
     assert_eq!(not_dir.status.code(), Some(2), "{}", text(&not_dir));
     let body = stdout_json(&not_dir);
-    assert_eq!(body["error"]["code"], "HOOKS_INSTALL_FAILED", "{body}");
+    assert_eq!(body["error"]["code"], "HOOKS_INSTALL_REFUSED", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("is not a directory"), "{body}");
 
     for dry in [&[][..], &["--dry-run"][..]] {
@@ -694,7 +694,7 @@ fn gate_check_107_gate_install_hooks_refuses_a_repo_that_is_no_directory_and_an_
         args.extend_from_slice(dry);
         let missing = canon_in(repo, &args);
         assert_eq!(missing.status.code(), Some(2), "{}", text(&missing));
-        assert_eq!(stdout_json(&missing)["error"]["code"], "HOOKS_INSTALL_FAILED");
+        assert_eq!(stdout_json(&missing)["error"]["code"], "HOOKS_INSTALL_REFUSED");
         assert!(!repo.join("nowhere").exists(), "the missing directory is not created");
     }
 

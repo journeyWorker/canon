@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:22.353200Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "disposition": "open",
+  "introduced_by": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "kind": "finding",
+  "reviewed_sha": "61c14f763172fa46123264154f3994c91556c715",
+  "reviewer": "rev-atip-check",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.56",
+    "atip.check.45",
+    "atip.check.47",
+    "atip.check.51"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards pass: a mutation probe of fed0cd14 on a scratch copy (27 mutations of checks.rs; 20 caught, 2 compile errors, 1 equivalent) left atip-check's 79 tests green for six value-level edges that the per-condition test (56) cannot see because it skips a whole condition, not a predicate's value: L0.page accepting any '--cursor' word whatever its value (checker.md 6.9: '--cursor <nextCursor>'), L0.page not accepting or not testing the '--cursor=<v>' form, the stderr 'carries an error' test reduced to JSON-with-ok only (the error/data forms and the bare code-in-text form are unplanted), L0.no-env-switch-text compared only for CI (TERM, NO_COLOR and the terminal variation of text mode unplanted), L0.unknown-command accepting 'expected': [] (only a missing member is planted), and L0.version accepting exit 2 (only exit 1 is planted). Every condition is covered; the survivors are value edges. Blast radius: canon and lute use a green run as an L0 claim, and none of these is on the path of a conforming tool. Fix: one config per edge (a wrong cursor value, an empty expected, text-mode TERM=dumb switching to JSON).",
+  "worktree_dirty": false
+}

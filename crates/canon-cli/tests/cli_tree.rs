@@ -124,12 +124,13 @@ fn meta_reaches_the_row_of_every_leaf() {
     }
 }
 
-/// Bare `canon brief` ran in 0.27; it is now a usage error naming `brief show`.
+/// Bare `canon brief` ran in 0.27; it is now `COMMAND_REQUIRED` (a group is never runnable) whose hint names `brief show`.
 #[test]
 fn bare_brief_is_a_usage_error_naming_brief_show() {
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["brief", "--json"]).output().expect("spawn canon");
     assert_eq!(out.status.code(), Some(2));
     let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("a JSON error");
-    assert_eq!(body["error"]["code"], "USAGE");
-    assert_eq!(body["error"]["expected"], serde_json::json!(["brief show"]));
+    assert_eq!(body["error"]["code"], "COMMAND_REQUIRED");
+    assert_eq!(body["error"]["expected"], serde_json::json!(["show", "check", "approve"]));
+    assert!(body["error"]["hint"].as_str().is_some_and(|hint| hint.contains("canon brief show")), "{body}");
 }

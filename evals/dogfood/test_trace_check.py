@@ -127,7 +127,7 @@ class TraceCheckTests(unittest.TestCase):
             '{"error":{"code":"USAGE","message":"error: unexpected argument \'--project-id\' found"}} --project'), "naming")
         self.assertEqual(trace_check.classify_failure("error: invalid value 'review_record' for '--kind <KIND>'"), "naming")
         self.assertEqual(trace_check.classify_failure("error: unexpected argument '--zzz' found"), "other")
-        self.assertEqual(trace_check.error_code("canon gate check: GATE_FAILED \u2014 nope"), "GATE_FAILED")
+        self.assertEqual(trace_check.error_code("canon: GATE_FAILED: nope"), "GATE_FAILED")
         self.assertEqual(trace_check.classify_failure(
             '{"error":{"code":"USAGE","hint":"--actor-id was removed in 0.31.0; use `canon finding add --actor x`"}}'), "naming")
         self.assertEqual(trace_check.classify_failure(
@@ -137,9 +137,9 @@ class TraceCheckTests(unittest.TestCase):
 
 
 def failure(command, code="USAGE", message="unexpected argument '--x' found", hint=""):
-    """A 0.28 JSON failure envelope as `canon <command> --json` prints it."""
+    """An atip/1 JSON failure envelope as `canon <command> --json` prints it."""
     return json.dumps({"ok": False, "error": {"code": code, "message": message, "hint": hint, "retryable": False},
-                       "meta": {"command": command, "schemaVersion": "1.0"}}, separators=(",", ":"))
+                       "meta": {"schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.33.0", "contract": "atip/1", "command": command}}, separators=(",", ":"))
 
 
 class SyntheticTranscriptTests(unittest.TestCase):
@@ -177,10 +177,10 @@ class SyntheticTranscriptTests(unittest.TestCase):
 
     def test_input_and_unknown_field_codes_are_shape_errors_but_a_refusal_is_not(self):
         report = self.run_calls(
-            ("canon scenario new --input '{\"bogus\":1}' --json", failure("scenario new", "INPUT_UNKNOWN_FIELD", "`bogus` is not an option")),
-            ("canon query --kind nope --json", failure("query", "UNKNOWN_FIELD", "no such field")),
+            ("canon scenario new --input '{\"bogus\":1}' --json", failure("scenario new", "INPUT_INVALID", "`bogus` is not an option")),
+            ("canon query --kind nope --json", failure("query", "UNKNOWN_COMMAND", "no such command")),
             ("canon evidence add --scenario a.b.01 --json", failure("evidence add", "BRIEF_UNAPPROVED", "brief not approved")))
-        self.assertEqual(self.wrong(report), [("canon scenario new", "INPUT_UNKNOWN_FIELD", "other"), ("canon query", "UNKNOWN_FIELD", "other")])
+        self.assertEqual(self.wrong(report), [("canon scenario new", "INPUT_INVALID", "other"), ("canon query", "UNKNOWN_COMMAND", "other")])
         self.assertEqual([r["code"] for r in report["refusals"]], ["BRIEF_UNAPPROVED"])
 
     def test_two_failures_in_one_call_are_two_wrong_shapes(self):
@@ -338,7 +338,7 @@ class SyntheticTranscriptTests(unittest.TestCase):
         self.assertEqual([(i["command"].split(" --as")[0], i["code"]) for i in items], [("canon gate check", "USAGE")])
 
     def test_a_command_named_in_the_message_attributes_a_cut_envelope(self):
-        cut = '{"ok":false,"error":{"code":"UNKNOWN_FIELD","message":"`canon query` has no field `key`","field":"--fields","expected":["actor","at'
+        cut = '{"ok":false,"error":{"code":"USAGE","message":"`canon query` has no field `key`","field":"--fields","expected":["actor","at'
         report = self.run_calls(("canon gate check --json | head -c 100\ncanon query --kind evidence --fields key --json | head -c 300", '{"ok":true}\n' + cut))
         self.assertEqual([i["command"].split(" --")[0] for i in report["wrong_shape_calls"]["items"]], ["canon query"])
 

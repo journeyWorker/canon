@@ -39,8 +39,8 @@ pub const SPEC_PATH: &str = "docs/cli/canon.cli.json";
 /// The exit table every leaf's own `exits` refines (0.28 D4).
 const EXIT_TABLE: &[(u8, &str)] = &[
     (0, "ok"),
-    (1, "the command's finding, a failed check, or an unverifiable result"),
-    (2, "refused: usage, CONFIG_MISSING, an id or file that does not exist, unreadable input, or an invalid argument"),
+    (1, "the command ran and its answer is negative or incomplete: a finding, a failed check, an unverifiable result, a failure after the work began, an internal error"),
+    (2, "the command refused to run: usage, an unknown command, CONFIG_MISSING, an id or file that does not exist, unreadable input, an invalid argument, a target that cannot be written"),
 ];
 
 /// An environment variable canon reads and a user may set.
@@ -67,7 +67,8 @@ const ENV_VARS: &[EnvVar] = &[
 
 /// Variables canon reads or sets that are not a user's to set: a build input,
 /// the roots canon points its own DuckDB views at, and debug-build test seams (`CANON_WITNESS_DIR`:
-/// where a debug build records which (command, report) pairs it emitted, for the T9 witness).
+/// where a debug build records which (command, report) pairs it emitted, for the T9 witness; `CANON_TEST_PANIC`:
+/// a debug build panics at start, for the test of the `INTERNAL` error).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -76,6 +77,7 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_LEARN_ROOT",
     "CANON_R2_LOCAL_ROOT",
     "CANON_R2_ROOT",
+    "CANON_TEST_PANIC",
     "CANON_WITNESS_DIR",
 ];
 
@@ -156,7 +158,7 @@ pub struct Output {
     pub media_type: Option<&'static str>,
     /// `#/schemas/<report>`; absent while the report has no schema.
     pub schema_ref: Option<String>,
-    pub schema_version: Option<&'static str>,
+    pub schema_version: Option<String>,
     /// The report of a leaf run with an array or NDJSON as `--input` (`Batch<Name>Report`, D7).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub batch: bool,
@@ -406,7 +408,7 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
                 report: o.report.to_string(),
                 media_type: o.media_type,
                 schema_ref: schema.map(|r| format!("#/schemas/{}", r.name)),
-                schema_version: schema.map(|r| r.schema_version),
+                schema_version: schema.map(|r| r.schema_version.clone()),
                 batch: false,
             }
         })
@@ -417,7 +419,7 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
             .filter_map(|o| {
                 let name = format!("Batch{}", o.report);
                 let schema = reports.iter().find(|r| r.name == name)?;
-                Some(Output { kind: OutputKind::Report, schema_ref: Some(format!("#/schemas/{name}")), schema_version: Some(schema.schema_version), report: name, media_type: None, batch: true })
+                Some(Output { kind: OutputKind::Report, schema_ref: Some(format!("#/schemas/{name}")), schema_version: Some(schema.schema_version.clone()), report: name, media_type: None, batch: true })
             })
             .collect();
         outputs.extend(batch);
@@ -551,14 +553,6 @@ fn schemas(nodes: &[Node]) -> Value {
     Value::Object(map)
 }
 
-/// The success and failure envelope schemas, each with its own base URI.
-fn envelopes() -> Value {
-    match crate::reports::envelope_schemas() {
-        Value::Object(map) => Value::Object(map.into_iter().map(|(name, schema)| (name.clone(), with_id(schema, format!("urn:canon:envelope:{name}")))).collect()),
-        other => other,
-    }
-}
-
 /// The whole spec.
 pub fn generate() -> Value {
     let mut root = crate::cli::command();
@@ -575,7 +569,7 @@ pub fn generate() -> Value {
         "globalOptions": global_options(&root),
         "envVars": ENV_VARS.iter().map(|v| json!({ "name": v.name, "about": v.about })).collect::<Vec<_>>(),
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
-        "envelopes": envelopes(),
+        "contract": crate::json_out::CONTRACT,
         "errors": error_rows(),
         "removed": removed_rows(),
         "commands": nodes,

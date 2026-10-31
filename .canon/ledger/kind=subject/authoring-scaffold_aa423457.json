@@ -1,0 +1,32 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-31T16:43:38.602556Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-fixes",
+    "canon-0-31-brief-format",
+    "canon-0-31-cli-ids",
+    "canon-0-33-atip-l0"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-33-orch"
+    },
+    "reason": "0.33 ATIP L0: changes reviewed, gate clean"
+  },
+  "subject_id": "authoring-scaffold",
+  "summary": "",
+  "title": "Authoring: feature and scenario scaffolding"
+}

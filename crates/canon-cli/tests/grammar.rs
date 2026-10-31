@@ -90,8 +90,10 @@ fn the_removed_command_names_are_clap_usage_errors() {
         let out = canon(dir.path(), &argv);
         assert_eq!(out.status.code(), Some(2), "canon {args:?}: {}{}", stdout(&out), stderr(&out));
         let error = &json_of(&out)["error"];
-        assert_eq!(error["code"], "USAGE", "canon {args:?}: {}", stdout(&out));
-        assert!(error["message"].as_str().unwrap_or_default().contains("unrecognized subcommand"), "canon {args:?}: {}", stdout(&out));
+        assert_eq!(error["code"], "UNKNOWN_COMMAND", "canon {args:?}: {}", stdout(&out));
+        assert_eq!((error["field"].as_str(), error["received"].as_str()), (Some("command"), args.get(1).copied()), "canon {args:?}: {}", stdout(&out));
+        assert!(error["expected"].as_array().is_some_and(|valid| !valid.is_empty() && !valid.iter().any(|word| Some(word.as_str().unwrap_or_default()) == args.get(1).copied())), "canon {args:?}: `expected` lists the valid words: {}", stdout(&out));
+        assert!(error["message"].as_str().unwrap_or_default().contains("is not a command of"), "canon {args:?}: {}", stdout(&out));
     }
 }
 

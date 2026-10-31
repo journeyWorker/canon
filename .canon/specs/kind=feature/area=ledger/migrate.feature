@@ -84,10 +84,10 @@ Feature: ledger migrate
   @case:failure
   @flow:canon-0-30-ledger-naming.F4
   @ledger.migrate.08
-  Scenario: Another digest is refused with PLAN_CHANGED and nothing changes
+  Scenario: Another digest is refused with PLAN_STALE and nothing changes
     Given a 0.29 repo
     When `canon migrate --commit --plan-digest` runs with a digest that is not the preview's
-    Then it is refused PLAN_CHANGED and the tree, the sqlite file and the config are unchanged
+    Then it is refused PLAN_STALE and the tree, the sqlite file and the config are unchanged
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:35Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:tier-storage

@@ -104,17 +104,33 @@ pub fn default_report_path(repo: &Path) -> PathBuf {
 /// `canon report build`'s write: [`canon_report::write_report`], except that a
 /// report file already holding exactly these bytes is left alone and the run
 /// is marked unchanged ([`crate::json_out::mark_unchanged`]).
-pub fn build(inputs: &ReportInputs, report_path: &Path) -> Result<String, canon_report::ReportError> {
-    let content = canon_report::report(inputs)?;
+pub fn build(inputs: &ReportInputs, report_path: &Path) -> Result<String, BuildError> {
+    let content = canon_report::report(inputs).map_err(BuildError::Failed)?;
     if std::fs::read(report_path).is_ok_and(|held| held == content.as_bytes()) {
         crate::json_out::mark_unchanged();
         return Ok(content);
     }
-    if let Some(parent) = report_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(report_path, &content)?;
+    // The report is about to be written: a target that cannot take it is refused before the write.
+    crate::write_mode::check_writable(report_path).map_err(|cause| BuildError::Unavailable(crate::write_mode::unavailable(report_path, &cause)))?;
+    let write = || -> std::io::Result<()> {
+        if let Some(parent) = report_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(report_path, &content)
+    };
+    write().map_err(|e| BuildError::Failed(e.into()))?;
     Ok(content)
+}
+
+/// Why [`build`] wrote no report.
+#[derive(Debug, thiserror::Error)]
+pub enum BuildError {
+    /// The report file cannot be written, known before anything was changed (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(crate::cli_error::CliError),
+    /// The report could not be built or written.
+    #[error(transparent)]
+    Failed(canon_report::ReportError),
 }
 
 /// `canon report snapshot`'s write: [`canon_report::snapshot`], except that a

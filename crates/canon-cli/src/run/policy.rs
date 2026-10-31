@@ -1,5 +1,6 @@
 //! `canon policy` — the handlers of the group.
 
+use crate::cli_error::CliErrorExt as _;
 use crate::cli::policy::{PolicyApproveArgs, PolicyCommand, PolicyShowArgs};
 use std::process::ExitCode;
 

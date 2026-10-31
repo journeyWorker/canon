@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::process::ExitCode;
 
 use crate::cli::brief::{BriefApproveArgs, BriefCheckArgs, BriefCommand, BriefShowArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 pub fn run(cmd: BriefCommand) -> ExitCode {
     ExitCode::from(match cmd {

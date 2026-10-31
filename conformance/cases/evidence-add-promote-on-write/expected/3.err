@@ -1,5 +1,4 @@
-error: the argument '--promote' cannot be used with '--no-promote'
-
-Usage: canon evidence add --scenario <SCENARIO_ID> --project <PROJECT_ID> --class <CLASS> --ref <TEXT> --role <ROLE> --actor <ACTOR_ID> --promote
-
-For more information, try '--help'.
+canon: USAGE: the argument '--promote' cannot be used with '--no-promote'
+  field: --promote
+  expected: true, false
+  hint: a working call: canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer; `canon schema evidence add` lists every argument

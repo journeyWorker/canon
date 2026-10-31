@@ -1,0 +1,61 @@
+{
+  "probe": "check",
+  "registry": [
+    {
+      "code": "BINARY_UNUSABLE",
+      "exit": 2,
+      "fix": "Pass the path of a built, executable binary with --bin <BINARY>.",
+      "meaning": "the binary named by --bin does not exist, is not a file, is not executable, or cannot be started",
+      "retryable": false
+    },
+    {
+      "code": "COMMAND_REQUIRED",
+      "exit": 2,
+      "fix": "Run atip check --bin <BINARY> --level L0 --fixture <FILE>.",
+      "meaning": "atip was run without a command",
+      "retryable": false
+    },
+    {
+      "code": "FIXTURE_INVALID",
+      "exit": 2,
+      "fix": "Fix the member the message names, or the setup command, then run atip check again.",
+      "meaning": "the fixture file cannot be read, is not JSON, has a member of the wrong shape, or its setup command failed",
+      "retryable": false
+    },
+    {
+      "code": "INTERNAL",
+      "exit": 1,
+      "fix": "Report it at https://github.com/journeyWorker/atip/issues with the command line; if the message names a scratch directory, point TMPDIR at a writable one.",
+      "meaning": "a bug in atip, or its scratch space could not be used",
+      "retryable": false
+    },
+    {
+      "code": "LEVEL_NOT_MET",
+      "exit": 1,
+      "fix": "Read data.checks, fix every check whose result is fail or unprovided, then run atip check again.",
+      "meaning": "a MUST check of the level failed or is unprovided",
+      "retryable": false
+    },
+    {
+      "code": "LEVEL_UNSUPPORTED",
+      "exit": 2,
+      "fix": "Run atip check with --level L0.",
+      "meaning": "the level is known but this release of atip has no checks for it",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_COMMAND",
+      "exit": 2,
+      "fix": "Run atip check; it is the only command.",
+      "meaning": "the command word is not a command of atip",
+      "retryable": false
+    },
+    {
+      "code": "USAGE",
+      "exit": 2,
+      "fix": "Run atip check --help for the options.",
+      "meaning": "the command line does not parse or does not satisfy the command's requirements",
+      "retryable": false
+    }
+  ]
+}

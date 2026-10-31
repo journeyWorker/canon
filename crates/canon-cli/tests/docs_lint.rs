@@ -475,13 +475,13 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
         let scratch = TempDir::new().unwrap();
         let cwd = scratch.path().join("repo");
         copy_dir(base.path(), &cwd);
-        let mut argv: Vec<String> = canon_cli::next::split_argv(leaf["examples"][0].as_str().expect("example"));
+        let mut argv: Vec<String> = atip::split_argv(leaf["examples"][0].as_str().expect("example"));
         argv.remove(0);
         argv.push("--json".into());
         let output = run(&cwd, home.path(), &argv);
         let Ok(doc) = serde_json::from_slice::<Value>(&output.stdout) else { continue };
         for step in doc["meta"]["next"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
-            if step["actor"] == "agent" && step["command"].as_str().is_some_and(|c| c.starts_with("canon ")) {
+            if step["x-canon"]["actor"] == "agent" && step["command"].as_str().is_some_and(|c| c.starts_with("canon ")) {
                 let text = step["command"].as_str().unwrap().to_string();
                 if seen.insert(text.clone()) {
                     let mode = if placeholder_in(&text).is_some() { Mode::Syntax } else { Mode::Runnable };

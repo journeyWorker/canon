@@ -62,7 +62,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::reports::Report;
 use crate::context::resolve_repo_root;
 use crate::inventory::{SpecRoot, SyncCtx};
@@ -457,8 +457,12 @@ fn stage(pending: &mut Vec<Pending>, planned: Planned, spec: &ScenarioSpec, prov
     pending[at].content = append_scenario_block(&pending[at].content, spec.tag.as_str(), &spec.title, prov_line, axes);
 }
 
-/// Write every pending file, creating its directory.
+/// Write every pending file, creating its directory. Every target is checked
+/// before the first write, so an unwritable one refuses with nothing written.
 fn write_pending(pending: &[Pending]) -> Result<(), CliError> {
+    for file in pending {
+        crate::write_mode::check_writable(&file.path).map_err(|e| crate::write_mode::unavailable(&file.path, &e))?;
+    }
     for file in pending {
         if let Some(parent) = file.path.parent() {
             fs::create_dir_all(parent).map_err(|e| CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).hint("check that the path is writable and the disk has room, then run the command again"))?;
@@ -474,10 +478,6 @@ fn write_pending(pending: &[Pending]) -> Result<(), CliError> {
 /// prints it; `--json` carries it as `meta.note`.
 const PROVENANCE_NOTE: &str = "keep the `# canon: {...}` provenance lines when you fill in the scenario: one right after `Feature:` and one above the scenario's tags; without them `canon inventory sync` aborts on missing-provenance";
 
-fn provenance_meta() -> serde_json::Value {
-    serde_json::json!({ "note": PROVENANCE_NOTE })
-}
-
 /// `canon scenario new <tag>`: the scenario written.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -485,6 +485,8 @@ pub struct ScenarioNewReport<'a> {
     pub scenario_id: &'a str,
     /// The feature file it was written to.
     pub feature: String,
+    /// What to keep when the stub is filled in: the `# canon: {...}` provenance lines.
+    pub note: &'static str,
 }
 
 impl Report for ScenarioNewReport<'_> {}
@@ -533,7 +535,7 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
     crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
     crate::say!(json, "canon scenario new: {PROVENANCE_NOTE}");
     let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
-    crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, &ScenarioNewReport { scenario_id: tag.as_str(), feature: feature_path.display().to_string() }, provenance_meta());
+    crate::next::finish(&repo_root, "scenario new", &scope, false, json, &ScenarioNewReport { scenario_id: tag.as_str(), feature: feature_path.display().to_string(), note: PROVENANCE_NOTE });
     0
 }
 
@@ -608,6 +610,11 @@ pub fn run_feature_new(
     // resolved rather than making the operator re-derive it.
     let project_hint = if roots.len() > 1 { format!(" --project {}", root.id.as_str()) } else { String::new() };
 
+    if !feature_path.exists() {
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[&feature_path], "canon feature new", json) {
+            return code;
+        }
+    }
     if let Some(parent) = feature_path.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
             return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", parent.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon feature new", json);

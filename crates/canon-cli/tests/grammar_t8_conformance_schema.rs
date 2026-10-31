@@ -1,6 +1,7 @@
 //! T8 (0.28 D2): every JSON `conformance/cases/*/expected/N.out` is a correct
 //! report. The corpus freezes what consumers see; this holds each frozen JSON
-//! document to the schemas of the generated spec: the envelope, then `data` against
+//! document to the contract: the envelope against the vendored atip/1 schema
+//! (`atip::envelope_problems`), then `data` against
 //! a report its leaf declares. An `.out` that is JSON but no envelope must be the
 //! bytes of an `artifact` leaf (`export`, `completion`).
 

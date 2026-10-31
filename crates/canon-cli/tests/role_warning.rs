@@ -38,8 +38,19 @@ fn add(repo: &Path, seq: &str, role: &str) -> Value {
     serde_json::from_slice(&out.stdout).expect("one JSON document")
 }
 
+/// `meta.warnings` as `{code, message}` objects: the message of each, after checking its code.
 fn warnings(body: &Value) -> Vec<String> {
-    body["meta"]["warnings"].as_array().map(|list| list.iter().map(|w| w.as_str().unwrap().to_string()).collect()).unwrap_or_default()
+    body["meta"]["warnings"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .map(|w| {
+                    assert_eq!(w["code"], "ROLE_UNKNOWN_RECORDED", "{w}");
+                    w["message"].as_str().unwrap().to_string()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[test]

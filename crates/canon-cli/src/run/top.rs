@@ -1,7 +1,7 @@
 //! Handlers of the top-level leaf commands.
 
 use canon_model::{RegimeKey, RoleId, SubjectId, regime_key};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::cli::top::QueryArgs;
 use std::process::ExitCode;
 
@@ -60,7 +60,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
             for msg in &plugin_outcome.diagnostics {
                 crate::say_err!(json, "canon query --plugin {plugin_id}: {msg}");
             }
-            let diagnostics: Vec<String> = plugin_outcome.diagnostics.iter().map(|msg| format!("canon query --plugin {plugin_id}: {msg}")).collect();
+            let diagnostics: Vec<crate::json_out::Warning> = plugin_outcome.diagnostics.iter().map(|msg| crate::json_out::Warning::new("QUERY_PLUGIN_DIAGNOSTIC", format!("canon query --plugin {plugin_id}: {msg}"))).collect();
             if plugin_outcome.projections.is_empty() {
                 if json {
                     print_query(&crate::query::report(&outcome, include_sensitive), outcome.page.as_ref(), &diagnostics);
@@ -217,7 +217,7 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
     match crate::retrieve::run_scoped(repo, role, regime, domain, subject, k) {
         Ok(o) => {
             if json {
-                let warnings = crate::retrieve::serving_note(&o).map(|note| vec![note]).unwrap_or_default();
+                let warnings: Vec<crate::json_out::Warning> = crate::retrieve::serving_note(&o).map(|note| crate::json_out::Warning::new("RETRIEVE_REGIME_FELL_BACK", note)).into_iter().collect();
                 crate::json_out::data_with_meta("retrieve", &crate::retrieve::RetrieveReport(&o.guidance), crate::json_out::warnings_meta(&warnings));
             } else {
                 print!("{}", crate::retrieve::format_human_scoped(role, &o));
@@ -225,7 +225,16 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
             ExitCode::SUCCESS
         }
         Err(e) => {
-            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --role and --regime (`canon regime show` prints a valid key) and that the ledger is readable").emit("canon retrieve", json))
+            use crate::retrieve::RetrieveCliError as E;
+            // How the call scopes the retrieval is its usage; only a regime key that cannot be derived is the retrieval's own failure.
+            let error = match &e {
+                E::NoScope => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>, or --regime <KEY> (`canon regime show` prints a valid key)"),
+                E::ScopeConflict => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("pass --regime or --domain, not both"),
+                E::SubjectWithoutDomain => CliError::refused("USAGE", e.to_string()).field("--subject").hint("add --domain <DOMAIN>, or drop --subject"),
+                E::RoleRegimeMismatch { regime_role, .. } => CliError::refused("USAGE", e.to_string()).field("--regime").received(regime_role.clone()).hint("pass the same role to --for-role and --regime (`canon regime show` prints a valid key)"),
+                E::DerivationFailed { .. } => CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name"),
+            };
+            ExitCode::from(error.emit("canon retrieve", json))
         }
     }
 }
@@ -295,10 +304,14 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     let mut report_warnings = Vec::new();
     if let Some(msg) = canon_report::tier_boundary::warn_line(&kinds_not_read_directly) {
         crate::say_err!(json, "canon report: WARN {msg}");
-        report_warnings.push(format!("canon report: WARN {msg}"));
+        report_warnings.push(crate::json_out::Warning::new("REPORT_TIER_NOT_READ_DIRECTLY", format!("canon report: WARN {msg}")));
     }
 
     if let Some(dir) = snapshot_dir {
+        // The snapshot is written into `dir` (created when absent): a directory that cannot take it is refused first.
+        if let Some(code) = crate::write_mode::refuse_unwritable(&[dir], "canon report snapshot", json) {
+            return ExitCode::from(code);
+        }
         return match crate::report::snapshot(&inputs, dir) {
             Ok(manifest) => {
                 crate::say!(json, "canon report snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
@@ -350,6 +363,7 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
             }
             ExitCode::SUCCESS
         }
+        Err(crate::report::BuildError::Unavailable(error)) => ExitCode::from(error.emit("canon report build", json)),
         Err(err) => {
             ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report build", json))
         }
@@ -371,7 +385,7 @@ pub(crate) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
             if let crate::dashboard::SnapshotState::Unavailable { reason, fix } = &bound.snapshot {
                 let warning = format!("{reason}; the panels page says so instead of showing panels; to fix it: {fix}");
                 crate::say_err!(json, "canon dashboard: warning: {warning}");
-                warnings.push(warning);
+                warnings.push(crate::json_out::Warning::new("DASHBOARD_SNAPSHOT_UNAVAILABLE", warning));
             }
             crate::say!(json, "canon dashboard: briefs    = {}", bound.briefs_url());
             crate::say!(json, "canon dashboard: serving {}", bound.url());
@@ -395,13 +409,13 @@ pub(crate) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
 
 /// Prints one query document as the envelope: the page state goes into `meta`,
 /// beside the command's `warnings`.
-fn print_query(report: &crate::query::QueryReport, page: Option<&crate::paging::PageMeta>, warnings: &[String]) {
+fn print_query(report: &crate::query::QueryReport, page: Option<&crate::paging::PageMeta>, warnings: &[crate::json_out::Warning]) {
     let mut meta = serde_json::Map::new();
     if let Some(page) = page {
         page.insert_into(&mut meta);
     }
     if !warnings.is_empty() {
-        meta.insert("warnings".to_string(), serde_json::to_value(warnings).expect("strings serialize"));
+        meta.insert("warnings".to_string(), serde_json::to_value(warnings).expect("warnings serialize"));
     }
     let meta = if meta.is_empty() { serde_json::Value::Null } else { serde_json::Value::Object(meta) };
     crate::json_out::data_with_meta("query", report, meta);

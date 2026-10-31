@@ -1,0 +1,41 @@
+{
+  "ok": false,
+  "error": {
+    "code": "BATCH_INCOMPLETE",
+    "message": "item 1 of 2 failed (MEMBER_NOT_FOUND): 1 written",
+    "field": "/1",
+    "retryable": false
+  },
+  "data": {
+    "items": [
+      {
+        "index": 0,
+        "status": "written",
+        "data": {
+          "number": 7,
+          "tags": [
+            "core"
+          ],
+          "unchanged": false
+        }
+      },
+      {
+        "index": 1,
+        "status": "failed",
+        "error": {
+          "code": "MEMBER_NOT_FOUND",
+          "message": "no member has number 8",
+          "retryable": false
+        }
+      }
+    ]
+  },
+  "meta": {
+    "command": "member tag",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "output": "BatchMemberTagReport"
+  }
+}

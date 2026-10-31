@@ -1,1 +1,1 @@
-{"ok":true,"data":{"kind":"review","since":null,"count":0,"violations":0,"records":[]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"0.32.0","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":0,"total":0}}
+{"ok":true,"data":{"kind":"review","since":null,"count":0,"violations":0,"records":[]},"meta":{"command":"query","schemaVersion":"1.0","tool":"canon","toolVersion":"0.33.0","contract":"atip/1","context":{"repo":"."},"page":{"returned":0,"total":0}}}

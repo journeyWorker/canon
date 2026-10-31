@@ -18,7 +18,7 @@
 //!   same exit and `error.code` and writes nothing;
 //! - every leaf declared `replay-safe` or `content-keyed` runs its example
 //!   twice and the second run changes nothing (and, when the report says
-//!   `unchanged`, says true; a replay-safe or content-keyed leaf must say `meta.unchanged`, a destructive
+//!   `unchanged`, says true; a replay-safe or content-keyed leaf must say `unchanged` (in `data`, or in `meta.x-canon` for a stored record), a destructive
 //!   leaf's preview excepted); a `once` leaf refuses the second run. The state
 //!   a leaf needs is built here; what cannot be built is listed in
 //!   [`IDEMPOTENCY_NEEDS_STATE`] and checked to be honest. `appends` leaves
@@ -94,7 +94,7 @@ const REFUSALS: &[Row] = &[
     lit("change new", &["change", "new", "add-login", "--subject", "demo", "--title", "Again"], "CHANGE_EXISTS"),
     lit("context-pack add", &["context-pack", "add", "--manifest", "missing.json"], "CONTEXT_INPUT_MISSING"),
     lit("dashboard", &["dashboard", "--repo", "@missing"], "REPO_UNREADABLE"),
-    lit("demo init", &["demo", "init", "--repo", "canon.yaml"], "WRITE_FAILED"),
+    lit("demo init", &["demo", "init", "--repo", "canon.yaml"], "WRITE_UNAVAILABLE"),
     lit("demo review", &["demo", "review", "--repo", "@empty"], "DEMO_NOT_INITIALIZED"),
     lit("dispatch begin", &["dispatch", "begin", "--regime", "implementer/my-repo/api/abcdef012345", "--role", "implementer", "--task", "add-login#1"], "TASK_NOT_FOUND"),
     lit("dispatch end", &["dispatch", "end", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--run-outcome", "succeeded"], "DISPATCH_RUN_NOT_FOUND"),
@@ -105,24 +105,24 @@ const REFUSALS: &[Row] = &[
     example("divergence resolve", &["--project", "nosuchroot"], "UNKNOWN_SPEC_ROOT"),
     lit("evidence add", &["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BIND_REFUSED"),
     lit("evidence audit", &["evidence", "audit", "auth.login.01", "--ref", "audit-report.json", "--evaluator", "eval-1", "--evaluator-version", "2.1", "--evaluator-digest", DIGEST, "--audit-result", "confirmed", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BIND_REFUSED"),
-    lit("export", &["export", "--kind", "evidence", "--output", "missing-dir/out.json"], "RETENTION_EXPORT_FAILED"),
+    lit("export", &["export", "--kind", "evidence", "--output", "missing-dir/out.json"], "WRITE_UNAVAILABLE"),
     lit("feature new", &["feature", "new", "auth.login", "--title", "Again"], "FEATURE_EXISTS"),
     lit("finding add", &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "alice", "--summary", "Again"], "FINDING_SEQ_OCCUPIED"),
     lit("finding close", &["finding", "close", "add-login", "--round", "9", "--seq", "9", "--disposition", "rejected", "--reason", "no such finding"], "FINDING_NOT_FOUND"),
     // `.claude/settings.json` is written first: a refusal on the second file must leave the first alone.
-    lit("gate install-hooks", &["gate", "install-hooks"], "HOOKS_INSTALL_FAILED").setup(HOOKS_JSON_IS_A_DIRECTORY),
+    lit("gate install-hooks", &["gate", "install-hooks"], "HOOKS_INSTALL_REFUSED").setup(HOOKS_JSON_IS_A_DIRECTORY),
     lit("gate promote", &["gate", "promote"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("ingest plans", &["ingest", "plans", "--repo", "@empty"], "CONFIG_MISSING"),
     lit("ingest records", &["ingest", "records", "--repo", "@empty"], "CONFIG_MISSING"),
     lit("ingest sessions", &["ingest", "sessions", "--repo", "@empty"], "CONFIG_MISSING"),
     lit("init", &["init", "--providers", "bogus", "--repo", "@empty"], "INIT_INVALID_ARGUMENT"),
-    lit("inventory sync", &["inventory", "sync"], "INVENTORY_FAILED").setup(BROKEN_CONFIG),
-    lit("ledger compact", &["ledger", "compact", "--commit", "--plan-digest", "bogus"], "PLAN_CHANGED"),
-    lit("migrate", &["migrate", "--commit", "--plan-digest", "bogus"], "PLAN_CHANGED"),
+    lit("inventory sync", &["inventory", "sync"], "INVENTORY_REFUSED").setup(BROKEN_CONFIG),
+    lit("ledger compact", &["ledger", "compact", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
+    lit("migrate", &["migrate", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("plugin sync", &["plugin", "sync", "no-such-plugin"], "PLUGIN_SYNC_FAILED"),
-    lit("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"], "POLICY_APPROVAL_FAILED").setup(NO_POLICY),
+    lit("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"], "POLICY_APPROVAL_REFUSED").setup(NO_POLICY),
     lit("prompt add", &["prompt", "add", "reviewer@v1", "--manifest", "missing.json"], "CONTEXT_INPUT_MISSING"),
-    lit("purge", &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z", "--commit", "--plan-digest", "bogus"], "PLAN_CHANGED"),
+    lit("purge", &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("report build", &["report", "build"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("report snapshot", &["report", "snapshot", "snapshot-out"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     // The spec's example: `add-login` is a feature, and only a chore change is reviewed whole.
@@ -137,7 +137,7 @@ const REFUSALS: &[Row] = &[
     lit("subject new", &["subject", "new", "demo", "--domain", "dev", "--title", "Again"], "SUBJECT_EXISTS"),
     lit("subject unadopt", &["subject", "unadopt", "no-such", "--change", "add-login"], "SUBJECT_ADOPT_REFUSED"),
     lit("task done", &["task", "done", "add-login#1"], "TASK_NOT_FOUND"),
-    lit("tier age", &["tier", "age", "--commit", "--plan-digest", "bogus"], "PLAN_CHANGED"),
+    lit("tier age", &["tier", "age", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
 ];
 
 /// Cases the checks catch that are not fixed: (leaf, check, what is wrong).
@@ -525,21 +525,24 @@ fn a_declared_idempotent_write_leaf_is_a_no_op_the_second_time() {
                 found.push((name.clone(), format!("the second run exits {:?}: {}", second.status.code(), String::from_utf8_lossy(&second.stdout))));
                 continue;
             }
-            // A replay-safe or content-keyed leaf says its no-op: `meta.unchanged` is true. A destructive
+            // A replay-safe or content-keyed leaf says its no-op: `unchanged` is true, in `data` (or in
+            // `meta.x-canon` when the report is a stored record verbatim), never in `meta`. A destructive
             // leaf's example is its bare preview, which is a read of the plan and not a no-op: its
             // `--commit` repeat is held to `unchanged` by `contract_d5.rs`.
+            let unchanged_of = |document: &Value| document["data"].get("unchanged").or_else(|| document["meta"]["x-canon"].get("unchanged")).cloned();
             match parse(&second) {
                 _ if node["effect"] == "destructive" => {}
-                Some(document) if document["meta"]["unchanged"] == true => {}
-                other => found.push((name.clone(), format!("a `{kind}` leaf: the second run does not report meta.unchanged = true: {}", other.map(|d| d["meta"].to_string()).unwrap_or_default()))),
+                Some(document) if unchanged_of(&document) == Some(Value::Bool(true)) => {}
+                other => found.push((name.clone(), format!("a `{kind}` leaf: the second run does not report unchanged = true: {}", other.map(|d| d.to_string()).unwrap_or_default()))),
             }
-            // `unchanged` is the report's own word for a no-op: when it is there it is true.
+            // `unchanged` is the report's own word for a no-op: when it is there it is true, and `meta` has none.
             if let Some(document) = parse(&second) {
-                for place in ["data", "meta"] {
-                    if let Some(unchanged) = document[place].get("unchanged") {
-                        if unchanged != true {
-                            found.push((name.clone(), format!("the second run reports {place}.unchanged = {unchanged}")));
-                        }
+                if document["meta"].get("unchanged").is_some() {
+                    found.push((name.clone(), "the second run reports meta.unchanged: it moved into data".to_string()));
+                }
+                if let Some(unchanged) = unchanged_of(&document) {
+                    if unchanged != true {
+                        found.push((name.clone(), format!("the second run reports unchanged = {unchanged}")));
                     }
                 }
             }

@@ -44,7 +44,7 @@ use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::json_out::Report;
 use crate::safety::{Effect, Mode, Plan};
@@ -61,6 +61,40 @@ fn store_error(e: &ArtifactStoreError) -> CliError {
         _ => "ARTIFACTS_STORE_UNREACHABLE",
     };
     CliError::refused(code, e.to_string()).hint(e.hint())
+}
+
+/// Whether `e` is what the artifact store reports before it has written
+/// anything: a `canon.yaml` that cannot be used, a tier that cannot be
+/// attached, a store directory that is not a real directory, a lock another
+/// process holds, a digest that is not one. That is a precondition (exit 2);
+/// a remote or file-system failure while blobs are being written is a failure
+/// during the work (exit 1).
+pub(crate) fn before_first_write(e: &ArtifactStoreError) -> bool {
+    matches!(e, ArtifactStoreError::Config(_) | ArtifactStoreError::Unattached { .. } | ArtifactStoreError::UnsafeStoreDir | ArtifactStoreError::Locked(_) | ArtifactStoreError::InvalidDigest(_) | ArtifactStoreError::Changed { .. })
+}
+
+/// The code `evidence add` reports when binding or storing a bound file fails:
+/// `EVIDENCE_BIND_REFUSED` for a file that changed since it was bound,
+/// `EVIDENCE_STORE_UNAVAILABLE` (exit 2) when the store could not be used
+/// before anything was written, `EVIDENCE_STORE_FAILED` (exit 1) when a write
+/// to it failed.
+pub(crate) fn evidence_store_code(e: &ArtifactStoreError) -> &'static str {
+    match e {
+        ArtifactStoreError::Changed { .. } => "EVIDENCE_BIND_REFUSED",
+        _ if before_first_write(e) => "EVIDENCE_STORE_UNAVAILABLE",
+        _ => "EVIDENCE_STORE_FAILED",
+    }
+}
+
+/// What a store of bound files writes first: the repo's artifact-store lock and,
+/// for the local store, the blob directory. An object store has no local
+/// directory; reaching it is [`store_error`]'s `ARTIFACTS_STORE_UNREACHABLE`.
+pub(crate) fn store_targets(repo: &Path) -> Vec<PathBuf> {
+    let mut targets = vec![repo.join(canon_model::paths::ARTIFACT_STORE_LOCK_FILE)];
+    if ArtifactStore::open(repo).is_ok_and(|store| store.is_local()) {
+        targets.push(store_dir(repo));
+    }
+    targets
 }
 
 /// `canon artifacts verify`.
@@ -323,6 +357,22 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     let ArtifactStore::Object(object) = &store else {
         return refuse(format!("`{to}` is not an object-store tier"), "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)");
     };
+    // A commit rewrites canon.yaml and .gitignore after its uploads: refuse a read-only one before anything is uploaded.
+    if matches!(mode, Mode::Commit(_)) {
+        let (yaml, gitignore) = (repo.join("canon.yaml"), repo.join(".gitignore"));
+        // The move also takes the store lock and removes the local blobs after uploading them.
+        let (lock, blobs) = (repo.join(canon_model::paths::ARTIFACT_STORE_LOCK_FILE), store_dir(&repo));
+        let mut targets: Vec<&Path> = vec![lock.as_path(), blobs.as_path()];
+        if new_yaml.is_some() {
+            targets.push(&yaml);
+        }
+        if !gitignored(&repo) {
+            targets.push(&gitignore);
+        }
+        if let Some(code) = crate::write_mode::refuse_unwritable(&targets, CMD, json) {
+            return code;
+        }
+    }
 
     // A commit holds the local store for the whole move, so no writer adds a
     // local blob between the plan and the removal. A preview writes nothing and takes no lock.
@@ -406,7 +456,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
         let outcome = match std::fs::File::open(&blob.path).map_err(ArtifactStoreError::from).and_then(|file| object.upload(&blob.digest, file)) {
             Ok(outcome) => outcome,
             Err(e @ (ArtifactStoreError::Remote { .. } | ArtifactStoreError::Unattached { .. })) => {
-                return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("uploading {} failed after {uploaded} upload(s): {e}", store.display(&blob.digest)))
+                return CliError::failed("ARTIFACTS_STORE_FAILED", format!("uploading {} failed after {uploaded} upload(s): {e}", store.display(&blob.digest)))
                     .hint(format!("{OBJECT_STORE_HINT}; no local blob was removed, and a second run resumes where this one stopped"))
                     .emit("canon artifacts move", json);
             }

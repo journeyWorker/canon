@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-crate",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-crate"
+  },
+  "at": "2026-10-31T11:26:03.607804Z",
+  "attachments": [
+    {
+      "case": "context::tests::risk_tiers_are_projected_to_json_and_outline",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-crate-junit.xml",
+      "sha256": "e04569c05853e7bb1cdc7aca76148a32532e02c37f3954818756e9c407e5d0fa"
+    }
+  ],
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-crate-junit.xml"
+  },
+  "evidence_sha": "48824ebef2c708ffedff3e293f91d60cecb522e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 350,
+  "scenario_id": "context.capability.10",
+  "schema": 1,
+  "staging_id": "1b6eff5a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

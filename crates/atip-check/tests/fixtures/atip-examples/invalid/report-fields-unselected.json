@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "data": {
+    "changeId": "add-login",
+    "findings": [
+      {
+        "round": 1,
+        "seq": 1,
+        "disposition": "open",
+        "summary": "Token is logged",
+        "severity": "blocker"
+      },
+      {
+        "round": 1,
+        "seq": 3,
+        "disposition": "open",
+        "summary": "No rate limit on login"
+      }
+    ]
+  },
+  "meta": {
+    "command": "finding list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    },
+    "fields": [
+      "round",
+      "seq",
+      "disposition",
+      "summary"
+    ]
+  }
+}

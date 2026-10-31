@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T16:33:26.475143Z",
+  "attachments": [
+    {
+      "case": "atip_l0_16_a_bare_tool_or_group_answers_command_required",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r2-junit.xml",
+      "sha256": "69e0cf1f29d931967243bdc1c4be69e722538bec551b5118cfd60a66eb19f631"
+    }
+  ],
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-l0-r2-junit.xml"
+  },
+  "evidence_sha": "f1e174797a525804686d9dae500b35d08f7e9cb9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 59,
+  "scenario_id": "atip.l0.16",
+  "schema": 1,
+  "staging_id": "5d3e3ce4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

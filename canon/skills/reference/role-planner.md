@@ -172,7 +172,7 @@ canon trace add-login_1_1
 ```
 <!-- canon:generated commands-planner end -->
 
-After the first `status`, follow `meta.next` of each write. `brief check`
+After the first `status`, follow `meta.next` of each write. Each `meta.next` entry is runnable: run `canon` + its `argv`; guidance that needs a value you must fill in is in the error `hint` or the report text, not in `meta.next`. `brief check`
 lists blockers and advisories and exits 1 when it finds blockers; `canon
 brief show --as planner` names the next steps. The change is an optional
 operand of both (`canon brief check add-login`); without it they read the

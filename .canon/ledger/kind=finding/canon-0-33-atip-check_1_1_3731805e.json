@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T13:16:56.341806Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "resolution_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "reviewer": "impl-atip-check",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.20"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "A terminal run lost the child's output under load: the checker read the pty master until EIO after closing its own slave end, and the kernel can drop unread output on the last slave close, so L0.no-env-switch failed intermittently. Fixed by keeping a slave end open until the master has been drained (exec.rs terminal_reader); atip_check_28_everything_a_process_writes_to_a_terminal_is_read_however_fast_it_exits holds it.",
+  "worktree_dirty": false
+}

@@ -1,7 +1,7 @@
 //! `canon tier` — the handlers of the group.
 
 use crate::cli::tier::{TierCommand, TierAgeArgs};
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::safety::{Mode, Plan};
 use std::process::ExitCode;
 
@@ -37,6 +37,19 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
         let report = crate::tier::report(&planned, plan);
         crate::safety::finish_preview(&base, "tier age", &report.plan, "the plan only lists what would move; moving takes its planDigest", json, &report);
         return ExitCode::SUCCESS;
+    }
+    // Records leave one rung and land in another: each local store a move touches must take it before the first record moves. A plan with nothing to move writes nothing and is not refused.
+    let mut targets: Vec<std::path::PathBuf> = Vec::new();
+    for rule in planned.iter().filter(|rule| rule.candidates > 0) {
+        for target in crate::write_mode::move_targets(&canon_yaml_path, rule.kind, rule.source, rule.destination) {
+            if !targets.contains(&target) {
+                targets.push(target);
+            }
+        }
+    }
+    let targets: Vec<&std::path::Path> = targets.iter().map(std::path::PathBuf::as_path).collect();
+    if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon tier age", json) {
+        return ExitCode::from(code);
     }
     // Moving writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
     let loaded = match crate::tiers::build_tiers(&canon_yaml_path) {

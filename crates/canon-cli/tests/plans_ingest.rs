@@ -165,8 +165,13 @@ fn one_shot_override_requires_both_flags_dialect_alone_fails() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
+    let before = std::fs::read_dir(dir.path()).unwrap().count();
     let output = run_canon(&["ingest", "plans", "--dialect", "openspec"], dir.path());
     assert_eq!(output.status.code(), Some(2), "`--dialect` without `--plan-source` is a usage error");
+    let err = stderr(&output);
+    assert!(err.contains("--plan-source") && err.contains("required arguments were not provided"), "the error names the missing half: {err}");
+    assert!(!err.contains("no such file"), "it never falls back to a guessed root: {err}");
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), before, "nothing was written (no ledger, no .canon)");
 }
 
 #[test]
@@ -176,6 +181,7 @@ fn one_shot_override_requires_both_flags_source_alone_fails() {
 
     let output = run_canon(&["ingest", "plans", "--plan-source", "."], dir.path());
     assert_eq!(output.status.code(), Some(2), "`--plan-source` without `--dialect` is a usage error");
+    assert!(stderr(&output).contains("--dialect") && stderr(&output).contains("required arguments were not provided"), "the error names the missing half: {}", stderr(&output));
 }
 
 #[test]

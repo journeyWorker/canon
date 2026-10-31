@@ -566,7 +566,7 @@ fn gate_task_flip_succeeds_with_clean_evidence() {
     let second = run_canon(&["task", "done", "it-task-flip-ok#1", "--repo", ".", "--json"], dir.path());
     assert!(second.status.success());
     let shown: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
-    assert_eq!(shown["meta"]["unchanged"], true, "{shown}");
+    assert_eq!(shown["data"]["unchanged"], true, "{shown}");
     assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), flipped, "a second gate_task call on an already-flipped row must be a byte-identical no-op");
 }
 
@@ -1118,6 +1118,9 @@ fn evidence_add_refuses_a_record_with_no_coverage_subject() {
     let dir = repo_with_spec_corpus();
     let out = run_canon(&["evidence", "add", "--class", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
+    let message = format!("{}{}", stdout(&out), stderr(&out));
+    assert!(message.contains("--task") && message.contains("--scenario"), "the refusal names the keys it will accept: {message}");
+    assert_eq!(evidence_files(&dir.path().join(".canon/ledger")), Vec::<PathBuf>::new(), "nothing is staged");
 }
 
 /// The composite key is the scenario's identity; with exactly one spec
@@ -1185,6 +1188,7 @@ fn evidence_add_with_a_report_refuses_a_failed_case_and_binds_a_passing_one() {
     assert_eq!(refused.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
     let error: serde_json::Value = serde_json::from_str(stdout(&refused).lines().last().unwrap()).unwrap();
     assert_eq!(error["error"]["code"], "EVIDENCE_REPORT_CONTRADICTION", "{error}");
+    assert!(stdout(&refused).contains("core.login.01 signs in"), "the refusal names the failed case: {}", stdout(&refused));
     assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
 
     let passing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"/></testsuite></testsuites>"#;

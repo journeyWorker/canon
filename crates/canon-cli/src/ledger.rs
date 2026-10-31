@@ -18,7 +18,7 @@
 //! moved stays moved, the rest is untouched, run it again); `2` refused
 //! (the ledger has no archive: its root is not a `ledger` directory).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use canon_gate::GateCtx;
 use canon_store::archive::KindCompaction;
@@ -26,7 +26,7 @@ use canon_store::git_tier::GitTier;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::json_out::Report;
 use crate::safety::{Effect, Mode, Plan};
 use crate::context::resolve_repo_root;
@@ -176,6 +176,22 @@ pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         crate::safety::finish_preview(&base, "ledger compact", &report.plan, "the plan only lists what would move; moving takes its planDigest", json, &report);
         return 0;
     }
+    // Superseded versions move out of the ledger's `kind=` directories into the archive's: each must take the change before the first move. A pass with nothing to move writes nothing and is not refused.
+    if let Ok(ctx) = GateCtx::from_repo(&repo_dir) {
+        let archive = canon_store::archive::archive_root_of(&ctx.ledger_root);
+        let mut targets: Vec<PathBuf> = Vec::new();
+        for path in preview.iter().flat_map(|kind| &kind.paths) {
+            for root in std::iter::once(&ctx.ledger_root).chain(archive.as_ref()) {
+                if let Some(directory) = root.join(path).parent().map(Path::to_path_buf).filter(|directory| !targets.contains(directory)) {
+                    targets.push(directory);
+                }
+            }
+        }
+        let targets: Vec<&Path> = targets.iter().map(PathBuf::as_path).collect();
+        if let Some(code) = crate::write_mode::refuse_unwritable(&targets, CMD, json) {
+            return code;
+        }
+    }
     let kinds = match compact(&repo_dir, false) {
         Ok(kinds) => kinds,
         Err(e) => return e.emit(CMD, json),
@@ -212,6 +228,6 @@ pub fn migrate_lines(repo: &Path, dry_run: bool) -> Result<Vec<String>, CliError
 /// append; it never turns the writer's own error into a different one.
 pub(crate) fn restore_after_rollback(ledger_root: &Path, kind: canon_model::RecordKind) {
     if let Err(e) = GitTier::new(ledger_root).restore_unsuperseded(kind) {
-        crate::warn_err!("canon: rolled back, but could not restore the archived {} version(s) the rolled-back records had replaced ({e}); copy them back from the archive beside the ledger", kind.as_str());
+        crate::warn_err!("LEDGER_ROLLBACK_NOT_RESTORED", "canon: rolled back, but could not restore the archived {} version(s) the rolled-back records had replaced ({e}); copy them back from the archive beside the ledger", kind.as_str());
     }
 }

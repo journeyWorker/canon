@@ -22,7 +22,7 @@ use std::path::Path;
 
 use canon_model::{paths, ChangeId};
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::status::{NextStep, StepActor};
 
 /// The code of the refusal.
@@ -115,7 +115,7 @@ pub fn announce(repo: &Path) {
     }
     let names = found.iter().take(3).map(|b| format!("`{}`", b.change)).collect::<Vec<_>>().join(", ");
     let more = if found.len() > 3 { format!(" and {} more", found.len() - 3) } else { String::new() };
-    crate::json_out::warn(format!(
+    crate::json_out::warn("OLD_BRIEF_FORMAT_FOUND", format!(
         "{} brief(s) are in the format canon 0.30 and earlier wrote ({names}{more}); commands that write and judge them are refused until `canon migrate` rewrites them. Hint: run `canon migrate --json` to preview the rewrite",
         found.len()
     ));

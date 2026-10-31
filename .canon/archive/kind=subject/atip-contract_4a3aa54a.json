@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-10-31T16:43:28.432601Z",
+  "change_ids": [
+    "canon-0-33-atip-crate",
+    "canon-0-33-atip-l0"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-33-orch"
+    },
+    "reason": "0.33 ATIP L0: changes reviewed, gate clean"
+  },
+  "subject_id": "atip-contract",
+  "summary": "Output selection, envelope, errors, registry and exit codes of canon follow atip/1 L0",
+  "title": "ATIP: canon's atip/1 L0 output contract"
+}

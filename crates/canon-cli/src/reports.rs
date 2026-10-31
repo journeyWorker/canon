@@ -3,11 +3,11 @@
 //! Every `--json` payload is a struct that implements [`Report`]. The trait
 //! ties `Serialize` to `JsonSchema`, and `json_out::data` is generic over it,
 //! so a payload without a schema does not compile. [`report_schemas`] lists one schema
-//! per typed report for the generated spec; [`envelope_schemas`] holds the
-//! success and failure envelopes every report travels in.
+//! per typed report for the generated spec. The envelope every report travels
+//! in is the contract's own (`atip::ENVELOPE_SCHEMA`), not a canon schema.
 
 use schemars::JsonSchema;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 /// A typed `--json` payload: serializable, with a derived JSON Schema.
 ///
@@ -19,6 +19,11 @@ pub trait Report: serde::Serialize + JsonSchema {
     /// `"<major>.<minor>"` of this report's shape; a consumer accepts unknown
     /// fields within a major and rejects an unknown major.
     const SCHEMA_VERSION: &'static str = "1.0";
+
+    /// Whether a write's `unchanged`, `waitingOn` and `nextOmitted` are members of this report's
+    /// `data`. A report that is a stored ledger record verbatim, or that is not an object,
+    /// sets this to `false`: they then travel in `meta.x-canon`.
+    const STATE_IN_DATA: bool = true;
 }
 
 /// A refusal that `--override-reason` waived (0.28 D12): the error code the
@@ -41,19 +46,66 @@ pub struct ReportSchema {
     pub command: &'static str,
     /// `<PascalCaseCommandId>Report`, the name the per-leaf table gives it.
     pub name: String,
-    pub schema_version: &'static str,
+    pub schema_version: String,
     /// The Rust type of the report (`std::any::type_name`): the witness (`CANON_WITNESS_DIR`) names the type it saw.
     pub type_name: &'static str,
     /// A JSON Schema 2020-12 for `data`.
     pub schema: Value,
 }
 
-fn entry<R: Report>(command: &'static str, name: &str) -> ReportSchema {
-    ReportSchema { command, name: name.to_string(), schema_version: R::SCHEMA_VERSION, type_name: std::any::type_name::<R>(), schema: schema_of::<R>() }
+/// A [`ReportSchema`] without its schema, which costs to build: what the output of a run is named by.
+struct ReportRow {
+    command: &'static str,
+    name: String,
+    schema_version: String,
+    type_name: &'static str,
+    /// Whether the members of [`crate::json_out::state_properties`] belong to this report's schema.
+    state: bool,
+    schema: fn() -> Value,
+    /// Whether this is the output of a batch `--input`.
+    batch: bool,
 }
 
-fn batch_entry<R: Report + 'static>(command: &'static str, name: &str) -> ReportSchema {
-    ReportSchema { command, name: name.to_string(), schema_version: crate::input::BatchReport::<R>::SCHEMA_VERSION, type_name: std::any::type_name::<crate::input::BatchReport<R>>(), schema: schema_of::<crate::input::BatchReport<R>>() }
+fn entry<R: Report>(command: &'static str, name: &str) -> ReportRow {
+    ReportRow { command, name: name.to_string(), schema_version: crate::json_out::schema_version_of::<R>(command), type_name: std::any::type_name::<R>(), state: R::STATE_IN_DATA && crate::json_out::carries_state(command), schema: schema_of::<R>, batch: false }
+}
+
+fn batch_entry<R: Report + 'static>(command: &'static str, name: &str) -> ReportRow {
+    ReportRow {
+        command,
+        name: name.to_string(),
+        schema_version: crate::json_out::schema_version_of::<crate::input::BatchReport<R>>(command),
+        type_name: std::any::type_name::<crate::input::BatchReport<R>>(),
+        state: crate::json_out::carries_state(command),
+        schema: schema_of::<crate::input::BatchReport<R>>,
+        batch: true,
+    }
+}
+
+/// The report named `name` of `command` that declares more than one output, when `R` is one of them.
+/// `meta.output` (spec 6.6): a caller picks the decoder by it.
+pub fn output_name<R: Report>(command: &str) -> Option<String> {
+    let rows = report_rows();
+    let of_command: Vec<&ReportRow> = rows.iter().filter(|row| row.command == command).collect();
+    if of_command.len() < 2 {
+        return None;
+    }
+    of_command.iter().find(|row| row.type_name == std::any::type_name::<R>()).map(|row| row.name.clone())
+}
+
+/// The `meta.output` of the report of a batch `--input` (`Batch<Name>Report`): the batch variant of the
+/// command's first output.
+pub fn batch_output_name(command: &str) -> Option<String> {
+    report_rows().iter().find(|row| row.command == command && row.batch).map(|row| row.name.clone())
+}
+
+/// The `meta.schemaVersion` of a failure without `data` (spec 6.11): the version of the output the
+/// invocation would have produced: the batch output for a batch `--input`, otherwise the command's
+/// first output that is not a batch.
+pub fn declared_version(command: &str, batch: bool) -> Option<String> {
+    let rows = report_rows();
+    let mut of_command = rows.iter().filter(|row| row.command == command && row.batch == batch);
+    of_command.next().map(|row| row.schema_version.clone())
 }
 
 /// The JSON Schema of `R` as a value.
@@ -63,10 +115,26 @@ pub fn schema_of<R: JsonSchema>() -> Value {
     serde_json::to_value(generator.into_root_schema_for::<R>()).expect("a JSON Schema serializes")
 }
 
-/// Every typed report, one entry per `(command, name)`, sorted by command.
+/// Every typed report, one entry per `(command, name)`, sorted by command, with its schema.
 pub fn report_schemas() -> Vec<ReportSchema> {
+    report_rows()
+        .iter()
+        .map(|row| {
+            let schema = (row.schema)();
+            ReportSchema { command: row.command, name: row.name.clone(), schema_version: row.schema_version.clone(), type_name: row.type_name, schema: if row.state { crate::json_out::with_state_properties(schema) } else { schema } }
+        })
+        .collect()
+}
+
+/// Every typed report without its schema, sorted like [`report_schemas`]. Built once.
+fn report_rows() -> &'static [ReportRow] {
+    static ROWS: std::sync::OnceLock<Vec<ReportRow>> = std::sync::OnceLock::new();
+    ROWS.get_or_init(build_rows)
+}
+
+fn build_rows() -> Vec<ReportRow> {
     use crate::{adapter, artifact_ingest, artifacts, brief_approve, brief_check, change, completion, context, context_pack, demo, dispatch, divergence, evidence, finding, gate, learn, ledger, migrate, plans, policy_approval, retention, retrieve, review, scaffold, selftest, status, subject, tier};
-    let mut schemas: Vec<ReportSchema> = vec![
+    let mut schemas: Vec<ReportRow> = vec![
         entry::<change::ChangeNewReport<'static>>("change new", "ChangeNewReport"),
         entry::<demo::DemoReviewReport>("demo review", "DemoReviewReport"),
         entry::<demo::DemoInitReport>("demo init", "DemoInitReport"),
@@ -193,19 +261,4 @@ pub fn report_schemas() -> Vec<ReportSchema> {
     ];
     schemas.sort_by(|a, b| a.command.cmp(b.command).then_with(|| a.name.cmp(&b.name)));
     schemas
-}
-
-/// The success `{ok: true, data, meta}` and failure `{ok: false, error,
-/// meta[, data]}` envelopes as JSON Schemas (2020-12): `{"success": …,
-/// "failure": …}`. `data` is typed per command by [`report_schemas`].
-pub fn envelope_schemas() -> Value {
-    json!({ "success": envelope_schema::<crate::json_out::SuccessEnvelope>(true), "failure": envelope_schema::<crate::json_out::FailureEnvelope>(false) })
-}
-
-fn envelope_schema<E: JsonSchema>(ok: bool) -> Value {
-    let mut schema = schema_of::<E>();
-    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
-        properties.insert("ok".to_string(), json!({ "const": ok, "description": if ok { "true: the command succeeded" } else { "false: the command failed; see `error`" } }));
-    }
-    schema
 }

@@ -45,6 +45,7 @@
 //! one a single `suites()` line, never a re-plumb.
 
 use std::process::ExitCode;
+use crate::cli_error::CliErrorExt as _;
 
 /// One registered suite's outcome: `passed` counts the independent
 /// fixture checks that cleared; `failures` carries one human-readable

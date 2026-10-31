@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T13:42:45.674210Z",
+  "attachments": [
+    {
+      "case": "schema::tests::atip_l0_07_one_changed_character_changes_the_digest",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    },
+    {
+      "case": "schema::tests::atip_l0_07_an_error_with_a_null_hint_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    },
+    {
+      "case": "schema::tests::atip_l0_07_the_vendored_schemas_are_the_published_bytes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    },
+    {
+      "case": "schema::tests::atip_l0_07_a_null_meta_a_null_member_and_an_undefined_meta_key_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-junit.xml",
+      "sha256": "16adea9a8e529a1dfb6e9a898f5d5f0a11ef4bc9515c7b3fa5f60db531e88d7a"
+    }
+  ],
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-l0-junit.xml"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "atip.l0.07",
+  "schema": 1,
+  "staging_id": "77c7a5e2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

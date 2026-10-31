@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:46.505316Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_l0.rs:350",
+  "introduced_by": "9342db524690e0b9002844541b8bb69b528373e5",
+  "kind": "finding",
+  "reviewed_sha": "d5356aea98f659feff613127e9cf403be61f671a",
+  "reviewer": "rev-atip-l0",
+  "round": 2,
+  "scenario_ids": [
+    "atip.l0.16"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards: finding 1 (brief/report answering USAGE) is fixed and I confirmed it in the binary for all 27 groups, with and without nosuch, but the guard is only atip_l0_31 (error-schema validity of brief --json and report nosuch --json); atip_l0_16 still tries only the bare tool and finding, so a regression of COMMAND_REQUIRED on brief/report would not fail it. Also status.rs:180 still documents meta.nextOmitted (it is data.nextOmitted). Blast radius: atip check L0.next and L0.page are reported unsupported for canon (the fixture drives no envelope with next or page): fixture matter for atip-check, not this change.",
+  "worktree_dirty": false
+}

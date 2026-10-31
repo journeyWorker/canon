@@ -163,19 +163,74 @@ fn seed_approved_subject(repo: &Path, id: &str, status: SubjectStatus) {
     write_brief(repo, &change, &format!("{APPROVED}\n"));
 }
 
+/// The steps of `canon status` as its human form lists them: the `next:`
+/// block (`# why` over the command, `human:` before a human step's text).
+/// In JSON mode `meta.next` holds only the runnable ones. Also returns how
+/// many more the human form says follow (`… N more once these are done`).
+fn text_steps(repo: &Path) -> (Vec<Value>, u64) {
+    let out = run(repo, &["status"]);
+    assert_eq!(out.status.code(), Some(0), "status always exits 0; stderr: {}", stderr(&out));
+    let text = stdout(&out);
+    let Some((_, block)) = text.split_once("\nnext:\n") else { return (Vec::new(), 0) };
+    let mut steps = Vec::new();
+    let mut omitted = 0;
+    let mut why = None;
+    for line in block.lines() {
+        if let Some(more) = line.strip_prefix("  … ").and_then(|rest| rest.strip_suffix(" more once these are done")) {
+            omitted = more.parse().expect("a count");
+        } else if let Some(reason) = line.strip_prefix("  # ") {
+            why = Some(reason.to_string());
+        } else if let (Some(command), Some(reason)) = (line.strip_prefix("  "), why.take()) {
+            let (actor, command) = command.strip_prefix("human: ").map_or(("agent", command), |rest| ("human", rest));
+            steps.push(serde_json::json!({"actor": actor, "command": command, "why": reason}));
+        }
+    }
+    (steps, omitted)
+}
+
+/// Whether `command` is a canon command line with no `<placeholder>`: the
+/// only kind `meta.next` carries.
+fn runnable(command: &str) -> bool {
+    command.starts_with("canon ") && !(command.contains('<') && command.contains('>'))
+}
+
+/// The status report: `data` as printed, with `next` and `nextOmitted` those
+/// of the human form (`why`, `command`, `actor`), because the JSON form lists
+/// only the runnable steps (a canon command line with no `<placeholder>`; the
+/// five-step cap counts those). Checks `meta.next` against them, in the new
+/// entry shape.
 fn status_json(repo: &Path) -> Value {
     let out = run(repo, &["status", "--json"]);
     assert_eq!(out.status.code(), Some(0), "status always exits 0; stderr: {}", stderr(&out));
     let doc: Value = serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object");
     assert_eq!(doc["ok"], true, "{doc}");
     let mut report = doc["data"].clone();
-    for key in ["next", "nextOmitted", "waitingOn"] {
-        report[key] = doc["meta"][key].clone();
+    let (steps, omitted) = text_steps(repo);
+    let entries: Vec<Value> = doc["meta"].get("next").map(|n| n.as_array().expect("meta.next is an array").clone()).unwrap_or_default();
+    assert!(entries.len() <= 5, "{doc}");
+    let visible: Vec<&Value> = steps.iter().filter(|s| runnable(s["command"].as_str().unwrap())).collect();
+    if omitted == 0 {
+        assert_eq!(entries.len(), visible.len(), "meta.next is the runnable steps of the human form\nmeta.next: {entries:?}\ntext: {steps:?}");
+    } else {
+        assert!(entries.len() >= visible.len(), "meta.next starts with the runnable steps the human form shows\nmeta.next: {entries:?}\ntext: {steps:?}");
     }
-    if report["nextOmitted"].is_null() {
-        report["nextOmitted"] = serde_json::json!(0);
+    for (entry, step) in entries.iter().zip(visible) {
+        let words = shell_words(step["command"].as_str().unwrap());
+        let mut argv: Vec<String> = words[1..].to_vec();
+        argv.push("--json".to_string());
+        assert_eq!(entry["argv"], serde_json::json!(argv), "{entry}");
+        assert_eq!(entry["command"], serde_json::json!(format!("{} --json", step["command"].as_str().unwrap())), "{entry}");
+        assert_eq!(entry["reason"], step["why"], "{entry}");
     }
-    for step in report["next"].as_array().unwrap() {
+    for entry in &entries {
+        assert_eq!(entry["x-canon"]["actor"], "agent", "{entry}");
+        assert!(entry.get("why").is_none() && entry.get("actor").is_none() && entry.get("role").is_none(), "{entry}");
+        assert!(entry["argv"].as_array().unwrap().iter().all(|w| !w.as_str().unwrap().contains("<")), "no placeholder in an entry: {entry}");
+    }
+    if entries.is_empty() {
+        assert!(doc["meta"].get("next").is_none(), "no steps, no `meta.next` member: {doc}");
+    }
+    for step in &steps {
         match step["actor"].as_str() {
             Some("agent") => {}
             Some("human") => assert!(
@@ -185,6 +240,8 @@ fn status_json(repo: &Path) -> Value {
             _ => panic!("every step names its actor: {step}"),
         }
     }
+    report["next"] = Value::Array(steps);
+    report["nextOmitted"] = serde_json::json!(omitted);
     report
 }
 
@@ -970,6 +1027,14 @@ fn status_caps_next_at_five() {
     assert_eq!(report["next"].as_array().unwrap().len(), 5);
     assert_eq!(report["nextOmitted"], 3, "7 subject steps + 1 unowned step, 5 shown");
     assert!(stdout(&run(dir.path(), &["status"])).contains("  … 3 more once these are done\n"));
+
+    // The JSON form lists only runnable steps and the cap counts those: seven
+    // steps hold a `<placeholder>`, the one runnable step is the unowned scenario's.
+    let doc: Value = serde_json::from_str(&stdout(&run(dir.path(), &["status", "--json"]))).unwrap();
+    let next = doc["meta"]["next"].as_array().unwrap();
+    assert_eq!(next.len(), 1, "{doc}");
+    assert_eq!(next[0]["command"], "canon status --json", "{doc}");
+    assert!(doc["data"].get("nextOmitted").is_none(), "nothing runnable is past the cap, so no `nextOmitted`: {doc}");
 }
 
 /// context.status.09: a corpus the refresh cannot index (here, headers

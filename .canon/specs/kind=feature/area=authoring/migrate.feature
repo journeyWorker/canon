@@ -92,7 +92,7 @@ Feature: canon migrate
   @authoring.migrate.09
   Scenario: A migrate run that stopped before writing canon.yaml is finished by the next run
     Given a repo canon 0.16 set up, and a committed canon migrate run whose canon.yaml write fails after the corpus and the change moved
-    Then that run exits 2 and canon.yaml is byte-identical, never half-written
+    Then that run exits 1 with MIGRATE_STOPPED and canon.yaml is byte-identical, never half-written
     When canon migrate is committed again
     Then it sees the root already at .canon/specs while canon.yaml names specs and writes root .canon/specs with former_roots [specs]
     And it re-imports the moved change under the same change id with its adoption, removes the init openspec source, and a third run finds nothing to migrate
@@ -104,7 +104,7 @@ Feature: canon migrate
   Scenario: A pointer brief that cannot be written keeps the openspec source that holds the approval
     Given an external openspec change whose proposal.md holds an Approved: line, the init openspec source, and a .canon/changes directory canon cannot write into
     When canon migrate is committed with the digest of its preview
-    Then it exits 2 naming the brief it could not write, and canon.yaml still lists the init openspec source and its .gitkeep stays
+    Then it exits 1 with MIGRATE_STOPPED naming the brief it could not write, and canon.yaml still lists the init openspec source and its .gitkeep stays
     When the directory is writable again and canon migrate is committed
     Then it writes the pointer brief with Source: and that Approved: line, and only then removes the init openspec source
 
@@ -167,10 +167,10 @@ Feature: canon migrate
   @subject:authoring-scaffold
   @case:failure
   @authoring.migrate.16
-  Scenario: A commit whose plan digest no longer matches the repo is refused PLAN_CHANGED and writes nothing
+  Scenario: A commit whose plan digest no longer matches the repo is refused PLAN_STALE and writes nothing
     Given a repo whose migrate preview gave a digest, and the repo changed afterwards so the plan differs
     When canon migrate --commit --plan-digest runs with the old digest
-    Then it exits 2 with PLAN_CHANGED and nothing is written
+    Then it exits 2 with PLAN_STALE and nothing is written
     And a fresh preview gives a new digest that commits
 
   # canon: {"schema":1,"at":"2026-10-23T11:48:42Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -248,7 +248,7 @@ Feature: canon migrate
   Scenario: A changed plan digest is refused with nothing written, and a brief edited after its approval stays changed
     Given a plan previewed and then a brief changed
     When canon migrate --commit runs with the old digest
-    Then it is refused with PLAN_CHANGED and nothing is written
+    Then it is refused with PLAN_STALE and nothing is written
     And a brief edited after its approval is rewritten and still reads BRIEF_CHANGED_SINCE_APPROVAL
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:55Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}

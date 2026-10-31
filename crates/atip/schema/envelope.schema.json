@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/envelope.schema.json",
+  "title": "atip/1 envelope",
+  "description": "The one JSON document a command prints on stdout with --json (spec section 6). `ok` is true exactly when the exit code is 0.",
+  "oneOf": [
+    { "$ref": "#/$defs/success" },
+    { "$ref": "#/$defs/failure" }
+  ],
+  "$defs": {
+    "success": {
+      "type": "object",
+      "required": ["ok", "data", "meta"],
+      "properties": {
+        "ok": { "const": true },
+        "data": { "description": "The output. Its JSON Schema is the schemaRef of the output meta.output names (or of the command's only output)." },
+        "meta": { "$ref": "#/$defs/meta" }
+      },
+      "additionalProperties": false
+    },
+    "failure": {
+      "type": "object",
+      "required": ["ok", "error", "meta"],
+      "properties": {
+        "ok": { "const": false },
+        "error": { "$ref": "error.schema.json" },
+        "data": { "description": "The partial output of a command that ran (exit 1): a failed check's findings, a stopped batch's report. Never on a refusal (exit 2)." },
+        "meta": { "$ref": "#/$defs/meta" }
+      },
+      "additionalProperties": false
+    },
+    "meta": {
+      "type": "object",
+      "required": ["schemaVersion", "tool", "toolVersion"],
+      "properties": {
+        "command": {
+          "description": "The command id (path words joined by one space) resolved so far. Omitted when not even the first word resolved.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*( [a-z][a-z0-9]*(-[a-z0-9]+)*)*$"
+        },
+        "contract": {
+          "description": "Required on `schema` answers, SHOULD elsewhere (spec 6.6).",
+          "const": "atip/1"
+        },
+        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+        "tool": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "toolVersion": { "type": "string", "minLength": 1 },
+        "output": {
+          "description": "The name, in the command's `schemas`, of the output schema `data` follows (spec 6.6).",
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*$"
+        },
+        "context": {
+          "description": "Keys: camelCase names of the options that select context; values: the values the command used; paths relative to the working directory (spec 6.7).",
+          "type": "object",
+          "propertyNames": { "pattern": "^([a-z][a-zA-Z0-9]*|x-[a-z][a-z0-9-]*)$" },
+          "additionalProperties": { "not": { "type": "null" } }
+        },
+        "next": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nextStep" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/warning" },
+          "minItems": 1
+        },
+        "coverage": {
+          "description": "What a check or listing examined (spec 8.5).",
+          "type": "object"
+        },
+        "page": { "$ref": "#/$defs/page" },
+        "fields": {
+          "description": "The field paths `data` was projected to with --fields, the always-kept ones included (spec 6.10).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/fieldPath" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "truncated": { "$ref": "#/$defs/truncated" }
+      },
+      "patternProperties": {
+        "^x-[a-z][a-z0-9-]*$": true
+      },
+      "additionalProperties": false
+    },
+    "schemaVersion": {
+      "description": "<major>.<minor>. Minor: additive. Major: breaking.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "fieldPath": {
+      "description": "A dot path into a record; `[]` after a name descends into each element of a list.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[\\])?)*$"
+    },
+    "nextStep": {
+      "type": "object",
+      "required": ["command", "argv"],
+      "properties": {
+        "command": {
+          "description": "The whole invocation as one display string, starting with the tool name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "argv": {
+          "description": "The same invocation as argument words, without the executable. Every word is literal.",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "patternProperties": {
+        "^x-[a-z][a-z0-9-]*$": true
+      },
+      "additionalProperties": false
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "$ref": "error.schema.json#/$defs/code" },
+        "message": { "type": "string", "minLength": 1 },
+        "field": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "page": {
+      "description": "Paging (spec 6.9). nextCursor is present exactly when more items follow.",
+      "type": "object",
+      "required": ["returned"],
+      "properties": {
+        "returned": { "type": "integer", "minimum": 0 },
+        "nextCursor": { "type": "string", "minLength": 1 },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "truncated": {
+      "description": "An answer cut by size (spec 6.9).",
+      "type": "object",
+      "required": ["path", "kept"],
+      "properties": {
+        "path": { "description": "RFC 6901 JSON pointer into `data` of the list or value cut.", "type": "string", "pattern": "^(/([^~]|~[01])*)*$" },
+        "kept": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "maxBytes": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,3 +1,3 @@
-error: invalid value 'Not A Change' for '--change <CHANGE_ID>': invalid ChangeId: "Not A Change" does not match grammar `openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/``
-
-For more information, try '--help'.
+canon: USAGE: invalid value 'Not A Change' for '--change <CHANGE_ID>': invalid ChangeId: "Not A Change" does not match grammar `openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/``
+  field: --change
+  hint: a working call: canon finding list --change add-login; `canon schema finding list` lists every argument

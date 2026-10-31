@@ -191,6 +191,8 @@ fn evidence_add_refuses_a_bound_file_over_the_size_limit_and_names_the_override(
     assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
     assert!(text(&refused).contains("--max-artifact-mib"), "{}", text(&refused));
     assert!(committed_records(repo).is_empty() && !repo.join(".canon/artifacts").exists(), "a refused add writes nothing");
+    let staged = repo.join(".canon/ledger/_staging");
+    assert!(!staged.exists() || std::fs::read_dir(&staged).unwrap().next().is_none(), "a refused add stages nothing");
 
     let raised = attest(repo, &["--artifact", "trace.bin", "--max-artifact-mib", "2"]);
     assert!(raised.status.success(), "{}", text(&raised));
@@ -256,7 +258,7 @@ fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
     let stderr = String::from_utf8_lossy(&refused.stderr).into_owned();
     let lines: Vec<&str> = stderr.lines().collect();
     assert_eq!(lines.len(), 3, "one line per finding, then the hint: {stderr}");
-    assert!(lines[0].starts_with("canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("hint: "), "{stderr}");
+    assert!(lines[0].starts_with("canon: EVIDENCE_FABRICATED: fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("  hint: "), "{stderr}");
     assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
     assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
     let staged = repo.join(".canon/ledger/_staging/kind=evidence");

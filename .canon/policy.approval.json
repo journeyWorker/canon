@@ -1,6 +1,11 @@
 {
   "policy_digest": "sha256:106b851bac352289019fca88f8095ee042f23efb41a15dd2dbb688fe4240474b",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-10-30T11:42:55Z",
-  "note": "승인"
+  "approved_at": "2026-10-31T10:46:20Z",
+  "note": "승인",
+  "relay": {
+    "role": "orchestrator",
+    "actor": "orchestrator-main",
+    "tool": "ask"
+  }
 }

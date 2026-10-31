@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:50.104436Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/dispatch.rs:98",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "resolution_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "retrieve.guidance.06"
+  ],
+  "schema": 2,
+  "seq": 11,
+  "severity": "should_fix",
+  "summary": "Standards pass: the replay assertion compares a manifest guidance snapshot taken from a `Run` loaded before the demotion with the recorded one and never re-reads the manifest afterwards, so it cannot show the on-disk manifest is untouched; the fresh retrieval goes through the library, not the CLI. Not signed.",
+  "worktree_dirty": false
+}

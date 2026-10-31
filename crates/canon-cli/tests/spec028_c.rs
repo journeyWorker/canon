@@ -133,7 +133,7 @@ fn sorted_keys(value: &Value) -> Vec<&str> {
 }
 
 /// context.capability.29: a success is `{ok: true, data, meta}` with the command, the schema
-/// version and the canon version in `meta`.
+/// version, the tool, its version and the contract in `meta`.
 #[test]
 fn context_capability_29_a_success_is_ok_data_and_meta() {
     let dir = repo();
@@ -147,8 +147,16 @@ fn context_capability_29_a_success_is_ok_data_and_meta() {
         assert_eq!(meta["command"], command, "{args:?}: {meta}");
         let version = meta["schemaVersion"].as_str().expect("schemaVersion");
         assert!(version.split('.').count() == 2 && version.split('.').all(|p| p.parse::<u32>().is_ok()), "{version}");
-        assert_eq!(meta["canonVersion"], env!("CARGO_PKG_VERSION"));
-        assert!(meta["context"].get("repo").is_some(), "{meta}");
+        assert_eq!((meta["tool"].as_str(), meta["contract"].as_str()), (Some("canon"), Some("atip/1")), "{meta}");
+        assert_eq!(meta["toolVersion"], env!("CARGO_PKG_VERSION"));
+        assert!(meta.get("canonVersion").is_none(), "meta.canonVersion is toolVersion now: {meta}");
+        // `meta.context` is `{repo}` and is there exactly for a leaf that takes `--repo`.
+        let node = json_of(&canon(dir.path(), &[&["schema"][..], &command.split(' ').collect::<Vec<_>>(), &["--json"]].concat()));
+        let takes_repo = node["data"]["options"].as_array().is_some_and(|o| o.iter().any(|o| o["name"] == "repo"));
+        assert_eq!(meta.get("context").is_some(), takes_repo, "{args:?}: {meta}");
+        if takes_repo {
+            assert_eq!(sorted_keys(&meta["context"]), ["repo"], "{args:?}: {meta}");
+        }
     }
 }
 
@@ -217,7 +225,9 @@ fn context_capability_31_json_mode_carries_warnings_in_meta_and_leaves_stderr_em
     assert!(stderr(&out).is_empty(), "JSON mode writes nothing on stderr: {}", stderr(&out));
     let body = json_of(&out);
     let warnings = body["meta"]["warnings"].as_array().expect("meta.warnings");
-    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("reviwer"))), "{body}");
+    let warning = warnings.iter().find(|w| w["message"].as_str().is_some_and(|m| m.contains("reviwer"))).unwrap_or_else(|| panic!("a warning names `reviwer`: {body}"));
+    let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning has a code: {body}"));
+    assert!(canon_cli::cli_error::code_info(code).is_some(), "the warning code {code} is registered: {body}");
 
     let human = finding("2", false);
     assert_eq!(human.status.code(), Some(0), "{}", stderr(&human));
@@ -435,14 +445,18 @@ fn context_capability_37_a_bare_group_is_exit_two_with_the_leaf_to_run() {
         assert_eq!(out.status.code(), Some(2), "{args:?}");
         assert!(stderr(&out).is_empty(), "{args:?}: {}", stderr(&out));
         let error = json_of(&out)["error"].clone();
-        assert_eq!(error["code"], "USAGE", "{error}");
+        // A group is never runnable bare: COMMAND_REQUIRED, with the 0.28 replacement in the hint where there was one.
+        assert_eq!(error["code"], "COMMAND_REQUIRED", "{error}");
         if replacement.is_empty() {
-            // A group that never ran bare is the ordinary usage error: still exit 2, still a hint.
+            // A group that never ran bare asks for its command: still exit 2, still a hint, and the commands it has.
             assert!(error["hint"].as_str().is_some_and(|h| !h.is_empty()), "{error}");
+            assert_eq!(error["field"], "command", "{error}");
+            assert!(error["expected"].as_array().is_some_and(|e| e.iter().any(|c| c == "verify")), "{error}");
             continue;
         }
         let named = calls(error["hint"].as_str().unwrap_or_default());
         assert!(named.iter().any(|c| c == replacement), "{args:?}: the hint names `{replacement}`: {error}");
+        assert_eq!(error["field"], "command", "{error}");
         parses(dir.path(), replacement);
     }
 }

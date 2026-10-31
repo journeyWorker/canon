@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T15:17:19.616654Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "reason": "atip_check_53 asserts the working directory, TMPDIR and HOME are empty after a pass and after a failed level",
+  "resolution_code_tree": "0faddef99fed86099eaaa46412800489070ede4b",
+  "resolution_sha": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.24",
+    "atip.check.41"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "Brief F2 says the checker installs and writes nothing in the checked repository. Refusal paths assert it (atip_check_04, 27, 33), but no test asserts it for a completed run (working directory of atip and its TMPDIR left empty, scratch removed). I checked by hand: after atip check on canon, run from an empty directory with an empty TMPDIR, both were empty.",
+  "worktree_dirty": false
+}

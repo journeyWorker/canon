@@ -6,6 +6,7 @@
 //! false, `data.unverifiable` true) and the exit is 1.
 
 use serde_json::{json, Map, Value};
+use crate::cli_error::CliErrorExt as _;
 
 /// One spec root a check looked at.
 #[derive(Debug)]

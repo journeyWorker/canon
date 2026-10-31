@@ -1,8 +1,9 @@
-//! The shared error contract (0.20 D3): every refusal and operational
-//! failure carries a stable `code`, in the same two shapes. Human mode puts
-//! `canon <command>: <CODE> — <message>` on stderr; `--json` puts
-//! `{"error":{"code","message","hint","retryable"}}` on stdout. Exit codes
-//! keep their 0.19 meaning. Against the actually-built `canon` binary.
+//! The shared error contract (0.20 D3, atip/1 L0 since 0.33): every refusal
+//! and operational failure carries a stable `code`, in the same two shapes.
+//! Human mode puts `canon: <CODE>: <message>` on stderr (then indented
+//! `field:`, `expected:`, `hint:` lines); `--json` puts
+//! `{"error":{"code","message","retryable",…}}` on stdout. Exit codes come
+//! only from the registry row. Against the actually-built `canon` binary.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -42,23 +43,27 @@ fn json_error(out: &Output) -> Value {
     let body: Value = serde_json::from_str(&stdout(out)).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", stdout(out)));
     let error = body.get("error").unwrap_or_else(|| panic!("no `error` object: {body}")).clone();
     let keys: BTreeSet<&str> = error.as_object().expect("error is an object").keys().map(String::as_str).collect();
-    // `field`, `expected` and `received` appear only on a refusal about one argument.
-    let required = BTreeSet::from(["code", "message", "hint", "retryable", "suggestions"]);
-    assert!(required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "hint", "retryable", "suggestions", "field", "expected", "received"])), "{error}");
-    assert!(error["suggestions"].is_array(), "{error}");
+    // `hint`, `field`, `expected`, `received`, `suggestions` and `details` are absent when they have no value.
+    let required = BTreeSet::from(["code", "message", "retryable"]);
+    assert!(
+        required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "retryable", "hint", "suggestions", "field", "expected", "received", "details"])),
+        "{error}"
+    );
+    assert!(error.get("suggestions").is_none_or(Value::is_array), "{error}");
     assert!(error.get("expected").is_none() || error.get("field").is_some(), "`expected` always comes with `field`: {error}");
     assert!(error["code"].is_string() && error["message"].is_string() && error["retryable"].is_boolean(), "{error}");
-    assert!(error["hint"].is_null() || error["hint"].is_string(), "{error}");
+    assert!(error.get("hint").is_none_or(Value::is_string), "an absent hint is absent, never null: {error}");
     error
 }
 
 /// The code a human-mode failure puts on its first stderr line:
-/// `canon <command>: <CODE> — <message>`.
+/// `canon: <CODE>: <message>`.
 fn human_code(out: &Output) -> String {
     let err = stderr(out);
-    let line = err.lines().find(|l| l.starts_with("canon ")).unwrap_or_else(|| panic!("no `canon …:` line on stderr: {err}"));
-    let (_, rest) = line.split_once(": ").expect("`canon <command>: <CODE> — …`");
-    let (code, _) = rest.split_once(" — ").unwrap_or_else(|| panic!("no ` — ` after the code: {line}"));
+    assert!(stdout(out).is_empty(), "a human-mode failure leaves stdout empty: {}", stdout(out));
+    let line = err.lines().next().unwrap_or_else(|| panic!("nothing on stderr"));
+    let rest = line.strip_prefix("canon: ").unwrap_or_else(|| panic!("first stderr line is not `canon: <CODE>: <message>`: {err}"));
+    let (code, _) = rest.split_once(": ").unwrap_or_else(|| panic!("no `: ` after the code: {line}"));
     assert!(code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'), "{code}");
     code.to_string()
 }
@@ -95,7 +100,7 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
     );
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(human_code(&out), "BRIEF_UNAPPROVED");
-    assert!(stderr(&out).contains("\nhint: stop and get the human's answer to the brief"), "the next step is its own hint line: {}", stderr(&out));
+    assert!(stderr(&out).contains("\n  hint: stop and get the human's answer to the brief"), "the next step is its own hint line: {}", stderr(&out));
 }
 
 #[test]
@@ -140,7 +145,8 @@ fn init_over_a_finished_repo_is_unchanged_and_demo_init_over_it_is_refused() {
     let out = run(repo, &["init", "--providers", "none", "--no-agents-md", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let shown: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(shown["meta"]["unchanged"], true, "{shown}");
+    assert_eq!(shown["data"]["unchanged"], true, "{shown}");
+    assert!(shown["meta"].get("unchanged").is_none(), "unchanged moved from meta into data: {shown}");
     let out = run(repo, &["demo", "init", "--repo", "."]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(human_code(&out), "INIT_CONFIG_EXISTS");
@@ -189,16 +195,20 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
 
 // ───────────────────────────── the registry ─────────────────────────────
 
-/// Every `.rs` under `src/`, as text.
+/// Every `.rs` under `src/` (subdirectories included), as text.
 fn sources() -> Vec<(String, String)> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut out = Vec::new();
-    for entry in std::fs::read_dir(dir).unwrap() {
-        let path = entry.unwrap().path();
-        if path.extension().is_some_and(|e| e == "rs") {
-            out.push((path.file_name().unwrap().to_string_lossy().to_string(), std::fs::read_to_string(&path).unwrap()));
+    fn walk(dir: &Path, out: &mut Vec<(String, String)>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                out.push((path.file_name().unwrap().to_string_lossy().to_string(), std::fs::read_to_string(&path).unwrap()));
+            }
         }
     }
+    let mut out = Vec::new();
+    walk(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut out);
     out
 }
 
@@ -255,7 +265,9 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
     for info in canon_cli::cli_error::all_codes() {
         assert!(matches!(info.exit, 1 | 2), "{} declares exit {} (only 1 and 2 are errors)", info.code, info.exit);
         assert!(!info.meaning.trim().is_empty(), "{} has no meaning", info.code);
-        if info.code.ends_with("_NOT_FOUND") || info.code.ends_with("_UNREADABLE") || info.code.ends_with("_INVALID_ARGUMENT") {
+        // `POLICY_APPROVAL_UNREADABLE` is the decided exception: a closed gate answers exit 1 (0.33).
+        let closed_gate = info.code == "POLICY_APPROVAL_UNREADABLE";
+        if !closed_gate && (info.code.ends_with("_NOT_FOUND") || info.code.ends_with("_UNREADABLE") || info.code.ends_with("_INVALID_ARGUMENT")) {
             assert_eq!(info.exit, 2, "{} names a missing, unreadable or invalid input, so it is a refusal (exit 2)", info.code);
         }
     }
@@ -265,28 +277,16 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
     assert_eq!(exit_of("GATE_VIOLATIONS"), 1);
     assert_eq!(exit_of("CONFIG_MISSING"), 2);
     assert_eq!(exit_of("USAGE"), 2);
+    assert_eq!(exit_of("POLICY_APPROVAL_UNREADABLE"), 1, "an unreadable approval is a closed gate, not a refused run");
     assert!(canon_cli::cli_error::code_info("DISPATCH_END_IN_PROGRESS").unwrap().retryable, "a concurrent close is the retryable case");
     assert!(!canon_cli::cli_error::code_info("USAGE").unwrap().retryable);
 }
 
 #[test]
 fn a_cli_error_takes_its_exit_and_retryability_from_the_registry() {
-    use canon_cli::cli_error::CliError;
+    use canon_cli::cli_error::{CliError, CliErrorExt as _};
     assert_eq!(CliError::refused("BRIEF_NOT_FOUND", "x").exit, 2);
     assert_eq!(CliError::failed("BRIEF_NOT_FOUND", "x").exit, 2, "the constructor does not choose the exit");
     assert_eq!(CliError::failed("GATE_VIOLATIONS", "x").exit, 1);
     assert!(CliError::refused("DISPATCH_END_IN_PROGRESS", "x").retryable);
-}
-
-#[test]
-fn a_received_value_is_redacted_when_it_looks_like_a_secret() {
-    use canon_cli::cli_error::redact;
-    assert_eq!(redact(Some("--api-token"), "abc"), "<redacted>");
-    assert_eq!(redact(None, "CANON_SECRET=hunter2"), "CANON_SECRET=<redacted>");
-    assert_eq!(redact(None, "ghp_0123456789abcdef"), "<redacted>");
-    assert_eq!(redact(None, "Ab3dEf6hIj9kLm2nOp5qRs8tUv1"), "<redacted>");
-    assert_eq!(redact(Some("--kind"), "evidence"), "evidence");
-    let digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    assert_eq!(redact(Some("--plan-digest"), digest), digest, "a digest is not a secret");
-    assert_eq!(redact(Some("--signature-file"), "approval.sig"), "approval.sig");
 }

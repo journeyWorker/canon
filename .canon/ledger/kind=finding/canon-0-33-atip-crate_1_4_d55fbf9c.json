@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-crate",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-crate-rev"
+  },
+  "at": "2026-10-31T12:04:11.006603Z",
+  "change_id": "canon-0-33-atip-crate",
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "disposition": "open",
+  "file_ref": "crates/canon-gate/src/audit.rs:91",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "bc73b3a2c0f824de97c7946345d7e98adfb5316e",
+  "reviewer": "rev-atip-crate",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity, out of this change: a second shell-word quoter, canon_gate::audit::shell_quote, still exists beside atip::quote with a different safe set (`%` allowed, `@` not), used by evidence.rs for audit commands. The brief moves only the next-step rules, canon-gate has no atip dependency, and unifying would change bytes, so leaving it is correct here; recorded so L1 (0.34) decides which quoting the contract names.",
+  "worktree_dirty": false
+}

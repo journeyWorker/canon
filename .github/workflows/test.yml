@@ -200,6 +200,44 @@ jobs:
       - name: no pub(super) or pub(in ..) in crate sources
         run: scripts/check_visibility.sh
 
+  # 0.33: canon claims atip/1 L0, and the shared checker is what holds it to that
+  # (approaches/checker.md in https://github.com/journeyWorker/atip). `atip check`
+  # runs the built binary from outside (argv, stdout, stderr, exit status, files)
+  # and reports the 16 L0 checks; the MUST ones failing, or missing a fixture
+  # entry, fail the job. The fixture is `crates/canon-cli/tests/atip/canon.fixture.json`;
+  # its registry is generated from `canon schema --errors --json` and a test
+  # compares the two. The checker also runs on itself: it follows the contract it checks.
+  atip-l0:
+    name: atip check L0 (canon and the checker itself)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-atip-l0-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo fetch --locked
+        run: cargo fetch --locked
+
+      - name: build the canon and atip binaries
+        run: cargo build --locked --offline -p canon-cli -p atip-check
+
+      - name: atip check, canon at L0
+        run: target/debug/atip check --bin target/debug/canon --level L0 --fixture crates/canon-cli/tests/atip/canon.fixture.json
+
+      - name: atip check, the checker at L0
+        run: target/debug/atip check --bin target/debug/atip --level L0 --fixture crates/atip-check/atip.fixture.json
+
   # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
   # it builds a copy of the workspace, which would double the time of the job above.
   grammar-mutation:

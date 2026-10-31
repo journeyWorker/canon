@@ -196,7 +196,7 @@ fn compaction_is_idempotent_and_the_gate_and_status_say_the_same_after_it() {
     let first = json(&first);
     assert_eq!(first["data"]["moved"], 2);
     assert_eq!(first["meta"]["command"], "ledger compact");
-    assert!(first["meta"]["next"].is_array(), "a write carries meta.next");
+    assert!(first["meta"].get("next").is_none(), "a write with no follow-up step has no meta.next (never null, never []): {first}");
     let evidence_row = first["data"]["kinds"].as_array().unwrap().iter().find(|row| row["kind"] == "evidence").unwrap().clone();
     assert_eq!((evidence_row["files"].as_u64(), evidence_row["live"].as_u64(), evidence_row["moved"].as_u64()), (Some(4), Some(2), Some(2)));
     assert_eq!((ledger_count(repo, "evidence"), archive_count(repo, "evidence")), (2, 2), "one file per (scenario, role) cell");
@@ -234,7 +234,7 @@ fn compaction_commits_only_the_previewed_plan_and_the_old_flag_is_gone() {
     let moved = (ledger_count(repo, "evidence"), archive_count(repo, "evidence"));
     let stale = canon(repo, &["ledger", "compact", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", out(&stale));
-    assert_eq!(json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!(json(&stale)["error"]["code"], "PLAN_STALE");
     assert_eq!((ledger_count(repo, "evidence"), archive_count(repo, "evidence")), moved, "a stale digest moves nothing");
 
     assert_eq!(canon(repo, &["ledger", "compact", "--dry-run"]).status.code(), Some(2), "--dry-run is gone");

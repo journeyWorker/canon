@@ -13,7 +13,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// `(file, code, reason)`: constructions whose chain has no `.hint(` and may keep none.
-const ALLOWED: &[(&str, &str, &str)] = &[("run/entry.rs", "USAGE", "the usage error is built up across a `match` and takes its hint (a working call) on the value it returns")];
+const ALLOWED: &[(&str, &str, &str)] = &[
+    ("run/entry.rs", "USAGE", "the usage error is built up across a `match` and takes its hint (a working call) on the value it returns"),
+    ("run/entry.rs", "UNKNOWN_COMMAND", "the same `match` builds it; the hint (a working call) is put on the value it returns"),
+    ("run/entry.rs", "COMMAND_REQUIRED", "the same `match` builds it; the hint (a working call) is put on the value it returns"),
+];
 
 fn src_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")

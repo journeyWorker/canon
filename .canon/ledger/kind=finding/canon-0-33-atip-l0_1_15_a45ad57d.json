@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T16:28:51.402648Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/review_artifacts.rs:118",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "resolution_sha": "9342db524690e0b9002844541b8bb69b528373e5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "review.add.41"
+  ],
+  "schema": 2,
+  "seq": 15,
+  "severity": "should_fix",
+  "summary": "Spec fidelity: the test requires a gate line holding the scenario id, the file name and the reviewer; the Then also names the review's time, the recorded digest and what the store and working tree hold, none asserted. Not signed.",
+  "worktree_dirty": false
+}

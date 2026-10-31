@@ -444,10 +444,10 @@ canon trace add-login_1_1
 ## Read the state
 
 `canon status` lists the next steps, each with the `role` that takes it
-(`null` for the human), and `waitingOn` counts the steps held by each other
+(`null` for the human), and `data.waitingOn` counts the steps held by each other
 owner, `human` included. Call it once at the start and when resuming, not
 after a write: after `subject move --to` or a spawned role's write, the
-write's `meta.next` and `meta.waitingOn` are the status for what it touched.
+write's `meta.next` and `data.waitingOn` are the status for what it touched.
 
 ## Spawn each role
 
@@ -510,7 +510,7 @@ not sign off.
 
 ## Relay the human's answer
 
-When `status` or `meta.next` shows a step with `actor: human` (the brief's
+When `status` or `meta.next` shows a step with `x-canon.actor: human` (the brief's
 approval), stop everything for that scope and put the brief in front of the
 human in its language: `canon brief show <slug> --body` prints the brief and,
 last, its digest. Send the output to the human's own view, never retyped (omp:
@@ -563,7 +563,7 @@ holds the next command and the verified claims (`canon skills show canon-vocab`)
 After a timeout or a lost response, repeat the write only when its repeat is
 safe. `evidence add`, `review scenario`, `review change` and `finding add`
 are content-keyed: an identical repeat returns the existing record with
-`meta.unchanged: true` (a batch reports the element `unchanged`).
+`data.unchanged: true` (a batch reports the element `unchanged`).
 `finding close`, `subject adopt`, `inventory sync`, `ingest *`, `gate
 promote` and `task done` are replay-safe the same way. `subject new`,
 `change new`, `feature new`, `scenario new`, `subject move` and `dispatch
@@ -580,7 +580,7 @@ its preview, never from an old digest.
 | "The reviewer can be me under another label." | The reviewer is a separate process with its own real session id (#39). |
 | "Approve the brief; the human said they are busy." | An answer they did not give is not recorded. Show the brief, ask, and record only an explicit approval with `--relayed-via`. |
 | "Override the refusal to ship." | Fix the gap the refusal names; `--override-reason` waives only the `require_review` gaps and the brief gap, is recorded on the subject, and is for the human's call, not a shortcut. |
-| "Run the commit now, the preview looked fine earlier." | A bare run previews; `--commit --plan-digest` acts only on the plan you just previewed (`PLAN_CHANGED` otherwise). Preview again, then act. |
+| "Run the commit now, the preview looked fine earlier." | A bare run previews; `--commit --plan-digest` acts only on the plan you just previewed (`PLAN_STALE` otherwise). Preview again, then act. |
 | "I have corrected this agent before." | A correction repeated across runs belongs in a scenario, the policy or a gate, not more prose. Tell the human. |
 
 ## Move the subject
@@ -623,10 +623,10 @@ read the refusal in `error` of `canon subject move demo --to shipped --json`.
 move` and `canon migrate` delete or rewrite existing data. A bare run only
 previews: exit 0, nothing written, a report with `planDigest` and
 `effects[]`. Read the effects, then act with `--commit --plan-digest
-<planDigest>`; it refuses (`PLAN_CHANGED`, exit 2) when the plan recomputed
+<planDigest>`; it refuses (`PLAN_STALE`, exit 2) when the plan recomputed
 now differs from the one you previewed. A document passed with `--input`
 never carries `--commit` or `--plan-digest`, and these five leaves take one
-object only (`INPUT_BATCH_UNSUPPORTED`).
+object only (`INPUT_INVALID`).
 
 ```bash
 canon purge --kind session --before 2026-01-01
@@ -678,6 +678,6 @@ git-ignored, and `canon migrate --revert` needs it (keep it until you are sure).
 **Done when:** `canon migrate` reports nothing left to move, `canon skills
 check` exits 0, and `canon status` and `canon gate check` no longer warn
 about 0.27 state; read the first in `data` of `canon migrate --json`, the
-others in `meta.warnings`.
+others in `meta.warnings` (`[{code, message}]`).
 
 Reference: `canon skills show canon-subject`.

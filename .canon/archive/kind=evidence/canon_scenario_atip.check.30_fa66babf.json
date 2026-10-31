@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T14:05:56.956058Z",
+  "attachments": [
+    {
+      "case": "snapshot::tests::atip_check_30_a_snapshot_names_what_was_created_changed_and_removed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "exec::tests::atip_check_30_a_refusal_that_changes_the_directory_or_home_names_the_paths",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "atip_check_30_a_refusal_that_writes_a_file_in_the_working_directory_or_in_home_fails_and_the_report_names_the_paths",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    }
+  ],
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check; cargo nextest run -p canon-cli --test atip_check"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 73,
+  "scenario_id": "atip.check.30",
+  "schema": 1,
+  "staging_id": "22161f5e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

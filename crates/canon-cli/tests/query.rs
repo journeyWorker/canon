@@ -124,7 +124,10 @@ fn unknown_kind_is_a_clean_cli_error() {
     let output = fixture.run_canon(&["query", "--kind", "not-a-real-kind"]);
     assert!(!output.status.success());
     let stderr = support::stderr(&output);
-    assert!(stderr.contains("invalid value 'not-a-real-kind'") && stderr.contains("possible values:") && stderr.contains("trajectory"), "stderr: {stderr}");
+    assert!(stderr.starts_with("canon: USAGE: invalid value 'not-a-real-kind' for '--kind <KIND>'\n"), "stderr: {stderr}");
+    assert!(stderr.contains("\n  field: --kind\n") && stderr.contains("\n  expected: change, task, scenario,") && stderr.contains("trajectory"), "the closed set is the `expected` member: {stderr}");
+    assert!(!stderr.contains("possible values:"), "stderr: {stderr}");
+    assert!(support::stdout(&output).is_empty(), "a text-mode error leaves stdout empty");
 }
 
 /// s18 `uniform-repo-resolution` spec: "canon query with no flags resolves

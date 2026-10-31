@@ -1,0 +1,19 @@
+{
+  "ok": false,
+  "error": {
+    "code": "BATCH_INCOMPLETE",
+    "message": "item 1 of 3 failed",
+    "field": "/1",
+    "retryable": false
+  },
+  "meta": {
+    "command": "finding close",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

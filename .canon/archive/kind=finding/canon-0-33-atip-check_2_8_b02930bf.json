@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:33.220330Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.25"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "report::Report::new treats unsupported and entailed as never blocking; checker.md 2 lets entailed pass only when every rule it names passed in the same run. No L0 check produces either result, so nothing here is wrong today; 0.34 has to add that rule. Separately, the 43 scenarios and check.feature entered the repository in f5ffd465 (the atip-l0 commit), not in 25d198e7 whose message lists them.",
+  "worktree_dirty": false
+}

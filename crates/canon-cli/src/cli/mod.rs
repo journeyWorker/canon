@@ -67,9 +67,21 @@ pub use artifacts::ArtifactsCommand;
 
 use clap::{CommandFactory, Parser, Subcommand};
 
-/// The clap tree of the whole CLI.
+/// The clap tree of the whole CLI. Every node that has subcommands (the root and each
+/// group) also accepts `--json` (hidden), so a command-less call in JSON mode
+/// reaches the error that names the missing command instead of clap's
+/// "unexpected argument" (atip/1 spec 4.4, 4.5).
 pub fn command() -> clap::Command {
-    Cli::command()
+    accept_json_on_groups(Cli::command())
+}
+
+fn accept_json_on_groups(node: clap::Command) -> clap::Command {
+    let node = node.mut_subcommands(accept_json_on_groups);
+    if node.get_subcommands().next().is_some() && !node.get_arguments().any(|arg| arg.get_id() == "json") {
+        node.arg(clap::Arg::new("json").long("json").action(clap::ArgAction::SetTrue).hide(true))
+    } else {
+        node
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -347,7 +359,7 @@ pub struct InputArgs {
 /// destructive leaves (`purge`, `artifacts move`, `migrate`, `ledger compact`,
 /// `tier age`; 0.28 D6). The bare run is the preview: it prints the plan with
 /// its `planDigest`, exits 0 and writes nothing. `--commit` acts only when the
-/// plan recomputed now still has `--plan-digest` (`PLAN_CHANGED`, exit 2).
+/// plan recomputed now still has `--plan-digest` (`PLAN_STALE`, exit 2).
 /// [`SafetyArgs::mode`] is what a handler reads.
 #[derive(clap::Args, Clone, Debug, Default)]
 pub struct SafetyArgs {

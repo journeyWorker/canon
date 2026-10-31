@@ -21,7 +21,7 @@ use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, 
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 
 /// The one scenario the demo's evidence loop is keyed to — `<area>.
@@ -138,6 +138,9 @@ pub fn run_demo_review(repo: &Path, json: bool) -> u8 {
     let root = resolve_repo_root(repo);
     if !root.join("canon.yaml").exists() {
         return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo review", json);
+    }
+    if let Some(code) = crate::write_mode::refuse_unwritable(&[&ledger_root(&root)], "canon demo review", json) {
+        return code;
     }
 
     if let Err(e) = write_evidence(&root, "reviewer-agent", "reviewer") {

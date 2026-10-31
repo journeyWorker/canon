@@ -347,7 +347,7 @@ brief_override:
 Under `--json` the same waiver is `data.overrides[]` (`code` of the waived
 refusal, `reason` verbatim), so a caller sees what its `--override-reason`
 let through; a repeat of an identical record is `unchanged`
-(`meta.unchanged`) and records no second override. `--override-reason`
+(`data.unchanged`) and records no second override. `--override-reason`
 exists on `subject move` too (see `canon-subject`).
 
 A blank or multi-line reason exits 2; an override when nothing refused is

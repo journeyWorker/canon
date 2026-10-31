@@ -359,12 +359,49 @@ fn evidence_add_102_a_legacy_subject_keeps_re_verifying_its_evidenced_scenarios(
     );
 }
 
-fn warnings(out: &Output) -> Vec<String> {
+/// `meta.warnings`: `{code, message, field?}` objects, `[]` when the member is absent.
+fn warnings(out: &Output) -> Vec<Value> {
     let json: Value = serde_json::from_str(&stdout(out)).unwrap();
-    json["meta"]["warnings"]
-        .as_array()
-        .map(|w| w.iter().map(|w| w.as_str().unwrap().to_string()).collect())
-        .unwrap_or_default()
+    json["meta"].get("warnings").map(|w| w.as_array().expect("meta.warnings is an array").clone()).unwrap_or_default()
+}
+
+/// The steps `canon status` lists, from its human form, under `role` when given:
+/// `{actor, command, why}` (the human's step has no `canon` command, so the JSON
+/// form's `meta.next` does not carry it, nor any step holding a `<placeholder>`).
+fn status_steps(repo: &Path, role: Option<&str>) -> Vec<Value> {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    command.args(["status"]).current_dir(repo).env_remove("CANON_ROLE");
+    if let Some(role) = role {
+        command.env("CANON_ROLE", role);
+    }
+    let out = command.output().expect("spawn canon binary");
+    assert!(out.status.success(), "{}", stderr(&out));
+    let text = stdout(&out);
+    let Some((_, block)) = text.split_once("\nnext:\n") else { return Vec::new() };
+    let mut steps = Vec::new();
+    let mut why = None;
+    for line in block.lines() {
+        if let Some(reason) = line.strip_prefix("  # ") {
+            why = Some(reason.to_string());
+        } else if let (Some(command), Some(reason)) = (line.strip_prefix("  "), why.take()) {
+            let (actor, command) = command.strip_prefix("human: ").map_or(("agent", command), |rest| ("human", rest));
+            steps.push(serde_json::json!({"actor": actor, "command": command, "why": reason}));
+        }
+    }
+    steps
+}
+
+/// The entries of `status --json`'s `meta.next`, `[]` when the member is absent.
+fn status_entries(repo: &Path) -> Vec<Value> {
+    let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
+    status["meta"].get("next").map(|n| n.as_array().unwrap().clone()).unwrap_or_default()
+}
+
+/// The message of a coded adoption warning.
+fn adoption_warning(found: &[Value]) -> &str {
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0]["code"], "BRIEF_ADOPTION_UNAPPROVED", "{found:?}");
+    found[0]["message"].as_str().unwrap()
 }
 
 /// subject.lifecycle.35: adopting an unapproved change into a building,
@@ -408,12 +445,8 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
         ],
     );
     let found = warnings(&out);
-    assert_eq!(found.len(), 1, "{found:?}");
-    assert!(
-        found[0].contains("canon subject unadopt s --change a")
-            && found[0].contains("cannot ship"),
-        "{found:?}"
-    );
+    let message = adoption_warning(&found);
+    assert!(message.contains("canon subject unadopt s --change a") && message.contains("cannot ship"), "{found:?}");
     assert!(stderr(&out).is_empty(), "JSON mode writes nothing to stderr: {}", stderr(&out));
 
     // `subject adopt` warns the same way; an approved brief does not.
@@ -441,7 +474,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
         repo2,
         &["subject", "adopt", "s", "--change", "c", "--json"],
     );
-    assert_eq!(warnings(&out).len(), 1, "{}", stdout(&out));
+    adoption_warning(&warnings(&out));
     ok(repo2, &["subject", "unadopt", "s", "--change", "c"]);
     std::fs::write(brief_path(repo2, "c"), brief("")).unwrap();
     ok(
@@ -490,7 +523,11 @@ fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
     );
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(json["meta"]["command"], "subject unadopt");
-    assert!(json["meta"]["next"].is_array(), "{json}");
+    // The remaining steps hold placeholders, so no entry: the member is absent, never `[]`.
+    let next: Vec<Value> = json["meta"].get("next").map(|n| n.as_array().expect("meta.next is an array").clone()).unwrap_or_default();
+    let status: Vec<Value> = status_entries(repo).into_iter().filter(|s| s["reason"].as_str().unwrap().starts_with("s:")).collect();
+    assert_eq!(next, status, "{json}");
+    assert!(json["meta"]["next"].as_array().is_none_or(|next| !next.is_empty()), "never an empty `meta.next`: {json}");
     let records = |kind: &str| -> Vec<Value> {
         serde_json::from_str::<Value>(&stdout(&ok(repo, &["query", "--kind", kind, "--json"])))
             .unwrap()["data"]["records"]
@@ -659,11 +696,11 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_war
         &["change", "new", "a", "--subject", "s", "--title", "A", "--json"],
     );
     let found = warnings(&out);
-    assert_eq!(found.len(), 1, "{found:?}");
+    let message = adoption_warning(&found);
     assert!(
-        found[0].contains("is shipped")
-            && found[0].contains("can still be reopened and shipped for its approved scope")
-            && found[0].contains("canon subject unadopt s --change a"),
+        message.contains("is shipped")
+            && message.contains("can still be reopened and shipped for its approved scope")
+            && message.contains("canon subject unadopt s --change a"),
         "{found:?}"
     );
 }
@@ -768,22 +805,27 @@ fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
     // An unfilled brief skeleton: blockers.
     ok(repo, &["change", "new", "b", "--subject", "s", "--title", "B"]);
 
-    let steps = |repo: &Path| -> Vec<Value> {
-        let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
-        status["meta"]["next"].as_array().unwrap().clone()
-    };
+    // The human form lists every step (the human's report step is no canon command,
+    // `subject move` holds `<placeholder>` words); `meta.next` carries the runnable ones.
+    let steps = |repo: &Path| status_steps(repo, None);
     let has = |steps: &[Value], prefix: &str| steps.iter().any(|s| s["command"].as_str().unwrap().starts_with(prefix));
 
     let blocked = steps(repo);
     assert!(has(&blocked, "canon brief check b"), "{blocked:?}");
     assert!(!has(&blocked, "show the pending draft's brief"), "{blocked:?}");
     assert!(has(&blocked, "canon subject move s --to shipped"), "{blocked:?}");
+    let entries = status_entries(repo);
+    assert_eq!(entries.len(), 1, "only the check is runnable as printed: {entries:?}");
+    assert_eq!(entries[0]["command"], "canon brief check b --json");
+    assert_eq!(entries[0]["argv"], serde_json::json!(["brief", "check", "b", "--json"]));
+    assert_eq!(entries[0]["x-canon"], serde_json::json!({"actor": "agent", "role": "planner"}));
 
     std::fs::write(brief_path(repo, "b"), brief("")).unwrap();
     let clean = steps(repo);
     assert!(has(&clean, "show the pending draft's brief in .canon/changes/b/brief.md to the human and ask; s is not blocked meanwhile"), "{clean:?}");
     assert!(!has(&clean, "canon brief check"), "{clean:?}");
     assert!(has(&clean, "canon subject move s --to shipped"), "{clean:?}");
+    assert!(status_entries(repo).is_empty(), "no step of a clean draft is a runnable canon command");
 }
 
 /// A subject that shipped with approved `a`, then adopted a draft `b`
@@ -923,13 +965,14 @@ fn context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_re
     ok(repo, &["change", "new", "b", "--subject", "s", "--title", "B"]);
     std::fs::write(brief_path(repo, "b"), brief("").replace(" ==**F1 is the happy path.**==", "")).unwrap();
 
-    let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
-    let steps = status["meta"]["next"].as_array().unwrap();
+    let steps = status_steps(repo, None);
     let position = |needle: &str| steps.iter().position(|s| s["command"].as_str().unwrap().contains(needle));
     let polish = position("canon skills show brief-polish").unwrap_or_else(|| panic!("{steps:?}"));
     let report = position("show the pending draft's brief").unwrap_or_else(|| panic!("{steps:?}"));
     assert_eq!(report, polish + 1, "{steps:?}");
-    assert_eq!(steps[polish]["role"], "planner");
+    assert_eq!((steps[polish]["actor"].as_str(), steps[report]["actor"].as_str()), (Some("agent"), Some("human")), "{steps:?}");
+    // The role is not printed: the planner's step is the one a planner is left with.
+    assert!(status_steps(repo, Some("planner")).iter().any(|s| s == &steps[polish]), "the polish step is the planner's");
     assert!(steps[polish]["command"].as_str().unwrap().contains("`canon brief check b`"), "{}", steps[polish]);
     let why = steps[polish]["why"].as_str().unwrap();
     assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence") && why.contains("not blocked meanwhile"), "{why}");

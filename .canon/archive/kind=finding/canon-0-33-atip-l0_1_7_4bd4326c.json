@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-l0",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-l0-rev"
+  },
+  "at": "2026-10-31T14:50:13.274582Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "28574880f3865aefde48bc190db4f4b932b0f7e3",
+  "reviewer": "rev-atip-l0",
+  "round": 1,
+  "scenario_ids": [
+    "atip.l0.18"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "Contract 7.4.1 vs text mode: a failure that carries a report (exit 1: `canon gate check` GATE_VIOLATIONS, `canon brief check` BRIEF_HAS_BLOCKERS) prints the report on stdout and nothing on stderr, no `canon: CODE: message` line, while refusals follow the new form. Scenario atip.l0.18 and the brief limit the form to refusals, so the bound test passes; the contract says an error is printed on stderr with stdout empty. Blast radius: every exit-1 command that prints a human report.",
+  "worktree_dirty": false
+}

@@ -33,11 +33,11 @@ function runWithStubExit(code: number | "signal"): { status: number | null } {
 }
 
 describe.skipIf(process.platform === "win32")("launcher exit status", () => {
-  test.each([0, 1, 2, 3])("passes the native binary's exit code %d through", (code) => {
+  test.each([0, 1, 2])("passes the native binary's exit code %d through", (code) => {
     expect(runWithStubExit(code).status).toBe(code);
   });
 
-  test("a binary killed by a signal reads as failure, never success", () => {
-    expect(runWithStubExit("signal").status).toBe(1);
+  test("a binary killed by a signal exits 128+n (SIGKILL: 137), never canon's 1 and never success", () => {
+    expect(runWithStubExit("signal").status).toBe(137);
   });
 });

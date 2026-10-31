@@ -136,6 +136,13 @@ fn scenario_new_emits_leading_provenance_subject_lane_and_actor() {
     assert!(out.status.success(), "scenario new failed: {}", stderr(&out));
     let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let content = std::fs::read_to_string(path).unwrap();
+    // Stamped to the whole second: every provenance `at` is `YYYY-MM-DDTHH:MM:SSZ`, no fraction.
+    let stamps: Vec<&str> = content.split("\"at\":\"").skip(1).map(|rest| rest.split('"').next().unwrap()).collect();
+    assert_eq!(stamps.len(), 2, "{content}");
+    for stamp in stamps {
+        let bytes = stamp.as_bytes();
+        assert!(stamp.len() == 20 && stamp.ends_with('Z') && bytes[10] == b'T' && bytes[19] == b'Z' && !stamp.contains('.'), "provenance time is whole-second: {stamp}");
+    }
     let normalized = normalize_provenance_timestamps(&content);
     assert_eq!(
         normalized,
@@ -157,6 +164,20 @@ fn scenario_new_uses_canon_actor_environment_when_flag_is_absent() {
     let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let content = std::fs::read_to_string(path).unwrap();
     assert!(content.contains("\"agent_id\":\"env-agent\""), "{content}");
+
+    // With neither flag nor environment the actor is the scaffold's own fixed id.
+    let bare = tempfile::tempdir().unwrap();
+    write_canon_yaml(bare.path());
+    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["scenario", "new", "world.checkout.01", "--title", "Start checkout"])
+        .env_remove("CANON_ACTOR")
+        .current_dir(bare.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "scenario new failed: {}", stderr(&out));
+    let content = std::fs::read_to_string(bare.path().join(".canon/specs/kind=feature/area=world/checkout.feature")).unwrap();
+    assert!(content.contains("\"agent_id\":\"canon-scaffold\""), "{content}");
+    assert!(!content.contains("env-agent"), "{content}");
 }
 
 #[test]
@@ -249,7 +270,7 @@ fn inventory_sync_materializes_exactly_the_tagged_scenario_identical_to_a_hand_a
 // ── the provenance lines survive filling in a scenario (#64) ──
 
 /// `scenario new` says to keep the `# canon:` lines: on stdout for a human,
-/// in `meta.note` for `--json`.
+/// in `data.note` for `--json`.
 #[test]
 fn scenario_new_says_to_keep_the_provenance_lines() {
     let dir = tempfile::tempdir().unwrap();
@@ -259,7 +280,8 @@ fn scenario_new_says_to_keep_the_provenance_lines() {
 
     let json = run_canon(&["scenario", "new", "world.checkout.02", "--title", "Pay", "--json"], dir.path());
     let envelope: Value = serde_json::from_str(&stdout(&json)).unwrap();
-    assert!(envelope["meta"]["note"].as_str().is_some_and(|note| note.contains("keep the `# canon: {...}` provenance lines")), "{envelope}");
+    assert!(envelope["data"]["note"].as_str().is_some_and(|note| note.contains("keep the `# canon: {...}` provenance lines")), "{envelope}");
+    assert!(envelope["meta"].get("note").is_none(), "`note` is a report member, not a flat `meta` one: {envelope}");
 }
 
 /// A scenario file whose provenance line was edited away aborts
@@ -336,6 +358,7 @@ fn feature_new_against_an_already_existing_file_is_rejected_loud_with_the_file_u
 
     let path = dir.path().join(".canon/specs/kind=feature/area=world/checkout.feature");
     let bytes_after_first = std::fs::read(&path).unwrap();
+    let listing_after_first = files_under(dir.path());
 
     let second = feature_new(dir.path(), "world.checkout", "A completely different title");
     assert!(!second.status.success(), "an existing feature file must be rejected loud (nonzero exit)");
@@ -344,6 +367,8 @@ fn feature_new_against_an_already_existing_file_is_rejected_loud_with_the_file_u
 
     let bytes_after_second = std::fs::read(&path).unwrap();
     assert_eq!(bytes_after_first, bytes_after_second, "a rejected `canon feature new` must leave the existing file byte-for-byte unchanged");
+    assert!(!String::from_utf8_lossy(&bytes_after_second).contains("A completely different title"), "the new title never half-landed");
+    assert_eq!(files_under(dir.path()), listing_after_first, "no temp or sibling file was left behind by the refused create");
 }
 
 // ── s19 `derived-validated-scenario-feature`: --feature is optional, tag-derived, validated ──
@@ -364,6 +389,15 @@ fn omitting_feature_derives_the_identical_path_feature_new_would_scaffold() {
     let content = std::fs::read_to_string(&path).unwrap();
     assert!(content.starts_with("Feature: world hotdeal\n"), "content: {content:?}");
     assert!(content.contains("@world.hotdeal.42"), "content missing the tag: {content:?}");
+
+    // The same path `canon feature new` produces for that area and surface, observed from its own output.
+    let other = tempfile::tempdir().unwrap();
+    write_canon_yaml(other.path());
+    let scaffolded = feature_new(other.path(), "world.hotdeal", "Hotdeal");
+    assert!(scaffolded.status.success(), "{}", stderr(&scaffolded));
+    let relative = |root: &Path| -> Vec<std::path::PathBuf> { files_under(root).into_iter().map(|p| p.strip_prefix(root).unwrap().to_path_buf()).filter(|p| p.extension().is_some_and(|e| e == "feature")).collect() };
+    assert_eq!(relative(dir.path()), relative(other.path()), "`scenario new` without --feature writes the file `feature new` scaffolds");
+    assert_eq!(relative(other.path()), vec![std::path::PathBuf::from(HOTDEAL_FEATURE_PATH)]);
 }
 
 #[test]
@@ -451,6 +485,14 @@ fn feature_new_prints_a_next_step_hint_and_fmt_check_reports_the_wip_stub_wordin
         report.contains("empty feature stub (not yet a valid corpus entry)"),
         "expected the reworded WIP-stub violation text in `canon format`'s report: {report}"
     );
+
+    // Running the printed invocation (its tag taken from the hint, the `<label>` placeholder filled) turns the stub clean.
+    let printed = hint.split("`canon scenario new ").nth(1).and_then(|rest| rest.split_whitespace().next()).expect("the hint carries the first derived tag");
+    assert_eq!(printed, "world.hotdeal.01");
+    let run = scenario_new_no_feature(dir.path(), printed, "First hotdeal scenario");
+    assert!(run.status.success(), "the printed invocation must run: {}", stderr(&run));
+    let clean = run_canon(&["format", ".canon/specs"], dir.path());
+    assert!(clean.status.success(), "running the printed invocation makes the stub fmt-clean: {}{}", stdout(&clean), stderr(&clean));
 }
 
 // ── s19 review nit: `specs` vs `specs2` is a SIBLING, not a prefix ──

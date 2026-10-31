@@ -34,13 +34,13 @@ Feature: query read
   @subject:query-reads
   @case:edge
   @query.read.04
-  Scenario: A review's natural key carries the pinned commit, so two attestations at two pins are two records
+  Scenario: A review's natural key leaves out the pinned commit, so two attestations at two pins are two records under one key
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a review attesting one scenario of one project at one pinned commit
     When its natural key is resolved
-    Then the key is the project, the scenario and the pin joined together
-    And two attestations of the same scenario at two commits are two distinct keys, not two versions of one
-    And a review query returns both attestations, because reviews are never folded by key and so neither is dropped as a stale version
+    Then the key is the project, the scenario kind and the scenario id joined, without the pin
+    And two attestations of the same scenario at two commits are two records under one key, told apart by digest, with the pin kept in the body
+    And the default review query returns the one in-effect review of that reviewer, and `--history` returns both attestations
 
   @subject:query-reads
   @case:edge

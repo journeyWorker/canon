@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "error": {
+    "code": "USAGE",
+    "message": "unexpected argument '--bogus' found",
+    "field": "--bogus",
+    "hint": null,
+    "retryable": false
+  },
+  "meta": {
+    "command": "status",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

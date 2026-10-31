@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:54.957237Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "kind": "review",
+  "pin": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_12_l0_bare_fails_when_a_call_with_no_command_is_not_command_required"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "8f2d67c95a0243f604a47661712187fb839d45bae948bff3fe50784b3a7b5562",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-check/brief.md"
+  },
+  "review_id": "01M696HXRD8XNXX3630HR94J8Y",
+  "reviewer": "rev-atip-check",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.check.12",
+  "schema": 2,
+  "worktree_dirty": false
+}

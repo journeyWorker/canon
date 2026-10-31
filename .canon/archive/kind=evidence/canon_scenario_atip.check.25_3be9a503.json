@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T14:05:56.956058Z",
+  "attachments": [
+    {
+      "case": "report::tests::atip_check_25_a_level_is_met_unless_a_must_check_fails_or_is_unprovided",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    },
+    {
+      "case": "atip_check_25_a_fixture_without_a_probe_or_a_registry_leaves_the_checks_that_need_them_unprovided_and_fails_the_level",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "b7fb7541e09865039bd2e105b80c3a6415895e50c3055e4ebf7a3c74795d2070"
+    }
+  ],
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check; cargo nextest run -p canon-cli --test atip_check"
+  },
+  "evidence_sha": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 68,
+  "scenario_id": "atip.check.25",
+  "schema": 1,
+  "staging_id": "bb51a316",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

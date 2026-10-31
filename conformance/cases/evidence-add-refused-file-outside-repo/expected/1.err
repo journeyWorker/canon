@@ -1,2 +1,3 @@
-canon evidence add: EVIDENCE_BIND_REFUSED — /etc/hosts is outside the repository; bound files are recorded by repository-relative path
-hint: copy the file anywhere under the repository and bind that path; canon stores the bytes under .canon/artifacts/sha256 either way
+canon: EVIDENCE_BIND_REFUSED: /etc/hosts is outside the repository; bound files are recorded by repository-relative path
+  field: --artifact
+  hint: copy the file anywhere under the repository and bind that path; canon stores the bytes under .canon/artifacts/sha256 either way

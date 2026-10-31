@@ -1,2 +1,2 @@
-canon init: INIT_INVALID_ARGUMENT — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none
-hint: `canon schema init` lists the accepted arguments and their forms
+canon: INIT_INVALID_ARGUMENT: invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none
+  hint: `canon schema init` lists the accepted arguments and their forms

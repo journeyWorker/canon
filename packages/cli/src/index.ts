@@ -17,6 +17,7 @@
 // priority explicit and structural rather than incidental.
 import { spawnSync, execSync } from "node:child_process";
 import { existsSync, readdirSync, realpathSync } from "node:fs";
+import { constants as osConstants } from "node:os";
 import { resolve, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -271,9 +272,14 @@ const result = spawnSync(binary, process.argv.slice(2), {
 });
 
 // The launcher IS the `canon` users run, so the native binary's exit code
-// must survive it: scripts, CI, and hooks read only the status. A spawn
-// failure or signal death has no status and must still read as failure.
+// must survive it: scripts, CI, and hooks read only the status. canon's own
+// exits are 0, 1 and 2 (atip/1 spec 8); a signal death has no status and
+// reads as 128+n, the shell's spelling of it (spec 8.4), never as canon's 1.
+// A spawn failure has neither and still reads as failure.
 if (result.error) {
   console.error(`canon: failed to run ${binary}: ${result.error.message}`);
+}
+if (result.status === null && result.signal) {
+  process.exit(128 + (osConstants.signals[result.signal] ?? 0));
 }
 process.exit(result.status ?? 1);

@@ -129,7 +129,7 @@ fn init_rerun_with_no_agents_md_leaves_an_existing_canon_yaml_alone_and_reports_
     assert_eq!(out.status.code(), Some(0), "with nothing to refresh, a rerun is a no-op: {}", stderr(&out));
     let json = run_canon(&["init", "--repo", ".", "--no-agents-md", "--json"], dir.path());
     let body: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
-    assert_eq!(body["meta"]["unchanged"], true, "{body}");
+    assert_eq!(body["data"]["unchanged"], true, "{body}");
     assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), before, "the existing file's bytes must be byte-identical before and after the rerun");
     assert!(!dir.path().join("AGENTS.md").exists());
     assert_eq!(std::fs::read_to_string(dir.path().join(".gitignore")).unwrap(), CANON_GITIGNORE);
@@ -196,6 +196,9 @@ fn init_refuses_an_agents_md_with_an_unclosed_canon_block_and_writes_nothing() {
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(stderr(&out).contains("<!-- canon:end -->"), "{}", stderr(&out));
     assert!(!dir.path().join("canon.yaml").exists(), "a refused init writes nothing");
+    let mut names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    names.sort();
+    assert_eq!(names, ["AGENTS.md"], "no other file or directory exists after the refusal");
     assert_eq!(std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap(), "<!-- canon:begin -->\nno end marker\n");
 }
 
@@ -265,6 +268,8 @@ fn init_starter_policy_makes_the_gate_report_an_unevidenced_scenario() {
     let empty = run_canon(&["gate", "check"], dir.path());
     assert_eq!(empty.status.code(), Some(1), "{}{}", stdout(&empty), stderr(&empty));
     assert!(!stdout(&empty).contains("violation(s)"), "an empty corpus has no violation, it is unverifiable: {}", stdout(&empty));
+    assert!(!stdout(&empty).contains("is not a known top-level policy.yaml key"), "the loader reports no unknown-key diagnostic on the starter policy: {}", stdout(&empty));
+    assert!(!format!("{}{}", stdout(&empty), stderr(&empty)).contains("policy unreadable"), "the starter policy is readable: {}{}", stdout(&empty), stderr(&empty));
 
     let scenario = run_canon(&["scenario", "new", "cart.add.01", "--title", "An out-of-stock item is refused", "--case", "failure"], dir.path());
     assert!(scenario.status.success(), "{}", stderr(&scenario));
@@ -416,7 +421,8 @@ fn init_then_ingest_plans_exits_0_as_a_clean_no_op() {
     let body: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
     let payload = &body["data"];
     assert_eq!(body["meta"]["command"], "ingest plans", "{body}");
-    assert!(body["meta"]["next"].is_array(), "a write names what follows: {body}");
+    assert_eq!(payload["unchanged"], true, "a clean no-op says so in data, and names no next step: {body}");
+    assert!(body["meta"].get("next").is_none(), "{body}");
     assert_eq!(payload["sources"].as_array().map(Vec::len), Some(0), "no external source and no .canon/changes yet: {payload}");
     assert_eq!(payload["changesPersisted"], 0, "{payload}");
 }
@@ -687,12 +693,12 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
 
     let out = init_with_source(&["--providers", "claude,gemini"], &repo, &source);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert_eq!(stderr(&out), "canon init: INIT_INVALID_ARGUMENT — invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none\nhint: `canon schema init` lists the accepted arguments and their forms\n");
+    assert_eq!(stderr(&out), "canon: INIT_INVALID_ARGUMENT: invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none\n  hint: `canon schema init` lists the accepted arguments and their forms\n");
     assert_eq!(std::fs::read_dir(&repo).unwrap().count(), 0, "nothing is written");
 }
 
 /// authoring.init.95: when the skill source is missing, init still
-/// records the choice, then exits 2 naming the install to run.
+/// records the choice, then exits 1 naming the install to run.
 #[test]
 fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry() {
     let tmp = tempfile::tempdir().unwrap();
@@ -700,7 +706,7 @@ fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry(
     std::fs::create_dir_all(repo.join(".pi")).unwrap();
 
     let out = init_with_source(&[], &repo, &tmp.path().join("missing"));
-    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
     assert!(stderr(&out).contains("INIT_SKILL_INSTALL_FAILED"), "{}", stderr(&out));
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [pi]\n"));
     assert!(projected(&repo).is_empty());

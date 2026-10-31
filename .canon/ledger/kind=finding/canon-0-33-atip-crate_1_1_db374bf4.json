@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-crate",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-crate-rev"
+  },
+  "at": "2026-10-31T12:04:08.950381Z",
+  "change_id": "canon-0-33-atip-crate",
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "bc73b3a2c0f824de97c7946345d7e98adfb5316e",
+  "reviewer": "rev-atip-crate",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards pass, brief Check \"canon gate check passes at the same commit\" is not met at bc73b3a2: gate check is red with 352 stale-evidence (53 commits behind HEAD, max_commits_behind=50; gate check at v0.32.0 is clean). The 352 are the scenarios whose latest evidence is the 2026-10-27 test-command records (code_tree 49ce3e80); the commit-bc73b3a2 rerun bound 471 scenarios (434 junit case-named + 37 test-command re-records) and left these 352 on their old command-bound records. Not caused by the refactor itself (the plan/reopen commits pushed the count past 50), but the check is literal. Re-record them by their own test commands (as done for the 37) or have the orchestrator decide it is a release-time step. Blast radius: unreviewed-promotion for the chore is the only other violation and is this review. The count grows with every L0/check commit.",
+  "worktree_dirty": false
+}

@@ -36,8 +36,9 @@ fn paging_with_next_cursor_yields_exactly_the_all_set_in_order() {
     let fixture = five_trajectories();
     let all = json(&fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--all"]));
     assert_eq!(rewards(&all), vec![0.1, 0.2, 0.3, 0.4, 0.5]);
-    assert_eq!(all["meta"]["hasMore"], false);
-    assert!(all["meta"]["nextCursor"].is_null());
+    assert!(all["meta"]["page"].get("nextCursor").is_none(), "the whole set has no next page: {all}");
+    assert_eq!(all["meta"]["page"]["returned"], 5);
+    assert!(all["meta"].get("hasMore").is_none() && all["meta"].get("nextCursor").is_none(), "hasMore and the flat paging members are gone: {all}");
 
     let mut paged = Vec::new();
     let mut cursor: Option<String> = None;
@@ -49,18 +50,21 @@ fn paging_with_next_cursor_yields_exactly_the_all_set_in_order() {
         }
         let page = json(&fixture.run_canon(&args));
         pages += 1;
-        assert_eq!(page["meta"]["returned"], page["data"]["records"].as_array().unwrap().len());
-        assert_eq!(page["meta"]["total"], 5);
+        assert_eq!(page["meta"]["page"]["returned"], page["data"]["records"].as_array().unwrap().len());
+        assert_eq!(page["meta"]["page"]["total"], 5);
+        assert!(page["meta"].get("hasMore").is_none() && page["meta"].get("returned").is_none() && page["meta"].get("total").is_none(), "{page}");
         paged.extend(rewards(&page));
-        match page["meta"]["nextCursor"].as_str() {
+        match page["meta"]["page"]["nextCursor"].as_str() {
             Some(next) => {
-                assert_eq!(page["meta"]["hasMore"], true);
+                // The next page is the same call plus `--cursor <nextCursor>`.
+                let step = page["meta"]["next"].as_array().and_then(|steps| steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w == "--cursor")))).unwrap_or_else(|| panic!("a next page is a next step: {page}"));
+                let argv: Vec<&str> = step["argv"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
+                let at = argv.iter().position(|w| *w == "--cursor").unwrap();
+                assert_eq!(argv[at + 1], next, "{step}");
+                assert_eq!(argv[0], "query", "{step}");
                 cursor = Some(next.to_string());
             }
-            None => {
-                assert_eq!(page["meta"]["hasMore"], false);
-                break;
-            }
+            None => break,
         }
     }
     assert_eq!(pages, 3);
@@ -89,15 +93,15 @@ fn a_cursor_from_another_listing_or_garbage_is_refused() {
     fixture.plant_handoff_in_git("20260713-0900-first-topic-a1a1", "a", Utc::now());
     fixture.plant_handoff_in_git("20260713-0901-second-topic-b2b2", "b", Utc::now() + Duration::seconds(1));
     let page = json(&fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "2"]));
-    let cursor = page["meta"]["nextCursor"].as_str().unwrap().to_string();
+    let cursor = page["meta"]["page"]["nextCursor"].as_str().unwrap().to_string();
 
     let other_kind = fixture.run_canon(&["query", "--kind", "handoff", "--json", "--limit", "1", "--cursor", &cursor]);
     assert_eq!(other_kind.status.code(), Some(2));
-    assert_eq!(error_code(&other_kind), "INVALID_CURSOR");
+    assert_eq!(error_code(&other_kind), "CURSOR_INVALID");
 
     let garbage = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--cursor", "not-a-cursor"]);
     assert_eq!(garbage.status.code(), Some(2));
-    assert_eq!(error_code(&garbage), "INVALID_CURSOR");
+    assert_eq!(error_code(&garbage), "CURSOR_INVALID");
 }
 
 #[test]
@@ -112,7 +116,8 @@ fn fields_projects_records_and_an_unknown_field_is_refused() {
 
     let bad = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--fields", "reward,nope"]);
     assert_eq!(bad.status.code(), Some(2));
-    assert_eq!(error_code(&bad), "UNKNOWN_FIELD");
+    assert_eq!(error_code(&bad), "USAGE");
+    assert_eq!(json(&bad)["error"]["field"], "--fields");
     assert!(json(&bad)["error"]["message"].as_str().unwrap().contains("nope"));
 }
 
@@ -137,7 +142,8 @@ fn fields_match_in_either_case_style_and_an_unknown_one_gets_suggestions() {
     let bad = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--fields", "rewrd"]);
     assert_eq!(bad.status.code(), Some(2));
     let body = json(&bad);
-    assert_eq!(body["error"]["code"], "UNKNOWN_FIELD");
+    assert_eq!(body["error"]["code"], "USAGE");
+    assert_eq!(body["error"]["field"], "--fields");
     assert!(body["error"]["suggestions"].as_array().unwrap().iter().any(|s| s == "reward"), "{body}");
 }
 
@@ -169,7 +175,7 @@ fn purge_preview_then_commit_deletes_and_a_stale_digest_deletes_nothing() {
     // The one step after a preview is the exact commit, digest filled in.
     assert_eq!(preview_body["meta"]["command"], "purge", "{preview_body}");
     let repo = fixture.root.path().display().to_string();
-    let expected = ["canon", "purge", "--kind", "trajectory", "--before", before.as_str(), "--repo", repo.as_str(), "--commit", "--plan-digest", digest.as_str(), "--json"];
+    let expected = ["purge", "--kind", "trajectory", "--before", before.as_str(), "--repo", repo.as_str(), "--commit", "--plan-digest", digest.as_str(), "--json"];
     assert_eq!(preview_body["meta"]["next"][0]["argv"], serde_json::json!(expected), "{preview_body}");
     assert_eq!(fixture.git_file_count(), 2, "a preview deletes nothing");
     assert!(!fixture.root.path().join(canon_model::paths::ACCESS_AUDIT_FILE).exists(), "a preview writes no audit line");
@@ -178,7 +184,7 @@ fn purge_preview_then_commit_deletes_and_a_stale_digest_deletes_nothing() {
     fixture.plant_trajectory_in_git(Utc::now() - Duration::days(3), 0.3);
     let stale = fixture.run_canon(&purge_args(&before, &["--commit", "--plan-digest", &digest]));
     assert_eq!(stale.status.code(), Some(2));
-    assert_eq!(error_code(&stale), "PLAN_CHANGED");
+    assert_eq!(error_code(&stale), "PLAN_STALE");
     assert_eq!(fixture.git_file_count(), 3, "a stale digest deletes nothing");
 
     let replan = fixture.run_canon(&purge_args(&before, &[]));
@@ -190,7 +196,8 @@ fn purge_preview_then_commit_deletes_and_a_stale_digest_deletes_nothing() {
     let committed_body = json(&committed);
     assert_eq!(committed_body["data"]["planDigest"], fresh.as_str(), "{committed_body}");
     assert_eq!(committed_body["data"]["committed"], true, "{committed_body}");
-    assert!(committed_body["meta"]["next"].is_array(), "a committed purge is a write: {committed_body}");
+    assert!(committed_body["meta"].get("next").is_none_or(Value::is_array), "a committed purge names what follows in meta.next, or nothing: {committed_body}");
+    assert!(committed_body["data"].get("unchanged").is_none(), "the first commit changed things: {committed_body}");
 }
 
 #[test]
@@ -237,6 +244,6 @@ fn replacing_a_matching_record_with_another_at_equal_count_is_plan_changed() {
 
     let out = fixture.run_canon(&purge_args(&before, &["--commit", "--plan-digest", &digest]));
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(error_code(&out), "PLAN_CHANGED");
+    assert_eq!(error_code(&out), "PLAN_STALE");
     assert_eq!(fixture.git_file_count(), 2, "nothing was deleted");
 }

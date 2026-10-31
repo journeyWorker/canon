@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T14:41:54.957237Z",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "kind": "review",
+  "pin": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_25_a_fixture_without_a_probe_or_a_registry_leaves_the_checks_that_need_them_unprovided_and_fails_the_level",
+          "junit:report::tests::atip_check_25_a_level_is_met_unless_a_must_check_fails_or_is_unprovided"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "72a0ad7d020792b09c0365865031903e732d3a242b2db63440fe0f4162b5bf82",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-check/brief.md"
+  },
+  "review_id": "01M696HXRD8XNXX3630HR94J8Y",
+  "reviewer": "rev-atip-check",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.check.25",
+  "schema": 2,
+  "worktree_dirty": false
+}

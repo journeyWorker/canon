@@ -8,13 +8,17 @@
 //! the next step. canon never runs a step; `actor: human` marks the ones
 //! only a human takes.
 //!
-//! JSON mode puts them in `meta.next` (`[{command, argv, why, actor, role}]`,
-//! at most [`NEXT_LIMIT`]; `meta.nextOmitted` counts the rest; `argv` is
-//! `command` split like a shell would, empty for a step that is not a canon
-//! command line). Human
-//! mode ends with one `next: <command> — <why>` line and `(+N more)`.
+//! JSON mode puts them in `meta.next` (`[{command, argv, reason, x-canon}]`,
+//! at most [`NEXT_LIMIT`]; `data.nextOmitted` counts the rest). `argv` is the
+//! command without the executable, every word literal, with `--json` when the
+//! run is in JSON mode and the next command takes it; `x-canon` carries who
+//! takes the step (`actor`, `role`). A step that still holds a `<placeholder>`
+//! for a value only the agent knows is not an entry (the guidance is the
+//! error's `hint` or the report's text), and neither is a step that is not a
+//! canon command line. Human mode ends with one `next: <command> — <why>`
+//! line and `(+N more)`.
 //! With a declared role ([`Role::current`]) only that role's steps are
-//! kept and the rest are counted per role (`meta.waitingOn`,
+//! kept and the rest are counted per role (`data.waitingOn`,
 //! `waiting on reviewer: 2`), as in `canon status`.
 //!
 //! # Scope
@@ -31,7 +35,6 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -39,84 +42,72 @@ use crate::json_out::Report;
 use crate::role::Role;
 use crate::status::{self, NextStep, StatusReport, StepActor, NEXT_LIMIT};
 
-/// One `meta.next` entry: a step with its command split for a caller that
-/// runs it without a shell.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+/// One `meta.next` entry: a runnable step (spec 6.8).
+#[derive(Debug, Clone, Serialize)]
 pub struct NextEntry {
-    /// A canon command line when `actor` is `agent`; what to get from the human when it is `human`.
+    /// The whole invocation as one display string: `canon` and the words of `argv`, quoted as a shell would.
     pub command: String,
-    /// `command` split into its words (`["canon", "gate", "check"]`); empty when `command` is not a canon command line, or still holds a `<placeholder>` for what only the agent knows (T14: `argv` is always runnable).
+    /// The invocation without the executable; every word is literal.
     pub argv: Vec<String>,
-    pub why: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(rename = "x-canon", skip_serializing_if = "Option::is_none")]
+    pub x_canon: Option<NextExt>,
+}
+
+/// What canon adds to a next step: who takes it.
+#[derive(Debug, Clone, Serialize)]
+pub struct NextExt {
+    /// `agent`, or `human` for the one step only a human takes.
     pub actor: StepActor,
-    /// Who in the role set carries the step out; `null` for a step only the human takes.
+    /// Who in the role set carries the step out; absent for a step only the human takes.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<Role>,
 }
 
-impl From<&NextStep> for NextEntry {
-    fn from(step: &NextStep) -> Self {
-        let argv = if step.actor == StepActor::Agent && step.command.starts_with("canon ") && !has_placeholder(&step.command) { split_argv(&step.command) } else { Vec::new() };
-        Self { command: step.command.clone(), argv, why: step.why.clone(), actor: step.actor, role: step.role }
-    }
-}
+/// The clap tree, built once: which commands take `--json`.
+static TREE: std::sync::LazyLock<clap::Command> = std::sync::LazyLock::new(|| {
+    let mut tree = crate::cli::command();
+    tree.build();
+    tree
+});
 
-/// Whether `command` still holds a `<placeholder>`: a `<` opening a word and a later `>`.
-pub fn has_placeholder(command: &str) -> bool {
-    command.match_indices('<').any(|(at, _)| command[at + 1..].starts_with(|c: char| c.is_ascii_alphabetic()) && command[at..].contains('>'))
-}
-
-/// `command` split into words the way a POSIX shell would: whitespace
-/// separates, single quotes keep everything, double quotes keep everything but
-/// `\"` and `\\`.
-pub fn split_argv(command: &str) -> Vec<String> {
-    let mut words = Vec::new();
-    let mut word = String::new();
-    let mut started = false;
-    let mut chars = command.chars();
-    while let Some(c) = chars.next() {
-        match c {
-            c if c.is_whitespace() => {
-                if started {
-                    words.push(std::mem::take(&mut word));
-                    started = false;
-                }
-            }
-            '\'' => {
-                started = true;
-                for q in chars.by_ref() {
-                    if q == '\'' {
-                        break;
-                    }
-                    word.push(q);
-                }
-            }
-            '"' => {
-                started = true;
-                while let Some(q) = chars.next() {
-                    match q {
-                        '"' => break,
-                        '\\' => match chars.next() {
-                            Some(e @ ('"' | '\\')) => word.push(e),
-                            Some(other) => {
-                                word.push('\\');
-                                word.push(other);
-                            }
-                            None => word.push('\\'),
-                        },
-                        other => word.push(other),
-                    }
-                }
-            }
-            other => {
-                started = true;
-                word.push(other);
-            }
+/// Whether the command `words` names takes `--json`.
+fn takes_json(words: &[String]) -> bool {
+    let mut node: &clap::Command = &TREE;
+    for word in words.iter().take_while(|word| *word != "--").filter(|word| !word.starts_with('-')) {
+        match node.find_subcommand(word) {
+            Some(child) => node = child,
+            None => break,
         }
     }
-    if started {
-        words.push(word);
+    node.get_subcommands().next().is_none() && node.get_arguments().any(|arg| arg.get_id() == "json")
+}
+
+impl NextEntry {
+    /// The entry for the invocation `argv` (without the executable), or none when `argv` is empty.
+    /// In JSON mode `--json` is added where the command takes it, before a `--`.
+    pub fn runnable(mut argv: Vec<String>, reason: &str, x_canon: Option<NextExt>) -> Option<Self> {
+        if argv.is_empty() {
+            return None;
+        }
+        if atip::json_mode() && takes_json(&argv) && !argv.iter().take_while(|word| *word != "--").any(|word| word == "--json") {
+            let at = argv.iter().position(|word| word == "--").unwrap_or(argv.len());
+            argv.insert(at, "--json".to_string());
+        }
+        let command = std::iter::once("canon").chain(argv.iter().map(String::as_str)).map(atip::quote).collect::<Vec<_>>().join(" ");
+        Some(Self { command, argv, reason: (!reason.is_empty()).then(|| reason.to_string()), x_canon })
     }
-    words
+
+    /// The entry for a status step, or none when the step is not a runnable canon command line.
+    pub fn from_step(step: &NextStep) -> Option<Self> {
+        if !step.command.starts_with("canon ") || atip::has_placeholder(&step.command) {
+            return None;
+        }
+        let mut words = atip::split_argv(&step.command);
+        words.remove(0);
+        Self::runnable(words, &step.why, Some(NextExt { actor: step.actor, role: step.role }))
+    }
 }
 
 /// What a write touched, to narrow the status steps to it.
@@ -180,6 +171,8 @@ fn present(steps: Vec<NextStep>, role: Option<Role>) -> After {
         }
         None => (steps, None),
     };
+    // JSON mode lists only steps a caller can run as they are, so the limit counts those.
+    let steps: Vec<NextStep> = if atip::json_mode() { steps.into_iter().filter(|step| NextEntry::from_step(step).is_some()).collect() } else { steps };
     let omitted = steps.len().saturating_sub(NEXT_LIMIT);
     After { steps: steps.into_iter().take(NEXT_LIMIT).collect(), omitted, waiting_on }
 }
@@ -217,15 +210,15 @@ impl After {
         present(steps, Role::current(None))
     }
 
-    /// The steps as `meta.next` entries.
+    /// The steps as `meta.next` entries: the runnable ones.
     pub fn entries(&self) -> Vec<NextEntry> {
-        self.steps.iter().map(NextEntry::from).collect()
+        self.steps.iter().filter_map(NextEntry::from_step).collect()
     }
 
-    /// The steps `canon status` reports, as a write's `After` would: its
-    /// own `next`, `nextOmitted` and `waitingOn`.
+    /// The steps `canon status` reports, as a write's `After` would list
+    /// them: every step the rules produced, under the declared role, limited.
     pub fn of_status(report: &StatusReport) -> Self {
-        Self { steps: report.next.clone(), omitted: report.next_omitted, waiting_on: report.waiting_on.clone() }
+        present(report.all_next.clone(), Role::current(None))
     }
 
     /// The human form: one `next:` line, then a `waiting on` line per

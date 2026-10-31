@@ -280,6 +280,50 @@ fn parity_transcript(binary: &Path, old_spelling: bool) -> String {
     out
 }
 
+/// A transcript as the 0.31 parity compares it. canon 0.33 moved the JSON to atip/1 L0 (the `meta` members, the
+/// `error` shape, the text-mode error lines), and the 0.30 transcript is not re-blessed: both sides are read down to what
+/// the renamed options must not change: the exit, the `ok` and `data` of each answer minus the members 0.33 added to
+/// a report (`unchanged`, `waitingOn`, `nextOmitted`, `note`), the code and message of a failure, the code on the
+/// first line of a text-mode error, and the stored records.
+fn contract_view(transcript: &str) -> String {
+    let mut out = String::new();
+    for line in transcript.lines() {
+        let trimmed = line.trim_start();
+        if line.starts_with("{\"ok\":") {
+            let mut doc: Value = serde_json::from_str(line).unwrap_or_else(|e| panic!("an answer line is one JSON document ({e}): {line}"));
+            let mut view = serde_json::Map::new();
+            view.insert("ok".into(), doc["ok"].clone());
+            if let Some(mut data) = doc.get_mut("data").map(Value::take) {
+                if let Some(object) = data.as_object_mut() {
+                    for added in ["unchanged", "waitingOn", "nextOmitted", "note"] {
+                        object.remove(added);
+                    }
+                }
+                view.insert("data".into(), data);
+            }
+            if let Some(error) = doc.get("error") {
+                // 0.33 names the missing arguments after the colon of clap's "required arguments were not provided:".
+                let message = error["message"].as_str().map(|m| m.split_once("required arguments were not provided:").map_or(m, |(head, _)| &m[..head.len() + "required arguments were not provided:".len()]).to_string());
+                view.insert("error".into(), serde_json::json!({ "code": error["code"], "message": message }));
+            }
+            out.push_str(&Value::Object(view).to_string());
+        } else if let Some(rest) = line.strip_prefix("canon: ") {
+            // 0.33: `canon: <CODE>: <message>`
+            out.push_str(&format!("error {}", rest.split(": ").next().unwrap_or_default()));
+        } else if line.starts_with("canon ") && line.contains(" — ") {
+            // 0.30: `canon <command>: <CODE> — <message>`
+            let code = line.split_once(": ").and_then(|(_, rest)| rest.split_once(" — ")).map_or("", |(code, _)| code);
+            out.push_str(&format!("error {code}"));
+        } else if trimmed.starts_with("hint: ") || ["field: ", "expected: ", "suggestions: "].iter().any(|key| line.starts_with(&format!("  {key}"))) {
+            continue;
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out
+}
+
 // ── F1 ───────────────────────────────────────────────────────────────────
 
 /// context.capability.47: the 14 options are the bare nouns on the 70 places of 27 commands (0.32: `--actor` names the agent that relays an approval
@@ -305,8 +349,8 @@ fn context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_
     if let Some(old) = std::env::var_os("CANON_030_BIN") {
         std::fs::write(&expected_path, parity_transcript(Path::new(&old), true)).unwrap();
     }
-    let expected = std::fs::read_to_string(&expected_path).expect("the 0.30 transcript is checked in");
-    let actual = parity_transcript(Path::new(env!("CARGO_BIN_EXE_canon")), false);
+    let expected = contract_view(&std::fs::read_to_string(&expected_path).expect("the 0.30 transcript is checked in"));
+    let actual = contract_view(&parity_transcript(Path::new(env!("CARGO_BIN_EXE_canon")), false));
     if actual != expected {
         // Each step (`$ canon …`) and each stored file (`### …`) is one block; name every block that differs.
         let blocks = |text: &str| -> Vec<String> {
@@ -488,7 +532,7 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     let out = canon(repo, &["evidence", "add", "--input", doc, "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
-    assert_eq!(body["error"]["code"], "INPUT_UNKNOWN_FIELD", "{body}");
+    assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
     assert_eq!(body["error"]["field"], "/items/1/scenarioId", "{body}");
     assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "scenario"), "{body}");
     assert_eq!(body["error"]["suggestions"][0], "scenario", "{body}");
@@ -498,6 +542,20 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     let fixed = doc.replace("scenarioId", "scenario");
     let out = ok(repo, &["evidence", "add", "--input", &fixed, "--json"]);
     assert_eq!(json(&out)["ok"], true);
+
+    // The scenario the sentence names: `canon scenario new --input`, second element keeping `subjectId`.
+    let dir = repo_with_change();
+    let repo = dir.path();
+    let before = harness::tree(repo);
+    let doc = r#"[{"operands":["demo.login.01"],"title":"One","subject":"demo"},{"operands":["demo.login.02"],"title":"Two","subjectId":"demo"}]"#;
+    let out = canon(repo, &["scenario", "new", "--input", doc, "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
+    let body = json(&out);
+    assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
+    assert_eq!(body["error"]["field"], "/items/1/subjectId", "{body}");
+    assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "subject"), "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("use \"subject\""), "{body}");
+    unchanged(repo, &before, "a refused scenario batch, its first element included");
 }
 
 // ── F4 ───────────────────────────────────────────────────────────────────
@@ -547,7 +605,7 @@ fn context_capability_55_an_unknown_project_root_and_an_unknown_finding_review_a
 }
 
 /// The `canon …` command lines in one output: every backtick span that starts with `canon `, and in a JSON document the
-/// `command` of every step and every `argv` array.
+/// `command` of every step and every `argv` array (which carries no executable: `canon` is put in front of it).
 fn command_lines(text: &str) -> Vec<Vec<String>> {
     fn walk(value: &Value, strings: &mut Vec<String>, out: &mut Vec<Vec<String>>) {
         match value {
@@ -561,7 +619,7 @@ fn command_lines(text: &str) -> Vec<Vec<String>> {
                 for (key, v) in map {
                     match (key.as_str(), v) {
                         ("command", Value::String(s)) if s.starts_with("canon ") => out.push(harness::words(s)),
-                        ("argv", Value::Array(words)) if !words.is_empty() => out.push(words.iter().filter_map(|w| w.as_str().map(str::to_string)).collect()),
+                        ("argv", Value::Array(words)) if !words.is_empty() => out.push(std::iter::once("canon".to_string()).chain(words.iter().filter_map(|w| w.as_str().map(str::to_string))).collect()),
                         _ => walk(v, strings, out),
                     }
                 }

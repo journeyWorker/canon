@@ -35,10 +35,11 @@ fn multi_tier_config_renders_the_boundary_note_naming_exactly_the_kinds_not_read
     let content = report(&inputs).unwrap();
 
     assert!(content.contains("## Kinds not read directly"), "{content}");
-    assert!(content.contains("- `session`\n"), "{content}");
-    assert!(content.contains("- `task`\n"), "{content}");
-    assert!(content.contains("- `scenario`\n"), "an s3-backed (cold)-routed kind must be named (s28 D2 correction):\n{content}");
     assert!(content.contains("canon query --kind"), "{content}");
+    // Exactly the kinds not read directly, sorted: the bullets of that section and no others.
+    let section = content.split("## Kinds not read directly").nth(1).unwrap().split("\n## ").next().unwrap();
+    let named: Vec<&str> = section.lines().filter_map(|line| line.strip_prefix("- `").and_then(|rest| rest.strip_suffix('`'))).collect();
+    assert_eq!(named, ["scenario", "session", "task"], "the s3-backed (cold) scenario, and the postgres-backed session and task, sorted; a local (git-backed) change never:\n{content}");
     assert!(!content.contains("- `change`\n"), "a local (git-backed)-routed kind must never be named:\n{content}");
 
     // Placement: after `## Inputs (digest)`, before `## Trust matrix`.

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::json_out::Report;
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 
 pub const CONTEXT_PACK_FORMAT_VERSION: u32 = 1;
 pub const CONTEXT_PACK_DIR: &str = ".canon/context-packs";
@@ -47,6 +47,10 @@ pub enum ContextPackError {
     Git(String),
     #[error("prompt bundle `{name}@{version}` is invalid: {detail}")]
     PromptBundle { name: String, version: String, detail: String },
+    /// A directory the store writes into cannot be written, known before the
+    /// write (`WRITE_UNAVAILABLE`).
+    #[error("{}", .0.message)]
+    Unavailable(CliError),
 }
 
 impl ContextPackError {
@@ -65,6 +69,7 @@ impl ContextPackError {
             Self::ObjectConflict { .. } => CliError::failed("CONTEXT_OBJECT_CONFLICT", self.to_string()).hint("an object already stored under this digest differs from the new content: inspect it with `git status` and restore or remove it, then run the command again"),
             Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_TAMPERED", self.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack add`"),
             Self::Git(_) => CliError::failed("CONTEXT_GIT_UNAVAILABLE", self.to_string()).hint("run from inside a git repository with git installed (`git init` creates one)"),
+            Self::Unavailable(error) => error.clone(),
         }
     }
 }
@@ -598,6 +603,8 @@ fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
         }
         return Ok(());
     }
+    // A target that cannot take the file is refused before the write (`WRITE_UNAVAILABLE`), not after it fails.
+    crate::write_mode::check_writable(path).map_err(|cause| ContextPackError::Unavailable(crate::write_mode::unavailable(path, &cause)))?;
     write_atomic(path, bytes).map_err(|e| io(path, e))?;
     FRESH_WRITES.with(|n| n.set(n.get() + 1));
     Ok(())

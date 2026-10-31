@@ -198,8 +198,8 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         let report: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
         let next = report["meta"]["next"].as_array().unwrap();
         assert_eq!(next.len(), 1, "{report}");
-        assert_eq!(next[0]["command"], "canon migrate");
-        assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
+        assert_eq!(next[0]["command"], "canon migrate --json");
+        assert!(next[0]["reason"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
 
         std::fs::rename(repo.join("specs/features/kind=feature"), repo.join("specs/kind=feature")).unwrap();
         // Whatever the gate then finds (an empty corpus is `unverifiable`), it no longer names the old layout.
@@ -219,17 +219,17 @@ fn authoring_scaffold_13_the_scaffold_refuses_a_pre_0_17_root() {
 
     let out = canon(repo, &["scenario", "new", "world.hotdeal.02", "--title", "Another coupon", "--case", "failure"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains(&format!("canon scenario new: LAYOUT_MIGRATION_REQUIRED — {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(stderr(&out).contains(&format!("canon: LAYOUT_MIGRATION_REQUIRED: {MIGRATE}; nothing written")), "{}", stderr(&out));
 
     let out = canon(repo, &["scenario", "new", "world.cart.01", "--title", "A cart", "--feature", "specs/kind=feature/area=world/cart.feature"]);
     assert_eq!(out.status.code(), Some(2), "an explicit --feature under the root is refused too: {}", stderr(&out));
-    assert!(stderr(&out).contains(&format!("canon scenario new: LAYOUT_MIGRATION_REQUIRED — {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(stderr(&out).contains(&format!("canon: LAYOUT_MIGRATION_REQUIRED: {MIGRATE}; nothing written")), "{}", stderr(&out));
     assert!(!repo.join("specs/kind=feature/area=world/cart.feature").exists(), "the explicit --feature target is not written");
     assert_eq!(files_under(repo.join("specs")), before, "nothing written by the explicit --feature refusal");
 
     let out = canon(repo, &["feature", "new", "world.cart", "--title", "Cart"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains(&format!("canon feature new: LAYOUT_MIGRATION_REQUIRED — {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(stderr(&out).contains(&format!("canon: LAYOUT_MIGRATION_REQUIRED: {MIGRATE}; nothing written")), "{}", stderr(&out));
 
     assert_eq!(files_under(repo.join("specs")), before, "nothing written");
 }

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:23.967944Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "disposition": "open",
+  "introduced_by": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "kind": "finding",
+  "reviewed_sha": "61c14f763172fa46123264154f3994c91556c715",
+  "reviewer": "rev-atip-check",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.41",
+    "atip.check.01"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Spec fidelity pass: stale count after the amendment. Scenario atip.check.41 is still titled 'canon passes the 16 L0 checks through the committed fixture' while its Then and the brief say 19 (15 MUST, 4 SHOULD); crates/atip-check/src/lib.rs says 'the 16 L0 checks', atip_check_run.rs's module doc says 'the 16 checks', and the comment above the atip-l0 job in .github/workflows/test.yml says 'reports the 16 L0 checks'. Fixing the title changes scenario 41's digest, so its evidence and review are re-pinned.",
+  "worktree_dirty": false
+}

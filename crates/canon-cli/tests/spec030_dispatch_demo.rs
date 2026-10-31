@@ -156,7 +156,7 @@ fn dispatch_manifest_11_adapter_validate_prints_the_normalized_summary_of_a_well
 fn dispatch_manifest_12_adapter_validate_rejects_a_response_whose_envelope_breaks_a_rule() {
     let dir = repo();
     let before = snapshot(dir.path());
-    let b = refused(dir.path(), &["adapter", "validate", "--response", &adapter("reject-negative-cost.json")], 1, "ADAPTER_REFUSED");
+    let b = refused(dir.path(), &["adapter", "validate", "--response", &adapter("reject-negative-cost.json")], 1, "ADAPTER_RESPONSE_INVALID");
     assert!(b["error"]["message"].as_str().unwrap().contains("telemetry.cost_usd"), "{b}");
     assert_eq!(snapshot(dir.path()), before);
 }
@@ -495,7 +495,7 @@ fn dispatch_manifest_32_schema_error_adapter_refused_states_the_exit_of_each_ada
     let validate_exits = exits(&["adapter", "validate"]);
     assert!(validate_exits.iter().any(|(code, m)| *code == 1 && m.contains("envelope breaks a rule")), "{validate_exits:?}");
     assert!(validate_exits.iter().any(|(code, m)| *code == 2 && m.contains("unreadable")), "{validate_exits:?}");
-    assert!(meaning.contains("adapter authorize") && meaning.contains("adapter validate") && meaning.contains("exit 1"), "{meaning}");
+    assert!(meaning.contains("adapter authorize") && meaning.contains("adapter validate") && meaning.contains("could not read the response file"), "{meaning}");
     let authorize = body(&run(d, &["schema", "adapter", "authorize"])).to_string();
     assert!(authorize.contains("ADAPTER_EXECUTION_NOT_AUTHORIZED") && authorize.contains("the only exit 1") && authorize.contains("policy file is broken"), "{authorize}");
     let validate = body(&run(d, &["schema", "adapter", "validate"])).to_string();

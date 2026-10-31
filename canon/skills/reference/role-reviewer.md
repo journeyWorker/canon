@@ -220,7 +220,7 @@ advisory names it); that is the orchestrator's step, not yours.
 Run `gate check` once, before `review scenario`: its `unreviewed-promotion`
 violations are the subjects and scenarios that need your review. Do not loop
 it. After `review scenario`, read its `meta.next` instead of calling `gate check`
-or `status` again.
+or `status` again. Each `meta.next` entry is runnable: run `canon` + its `argv`; guidance that needs a value you must fill in is in the error `hint` or the report text, not in `meta.next`.
 
 ## Separate session
 
@@ -355,7 +355,7 @@ implementer owns. Your last write's `meta.next` names the next step.
 ## Retry safety
 
 `review scenario`, `review change` and `finding add` are content-keyed: an
-identical repeat is reported `unchanged` (`meta.unchanged: true`, or the
+identical repeat is reported `unchanged` (`data.unchanged: true`, or the
 element's `status` in a batch), so after a timeout run the same command
 again. A different finding under an occupied round and seq is refused
 (`FINDING_SEQ_OCCUPIED`): take the next seq. `finding close` with the same

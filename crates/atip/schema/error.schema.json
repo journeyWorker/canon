@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/error.schema.json",
+  "title": "atip/1 error object",
+  "description": "The `error` member of a failure envelope (spec section 7). Optional members are omitted when absent, never null.",
+  "type": "object",
+  "required": ["code", "message", "retryable"],
+  "properties": {
+    "code": { "$ref": "#/$defs/code" },
+    "message": { "type": "string", "minLength": 1 },
+    "retryable": { "type": "boolean" },
+    "hint": {
+      "description": "One runnable invocation that fixes or explains the failure, or one sentence when no command applies.",
+      "type": "string",
+      "minLength": 1
+    },
+    "field": {
+      "description": "The argv name (`--round`, `CHANGE_ID`, `command`) or an RFC 6901 JSON pointer into the --input document (`/round`, `/2/round`).",
+      "type": "string",
+      "minLength": 1
+    },
+    "expected": {
+      "description": "The valid set, when there is one.",
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "received": {
+      "description": "What was given, redacted when it may hold a secret. Never null.",
+      "type": ["string", "number", "boolean", "array", "object"]
+    },
+    "suggestions": {
+      "description": "Close matches from `expected`, best first.",
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "details": {
+      "description": "Only when one input yields several errors; each item is one of them.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/detail" },
+      "minItems": 2
+    }
+  },
+  "patternProperties": {
+    "^x-[a-z][a-z0-9-]*$": true
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "code": {
+      "description": "UPPER_SNAKE_CASE, registered in the tool's error registry.",
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"
+    },
+    "detail": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/code" },
+        "message": { "type": "string", "minLength": 1 },
+        "hint": { "type": "string", "minLength": 1 },
+        "field": { "type": "string", "minLength": 1 },
+        "expected": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "received": { "type": ["string", "number", "boolean", "array", "object"] },
+        "suggestions": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      },
+      "patternProperties": {
+        "^x-[a-z][a-z0-9-]*$": true
+      },
+      "additionalProperties": false
+    }
+  }
+}

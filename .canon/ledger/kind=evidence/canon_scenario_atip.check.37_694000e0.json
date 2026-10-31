@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-check"
+  },
+  "at": "2026-10-31T16:24:54.163723Z",
+  "attachments": [
+    {
+      "case": "atip_check_37_the_committed_fixture_of_atip_is_generated_from_its_registry",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "4ed638aec13991451c543e8d0888bded0f66e0bf8079f21ee79fc7ac70cc8872"
+    },
+    {
+      "case": "atip_check_37_atip_check_passes_on_atip_itself",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/atip-check-junit.xml",
+      "sha256": "4ed638aec13991451c543e8d0888bded0f66e0bf8079f21ee79fc7ac70cc8872"
+    }
+  ],
+  "code_tree": "cf1be55f5f03a322cda3aa717af16242a9e3fc95",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check; cargo nextest run -p canon-cli --test atip_check"
+  },
+  "evidence_sha": "1f88c4c6c5ceef0bdb8fbe080716207345d49373",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 179,
+  "scenario_id": "atip.check.37",
+  "schema": 1,
+  "staging_id": "f373bc49",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

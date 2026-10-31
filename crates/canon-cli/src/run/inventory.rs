@@ -2,7 +2,7 @@
 
 use crate::cli::inventory::{InventoryCommand, InventorySyncArgs};
 use super::top::with_provenance_fix;
-use crate::cli_error::CliError;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use std::process::ExitCode;
 
 pub fn run(cmd: InventoryCommand) -> ExitCode {
@@ -45,7 +45,12 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             }
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("INVENTORY_FAILED", err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again").emit("canon inventory sync", json))
+            if let crate::inventory::InventoryError::Unavailable(error) = &err {
+                return ExitCode::from(error.emit("canon inventory sync", json));
+            }
+            // The specs config, canon.yaml and the index lock are resolved before any record is read or written (exit 2); a store error comes while the sync works (exit 1).
+            let code = if matches!(err, crate::inventory::InventoryError::Store(_)) { "INVENTORY_FAILED" } else { "INVENTORY_REFUSED" };
+            ExitCode::from(CliError::refused(code, err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again").emit("canon inventory sync", json))
         }
     }
 }

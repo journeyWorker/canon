@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-l0",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-l0"
+  },
+  "at": "2026-10-31T16:33:24.241475Z",
+  "attachments": [
+    {
+      "case": "ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r2-junit.xml",
+      "sha256": "69e0cf1f29d931967243bdc1c4be69e722538bec551b5118cfd60a66eb19f631"
+    },
+    {
+      "case": "ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-l0-r2-junit.xml",
+      "sha256": "69e0cf1f29d931967243bdc1c4be69e722538bec551b5118cfd60a66eb19f631"
+    }
+  ],
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-l0-r2-junit.xml"
+  },
+  "evidence_sha": "f1e174797a525804686d9dae500b35d08f7e9cb9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 81,
+  "scenario_id": "ingest.sessions.16",
+  "schema": 1,
+  "staging_id": "43d063c9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

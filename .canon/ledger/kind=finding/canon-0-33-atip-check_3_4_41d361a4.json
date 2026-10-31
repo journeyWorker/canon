@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:26.681454Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "disposition": "open",
+  "introduced_by": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "kind": "finding",
+  "reviewed_sha": "61c14f763172fa46123264154f3994c91556c715",
+  "reviewer": "rev-atip-check",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.26",
+    "atip.check.50"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Standards pass: timing. (a) atip_check_26 (a version hang killed at a 1 s limit) failed once in my mutation run, in a run whose mutation does not touch it, while a cargo build ran next to it; it passed alone. (b) The prompt probe has a fixed 5 s limit (min with timeoutSeconds, checks.rs PROMPT_LIMIT): a tool whose start-up takes over 5 s under load is reported as waiting for input, a MUST failure of L0.no-env-switch, and a fixture can only lower it. Neither affects canon today (about 1 s per call). Also: ok-exit/reserved-codes (a reserved code registered with another exit) is judged in L0.ok-exit, which the brief's ok-exit list does not name; spec 7.2.1 marks those four codes L0, so it is accepted.",
+  "worktree_dirty": false
+}

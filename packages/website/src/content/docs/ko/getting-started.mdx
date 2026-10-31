@@ -69,7 +69,7 @@ canon의 모든 명령은 명세 하나(`docs/cli/canon.cli.json`)에서 생성�
 몇 가지뿐입니다:
 
 - **`--json`은 봉투 하나**를 냅니다: `{ok, data, meta}`. 쓰기 명령은 `meta.next`로 다음
-  단계를, 같은 입력의 반복은 `meta.unchanged`로 "이미 있음"을 알립니다.
+  단계를, 같은 입력의 반복은 `data.unchanged`로 "이미 있음"을 알립니다.
 - **쓰기 명령은 모두 `--input`**(인라인 JSON, 파일, `-`로 stdin)을 받습니다. 배열은
   배치이고 첫 쓰기 전에 전부 검증됩니다. `canon schema <command> --json`이 입력
   스키마와 예시를 보여 줍니다.
