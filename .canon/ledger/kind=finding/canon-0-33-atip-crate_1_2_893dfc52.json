@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-crate",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-crate-rev"
+  },
+  "at": "2026-10-31T12:04:09.849200Z",
+  "change_id": "canon-0-33-atip-crate",
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/cli_error.rs:43",
+  "introduced_by": "48824ebef2c708ffedff3e293f91d60cecb522e9",
+  "kind": "finding",
+  "reviewed_sha": "bc73b3a2c0f824de97c7946345d7e98adfb5316e",
+  "reviewer": "rev-atip-crate",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards pass: `pub use atip::{redact, ...}` in canon-cli cli_error re-exports `redact`, which nothing in canon-cli or its tests uses any more (the only user, tests/cli_error.rs, moved to atip). Dead re-export left after a cutover; drop `redact` from the list (L0 touches this file anyway). Behavior unaffected.",
+  "worktree_dirty": false
+}
