@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:25.337312Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "disposition": "open",
+  "introduced_by": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "kind": "finding",
+  "reviewed_sha": "61c14f763172fa46123264154f3994c91556c715",
+  "reviewer": "rev-atip-check",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.41",
+    "atip.check.46"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Spec fidelity pass: brief F6 says canon passes the 15 MUST and 4 SHOULD checks; the run on canon reports L0.next and L0.page as unsupported ('L0 met: 13 MUST passed, 0 MUST failed, 0 MUST unprovided, 2 not applicable') because 'status --json' in the 'init' state carries no meta.next and no meta.page. The brief's assumptions allow it ('canon-like probes that make neither are not applicable'), and scenario 41 accepts it, but then canon's 6.8 and 6.9 are never exercised by the atip-l0 CI job: the L0 claim of 0.33 does not cover next steps or pagination. Blast radius: canon's next-step and cursor output is covered only by its own tests (atip-l0 scenarios). Suggest a fixture setup or probe that yields a meta.next, as a later change.",
+  "worktree_dirty": false
+}

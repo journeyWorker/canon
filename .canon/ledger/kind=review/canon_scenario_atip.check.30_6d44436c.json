@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:37.748390Z",
+  "code_tree": "9bcdc836c50c360943a020e2ff31803db553a392",
+  "kind": "review",
+  "pin": "61c14f763172fa46123264154f3994c91556c715",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_30_l0_refusal_effects_fails_when_a_refusal_writes_in_the_working_directory_or_in_home",
+          "junit:exec::tests::atip_check_30_a_refusal_that_changes_the_directory_or_home_names_the_paths",
+          "junit:snapshot::tests::atip_check_30_a_snapshot_names_what_was_created_changed_and_removed"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bea8e8ca8794965c2bf3c3e54c85d5909ff267f7ae42d6d515f4eb9112dee782",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-check/brief.md"
+  },
+  "review_id": "01M69DD46M2S0NK4JHKYYZTPMH",
+  "reviewer": "rev-atip-check",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.check.30",
+  "schema": 2,
+  "worktree_dirty": false
+}

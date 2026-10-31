@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-check",
+    "role": "reviewer",
+    "session_id": "s-0-33-atip-check-rev"
+  },
+  "at": "2026-10-31T16:41:27.366186Z",
+  "change_id": "canon-0-33-atip-check",
+  "code_tree": "14496d4cf94ae55fe94724ba13739c865b346b02",
+  "disposition": "fixed",
+  "introduced_by": "25d198e7ce6132363a4ce307b7002121e526474e",
+  "kind": "finding",
+  "resolution_code_tree": "0faddef99fed86099eaaa46412800489070ede4b",
+  "resolution_sha": "fed0cd14d145401483e59669704c8b889fe225a0",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0e8115be3370db0fc59ac92e4ec72cf1a7c287f1",
+  "reviewer": "rev-atip-check",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.30",
+    "atip.check.16"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Deviation judged, no brief contradiction: refusal side effects are reported under L0.ok-exit and the report lists rule 8.2 for it (checker.md's L0 table lists 6.2, 6.4, 7.3.2, 7.3.3, 8.1). Brief F3 and checker.md 4 and 7.2 require a MUST failure naming the changed paths for an exit-2 call and the L0 table has no effects check, so ok-exit ('every invocation') is the owner; spec 8.2 states the rule. The report's rules column for that one check therefore differs from the approved table. Also judged and accepted: L0.unknown-option does not compare the process exit (checker.md 7.2 plants 'unknown option exits 1' as an L0.ok-exit-only failure, and the registered exit-2 code plus ok-exit together enforce exit 2) and L0.one-document reads only the plain probe --json run (the table scopes it to report or artifact commands; failure documents are read exactly by unknown-command).",
+  "worktree_dirty": false
+}
