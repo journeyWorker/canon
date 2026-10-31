@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-crate",
+    "role": "implementer",
+    "session_id": "s-0-33-atip-crate"
+  },
+  "at": "2026-10-31T11:26:23.217248Z",
+  "attachments": [
+    {
+      "case": "a_known_role_and_a_policy_named_role_do_not_warn",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-crate-junit.xml",
+      "sha256": "e04569c05853e7bb1cdc7aca76148a32532e02c37f3954818756e9c407e5d0fa"
+    },
+    {
+      "case": "a_misspelt_role_runs_and_warns_with_the_closest_known_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-crate-junit.xml",
+      "sha256": "e04569c05853e7bb1cdc7aca76148a32532e02c37f3954818756e9c407e5d0fa"
+    },
+    {
+      "case": "an_unknown_role_with_nothing_close_still_runs_and_warns_without_a_suggestion",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-33-atip-crate-junit.xml",
+      "sha256": "e04569c05853e7bb1cdc7aca76148a32532e02c37f3954818756e9c407e5d0fa"
+    }
+  ],
+  "code_tree": "2616c5f76f0225e15c6fd4a6e267a4cbab925413",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-33-atip-crate-junit.xml"
+  },
+  "evidence_sha": "48824ebef2c708ffedff3e293f91d60cecb522e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 362,
+  "scenario_id": "context.capability.43",
+  "schema": 1,
+  "staging_id": "fb931313",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
