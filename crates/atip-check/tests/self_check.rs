@@ -39,10 +39,26 @@ fn atip_check_37_atip_check_passes_on_atip_itself() {
     std::fs::create_dir_all(&cwd).expect("cwd");
     std::fs::create_dir_all(&tmp).expect("tmp");
     let fixture = fixture_path();
-    let args = ["check", "--bin", ATIP, "--level", "L0", "--fixture", fixture.to_str().expect("utf8")];
+    let args = [
+        "check",
+        "--bin",
+        ATIP,
+        "--level",
+        "L0",
+        "--fixture",
+        fixture.to_str().expect("utf8"),
+    ];
     let text = atip_in(&cwd, &tmp, &args);
     assert_eq!(text.code, Some(0), "{}{}", text.stdout, text.stderr);
-    assert!(text.stdout.lines().last().expect("summary").starts_with("L0 met: 12 MUST passed, 0 MUST failed, 0 MUST unprovided"), "{}", text.stdout);
+    assert!(
+        text.stdout
+            .lines()
+            .last()
+            .expect("summary")
+            .starts_with("L0 met: 13 MUST passed, 0 MUST failed, 0 MUST unprovided, 2 not applicable"),
+        "{}",
+        text.stdout
+    );
     let mut json_args = args.to_vec();
     json_args.push("--json");
     let output = atip_in(&cwd, &tmp, &json_args);
@@ -50,6 +66,14 @@ fn atip_check_37_atip_check_passes_on_atip_itself() {
     let document = output.envelope();
     assert_eq!(document["data"]["passed"], true);
     let results = output.results();
-    assert_eq!(results.len(), 16);
-    assert!(results.iter().all(|(_, result)| result == "pass"), "{results:?}");
+    assert_eq!(results.len(), 19);
+    // atip's own answers carry no `meta.next` and no `meta.page`, so those two checks do not apply; the other 17 pass.
+    for (id, result) in &results {
+        let expected = if id == "L0.next" || id == "L0.page" {
+            "unsupported"
+        } else {
+            "pass"
+        };
+        assert_eq!(result, expected, "{id}");
+    }
 }

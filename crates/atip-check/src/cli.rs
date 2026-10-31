@@ -80,7 +80,9 @@ pub fn parse(args: &[OsString]) -> Result<Command, Failure> {
             Some("--json") => {}
             Some("--version" | "-V") => version = true,
             Some("--help" | "-h") => help = true,
-            Some(option) if option.starts_with('-') && option.len() > 1 => return Err(unknown_option(option, &ROOT_OPTIONS, None)),
+            Some(option) if option.starts_with('-') && option.len() > 1 => {
+                return Err(unknown_option(option, &ROOT_OPTIONS, None))
+            }
             _ => {
                 command_at = Some(position);
                 break;
@@ -92,11 +94,26 @@ pub fn parse(args: &[OsString]) -> Result<Command, Failure> {
         return Ok(Command::Version);
     }
     let Some(command_at) = command_at else {
-        return if help { Ok(Command::RootHelp) } else { Err(Failure::new(Code::CommandRequired, "atip was run without a command").expected(COMMANDS).hint("Run atip check --bin <BINARY> --level L0 --fixture <FILE>.")) };
+        return if help {
+            Ok(Command::RootHelp)
+        } else {
+            Err(
+                Failure::new(Code::CommandRequired, "atip was run without a command")
+                    .expected(COMMANDS)
+                    .hint("Run atip check --bin <BINARY> --level L0 --fixture <FILE>."),
+            )
+        };
     };
     let word = args[command_at].to_string_lossy();
     if word != "check" {
-        return Err(Failure::new(Code::UnknownCommand, format!("{word} is not a command of atip")).field("command").expected(COMMANDS).received(word.as_ref()).suggestions(close(&word, &COMMANDS)));
+        return Err(Failure::new(
+            Code::UnknownCommand,
+            format!("{word} is not a command of atip"),
+        )
+        .field("command")
+        .expected(COMMANDS)
+        .received(word.as_ref())
+        .suggestions(close(&word, &COMMANDS)));
     }
     parse_check(&args[command_at + 1..])
 }
@@ -133,7 +150,11 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
                             position += 1;
                             next.clone()
                         }
-                        _ => return Err(usage(format!("the option {name} needs a value")).field(name)),
+                        _ => {
+                            return Err(
+                                usage(format!("the option {name} needs a value")).field(name)
+                            )
+                        }
                     },
                 };
                 let slot = match name {
@@ -145,7 +166,9 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
                     return Err(usage(format!("the option {name} was given twice")).field(name));
                 }
             }
-            option if option.starts_with('-') && option.len() > 1 => return Err(unknown_option(option, &CHECK_OPTIONS, Some("check"))),
+            option if option.starts_with('-') && option.len() > 1 => {
+                return Err(unknown_option(option, &CHECK_OPTIONS, Some("check")))
+            }
             operand => return Err(unexpected_operand(operand)),
         }
         position += 1;
@@ -153,7 +176,9 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
     if help {
         return Ok(Command::CheckHelp);
     }
-    let required = |value: Option<OsString>, name: &str| value.ok_or_else(|| usage(format!("the option {name} is required")).field(name));
+    let required = |value: Option<OsString>, name: &str| {
+        value.ok_or_else(|| usage(format!("the option {name} is required")).field(name))
+    };
     let bin = required(bin, "--bin")?;
     let level = required(level, "--level")?;
     let fixture = required(fixture, "--fixture")?;
@@ -163,28 +188,62 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
         Some("L2") => Level::L2,
         _ => {
             let given = level.to_string_lossy();
-            return Err(usage(format!("{given} is not a level")).field("--level").expected(LEVELS).received(given.as_ref()).suggestions(close(&given.to_ascii_uppercase(), &LEVELS)));
+            return Err(usage(format!("{given} is not a level"))
+                .field("--level")
+                .expected(LEVELS)
+                .received(given.as_ref())
+                .suggestions(close(&given.to_ascii_uppercase(), &LEVELS)));
         }
     };
-    Ok(Command::Check(CheckArgs { bin, level, fixture }))
+    Ok(Command::Check(CheckArgs {
+        bin,
+        level,
+        fixture,
+    }))
 }
 
 fn unexpected_operand(operand: &str) -> Failure {
-    Failure::new(Code::Usage, format!("atip check takes no operand, got {operand}")).in_command("check").field("ARGUMENT").received(operand)
+    Failure::new(
+        Code::Usage,
+        format!("atip check takes no operand, got {operand}"),
+    )
+    .in_command("check")
+    .field("ARGUMENT")
+    .received(operand)
 }
 
 fn unknown_option(option: &str, valid: &[&'static str], command: Option<&'static str>) -> Failure {
     let name = option.split_once('=').map_or(option, |(name, _)| name);
-    let mut failure = Failure::new(Code::Usage, format!("{name} is not an option of {}", command.map_or("atip", |_| "atip check"))).field(name).expected(valid.iter().copied()).suggestions(close(name, valid));
+    let mut failure = Failure::new(
+        Code::Usage,
+        format!(
+            "{name} is not an option of {}",
+            command.map_or("atip", |_| "atip check")
+        ),
+    )
+    .field(name)
+    .expected(valid.iter().copied())
+    .suggestions(close(name, valid));
     failure.command = command;
     failure
 }
 
 /// The words of `valid` nearest to `word`, when they are within edit distance 2 of it.
 fn close(word: &str, valid: &[&str]) -> Vec<String> {
-    let distances: Vec<(usize, &str)> = valid.iter().map(|candidate| (distance(word, candidate), *candidate)).collect();
-    let nearest = distances.iter().map(|(distance, _)| *distance).min().unwrap_or(usize::MAX);
-    distances.into_iter().filter(|(distance, _)| *distance == nearest && nearest <= 2).map(|(_, candidate)| candidate.to_string()).collect()
+    let distances: Vec<(usize, &str)> = valid
+        .iter()
+        .map(|candidate| (distance(word, candidate), *candidate))
+        .collect();
+    let nearest = distances
+        .iter()
+        .map(|(distance, _)| *distance)
+        .min()
+        .unwrap_or(usize::MAX);
+    distances
+        .into_iter()
+        .filter(|(distance, _)| *distance == nearest && nearest <= 2)
+        .map(|(_, candidate)| candidate.to_string())
+        .collect()
 }
 
 fn distance(a: &str, b: &str) -> usize {
@@ -220,42 +279,142 @@ mod tests {
 
     #[test]
     fn atip_check_06_a_complete_check_line_parses_with_either_option_spelling() {
-        let expected = Command::Check(CheckArgs { bin: "target/x".into(), level: Level::L0, fixture: "f.json".into() });
-        assert_eq!(parse(&args(&["check", "--bin", "target/x", "--level", "L0", "--fixture", "f.json"])).ok(), Some(expected.clone()));
-        assert_eq!(parse(&args(&["--json", "check", "--bin=target/x", "--fixture=f.json", "--level=L0", "--json"])).ok(), Some(expected));
-        assert!(matches!(parse(&args(&["check", "--level", "L2", "--bin", "b", "--fixture", "f"])).ok(), Some(Command::Check(CheckArgs { level: Level::L2, .. }))));
+        let expected = Command::Check(CheckArgs {
+            bin: "target/x".into(),
+            level: Level::L0,
+            fixture: "f.json".into(),
+        });
+        assert_eq!(
+            parse(&args(&[
+                "check",
+                "--bin",
+                "target/x",
+                "--level",
+                "L0",
+                "--fixture",
+                "f.json"
+            ]))
+            .ok(),
+            Some(expected.clone())
+        );
+        assert_eq!(
+            parse(&args(&[
+                "--json",
+                "check",
+                "--bin=target/x",
+                "--fixture=f.json",
+                "--level=L0",
+                "--json"
+            ]))
+            .ok(),
+            Some(expected)
+        );
+        assert!(matches!(
+            parse(&args(&[
+                "check",
+                "--level",
+                "L2",
+                "--bin",
+                "b",
+                "--fixture",
+                "f"
+            ]))
+            .ok(),
+            Some(Command::Check(CheckArgs {
+                level: Level::L2,
+                ..
+            }))
+        ));
     }
 
     #[test]
     fn atip_check_06_the_root_answers_a_missing_or_unknown_command_with_its_own_code() {
         assert_eq!(code(&[]), (Code::CommandRequired, None, None));
         assert_eq!(code(&["--json"]), (Code::CommandRequired, None, None));
-        assert_eq!(code(&["nosuch-xyz", "--json"]), (Code::UnknownCommand, Some("command".to_string()), None));
-        assert_eq!(code(&["--bogus", "check"]), (Code::Usage, Some("--bogus".to_string()), None));
+        assert_eq!(
+            code(&["nosuch-xyz", "--json"]),
+            (Code::UnknownCommand, Some("command".to_string()), None)
+        );
+        assert_eq!(
+            code(&["--bogus", "check"]),
+            (Code::Usage, Some("--bogus".to_string()), None)
+        );
         assert_eq!(parse(&args(&["--version"])).ok(), Some(Command::Version));
         assert_eq!(parse(&args(&["-h"])).ok(), Some(Command::RootHelp));
-        assert_eq!(parse(&args(&["check", "--help"])).ok(), Some(Command::CheckHelp));
+        assert_eq!(
+            parse(&args(&["check", "--help"])).ok(),
+            Some(Command::CheckHelp)
+        );
         let failure = parse(&args(&["chekc"])).expect_err("unknown");
-        assert_eq!((failure.expected.as_slice(), failure.suggestions.as_slice()), (["check".to_string()].as_slice(), ["check".to_string()].as_slice()));
+        assert_eq!(
+            (failure.expected.as_slice(), failure.suggestions.as_slice()),
+            (
+                ["check".to_string()].as_slice(),
+                ["check".to_string()].as_slice()
+            )
+        );
     }
 
     #[test]
     fn atip_check_06_a_malformed_check_line_is_a_usage_error_naming_the_argument() {
-        assert_eq!(code(&["check", "--bogus-xyz", "--json"]), (Code::Usage, Some("--bogus-xyz".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--json", "--bogus-xyz"]), (Code::Usage, Some("--bogus-xyz".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--level", "L0", "--fixture", "f"]), (Code::Usage, Some("--bin".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--bin"]), (Code::Usage, Some("--bin".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--bin", "--level"]), (Code::Usage, Some("--bin".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--bin", "a", "--bin", "b"]), (Code::Usage, Some("--bin".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--bin", "a", "--level", "L9", "--fixture", "f"]), (Code::Usage, Some("--level".to_string()), Some("check")));
-        assert_eq!(code(&["check", "--", "--json"]), (Code::Usage, Some("ARGUMENT".to_string()), Some("check")));
-        assert_eq!(code(&["check", "stray"]), (Code::Usage, Some("ARGUMENT".to_string()), Some("check")));
-        let level = parse(&args(&["check", "--bin", "a", "--level", "l1", "--fixture", "f"])).expect_err("lower case is not a level");
+        assert_eq!(
+            code(&["check", "--bogus-xyz", "--json"]),
+            (Code::Usage, Some("--bogus-xyz".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--json", "--bogus-xyz"]),
+            (Code::Usage, Some("--bogus-xyz".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--level", "L0", "--fixture", "f"]),
+            (Code::Usage, Some("--bin".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--bin"]),
+            (Code::Usage, Some("--bin".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--bin", "--level"]),
+            (Code::Usage, Some("--bin".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--bin", "a", "--bin", "b"]),
+            (Code::Usage, Some("--bin".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--bin", "a", "--level", "L9", "--fixture", "f"]),
+            (Code::Usage, Some("--level".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "--", "--json"]),
+            (Code::Usage, Some("ARGUMENT".to_string()), Some("check"))
+        );
+        assert_eq!(
+            code(&["check", "stray"]),
+            (Code::Usage, Some("ARGUMENT".to_string()), Some("check"))
+        );
+        let level = parse(&args(&[
+            "check",
+            "--bin",
+            "a",
+            "--level",
+            "l1",
+            "--fixture",
+            "f",
+        ]))
+        .expect_err("lower case is not a level");
         assert_eq!(level.suggestions, ["L1"]);
     }
 
     #[test]
     fn edit_distance_counts_single_edits() {
-        assert_eq!((distance("check", "check"), distance("chekc", "check"), distance("", "ab")), (0, 2, 2));
+        assert_eq!(
+            (
+                distance("check", "check"),
+                distance("chekc", "check"),
+                distance("", "ab")
+            ),
+            (0, 2, 2)
+        );
     }
 }

@@ -17,11 +17,20 @@ path = "src/main.rs"
 
 # A small program whose behaviour is a JSON configuration: the checker's tests
 # run `atip check` against it, once conforming and once per seeded violation
-# (approaches/checker.md 7.2). Not part of the checker.
+# (approaches/checker.md 7.2). Test-only: it is built only with the feature
+# `test-support`, which the crate's own dev-dependency turns on, so `cargo
+# build`, `cargo install` and the CI job never build or ship it.
 [[bin]]
 name = "atip-fake-tool"
 path = "fake-tool/main.rs"
 test = false
+required-features = ["test-support"]
+
+[features]
+default = []
+# The fake tool binary, and the hook that makes a check, or one condition of it, pass whatever it finds
+# (`app::check_binary_mutated`): what the checker's own tests need and no tool run does.
+test-support = []
 
 [dependencies]
 atip = { workspace = true }
@@ -32,7 +41,13 @@ tempfile = "3"
 # Schemas are validated with JSON Schema 2020-12; `format` is an annotation only (no format assertions).
 jsonschema = { version = "0.47.0", default-features = false }
 
+[dev-dependencies]
+# The crate's own test-support feature, for its integration tests.
+atip-check = { path = ".", features = ["test-support"] }
+
 [target.'cfg(unix)'.dependencies]
+# Restores the default SIGPIPE action (a closed stdout ends the process by signal, as spec 8.4 asks).
+libc = "0.2"
 # A pseudo-terminal for the checks that need stdout on a terminal, and the kill of a timed-out process group.
 nix = { version = "0.31", default-features = false, features = ["term", "signal", "poll"] }
 

@@ -113,12 +113,13 @@ fn run_checker(bin: &Path) -> atip_check::report::Report {
 }
 
 #[test]
-fn atip_check_41_canon_passes_the_16_l0_checks_through_the_committed_fixture() {
+fn atip_check_41_canon_passes_the_19_l0_checks_through_the_committed_fixture() {
     let report = run_checker(Path::new(CANON));
     assert!(report.passed, "{}", report.text());
-    assert_eq!(report.checks.len(), 16);
-    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result != atip_check::report::CheckResult::Pass).map(|check| check.id).collect();
-    assert!(failing.is_empty(), "MUST and SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
+    assert_eq!(report.checks.len(), 19);
+    // A check that does not apply (`L0.next`, `L0.page`, when no call the run makes carries a next step or a page) is not a failure.
+    let failing: Vec<&str> = report.checks.iter().filter(|check| !matches!(check.result, atip_check::report::CheckResult::Pass | atip_check::report::CheckResult::Unsupported)).map(|check| check.id).collect();
+    assert!(failing.is_empty(), "the 15 MUST and 4 SHOULD checks all pass or do not apply for canon: {failing:?}\n{}", report.text());
 }
 
 #[test]
@@ -134,7 +135,7 @@ fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
     let check = report.find("L0.no-null").expect("L0.no-null");
     assert_eq!(check.result, atip_check::report::CheckResult::Fail, "{}", report.text());
     assert!(check.reason.as_deref().unwrap_or_default().contains("hint"), "{:?}", check.reason);
-    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result != atip_check::report::CheckResult::Pass).map(|check| check.id).collect();
+    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail).map(|check| check.id).collect();
     assert_eq!(failing, ["L0.no-null"], "the planted null is the only thing wrong: {}", report.text());
 }
 

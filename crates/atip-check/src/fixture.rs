@@ -54,8 +54,10 @@ impl Fixture {
 
 /// Reads and validates the fixture at `path`; the reason is one sentence naming the member at fault.
 pub fn load(path: &Path) -> Result<Fixture, String> {
-    let text = std::fs::read_to_string(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
-    let document: Value = serde_json::from_str(&text).map_err(|error| format!("{} is not JSON: {error}", path.display()))?;
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let document: Value = serde_json::from_str(&text)
+        .map_err(|error| format!("{} is not JSON: {error}", path.display()))?;
     parse(&document)
 }
 
@@ -65,31 +67,53 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
         return Err("the fixture must be a JSON object".to_string());
     };
     Ok(Fixture {
-        setup: object.get("setup").map(setup).transpose()?.unwrap_or_default(),
+        setup: object
+            .get("setup")
+            .map(setup)
+            .transpose()?
+            .unwrap_or_default(),
         env: object.get("env").map(env).transpose()?.unwrap_or_default(),
-        timeout: object.get("timeoutSeconds").map(timeout).transpose()?.unwrap_or(DEFAULT_TIMEOUT),
+        timeout: object
+            .get("timeoutSeconds")
+            .map(timeout)
+            .transpose()?
+            .unwrap_or(DEFAULT_TIMEOUT),
         probe: object.get("probe").map(probe).transpose()?,
         registry: object.get("registry").map(registry).transpose()?,
     })
 }
 
 fn setup(value: &Value) -> Result<Vec<Vec<String>>, String> {
-    let commands = value.as_array().ok_or("`setup` must be an array of argv arrays")?;
+    let commands = value
+        .as_array()
+        .ok_or("`setup` must be an array of argv arrays")?;
     commands
         .iter()
         .enumerate()
         .map(|(index, command)| {
-            let words = command.as_array().ok_or_else(|| format!("`setup/{index}` must be an array of strings"))?;
+            let words = command
+                .as_array()
+                .ok_or_else(|| format!("`setup/{index}` must be an array of strings"))?;
             if words.is_empty() {
                 return Err(format!("`setup/{index}` must not be empty"));
             }
-            words.iter().enumerate().map(|(at, word)| word.as_str().map(str::to_string).ok_or_else(|| format!("`setup/{index}/{at}` must be a string"))).collect()
+            words
+                .iter()
+                .enumerate()
+                .map(|(at, word)| {
+                    word.as_str()
+                        .map(str::to_string)
+                        .ok_or_else(|| format!("`setup/{index}/{at}` must be a string"))
+                })
+                .collect()
         })
         .collect()
 }
 
 fn env(value: &Value) -> Result<BTreeMap<String, String>, String> {
-    let object = value.as_object().ok_or("`env` must be an object of strings")?;
+    let object = value
+        .as_object()
+        .ok_or("`env` must be an object of strings")?;
     object
         .iter()
         .map(|(name, value)| {
@@ -97,49 +121,89 @@ fn env(value: &Value) -> Result<BTreeMap<String, String>, String> {
                 return Err(format!("`env` has the invalid variable name {name:?}"));
             }
             if name == "HOME" {
-                return Err("`env` must not set HOME: the checker points it into the copy of the template".to_string());
+                return Err(
+                    "`env` must not set HOME: the checker points it into the copy of the template"
+                        .to_string(),
+                );
             }
-            let value = value.as_str().filter(|text| !text.contains('\0')).ok_or_else(|| format!("`env/{name}` must be a string"))?;
+            let value = value
+                .as_str()
+                .filter(|text| !text.contains('\0'))
+                .ok_or_else(|| format!("`env/{name}` must be a string"))?;
             Ok((name.clone(), value.to_string()))
         })
         .collect()
 }
 
 fn timeout(value: &Value) -> Result<Duration, String> {
-    let seconds = value.as_f64().filter(|seconds| *seconds > 0.0 && *seconds <= MAX_TIMEOUT_SECONDS);
-    seconds.map(Duration::from_secs_f64).ok_or_else(|| format!("`timeoutSeconds` must be a number above 0 and at most {MAX_TIMEOUT_SECONDS}"))
+    let seconds = value
+        .as_f64()
+        .filter(|seconds| *seconds > 0.0 && *seconds <= MAX_TIMEOUT_SECONDS);
+    seconds.map(Duration::from_secs_f64).ok_or_else(|| {
+        format!("`timeoutSeconds` must be a number above 0 and at most {MAX_TIMEOUT_SECONDS}")
+    })
 }
 
 /// The command id pattern of the envelope schema's `meta.command`.
 fn is_command_id(words: &[String]) -> bool {
     words.iter().all(|word| {
         let mut parts = word.split('-');
-        let first_ok = parts.next().is_some_and(|part| part.starts_with(|c: char| c.is_ascii_lowercase()) && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
-        first_ok && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+        let first_ok = parts.next().is_some_and(|part| {
+            part.starts_with(|c: char| c.is_ascii_lowercase())
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        });
+        first_ok
+            && parts.all(|part| {
+                !part.is_empty()
+                    && part
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+            })
     })
 }
 
 fn probe(value: &Value) -> Result<Vec<String>, String> {
-    let text = value.as_str().ok_or("`probe` must be a string: the id of a command that runs without state")?;
+    let text = value
+        .as_str()
+        .ok_or("`probe` must be a string: the id of a command that runs without state")?;
     let words: Vec<String> = text.split_whitespace().map(str::to_string).collect();
     if words.is_empty() || !is_command_id(&words) {
-        return Err(format!("`probe` {text:?} is not a command id (lower kebab-case words separated by spaces)"));
+        return Err(format!(
+            "`probe` {text:?} is not a command id (lower kebab-case words separated by spaces)"
+        ));
     }
     Ok(words)
 }
 
 fn registry(value: &Value) -> Result<Vec<RegistryRow>, String> {
-    let rows = value.as_array().ok_or("`registry` must be an array of registry rows")?;
+    let rows = value
+        .as_array()
+        .ok_or("`registry` must be an array of registry rows")?;
     let mut parsed: Vec<RegistryRow> = Vec::with_capacity(rows.len());
     for (index, row) in rows.iter().enumerate() {
         if let Some(problem) = schemas().registry_entry_problems(row).first() {
-            return Err(format!("`registry/{index}` is not a registry row: {problem}"));
+            return Err(format!(
+                "`registry/{index}` is not a registry row: {problem}"
+            ));
         }
-        let code = row.get("code").and_then(Value::as_str).unwrap_or_default().to_string();
+        let code = row
+            .get("code")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
         if parsed.iter().any(|earlier| earlier.code == code) {
             return Err(format!("`registry/{index}` repeats the code {code}"));
         }
-        parsed.push(RegistryRow { code, exit: row.get("exit").and_then(Value::as_i64).unwrap_or_default(), retryable: row.get("retryable").and_then(Value::as_bool).unwrap_or_default() });
+        parsed.push(RegistryRow {
+            code,
+            exit: row.get("exit").and_then(Value::as_i64).unwrap_or_default(),
+            retryable: row
+                .get("retryable")
+                .and_then(Value::as_bool)
+                .unwrap_or_default(),
+        });
     }
     Ok(parsed)
 }
@@ -167,7 +231,14 @@ mod tests {
         assert_eq!(fixture.probe_id().as_deref(), Some("member list"));
         assert_eq!(fixture.row("USAGE").map(|row| row.exit), Some(2));
         let empty = parse(&json!({})).expect("an empty fixture is valid");
-        assert_eq!((empty.timeout, empty.probe.is_none(), empty.registry.is_none()), (DEFAULT_TIMEOUT, true, true));
+        assert_eq!(
+            (
+                empty.timeout,
+                empty.probe.is_none(),
+                empty.registry.is_none()
+            ),
+            (DEFAULT_TIMEOUT, true, true)
+        );
     }
 
     #[test]
@@ -185,9 +256,18 @@ mod tests {
             (json!({"probe": "Status"}), "probe"),
             (json!({"probe": "  "}), "probe"),
             (json!({"registry": {}}), "registry"),
-            (json!({"registry": [{"code": "usage", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"}]}), "registry/0"),
-            (json!({"registry": [{"code": "USAGE", "exit": 3, "retryable": false, "meaning": "m", "fix": "f"}]}), "registry/0"),
-            (json!({"registry": [{"code": "USAGE", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"}, {"code": "USAGE", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"}]}), "repeats"),
+            (
+                json!({"registry": [{"code": "usage", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"}]}),
+                "registry/0",
+            ),
+            (
+                json!({"registry": [{"code": "USAGE", "exit": 3, "retryable": false, "meaning": "m", "fix": "f"}]}),
+                "registry/0",
+            ),
+            (
+                json!({"registry": [{"code": "USAGE", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"}, {"code": "USAGE", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"}]}),
+                "repeats",
+            ),
         ] {
             let reason = parse(&document).expect_err(&format!("{document} must be refused"));
             assert!(reason.contains(needle), "{reason:?} must name {needle:?}");

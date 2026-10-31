@@ -37,13 +37,22 @@ fn walk(dir: &Path, prefix: &str, snapshot: &mut Snapshot) -> io::Result<()> {
         let relative = format!("{prefix}/{}", entry.file_name().to_string_lossy());
         let kind = entry.file_type()?;
         if kind.is_symlink() {
-            snapshot.insert(relative, Entry::Symlink(fs::read_link(entry.path())?.to_string_lossy().into_owned()));
+            snapshot.insert(
+                relative,
+                Entry::Symlink(fs::read_link(entry.path())?.to_string_lossy().into_owned()),
+            );
         } else if kind.is_dir() {
             snapshot.insert(relative.clone(), Entry::Dir);
             walk(&entry.path(), &relative, snapshot)?;
         } else {
             let bytes = fs::read(entry.path())?;
-            snapshot.insert(relative, Entry::File { size: bytes.len() as u64, sha256: Sha256::digest(&bytes).into() });
+            snapshot.insert(
+                relative,
+                Entry::File {
+                    size: bytes.len() as u64,
+                    sha256: Sha256::digest(&bytes).into(),
+                },
+            );
         }
     }
     Ok(())
@@ -54,7 +63,11 @@ pub fn changed(before: &Snapshot, after: &Snapshot) -> Vec<String> {
     let mut paths: Vec<&String> = before.keys().chain(after.keys()).collect();
     paths.sort();
     paths.dedup();
-    paths.into_iter().filter(|path| before.get(*path) != after.get(*path)).map(|path| path.trim_start_matches('/').to_string()).collect()
+    paths
+        .into_iter()
+        .filter(|path| before.get(*path) != after.get(*path))
+        .map(|path| path.trim_start_matches('/').to_string())
+        .collect()
 }
 
 /// Copies the tree at `from` to `to` (created), keeping links as links and permission bits.
@@ -94,7 +107,10 @@ mod tests {
         fs::create_dir(dir.path().join("made")).expect("mkdir");
         fs::write(dir.path().join("made").join("inside"), "").expect("write");
         let after = take(dir.path()).expect("snapshot");
-        assert_eq!(changed(&before, &after), ["edited", "gone", "made", "made/inside"]);
+        assert_eq!(
+            changed(&before, &after),
+            ["edited", "gone", "made", "made/inside"]
+        );
         assert!(changed(&after, &after).is_empty());
     }
 
@@ -107,8 +123,17 @@ mod tests {
         std::os::unix::fs::symlink("sub/file", from.path().join("link")).expect("symlink");
         let copy = to.path().join("copy");
         copy_tree(from.path(), &copy).expect("copy");
-        assert_eq!(changed(&take(from.path()).expect("snapshot"), &take(&copy).expect("snapshot")), Vec::<String>::new());
+        assert_eq!(
+            changed(
+                &take(from.path()).expect("snapshot"),
+                &take(&copy).expect("snapshot")
+            ),
+            Vec::<String>::new()
+        );
         fs::write(copy.join("sub").join("file"), "y").expect("write");
-        assert_eq!(fs::read_to_string(from.path().join("sub").join("file")).expect("read"), "x");
+        assert_eq!(
+            fs::read_to_string(from.path().join("sub").join("file")).expect("read"),
+            "x"
+        );
     }
 }

@@ -37,13 +37,19 @@ fn table() -> Vec<Row> {
         .map(|line| {
             let cells: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
             assert_eq!(cells.len(), 4, "{line}");
-            Row { file: cells[0].trim_matches('`').to_string(), expect: cells[1].to_string(), by: cells[2].to_string(), why: cells[3].to_string() }
+            Row {
+                file: cells[0].trim_matches('`').to_string(),
+                expect: cells[1].to_string(),
+                by: cells[2].to_string(),
+                why: cells[3].to_string(),
+            }
         })
         .collect()
 }
 
 fn load(file: &str) -> Value {
-    serde_json::from_str(&std::fs::read_to_string(root().join(file)).expect("example")).unwrap_or_else(|error| panic!("{file}: {error}"))
+    serde_json::from_str(&std::fs::read_to_string(root().join(file)).expect("example"))
+        .unwrap_or_else(|error| panic!("{file}: {error}"))
 }
 
 /// The registry rows of the two registries the examples ship.
@@ -53,7 +59,11 @@ fn registry() -> Vec<RegistryRow> {
         for row in load(file)["data"]["errors"].as_array().expect("errors") {
             let code = row["code"].as_str().expect("code").to_string();
             if !rows.iter().any(|known| known.code == code) {
-                rows.push(RegistryRow { code, exit: row["exit"].as_i64().expect("exit"), retryable: row["retryable"].as_bool().expect("retryable") });
+                rows.push(RegistryRow {
+                    code,
+                    exit: row["exit"].as_i64().expect("exit"),
+                    retryable: row["retryable"].as_bool().expect("retryable"),
+                });
             }
         }
     }
@@ -79,31 +89,60 @@ fn atip_check_34_every_valid_envelope_example_of_the_contract_repository_passes(
     for row in table().iter().filter(|row| row.expect == "accept") {
         let document = load(&row.file);
         for (layer, problems) in layers(&document, &rows) {
-            assert!(problems.is_empty(), "{} is rejected by {layer}: {problems:?}", row.file);
+            assert!(
+                problems.is_empty(),
+                "{} is rejected by {layer}: {problems:?}",
+                row.file
+            );
         }
         accepted += 1;
     }
-    assert_eq!(accepted, 23, "the 23 report-*.json examples of the pinned commit");
+    assert_eq!(
+        accepted, 23,
+        "the 23 report-*.json examples of the pinned commit"
+    );
     // The one that the unknown-command rules apply to is among them.
-    assert_eq!(load("report-failure-unknown-command.json")["error"]["code"], "UNKNOWN_COMMAND");
+    assert_eq!(
+        load("report-failure-unknown-command.json")["error"]["code"],
+        "UNKNOWN_COMMAND"
+    );
 }
 
 #[test]
-fn atip_check_35_every_invalid_envelope_example_is_rejected_and_the_l1_and_l2_only_ones_are_skipped_with_a_reason() {
+fn atip_check_35_every_invalid_envelope_example_is_rejected_and_the_l1_and_l2_only_ones_are_skipped_with_a_reason(
+) {
     let rows = registry();
     let table = table();
     for row in &table {
         match row.expect.as_str() {
             "reject" => {
                 let found = layers(&load(&row.file), &rows);
-                let by = found.iter().find(|(layer, _)| *layer == row.by).unwrap_or_else(|| panic!("{}: {} did not look at it", row.file, row.by));
-                assert!(!by.1.is_empty(), "{} must be rejected by {}: {found:?}", row.file, row.by);
+                let by = found
+                    .iter()
+                    .find(|(layer, _)| *layer == row.by)
+                    .unwrap_or_else(|| panic!("{}: {} did not look at it", row.file, row.by));
+                assert!(
+                    !by.1.is_empty(),
+                    "{} must be rejected by {}: {found:?}",
+                    row.file,
+                    row.by
+                );
             }
             "skip" => {
-                assert!(row.by.starts_with("L1.") || row.by.starts_with("L2."), "{}: a skip names the L1 or L2 check that owns the rule: {}", row.file, row.by);
+                assert!(
+                    row.by.starts_with("L1.") || row.by.starts_with("L2."),
+                    "{}: a skip names the L1 or L2 check that owns the rule: {}",
+                    row.file,
+                    row.by
+                );
                 assert!(row.why.len() > 10, "{}: a skip says why", row.file);
                 for (layer, problems) in layers(&load(&row.file), &rows) {
-                    assert!(problems.is_empty(), "{} is skipped as an {} matter but {layer} rejects it: {problems:?}", row.file, row.by);
+                    assert!(
+                        problems.is_empty(),
+                        "{} is skipped as an {} matter but {layer} rejects it: {problems:?}",
+                        row.file,
+                        row.by
+                    );
                 }
             }
             "accept" | "registry" => {}
@@ -118,8 +157,16 @@ fn atip_check_35_every_invalid_envelope_example_is_rejected_and_the_l1_and_l2_on
     for dir in ["", "invalid"] {
         for entry in std::fs::read_dir(root().join(dir)).expect("dir") {
             let path = entry.expect("entry").path();
-            if path.extension().is_some_and(|extension| extension == "json") {
-                on_disk.push(path.strip_prefix(root()).expect("prefix").to_string_lossy().into_owned());
+            if path
+                .extension()
+                .is_some_and(|extension| extension == "json")
+            {
+                on_disk.push(
+                    path.strip_prefix(root())
+                        .expect("prefix")
+                        .to_string_lossy()
+                        .into_owned(),
+                );
             }
         }
     }
@@ -130,8 +177,13 @@ fn atip_check_35_every_invalid_envelope_example_is_rejected_and_the_l1_and_l2_on
 }
 
 #[test]
-fn atip_check_35_a_failure_envelope_that_breaks_the_registry_is_rejected_by_the_rule_that_names_it() {
-    let rows = vec![RegistryRow { code: "FINDING_NOT_FOUND".into(), exit: 2, retryable: false }];
+fn atip_check_35_a_failure_envelope_that_breaks_the_registry_is_rejected_by_the_rule_that_names_it()
+{
+    let rows = vec![RegistryRow {
+        code: "FINDING_NOT_FOUND".into(),
+        exit: 2,
+        retryable: false,
+    }];
     let failure = |extra: Value| {
         let mut document = json!({"ok": false, "error": {"code": "FINDING_NOT_FOUND", "message": "m", "retryable": false}, "meta": {"schemaVersion": "1.0", "tool": "t", "toolVersion": "1"}});
         for (key, value) in extra.as_object().expect("object") {
@@ -140,25 +192,54 @@ fn atip_check_35_a_failure_envelope_that_breaks_the_registry_is_rejected_by_the_
         document
     };
     assert!(failure_problems(&failure(json!({})), &rows, Some(2)).is_empty());
-    assert!(failure_problems(&failure(json!({"retryable": true})), &rows, Some(2))[0].contains("`retryable` true, the registry says false"));
-    assert!(failure_problems(&failure(json!({"code": "NOPE"})), &rows, Some(2))[0].contains("not in the registry"));
-    assert!(failure_problems(&failure(json!({})), &rows, Some(1))[0].contains("exited 1, the registry says 2"));
+    assert!(
+        failure_problems(&failure(json!({"retryable": true})), &rows, Some(2))[0]
+            .contains("`retryable` true, the registry says false")
+    );
+    assert!(
+        failure_problems(&failure(json!({"code": "NOPE"})), &rows, Some(2))[0]
+            .contains("not in the registry")
+    );
+    assert!(failure_problems(&failure(json!({})), &rows, Some(1))[0]
+        .contains("exited 1, the registry says 2"));
     let mut with_data = failure(json!({}));
     with_data["data"] = json!({});
     assert!(failure_problems(&with_data, &rows, Some(2))[0].contains("carries `data`"));
-    assert!(failure_problems(&with_data, &rows, None)[0].contains("carries `data`"), "without an exit the registered exit stands for it");
+    assert!(
+        failure_problems(&with_data, &rows, None)[0].contains("carries `data`"),
+        "without an exit the registered exit stands for it"
+    );
 }
 
 #[test]
-fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_keyword_is_an_annotation() {
+fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_keyword_is_an_annotation(
+) {
     // The three schemas the checker validates against are byte for byte the pinned originals (sha256 of `schema/*.schema.json` at 365244c).
     for (name, text, digest) in [
-        ("envelope.schema.json", atip::schema::ENVELOPE_SCHEMA, "055ace2ffb10eddba2c62fdff63155a83be4a8c1ba6ece73f6922f561ac8b299"),
-        ("error.schema.json", atip::schema::ERROR_SCHEMA, "49afaa3bf93d848b1e477b19b3969680b4a0818e46dbdc6c54db248d4ecfdcfb"),
-        ("registry-entry.schema.json", atip::schema::REGISTRY_ENTRY_SCHEMA, "411228ac4a2cc79ef4079161e9d015c5352bca49953aa33bf7007d0b100daedc"),
+        (
+            "envelope.schema.json",
+            atip::schema::ENVELOPE_SCHEMA,
+            "055ace2ffb10eddba2c62fdff63155a83be4a8c1ba6ece73f6922f561ac8b299",
+        ),
+        (
+            "error.schema.json",
+            atip::schema::ERROR_SCHEMA,
+            "49afaa3bf93d848b1e477b19b3969680b4a0818e46dbdc6c54db248d4ecfdcfb",
+        ),
+        (
+            "registry-entry.schema.json",
+            atip::schema::REGISTRY_ENTRY_SCHEMA,
+            "411228ac4a2cc79ef4079161e9d015c5352bca49953aa33bf7007d0b100daedc",
+        ),
     ] {
-        let actual: String = Sha256::digest(text.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect();
-        assert_eq!(actual, digest, "{name} is not the original of commit {PINNED}");
+        let actual: String = Sha256::digest(text.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(
+            actual, digest,
+            "{name} is not the original of commit {PINNED}"
+        );
     }
     // A null where the contract forbids one is rejected: the schema is what judges `L0.no-null`.
     let null_hint = json!({"ok": false, "error": {"code": "USAGE", "message": "m", "retryable": false, "hint": null}, "meta": {"schemaVersion": "1.0", "tool": "t", "toolVersion": "1"}});
@@ -168,5 +249,8 @@ fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_ke
     // `format` is an annotation: a value that is not a date-time passes a schema that says it is one.
     let validator = schemas().validator(&json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "string", "format": "date-time"})).expect("compiles");
     assert!(validator.is_valid(&json!("not a date")));
-    assert!(!validator.is_valid(&json!(3)), "the other keywords still assert");
+    assert!(
+        !validator.is_valid(&json!(3)),
+        "the other keywords still assert"
+    );
 }

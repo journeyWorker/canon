@@ -83,7 +83,18 @@ pub struct FailureBody {
 
 impl Failure {
     pub fn new(code: Code, message: impl Into<String>) -> Self {
-        Self(Box::new(FailureBody { code, message: message.into(), command: None, field: None, expected: Vec::new(), received: None, suggestions: Vec::new(), hint: None, data: None, detail: None }))
+        Self(Box::new(FailureBody {
+            code,
+            message: message.into(),
+            command: None,
+            field: None,
+            expected: Vec::new(),
+            received: None,
+            suggestions: Vec::new(),
+            hint: None,
+            data: None,
+            detail: None,
+        }))
     }
 
     #[must_use]
@@ -187,12 +198,23 @@ struct Envelope<'a> {
 }
 
 fn meta(command: Option<&'static str>) -> Meta {
-    Meta { command, contract: "atip/1", schema_version: SCHEMA_VERSION, tool: TOOL, tool_version: env!("CARGO_PKG_VERSION") }
+    Meta {
+        command,
+        contract: "atip/1",
+        schema_version: SCHEMA_VERSION,
+        tool: TOOL,
+        tool_version: env!("CARGO_PKG_VERSION"),
+    }
 }
 
 /// The success envelope of `atip check`: one compact line.
 pub fn success_line(data: &Value) -> String {
-    atip::line(&Envelope { ok: true, data: Some(data), error: None, meta: meta(Some("check")) })
+    atip::line(&Envelope {
+        ok: true,
+        data: Some(data),
+        error: None,
+        meta: meta(Some("check")),
+    })
 }
 
 /// The failure envelope: one compact line.
@@ -207,12 +229,21 @@ pub fn failure_line(failure: &Failure) -> String {
         received: failure.received.as_deref(),
         suggestions: &failure.suggestions,
     };
-    atip::line(&Envelope { ok: false, data: failure.data.as_ref(), error: Some(error), meta: meta(failure.command) })
+    atip::line(&Envelope {
+        ok: false,
+        data: failure.data.as_ref(),
+        error: Some(error),
+        meta: meta(failure.command),
+    })
 }
 
 /// The failure as text for stderr (spec 7.4), then its `detail` lines.
 pub fn failure_text(failure: &Failure) -> String {
-    let mut lines = vec![format!("{TOOL}: {}: {}", failure.code.info().code, failure.message)];
+    let mut lines = vec![format!(
+        "{TOOL}: {}: {}",
+        failure.code.info().code,
+        failure.message
+    )];
     if let Some(field) = &failure.field {
         lines.push(format!("  field: {field}"));
     }
@@ -261,15 +292,37 @@ mod tests {
     fn atip_check_03_a_failure_omits_what_it_does_not_have() {
         let line = failure_line(&Failure::new(Code::UnknownCommand, "no such command"));
         assert_eq!(line, r#"{"ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"no such command","retryable":false},"meta":{"contract":"atip/1","schemaVersion":"1.0","tool":"atip","toolVersion":""#.to_string() + env!("CARGO_PKG_VERSION") + r#""}}"#);
-        let full = failure_line(&Failure::new(Code::Usage, "m").in_command("check").field("--bin").expected(["a"]).received("b").suggestions(["a"]).hint("h"));
-        assert!(full.contains(r#""command":"check""#) && full.contains(r#""field":"--bin""#) && full.contains(r#""expected":["a"]"#) && full.contains(r#""hint":"h""#), "{full}");
+        let full = failure_line(
+            &Failure::new(Code::Usage, "m")
+                .in_command("check")
+                .field("--bin")
+                .expected(["a"])
+                .received("b")
+                .suggestions(["a"])
+                .hint("h"),
+        );
+        assert!(
+            full.contains(r#""command":"check""#)
+                && full.contains(r#""field":"--bin""#)
+                && full.contains(r#""expected":["a"]"#)
+                && full.contains(r#""hint":"h""#),
+            "{full}"
+        );
         assert!(!full.contains("null") && !full.contains("[]"));
     }
 
     #[test]
     fn atip_check_05_the_text_form_is_code_message_then_the_members_that_exist() {
-        let text = failure_text(&Failure::new(Code::Usage, "bad").field("--bin").hint("pass it").with_detail("line one\nline two".to_string()));
-        assert_eq!(text, "atip: USAGE: bad\n  field: --bin\n  hint: pass it\n  line one\n  line two");
+        let text = failure_text(
+            &Failure::new(Code::Usage, "bad")
+                .field("--bin")
+                .hint("pass it")
+                .with_detail("line one\nline two".to_string()),
+        );
+        assert_eq!(
+            text,
+            "atip: USAGE: bad\n  field: --bin\n  hint: pass it\n  line one\n  line two"
+        );
         assert!(success_line(&serde_json::json!({"level": "L0"})).contains(r#""command":"check""#));
     }
 }

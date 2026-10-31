@@ -23,7 +23,7 @@ pub enum CheckResult {
     Fail,
     /// The check needs a fixture entry the tool did not provide.
     Unprovided,
-    /// The tool does not offer the feature, so the check does not apply (decided from the self-description, an L1 matter: no L0 check is ever `unsupported`).
+    /// The check does not apply: no envelope the run saw carries what it judges (`L0.next` without a `meta.next`, `L0.page` without a `meta.page`).
     Unsupported,
     /// The rule cannot be violated alone (an L1 matter: no L0 check is ever `entailed`).
     Entailed,
@@ -42,6 +42,9 @@ pub struct Check {
     /// Why the check failed, or which fixture entry it lacks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// Things seen that the contract only recommends against (stderr output that carries no error or result). They never change the result.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub advisories: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -57,8 +60,15 @@ pub struct Report {
 
 impl Report {
     pub fn new(level: &'static str, checks: Vec<Check>) -> Self {
-        let passed = !checks.iter().any(|check| check.strength == Strength::Must && matches!(check.result, CheckResult::Fail | CheckResult::Unprovided));
-        Self { level, passed, checks }
+        let passed = !checks.iter().any(|check| {
+            check.strength == Strength::Must
+                && matches!(check.result, CheckResult::Fail | CheckResult::Unprovided)
+        });
+        Self {
+            level,
+            passed,
+            checks,
+        }
     }
 
     pub fn find(&self, id: &str) -> Option<&Check> {
@@ -66,7 +76,10 @@ impl Report {
     }
 
     fn count(&self, strength: Strength, result: CheckResult) -> usize {
-        self.checks.iter().filter(|check| check.strength == strength && check.result == result).count()
+        self.checks
+            .iter()
+            .filter(|check| check.strength == strength && check.result == result)
+            .count()
     }
 
     /// The text of the report: one line per check, then one summary line. The text is not part of the contract.
@@ -80,9 +93,10 @@ impl Report {
     pub fn summary(&self) -> String {
         let must = |result| self.count(Strength::Must, result);
         let advisories = self.count(Strength::Should, CheckResult::Fail);
+        let not_applicable = self.checks.iter().filter(|check| check.result == CheckResult::Unsupported).count();
         let verdict = if self.passed { "met" } else { "not met" };
         format!(
-            "{} {verdict}: {} MUST passed, {} MUST failed, {} MUST unprovided, {advisories} SHOULD advisories",
+            "{} {verdict}: {} MUST passed, {} MUST failed, {} MUST unprovided, {not_applicable} not applicable, {advisories} SHOULD advisories",
             self.level,
             must(CheckResult::Pass),
             must(CheckResult::Fail),
@@ -104,7 +118,11 @@ impl Check {
             Strength::Must => "MUST",
             Strength::Should => "SHOULD",
         };
-        let base = format!("{result:<10} {strength:<6} {} (spec {})", self.id, self.rules.join(", "));
+        let base = format!(
+            "{result:<10} {strength:<6} {} (spec {})",
+            self.id,
+            self.rules.join(", ")
+        );
         match &self.reason {
             Some(reason) => format!("{base}: {reason}"),
             None => base,
@@ -113,7 +131,8 @@ impl Check {
 
     /// The `id`s of the checks that fail the level, for the error message.
     pub fn blocks_level(&self) -> bool {
-        self.strength == Strength::Must && matches!(self.result, CheckResult::Fail | CheckResult::Unprovided)
+        self.strength == Strength::Must
+            && matches!(self.result, CheckResult::Fail | CheckResult::Unprovided)
     }
 }
 
@@ -122,18 +141,40 @@ mod tests {
     use super::{Check, CheckResult, Report, Strength};
 
     fn check(id: &'static str, strength: Strength, result: CheckResult) -> Check {
-        Check { id, strength, result, rules: vec!["1"], reason: None, observed: Vec::new() }
+        Check {
+            id,
+            strength,
+            result,
+            rules: vec!["1"],
+            reason: None,
+            advisories: Vec::new(),
+            observed: Vec::new(),
+        }
     }
 
     #[test]
     fn atip_check_25_a_level_is_met_unless_a_must_check_fails_or_is_unprovided() {
-        let all = |result| Report::new("L0", vec![check("L0.a", Strength::Must, CheckResult::Pass), check("L0.b", Strength::Must, result)]);
+        let all = |result| {
+            Report::new(
+                "L0",
+                vec![
+                    check("L0.a", Strength::Must, CheckResult::Pass),
+                    check("L0.b", Strength::Must, result),
+                ],
+            )
+        };
         assert!(all(CheckResult::Pass).passed);
         assert!(all(CheckResult::Unsupported).passed);
         assert!(all(CheckResult::Entailed).passed);
         assert!(!all(CheckResult::Fail).passed);
-        assert!(!all(CheckResult::Unprovided).passed, "a tool cannot pass by withholding fixtures");
-        let advisory = Report::new("L0", vec![check("L0.a", Strength::Should, CheckResult::Fail)]);
+        assert!(
+            !all(CheckResult::Unprovided).passed,
+            "a tool cannot pass by withholding fixtures"
+        );
+        let advisory = Report::new(
+            "L0",
+            vec![check("L0.a", Strength::Should, CheckResult::Fail)],
+        );
         assert!(advisory.passed, "a SHOULD failure never fails the level");
     }
 
@@ -141,10 +182,21 @@ mod tests {
     fn atip_check_05_the_text_has_a_line_per_check_and_one_summary() {
         let mut failing = check("L0.b", Strength::Must, CheckResult::Fail);
         failing.reason = Some("it broke".to_string());
-        let report = Report::new("L0", vec![check("L0.a", Strength::Should, CheckResult::Pass), failing]);
+        let report = Report::new(
+            "L0",
+            vec![check("L0.a", Strength::Should, CheckResult::Pass), failing],
+        );
         let text = report.text();
         assert_eq!(text.lines().count(), 3);
-        assert!(text.contains("fail       MUST   L0.b (spec 1): it broke"), "{text}");
-        assert!(text.ends_with("L0 not met: 0 MUST passed, 1 MUST failed, 0 MUST unprovided, 0 SHOULD advisories"), "{text}");
+        assert!(
+            text.contains("fail       MUST   L0.b (spec 1): it broke"),
+            "{text}"
+        );
+        assert!(
+            text.ends_with(
+                "L0 not met: 0 MUST passed, 1 MUST failed, 0 MUST unprovided, 0 not applicable, 0 SHOULD advisories"
+            ),
+            "{text}"
+        );
     }
 }
