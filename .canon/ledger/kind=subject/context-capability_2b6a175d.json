@@ -1,0 +1,43 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-31T10:46:41.271981Z",
+  "change_ids": [
+    "canon-0-30-spec-backfill",
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-record-links",
+    "canon-0-31-cli-ids",
+    "canon-0-31-brief-format",
+    "canon-0-31-loop",
+    "canon-0-33-atip-l0",
+    "canon-0-33-atip-crate"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-33-orch"
+    },
+    "change": "canon-0-33-atip-crate",
+    "reason": "0.33 ATIP L0 changes approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-33-orch"
+    },
+    "reason": "0.33 ATIP L0 changes approved"
+  },
+  "subject_id": "context-capability",
+  "summary": "",
+  "title": "Context: the authoring-surface capability query"
+}
