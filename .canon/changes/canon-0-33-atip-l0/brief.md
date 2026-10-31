@@ -114,13 +114,15 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
 | `INPUT_ELEMENT_FAILED` | `BATCH_INCOMPLETE` | 1 |
 | `INPUT_BATCH_UNSUPPORTED`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`, `INPUT_UNREADABLE`, `INPUT_STDIN_TTY` | `INPUT_INVALID` | 2 |
 | `INPUT_STDIN_CONFLICT` | `USAGE`, `field`는 `--input` | 2 |
+| `--input`이 두 번 오거나 값이 없는 호출 | `USAGE`, `field`는 `--input` | 2 |
 | `INPUT_INVALID`, `INPUT_CONFLICT`, `INPUT_TOO_LARGE` | 그대로 | 2 |
 | `INVALID_CURSOR` | `CURSOR_INVALID` | 2 |
 | `UNKNOWN_FIELD` | `USAGE` | 2 |
 | `USAGE`(모르는 명령, 명령 없는 호출) | `UNKNOWN_COMMAND`, `COMMAND_REQUIRED` | 2 |
 | (없음) | `INTERNAL` | 1 |
 
-- `INPUT_INVALID`는 `--input`을 읽거나 나눌 수 없을 때와 입력 문서가 조각 스키마를 어길 때만 쓴다. `INPUT_STDIN_TTY`는 `field`가 `--input`이다. 다른 옵션도 stdin을 읽는 경우(`INPUT_STDIN_CONFLICT`)는 사용 오류다. 합쳐진 `INPUT_*`의 구분은 메시지와 `field`에 남는다. `BATCH_INCOMPLETE`의 `data` 모양과 입력 문서 포인터는 지금 그대로다.
+- `INPUT_INVALID`는 `--input`의 값 자체를 읽거나 나눌 수 없을 때와 입력 문서가 조각 스키마를 어길 때만 쓴다(계약 11.7 1-2단계). `--input`이 두 번 오거나 값이 없는 호출과, 다른 옵션도 stdin을 읽는 호출(`INPUT_STDIN_CONFLICT`)은 모양 오류라 `USAGE`이고 `field`가 `--input`이다. `INPUT_STDIN_TTY`는 `INPUT_INVALID`이고 `field`가 `--input`이다. `BATCH_INCOMPLETE`의 `data` 모양과 입력 문서 포인터는 지금 그대로다.
+- `INPUT_INVALID` 오류에는 `--input` 값의 형식 문제 다섯 가지를 가르는 `x-canon: {reason}`이 붙는다. 값은 `unreadable`, `tty`, `empty`, `syntax`, `batch-unsupported` 중 하나다. 계약의 오류 스키마가 `x-<tool>` 멤버를 허용한다. 입력 문서가 조각 스키마를 어기는 경우는 `field`가 문서 포인터이고 `reason`이 없다.
 - canon이 만들 수 있는 예약 코드는 레지스트리에 계약의 종료 값과 retryable로 등록된다. 예약 코드 12개 중 `OPERATION_REUSED`만 canon에 `--operation`이 없어 등록하지 않는다.
 - 버그로 panic이 나면 JSON 모드에서 `INTERNAL`(exit 1) 봉투가 나온다. 메시지가 보고 방법을 알려 준다. 지금은 exit 101이다. 닫힌 stdout으로 SIGPIPE를 받아 죽는 경우는 0.20처럼 신호 종료(128+n)로 남는다. 신호 종료는 레지스트리 밖이다.
 - 코드 이름이 바뀐 곳은 명령 명세 파일의 오류 표, 명령별 코드 목록, 스키마 응답, CHANGELOG의 대체표다.
@@ -180,7 +182,8 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
   - 옛 코드 문자열이 어떤 소스, 명세 파일, 스킬에도 없음을 테스트가 확인한다.
   - 실패 경로: 시험용으로 panic을 일으키면 JSON 모드에서 `INTERNAL` 봉투와 exit 1이 나온다. 종료 값 101은 나오지 않는다.
   - 닫힌 stdout으로 SIGPIPE를 받아 죽으면 신호 종료 값이고 레지스트리 코드가 아니다.
-  - `--input -`를 쓰면서 다른 옵션도 stdin을 읽는 호출은 `INPUT_STDIN_CONFLICT`였고 이제 exit 2, `USAGE`, `field`가 `--input`이다. 터미널에서 `--input -`를 쓰는 호출은 `INPUT_INVALID`, `field`가 `--input`이다.
+  - `--input -`를 쓰면서 다른 옵션도 stdin을 읽는 호출은 `INPUT_STDIN_CONFLICT`였고 이제 exit 2, `USAGE`, `field`가 `--input`이다. `--input`을 두 번 주거나 값 없이 주는 호출도 exit 2, `USAGE`, `field`가 `--input`이다. 터미널에서 `--input -`를 쓰는 호출은 `INPUT_INVALID`, `field`가 `--input`이다.
+  - `INPUT_INVALID`가 되는 형식 문제 다섯 가지는 각 오류에 해당 `x-canon.reason`이 있다. 읽을 수 없는 파일은 `unreadable`, 터미널은 `tty`, 빈 값은 `empty`, JSON 문법 오류는 `syntax`, 단일 명령에 준 배열은 `batch-unsupported`다. 오류 개체는 계약 오류 스키마를 통과한다.
 - F7:
   - 소스에서 종료 값을 덮어쓰는 호출이 없음을 테스트가 확인한다. ==**모든 오류 코드는 레지스트리의 종료 값으로 끝난다.**==
   - 쓸 수 없는 대상에 쓰는 명령은 exit 2와 사전 조건 코드이고 아무것도 바뀌지 않는다. 첫 기록을 쓴 뒤 쓰기가 실패하는 시험은 exit 1, `WRITE_FAILED`다.
@@ -192,7 +195,7 @@ canon의 `--json` 출력은 atip/1 L0와 다르다. meta에 도구 이름과 계
 
 ## Questions and assumptions
 
-- 계약 저자가 정했다. `INPUT_*`는 F6 표대로 간다. `INPUT_STDIN_CONFLICT`는 `USAGE`이고 `INPUT_STDIN_TTY`는 `INPUT_INVALID`다. `INPUT_MISSING`은 레지스트리에 없고 시나리오 문장에만 나오므로 문장을 고친다.
+- 계약 저자가 정했다. `INPUT_*`는 F6 표대로 간다. `--input` 모양 오류(두 번, 값 없음, 다른 옵션도 stdin을 읽음)는 `USAGE`이고 `field`가 `--input`이다. `INPUT_STDIN_TTY`는 `INPUT_INVALID`다. `INPUT_INVALID`의 형식 문제 다섯 가지는 코드를 나누지 않고 `x-canon.reason`으로 가른다. 정식 분리는 atip/2 후보다. `INPUT_MISSING`은 레지스트리에 없고 시나리오 문장에만 나오므로 문장을 고친다.
 - 계약 저자가 정했다. panic은 `INTERNAL`(exit 1)이고 메시지가 보고 방법을 알려 준다. SIGPIPE 종료는 신호 종료로 남는다. 계약 8.4가 신호 종료를 레지스트리 밖에 둔다.
 - 계약 저자가 정했다. `*_FAILED`류 13개는 같은 상황이 작업 전과 중에 모두 날 때만 나눈다. 작업 전에만 나면 exit 2, 작업 중에만 나면 exit 1이다. `WRITE_FAILED`는 exit 1이다.
 - 계약 저자가 정했다. 다음 단계의 `why`는 `reason`, `actor`와 `role` 표시는 `x-canon`이다. 자리표시자가 필요한 단계는 다음 단계에서 뺀다. 역할별 안내에서 이 단계를 읽던 에이전트 흐름이 바뀐다.
