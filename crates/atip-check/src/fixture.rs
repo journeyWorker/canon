@@ -1,7 +1,7 @@
 //! The tool's fixture file (approaches/checker.md 5), the L0 and L1 keys of it.
 //!
 //! A fixture is a JSON object. At L0 the checker reads `contractVersion`, `setup`, `env`, `timeoutSeconds`,
-//! `probe`, `globalOptions`, `registry` (a list, or `"from-schema"`), `warnings` and, in `commands`, the invocations `ok`, `refused`,
+//! `prepare` (programs run before `setup`), `probe`, `globalOptions`, `registry` (a list, or `"from-schema"`), `warnings` and, in `commands`, the invocations `ok`, `refused`,
 //! `paged` and `missingValue`. At L1 it also reads, in `commands`, `fields` (selections) and `domainRejects` (values outside a
 //! pattern or a structural domain, by argument). The other members of `commands` (`batchFailsAt`, `preview`,
 //! `allowedEffects`, `async`, ...), `search` and any other member belong to L2 and are ignored when present.
@@ -55,6 +55,8 @@ pub struct Fixture {
     pub setup: Vec<Vec<String>>,
     /// The fixture's own environment variables.
     pub env: BTreeMap<String, String>,
+    /// Programs the checker runs once in the template directory before `setup`, with `env` applied: environment preparation (`git init`, an empty commit) the tool cannot do itself. Argv arrays of any program, no shell; the tool's own state is `setup`'s.
+    pub prepare: Vec<Vec<String>>,
     pub timeout: Duration,
     /// The id of the command that runs without state, split into words.
     pub probe: Option<Vec<String>>,
@@ -151,6 +153,11 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
             .transpose()?
             .unwrap_or_default(),
         env: object.get("env").map(env).transpose()?.unwrap_or_default(),
+        prepare: object
+            .get("prepare")
+            .map(|value| argv_list(value, "prepare"))
+            .transpose()?
+            .unwrap_or_default(),
         timeout: object
             .get("timeoutSeconds")
             .map(timeout)

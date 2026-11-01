@@ -523,6 +523,23 @@ impl Run<'_> {
         Ok(())
     }
 
+    /// A value for `option`: one a documented example gives it (a value the author wrote is a value the parser takes), else a generated one; never one of `avoid`.
+    fn choose(doc: &CommandDoc, option: &Arg, avoid: &[Value]) -> Option<String> {
+        let avoided: Vec<String> = avoid.iter().map(witness::word_of).collect();
+        let from_examples = doc.examples.iter().filter_map(|line| {
+            let words = invocation::split_line(line).ok()?;
+            let parsed = invocation::parse(doc, words.get(1..)?).ok()?;
+            parsed.items.iter().find_map(|item| match item {
+                Item::Option { name, value: Some(value) } if *name == option.name => Some(value.clone()),
+                _ => None,
+            })
+        });
+        from_examples
+            .filter(|word| !avoided.contains(word))
+            .find(|word| invocation::value_problem(option, &witness::typed(option, word)).is_none())
+            .or_else(|| witness::generate(option, avoid))
+    }
+
     fn plan_paging_of(&mut self, run: &mut L1Run, doc: &CommandDoc, base: &Invocation) -> Result<(), RunError> {
         let mut limited = base.clone();
         invocation::remove_option(&mut limited, "all");
@@ -574,7 +591,7 @@ impl Run<'_> {
                     invocation::remove_option(&mut changed, &option.name);
                 } else {
                     let current = args.options.get(&option.name).cloned().into_iter().collect::<Vec<_>>();
-                    let Some(word) = witness::generate(option, &current) else { continue };
+                    let Some(word) = Self::choose(doc, option, &current) else { continue };
                     invocation::set_option(&mut changed, &option.name, Some(word));
                 }
                 variants.push((format!("--{} changed", option.name), invocation::render(&changed)));
@@ -585,7 +602,7 @@ impl Run<'_> {
                     invocation::set_option(&mut changed, &option.name, None);
                 } else {
                     let defaults = [option.default.clone()];
-                    let Some(word) = witness::generate(option, &defaults) else { continue };
+                    let Some(word) = Self::choose(doc, option, &defaults) else { continue };
                     invocation::set_option(&mut changed, &option.name, Some(word));
                 }
                 variants.push((format!("--{} added", option.name), invocation::render(&changed)));

@@ -55,6 +55,8 @@ pub struct Call {
     pub empty: bool,
     /// Run in an empty directory and an empty `HOME` with the fixture's environment: the fixture state without its `setup` (`L1.validators`: a validator reads no state, spec 10.8.3).
     pub without_setup: bool,
+    /// Run this program instead of the tool (a `prepare` command of the fixture).
+    pub program: Option<String>,
 }
 
 impl Call {
@@ -72,6 +74,7 @@ impl Call {
             measure: false,
             empty: false,
             without_setup: false,
+            program: None,
         }
     }
 
@@ -159,6 +162,8 @@ pub enum RunError {
     Spawn(String),
     /// A `setup` command failed.
     Setup(String),
+    /// A `prepare` command failed or could not be started: a defect of the fixture, not of the tool.
+    Prepare(String),
     /// The checker's own scratch space failed.
     Scratch(String),
 }
@@ -206,6 +211,27 @@ impl Runner {
                 words
             }),
         };
+        for command in &fixture.prepare {
+            let template = runner.template.clone();
+            let Some((program, args)) = command.split_first() else { continue };
+            let mut call = Call::new(args.iter().cloned());
+            call.program = Some(program.clone());
+            let outcome = runner
+                .execute(&call, &template)
+                .map_err(|error| RunError::Prepare(format!("the prepare command `{}` cannot be started: {error}", command.join(" "))))?;
+            if outcome.exit != Exit::Code(0) {
+                let detail = match outcome.exit {
+                    Exit::Code(code) => format!("exited {code}"),
+                    Exit::Signal(signal) => format!("was killed by signal {signal}"),
+                    Exit::TimedOut => format!("ran over the {} second limit", runner.timeout.as_secs_f64()),
+                };
+                return Err(RunError::Prepare(format!(
+                    "the prepare command `{}` {detail}: {}",
+                    command.join(" "),
+                    tail(&outcome.stderr)
+                )));
+            }
+        }
         for command in &fixture.setup {
             let template = runner.template.clone();
             let outcome = runner
@@ -349,7 +375,10 @@ impl Runner {
     }
 
     fn command(&self, call: &Call, root: &Path) -> Command {
-        let mut command = Command::new(&self.bin);
+        let mut command = match &call.program {
+            Some(program) => Command::new(program),
+            None => Command::new(&self.bin),
+        };
         command
             .args(&call.argv)
             .current_dir(root.join("work"))
@@ -838,5 +867,35 @@ mod tests {
             reason.contains("exited 3") && reason.contains("broken"),
             "{reason}"
         );
+    }
+
+    #[test]
+    fn atip_checkl1_prepare_programs_run_before_setup_with_the_fixture_environment_and_are_not_a_change_a_refusal_made() {
+        let mut prepared = fixture(&[&["-c", "cat prepared.txt >&2; echo \"$FIXTURE_VAR\" >&2; exit 2"]], Duration::from_secs(10));
+        prepared.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
+        let runner = Runner::new("/bin/sh".as_ref(), &prepared);
+        let error = runner.expect_err("the setup command exits 2");
+        let super::RunError::Setup(reason) = error else { panic!("a setup error") };
+        assert!(reason.contains("prepared") && reason.contains("yes"), "the program ran first, with the fixture's variable: {reason}");
+        // A refusal that changes nothing is not charged with the file the prepare command made.
+        let mut quiet = fixture(&[], Duration::from_secs(10));
+        quiet.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
+        let mut runner = Runner::new("/bin/sh".as_ref(), &quiet).expect("runner");
+        let outcome = runner.run(&sh("test -f prepared.txt; exit 2")).expect("run");
+        assert_eq!(outcome.exit, Exit::Code(2));
+        assert!(outcome.changes.is_empty(), "{:?}", outcome.changes);
+    }
+
+    #[test]
+    fn atip_checkl1_a_failing_prepare_command_is_a_defect_of_the_fixture_named_by_its_command() {
+        let mut failing = fixture(&[], Duration::from_secs(10));
+        failing.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "echo no git >&2; exit 4".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &failing).expect_err("prepare fails");
+        let super::RunError::Prepare(reason) = error else { panic!("a prepare error") };
+        assert!(reason.contains("exited 4") && reason.contains("no git"), "{reason}");
+        let mut missing = fixture(&[], Duration::from_secs(10));
+        missing.prepare = vec![vec!["/nonexistent/atip-prepare".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &missing).expect_err("prepare cannot start");
+        assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("cannot be started")));
     }
 }

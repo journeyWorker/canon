@@ -24,6 +24,26 @@
           "1",
           "--json"
         ]
+      ],
+      "paged": [
+        [
+          "query",
+          "--kind",
+          "subject",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ],
+      "fields": [
+        [
+          "domain",
+          "at"
+        ],
+        [
+          "actor",
+          "title"
+        ]
       ]
     },
     "status": {
@@ -31,6 +51,57 @@
         [
           "status",
           "--json"
+        ]
+      ]
+    },
+    "finding list": {
+      "ok": [
+        [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ],
+      "fields": [
+        [
+          "reviewer",
+          "summary"
+        ]
+      ]
+    },
+    "divergence list": {
+      "ok": [
+        [
+          "divergence",
+          "list",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "divergence",
+          "list",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ],
+      "fields": [
+        [
+          "state"
         ]
       ]
     }
@@ -971,6 +1042,88 @@
       "core",
       "--title",
       "Beta"
+    ],
+    [
+      "change",
+      "new",
+      "add-login",
+      "--subject",
+      "alpha",
+      "--title",
+      "Add login"
+    ],
+    [
+      "finding",
+      "add",
+      "--change",
+      "add-login",
+      "--round",
+      "1",
+      "--seq",
+      "1",
+      "--severity",
+      "note",
+      "--actor",
+      "fixture",
+      "--summary",
+      "first"
+    ],
+    [
+      "finding",
+      "add",
+      "--change",
+      "add-login",
+      "--round",
+      "1",
+      "--seq",
+      "2",
+      "--severity",
+      "note",
+      "--actor",
+      "fixture",
+      "--summary",
+      "second"
+    ],
+    [
+      "scenario",
+      "new",
+      "auth.login.01",
+      "--title",
+      "First",
+      "--subject",
+      "alpha"
+    ],
+    [
+      "scenario",
+      "new",
+      "auth.login.02",
+      "--title",
+      "Second",
+      "--subject",
+      "alpha"
+    ],
+    [
+      "subject",
+      "show",
+      "alpha"
+    ],
+    [
+      "divergence",
+      "add",
+      "auth.login.01",
+      "--actor",
+      "fixture",
+      "--role",
+      "reviewer"
+    ],
+    [
+      "divergence",
+      "add",
+      "auth.login.02",
+      "--actor",
+      "fixture",
+      "--role",
+      "reviewer"
     ]
   ],
   "timeoutSeconds": 120,
@@ -1027,5 +1180,23 @@
     "TASK_REIMPORT_INCOMPLETE",
     "TASK_STATUS_NOT_REFRESHED",
     "UNKNOWN_ROLE_IGNORED"
+  ],
+  "prepare": [
+    [
+      "git",
+      "init",
+      "-q"
+    ],
+    [
+      "git",
+      "-c",
+      "user.name=fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "commit",
+      "--allow-empty",
+      "-qm",
+      "fixture"
+    ]
   ]
 }

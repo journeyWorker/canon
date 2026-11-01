@@ -182,6 +182,9 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         RunError::Setup(reason) => {
             refuse(Code::FixtureInvalid, reason, "--fixture").reason("SETUP_FAILED")
         }
+        RunError::Prepare(reason) => {
+            refuse(Code::FixtureInvalid, reason, "--fixture").reason("PREPARE_FAILED")
+        }
         RunError::Scratch(reason) => scratch_failure(reason),
     };
     let runner = Runner::new(&bin, &fixture).map_err(from_run)?;
