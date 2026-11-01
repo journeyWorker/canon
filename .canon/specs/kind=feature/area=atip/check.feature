@@ -447,10 +447,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:happy
   @flow:canon-0-33-atip-check.F6
   @atip.check.41
-  Scenario: canon passes the 27 applicable L0 checks through the committed fixture
+  Scenario: canon passes the 26 applicable L0 checks through the committed fixture
     Given canon built from this checkout and its committed fixture
     When atip check runs at L0
-    Then the 21 MUST and 6 SHOULD checks pass, L0.next and L0.page among them because the fixture has a paging call and a next-step call, L0.contract does not apply, and the level is met
+    Then the 21 MUST and 5 SHOULD checks pass, L0.next and L0.page among them because the fixture has a paging call and a next-step call, L0.contract (a 1.0 rule) and L0.usage-hint (canon's every USAGE names a field) do not apply, and the level is met
 
   # canon: {"schema":1,"at":"2026-10-31T11:47:16Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
   @subject:atip-check
@@ -458,8 +458,8 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:failure
   @flow:canon-0-33-atip-check.F6
   @atip.check.42
-  Scenario: A canon whose error prints hint: null fails L0.no-null
-    Given canon wrapped so that every error that has a hint prints hint: null instead
+  Scenario: A canon whose error prints a null member fails L0.no-null
+    Given canon wrapped so that every error that has a hint also prints a null member before it
     When atip check runs at L0
     Then L0.no-null is fail and it is the only check that fails
 
@@ -814,3 +814,14 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given a fake tool whose refusal changes the state the probe reports
     When atip check runs
     Then L0.refusal-effects is fail naming what the probe then reports
+
+  # canon: {"schema":1,"at":"2026-11-01T07:59:46Z","actor":{"agent_id":"impl-atip-check-1-1","role":"implementer","session_id":"s-0-34-check-1-1"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-34-atip-check-1-1.F6
+  @atip.check.75
+  Scenario: A canon whose hint is prose starting with its name fails L0.hint-form
+    Given canon wrapped so that every hint of its errors is prose that starts with `canon ` and is not one command line
+    When atip check runs at L0 with the committed fixture
+    Then L0.hint-form is fail naming the hint and no other check fails, so the CI job goes red
