@@ -122,7 +122,7 @@ pub fn ids() -> [&'static str; 28] {
 }
 
 /// The ids of the L1 checks, in table order.
-pub fn l1_ids() -> [&'static str; 30] {
+pub fn l1_ids() -> [&'static str; 31] {
     l1::ids()
 }
 
@@ -271,6 +271,8 @@ struct CommandCalls {
     ok: Vec<usize>,
     refused: Vec<usize>,
     missing: Vec<MissingCalls>,
+    /// The fixture's `paged` invocations: each is meant to return `meta.page.nextCursor`.
+    paged: Vec<usize>,
     /// The command once more with `--cursor x --json`.
     cursor: usize,
 }
@@ -411,10 +413,14 @@ impl Run<'_> {
                 ok: Vec::new(),
                 refused: Vec::new(),
                 missing: Vec::new(),
+                paged: Vec::new(),
                 cursor: 0,
             };
             for argv in &entry.ok {
                 calls.ok.push(self.invoke(Call::new(in_json_mode(argv)))?);
+            }
+            for argv in &entry.paged {
+                calls.paged.push(self.invoke(Call::new(in_json_mode(argv)))?);
             }
             for argv in &entry.refused {
                 calls.refused.push(self.invoke(Call::new(in_json_mode(argv)))?);
@@ -1516,8 +1522,35 @@ impl<'a> Judge<'a> {
                 });
             }
         }
+        // A `paged` invocation is one the fixture says returns a next cursor in its state.
+        for (id, command) in self.fixture.commands.iter().flatten().zip(&self.calls.commands).map(|((id, _), calls)| (id, calls)) {
+            for index in &command.paged {
+                c.own(*index);
+                let carries = self
+                    .envelope(*index)
+                    .and_then(|document| document.pointer("/meta/page/nextCursor"))
+                    .is_some_and(Value::is_string);
+                c.holds("paged-next-cursor", carries, || {
+                    format!("{} is listed as `paged` for {id} and its answer has no meta.page.nextCursor", self.label(*index))
+                });
+                exercised |= carries;
+            }
+        }
         if exercised {
             return c.finish_as(End::Observed);
+        }
+        // Nothing carried a page. Which commands page (spec 6.9): from L1 the command documents say, at L0 observation does.
+        if let Some(l1) = self.l1 {
+            let pages: Vec<&str> = l1.docs.commands.iter().filter(|(_, doc)| doc.has_option("cursor")).map(|(id, _)| id.as_str()).collect();
+            return c.finish_as(if pages.is_empty() {
+                End::Unsupported("no command document declares --cursor".to_string())
+            } else {
+                End::Unprovided(format!(
+                    "{} declare{} --cursor and no run saw a meta.page.nextCursor: list an invocation that pages under `paged` in the fixture",
+                    pages.join(", "),
+                    if pages.len() == 1 { "s" } else { "" }
+                ))
+            });
         }
         let Some(commands) = &self.fixture.commands else {
             return c.finish_as(End::Unprovided("the fixture has no `commands`".to_string()));
@@ -1525,7 +1558,7 @@ impl<'a> Judge<'a> {
         if commands.is_empty() {
             return c.finish_as(End::Unprovided("the fixture's `commands` is empty".to_string()));
         }
-        // No answer carried a page: does the tool page? A command that refuses `--cursor x` as an unknown option does not.
+        // At L0 a command that refuses `--cursor x` as an unknown option does not page; one that refuses it as a cursor does.
         let verdicts: Vec<CursorVerdict> = self
             .calls
             .commands
@@ -1534,7 +1567,7 @@ impl<'a> Judge<'a> {
             .collect();
         if verdicts.is_empty() || verdicts.iter().any(|verdict| *verdict != CursorVerdict::NoPaging) {
             return c.finish_as(End::Unprovided(
-                "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (an inconclusive answer counts as one that might page): list an `ok` invocation that pages".to_string(),
+                "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (CURSOR_INVALID shows a command pages; an inconclusive answer counts as one that might): list an invocation that pages under `paged`".to_string(),
             ));
         }
         c.finish_as(End::Unsupported(
@@ -1706,6 +1739,8 @@ impl<'a> Judge<'a> {
                     schemas()
                         .registry_entry_problems(&prepared)
                         .into_iter()
+                        // From L1 the reasons of an entry are `L1.reasons`' (form, no exit of their own, the same in the list and the entry).
+                        .filter(|problem| self.l1.is_none() || !problem.starts_with("/reasons"))
                         .map(|problem| format!("the entry {} is invalid: {problem}", entry.get("code").map_or("?".to_string(), Value::to_string)))
                 })
                 .collect();
@@ -1777,8 +1812,12 @@ impl<'a> Judge<'a> {
             }
         }
         self.emitted_conditions(&mut c);
-        let end = if !offered {
+        let end = if !offered && self.fixture.registry_from_schema {
+            End::Unprovided("the fixture says `\"registry\": \"from-schema\"` and the tool does not offer schema --errors, so there is no registry to take".to_string())
+        } else if !offered {
             End::Unsupported("the tool does not offer schema --errors".to_string())
+        } else if self.fixture.registry_from_schema {
+            End::Exercised(true)
         } else if self.fixture.registry.is_none() {
             End::Unprovided("the fixture has no `registry` to compare the tool's with".to_string())
         } else if self.tool_warnings.is_some() && self.fixture.warnings.is_none() {
@@ -1797,7 +1836,16 @@ impl<'a> Judge<'a> {
         if self.claim.is_1_1() && document.pointer("/data/kind").and_then(Value::as_str) != Some(kind) {
             return Some(format!("has no data.kind {kind:?}"));
         }
-        (document.pointer(&format!("/data/{kind}")) != listed).then(|| format!("answered an entry that is not the one the list holds ({})", show(document.pointer(&format!("/data/{kind}")))))
+        let without_reasons = |entry: Option<&Value>| -> Option<Value> {
+            let mut entry = entry.cloned();
+            if self.l1.is_some() {
+                if let Some(object) = entry.as_mut().and_then(Value::as_object_mut) {
+                    object.remove("reasons");
+                }
+            }
+            entry
+        };
+        (without_reasons(document.pointer(&format!("/data/{kind}"))) != without_reasons(listed)).then(|| format!("answered an entry that is not the one the list holds ({})", show(document.pointer(&format!("/data/{kind}")))))
     }
 
     /// Every error code, reason and warning code any run emitted is registered (spec 7.3.1, 7.5.1, 7.6.2).
@@ -1928,6 +1976,10 @@ impl<'a> Judge<'a> {
         };
         c.own(group.bare);
         let code = answers(group.bare);
+        // From L1 a group that runs is `L1.groups-not-runnable`'s; this check then has nothing to say about the option.
+        if self.l1.is_some() && code.as_deref() != Some("COMMAND_REQUIRED") {
+            return c.finish_as(End::Unsupported("the group is not refused with COMMAND_REQUIRED: L1.groups-not-runnable reports it".to_string()));
+        }
         c.holds("group-is-not-runnable", code.as_deref() == Some("COMMAND_REQUIRED"), || {
             format!("{} answered {}, expected COMMAND_REQUIRED", self.label(group.bare), code.clone().unwrap_or_else(|| "no failure envelope".to_string()))
         });

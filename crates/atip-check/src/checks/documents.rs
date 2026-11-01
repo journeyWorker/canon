@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::claim::Claim;
 use crate::l1::model::CommandDoc;
 use crate::l1::project;
-use crate::schema::{schemas, Problem};
+use crate::schema::schemas;
 
 /// One condition judged: its id, and what is wrong when something is.
 pub type Finding = (&'static str, Option<String>);
@@ -191,25 +191,74 @@ pub fn fields_findings(doc: &CommandDoc, document: &Value, kept: &[String], unpr
 
 
 /// The problems of a `schema` answer against `schema-doc.schema.json`, but for what another check owns: the path words and
-/// option names (`L1.grammar`), a `null` in `meta` or `error` (`L0.no-null`) and members of a later minor (`L0.contract-version`).
+/// option names (`L1.grammar`: kebab-case, no `-id`, the reserved shapes), a `null` in `meta` or `error` (`L0.no-null`) and
+/// members of a later minor (`L0.contract-version`). The document is validated with the words and shapes `L1.grammar` judges
+/// replaced by ones that are right, so the schema reports only what is wrong besides them.
 pub fn schema_doc_problems(document: &Value, claim: Claim) -> Vec<String> {
-    let prepared = crate::claim::for_envelope_schema(document, claim);
+    let mut prepared = crate::claim::for_envelope_schema(document, claim);
+    if let Some(data) = prepared.get_mut("data") {
+        neutralise_grammar(data);
+    }
     schemas()
         .schema_doc_problem_list(&prepared)
         .into_iter()
-        .filter(|problem| !owned_by_grammar(problem))
         .map(|problem| problem.to_string())
         .collect()
 }
 
-/// Whether a schema-document problem is about a word or a name that `L1.grammar` owns: a path word or an option or operand name that is not lower kebab-case, or an option ending in `-id`.
-fn owned_by_grammar(problem: &Problem) -> bool {
-    let path = problem.path.as_str();
-    let word_position = path == "/data/command"
-        || path.starts_with("/data/path/")
-        || (path.starts_with("/data/commands/") && (path.ends_with("/command") || path.contains("/path/")))
-        || ((path.starts_with("/data/options/") || path.starts_with("/data/operands/")) && path.ends_with("/name"));
-    word_position && (problem.keyword == "pattern" || problem.keyword == "not")
+/// A kebab-case word standing for `word`: itself when it is one, else a fixed one.
+fn kebab_for(word: &str, at: usize) -> String {
+    let trimmed = word.strip_suffix("-id").unwrap_or(word);
+    if is_kebab(trimmed) {
+        trimmed.to_string()
+    } else {
+        format!("x{at}")
+    }
+}
+
+fn neutralise_words(value: &mut Value) {
+    if let Some(words) = value.as_array_mut() {
+        for (at, word) in words.iter_mut().enumerate() {
+            if let Some(text) = word.as_str() {
+                *word = Value::String(kebab_for(text, at));
+            }
+        }
+    }
+}
+
+/// `data` of a tree, group or command document with the words and shapes of `L1.grammar` made right (see [`schema_doc_problems`]).
+fn neutralise_grammar(data: &mut Value) {
+    for key in ["commands"] {
+        if let Some(entries) = data.get_mut(key).and_then(Value::as_array_mut) {
+            for entry in entries {
+                if let Some(path) = entry.get_mut("path") {
+                    neutralise_words(path);
+                }
+            }
+        }
+    }
+    if let Some(path) = data.get_mut("path") {
+        neutralise_words(path);
+    }
+    for key in ["operands", "options"] {
+        let Some(list) = data.get_mut(key).and_then(Value::as_array_mut) else { continue };
+        for (at, arg) in list.iter_mut().enumerate() {
+            let Some(object) = arg.as_object_mut() else { continue };
+            let name = object.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
+            if key == "options" {
+                let fixed = kebab_for(&name, at);
+                if let Some((_, shape)) = RESERVED_SHAPES.iter().find(|(reserved, _)| *reserved == fixed) {
+                    object.insert("valueType".to_string(), Value::String((*shape).to_string()));
+                }
+                if FLAG_ONLY.contains(&fixed.as_str()) {
+                    object.insert("flagOnly".to_string(), Value::Bool(true));
+                }
+                object.insert("name".to_string(), Value::String(fixed));
+            } else {
+                object.insert("name".to_string(), Value::String(kebab_for(&name, at)));
+            }
+        }
+    }
 }
 
 /// The option names with one reserved shape (spec 9.8, 10.13 rule 8): name and value type.

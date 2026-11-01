@@ -25,7 +25,7 @@ use crate::l1::rules as doc_rules;
 use crate::l1::witness::{Expect, GroupOutcome};
 
 /// The L1 table, in the order of approaches/checker.md.
-pub(crate) const TABLE: [Entry; 30] = [
+pub(crate) const TABLE: [Entry; 31] = [
     must("L1.tree", &["10.3", "10.13"], &[]),
     must("L1.no-state", &["10.2"], &[]),
     must("L1.walk", &["10.4", "10.5", "10.13"], &[]),
@@ -51,6 +51,7 @@ pub(crate) const TABLE: [Entry; 30] = [
     must("L1.validators", &["10.8.3"], &[Commands]),
     must("L1.output-data", &["6.6", "6.11", "10.9"], &[Commands]),
     must("L1.next", &["6.8"], &[]),
+    should("L1.hint-command", &["7.1.2"], &[]),
     must("L1.help-line", &["4.7"], &[]),
     should("L1.defaults", &["10.7.3"], &[]),
     should("L1.deterministic", &["10.2.4"], &[]),
@@ -59,7 +60,7 @@ pub(crate) const TABLE: [Entry; 30] = [
 ];
 
 /// The ids of the L1 checks, in table order.
-pub(crate) fn ids() -> [&'static str; 30] {
+pub(crate) fn ids() -> [&'static str; 31] {
     TABLE.each_ref().map(|entry| entry.id)
 }
 
@@ -190,6 +191,7 @@ impl<'a> Judge<'a> {
             self.l1_validators(),
             self.l1_output_data(),
             self.l1_next(),
+            self.l1_hint_command(),
             self.l1_help_line(),
             self.l1_defaults(),
             self.l1_deterministic(),
@@ -278,6 +280,10 @@ impl<'a> Judge<'a> {
                 }
             } else if let Some(doc) = l1.docs.commands.get(&call.id) {
                 for (condition, problem) in doc_rules::command_findings(doc, &tool, self.claim, &exit_of) {
+                    // The form of a `pattern` and the Rust limit are `L1.patterns`' (checker.md 6, 7.2).
+                    if condition == "rule-3-domain-pattern" {
+                        continue;
+                    }
                     c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
                 }
             }
@@ -371,6 +377,16 @@ impl<'a> Judge<'a> {
         c.own(self.calls.schema_errors);
         for (condition, problem) in documents::reasons_findings(entries) {
             c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
+        }
+        // The entries `schema --error <CODE>` answers are judged the same way: they are where a tool prints one code's reasons.
+        let answered: Vec<Value> = self
+            .calls
+            .error_entries
+            .iter()
+            .filter_map(|(_, index)| self.ok_envelope(*index).and_then(|document| document.pointer("/data/error")).cloned())
+            .collect();
+        for (condition, problem) in documents::reasons_findings(&answered) {
+            c.holds(condition, problem.is_none(), || format!("in `schema --error`: {}", problem.clone().unwrap_or_default()));
         }
         for (code, index) in &self.calls.error_entries {
             let Some(listed) = entries.iter().find(|entry| entry.get("code").and_then(Value::as_str) == Some(code)) else { continue };
@@ -942,6 +958,51 @@ impl<'a> Judge<'a> {
         c.finish(judged)
     }
 
+    /// A hint that starts with the tool name is a command line that parses against the `schema` document (spec 7.1.2): the command words, the
+    /// option names and the grammar of 9.12. A value that stands for a `<PLACEHOLDER>` is not judged against a domain or a constraint.
+    fn l1_hint_command(&'a self) -> Finding {
+        let l1 = self.l1();
+        let mut c = self.check("L1.hint-command");
+        if !self.claim.is_1_1() {
+            return c.finish_as(End::Unsupported("the claim is 1.0: a prose hint may start with the tool name (spec 7.1.2 binds 1.1 documents only)".to_string()));
+        }
+        if l1.docs.tree.is_none() {
+            return self.no_tree(c);
+        }
+        let tool = &l1.docs.tool;
+        let mut judged = false;
+        for (index, document) in self.envelopes() {
+            let Some(hint) = document.pointer("/error/hint").and_then(Value::as_str) else { continue };
+            if !hint.starts_with(&format!("{tool} ")) {
+                continue;
+            }
+            let words = atip::split_argv(hint);
+            let rest: Vec<String> = words.iter().skip(1).cloned().collect();
+            if rest.is_empty() || rest.iter().all(|word| word == "--help" || word == "--version") {
+                continue;
+            }
+            judged = true;
+            c.observe(index);
+            let problem = match names_command(&l1.docs, &rest) {
+                None => Some("names no command of the tool".to_string()),
+                Some(id) => match l1.docs.commands.get(&id) {
+                    None => Some(format!("names {id}, a group, which is not run")),
+                    Some(doc) => invocation::parse(doc, &rest).err().filter(|why| !why.is_empty()).or_else(|| {
+                        // Too many operands is a grammar problem of the line; a missing value is not (a hint may leave a placeholder out).
+                        invocation::parse(doc, &rest).ok().and_then(|parsed| {
+                            let args = invocation::args(doc, &parsed);
+                            invocation::requirement_problems(doc, &args).into_iter().find(|why| why.contains("too many"))
+                        })
+                    }),
+                },
+            };
+            c.holds("parses-as-a-command", problem.is_none(), || {
+                format!("{}: the hint `{hint}` {}", self.label(index), problem.clone().unwrap_or_default())
+            });
+        }
+        c.finish(judged)
+    }
+
     fn l1_help_line(&'a self) -> Finding {
         let l1 = self.l1();
         let mut c = self.check("L1.help-line");
@@ -993,14 +1054,14 @@ impl<'a> Judge<'a> {
         }
         let offered = self.docs().commands.values().any(|doc| doc.has_option("cursor"));
         if !offered {
-            return c.finish_as(End::Unsupported("no command offers --cursor".to_string()));
+            return c.finish_as(End::Unsupported("no command document declares --cursor".to_string()));
         }
-        let mut unprovided: Vec<String> = Vec::new();
-        let mut proven = false;
+        let mut unprovided: Vec<(String, String)> = Vec::new();
+        let mut proven: BTreeSet<String> = BTreeSet::new();
         for run in &l1.paging {
             c.own(run.first);
             let returned = self.ok_envelope(run.first).and_then(|document| document.pointer("/meta/page/returned")).and_then(Value::as_u64);
-            c.holds("returned-at-most-limit", returned.is_some_and(|returned| returned <= 1), || {
+            c.holds("returned-at-most-limit", !run.limited || returned.is_some_and(|returned| returned <= 1), || {
                 format!("{} has meta.page.returned {}, at most 1 for --limit 1", self.label(run.first), returned.map_or("missing".to_string(), |returned| returned.to_string()))
             });
             if let Some(next) = run.next {
@@ -1028,23 +1089,22 @@ impl<'a> Judge<'a> {
                     c.holds("changed-filter-refused", false, || format!("{}: {}", run.command, reason_of(&bad)));
                 } else if good {
                     c.holds("changed-filter-refused", true, String::new);
-                    proven = true;
+                    proven.insert(run.command.clone());
                 } else {
-                    unprovided.push(format!("{}: no changed argument was refused as a reused cursor", run.command));
+                    unprovided.push((run.command.clone(), format!("{}: no changed argument was refused as a reused cursor", run.command)));
                 }
             }
             if let Some(why) = &run.why_not {
-                unprovided.push(format!("{}: {why}", run.command));
+                unprovided.push((run.command.clone(), format!("{}: {why}", run.command)));
             }
         }
-        if !unprovided.is_empty() {
-            if !proven {
-                return c.finish_as(End::Unprovided(reason_of(&unprovided)));
-            }
-            c.notes.extend(unprovided.into_iter().map(|why| format!("not probed: {why}")));
+        for (command, why) in &l1.paging_gaps {
+            unprovided.push((command.clone(), format!("{command}: {why}")));
         }
-        if l1.paging.is_empty() {
-            return c.finish_as(End::Unprovided("the fixture lists no `ok` invocation of a command that pages".to_string()));
+        // A command that one of its invocations proved is not left unprovided by another.
+        let missing: Vec<String> = unprovided.into_iter().filter(|(command, _)| !proven.contains(command)).map(|(_, why)| why).collect();
+        if !missing.is_empty() {
+            return c.finish_as(End::Unprovided(reason_of(&missing)));
         }
         c.finish(true)
     }
@@ -1162,14 +1222,14 @@ mod tests {
     use crate::report::Strength;
 
     #[test]
-    fn atip_checkl1_table_is_thirty_checks_twenty_five_must_and_five_should() {
-        assert_eq!(ids().len(), 30);
+    fn atip_checkl1_table_is_thirty_one_checks_twenty_five_must_and_six_should() {
+        assert_eq!(ids().len(), 31);
         assert_eq!(TABLE.iter().filter(|entry| entry.strength == Strength::Must).count(), 25);
         assert!(ids().iter().all(|id| id.starts_with("L1.")));
         let mut unique = ids().to_vec();
         unique.sort_unstable();
         unique.dedup();
-        assert_eq!(unique.len(), 30);
+        assert_eq!(unique.len(), 31);
     }
 
     #[test]
