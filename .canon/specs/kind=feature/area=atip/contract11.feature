@@ -128,5 +128,5 @@ Feature: ATIP 1.1 contract
   @atip.contract11.13
   Scenario: None of the 0.33 names is left in the guides, the website, the evaluation scripts, the spec files or the scenario sentences, and reviving one fails
     Given the guides, the website in English and Korean, the command spec files, the conformance corpus, the evaluation scripts and the scenario sentences
-    When they are scanned for x-canon.reason, UNKNOWN_ERROR_CODE and the lowercase 0.33 reason values, and one of the names is put back
+    When they are scanned for the 0.33 reason extension of the error, the merged registry error code and the lowercase reason values, and one of the names is put back
     Then the scan finds none, and the revived name is found
