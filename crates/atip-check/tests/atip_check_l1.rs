@@ -16,10 +16,16 @@ use support::{atip_in, Case, Harness, Output};
 /// The L0 checks of a run and the L1 ones that apply to a 1.1 claim.
 const L0_CHECKS: usize = 28;
 const L1_CHECKS: usize = 31;
+/// Conditions a case plants that the conforming fake gives no occasion to judge (a code in both registries, which the conforming fake has none of).
+const EXEMPT_FROM_CONFORMING_RUN: &[&str] = &["warnings/meaning-agrees"];
 
-/// `atip check --level L1 --json` of the fake tool a configuration makes, with the fixture of `fixture`.
+/// `atip check --level <level> --json` of the fake tool a configuration makes, with the fixture of `fixture`.
 fn run_fixture(harness: &Harness, config: &Value, fixture: &Value, level: &str) -> Output {
-    let bin = l1_bin(harness, config);
+    run_bin(harness, &l1_bin(harness, config), fixture, level)
+}
+
+/// The same for the executable `bin`.
+fn run_bin(harness: &Harness, bin: &std::path::Path, fixture: &Value, level: &str) -> Output {
     let fixture_path = harness.write("fixture.json", fixture);
     let work = harness.path("cwd");
     std::fs::create_dir_all(&work).expect("cwd");
@@ -276,12 +282,44 @@ fn atip_checkl1_13_an_integer_one_beyond_the_safe_range_that_is_accepted_rounded
 #[test]
 fn atip_checkl1_14_a_validator_that_does_not_refuse_or_answers_a_precondition_code_without_setup_fails_only_l1_validators() {
     proves(&["validators"]);
+    // The `rejects` lines run in an empty directory, without `prepare` or `setup`: a tool that answers another code for them when the state a
+    // `prepare` step made is missing (a precondition read before the validator) fails `L1.validators` and nothing else, though the fixture
+    // makes that state for every other call. The same wrapper over a tool whose validators come first changes nothing.
+    let harness = Harness::new();
+    let config = l1_standard_config();
+    let mut fixture = harness.l1_fixture(&config);
+    fixture["prepare"] = json!([["/bin/sh", "-c", "echo state > prepared.marker"]]);
+    let seeded = harness.write("seeded-config.json", &l1_config(&json!({"validatorCodeUsage": true})));
+    let script = |alternative: &str| {
+        format!(
+            "#!/bin/sh\ncase \" $* \" in *2026-02-30*) [ -e prepared.marker ] || FAKE_ATIP_CONFIG='{alternative}' ;; esac\nexport FAKE_ATIP_CONFIG\nexec '{}' \"$@\"\n",
+            support::FAKE_TOOL
+        )
+    };
+    let wrapper = harness.path("precondition-first");
+    std::fs::write(&wrapper, script(seeded.to_str().expect("utf8"))).expect("write the wrapper");
+    std::fs::set_permissions(&wrapper, std::os::unix::fs::PermissionsExt::from_mode(0o755)).expect("chmod");
+    let output = run_bin(&harness, &wrapper, &fixture, "L1");
+    verdict(&output.envelope()["data"], "L1.validators").unwrap_or_else(|why| panic!("{why}\n{}", output.stdout));
+    assert!(check_of(&output.envelope()["data"], "L1.validators")["reason"].as_str().unwrap_or_default().contains("2026-02-30"), "{}", output.stdout);
+    let control = harness.path("validators-first");
+    std::fs::write(&control, script(&harness.path("fake-config.json").to_string_lossy())).expect("write the wrapper");
+    std::fs::set_permissions(&control, std::os::unix::fs::PermissionsExt::from_mode(0o755)).expect("chmod");
+    let output = run_bin(&harness, &control, &fixture, "L1");
+    assert_eq!((output.code, output.envelope()["data"]["passed"].as_bool()), (Some(0), Some(true)), "{}", output.stdout);
+    assert_eq!(check_of(&output.envelope()["data"], "L1.validators")["result"], "pass", "{}", output.stdout);
 }
 
 #[test]
-fn atip_checkl1_15_a_write_command_the_fixture_does_not_list_is_not_run_and_its_checks_are_unprovided() {
+fn atip_checkl1_15_a_write_command_the_fixture_does_not_list_is_never_run_and_the_report_names_it_unlisted_without_making_any_check_unprovided() {
     let harness = Harness::new();
     let config = l1_standard_config();
+    let listed = run_fixture(&harness, &config, &harness.l1_fixture(&config), "L1");
+    let listed_document = listed.envelope();
+    let unlisted_of = |document: &Value, id: &str| -> Vec<String> {
+        check_of(&document["data"], id)["unlisted"].as_array().map(|list| list.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()
+    };
+    assert!(!unlisted_of(&listed_document, "L1.constraints").contains(&"member tag".to_string()), "{}", listed.stdout);
     let mut fixture = harness.l1_fixture(&config);
     fixture["commands"].as_object_mut().expect("commands").remove("member tag");
     let output = run_fixture(&harness, &config, &fixture, "L1");
@@ -294,6 +332,15 @@ fn atip_checkl1_15_a_write_command_the_fixture_does_not_list_is_not_run_and_its_
         .flat_map(|check| check["observed"].as_array().cloned().unwrap_or_default())
         .any(|entry| entry["argv"].as_array().is_some_and(|argv| argv.iter().take(2).filter_map(Value::as_str).eq(["member", "tag"])));
     assert!(!ran_it, "the write command is never run");
+    // It is outside the population of the three checks that probe a command's declarations: none of them is unprovided or fails for it, the run passes,
+    // and each names the command, so a fixture cannot hide a write silently.
+    assert_eq!((output.code, document["data"]["passed"].as_bool()), (Some(0), Some(true)), "{}", output.stdout);
+    for id in ["L1.constraints", "L1.domains", "L1.validators"] {
+        assert_eq!(check_of(&document["data"], id)["result"], "pass", "{id}: {}", output.stdout);
+        assert!(unlisted_of(&document, id).contains(&"member tag".to_string()), "{id} names the unlisted write: {}", output.stdout);
+    }
+    assert!(document["data"]["checks"].as_array().expect("checks").iter().all(|check| check["result"] != "unprovided"), "{}", output.stdout);
+    assert!(check_of(&document["data"], "L1.paging").get("unlisted").is_none(), "only the three checks carry the list");
 }
 
 #[test]
@@ -424,6 +471,15 @@ fn atip_checkl1_23_prepare_programs_run_before_setup_and_their_effects_are_not_j
     assert_eq!(check_of(&output.envelope()["data"], "L0.refusal-effects")["result"], "pass", "{}", output.stdout);
     // The report lists every prepare step with its argv (contract 1.1.2).
     assert_eq!(output.envelope()["data"]["prepare"], json!([["/bin/sh", "-c", "echo environment > prepared.txt"]]), "{}", output.stdout);
+    // A `setup` step that exits non-zero is a fixture error too: `SETUP_FAILED`, exit 2, and no check result at all.
+    fixture["prepare"] = json!([]);
+    fixture["setup"] = json!([["reject", "--json"]]);
+    let output = run_fixture(&harness, &config, &fixture, "L1");
+    let document = output.envelope();
+    assert_eq!((output.code, document["error"]["code"].as_str(), document["error"]["reason"].as_str()), (Some(2), Some("FIXTURE_INVALID"), Some("SETUP_FAILED")), "{}", output.stdout);
+    assert!(document.get("data").is_none_or(Value::is_null), "a failing setup reports no check: {}", output.stdout);
+    fixture["setup"] = json!([]);
+    fixture["prepare"] = json!([["/bin/sh", "-c", "echo environment > prepared.txt"]]);
     // A prepare step that runs the binary under test is a fixture error whatever it does: the tool's own state is `setup`'s.
     fixture["prepare"] = json!([[l1_bin(&harness, &config).to_str().expect("utf8"), "init", "--json"]]);
     let output = run_fixture(&harness, &config, &fixture, "L1");
@@ -480,19 +536,16 @@ fn atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_c
     let unplanted: Vec<&String> = l1_judged.difference(&named).collect();
     let unjudged: Vec<&String> = named.difference(&l1_judged).collect();
     assert!(unplanted.is_empty(), "judged by a conforming run and not planted by any case: {unplanted:?}");
-    // `warnings/meaning-agrees`, `registry`'s and the like are judged only when the tool has something to compare: every planted one is judged by its case.
-    let _ = unjudged;
-    // For each check, its first case: planted, the owner fails and nothing else; the owner forced to pass, the run no longer fails there.
-    let mut firsts: Vec<Case> = Vec::new();
+    // A conforming run judges every condition a case plants but those that need a different tool: a condition a conforming tool has nothing to judge for.
+    println!("planted and not judged by the conforming run: {unjudged:?}");
+    assert!(unjudged.iter().all(|condition| EXEMPT_FROM_CONFORMING_RUN.contains(&condition.as_str())), "planted, never judged by a conforming run, and not named as exempt: {unjudged:?}");
+    // Every case: with its own condition switched off, the owner no longer fails (so the condition is independently proven: the planted document breaks nothing else
+    // the owner judges). For the first case of each check, the owner forced to pass no longer fails either.
     let mut seen: BTreeSet<String> = BTreeSet::new();
-    for case in l1_cases() {
-        if seen.insert(owner_of(&case)) {
-            firsts.push(case);
-        }
-    }
+    let firsts: Vec<(Case, bool)> = l1_cases().into_iter().map(|case| { let first = seen.insert(owner_of(&case)); (case, first) }).collect();
     let jobs: Vec<Box<dyn FnOnce() -> Result<(), String> + Send>> = firsts
         .into_iter()
-        .map(|case| -> Box<dyn FnOnce() -> Result<(), String> + Send> {
+        .map(|(case, first)| -> Box<dyn FnOnce() -> Result<(), String> + Send> {
             Box::new(move || {
                 let harness = Harness::new();
                 let mut fixture = harness.l1_fixture(&case.config);
@@ -506,9 +559,11 @@ fn atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_c
                     contract: None,
                 };
                 let owner = owner_of(&case);
-                let (forced, _) = check_binary_mutated(&args, &[owner.as_str()], &[]).map_err(|failure| format!("{}: {}", case.condition, failure.message))?;
-                if forced.find(&owner).map(|check| check.result) == Some(atip_check::report::CheckResult::Fail) {
-                    return Err(format!("{}: forced to pass, {owner} still fails", case.condition));
+                if first {
+                    let (forced, _) = check_binary_mutated(&args, &[owner.as_str()], &[]).map_err(|failure| format!("{}: {}", case.condition, failure.message))?;
+                    if forced.find(&owner).map(|check| check.result) == Some(atip_check::report::CheckResult::Fail) {
+                        return Err(format!("{}: forced to pass, {owner} still fails", case.condition));
+                    }
                 }
                 let (skipped, _) = check_binary_mutated(&args, &[], &[case.condition]).map_err(|failure| format!("{}: {}", case.condition, failure.message))?;
                 if skipped.find(&owner).map(|check| check.result) == Some(atip_check::report::CheckResult::Fail) {
@@ -617,7 +672,7 @@ fn draft_every_case() {
             println!("    exit {:?} {}", output.code, output.stdout.chars().take(500).collect::<String>());
             for check in document["data"]["checks"].as_array().into_iter().flatten() {
                 if check["id"] == owner.as_str() || check["id"] == "L0.global-on-group" || check["result"] == "fail" || check["result"] == "unprovided" {
-                    println!("    {} {}: {}", check["id"], check["result"], check["reason"].as_str().unwrap_or_default().chars().take(400).collect::<String>());
+                    println!("    {} {}: {}", check["id"], check["result"], check["reason"].as_str().unwrap_or_default().chars().take(2500).collect::<String>());
                 }
             }
         }

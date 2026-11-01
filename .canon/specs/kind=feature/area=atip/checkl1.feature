@@ -152,8 +152,8 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @atip.checkl1.14
   Scenario: A validator whose rejects line is not refused, is refused with another code or field, or answers a precondition code without setup fails only L1.validators
     Given a fake tool with a validator and variants that accept the rejects line, answer another code, name an argument that is not the validator's, or read its state first
-    When atip check --level L1 runs the rejects lines in a copy of the fixture state made without setup
-    Then each variant fails L1.validators only
+    When atip check --level L1 runs the rejects lines in an empty directory, without prepare and without setup, in a fixture that has both
+    Then each variant fails L1.validators only, and a tool that answers another code for a rejects line when the state a prepare step made is missing fails it too while the same tool with its validators first passes
 
   # canon: {"schema":1,"at":"2026-11-01T12:50:23Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
   @subject:atip-check
@@ -161,10 +161,10 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @case:edge
   @flow:canon-0-34-atip-check-l1.F3
   @atip.checkl1.15
-  Scenario: A write command the fixture does not list is never run and the checks that need it are unprovided
+  Scenario: A write command the fixture does not list is never run and the report names it unlisted without making any check unprovided
     Given a fake tool with a write command and a fixture that does not list it
     When atip check --level L1 runs
-    Then no invocation of the write command appears in any check's observed invocations and the checks that would probe it report what the fixture lacks
+    Then no invocation of the write command appears in any check's observed invocations, constraints, domains and validators stay pass and each carries the command's id in unlisted, and no check is unprovided for it
 
   # canon: {"schema":1,"at":"2026-11-01T12:50:27Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
   @subject:atip-check
@@ -249,10 +249,10 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @case:edge
   @flow:canon-0-34-atip-check-l1.F5
   @atip.checkl1.23
-  Scenario: prepare programs run before setup with the fixture environment, their effects are not judged, and a failing one is FIXTURE_INVALID with the reason PREPARE_FAILED
-    Given a fixture whose prepare writes a file and one whose prepare exits 3
+  Scenario: prepare programs run before setup with the fixture environment, their effects are not judged, and a failing prepare or setup step is a fixture error with the reason PREPARE_FAILED or SETUP_FAILED and no check
+    Given a fixture whose prepare writes a file, one whose prepare exits 3 or runs the binary under test, and one whose setup exits non-zero
     When atip check --level L1 runs
-    Then the first passes and L0.refusal-effects does not charge the file; the second exits 2 with PREPARE_FAILED and the program's stderr in the message
+    Then the first passes, lists its prepare steps in data.prepare, and L0.refusal-effects does not charge the file; the others exit 2 with FIXTURE_INVALID, PREPARE_FAILED or SETUP_FAILED, the program's stderr in the message, and no data.checks
 
   # canon: {"schema":1,"at":"2026-11-01T12:50:54Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
   @subject:atip-check
@@ -363,3 +363,14 @@ Feature: atip check: the L1 checks of contract 1.1.1
     Given a fake tool whose group runs, and one that registers UNKNOWN_OPTION and never emits USAGE
     When atip check runs at L0 and at L1
     Then at L0 L0.global-on-group fails; at L1 L1.groups-not-runnable fails and L0.global-on-group is unsupported; the second tool passes every L1 check that expects USAGE
+
+  # canon: {"schema":1,"at":"2026-11-01T16:14:13Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-34-atip-check-l1.F7
+  @atip.checkl1.34
+  Scenario: A canon command whose example does not parse fails only L1.examples, so the CI job that runs canon at L1 turns red on it
+    Given the built canon, its fixture, and a wrapper that rewrites the documented example of status so that it names another tool
+    When atip check --level L1 runs on the wrapper with the committed canon fixture
+    Then the level is not met, L1.examples fails naming the example, and no other MUST check fails

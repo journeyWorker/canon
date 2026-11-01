@@ -83,7 +83,7 @@ pub struct Arg {
 }
 
 impl Arg {
-    fn parse(value: &Value, is_option: bool) -> Self {
+    pub fn parse(value: &Value, is_option: bool) -> Self {
         Self {
             name: text(value, "name"),
             value_name: value

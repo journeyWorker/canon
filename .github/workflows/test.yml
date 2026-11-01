@@ -243,7 +243,7 @@ jobs:
         run: target/debug/atip check --bin target/debug/atip --level L0 --fixture crates/atip-check/atip.fixture.json
 
   # 0.34: canon claims atip/1 L1 (the self-description, the arguments and the data), and the shared checker holds it to that: `atip check --level L1`
-  # runs the 28 L0 and the 31 L1 checks of contract 1.1.1 against the built binary (25 + 21 MUST, the rest advisories). The same fixture as `atip-l0`, with
+  # runs the 28 L0 and the 31 L1 checks of contract 1.1.2 against the built binary (25 + 21 MUST, the rest advisories). The same fixture as `atip-l0`, with
   # `prepare` (a git repository with one commit, which findings and divergences need), more `setup`, and the `paged`, `fields` and `domainRejects`
   # entries the L1 checks read. The job is green only with `canon-0-34-atip-constraints` and `-paging-fields` in the binary. The tree's `level` is `L1`
   # from the schema-doc change; this job is what proves the claim.

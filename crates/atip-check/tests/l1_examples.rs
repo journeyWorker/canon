@@ -139,7 +139,7 @@ fn names_in(directory: &Path) -> Vec<PathBuf> {
 /// (`schema-option-id-suffix`, `schema-domain-pattern-unrecorded`, `schema-unknown-value-type`: every example line then names the old option or value).
 const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("invalid/schema-artifact-without-schemaref.json", &["L1.walk/valid"]),
-    ("invalid/schema-batch-without-batch-output.json", &["L1.walk/rule-5", "L1.walk/valid"]),
+    ("invalid/schema-batch-without-batch-output.json", &["L1.walk/rule-5"]),
     ("invalid/schema-command-missing-reserved-code.json", &["L1.reserved-applicable/cursor-code"]),
     ("invalid/schema-constraint-code-not-in-errors.json", &["L1.walk/rule-4-codes"]),
     ("invalid/schema-constraint-duplicate.json", &["L1.walk/rule-4-relation-once"]),
@@ -153,7 +153,7 @@ const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("invalid/schema-domain-default-outside.json", &["L1.walk/rule-3-defaults"]),
     ("invalid/schema-domain-number-bound-not-finite.json", &["unreadable"]),
     ("invalid/schema-domain-numeric-keyword-on-string.json", &["L1.walk/rule-3-domain-profile"]),
-    ("invalid/schema-domain-outside-profile.json", &["L1.walk/rule-3-domain-profile", "L1.walk/valid"]),
+    ("invalid/schema-domain-outside-profile.json", &["L1.walk/rule-3-domain-profile"]),
     ("invalid/schema-domain-pattern-alternation.json", &["L1.patterns/form"]),
     ("invalid/schema-domain-pattern-class-intersection.json", &["L1.patterns/form"]),
     ("invalid/schema-domain-pattern-class-symmetric-difference.json", &["L1.patterns/form"]),
@@ -163,8 +163,8 @@ const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("invalid/schema-domain-pattern-shorthand.json", &["L1.patterns/form"]),
     ("invalid/schema-domain-pattern-unanchored.json", &["L1.patterns/form"]),
     ("invalid/schema-domain-pattern-unrecorded.json", &["L1.examples/input-inline", "L1.examples/values", "L1.walk/rule-13", "L1.walk/rule-7"]),
-    ("invalid/schema-domain-ref.json", &["L1.walk/rule-3-domain-profile", "L1.walk/valid"]),
-    ("invalid/schema-domain-structural-enum.json", &["L1.walk/rule-3-domain-profile", "L1.walk/valid"]),
+    ("invalid/schema-domain-ref.json", &["L1.walk/rule-3-domain-profile"]),
+    ("invalid/schema-domain-structural-enum.json", &["L1.walk/rule-3-domain-profile"]),
     ("invalid/schema-enum-default-outside.json", &["L1.walk/rule-3-defaults"]),
     ("invalid/schema-error-acme-reason-lowercase.json", &["L1.reasons/reason-form"]),
     ("invalid/schema-errors-acme-duplicate-code.json", &["L1.registry/codes-unique"]),

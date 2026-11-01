@@ -302,10 +302,27 @@ pub fn l1_cases() -> Vec<Case> {
         case("walk/answered", json!({"schemaUnknown": ["touch"]})),
         case("walk/valid", patch(&[("member tag", vec![remove("/summary")])])),
         // The document of `init` says it is a group; the tree is untouched.
-        case("walk/kind", patch(&[("init", vec![set("/kind", json!("group"))])])),
+        // The tree lists `team` as a group and its document is a complete, valid command document: nothing but `data.kind` is wrong.
+        case(
+            "walk/kind",
+            patch(&[(
+                "team",
+                vec![
+                    set("/kind", json!("command")),
+                    remove("/commands"),
+                    set("/effect", json!("read")),
+                    set("/operands", json!([])),
+                    set("/options", json!([{"name": "json", "valueType": "switch", "required": false, "repeatable": false, "default": false, "flagOnly": true, "help": "Print the answer as one JSON document"}])),
+                    set("/errors", json!(["USAGE", "COMMAND_REQUIRED"])),
+                    set("/outputs", json!([{"kind": "report", "schemaRef": "#/schemas/TeamReport", "schemaVersion": "1.0"}])),
+                    set("/examples", json!(["fake team --json"])),
+                    set("/schemas", json!({"TeamReport": {"type": "object"}})),
+                ],
+            )]),
+        ),
         case(
             "walk/group-path",
-            patch(&[("team", vec![set("/command", json!("teams")), set("/path", json!(["teams"]))])]),
+            patch(&[("team", vec![set("/command", json!("teams"))])]),
         ),
         case("walk/group-children", patch(&[("member", vec![remove("/commands/2")])])),
         case("walk/rule-1", patch(&[("init", vec![set("/command", json!("ini"))])])),
@@ -339,7 +356,7 @@ pub fn l1_cases() -> Vec<Case> {
         ),
         case(
             "walk/rule-3-domain-compile",
-            patch(&[("member search", vec![set("/options/name=verbose/domain", json!({"maximum": "x"}))])]),
+            patch(&[("member search", vec![set("/options/name=filter/domain", json!({"type": "object", "required": ["team", "team"]}))])]),
         ),
         case(
             "walk/rule-4-names",
@@ -356,7 +373,7 @@ pub fn l1_cases() -> Vec<Case> {
         // `touch` is a batch command: its document says the input is no batch, and the batch output stays.
         case(
             "walk/rule-5",
-            patch(&[("touch", vec![set("/input/batch", json!(false)), remove("/input/maxItems")])]),
+            patch(&[("touch", vec![remove("/outputs/1/batch")])]),
         ),
         case("walk/rule-6", patch(&[("member search", vec![remove("/outputs/1/when")])])),
         case(

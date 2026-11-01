@@ -581,6 +581,7 @@ pub(crate) fn run_checks(
                 reason: finding.reason,
                 advisories: finding.advisories,
                 notes: finding.notes,
+                unlisted: if matches!(entry.id, "L1.constraints" | "L1.domains" | "L1.validators") { l1.as_ref().map(|l1| l1.unprobed_writes.clone()).unwrap_or_default() } else { Vec::new() },
                 observed: finding
                     .observed
                     .iter()
@@ -591,7 +592,7 @@ pub(crate) fn run_checks(
         .collect();
     let conditions = judge.seen.into_inner();
     Ok(Judged {
-        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()).with_unprobed_writes(l1.map(|l1| l1.unprobed_writes.clone()).unwrap_or_default()),
+        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()),
         conditions,
     })
 }

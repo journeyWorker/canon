@@ -50,6 +50,9 @@ pub struct Check {
     /// Facts the check found that do not change its result: the rules an `entailed` check rests on, a verified Unicode-version difference between the two regular-expression engines.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+    /// The write and destructive commands of the tool's documents that no fixture entry covers, named by `L1.constraints`, `L1.domains` and `L1.validators`: the checker never runs them, so they are outside what those checks probe (contract 1.1.2). Information only: it never changes the result.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unlisted: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -66,9 +69,6 @@ pub struct Report {
     /// The programs the fixture's `prepare` ran before `setup`, each as its argv: what was made outside the tool, for whoever reviews the claim.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub prepare: Vec<Vec<String>>,
-    /// The write and destructive commands the tool's documents list that no fixture entry covers: the checker never runs them, so nothing probes them. Information only: leaving a write out of the fixture is the fixture's choice and never makes a check `unprovided` (contract 1.1.2, populations of `L1.constraints`, `L1.domains`, `L1.validators`).
-    #[serde(rename = "unprobedWrites", skip_serializing_if = "Vec::is_empty")]
-    pub unprobed_writes: Vec<String>,
     pub checks: Vec<Check>,
 }
 
@@ -83,16 +83,8 @@ impl Report {
             contract_version: claim.as_str(),
             passed,
             prepare: Vec::new(),
-            unprobed_writes: Vec::new(),
             checks,
         }
-    }
-
-    /// The same report naming the write commands no fixture entry covers.
-    #[must_use]
-    pub fn with_unprobed_writes(mut self, unprobed: Vec<String>) -> Self {
-        self.unprobed_writes = unprobed;
-        self
     }
 
     /// The same report naming the `prepare` steps that built the state it ran against.
@@ -122,9 +114,6 @@ impl Report {
     pub fn text(&self) -> String {
         let mut lines: Vec<String> = self.prepare.iter().map(|step| format!("prepare: {}", step.join(" "))).collect();
         lines.extend(self.checks.iter().map(Check::line));
-        if !self.unprobed_writes.is_empty() {
-            lines.push(format!("not probed (no fixture entry): {}", self.unprobed_writes.join(", ")));
-        }
         lines.push(self.summary());
         lines.join("\n")
     }
@@ -168,6 +157,11 @@ impl Check {
         } else {
             format!("{base} [{}]", self.notes.join("; "))
         };
+        let base = if self.unlisted.is_empty() {
+            base
+        } else {
+            format!("{base} (unlisted writes, not probed: {})", self.unlisted.join(", "))
+        };
         match &self.reason {
             Some(reason) => format!("{base}: {reason}"),
             None => base,
@@ -195,6 +189,7 @@ mod tests {
             reason: None,
             advisories: Vec::new(),
             notes: Vec::new(),
+            unlisted: Vec::new(),
             observed: Vec::new(),
         }
     }

@@ -16,6 +16,20 @@
         ]
       }
     },
+    "context": {
+      "fields": [
+        [
+          "capabilityVersion",
+          "kinds"
+        ]
+      ],
+      "ok": [
+        [
+          "context",
+          "--json"
+        ]
+      ]
+    },
     "context-pack show": {
       "domainRejects": {
         "id": [
@@ -92,6 +106,42 @@
           "-core"
         ]
       }
+    },
+    "export": {
+      "domainRejects": {
+        "after": [
+          "Core",
+          "-core"
+        ],
+        "before": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "id",
+          "kind"
+        ]
+      ],
+      "ok": [
+        [
+          "export",
+          "--kind",
+          "subject",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "export",
+          "--kind",
+          "subject",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
     },
     "finding close": {
       "missingValue": [
@@ -252,6 +302,12 @@
       }
     },
     "status": {
+      "fields": [
+        [
+          "statusVersion",
+          "canonVersion"
+        ]
+      ],
       "ok": [
         [
           "status",

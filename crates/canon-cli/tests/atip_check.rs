@@ -182,6 +182,24 @@ fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1()
 }
 
 #[test]
+fn atip_checkl1_34_a_canon_command_whose_example_does_not_parse_fails_only_l1_examples() {
+    // canon with one planted violation: the documented example of `status` names `canonn`, a tool that is not this one, so the job that runs canon at L1 is red on `L1.examples` alone.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let wrapper = dir.path().join("canon-with-a-broken-example");
+    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"canon status --json\"/\"canonn status --json\"/g'; fi\nexit $code\n");
+    std::fs::write(&wrapper, script).expect("write");
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let args = CheckArgs { bin: wrapper.clone().into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
+    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
+    assert!(!report.passed, "{}", report.text());
+    let check = report.find("L1.examples").expect("L1.examples");
+    assert_eq!(check.result, atip_check::report::CheckResult::Fail, "{}", report.text());
+    assert!(check.reason.as_deref().unwrap_or_default().contains("canonn status --json"), "{:?}", check.reason);
+    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail && check.strength == atip_check::report::Strength::Must).map(|check| check.id).collect();
+    assert_eq!(failing, ["L1.examples"], "the broken example is the only MUST failure: {}", report.text());
+}
+
+#[test]
 fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
     // canon with one planted violation: every error that has a hint also prints `"x-was-hint":null` before it, the way canon 0.32 printed a member it had no value for; the hint itself stays, so only L0.no-null owns the violation.
     let dir = tempfile::tempdir().expect("tempdir");
