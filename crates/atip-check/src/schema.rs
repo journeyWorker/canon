@@ -12,6 +12,9 @@ use jsonschema::{Draft, Registry, ValidationOptions, Validator};
 use serde_json::Value;
 
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
+/// `schema/guide.schema.json` of the contract at tag v1.1.1, byte for byte (`atip` does not vendor it: no L1 document of canon refers to it).
+pub const GUIDE_SCHEMA: &str = include_str!("../schema/guide.schema.json");
+const SCHEMA_DOC_ID: &str = "https://atip.dev/1/schema-doc.schema.json";
 const REGISTRY_ENTRY_ID: &str = "https://atip.dev/1/registry-entry.schema.json";
 const ENVELOPE_ID: &str = "https://atip.dev/1/envelope.schema.json";
 const WARNING_ENTRY_ID: &str = "https://atip.dev/1/warning-entry.schema.json";
@@ -26,6 +29,7 @@ pub struct Schemas {
     failure: Validator,
     registry_entry: Validator,
     warning_entry: Validator,
+    schema_doc: Validator,
     stream_line: Validator,
 }
 
@@ -34,6 +38,8 @@ pub struct Schemas {
 pub struct Problem {
     pub path: String,
     pub message: String,
+    /// The JSON Schema keyword that was violated (`pattern`, `required`, ...).
+    pub keyword: String,
 }
 
 impl Problem {
@@ -78,17 +84,33 @@ impl Schemas {
             "warning-entry.schema.json",
             atip::schema::WARNING_ENTRY_SCHEMA,
         )?;
+        let schema_doc = parse("schema-doc.schema.json", atip::schema::SCHEMA_DOC_SCHEMA)?;
         let stream_line = parse(
             "stream-line.schema.json",
             atip::schema::STREAM_LINE_SCHEMA,
         )?;
-        let registry = Registry::new()
-            .add(ERROR_ID, error)
-            .and_then(|builder| builder.add(ENVELOPE_ID, envelope.clone()))
-            .and_then(|builder| builder.add(REGISTRY_ENTRY_ID, registry_entry.clone()))
-            .and_then(|builder| builder.add(WARNING_ENTRY_ID, warning_entry.clone()))
-            .and_then(jsonschema::RegistryBuilder::prepare)
-            .map_err(|error| error.to_string())?;
+        let registry = [
+            (ERROR_ID, error),
+            (ENVELOPE_ID, envelope.clone()),
+            (REGISTRY_ENTRY_ID, registry_entry.clone()),
+            (WARNING_ENTRY_ID, warning_entry.clone()),
+            (
+                "https://atip.dev/1/input-document.schema.json",
+                parse("input-document.schema.json", atip::schema::INPUT_DOCUMENT_SCHEMA)?,
+            ),
+            (
+                "https://atip.dev/1/batch-report.schema.json",
+                parse("batch-report.schema.json", atip::schema::BATCH_REPORT_SCHEMA)?,
+            ),
+            ("https://atip.dev/1/stream-line.schema.json", stream_line.clone()),
+            (SCHEMA_DOC_ID, schema_doc.clone()),
+            // L2's guide schema: a command document's `schemas` may `$ref` it (the contract's `skills show` example does).
+            ("https://atip.dev/1/guide.schema.json", parse("guide.schema.json", GUIDE_SCHEMA)?),
+        ]
+        .into_iter()
+        .try_fold(Registry::new(), |builder, (id, schema)| builder.add(id, schema))
+        .and_then(jsonschema::RegistryBuilder::prepare)
+        .map_err(|error| error.to_string())?;
         let build = |schema: &Value| {
             options(&registry)
                 .build(schema)
@@ -103,6 +125,7 @@ impl Schemas {
             failure: branch("failure")?,
             registry_entry: build(&registry_entry)?,
             warning_entry: build(&warning_entry)?,
+            schema_doc: build(&schema_doc)?,
             stream_line: build(&stream_line)?,
             registry,
         })
@@ -113,6 +136,11 @@ impl Schemas {
         options(&self.registry)
             .build(schema)
             .map_err(|error| error.to_string())
+    }
+
+    /// The problems of the whole `schema --json` answer `document` against the self-description schema, each with its place and keyword.
+    pub fn schema_doc_problem_list(&self, document: &Value) -> Vec<Problem> {
+        problem_list(&self.schema_doc, document)
     }
 
     /// The problems of `document` against the envelope schema, empty when it validates.
@@ -172,6 +200,7 @@ fn problem_list(validator: &Validator, document: &Value) -> Vec<Problem> {
         .map(|error| Problem {
             path: pointer(&error.instance_path().to_string()).to_string(),
             message: error.to_string(),
+            keyword: error.kind().keyword().to_string(),
         })
         .collect()
 }

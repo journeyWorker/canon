@@ -1,0 +1,590 @@
+{
+  "description": "Cross-engine record for the pattern form of spec 10.7.4. Each case: a pattern, a value, whether the pattern has the restricted I-Regexp form (`form`, checked by scripts/check.ts), and whether the value matches in ECMAScript with the u flag and in the Rust regex crate (true, false, or \"error\" when the engine refuses the pattern). scripts/check.ts verifies `form` and `ecmascript`, scripts/regex-parity verifies `rust`. For every case of the form that both engines compile the two must agree, unless the case carries `difference` of kind `unicode-version`: one code point whose general category differs between the two engines' Unicode tables, which each engine verifies on its own side. Every pattern a valid example uses is listed here.",
+  "engines": {
+    "ecmascript": {
+      "engine": "Bun 1.4.4, RegExp(pattern, \"u\")",
+      "unicode": "17.0"
+    },
+    "rust": {
+      "engine": "regex 1.13.1 with regex-syntax 0.8.11 (scripts/regex-parity/Cargo.lock), Regex::new with its default limits (compiled size 10 MiB, nesting 250)",
+      "unicode": "16.0.0",
+      "unicodeSource": "regex-syntax 0.8.11 src/unicode_tables/general_category.rs, generated from ucd-16.0.0"
+    }
+  },
+  "cases": [
+    {
+      "pattern": "^[a-z]+$",
+      "value": "abc",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "control"
+    },
+    {
+      "pattern": "^[a-z]+$",
+      "value": "abc\n",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "a trailing LF is not matched by $"
+    },
+    {
+      "pattern": "^[a-z]+$",
+      "value": "abc\r\n",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "nor CRLF"
+    },
+    {
+      "pattern": "^[a-z]+$",
+      "value": "ABC",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "case-sensitive in both"
+    },
+    {
+      "pattern": "^[a&&b]+$",
+      "value": "a",
+      "form": false,
+      "ecmascript": true,
+      "rust": false,
+      "note": "Rust reads && in a class as intersection"
+    },
+    {
+      "pattern": "^[a&&b]+$",
+      "value": "&",
+      "form": false,
+      "ecmascript": true,
+      "rust": false,
+      "note": "Rust reads && in a class as intersection; ECMAScript reads a literal &"
+    },
+    {
+      "pattern": "^[a~~b]+$",
+      "value": "~",
+      "form": false,
+      "ecmascript": true,
+      "rust": false,
+      "note": "Rust reads ~~ in a class as symmetric difference"
+    },
+    {
+      "pattern": "^[a-z&&[^aeiou]]+$",
+      "value": "b",
+      "form": false,
+      "ecmascript": "error",
+      "rust": true,
+      "note": "Rust nested set syntax; nested [ is not I-Regexp"
+    },
+    {
+      "pattern": "^[[:alpha:]]+$",
+      "value": "abc",
+      "form": false,
+      "ecmascript": "error",
+      "rust": true,
+      "note": "Rust POSIX class inside a class; nested [ is not I-Regexp"
+    },
+    {
+      "pattern": "^[:alpha:]+$",
+      "value": "abc",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "a plain class of : a l p h in both engines, not a POSIX class"
+    },
+    {
+      "pattern": "^[:alpha:]+$",
+      "value": ":",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "same"
+    },
+    {
+      "pattern": "^[a&b]$",
+      "value": "&",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "one & in a class is literal in both"
+    },
+    {
+      "pattern": "^[a~b]$",
+      "value": "~",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "one ~ in a class is literal in both"
+    },
+    {
+      "pattern": "^a&&b$",
+      "value": "a&&b",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "&& outside a class is literal in both"
+    },
+    {
+      "pattern": "^[-a]$",
+      "value": "-",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "leading - in a class"
+    },
+    {
+      "pattern": "^[a-]$",
+      "value": "-",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "trailing - in a class"
+    },
+    {
+      "pattern": "^[\\-a]$",
+      "value": "-",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "escaped - in a class"
+    },
+    {
+      "pattern": "^a\\-b$",
+      "value": "a-b",
+      "form": false,
+      "ecmascript": "error",
+      "rust": true,
+      "note": "\\- outside a class: ECMAScript u refuses it"
+    },
+    {
+      "pattern": "^[a-c-e]$",
+      "value": "-",
+      "form": false,
+      "ecmascript": true,
+      "rust": true,
+      "note": "a - between a range and a character is not I-Regexp (only first or last in a class); both engines read it as a literal -"
+    },
+    {
+      "pattern": "^[\\^a]$",
+      "value": "^",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "escaped ^ in a class"
+    },
+    {
+      "pattern": "^[a^]$",
+      "value": "^",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "^ not first in a class is literal"
+    },
+    {
+      "pattern": "^[\\[\\]]$",
+      "value": "]",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "escaped brackets in a class"
+    },
+    {
+      "pattern": "^\\{\\}$",
+      "value": "{}",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "escaped braces"
+    },
+    {
+      "pattern": "^[\\n]$",
+      "value": "\n",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "\\n escape"
+    },
+    {
+      "pattern": "^\\t$",
+      "value": "\t",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "\\t escape"
+    },
+    {
+      "pattern": "^[^a]$",
+      "value": "\n",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "a negated class matches LF in both"
+    },
+    {
+      "pattern": "^[^a]$",
+      "value": "\r",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "and CR"
+    },
+    {
+      "pattern": "^.$",
+      "value": "\r",
+      "form": false,
+      "ecmascript": false,
+      "rust": true,
+      "note": ". is excluded: ECMAScript excludes CR, Rust only LF"
+    },
+    {
+      "pattern": "^\\d$",
+      "value": "٣",
+      "form": false,
+      "ecmascript": false,
+      "rust": true,
+      "note": "\\d is excluded: Unicode digits in Rust, ASCII in ECMAScript"
+    },
+    {
+      "pattern": "^(core|lead)$",
+      "value": "lead",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "alternation inside a group"
+    },
+    {
+      "pattern": "^(core|lead)$",
+      "value": "core|lead",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "same"
+    },
+    {
+      "pattern": "^(|a)$",
+      "value": "",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "empty alternative"
+    },
+    {
+      "pattern": "^()$",
+      "value": "",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "empty group"
+    },
+    {
+      "pattern": "^$",
+      "value": "",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "empty body"
+    },
+    {
+      "pattern": "^[😀-😂]$",
+      "value": "😁",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "a range of non-BMP code points"
+    },
+    {
+      "pattern": "^😀+$",
+      "value": "😀😀",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "a quantified non-BMP code point"
+    },
+    {
+      "pattern": "^[ -~]+$",
+      "value": "hello world",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "printable ASCII range"
+    },
+    {
+      "pattern": "^[!-#]$",
+      "value": "\"",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "range over punctuation"
+    },
+    {
+      "pattern": "^\\p{Lu}+$",
+      "value": "ÉA",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "general category, two letters"
+    },
+    {
+      "pattern": "^\\P{L}$",
+      "value": "1",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "negated category"
+    },
+    {
+      "pattern": "^\\p{Nd}+$",
+      "value": "٣",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "decimal digits by category agree, unlike \\d"
+    },
+    {
+      "pattern": "^[^\\p{L}]$",
+      "value": "1",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "category inside a negated class"
+    },
+    {
+      "pattern": "^\\p{Zs}$",
+      "value": " ",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "space separator"
+    },
+    {
+      "pattern": "^\\p{Cn}$",
+      "value": "͸",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "unassigned: compiles and agrees in both engines"
+    },
+    {
+      "pattern": "^\\p{Co}$",
+      "value": "",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "private use"
+    },
+    {
+      "pattern": "^\\p{C}$",
+      "value": "͸",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "one-letter category"
+    },
+    {
+      "pattern": "^\\p{Cs}$",
+      "value": "a",
+      "form": false,
+      "ecmascript": false,
+      "rust": "error",
+      "note": "surrogates: not I-Regexp (RFC 9485 IsCategory), and Rust does not know the value"
+    },
+    {
+      "pattern": "^[a]{0}$",
+      "value": "",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "zero repetitions"
+    },
+    {
+      "pattern": "^[a-z]{2,}$",
+      "value": "ab",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "open upper bound"
+    },
+    {
+      "pattern": "^(a+)+b$",
+      "value": "aab",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "nested quantifiers"
+    },
+    {
+      "pattern": "^[a-z]{1,10000}$",
+      "value": "abc",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "a large repetition of a small class compiles in Rust"
+    },
+    {
+      "pattern": "^\\p{L}{1,200}$",
+      "value": "a",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "compiles within Rust's default 10 MiB size limit"
+    },
+    {
+      "pattern": "^\\p{L}{1,500}$",
+      "value": "a",
+      "form": true,
+      "ecmascript": true,
+      "rust": "error",
+      "note": "exceeds Rust's default 10 MiB compiled size limit: refused by 10.7.4"
+    },
+    {
+      "pattern": "^\\p{L}{1,100}-\\p{L}{1,100}-\\p{L}{1,100}$",
+      "value": "a-a-a",
+      "form": true,
+      "ecmascript": true,
+      "rust": "error",
+      "note": "exceeds Rust's default size limit too"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "value": "core",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "acme member tag --tag"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "value": "Core",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "acme member tag --tag, fixture domainRejects"
+    },
+    {
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9:.+Z\\-]+)?$",
+      "value": "2026-02-30",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "canon purge --before: the shape admits a date the validator refuses"
+    },
+    {
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9:.+Z\\-]+)?$",
+      "value": "2020-01-01T00:00:00Z",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "canon purge --before"
+    },
+    {
+      "pattern": "^colou?r$",
+      "value": "color",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "? quantifier"
+    },
+    {
+      "pattern": "^colou?r$",
+      "value": "colour",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "? quantifier"
+    },
+    {
+      "pattern": "^\\.\\*\\+\\?\\(\\)\\|\\\\$",
+      "value": ".*+?()|\\",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "single-character escapes outside a class"
+    },
+    {
+      "pattern": "^\\]$",
+      "value": "]",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "escaped ] outside a class"
+    },
+    {
+      "pattern": "^[\\r]$",
+      "value": "\r",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "\\r escape in a class"
+    },
+    {
+      "pattern": "^[\\P{L}]$",
+      "value": "1",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "negated category inside a class"
+    },
+    {
+      "pattern": "^[a-z0-9]{2,4}$",
+      "value": "abcde",
+      "form": true,
+      "ecmascript": false,
+      "rust": false,
+      "note": "bounded repetition, value too long"
+    },
+    {
+      "pattern": "^(ab){2}$",
+      "value": "abab",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "quantified group"
+    },
+    {
+      "pattern": "^\\p{L}$",
+      "value": "𑶰",
+      "form": true,
+      "ecmascript": true,
+      "rust": false,
+      "difference": {
+        "kind": "unicode-version",
+        "codePoint": "U+11DB0",
+        "ecmascript": "Lo",
+        "rust": "Cn"
+      },
+      "note": "a letter assigned in Unicode 17, unassigned in Unicode 16; allowed by spec 10.7.4"
+    },
+    {
+      "pattern": "^\\p{L}$",
+      "value": "Ᲊ",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "a letter both tables know"
+    },
+    {
+      "pattern": "^\\p{L}$",
+      "value": "A",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "control"
+    },
+    {
+      "pattern": "^((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((a))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))$",
+      "value": "a",
+      "form": true,
+      "ecmascript": true,
+      "rust": true,
+      "note": "100 nested groups compile in both"
+    },
+    {
+      "pattern": "^(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((a)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))$",
+      "value": "a",
+      "form": true,
+      "ecmascript": true,
+      "rust": "error",
+      "note": "251 nested groups exceed Rust's nesting limit of 250; refused by spec 10.7.4"
+    }
+  ]
+}

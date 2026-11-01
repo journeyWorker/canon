@@ -17,7 +17,7 @@ pub const SCHEMA_VERSION: &str = "1.0";
 pub const REGISTRY: [CodeInfo; 8] = [
     CodeInfo { code: "BINARY_UNUSABLE", meaning: "the binary named by --bin does not exist, is not a file, is not executable, or cannot be started", exit: 2, retryable: false, fix: "Pass the path of a built, executable binary with --bin <BINARY>.", reasons: &[] },
     CodeInfo { code: "COMMAND_REQUIRED", meaning: "atip was run without a command", exit: 2, retryable: false, fix: "Run atip check --bin <BINARY> --level L0 --fixture <FILE>.", reasons: &[] },
-    CodeInfo { code: "FIXTURE_INVALID", meaning: "the fixture file cannot be read, is not JSON, has a member of the wrong shape, or its setup command failed", exit: 2, retryable: false, fix: "Fix the member the message names, or the setup command, then run atip check again.", reasons: &FIXTURE_INVALID_REASONS },
+    CodeInfo { code: "FIXTURE_INVALID", meaning: "the fixture file cannot be read, is not JSON, has a member of the wrong shape, or its prepare or setup command failed", exit: 2, retryable: false, fix: "Fix the member the message names, or the setup command, then run atip check again.", reasons: &FIXTURE_INVALID_REASONS },
     CodeInfo { code: "INTERNAL", meaning: "a bug in atip, or its scratch space could not be used", exit: 1, retryable: false, fix: "Report it at https://github.com/journeyWorker/atip/issues with the command line; if the message names a scratch directory, point TMPDIR at a writable one.", reasons: &[] },
     CodeInfo { code: "LEVEL_NOT_MET", meaning: "a MUST check of the level failed or is unprovided", exit: 1, retryable: false, fix: "Read data.checks, fix every check whose result is fail or unprovided, then run atip check again.", reasons: &[] },
     CodeInfo { code: "LEVEL_UNSUPPORTED", meaning: "the level is known but this release of atip has no checks for it", exit: 2, retryable: false, fix: "Run atip check with --level L0.", reasons: &[] },
@@ -26,8 +26,9 @@ pub const REGISTRY: [CodeInfo; 8] = [
 ];
 
 /// The reasons under `FIXTURE_INVALID` (spec 7.6), sorted by name.
-pub const FIXTURE_INVALID_REASONS: [ReasonInfo; 4] = [
+pub const FIXTURE_INVALID_REASONS: [ReasonInfo; 5] = [
     ReasonInfo { reason: "NOT_JSON", meaning: "the fixture file is not JSON", fix: "Write the fixture as one JSON object." },
+    ReasonInfo { reason: "PREPARE_FAILED", meaning: "a prepare command of the fixture did not exit 0", fix: "Run the prepare command named in the message by hand and fix what it reports." },
     ReasonInfo { reason: "SETUP_FAILED", meaning: "a setup command of the fixture did not exit 0", fix: "Run the setup command named in the message by hand and fix what it reports." },
     ReasonInfo { reason: "UNREADABLE", meaning: "the fixture file cannot be read", fix: "Pass the path of a readable file with --fixture." },
     ReasonInfo { reason: "WRONG_SHAPE", meaning: "a member of the fixture has the wrong shape or an unknown value", fix: "Fix the member the message names." },

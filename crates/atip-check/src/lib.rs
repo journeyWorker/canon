@@ -26,6 +26,7 @@ pub mod claim;
 pub mod cli;
 pub mod exec;
 pub mod fixture;
+pub mod l1;
 pub mod output;
 pub mod report;
 pub mod schema;

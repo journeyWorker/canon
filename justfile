@@ -86,10 +86,11 @@ live:
     env {{ live_env }} cargo test -p canon-store --features live-pg,live-r2 --locked
     env {{ live_env }} cargo test -p canon-cli --test ledger_pg_live --locked
 
-# atip check at L0 (the 1.1 claim of the fixtures) on the canon binary and on the checker itself (test.yml `atip-l0`).
+# atip check on the canon binary at L1 (test.yml `atip-l1`) and at L0 (`atip-l0`), and on the checker itself at L0 (the 1.1 claim of the fixtures).
 atip:
     cargo build --locked -p canon-cli -p atip-check
     {{ target }}/debug/atip check --bin {{ target }}/debug/canon --level L0 --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    {{ target }}/debug/atip check --bin {{ target }}/debug/canon --level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json
     {{ target }}/debug/atip check --bin {{ target }}/debug/atip --level L0 --fixture crates/atip-check/atip.fixture.json
 
 # Every CI check that needs no docker.

@@ -49,6 +49,14 @@ pub struct Call {
     pub terminal: bool,
     /// A time limit shorter than the fixture's, for the call that must not wait.
     pub limit: Option<Duration>,
+    /// Measure what the call changed in the directory and `HOME` whatever its exit (`schema` writes nothing, approaches/checker.md 4); without it only a refusal (exit 2) is measured.
+    pub measure: bool,
+    /// Run in an empty directory with an empty `HOME` and only `PATH`, `HOME` and `LANG` in the environment: no fixture state, no fixture variables (`L1.no-state`).
+    pub empty: bool,
+    /// Run in an empty directory and an empty `HOME` with the fixture's environment: the fixture state without its `setup` (`L1.validators`: a validator reads no state, spec 10.8.3).
+    pub without_setup: bool,
+    /// Run this program instead of the tool (a `prepare` command of the fixture).
+    pub program: Option<String>,
 }
 
 impl Call {
@@ -63,6 +71,10 @@ impl Call {
             pty: false,
             terminal: false,
             limit: None,
+            measure: false,
+            empty: false,
+            without_setup: false,
+            program: None,
         }
     }
 
@@ -87,6 +99,28 @@ impl Call {
         self
     }
 
+    /// The same call with its changes to the directory and `HOME` measured whatever its exit.
+    #[must_use]
+    pub fn measured(mut self) -> Self {
+        self.measure = true;
+        self
+    }
+
+    /// The same call in a copy of the fixture state made without `setup`: an empty directory and `HOME`, the fixture's environment.
+    #[must_use]
+    pub fn without_setup(mut self) -> Self {
+        self.without_setup = true;
+        self
+    }
+
+    /// The same call in an empty directory and a minimal environment, measured.
+    #[must_use]
+    pub fn in_empty_state(mut self) -> Self {
+        self.empty = true;
+        self.measure = true;
+        self
+    }
+
     /// Whether argv selects JSON mode: the word `--json` before the first `--` (spec 4.4).
     pub fn json_mode(&self) -> bool {
         atip::wants_json(&self.argv)
@@ -108,6 +142,8 @@ pub struct Outcome {
     pub at_deadline: Option<AtDeadline>,
     /// The stdout of the fixture's probe, run in the same copy after the invocation exited 2; `None` when it was not run.
     pub probe_after: Option<Vec<u8>>,
+    /// The number of the sequence (the copy of the fixture state) the invocation ran in: [`Runner::run_after`] continues it.
+    pub sequence: usize,
 }
 
 /// What a terminal run showed when it was still running at its deadline.
@@ -126,6 +162,8 @@ pub enum RunError {
     Spawn(String),
     /// A `setup` command failed.
     Setup(String),
+    /// A `prepare` command failed or could not be started: a defect of the fixture, not of the tool.
+    Prepare(String),
     /// The checker's own scratch space failed.
     Scratch(String),
 }
@@ -173,6 +211,33 @@ impl Runner {
                 words
             }),
         };
+        for command in &fixture.prepare {
+            let template = runner.template.clone();
+            let Some((program, args)) = command.split_first() else { continue };
+            if resolves_to(program, &template, &runner.bin) {
+                return Err(RunError::Prepare(format!(
+                    "the prepare command `{}` runs the binary under test: the state the tool keeps is built by `setup`, through the tool's own argv",
+                    command.join(" ")
+                )));
+            }
+            let mut call = Call::new(args.iter().cloned());
+            call.program = Some(program.clone());
+            let outcome = runner
+                .execute(&call, &template)
+                .map_err(|error| RunError::Prepare(format!("the prepare command `{}` cannot be started: {error}", command.join(" "))))?;
+            if outcome.exit != Exit::Code(0) {
+                let detail = match outcome.exit {
+                    Exit::Code(code) => format!("exited {code}"),
+                    Exit::Signal(signal) => format!("was killed by signal {signal}"),
+                    Exit::TimedOut => format!("ran over the {} second limit", runner.timeout.as_secs_f64()),
+                };
+                return Err(RunError::Prepare(format!(
+                    "the prepare command `{}` {detail}: {}",
+                    command.join(" "),
+                    tail(&outcome.stderr)
+                )));
+            }
+        }
         for command in &fixture.setup {
             let template = runner.template.clone();
             let outcome = runner
@@ -229,49 +294,75 @@ impl Runner {
         })
     }
 
-    /// A fresh copy of the template as the next sequence's directory.
-    fn sequence(&mut self) -> Result<PathBuf, RunError> {
+    /// The directory of sequence `number`.
+    fn sequence_dir(&self, number: usize) -> PathBuf {
+        self.scratch.path().join(format!("sequence-{number}"))
+    }
+
+    /// A fresh copy of the template as the next sequence's directory, or an empty one for a call in the empty state.
+    fn sequence(&mut self, empty: bool) -> Result<(usize, PathBuf), RunError> {
         self.sequences += 1;
-        let sequence = self
-            .scratch
-            .path()
-            .join(format!("sequence-{}", self.sequences));
+        let number = self.sequences;
+        let sequence = self.sequence_dir(number);
         for part in ["work", "home"] {
-            copy_tree(&self.template.join(part), &sequence.join(part))
-                .map_err(|error| RunError::Scratch(error.to_string()))?;
+            if empty {
+                std::fs::create_dir_all(sequence.join(part))
+                    .map_err(|error| RunError::Scratch(error.to_string()))?;
+            } else {
+                copy_tree(&self.template.join(part), &sequence.join(part))
+                    .map_err(|error| RunError::Scratch(error.to_string()))?;
+            }
         }
-        Ok(sequence)
+        Ok((number, sequence))
     }
 
     fn run_plain(&mut self, call: &Call) -> Result<Outcome, RunError> {
-        let sequence = self.sequence()?;
+        let (_, sequence) = self.sequence(false)?;
         self.execute(call, &sequence)
             .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))
     }
 
-    /// What a refusal left behind: the changed paths of the directory and `HOME`, and the probe's answer.
-    fn after_refusal(&self, outcome: &mut Outcome, sequence: &Path) -> Result<(), RunError> {
-        if outcome.exit != Exit::Code(2) {
+    /// What a call left behind: the changed paths of the directory and `HOME` since `before` (measured for a refusal and for a call that asks), and, after a refusal, the probe's answer.
+    fn after_call(&self, outcome: &mut Outcome, sequence: &Path, before: &Snapshot) -> Result<(), RunError> {
+        if outcome.exit != Exit::Code(2) && !outcome.call.measure {
             return Ok(());
         }
         let after = Self::both(sequence).map_err(|error| RunError::Scratch(error.to_string()))?;
-        outcome.changes = changed(&self.template_files, &after);
-        if let Some(probe) = &self.probe {
-            outcome.probe_after = self
-                .execute(&Call::new(probe.iter().cloned()), sequence)
-                .ok()
-                .map(|probed| probed.stdout);
+        outcome.changes = changed(before, &after);
+        if outcome.exit == Exit::Code(2) {
+            if let Some(probe) = &self.probe {
+                outcome.probe_after = self
+                    .execute(&Call::new(probe.iter().cloned()), sequence)
+                    .ok()
+                    .map(|probed| probed.stdout);
+            }
         }
         Ok(())
     }
 
-    /// Runs `call` once in its own fresh copy of the template.
+    /// Runs `call` once in its own fresh copy of the template (an empty one for a call in the empty state).
     pub fn run(&mut self, call: &Call) -> Result<Outcome, RunError> {
-        let sequence = self.sequence()?;
+        let (number, sequence) = self.sequence(call.empty || call.without_setup)?;
         let mut outcome = self
             .execute(call, &sequence)
             .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
-        self.after_refusal(&mut outcome, &sequence)?;
+        outcome.sequence = number;
+        let before = if call.empty || call.without_setup { Snapshot::new() } else { self.template_files.clone() };
+        self.after_call(&mut outcome, &sequence, &before)?;
+        Ok(outcome)
+    }
+
+    /// Runs `call` in the directory of sequence `number`, as it is after the calls that ran there before: a follow-up that depends on
+    /// the state an earlier call left (a page and the next page it points to, a `next` entry and the answer that carried it).
+    /// What it changed is measured against the state it found.
+    pub fn run_after(&mut self, number: usize, call: &Call) -> Result<Outcome, RunError> {
+        let sequence = self.sequence_dir(number);
+        let before = Self::both(&sequence).map_err(|error| RunError::Scratch(error.to_string()))?;
+        let mut outcome = self
+            .execute(call, &sequence)
+            .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
+        outcome.sequence = number;
+        self.after_call(&mut outcome, &sequence, &before)?;
         Ok(outcome)
     }
 
@@ -279,16 +370,21 @@ impl Runner {
     /// own fresh copy. A process still running after `deadline` gets the end-of-file character at the start of a
     /// line and two more seconds; [`Outcome::at_deadline`] says what it did.
     pub fn run_on_terminal(&mut self, call: &Call, deadline: Duration) -> Result<Outcome, RunError> {
-        let sequence = self.sequence()?;
+        let (number, sequence) = self.sequence(false)?;
         let mut outcome = self
             .execute_terminal(call, &sequence, deadline)
             .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
-        self.after_refusal(&mut outcome, &sequence)?;
+        outcome.sequence = number;
+        let before = self.template_files.clone();
+        self.after_call(&mut outcome, &sequence, &before)?;
         Ok(outcome)
     }
 
     fn command(&self, call: &Call, root: &Path) -> Command {
-        let mut command = Command::new(&self.bin);
+        let mut command = match &call.program {
+            Some(program) => Command::new(program),
+            None => Command::new(&self.bin),
+        };
         command
             .args(&call.argv)
             .current_dir(root.join("work"))
@@ -299,7 +395,12 @@ impl Runner {
             )
             .env("HOME", root.join("home"))
             .env("LANG", "C.UTF-8")
-            .envs(self.fixture_env.iter().map(|(name, value)| (name, value)))
+            .envs(
+                self.fixture_env
+                    .iter()
+                    .filter(|_| !call.empty)
+                    .map(|(name, value)| (name, value)),
+            )
             .envs(call.env.iter().map(|(name, value)| (name, value)))
             .stdin(Stdio::null())
             .stderr(Stdio::piped())
@@ -349,6 +450,7 @@ impl Runner {
             elapsed: started.elapsed(),
             at_deadline: None,
             probe_after: None,
+            sequence: 0,
         })
     }
 
@@ -423,6 +525,7 @@ impl Runner {
             elapsed: started.elapsed(),
             at_deadline,
             probe_after: None,
+            sequence: 0,
         })
     }
 }
@@ -558,6 +661,17 @@ fn exit_of(status: ExitStatus) -> Exit {
 }
 
 /// The last 200 characters of `bytes` as text, for a failure message.
+/// Whether `program` (a path, or a name looked up on `PATH`) is the same file as `bin`.
+fn resolves_to(program: &str, directory: &Path, bin: &Path) -> bool {
+    let Ok(bin) = bin.canonicalize() else { return false };
+    let candidates: Vec<PathBuf> = if program.contains('/') {
+        vec![directory.join(program)]
+    } else {
+        std::env::var_os("PATH").map(|path| std::env::split_paths(&path).map(|dir| dir.join(program)).collect()).unwrap_or_default()
+    };
+    candidates.iter().any(|candidate| candidate.canonicalize().is_ok_and(|resolved| resolved == bin))
+}
+
 fn tail(bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes);
     let text = text.trim();
@@ -770,5 +884,46 @@ mod tests {
             reason.contains("exited 3") && reason.contains("broken"),
             "{reason}"
         );
+    }
+
+    #[test]
+    fn atip_checkl1_prepare_programs_run_before_setup_with_the_fixture_environment_and_are_not_a_change_a_refusal_made() {
+        let mut prepared = fixture(&[&["-c", "cat prepared.txt >&2; echo \"$FIXTURE_VAR\" >&2; exit 2"]], Duration::from_secs(10));
+        prepared.prepare = vec![vec!["/usr/bin/env".to_string(), "sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
+        let runner = Runner::new("/bin/sh".as_ref(), &prepared);
+        let error = runner.expect_err("the setup command exits 2");
+        let super::RunError::Setup(reason) = error else { panic!("a setup error") };
+        assert!(reason.contains("prepared") && reason.contains("yes"), "the program ran first, with the fixture's variable: {reason}");
+        // A refusal that changes nothing is not charged with the file the prepare command made.
+        let mut quiet = fixture(&[], Duration::from_secs(10));
+        quiet.prepare = vec![vec!["/usr/bin/env".to_string(), "sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
+        let mut runner = Runner::new("/bin/sh".as_ref(), &quiet).expect("runner");
+        let outcome = runner.run(&sh("test -f prepared.txt; exit 2")).expect("run");
+        assert_eq!(outcome.exit, Exit::Code(2));
+        assert!(outcome.changes.is_empty(), "{:?}", outcome.changes);
+    }
+
+    #[test]
+    fn atip_checkl1_a_failing_prepare_command_is_a_defect_of_the_fixture_named_by_its_command() {
+        let mut failing = fixture(&[], Duration::from_secs(10));
+        failing.prepare = vec![vec!["/usr/bin/env".to_string(), "sh".to_string(), "-c".to_string(), "echo no git >&2; exit 4".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &failing).expect_err("prepare fails");
+        let super::RunError::Prepare(reason) = error else { panic!("a prepare error") };
+        assert!(reason.contains("exited 4") && reason.contains("no git"), "{reason}");
+        let mut missing = fixture(&[], Duration::from_secs(10));
+        missing.prepare = vec![vec!["/nonexistent/atip-prepare".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &missing).expect_err("prepare cannot start");
+        assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("cannot be started")));
+    }
+
+    #[test]
+    fn atip_checkl1_a_prepare_step_that_runs_the_binary_under_test_is_a_fixture_error() {
+        let mut fixture = fixture(&[], Duration::from_secs(10));
+        fixture.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "true".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &fixture).expect_err("the prepare step is the binary");
+        assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("runs the binary under test")));
+        fixture.prepare = vec![vec!["sh".to_string(), "-c".to_string(), "true".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &fixture).expect_err("found on PATH");
+        assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("runs the binary under test")));
     }
 }

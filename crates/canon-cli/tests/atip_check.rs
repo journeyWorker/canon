@@ -65,26 +65,17 @@ fn answer(args: &[&str]) -> Value {
     serde_json::from_slice(&output.stdout).expect("the answer is JSON")
 }
 
-/// The fixture as the binary says it should be: the registry and the warnings from `canon schema`, the rest as written here.
+/// The hand-written part of the fixture: `prepare`, `setup`, `probe`, the commands and what the L0 and L1 checks read of them (`paged`, `fields`, `domainRejects`).
+fn source_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/atip/canon.fixture.src.json")
+}
+
+/// The fixture as the binary says it should be: the registry and the warnings from `canon schema`, the rest as written in `canon.fixture.src.json`.
 fn generate() -> Value {
-    json!({
-        "contractVersion": "1.1",
-        "timeoutSeconds": 120,
-        "setup": [
-            ["init"],
-            ["subject", "new", "alpha", "--domain", "core", "--title", "Alpha"],
-            ["subject", "new", "beta", "--domain", "core", "--title", "Beta"]
-        ],
-        "probe": "status",
-        "globalOptions": [["--repo", "."]],
-        "registry": registry_rows(&answer(&["schema", "--errors"])),
-        "warnings": warning_codes(&answer(&["schema", "--warnings"])),
-        "commands": {
-            "query": {"ok": [["query", "--kind", "subject", "--limit", "1", "--json"]]},
-            "status": {"ok": [["status", "--json"]]},
-            "finding close": {"missingValue": [["finding", "close", "add-login", "--round", "1", "--disposition", "fixed", "--json"]]}
-        }
-    })
+    let mut fixture: Value = serde_json::from_str(&std::fs::read_to_string(source_path()).expect("tests/atip/canon.fixture.src.json")).expect("the source is JSON");
+    fixture["registry"] = Value::Array(registry_rows(&answer(&["schema", "--errors"])));
+    fixture["warnings"] = Value::Array(warning_codes(&answer(&["schema", "--warnings"])));
+    fixture
 }
 
 fn rendered(fixture: &Value) -> String {
@@ -109,7 +100,7 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.1"), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
-    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L0 keys only");
+    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L0 and L1 keys only");
     for row in fixture["registry"].as_array().expect("registry") {
         let mut members: Vec<&str> = row.as_object().expect("row").keys().map(String::as_str).collect();
         members.sort_unstable();
@@ -168,6 +159,26 @@ fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_
     assert_eq!(not_applicable, ["L0.contract", "L0.usage-hint"], "{}", report.text());
     let failing: Vec<&str> = report.checks.iter().filter(|check| !matches!(check.result, atip_check::report::CheckResult::Pass | atip_check::report::CheckResult::Unsupported)).map(|check| check.id).collect();
     assert!(failing.is_empty(), "the 21 MUST and 5 SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
+}
+
+#[test]
+fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1() {
+    let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
+    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
+    assert!(report.passed, "{}", report.text());
+    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.1", 28 + 31));
+    let failing: Vec<&str> = report.checks.iter().filter(|check| matches!(check.result, atip_check::report::CheckResult::Fail | atip_check::report::CheckResult::Unprovided)).map(|check| check.id).collect();
+    // The one advisory canon does not meet: `--kind` names the set of ledger kinds on `gate promote` and the kinds `gate purge` can delete, which share no value (L1.one-meaning-values, a SHOULD).
+    assert_eq!(failing, ["L1.one-meaning-values"], "no MUST check fails or is unprovided for canon, and the one advisory is the known one:\n{}", report.text());
+    assert_eq!(report.advisories(), 1);
+    // The tree says the level the claim is (L1.tree), and the fixture names every step it made outside canon.
+    assert_eq!(report.find("L1.tree").map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{}", report.text());
+    assert!(report.prepare.iter().all(|step| step.first().is_some_and(|program| program == "git")), "{:?}", report.prepare);
+    assert_eq!(report.prepare.len(), 2);
+    // The checks that probe the arguments and the data were exercised, not skipped for lack of a fixture entry.
+    for id in ["L1.constraints", "L1.domains", "L1.patterns", "L1.numbers", "L1.validators", "L1.paging", "L1.fields", "L1.output-data"] {
+        assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
+    }
 }
 
 #[test]

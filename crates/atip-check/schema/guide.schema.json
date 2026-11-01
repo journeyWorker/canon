@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/guide.schema.json",
+  "title": "atip/1 `skills show --json` data",
+  "description": "The JSON representation of a guide printed by `<tool> skills show [NAME] --json` (spec 14.3).",
+  "type": "object",
+  "required": ["name", "text", "guides"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
+    "text": { "description": "The guide as Markdown.", "type": "string", "minLength": 1 },
+    "guides": {
+      "description": "The name of every guide in this build, this one included.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "full": { "description": "Whether --full material is included.", "type": "boolean" }
+  },
+  "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+  "additionalProperties": false
+}

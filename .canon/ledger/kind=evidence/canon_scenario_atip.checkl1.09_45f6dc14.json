@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-l1"
+  },
+  "at": "2026-11-01T15:26:39.757855Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_09_constraints_declared_and_not_enforced_fail_only_l1_constraints_and_an_entailed_rule_passes_naming_what_entails_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "b2bfe15cff94db14a3a73f3d5b367dd40d5989b98f7fc68679a6fb409700322f"
+    }
+  ],
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "6d5c24d1f55c8a67d4ae34b751cf36e72a9e6099",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "atip.checkl1.09",
+  "schema": 1,
+  "staging_id": "df6dc61f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

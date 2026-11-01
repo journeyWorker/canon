@@ -1,9 +1,10 @@
-//! The tool's fixture file (approaches/checker.md 5), the L0 keys of it.
+//! The tool's fixture file (approaches/checker.md 5), the L0 and L1 keys of it.
 //!
 //! A fixture is a JSON object. At L0 the checker reads `contractVersion`, `setup`, `env`, `timeoutSeconds`,
-//! `probe`, `globalOptions`, `registry`, `warnings` and, in `commands`, the invocations `ok`, `refused` and
-//! `missingValue`. The other members of `commands` (`fields`, `domainRejects`, `batchFailsAt`, ...), `search`
-//! and any other member belong to L1 and L2 and are ignored when present.
+//! `prepare` (programs run before `setup`), `probe`, `globalOptions`, `registry` (a list, or `"from-schema"`), `warnings` and, in `commands`, the invocations `ok`, `refused`,
+//! `paged` and `missingValue`. At L1 it also reads, in `commands`, `fields` (selections) and `domainRejects` (values outside a
+//! pattern or a structural domain, by argument). The other members of `commands` (`batchFailsAt`, `preview`,
+//! `allowedEffects`, `async`, ...), `search` and any other member belong to L2 and are ignored when present.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -28,15 +29,21 @@ pub struct RegistryRow {
     pub reasons: Option<Vec<String>>,
 }
 
-/// The L0 invocations of one command: argv arrays, each run in its own copy of the state.
+/// The invocations of one command: argv arrays, each run in its own copy of the state, and the L1 lists.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CommandEntry {
-    /// Invocations that succeed; the checker reads their envelopes (`meta.next`, `meta.page`).
+    /// Invocations that succeed; the checker reads their envelopes (`meta.next`, `meta.page`) and builds its probes from them.
     pub ok: Vec<Vec<String>>,
     /// Invocations that are refused.
     pub refused: Vec<Vec<String>>,
     /// Invocations of the command with one required value left out (`L0.no-prompt`).
     pub missing_value: Vec<Vec<String>>,
+    /// `--fields` selections: each a list of field paths (`L1.fields`).
+    pub fields: Vec<Vec<String>>,
+    /// Invocations of a paging command that return `meta.page.nextCursor` in the fixture state (`L0.page`, `L1.paging`).
+    pub paged: Vec<Vec<String>>,
+    /// Values outside a `pattern` or a structural domain, by argument name: the fixture author knows them, the checker cannot generate them (`L1.domains`, `L1.patterns`).
+    pub domain_rejects: BTreeMap<String, Vec<String>>,
 }
 
 /// What the checker reads from a fixture.
@@ -48,6 +55,8 @@ pub struct Fixture {
     pub setup: Vec<Vec<String>>,
     /// The fixture's own environment variables.
     pub env: BTreeMap<String, String>,
+    /// Programs the checker runs once in the template directory before `setup`, with `env` applied: environment preparation (`git init`, an empty commit) the tool cannot do itself. Argv arrays of any program, no shell; the tool's own state is `setup`'s.
+    pub prepare: Vec<Vec<String>>,
     pub timeout: Duration,
     /// The id of the command that runs without state, split into words.
     pub probe: Option<Vec<String>>,
@@ -55,6 +64,8 @@ pub struct Fixture {
     pub global_options: Option<Vec<Vec<String>>>,
     /// The tool's error registry; `None` when the fixture gives none.
     pub registry: Option<Vec<RegistryRow>>,
+    /// `"registry": "from-schema"`: the registry and the warning codes are the tool's own `schema --errors` and `--warnings` answers, and nothing is compared with the fixture (approaches/checker.md 5, spec 17.3).
+    pub registry_from_schema: bool,
     /// The tool's warning codes; `None` when the fixture gives none.
     pub warnings: Option<Vec<String>>,
     /// The L0 invocations by command id; `None` when the fixture has no `commands`.
@@ -142,6 +153,11 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
             .transpose()?
             .unwrap_or_default(),
         env: object.get("env").map(env).transpose()?.unwrap_or_default(),
+        prepare: object
+            .get("prepare")
+            .map(|value| argv_list(value, "prepare"))
+            .transpose()?
+            .unwrap_or_default(),
         timeout: object
             .get("timeoutSeconds")
             .map(timeout)
@@ -152,8 +168,17 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
             .get("globalOptions")
             .map(global_options)
             .transpose()?,
-        registry: object.get("registry").map(registry).transpose()?,
-        warnings: object.get("warnings").map(warnings).transpose()?,
+        registry: match object.get("registry") {
+            Some(Value::String(text)) if text == "from-schema" => None,
+            other => other.map(registry).transpose()?,
+        },
+        registry_from_schema: matches!(object.get("registry"), Some(Value::String(text)) if text == "from-schema"),
+        warnings: match (object.get("registry"), object.get("warnings")) {
+            (Some(Value::String(_)), Some(_)) => {
+                return Err("`warnings` must be left out when `registry` is \"from-schema\": the warning codes come from the tool too".to_string())
+            }
+            (_, warnings_value) => warnings_value.map(warnings).transpose()?,
+        },
         commands: object.get("commands").map(commands).transpose()?,
     })
 }
@@ -322,7 +347,7 @@ fn warnings(value: &Value) -> Result<Vec<String>, String> {
 fn registry(value: &Value) -> Result<Vec<RegistryRow>, String> {
     let rows = value
         .as_array()
-        .ok_or("`registry` must be an array of registry rows")?;
+        .ok_or("`registry` must be an array of registry rows, or the string \"from-schema\"")?;
     let mut parsed: Vec<RegistryRow> = Vec::with_capacity(rows.len());
     for (index, row) in rows.iter().enumerate() {
         let at = format!("registry/{index}");
@@ -397,10 +422,46 @@ fn commands(value: &Value) -> Result<BTreeMap<String, CommandEntry>, String> {
                 ok: list("ok")?,
                 refused: list("refused")?,
                 missing_value: list("missingValue")?,
+                fields: list("fields")?,
+                paged: list("paged")?,
+                domain_rejects: domain_rejects(entry.get("domainRejects"), id)?,
             },
         );
     }
     Ok(entries)
+}
+
+/// `domainRejects` of command `id`: an object of argument name to a list of values (strings, as argv words).
+fn domain_rejects(value: Option<&Value>, id: &str) -> Result<BTreeMap<String, Vec<String>>, String> {
+    let Some(value) = value else {
+        return Ok(BTreeMap::new());
+    };
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("`commands/{id}/domainRejects` must be an object of argument name to a list of values"))?;
+    let mut rejects = BTreeMap::new();
+    for (name, values) in object {
+        let at = format!("commands/{id}/domainRejects/{name}");
+        if name.is_empty() || name.starts_with('-') {
+            return Err(format!("`{at}`: the key is an argument name without dashes (`limit`, not `--limit`)"));
+        }
+        let list = values
+            .as_array()
+            .filter(|list| !list.is_empty())
+            .ok_or_else(|| format!("`{at}` must be a non-empty array of values"))?;
+        let strings = list
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                item.as_str()
+                    .filter(|text| !text.contains('\0'))
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("`{at}/{index}` must be a string (a JSON value is written as its text)"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        rejects.insert(name.clone(), strings);
+    }
+    Ok(rejects)
 }
 
 #[cfg(test)]

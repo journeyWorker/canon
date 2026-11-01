@@ -1,0 +1,190 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "errors",
+    "errors": [
+      {
+        "code": "BATCH_INCOMPLETE",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A batch stopped during execution; data.items says which items ran",
+        "fix": "Fix the failed item (data.items[].error) and send it and the skipped items again"
+      },
+      {
+        "code": "COMMAND_REQUIRED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A group or the bare tool was run without a command",
+        "fix": "Pick one of `expected`; canon schema --json lists every command"
+      },
+      {
+        "code": "CONFIG_MISSING",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No canon.yaml in the working directory or any ancestor, or in --repo",
+        "fix": "Run canon init in the repository root, or pass --repo <DIR>"
+      },
+      {
+        "code": "CONFIG_UNREADABLE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "canon.yaml exists but cannot be read or parsed",
+        "fix": "Fix the file named in the message"
+      },
+      {
+        "code": "CURSOR_INVALID",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The --cursor was not printed by this command with these arguments",
+        "fix": "Start again without --cursor"
+      },
+      {
+        "code": "FINDING_INVALID_ARGUMENT",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A finding argument is out of range (round or seq below 1)",
+        "fix": "Pass round and seq of at least 1"
+      },
+      {
+        "code": "FINDING_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No committed finding has this change, round and seq",
+        "fix": "List the change's findings: canon finding list --change <CHANGE_ID>"
+      },
+      {
+        "code": "FINDING_REASON_REQUIRED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A rejected or deferred disposition needs --reason",
+        "fix": "Repeat the command with --reason <TEXT>"
+      },
+      {
+        "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "Only a fixed disposition may carry --resolution-rev",
+        "fix": "Drop --resolution-rev, or use --disposition fixed"
+      },
+      {
+        "code": "FINDING_STAGED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The finding is staged, not committed yet",
+        "fix": "Promote it first: canon gate promote --kind finding"
+      },
+      {
+        "code": "INPUT_CONFLICT",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A --input value differs from the same argument on the command line",
+        "fix": "Give the argument once, or give the same value in both"
+      },
+      {
+        "code": "INPUT_INVALID",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "--input cannot be read or framed, or a document fails the command's fragment schema",
+        "fix": "Fix the key `field` points at; canon schema <COMMAND> --json shows the input schema"
+      },
+      {
+        "code": "INPUT_TOO_LARGE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "--input exceeds input.maxBytes, or a batch exceeds input.maxItems",
+        "fix": "Split the input into smaller invocations"
+      },
+      {
+        "code": "INTERNAL",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A bug in canon",
+        "fix": "Report it with the command line and the message"
+      },
+      {
+        "code": "NO_COMMIT",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The repository has no commit to resolve a revision against",
+        "fix": "Commit once, then repeat"
+      },
+      {
+        "code": "OLD_LAYOUT",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The repository uses a layout this canon no longer reads",
+        "fix": "Run canon migrate --json to preview the migration"
+      },
+      {
+        "code": "PLAN_STALE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "What the plan digest covers changed since the preview",
+        "fix": "Run the command without --commit to preview again, then commit with the new digest"
+      },
+      {
+        "code": "PROMOTE_FAILED",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "The record was staged but promoting it failed",
+        "fix": "Run canon gate promote --kind finding --json"
+      },
+      {
+        "code": "REPO_UNREADABLE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The repository directory cannot be read",
+        "fix": "Check --repo and its permissions"
+      },
+      {
+        "code": "RETENTION_PURGE_FAILED",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A purge stopped after deleting some records",
+        "fix": "Preview again; the plan lists what remains"
+      },
+      {
+        "code": "UNKNOWN_COMMAND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A command word is not in the tree",
+        "fix": "Pick one of `expected`; canon schema --json lists every command"
+      },
+      {
+        "code": "UNKNOWN_ROLE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "--as names a role canon does not know",
+        "fix": "Use one of planner, implementer, reviewer, orchestrator"
+      },
+      {
+        "code": "UNVERIFIABLE",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "The check examined nothing, so it cannot say the state is clean",
+        "fix": "See meta.coverage for what was missing"
+      },
+      {
+        "code": "USAGE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The command line does not parse or does not satisfy the command's requirements",
+        "fix": "Run canon schema <COMMAND> --json for the command's arguments"
+      },
+      {
+        "code": "WRITE_FAILED",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "Writing the record failed after the write began",
+        "fix": "Run canon status --json to see what was written, then repeat"
+      }
+    ]
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0"
+  }
+}

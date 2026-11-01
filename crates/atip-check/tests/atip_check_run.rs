@@ -833,7 +833,7 @@ fn atip_check_31_a_refusal_that_writes_nothing_passes_and_a_successful_call_that
 }
 
 #[test]
-fn atip_check_32_level_l1_and_l2_exit_2_with_level_unsupported_naming_the_release_and_l9_is_usage()
+fn atip_check_32_level_l2_exits_2_with_level_unsupported_naming_the_release_and_l9_is_usage()
 {
     let harness = Harness::new();
     let fixture = harness.write("fixture.json", &harness.fixture(&json!({})));
@@ -855,36 +855,35 @@ fn atip_check_32_level_l1_and_l2_exit_2_with_level_unsupported_naming_the_releas
         }
         atip_in(&cwd, &tmp, &args)
     };
-    for (level, release) in [("L1", "0.34"), ("L2", "0.35")] {
-        let output = run(level, true);
-        assert_eq!(output.code, Some(2));
-        let document = output.envelope();
-        assert_eq!(document["error"]["code"], "LEVEL_UNSUPPORTED");
-        assert!(
-            document["error"]["hint"]
-                .as_str()
-                .unwrap_or_default()
-                .contains(release),
-            "{level}: {}",
-            document["error"]["hint"]
-        );
-        assert_eq!(
-            (
-                document["error"]["field"].as_str(),
-                document["error"]["received"].as_str()
-            ),
-            (Some("--level"), Some(level))
-        );
-        assert_eq!(document["error"]["expected"], json!(["L0"]));
-        let text = run(level, false);
-        assert_eq!((text.code, text.stdout.is_empty()), (Some(2), true));
-        assert!(
-            text.stderr.starts_with("atip: LEVEL_UNSUPPORTED: "),
-            "{}",
-            text.stderr
-        );
-        assert!(text.stderr.contains(release));
-    }
+    let (level, release) = ("L2", "0.35");
+    let output = run(level, true);
+    assert_eq!(output.code, Some(2));
+    let document = output.envelope();
+    assert_eq!(document["error"]["code"], "LEVEL_UNSUPPORTED");
+    assert!(
+        document["error"]["hint"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(release),
+        "{level}: {}",
+        document["error"]["hint"]
+    );
+    assert_eq!(
+        (
+            document["error"]["field"].as_str(),
+            document["error"]["received"].as_str()
+        ),
+        (Some("--level"), Some(level))
+    );
+    assert_eq!(document["error"]["expected"], json!(["L0", "L1"]));
+    let text = run(level, false);
+    assert_eq!((text.code, text.stdout.is_empty()), (Some(2), true));
+    assert!(
+        text.stderr.starts_with("atip: LEVEL_UNSUPPORTED: "),
+        "{}",
+        text.stderr
+    );
+    assert!(text.stderr.contains(release));
     for level in ["L9", "0", "l0", ""] {
         let output = run(level, true);
         assert_eq!(output.code, Some(2), "{level:?}");
@@ -924,7 +923,7 @@ fn atip_check_33_a_refused_level_runs_no_binary_and_writes_nothing() {
     let (cwd, tmp) = (harness.path("cwd"), harness.path("tmp"));
     std::fs::create_dir_all(&cwd).expect("cwd");
     std::fs::create_dir_all(&tmp).expect("tmp");
-    for level in ["L1", "L2", "L9"] {
+    for level in ["L2", "L9"] {
         let output = atip_in(
             &cwd,
             &tmp,
@@ -1023,7 +1022,7 @@ fn atip_check_73_whether_the_tool_pages_is_decided_by_asking_each_command_for_a_
         check_of(&withheld.envelope()["data"], "L0.page")["reason"]
             .as_str()
             .unwrap_or_default()
-            .contains("list an `ok` invocation that pages")
+            .contains("list an invocation that pages under `paged`")
     );
     // A tool that pages and shows no page in a fixture that lists none is unprovided as well, with `commands` or without.
     let mut no_commands = harness.fixture(&json!({"noNextNoPage": true}));

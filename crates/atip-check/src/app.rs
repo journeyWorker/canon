@@ -4,7 +4,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use crate::checks::{run_l0, Judged, Mutation};
+use crate::checks::{run_checks, Judged, Mutation};
 use crate::claim::Claim;
 use crate::cli::{self, CheckArgs, Command, Level, CHECK_HELP, ROOT_HELP};
 use crate::exec::{RunError, Runner};
@@ -135,8 +135,7 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         Failure::new(code, message).in_command("check").field(field)
     };
     match args.level {
-        Level::L0 => {}
-        Level::L1 => return Err(unsupported("L1", "0.34")),
+        Level::L0 | Level::L1 => {}
         Level::L2 => return Err(unsupported("L2", "0.35")),
     }
     let fixture_path = Path::new(&args.fixture);
@@ -183,6 +182,9 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         RunError::Setup(reason) => {
             refuse(Code::FixtureInvalid, reason, "--fixture").reason("SETUP_FAILED")
         }
+        RunError::Prepare(reason) => {
+            refuse(Code::FixtureInvalid, reason, "--fixture").reason("PREPARE_FAILED")
+        }
         RunError::Scratch(reason) => scratch_failure(reason),
     };
     let runner = Runner::new(&bin, &fixture).map_err(from_run)?;
@@ -190,20 +192,20 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    run_l0(runner, &fixture, claim, &name, mutation).map_err(from_run)
+    run_checks(runner, &fixture, claim, &name, mutation, args.level).map_err(from_run)
 }
 
 fn unsupported(level: &str, release: &str) -> Failure {
     Failure::new(
         Code::LevelUnsupported,
-        format!("{level} is not supported yet: this release of atip has the L0 checks only"),
+        format!("{level} is not supported yet: this release of atip has the L0 and L1 checks only"),
     )
     .in_command("check")
     .field("--level")
-    .expected(["L0"])
+    .expected(["L0", "L1"])
     .received(level)
     .hint(format!(
-        "{level} checks arrive in {release}; run atip check --level L0 until then."
+        "{level} checks arrive in {release}; run atip check --level L1 until then."
     ))
 }
 

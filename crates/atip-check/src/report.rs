@@ -47,6 +47,9 @@ pub struct Check {
     /// Things seen that the contract only recommends against (stderr output that carries no error or result). They never change the result.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub advisories: Vec<String>,
+    /// Facts the check found that do not change its result: the rules an `entailed` check rests on, a verified Unicode-version difference between the two regular-expression engines.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -60,6 +63,9 @@ pub struct Report {
     #[serde(rename = "contractVersion")]
     pub contract_version: &'static str,
     pub passed: bool,
+    /// The programs the fixture's `prepare` ran before `setup`, each as its argv: what was made outside the tool, for whoever reviews the claim.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub prepare: Vec<Vec<String>>,
     pub checks: Vec<Check>,
 }
 
@@ -73,8 +79,16 @@ impl Report {
             level,
             contract_version: claim.as_str(),
             passed,
+            prepare: Vec::new(),
             checks,
         }
+    }
+
+    /// The same report naming the `prepare` steps that built the state it ran against.
+    #[must_use]
+    pub fn with_prepare(mut self, prepare: Vec<Vec<String>>) -> Self {
+        self.prepare = prepare;
+        self
     }
 
     /// How many SHOULD checks failed.
@@ -95,7 +109,8 @@ impl Report {
 
     /// The text of the report: one line per check, then one summary line. The text is not part of the contract.
     pub fn text(&self) -> String {
-        let mut lines: Vec<String> = self.checks.iter().map(Check::line).collect();
+        let mut lines: Vec<String> = self.prepare.iter().map(|step| format!("prepare: {}", step.join(" "))).collect();
+        lines.extend(self.checks.iter().map(Check::line));
         lines.push(self.summary());
         lines.join("\n")
     }
@@ -134,6 +149,11 @@ impl Check {
             self.id,
             self.rules.join(", ")
         );
+        let base = if self.notes.is_empty() {
+            base
+        } else {
+            format!("{base} [{}]", self.notes.join("; "))
+        };
         match &self.reason {
             Some(reason) => format!("{base}: {reason}"),
             None => base,
@@ -160,6 +180,7 @@ mod tests {
             rules: vec!["1"],
             reason: None,
             advisories: Vec::new(),
+            notes: Vec::new(),
             observed: Vec::new(),
         }
     }

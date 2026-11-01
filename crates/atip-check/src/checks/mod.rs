@@ -20,12 +20,18 @@ use std::time::Duration;
 use serde_json::{json, Map, Value};
 
 use crate::claim::Claim;
+use crate::cli::Level;
 use crate::exec::{Call, Exit, Outcome, RunError, Runner};
 use crate::fixture::{Fixture, RegistryRow};
 use crate::report::{Check, CheckResult, Report, Strength};
 use crate::schema::schemas;
 
+pub mod documents;
 pub mod rules;
+mod l1;
+mod l1_plan;
+
+use l1_plan::L1Run;
 
 /// A fixture entry a check needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,6 +121,11 @@ pub fn ids() -> [&'static str; 28] {
     TABLE.each_ref().map(|entry| entry.id)
 }
 
+/// The ids of the L1 checks, in table order.
+pub fn l1_ids() -> [&'static str; 31] {
+    l1::ids()
+}
+
 /// The fixture entries the check `id` needs.
 pub fn needs(id: &str) -> &'static [Need] {
     TABLE
@@ -151,6 +162,8 @@ struct Finding {
     reason: Option<String>,
     advisories: Vec<String>,
     observed: Vec<usize>,
+    /// Facts the check found that do not change its result.
+    notes: Vec<String>,
 }
 
 /// The most problems a reason lists, and the most characters of one.
@@ -258,6 +271,8 @@ struct CommandCalls {
     ok: Vec<usize>,
     refused: Vec<usize>,
     missing: Vec<MissingCalls>,
+    /// The fixture's `paged` invocations: each is meant to return `meta.page.nextCursor`.
+    paged: Vec<usize>,
     /// The command once more with `--cursor x --json`.
     cursor: usize,
 }
@@ -398,10 +413,14 @@ impl Run<'_> {
                 ok: Vec::new(),
                 refused: Vec::new(),
                 missing: Vec::new(),
+                paged: Vec::new(),
                 cursor: 0,
             };
             for argv in &entry.ok {
                 calls.ok.push(self.invoke(Call::new(in_json_mode(argv)))?);
+            }
+            for argv in &entry.paged {
+                calls.paged.push(self.invoke(Call::new(in_json_mode(argv)))?);
             }
             for argv in &entry.refused {
                 calls.refused.push(self.invoke(Call::new(in_json_mode(argv)))?);
@@ -482,13 +501,14 @@ pub(crate) struct Judged {
     pub(crate) conditions: BTreeSet<String>,
 }
 
-/// Runs every L0 check against the fixture's state and reports each.
-pub(crate) fn run_l0(
+/// Runs every check of `level` against the fixture's state and reports each.
+pub(crate) fn run_checks(
     runner: Runner,
     fixture: &Fixture,
     claim: Claim,
     bin_name: &str,
     mutation: Mutation<'_>,
+    level: Level,
 ) -> Result<Judged, RunError> {
     let mut run = Run {
         runner,
@@ -496,8 +516,16 @@ pub(crate) fn run_l0(
         log: Vec::new(),
     };
     let calls = run.invoke_all()?;
-    let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation);
-    let findings = vec![
+    let l1 = if level == Level::L1 {
+        let warnings_offered = claim.is_1_1()
+            && first_document(&run.log[calls.schema_warnings].stdout)
+                .is_some_and(|document| document.get("ok") == Some(&Value::Bool(true)) && document.pointer("/data/warnings").is_some_and(Value::is_array));
+        Some(run.invoke_l1(warnings_offered, claim)?)
+    } else {
+        None
+    };
+    let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation, l1.as_ref());
+    let mut findings = vec![
         judge.version(),
         judge.version_format(),
         judge.unknown_command(),
@@ -527,8 +555,13 @@ pub(crate) fn run_l0(
         judge.hint_form(),
         judge.global_on_group(),
     ];
-    let checks = TABLE
-        .iter()
+    let mut table: Vec<&Entry> = TABLE.iter().collect();
+    if l1.is_some() {
+        findings.extend(judge.l1_findings());
+        table.extend(l1::TABLE.iter());
+    }
+    let checks = table
+        .into_iter()
         .zip(findings)
         .map(|(entry, finding)| {
             let finding = if mutation.forced_pass.contains(&entry.id) {
@@ -547,6 +580,7 @@ pub(crate) fn run_l0(
                 rules: entry.rules.to_vec(),
                 reason: finding.reason,
                 advisories: finding.advisories,
+                notes: finding.notes,
                 observed: finding
                     .observed
                     .iter()
@@ -557,7 +591,7 @@ pub(crate) fn run_l0(
         .collect();
     let conditions = judge.seen.into_inner();
     Ok(Judged {
-        report: Report::new("L0", claim, checks),
+        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()),
         conditions,
     })
 }
@@ -572,6 +606,8 @@ enum End {
     Unsupported(String),
     /// The check observed its subject, so it needs no fixture entry to say so: nothing it judged failed.
     Observed,
+    /// Every rule the check judges is entailed by others that passed: the rules, and what each is entailed by.
+    Entailed(Vec<String>),
 }
 
 /// The conditions of one check being judged: what fails, what was looked at, what is only recommended.
@@ -582,6 +618,8 @@ struct Conditions<'j> {
     problems: Vec<String>,
     advisories: Vec<String>,
     observed: Vec<usize>,
+    /// Facts found that do not change the result.
+    notes: Vec<String>,
     /// The invocations this check made for itself: one that runs over the time limit is this check's failure.
     owned: Vec<usize>,
 }
@@ -637,6 +675,7 @@ impl<'j> Conditions<'j> {
                 reason: Some(reason),
                 advisories: self.advisories,
                 observed: self.observed,
+                notes: self.notes,
             };
         }
         if !self.problems.is_empty() {
@@ -645,22 +684,25 @@ impl<'j> Conditions<'j> {
                 reason: Some(reason_of(&self.problems)),
                 advisories: self.advisories,
                 observed: self.observed,
+                notes: self.notes,
             };
         }
-        let unprovided = |reason: String, advisories: Vec<String>| Finding {
+        let unprovided = |reason: String, advisories: Vec<String>, notes: Vec<String>| Finding {
             result: CheckResult::Unprovided,
             reason: Some(reason),
             advisories,
             observed: Vec::new(),
+            notes,
         };
         match end {
-            End::Unprovided(reason) => return unprovided(reason, self.advisories),
+            End::Unprovided(reason) => return unprovided(reason, self.advisories, self.notes),
             End::Unsupported(reason) => {
                 return Finding {
                     result: CheckResult::Unsupported,
                     reason: Some(reason),
                     advisories: self.advisories,
                     observed: self.observed,
+                    notes: self.notes,
                 }
             }
             End::Observed => {
@@ -669,7 +711,19 @@ impl<'j> Conditions<'j> {
                     reason: None,
                     advisories: self.advisories,
                     observed: self.observed,
+                    notes: self.notes,
                 }
+            }
+            End::Entailed(rules) => {
+                let mut notes = self.notes;
+                notes.extend(rules);
+                return Finding {
+                    result: CheckResult::Entailed,
+                    reason: None,
+                    advisories: self.advisories,
+                    observed: self.observed,
+                    notes,
+                };
             }
             End::Exercised(_) => {}
         }
@@ -689,7 +743,7 @@ impl<'j> Conditions<'j> {
             })
             .collect();
         if !missing.is_empty() {
-            return unprovided(format!("the fixture has no {}", missing.join(" and ")), self.advisories);
+            return unprovided(format!("the fixture has no {}", missing.join(" and ")), self.advisories, self.notes);
         }
         let exercised = matches!(end, End::Exercised(true));
         let reason = (!exercised)
@@ -703,6 +757,7 @@ impl<'j> Conditions<'j> {
             reason,
             advisories: self.advisories,
             observed: self.observed,
+            notes: self.notes,
         }
     }
 }
@@ -723,6 +778,8 @@ struct Judge<'a> {
     tool_warnings: Option<Vec<Value>>,
     /// The registry a code is looked up in: the tool's own when it prints one, else the fixture's.
     rows: Option<Vec<RegistryRow>>,
+    /// What the L1 invocations read, for an L1 run.
+    l1: Option<&'a L1Run>,
 }
 
 impl<'a> Judge<'a> {
@@ -733,6 +790,7 @@ impl<'a> Judge<'a> {
         calls: &'a Invocations,
         bin_name: &str,
         mutation: Mutation<'a>,
+        l1: Option<&'a L1Run>,
     ) -> Self {
         let documents: Vec<Option<Value>> = log
             .iter()
@@ -782,6 +840,7 @@ impl<'a> Judge<'a> {
             tool_errors,
             tool_warnings,
             rows,
+            l1,
         }
     }
 
@@ -807,8 +866,9 @@ impl<'a> Judge<'a> {
     fn check(&'a self, id: &'static str) -> Conditions<'a> {
         let entry = TABLE
             .iter()
+            .chain(l1::TABLE.iter())
             .find(|entry| entry.id == id)
-            .unwrap_or_else(|| panic!("{id} is not in the L0 table"));
+            .unwrap_or_else(|| panic!("{id} is not in a table"));
         Conditions {
             judge: self,
             entry,
@@ -817,6 +877,7 @@ impl<'a> Judge<'a> {
             advisories: Vec::new(),
             observed: Vec::new(),
             owned: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
@@ -1461,8 +1522,35 @@ impl<'a> Judge<'a> {
                 });
             }
         }
+        // A `paged` invocation is one the fixture says returns a next cursor in its state.
+        for (id, command) in self.fixture.commands.iter().flatten().zip(&self.calls.commands).map(|((id, _), calls)| (id, calls)) {
+            for index in &command.paged {
+                c.own(*index);
+                let carries = self
+                    .envelope(*index)
+                    .and_then(|document| document.pointer("/meta/page/nextCursor"))
+                    .is_some_and(Value::is_string);
+                c.holds("paged-next-cursor", carries, || {
+                    format!("{} is listed as `paged` for {id} and its answer has no meta.page.nextCursor", self.label(*index))
+                });
+                exercised |= carries;
+            }
+        }
         if exercised {
             return c.finish_as(End::Observed);
+        }
+        // Nothing carried a page. Which commands page (spec 6.9): from L1 the command documents say, at L0 observation does.
+        if let Some(l1) = self.l1 {
+            let pages: Vec<&str> = l1.docs.commands.iter().filter(|(_, doc)| doc.has_option("cursor")).map(|(id, _)| id.as_str()).collect();
+            return c.finish_as(if pages.is_empty() {
+                End::Unsupported("no command document declares --cursor".to_string())
+            } else {
+                End::Unprovided(format!(
+                    "{} declare{} --cursor and no run saw a meta.page.nextCursor: list an invocation that pages under `paged` in the fixture",
+                    pages.join(", "),
+                    if pages.len() == 1 { "s" } else { "" }
+                ))
+            });
         }
         let Some(commands) = &self.fixture.commands else {
             return c.finish_as(End::Unprovided("the fixture has no `commands`".to_string()));
@@ -1470,7 +1558,7 @@ impl<'a> Judge<'a> {
         if commands.is_empty() {
             return c.finish_as(End::Unprovided("the fixture's `commands` is empty".to_string()));
         }
-        // No answer carried a page: does the tool page? A command that refuses `--cursor x` as an unknown option does not.
+        // At L0 a command that refuses `--cursor x` as an unknown option does not page; one that refuses it as a cursor does.
         let verdicts: Vec<CursorVerdict> = self
             .calls
             .commands
@@ -1479,7 +1567,7 @@ impl<'a> Judge<'a> {
             .collect();
         if verdicts.is_empty() || verdicts.iter().any(|verdict| *verdict != CursorVerdict::NoPaging) {
             return c.finish_as(End::Unprovided(
-                "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (an inconclusive answer counts as one that might page): list an `ok` invocation that pages".to_string(),
+                "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (CURSOR_INVALID shows a command pages; an inconclusive answer counts as one that might): list an invocation that pages under `paged`".to_string(),
             ));
         }
         c.finish_as(End::Unsupported(
@@ -1651,6 +1739,8 @@ impl<'a> Judge<'a> {
                     schemas()
                         .registry_entry_problems(&prepared)
                         .into_iter()
+                        // From L1 the reasons of an entry are `L1.reasons`' (form, no exit of their own, the same in the list and the entry).
+                        .filter(|problem| self.l1.is_none() || !problem.starts_with("/reasons"))
                         .map(|problem| format!("the entry {} is invalid: {problem}", entry.get("code").map_or("?".to_string(), Value::to_string)))
                 })
                 .collect();
@@ -1724,6 +1814,8 @@ impl<'a> Judge<'a> {
         self.emitted_conditions(&mut c);
         let end = if !offered {
             End::Unsupported("the tool does not offer schema --errors".to_string())
+        } else if self.fixture.registry_from_schema {
+            End::Exercised(true)
         } else if self.fixture.registry.is_none() {
             End::Unprovided("the fixture has no `registry` to compare the tool's with".to_string())
         } else if self.tool_warnings.is_some() && self.fixture.warnings.is_none() {
@@ -1742,7 +1834,16 @@ impl<'a> Judge<'a> {
         if self.claim.is_1_1() && document.pointer("/data/kind").and_then(Value::as_str) != Some(kind) {
             return Some(format!("has no data.kind {kind:?}"));
         }
-        (document.pointer(&format!("/data/{kind}")) != listed).then(|| format!("answered an entry that is not the one the list holds ({})", show(document.pointer(&format!("/data/{kind}")))))
+        let without_reasons = |entry: Option<&Value>| -> Option<Value> {
+            let mut entry = entry.cloned();
+            if self.l1.is_some() {
+                if let Some(object) = entry.as_mut().and_then(Value::as_object_mut) {
+                    object.remove("reasons");
+                }
+            }
+            entry
+        };
+        (without_reasons(document.pointer(&format!("/data/{kind}"))) != without_reasons(listed)).then(|| format!("answered an entry that is not the one the list holds ({})", show(document.pointer(&format!("/data/{kind}")))))
     }
 
     /// Every error code, reason and warning code any run emitted is registered (spec 7.3.1, 7.5.1, 7.6.2).
@@ -1873,6 +1974,10 @@ impl<'a> Judge<'a> {
         };
         c.own(group.bare);
         let code = answers(group.bare);
+        // From L1 a group that runs is `L1.groups-not-runnable`'s; this check then has nothing to say about the option.
+        if self.l1.is_some() && code.as_deref() != Some("COMMAND_REQUIRED") {
+            return c.finish_as(End::Unsupported("the group is not refused with COMMAND_REQUIRED: L1.groups-not-runnable reports it".to_string()));
+        }
         c.holds("group-is-not-runnable", code.as_deref() == Some("COMMAND_REQUIRED"), || {
             format!("{} answered {}, expected COMMAND_REQUIRED", self.label(group.bare), code.clone().unwrap_or_else(|| "no failure envelope".to_string()))
         });

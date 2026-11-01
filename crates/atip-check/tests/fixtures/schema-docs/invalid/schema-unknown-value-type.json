@@ -1,0 +1,410 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "finding close",
+    "path": [
+      "finding",
+      "close"
+    ],
+    "summary": "Move an already-committed finding's disposition (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)",
+    "effect": "write",
+    "idempotency": "replay-safe",
+    "operands": [
+      {
+        "name": "change",
+        "valueName": "CHANGE_ID",
+        "valueType": "string",
+        "required": true,
+        "variadic": false,
+        "default": null,
+        "help": "The change under review — first component of the natural key"
+      }
+    ],
+    "options": [
+      {
+        "name": "round",
+        "valueName": "N",
+        "valueType": "float",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "help": "Which review round raised it (1-based)"
+      },
+      {
+        "name": "seq",
+        "valueName": "N",
+        "valueType": "integer",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "help": "Its sequence number within the round (1-based)"
+      },
+      {
+        "name": "disposition",
+        "valueName": "DISPOSITION",
+        "valueType": "enum",
+        "possibleValues": [
+          "open",
+          "fixed",
+          "rejected",
+          "deferred"
+        ],
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "help": "Where it lands: fixed / rejected / deferred / open (reopening is a real transition)"
+      },
+      {
+        "name": "resolution-rev",
+        "valueName": "REV",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "defaultNote": "HEAD when --disposition is fixed",
+        "help": "The commit that resolves it; only fixed may carry one"
+      },
+      {
+        "name": "reason",
+        "valueName": "TEXT",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Why; required for rejected and deferred"
+      },
+      {
+        "name": "actor",
+        "valueName": "ACTOR_ID",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": "canon",
+        "help": "The actor recorded as authoring the transition"
+      },
+      {
+        "name": "role",
+        "valueName": "ROLE",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": "reviewer",
+        "help": "The role the record is attributed to"
+      },
+      {
+        "name": "session",
+        "valueName": "SESSION_ID",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "The harness session recorded with the actor"
+      },
+      {
+        "name": "promote",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Promote this write in the same run"
+      },
+      {
+        "name": "no-promote",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Keep this write staged even under write: { promote: auto }"
+      },
+      {
+        "name": "repo",
+        "valueName": "DIR",
+        "valueType": "path",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "defaultNote": "the nearest ancestor directory holding a canon.yaml",
+        "flagOnly": true,
+        "help": "The repo to act on"
+      },
+      {
+        "name": "as",
+        "valueName": "ROLE",
+        "valueType": "enum",
+        "possibleValues": [
+          "planner",
+          "implementer",
+          "reviewer",
+          "orchestrator"
+        ],
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "env": "CANON_ROLE",
+        "flagOnly": true,
+        "help": "The role you act as; overrides CANON_ROLE"
+      },
+      {
+        "name": "input",
+        "valueName": "JSON|FILE|-",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "flagOnly": true,
+        "help": "The arguments as JSON: an object (one run) or an array / NDJSON file or - (a batch); keys are the option names in camelCase, operands an array"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "constraints": [
+      {
+        "rule": "requires",
+        "if": {
+          "name": "disposition",
+          "in": [
+            "rejected",
+            "deferred"
+          ]
+        },
+        "then": [
+          "reason"
+        ],
+        "code": "FINDING_REASON_REQUIRED"
+      },
+      {
+        "rule": "forbids",
+        "if": {
+          "name": "disposition",
+          "in": [
+            "open",
+            "rejected",
+            "deferred"
+          ]
+        },
+        "then": [
+          "resolution-rev"
+        ],
+        "code": "FINDING_RESOLUTION_REV_UNEXPECTED"
+      },
+      {
+        "rule": "atMostOne",
+        "names": [
+          "promote",
+          "no-promote"
+        ]
+      }
+    ],
+    "errors": [
+      "BATCH_INCOMPLETE",
+      "CONFIG_MISSING",
+      "CONFIG_UNREADABLE",
+      "FINDING_INVALID_ARGUMENT",
+      "FINDING_NOT_FOUND",
+      "FINDING_REASON_REQUIRED",
+      "FINDING_RESOLUTION_REV_UNEXPECTED",
+      "FINDING_STAGED",
+      "INPUT_CONFLICT",
+      "INPUT_INVALID",
+      "INPUT_TOO_LARGE",
+      "INTERNAL",
+      "NO_COMMIT",
+      "OLD_LAYOUT",
+      "PROMOTE_FAILED",
+      "REPO_UNREADABLE",
+      "UNKNOWN_ROLE",
+      "USAGE",
+      "WRITE_FAILED"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/FindingCloseReport",
+        "schemaVersion": "1.1"
+      },
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/BatchFindingCloseReport",
+        "schemaVersion": "1.0",
+        "batch": true,
+        "when": "--input is an array or NDJSON"
+      }
+    ],
+    "input": {
+      "option": "--input",
+      "schemaRef": "#/schemas/FindingCloseInput",
+      "batch": true,
+      "maxBytes": 8388608,
+      "maxItems": 10000,
+      "example": {
+        "operands": [
+          "add-login"
+        ],
+        "round": 1,
+        "seq": 1,
+        "disposition": "rejected",
+        "reason": "works as designed"
+      }
+    },
+    "examples": [
+      "canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \"works as designed\" --json",
+      "canon finding close add-login --input '{\"round\":1,\"seq\":2,\"disposition\":\"fixed\"}' --json",
+      "canon finding close --input '{\"operands\":[\"add-login\"],\"round\":1,\"seq\":1,\"disposition\":\"rejected\",\"reason\":\"works as designed\"}' --json"
+    ],
+    "schemas": {
+      "FindingCloseReport": {
+        "type": "object",
+        "description": "`canon finding close`: the transition staged or committed, or a no-op.",
+        "required": [
+          "changeId",
+          "round",
+          "seq",
+          "disposition",
+          "unchanged"
+        ],
+        "properties": {
+          "changeId": {
+            "type": "string"
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "disposition": {
+            "type": "string"
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The disposition it moved from; absent when unchanged."
+          },
+          "staged": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "committed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unchanged": {
+            "type": "boolean",
+            "description": "Proposed: moved from canon's meta.unchanged (spec 6.6); the addition bumps the report to 1.1."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BatchFindingCloseReport": {
+        "description": "The batch output: the generic ATIP batch report with each item's data a FindingCloseReport.",
+        "allOf": [
+          {
+            "$ref": "https://atip.dev/1/batch-report.schema.json"
+          },
+          {
+            "properties": {
+              "items": {
+                "items": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/schemas/FindingCloseReport"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "FindingCloseInput": {
+        "type": "object",
+        "description": "Fragment schema: no required keys (spec 10.10).",
+        "additionalProperties": false,
+        "properties": {
+          "operands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "round": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "pattern": "^-?(0|[1-9][0-9]*)$"
+          },
+          "seq": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "pattern": "^-?(0|[1-9][0-9]*)$"
+          },
+          "disposition": {
+            "enum": [
+              "open",
+              "fixed",
+              "rejected",
+              "deferred"
+            ]
+          },
+          "resolutionRev": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "session": {
+            "type": "string"
+          },
+          "promote": {
+            "type": "boolean"
+          },
+          "noPromote": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "x-canon": {
+      "roles": [
+        "reviewer"
+      ]
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}
