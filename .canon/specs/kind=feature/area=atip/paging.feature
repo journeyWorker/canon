@@ -29,7 +29,7 @@ Feature: atip paging: a cursor bound to its call, and field selection as the con
   Scenario: A cursor given other arguments is CURSOR_INVALID with reason ARGUMENTS_CHANGED and nothing is written
     Given a first page issued with --limit 1 for query, finding list, divergence list and export
     When the next call changes --kind, --since, --domain, --change, --open, --as-of, --before or adds --history
-    Then each is exit 2 CURSOR_INVALID with reason ARGUMENTS_CHANGED and field --cursor, the repo is byte-identical afterwards, and the same arguments in another order or spelling are accepted
+    Then each is exit 2 CURSOR_INVALID with reason ARGUMENTS_CHANGED and field --cursor, the repo is byte-identical afterwards, and the same arguments in another order or spelling are accepted; --json is not one of the arguments the cursor is bound to (scenario 17)
 
   # canon: {"schema":1,"at":"2026-11-01T10:52:49Z","actor":{"agent_id":"impl-paging-fields","role":"implementer","session_id":"s-0-34-paging-fields"}}
   @subject:atip-contract
@@ -139,7 +139,7 @@ Feature: atip paging: a cursor bound to its call, and field selection as the con
   Scenario: A paged or projected answer carries only the contract's meta members and the report has no paging member of its own
     Given a repo with three subjects, a change with three findings and two divergent scenarios
     When a page of each paged command runs with --limit 1 and --fields, and each command document is read
-    Then meta holds only the contract's members (page, fields, next, context, ...) and no meta.truncated; data and the report schemas hold no page, nextCursor, returned, hasMore or meta member
+    Then meta holds only the contract's members (page, fields, next, context, ...) and no meta.truncated; data and the report schemas hold no page, nextCursor, returned, hasMore or meta member (query's data.count and export's data.recordCount are report content: the records of the answer, not paging state)
 
   # canon: {"schema":1,"at":"2026-11-01T10:53:39Z","actor":{"agent_id":"impl-paging-fields","role":"implementer","session_id":"s-0-34-paging-fields"}}
   @subject:atip-contract
@@ -150,3 +150,23 @@ Feature: atip paging: a cursor bound to its call, and field selection as the con
     Given a repo with three subjects, a change with three findings and two divergent scenarios
     When canon query, finding list and divergence list run with --fields in the spellings 0.33 accepted: changeIds, resolution_sha, project_id, Reward
     Then each is exit 2 USAGE with field --fields and expected the declared paths; the spellings the records and reports use select
+
+  # canon: {"schema":1,"at":"2026-11-01T12:58:57Z","actor":{"agent_id":"impl-paging-fields","role":"implementer","session_id":"s-0-34-paging-fields"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-34-atip-paging-fields.F5
+  @atip.paging.16
+  Scenario: A batch takes no --fields: a fields key of a document is FLAG_ONLY_KEY, --fields on the command line of a batch is USAGE, both at plan time with nothing written
+    Given a repo with three subjects
+    When canon export --json --input runs a batch whose second element has a fields key, a single document with a fields key, and a batch with --fields on the command line; then the same batch without --fields
+    Then each of the first three is exit 2 before anything is written (INPUT_INVALID FLAG_ONLY_KEY at /items/1/fields and /fields, USAGE with field --fields), never BATCH_INCOMPLETE; the plain batch runs; the export command document marks --fields flagOnly, the batch output declares no fields and the fragment schema has no fields key
+
+  # canon: {"schema":1,"at":"2026-11-01T12:59:14Z","actor":{"agent_id":"impl-paging-fields","role":"implementer","session_id":"s-0-34-paging-fields"}}
+  @subject:atip-contract
+  @case:edge
+  @flow:canon-0-34-atip-paging-fields.F2
+  @atip.paging.17
+  Scenario: The output mode does not bind a cursor, an explicit argument equal to its default does, and text mode checks --fields as json mode does
+    Given a repo with three subjects
+    When a first page is issued in text mode and used with --json, one issued with --json is used in text mode, a call repeats the arguments with an explicit --repo equal to the default, and --fields nosuch is given to query, finding list and status without --json
+    Then the cursor works in both modes and is the same string, the explicit --repo is exit 2 CURSOR_INVALID with reason ARGUMENTS_CHANGED, and each unknown path is exit 2 USAGE on stderr with nothing on stdout and nothing written; declared paths are accepted in text mode
