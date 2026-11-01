@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-01T06:36:24.489592Z",
+  "change_ids": [
+    "canon-0-33-atip-crate",
+    "canon-0-33-atip-l0",
+    "canon-0-34-atip-paging-fields",
+    "canon-0-34-atip-1-1"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "change": "canon-0-34-atip-1-1",
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "subject_id": "atip-contract",
+  "summary": "Output selection, envelope, errors, registry and exit codes of canon follow atip/1 L0",
+  "title": "ATIP: canon's atip/1 L0 output contract"
+}

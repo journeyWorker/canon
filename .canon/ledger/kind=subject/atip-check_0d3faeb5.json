@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-01T06:36:52.987509Z",
+  "change_ids": [
+    "canon-0-33-atip-check",
+    "canon-0-34-atip-check-1-1",
+    "canon-0-34-atip-check-l1"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "change": "canon-0-34-atip-check-l1",
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "subject_id": "atip-check",
+  "summary": "A binary that runs a tool's built binary and checks it against atip/1",
+  "title": "ATIP: the atip check conformance checker"
+}
