@@ -225,7 +225,7 @@ pub struct ExportArgs {
     pub include_sensitive: bool,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)
+    /// Keep only these members of the answer this call prints (comma-separated field paths): of each exported record in the manifest, of the written answer with --json and --output, of the preview with --dry-run; `canon schema export --json` lists the paths per output
     #[arg(long, value_name = "FIELDS")]
     pub fields: Option<String>,
     #[command(flatten)]
