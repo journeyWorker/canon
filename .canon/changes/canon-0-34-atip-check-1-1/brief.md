@@ -7,6 +7,9 @@ waive:
     section: "detail"
     reason: "다섯 단계가 각자 입력, 환경, 판정 규칙을 가져야 해서 줄이면 사실이 빠진다"
   - rule: "prose.length"
+    section: "questions"
+    reason: "계약 저자의 결정과 가정이 서로 다른 결정이라 함께 적어야 한다"
+  - rule: "prose.length"
     section: "acceptance"
     reason: "다섯 단계마다 실패 경로를 요구하는 규칙 때문에 줄일 수 없다"
   - rule: "prose.code-citation"
@@ -70,7 +73,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
   - `L0.no-null`은 meta와 error의 `null`만, `L0.ok-exit`는 종료 값과 `retryable`과 `ok`가 레지스트리와 같은지만 본다.
   - `L0.stderr-result`는 stderr에 오류나 결과가 실렸는지, `L0.stderr-quiet`는 JSON 모드에서 stderr가 비었는지를 본다. 0.33에서 `ok-exit`와 `unknown-command` 등에 흩어져 있던 stderr 판정이 여기로 모인다.
 - `L0.contract-version`은 `schema` 답과 모든 봉투, 모든 종료 값의 호출을 대상으로 한다. `schema` 답의 `meta.schemaVersion`이 주장과 같은지도 본다.
-- `L0.refusal-effects`는 0.33과 같이 거절의 부작용을 보고, 이제 `probe`가 알려 주는 원격 상태의 변화도 본다.
+- `L0.refusal-effects`는 0.33과 같이 거절의 부작용을 보고, 이제 `probe`가 알려 주는 원격 상태의 변화도 본다. 부작용의 기준선은 `prepare`와 `setup`이 끝난 뒤에 잡는다. 둘이 만든 변화는 판정하지 않는다.
 - `L0.hint-form`은 도구 이름과 공백으로 시작하는 모든 힌트가 `next[].command`처럼 쪼개지고 명령 한 줄만 담는지 본다. 1.0 주장이면 적용하지 않는다. 그 명령이 실제로 있는지는 L1의 `hint-command`가 본다.
 - `L0.usage-hint`는 `field`가 없는 `USAGE`가 `canon schema <명령> --json` 꼴의 힌트(명령이 안 풀렸으면 `schema --json`)를 가지는지 본다. 그런 `USAGE`를 관찰하지 못하면 해당 없음이다.
 - `L0.global-on-group`은 fixture의 `globalOptions` 항목마다 그룹 하나에 대해 `<도구> <그룹> --json`과 `<도구> <그룹> <옵션> --json`이 모두 `COMMAND_REQUIRED`인지 본다. fixture의 명령에서 그룹을 알 수 없으면 제공되지 않음이다.
@@ -78,7 +81,11 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 
 ### F3 fixture
 
-- 키는 `contractVersion`, `setup`, `env`, `timeoutSeconds`, `probe`, `globalOptions`, `registry`, `warnings`, `commands`다. `registry`는 `{code, exit, retryable, reasons?}`의 배열이고 `reasons`는 이름 배열이다. 설명과 fix 문장은 fixture에 없다. `warnings`는 경고 코드 이름의 배열이다.
+- 키는 `contractVersion`, `prepare`, `setup`, `env`, `timeoutSeconds`, `probe`, `globalOptions`, `registry`, `warnings`, `commands`다. `registry`는 `{code, exit, retryable, reasons?}`의 배열이고 `reasons`는 이름 배열이다. 설명과 fix 문장은 fixture에 없다. `warnings`는 경고 코드 이름의 배열이다.
+- `prepare`는 아무 프로그램의 argv 배열 목록이다. 셸은 쓰지 않는다. 템플릿 디렉터리에서 `setup`보다 먼저 한 번 돌고 fixture의 `env`를 쓴다.
+  - `prepare`가 0이 아닌 종료 값으로 끝나면 검사기의 오류다. 도구의 실패가 아니고 어떤 검사 결과도 만들지 않는다. exit 2, `PREPARE_FAILED`이고 실패한 argv와 종료 값, stderr 끝부분이 보고에 있다.
+  - `prepare`는 환경만 만든다. 도구의 상태는 여전히 `setup`이 만든다.
+  - `prepare`가 만든 변화는 부작용 기준선에 들어가서 판정하지 않는다.
 - `registry`에는 배열 대신 `"from-schema"`를 쓸 수 있다. 오류와 경고 레지스트리를 도구의 `schema --errors --json`과 `--warnings --json`에서 가져오고 fixture와 비교하지 않는다. 그 fixture에는 `warnings`가 없다. 도구가 `schema --errors`를 제공하지 않으면 레지스트리가 필요한 검사는 제공되지 않음이다. canon fixture는 이 값을 쓸 수 있다.
 - `commands`에는 L0에 필요한 것만 쓴다. `missingValue`(필수 값 하나가 빠진 호출)와 `paged`(`meta.page.nextCursor`를 돌려주는 호출 목록)다. L1, L2 전용 키(`ok`, `domainRejects`, `fields` 등)는 있어도 무시한다.
 - L0에서 어느 명령이 쪽을 나누는지는 관찰로 정한다. fixture에 올린 명령의 `ok` 호출에 `--cursor x`를 붙여 본다.
@@ -116,7 +123,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 
 ### F6 canon에 대한 실행
 
-- canon fixture는 `contractVersion: "1.1"`, `globalOptions`(`--repo .`), `missingValue`(필수 `--seq`가 빠진 `finding close`), `paged` 호출 하나와 다음 단계를 내는 호출 하나를 가진다. `paged` 호출은 fixture 준비가 만든 기록이 둘 이상이라 `meta.page.nextCursor`가 있다. 레지스트리는 `"registry": "from-schema"`로 쓰거나, 배열로 쓰면 `canon schema --errors --json`과 `--warnings --json`에서 생성하고 손으로 쓰지 않는다.
+- canon fixture는 `contractVersion: "1.1"`, `prepare`(`git init`과 빈 커밋), `globalOptions`(`--repo .`), `missingValue`(필수 `--seq`가 빠진 `finding close`), `paged` 호출 하나와 다음 단계를 내는 호출 하나를 가진다. `prepare`가 있어야 `finding list`와 `divergence list`가 쪽을 나눈다. `paged` 호출은 fixture 준비가 만든 기록이 둘 이상이라 `meta.page.nextCursor`가 있다. 레지스트리는 `"registry": "from-schema"`로 쓰거나, 배열로 쓰면 `canon schema --errors --json`과 `--warnings --json`에서 생성하고 손으로 쓰지 않는다.
 - CI 잡과 `just atip` 레시피가 1.1 주장으로 돌린다. canon이 27개 검사를 통과해야 잡이 초록이다. 이 단계는 `canon-0-34-atip-1-1`이 출시된 뒤에만 초록이 된다.
 
 ## Acceptance
@@ -135,6 +142,8 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
   - 경고 전용 코드로 `--error`를 부르면 `USAGE`, `field`가 `--error`, exit 2가 아닐 때 `L0.registry`가 실패한다.
   - 쪽을 나누는 명령이 `paged` 항목이 없고 관찰한 `nextCursor`도 없으면 `L0.page`가 제공되지 않음이다. 모든 올린 명령이 `--cursor`를 모르는 옵션으로 거절하면 해당 없음이다. fixture에 명령을 올리지 않아도 해당 없음이 되지 않는다.
   - 실패 경로: 모양이 틀린 fixture는 exit 2, `FIXTURE_INVALID`다. 레지스트리에 없는 reason을 내는 도구는 `L0.registry` 실패다.
+  - 실패 경로: 0이 아닌 종료 값으로 끝나는 `prepare`는 exit 2, `PREPARE_FAILED`이고 `data.checks`에 검사 결과가 하나도 없다. 도구 실패로 보고되지 않는다.
+  - `prepare`가 파일을 만들거나 바꿔도 `L0.refusal-effects`는 실패하지 않는다. 거절이 `prepare`가 만든 파일을 바꾸면 그 변화는 실패다. `prepare`는 셸 없이 argv 그대로 실행되어 `;`나 `$VAR`가 해석되지 않는다.
 - F4:
   - 값이 빠지면 프롬프트를 읽고 기다리는 가짜 도구는 `L0.no-prompt` 실패다. 거절하고 끝나는 도구는 통과한다. 오래 자면서 입력도 읽지 않고 출력도 없는 도구는 제공되지 않음이다.
   - pty 출력이 잘리지 않고 EOF까지 읽힌다. 출력이 긴 도구의 뒷부분이 보고에 남는다.
@@ -149,9 +158,11 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 
 ## Questions and assumptions
 
-- 계약 저자가 정했다. 검사기는 1.1 검사 id와 Needs 열, 소유 검사 원칙, `L0.next`, `L0.page`, `L0.refusal-effects`, `L0.no-prompt`, `L0.registry`, `L0.contract-version`을 따른다. L2 검사는 0.35에 온다.
+- 계약 저자가 정했다. 검사기는 1.1 검사 id와 Needs 열, 소유 검사 원칙을 따른다.
+- 같은 결정에서 `L0.next`, `L0.page`, `L0.refusal-effects`, `L0.no-prompt`, `L0.registry`, `L0.contract-version`이 L0 검사다. L2 검사는 0.35에 온다.
 - 가정: 1.1 L0 검사는 모두 28개이고 1.1 주장에서 `L0.contract`가 해당 없음이라 27개가 적용된다. 이 수는 검사기 문서 v1.1.1의 L0 표를 센 것이다. 1.1.1은 검사를 더하지 않는다. 힌트가 실제 명령인지는 L1의 `hint-command`로 옮겨 갔다.
-- 가정: 새 오류 코드가 필요하면 기존 이름(`USAGE`, `BINARY_UNUSABLE`, `FIXTURE_INVALID`, `LEVEL_UNSUPPORTED`, `LEVEL_NOT_MET`)을 쓰고, `--contract`와 fixture가 다른 경우는 `USAGE`다.
+- 가정: 새 오류 코드가 필요하면 기존 이름(`USAGE`, `BINARY_UNUSABLE`, `FIXTURE_INVALID`, `LEVEL_UNSUPPORTED`, `LEVEL_NOT_MET`)을 쓰고, `--contract`와 fixture가 다른 경우는 `USAGE`다. 단 `prepare` 실패는 검사기 오류라 새 이름 `PREPARE_FAILED`(exit 2)를 쓴다.
+- 계약 저자가 정했다(1.1.2 후보). fixture 키 `prepare`를 둔다. 셸 없는 argv 배열이고 `setup` 전에 템플릿에서 `env`로 한 번 돈다. 0이 아닌 종료는 검사기 오류이고 부작용 기준선은 `prepare`와 `setup` 뒤에 잡는다. `prepare`는 환경만 만들고 도구의 상태는 `setup`이 만든다.
 - 가정: 프롬프트 검사의 기한 공식은 검사기 문서의 값(기준 시간의 두 배에 2초, 최대 fixture 시간 제한)을 그대로 쓴다.
 - 가정: pty 검사는 macOS와 Linux에서만 돈다. canon의 CI 대상과 같다.
 - 가정: `L1.reasons`, `L1.warnings`, `L2.input-usage`는 L1과 L2 검사라 이 변경이 아니다. L1은 `canon-0-34-atip-check-l1`이, L2는 0.35가 연다.
