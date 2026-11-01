@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T12:15:08.524736Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_14_a_refused_trace_leaves_a_fresh_index_as_it_was_and_a_trace_that_answers_still_writes_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    },
+    {
+      "case": "atip_contract11_14_a_search_of_an_empty_text_is_refused_and_writes_no_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    },
+    {
+      "case": "atip_contract11_14_a_trace_of_an_id_no_record_says_is_refused_and_writes_no_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    },
+    {
+      "case": "atip_contract11_14_a_trace_of_an_operand_with_no_shape_is_refused_and_writes_no_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    }
+  ],
+  "code_tree": "937b6ab3bc1c56d75b8369014d4dcdee7b1336ac",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-111-junit.xml"
+  },
+  "evidence_sha": "1c7c6ec3b1b17be04ff7354f070d8fc8e179b750",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 43,
+  "scenario_id": "atip.contract11.14",
+  "schema": 1,
+  "staging_id": "2697f8f2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T12:14:48.632780Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a_registered_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    },
+    {
+      "case": "atip_contract11_04_every_reason_canon_emits_is_registered_under_its_code_and_a_missing_one_fails",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    },
+    {
+      "case": "atip_contract11_04_every_input_error_the_corpus_froze_has_a_registered_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    }
+  ],
+  "code_tree": "937b6ab3bc1c56d75b8369014d4dcdee7b1336ac",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-111-junit.xml"
+  },
+  "evidence_sha": "1c7c6ec3b1b17be04ff7354f070d8fc8e179b750",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 34,
+  "scenario_id": "atip.contract11.04",
+  "schema": 1,
+  "staging_id": "15642214",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
