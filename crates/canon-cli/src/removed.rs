@@ -65,7 +65,14 @@ impl Removed {
             None if self.replacement.starts_with('-') => self.replacement.clone(),
             None => format!("canon {}", self.replacement),
         };
-        let mut hint = format!("{} was removed in {}; use `{shown}`", self.used, self.since);
+        // A hint that starts with `canon ` is one command line (spec 7.1.2); this one is a sentence, so a removed
+        // command (`canon brief` run bare) is quoted instead of leading it.
+        let used = match self.used.strip_suffix(" without a subcommand") {
+            Some(group) if group.starts_with("canon ") => format!("a bare `{group}`"),
+            _ if self.used.starts_with("canon ") => format!("`{}`", self.used),
+            _ => self.used.clone(),
+        };
+        let mut hint = format!("{used} was removed in {}; use `{shown}`", self.since);
         if !self.note.is_empty() {
             hint.push_str(&format!(" ({})", self.note));
         }

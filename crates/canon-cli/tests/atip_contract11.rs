@@ -59,6 +59,14 @@ fn atip_contract11_08_an_empty_value_the_caller_sent_is_received_empty_and_a_val
     let absent = json(&canon(dir.path(), &["finding", "add", "--json"]));
     assert_eq!(absent["error"]["code"], "USAGE", "{absent}");
     assert!(absent["error"].get("received").is_none(), "a value never sent has no received: {absent}");
+    // An option with no value is a value never sent: clap reports it as an empty value, canon leaves `received` out.
+    for args in [vec!["finding", "add", "--change", "--json"], vec!["finding", "add", "--json", "--change"]] {
+        let missing = json(&canon(dir.path(), &args));
+        assert_eq!((missing["error"]["code"].as_str(), missing["error"]["field"].as_str()), (Some("USAGE"), Some("--change")), "{args:?}: {missing}");
+        assert!(missing["error"].get("received").is_none(), "{args:?}: a value never sent has no received: {missing}");
+    }
+    let equals = json(&canon(dir.path(), &["finding", "add", "--change=", "--json"]));
+    assert_eq!(equals["error"]["received"], "", "an explicit empty value keeps received: {equals}");
     // The same through `--input`: an empty key of the document is reported as the caller sent it.
     let document = json(&canon(dir.path(), &["scenario", "new", "--input", r#"{"operands":["auth.login.01"],"title":"t","":1}"#, "--json"]));
     assert_eq!((document["error"]["code"].as_str(), document["error"]["reason"].as_str(), document["error"]["received"].as_str()), (Some("INPUT_INVALID"), Some("UNKNOWN_KEY"), Some("")), "{document}");

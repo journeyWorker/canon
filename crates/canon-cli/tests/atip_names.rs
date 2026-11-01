@@ -93,6 +93,34 @@ fn atip_contract11_13_the_0_33_names_are_gone_from_every_guide_page_script_spec_
     assert!(revived.is_empty(), "0.33 names that came back:\n{}", revived.join("\n"));
 }
 
+/// The scan, over `files`, as the test above runs it: what it finds.
+fn revived_in(files: &[PathBuf]) -> Vec<String> {
+    files.iter().filter_map(|file| old_name(&fs::read_to_string(file).unwrap_or_default()).map(|name| format!("{}: {name}", file.display()))).collect()
+}
+
+/// A name put into a file of a scanned surface makes the scan fail; the same file without it passes.
+#[test]
+fn atip_contract11_13_a_revived_name_in_a_scanned_file_fails_the_scan() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut copies = Vec::new();
+    for (label, files) in surfaces() {
+        let original = files.first().unwrap_or_else(|| panic!("{label}: no file"));
+        let copy = dir.path().join(format!("{}-{}", copies.len(), original.file_name().and_then(|n| n.to_str()).unwrap_or("file")));
+        fs::copy(original, &copy).expect("copy a scanned file");
+        copies.push(copy);
+    }
+    assert!(revived_in(&copies).is_empty(), "the untouched copies are clean: {:?}", revived_in(&copies));
+    for (i, name) in ["`error.x-canon.reason` is `tty`", "exits 2 with UNKNOWN_ERROR_CODE", "{\"error\":{\"x-canon\":{\"reason\":\"syntax\"}}}", "{\"reason\": \"batch-unsupported\"}"].iter().enumerate() {
+        let target = &copies[i % copies.len()];
+        let before = fs::read_to_string(target).unwrap();
+        fs::write(target, format!("{before}\n{name}\n")).unwrap();
+        let found = revived_in(&copies);
+        assert_eq!(found.len(), 1, "{name} was put into {}: {found:?}", target.display());
+        fs::write(target, before).unwrap();
+    }
+    assert!(revived_in(&copies).is_empty());
+}
+
 #[test]
 fn atip_contract11_13_reviving_one_of_the_old_names_fails_the_check() {
     assert_eq!(old_name("`error.x-canon.reason` is `tty`"), Some("x-canon.reason"));

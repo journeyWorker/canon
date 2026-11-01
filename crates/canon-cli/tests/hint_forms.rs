@@ -238,3 +238,51 @@ fn atip_contract11_10_the_rule_catches_prose_after_a_command_and_a_lowercase_pla
     assert!(problem("canon nosuch --json", &root).is_some(), "a command canon does not have");
     assert!(problem("canon schema nosuch --json", &root).is_some(), "a schema path that names no command");
 }
+
+/// Every command word path of canon's tree: `(path, is_group)`, the root first (`[]`).
+fn nodes(command: &clap::Command, path: &mut Vec<String>, out: &mut Vec<(Vec<String>, bool)>) {
+    let children: Vec<&clap::Command> = command.get_subcommands().filter(|sub| sub.get_name() != "help").collect();
+    out.push((path.clone(), !children.is_empty()));
+    for child in children {
+        path.push(child.get_name().to_string());
+        nodes(child, path, out);
+        path.pop();
+    }
+}
+
+/// The hints the binary builds at run time (the removed-spelling hints of `canon brief` and `canon report` run bare,
+/// the usage hints made from the clap tree): every group run bare, every leaf with an option it does not have.
+#[test]
+fn atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule() {
+    let root = canon_cli::cli::command();
+    let mut all = Vec::new();
+    nodes(&root, &mut Vec::new(), &mut all);
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (mut seen, mut groups, mut problems) = (0, 0, Vec::new());
+    for (path, is_group) in &all {
+        let mut args: Vec<&str> = path.iter().map(String::as_str).collect();
+        if !is_group {
+            args.push("--no-such-option-for-the-test");
+        } else {
+            groups += 1;
+        }
+        args.push("--json");
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("spawn canon");
+        let document: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{args:?}: stdout is not JSON ({e})"));
+        if let Some(hint) = document["error"]["hint"].as_str() {
+            seen += 1;
+            if let Some(why) = problem(hint, &root) {
+                problems.push(format!("canon {}: {hint:?}: {why}", args.join(" ")));
+            }
+        }
+    }
+    assert!(groups >= 10 && seen >= 100, "the run covered {groups} groups and {seen} hints");
+    assert!(problems.is_empty(), "hints the binary prints that break 7.1.2:\n{}", problems.join("\n"));
+    // The two removed groups of 0.28 answer with a sentence, not a command line.
+    for group in ["brief", "report"] {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args([group, "--json"]).current_dir(dir.path()).output().expect("spawn canon");
+        let document: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON");
+        let hint = document["error"]["hint"].as_str().expect("a hint");
+        assert!(!hint.starts_with("canon "), "{group}: {hint}");
+    }
+}

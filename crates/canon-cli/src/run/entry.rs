@@ -108,7 +108,11 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
                 }
             }
             if let Some(value) = string(ContextKind::InvalidValue) {
-                usage = usage.received(value);
+                // clap reports an option with no value (`--change --json`) as an empty value too: only a value the
+                // caller sent, empty or not, is `received` (spec 7.1.1); a value never sent leaves it out.
+                if !value.is_empty() || usage.field_name().is_none_or(|field| sent_empty_value(field, &std::env::args().collect::<Vec<_>>())) {
+                    usage = usage.received(value);
+                }
             }
             let valid: Vec<String> = match error.get(ContextKind::ValidValue) {
                 Some(ContextValue::Strings(values)) => values.clone(),
@@ -202,6 +206,17 @@ pub fn hoist_tool_wide_options(root: &clap::Command, args: Vec<std::ffi::OsStrin
     }
     out.extend(args[end..].iter().cloned());
     out
+}
+
+/// Whether `args` give the option `field` an empty value (`--change ""`, `--change=`). An operand (`field` not
+/// starting with `--`) has no value to leave out: clap reports its absence as a missing argument, not an empty value.
+fn sent_empty_value(field: &str, args: &[String]) -> bool {
+    if !field.starts_with("--") {
+        return true;
+    }
+    let end = args.iter().position(|arg| arg == "--").unwrap_or(args.len());
+    let words = &args[..end];
+    words.iter().enumerate().any(|(at, word)| (word == field && words.get(at + 1).is_some_and(String::is_empty)) || *word == format!("{field}="))
 }
 
 /// The accepted values of the option `--name` of `node`, when it takes a closed set.
@@ -322,7 +337,17 @@ pub fn refuse_without_config(command_tree: &clap::Command, parsed: &clap::ArgMat
 mod tests {
     use std::ffi::OsString;
 
-    use super::{hoist_tool_wide_options, leaf_takes_repo};
+    use super::{hoist_tool_wide_options, leaf_takes_repo, sent_empty_value};
+
+    #[test]
+    fn atip_contract11_08_an_option_with_no_value_is_not_an_empty_value_the_caller_sent() {
+        let args = |words: &[&str]| words.iter().map(|w| (*w).to_string()).collect::<Vec<_>>();
+        assert!(sent_empty_value("--change", &args(&["canon", "finding", "add", "--change", "", "--json"])));
+        assert!(sent_empty_value("--change", &args(&["canon", "finding", "add", "--change=", "--json"])));
+        assert!(!sent_empty_value("--change", &args(&["canon", "finding", "add", "--change", "--json"])));
+        assert!(!sent_empty_value("--change", &args(&["canon", "finding", "add", "--json", "--change"])));
+        assert!(!sent_empty_value("--change", &args(&["canon", "finding", "add", "--", "--change", ""])));
+    }
 
     fn hoisted(args: &[&str]) -> Vec<String> {
         let tree = crate::cli::command();
