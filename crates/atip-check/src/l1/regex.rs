@@ -22,6 +22,24 @@ const CATEGORIES: [&str; 30] = [
 /// The escapes I-Regexp allows besides `\p{…}` and `\P{…}`.
 const SINGLE_ESCAPES: &str = "()*+-.?[\\]^nrt{|}";
 
+type Memo = std::sync::Mutex<std::collections::HashMap<String, Option<String>>>;
+static FORM: std::sync::LazyLock<Memo> = std::sync::LazyLock::new(Memo::default);
+static RUST: std::sync::LazyLock<Memo> = std::sync::LazyLock::new(Memo::default);
+
+/// `compute(pattern)`, remembered: a pattern is compiled by the engines at every value a probe judges, and a large one (`\p{L}{1,500}`) takes seconds to compile.
+fn memoised(memo: &Memo, pattern: &str, compute: fn(&str) -> Option<String>) -> Option<String> {
+    if let Ok(known) = memo.lock() {
+        if let Some(answer) = known.get(pattern) {
+            return answer.clone();
+        }
+    }
+    let answer = compute(pattern);
+    if let Ok(mut known) = memo.lock() {
+        known.insert(pattern.to_string(), answer.clone());
+    }
+    answer
+}
+
 /// The ECMAScript reading of `pattern` with the `u` flag.
 pub fn ecmascript(pattern: &str) -> Result<regress::Regex, String> {
     regress::Regex::with_flags(pattern, "u").map_err(|error| error.to_string())
@@ -178,6 +196,10 @@ pub fn compare(pattern: &str, value: &str) -> Comparison {
 /// Why `pattern` is not of the form of spec 10.7.4: `^`, an I-Regexp body with its restrictions, `$`, and it compiles in the
 /// ECMAScript engine. `None` when it is. (Compiling in the Rust engine is [`rust_problem`].)
 pub fn form_problem(pattern: &str) -> Option<String> {
+    memoised(&FORM, pattern, uncached_form_problem)
+}
+
+fn uncached_form_problem(pattern: &str) -> Option<String> {
     let body = pattern
         .strip_prefix('^')
         .and_then(|rest| rest.strip_suffix('$'))
@@ -195,6 +217,10 @@ pub fn form_problem(pattern: &str) -> Option<String> {
 
 /// Why the Rust `regex` crate refuses `pattern` at its default limits; `None` when it compiles.
 pub fn rust_problem(pattern: &str) -> Option<String> {
+    memoised(&RUST, pattern, uncached_rust_problem)
+}
+
+fn uncached_rust_problem(pattern: &str) -> Option<String> {
     rust(pattern)
         .err()
         .map(|reason| format!("the Rust regex crate refuses it with its default limits: {}", reason.lines().last().unwrap_or_default().trim()))
