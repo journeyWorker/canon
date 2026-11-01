@@ -133,6 +133,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 ### F5 fixture
 
 - L1에서 읽는 키가 늘어난다. `commands`의 항목은 명령 id를 키로 하고 `ok`(통과 호출 목록), `missingValue`, `paged`(`nextCursor`를 돌려주는 호출 목록), `fields`(선택 목록), `domainRejects`(인수별 값 목록)를 가진다. `search`는 L2 키라 무시한다.
+- `prepare`는 L0의 키와 같다. 셸 없는 argv 배열 목록이고 `setup` 전에 템플릿에서 한 번 돈다. 부작용 기준선은 `prepare`와 `setup` 뒤에 잡고, `prepare`는 환경만 만든다. 0이 아닌 종료는 검사기 오류다. L1은 `prepare`가 만든 환경에서 `validators`가 `setup` 없이 돌 때도 같은 환경을 쓴다.
 - `registry`에는 `"from-schema"`를 쓸 수 있다. 그러면 오류와 경고 레지스트리를 도구의 `schema --errors --json`과 `--warnings --json`에서 가져오고 fixture와 비교하지 않는다. canon의 fixture는 이 값을 쓸 수 있다.
 - 필요한 항목이 없고 관찰한 위반도 없으면 해당 검사는 제공되지 않음이고, MUST이면 레벨이 통과하지 못한다. 항목이 없어도 이미 관찰한 위반은 실패다.
 - 검사기는 fixture에 올라 있지 않은 `write`나 `destructive` 명령을 돌리지 않는다.
@@ -173,6 +174,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 - F5:
   - fixture에서 필요한 `commands` 항목을 빼면 해당 MUST 검사가 제공되지 않음이고 종료 코드는 1이다. 관찰한 위반은 실패다.
   - 모양이 틀린 fixture는 exit 2, `FIXTURE_INVALID`다.
+  - 실패 경로: 0이 아닌 종료 값으로 끝나는 `prepare`는 exit 2, `PREPARE_FAILED`이고 어떤 검사 결과도 만들지 않는다. `prepare`가 만든 파일은 효과 판정(`L1.validators`의 아무것도 쓰이지 않는다는 조건 포함)에서 변화로 세지 않는다.
 - F6:
   - ==**L1 검사 id 31개 모두에 대해 위반 설정 시험이 있다.**== 그 검사 하나만 실패한다.
   - 정규식 기록의 모든 사례에서 두 엔진의 답이 기록과 같다. 정상 가짜 도구와 검사기 자신이 통과한다.
@@ -200,4 +202,4 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 - 계약 문서, 스키마, 예시의 수정. 사본을 읽기만 한다.
 - canon이 L1을 만족하게 하는 일(`canon-0-34-atip-1-1`, `-schema-doc`, `-constraints`, `-paging-fields`).
 
-Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:5aa33dde761552e2661e1b5b3e81016e6525ecbdf9c69e5c20202f531202e092)
+Approved: Journey Hwang 2026-11-01T12:03:12Z — "휴가 중 승인 위임(2026-11-01 대화): fixture prepare 반영분" (relayed by orchestrator orchestrator-main via chat) (brief sha256:caec48bbc213717bf4a4566bf1af8648beacbd212f67c8449fd7c44ba7dde7ff)

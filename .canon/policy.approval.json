@@ -1,11 +1,11 @@
 {
   "policy_digest": "sha256:106b851bac352289019fca88f8095ee042f23efb41a15dd2dbb688fe4240474b",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-01T06:36:14Z",
-  "note": "승인 (6개 모두 0.34, 깨는 변경 괜찮아)",
+  "approved_at": "2026-11-01T12:03:12Z",
+  "note": "휴가 중 승인 위임(2026-11-01 대화): fixture prepare 반영분",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",
-    "tool": "ask"
+    "tool": "chat"
   }
 }

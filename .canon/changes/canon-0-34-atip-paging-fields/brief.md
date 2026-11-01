@@ -136,4 +136,4 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, spec 6.9, 6.10, 7.2.3,
 - 검사기의 `L1.paging`과 `L1.fields`(`canon-0-34-atip-check-l1`).
 - 0.35: cursor를 쓰는 배치, `--input`으로 주는 `--fields`, stream.
 
-Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:180b32cfb9925b69756f04480f8975d35eb6dc731ab8170660d9156169089b9a)
+Approved: Journey Hwang 2026-11-01T11:53:57Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:ef07ccb9ba778dbbe086c1b4c0ebf69a3a885263682c8e52a76838357e84b4bf)

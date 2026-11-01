@@ -149,4 +149,4 @@ canon 0.33은 atip/1 1.0의 L0를 따르고, 출력에 1.1의 멤버가 없다. 
 - 8.3.1의 보수적 판정을 쓰는 일.
 - 0.35의 `--input` 처리 순서, 배치 보고서, 계획 digest, `skills show`, stream.
 
-Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:67d60ae716ddcb168d2beb3d84ac3e644a17cdbceebdee607dc413081d48c192)
+Approved: Journey Hwang 2026-11-01T11:53:57Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:4f38a6eccca1a2cc59f73fb290ed1598392f748f35e1b7f68ee1e1a840c96482)

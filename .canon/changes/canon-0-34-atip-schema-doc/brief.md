@@ -163,4 +163,4 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, spec 4.7, 9, 10.1-10.7
 - `schema --search`(알려진 SHOULD 공백, backlog).
 - L2(0.35): `--input` 처리 순서와 조각 병합, 배치 포인터, 계획 digest 형식, `--operation`, stream 선언(`dashboard`), `skills show`의 data 모양.
 
-Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:cfa5f36c309494f7d5b055314cef3809eaf058f6b8f2b31ede1b4f2e30a029df)
+Approved: Journey Hwang 2026-11-01T11:53:57Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:8d0c259743c0b69b72a55b89de931351796e785ee1f77890c463fdacce808f6b)

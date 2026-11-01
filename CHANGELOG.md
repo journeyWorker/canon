@@ -6,6 +6,8 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ### Breaking
 
+canon follows atip/1 **1.1.1** (the patch that makes the contract's own schema refuse a written-out `contractVersion` of `"1.0"`; `meta.contractVersion` stays `"1.1"`). The vendored `envelope.schema.json` is the v1.1.1 one; the other contract schemas are the v1.1.0 ones, which 1.1.1 did not change, and `atip::envelope_problems` no longer checks `"1.0"` beside the schema.
+
 canon adopts atip/1 **1.1** (https://github.com/journeyWorker/atip, tag v1.1.0: spec 6.6, 7.1 to 7.6, 9.13, 10.1, 15.6, 15.7). The 0.33 names below are deleted, with no aliases; every consumer in this repository (the guides the binary carries, the website in English and Korean, the dashboard, the npm launcher, the dogfood trace check, the conformance corpus, the command spec and the scenario sentences) moved to the new names in the same change. A caller written for 1.0 reads `meta.contractVersion` first; a caller that ignores unknown members (the contract requires it, 15.6) keeps working.
 
 **The envelope and `schema`.** The vendored contract schemas in `crates/atip/schema/` are the v1.1.0 ones, byte for byte, pinned by digest.
