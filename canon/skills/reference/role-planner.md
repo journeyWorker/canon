@@ -102,7 +102,7 @@ canon query --kind evidence --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20 --json

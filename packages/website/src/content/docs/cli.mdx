@@ -37,7 +37,7 @@ Commands without a group word.
 | `canon migrate` | none | none | destructive (preview, then `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate --json` |
 | `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | destructive (preview, then `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z --json` |
 | `canon query` | none | `--kind <KIND>` | read: Read stored records across every storage tier | `canon query --kind evidence --json` |
-| `canon retrieve` | none | `--for-role <ROLE>` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20 --json` |
+| `canon retrieve` | none | `--for-role <ROLE>`, one of `--regime` or `--domain` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20 --json` |
 | `canon schema` | `<path>` (optional) (repeatable) | none | read: Describe canon's own commands | `canon schema evidence add --json` |
 | `canon search` | `<text>` | none | read: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding --json` |
 | `canon selftest` | none | none | read: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate --json` |

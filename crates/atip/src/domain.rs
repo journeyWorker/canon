@@ -169,6 +169,9 @@ pub fn pattern_problem(pattern: &str) -> Option<String> {
         Some(body) if pattern.chars().count() >= 2 => body,
         _ => return Some("is not ^…$".to_string()),
     };
+    if let Some(at) = pattern.chars().position(|c| matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}')) {
+        return Some(format!("carries a raw line terminator at offset {at}: the contract's schema requires `^\\^.*\\$$`, and `.` does not match one (write `\\n`, `\\r`, `\\p{{Zl}}`, `\\p{{Zp}}`)"));
+    }
     if let Some(problem) = iregexp_problem(body) {
         return Some(problem);
     }
@@ -179,10 +182,7 @@ pub fn pattern_problem(pattern: &str) -> Option<String> {
 /// A port of `iregexpProblem` of the contract's `scripts/check.ts`.
 fn iregexp_problem(body: &str) -> Option<String> {
     let mut scan = Scan { cps: body.chars().collect(), i: 0 };
-    match scan.alternatives(0).and_then(|()| if scan.i < scan.cps.len() { scan.fail(&format!("unmatched {}", scan.cps[scan.i])) } else { Ok(()) }) {
-        Ok(()) => None,
-        Err(message) => Some(message),
-    }
+    scan.alternatives(0).and_then(|()| if scan.i < scan.cps.len() { scan.fail(&format!("unmatched {}", scan.cps[scan.i])) } else { Ok(()) }).err()
 }
 
 struct Scan {
@@ -397,8 +397,8 @@ pub fn admits(domain: &Value, value: &Value) -> Result<bool, String> {
 pub struct Compiled(Validator);
 
 impl std::fmt::Debug for Compiled {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("Compiled(..)")
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Compiled(..)")
     }
 }
 
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn a_pattern_of_the_restricted_form_passes_and_each_removed_spelling_is_named() {
-        for good in ["^[a-z][a-z0-9-]*$", "^(core|lead)$", "^\\p{L}{1,10}$", "^[^\\n\\r]+$", "^[a-z]+(-[a-z0-9]+)*$", "^[ \\t]*x$", "^a\\.b$"] {
+        for good in ["^[a-z][a-z0-9-]*$", "^(core|lead)$", "^\\p{L}{1,10}$", "^[^\\n\\r]+$", "^[a-z]+(-[a-z0-9]+)*$", "^[ \\t]*x$", "^a\\.b$", "^[^\\n\\r\\p{Zl}\\p{Zp}]+$"] {
             assert_eq!(pattern_problem(good), None, "{good}");
         }
         let bad = [
@@ -485,6 +485,8 @@ mod tests {
             ("^*a$", "* without an atom"),
             ("^(a$", "unclosed ("),
             ("^[]$", "empty character class"),
+            ("^[^\n]+$", "raw line terminator"),
+            ("^[^\u{2028}]+$", "raw line terminator"),
             ("^a^b$", "^ outside a character class"),
         ];
         for (pattern, expected) in bad {
@@ -538,7 +540,7 @@ mod tests {
     fn merging_keeps_the_tighter_bound_and_refuses_two_patterns() {
         let merged = merge(Some(json!({ "minimum": 0, "maximum": 4_294_967_295_u64 })), Some(json!({ "minimum": 1 }))).expect("merges");
         assert_eq!(merged, Some(json!({ "minimum": 1, "maximum": 4_294_967_295_u64 })));
-        assert!(merge(Some(json!({ "pattern": "^a$" })), Some(json!({ "pattern": "^b$" }))).is_err());
+        merge(Some(json!({ "pattern": "^a$" })), Some(json!({ "pattern": "^b$" }))).unwrap_err();
         assert_eq!(merge(None, Some(json!({ "minLength": 1 }))), Ok(Some(json!({ "minLength": 1 }))));
         assert_eq!(merge(None, None), Ok(None));
     }

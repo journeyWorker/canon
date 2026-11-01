@@ -15,7 +15,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Output;
 
 use atip::constraint::Given;
 use atip::doc::{ConditionDoc, ConstraintDoc, RuleKind};
@@ -506,7 +505,7 @@ pub fn run_call(provision: &Provision, home: &Path, words: &[String], role: Opti
     if let Some(role) = role {
         envs.push(("CANON_ROLE", role));
     }
-    let output: Output = canon_in(&repo, home, &argv, &envs);
+    let output = canon_in(&repo, home, &argv, &envs);
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let document: Value = serde_json::from_str(&stdout).unwrap_or(Value::Null);
     Outcome {
@@ -627,7 +626,7 @@ pub fn run_empty(words: &[String], role: Option<&str>) -> Outcome {
     if let Some(role) = role {
         envs.push(("CANON_ROLE", role));
     }
-    let output: Output = canon_in(scratch.path(), home.path(), &argv, &envs);
+    let output = canon_in(scratch.path(), home.path(), &argv, &envs);
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let document: Value = serde_json::from_str(&stdout).unwrap_or(Value::Null);
     Outcome {

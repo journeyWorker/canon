@@ -80,7 +80,7 @@ canon divergence resolve auth.login.01 --actor alice --role reviewer --json
 ```
 ```text
 # Record one code-review finding
-canon finding add --change <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--introduced-unknown] [--review <REVIEW_ID>] [--file-ref <TEXT>] [--scenario <SCENARIO_ID>]* [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
+canon finding add --change <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV> (with --disposition)] [--introduced-rev <REV> | --introduced-unknown] [--review <REVIEW_ID>] [--file-ref <TEXT>] [--scenario <SCENARIO_ID>]* [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged" --json
@@ -122,7 +122,7 @@ canon query --kind evidence --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20 --json

@@ -120,16 +120,18 @@ pub fn codes_for(path: &str, arguments: &[(String, Option<String>)]) -> Vec<&'st
 
 /// The character classes the patterns below are written in. A domain `pattern` is `^`, a restricted I-Regexp body and
 /// `$` (spec 10.7.4): no `.`, no `\d`, no `|` outside parentheses. The characters are written out because I-Regexp has no `\s`.
+/// A pattern carries no raw line terminator (`^\^.*\$$` of the contract's schema must match it, and `.` does not match one),
+/// so LF, CR, U+2028 and U+2029 are written as `\n`, `\r`, `\p{Zl}` and `\p{Zp}`.
 macro_rules! white_space {
     () => {
-        " \t\n\u{b}\u{c}\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}"
+        " \\t\\n\u{b}\u{c}\\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\\p{Zl}\\p{Zp}\u{202f}\u{205f}\u{3000}"
     };
 }
 
 /// The line separators a line of text may not carry: U+000A, U+000B, U+000C, U+000D, U+0085, U+2028 and U+2029.
 macro_rules! line_breaks {
     () => {
-        "\n\r\u{b}\u{c}\u{85}\u{2028}\u{2029}"
+        "\\n\\r\u{b}\u{c}\u{85}\\p{Zl}\\p{Zp}"
     };
 }
 

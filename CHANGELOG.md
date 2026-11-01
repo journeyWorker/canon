@@ -102,6 +102,73 @@ The shared part of the projection is in the `atip` crate (`atip::doc`: the typed
 | `data` of a run: `level`, `passed`, `checks` | also `data.contractVersion`, the minor the checks judged |
 | a fixture of a check that lacks an entry it needs: `unprovided` | unchanged, and a violation the run saw is `fail` whatever the fixture lacks |
 
+**Arguments declare what they accept: `constraints`, `domain` and `validators`.** Every command document lists the relations between its arguments, the restrictions of each argument's own value and the other checks that read no state (spec 10.7.4, 10.7.5, 10.8), and a test drives every one of them through the real parser, so a declaration cannot be false: a call that breaks exactly one rule is refused with the rule's code, exit 2, a `field` that is one of its arguments, and writes nothing; a call that meets it is not refused for it; a value just inside a domain is accepted and one just outside is refused with the code the document names; every validator's `rejects` call is refused with its code in an empty directory, with no repository and no `setup`; every `example` meets the constraints and domains of its command. A survey of the sources fails when a handler refuses an argument that no document declares and no table classifies (a check that reads state is classified as a precondition and is never declared). The tables are `crates/canon-cli/src/arg_rules/`; what clap says through its public getters (`conflicts_with`, `ArgGroup`) is read by `atip::constraint::clap_rules`, not restated.
+
+| 0.33 | 0.34 |
+|---|---|
+| clap's `requires` and `conflicts_with` were read from the `Debug` text of a clap argument (`atip::project::relations`) and listed as `conflictsWith` and `requires` on the option and `requiredOneOf` on the command | deleted: a command document's `constraints` is the one list of relations, and the guides and the syntax lines are drawn from it. `atMostOne` for a set whose members all conflict pairwise (`init`: `--check` with each of the others, `--policy` with `--no-policy`), `exactlyOne` for a required group (`review scenario`: `--upstream-ref`, `--original-spec-ref`), `requires` for `--commit`/`--plan-digest` in both directions |
+| `evidence add`'s `--task`, `--scenario`, `--all-scenarios`, `finding close`'s `--reason`, `retrieve`'s `--regime` or `--domain`, a calendar date, a lower bound on `--round` were known only to the handler | declared with the code the handler gives (`EVIDENCE_INVALID_ARGUMENT`, `FINDING_REASON_REQUIRED`, `USAGE`): `atLeastOne`, `exactlyOne`, `requires`, `forbids` with `if.in` on a value, domains, validators |
+| no `domain` | `domain` on every string, path and integer argument with a restriction: `minimum`/`maximum` for a number (the Rust integer type's bounds are in it: a `u32` is `{minimum: 0, maximum: 4294967295}`; `--round` and `--seq` `minimum: 1`, `--limit` and `--max-artifact-mib` `minimum: 1`), `minLength`, `maxLength` and `pattern` for text: `pattern` is `^…$` of the restricted I-Regexp of the contract, compiles with the Rust `regex` crate, and is a necessary condition (a value outside it is always refused; a value inside may still be refused by a validator or by state). Every id kind (change, subject, project, scenario, task, role, session, run, review, strategy), the time shape of the 12 time options, non-blank and one-line texts, `NAME@VERSION`, `FORMAT:PATH`, `--digest`, `--regime`, `trace`'s operand, `--language`, `--providers` have one |
+| no `validators` | `validators` for what neither can say, each with `rejects` calls: the calendar (`2026-02-30`) of each of the 12 time options (`--since`, `--before`, `--after`, `--expiry`, `--as-of`, `--approval-at`), `--role` against the role of `--regime` (`retrieve`, `dispatch begin`), `--status` against the kind (`query`), a blocker or should-fix `finding add` with `--introduced-rev` or `--introduced-unknown`, the digests of a relayed `brief approve`, `--artifact` scopes, the window of `export` |
+
+New refusals. These are the only calls that were accepted in 0.33 and are refused now:
+
+| Call | 0.33 | 0.34 |
+|---|---|---|
+| `canon export --kind change --before 2026-01-02 --after 2026-02-01` (`--after` later than `--before`) | exit 0, an empty export | exit 2, `USAGE`, `field` `--after`, before any read or write (also with `--dry-run` and `--output`); an equal pair is still an empty window |
+| `--max-artifact-mib`, `--interval-secs`, a paging `--limit` or `retrieve --limit` above 9007199254740991 (2^53-1), for example `--max-artifact-mib 9007199254740993` | read as a 64-bit integer | exit 2, `USAGE`, `field` the option; nothing is rounded into range. `9007199254740991` is still accepted; a negative value was and is refused |
+
+A validator runs before any precondition or state read (spec 10.8.3), so in a directory with no repository (or with an old layout) a call that a validator refuses answers with the validator's code, not `CONFIG_MISSING` or `OLD_LAYOUT`. The validators that were in a handler after the repository was found now run before it (`validators.rs`): `brief approve`'s digests and the relay checks of `brief approve` and `policy approve`, `evidence add` and `evidence audit`'s `--class audit` and `--artifact` scopes, `finding add`'s checks, `export`'s window, `query`'s `--status` and `--kind`. A call that breaks more than one of these answers with the first in the order the handler had; a call that broke an earlier check of the same command and a later one of the moved ones keeps its answer, except: `evidence add` reports a broken `--artifact` scope before a blank `--ref`, the `--all-scenarios` flag combination and the `--project` default; the relay checks (`--relayed-via` token, `--actor`, blank approver and note) come before the missing-role check.
+
+A refusal names the argument at fault in `field` (spec 7.1.1): an option as written, an operand by its value name with no brackets.
+
+| Call | 0.33 `field` | 0.34 `field` |
+|---|---|---|
+| a bad operand value, for example `canon subject show Bad_Id` | `<SUBJECT_ID>` | `SUBJECT_ID` |
+| `canon format` with a bad directory, `canon search ""`, `canon trace nonsense`, `canon context-pack show <bad id>` | `dir`, `text`, `id`, `<PACK_ID>` | `DIR`, `TEXT`, `ID`, `PACK_ID` |
+| a missing required argument or group member (for example `evidence add --report-case x` without `--report`) | the first argument clap listed | the argument the rule at fault names (`--report`) |
+| `canon retrieve --regime R --subject S` (no `--domain`) | `--regime` | `--subject` |
+| the handler refusals of a declared relation, domain or validator (`--round 0`, a blank `--summary`, `--reason` missing, an `--artifact` scope, a blank `--approver`, ...) | none | the option |
+
+The 64-bit integer options are `--max-artifact-mib` (`artifacts store`, `evidence add`, `evidence audit`, `review scenario`, `review change`), `--interval-secs` (`ingest sessions`, `ingest records`), the paging `--limit` (`query`, `export`, `finding list`, `divergence list`) and `retrieve --limit`. The 32-bit and 16-bit options (`--round`, `--seq`, `--port`, `--expand`, `--timeout`, `search --limit`) are bounded by their Rust type, which their `domain` states; nothing new is refused for them.
+
+The conformance corpus was regenerated and differs in eight expectations: three command documents of `schema` (they carry `constraints`, `validators` and `domain`) and five refusals of `evidence add` (they carry `field`).
+
+The relations declared in 0.34 (every command with a rule or a validator; a domain is listed in `canon schema <command> --json` under the option):
+
+| Command | Constraints and validators |
+|---|---|
+| `artifacts move` | requires: `--commit` → `--plan-digest`; requires: `--plan-digest` → `--commit` |
+| `brief approve` | requires: `--actor` → `--relayed-via`; requires: `--digest` → `--relayed-via`; validator `--relayed-via`, `--digest`, `--change` (`USAGE`); validator `--digest` (`USAGE`) |
+| `dispatch begin` | requires: `--skill-digest` → `--skill` (`DISPATCH_INVALID_ARGUMENT`); validator `--role`, `--regime` (`DISPATCH_ROLE_REGIME_MISMATCH`) |
+| `divergence accept` | requires: `--approver` → `--relayed-via`; requires: `--note` → `--relayed-via`; validator `--expiry` (`USAGE`) |
+| `divergence add` | atMostOne `--promote`, `--no-promote`; requires: `--state` = `deferred` → `--reason`, `--expiry` (`DIVERGENCE_INVALID_ARGUMENT`); validator `--expiry` (`USAGE`) |
+| `divergence defer` | validator `--expiry` (`USAGE`) |
+| `divergence list` | atMostOne `--limit`, `--all`; validator `--as-of` (`USAGE`) |
+| `evidence add` | atMostOne `--promote`, `--no-promote`; atLeastOne `--class`, `--report`; atLeastOne `--ref`, `--report`; atLeastOne `--task`, `--scenario`, `--all-scenarios` (`EVIDENCE_INVALID_ARGUMENT`); forbids: `--all-scenarios` → `--scenario`, `--task`, `--report-case`, `--approver`, `--approval-role`, `--signature-file`, `--approval-at` (`EVIDENCE_INVALID_ARGUMENT`); requires: `--all-scenarios` → `--report` (`EVIDENCE_INVALID_ARGUMENT`); requires: `--report-case` → `--report` (`EVIDENCE_INVALID_ARGUMENT`); requires: `--command-result` → `--summary` (`EVIDENCE_INVALID_ARGUMENT`); requires: `--approver` → `--approval-role`, `--signature-file`, `--approval-at` (`EVIDENCE_APPROVAL_INVALID`); requires: `--approval-role` → `--approver`, `--signature-file`, `--approval-at` (`EVIDENCE_APPROVAL_INVALID`); requires: `--signature-file` → `--approver`, `--approval-role`, `--approval-at` (`EVIDENCE_APPROVAL_INVALID`); requires: `--approval-at` → `--approver`, `--approval-role`, `--signature-file` (`EVIDENCE_APPROVAL_INVALID`); validator `--approval-at` (`USAGE`); validator `--surface-ref` (`USAGE`); validator `--class` (`EVIDENCE_INVALID_ARGUMENT`); validator `--artifact`, `--scenario`, `--all-scenarios` (`EVIDENCE_INVALID_ARGUMENT`) |
+| `evidence approval-payload` | atLeastOne `--task`, `--scenario` (`EVIDENCE_REFUSED`); validator `--approval-at` (`USAGE`); validator `--surface-ref` (`USAGE`) |
+| `evidence audit` | atMostOne `--promote`, `--no-promote`; requires: `--report-case` → `--report` (`EVIDENCE_INVALID_ARGUMENT`); requires: `--command-result` → `--summary` (`EVIDENCE_INVALID_ARGUMENT`); validator `--artifact`, `--scenario` (`EVIDENCE_INVALID_ARGUMENT`) |
+| `export` | atMostOne `--limit`, `--all`; validator `--before`, `--after` (`USAGE`); validator `--after`, `--before` (`USAGE`) |
+| `finding add` | atMostOne `--promote`, `--no-promote`; atMostOne `--introduced-rev`, `--introduced-unknown` (`FINDING_INVALID_ARGUMENT`); requires: `--resolution-rev` → `--disposition` (`FINDING_RESOLUTION_REV_UNEXPECTED`); forbids: `--disposition` = `open`/`rejected`/`deferred` → `--resolution-rev` (`FINDING_RESOLUTION_REV_UNEXPECTED`); validator `--severity`, `--introduced-rev`, `--introduced-unknown` (`FINDING_INTRODUCED_REQUIRED`); validator `--introduced-rev` (`USAGE`) |
+| `finding close` | atMostOne `--promote`, `--no-promote`; requires: `--disposition` = `rejected`/`deferred` → `--reason` (`FINDING_REASON_REQUIRED`); forbids: `--disposition` = `open`/`rejected`/`deferred` → `--resolution-rev` (`FINDING_RESOLUTION_REV_UNEXPECTED`) |
+| `finding list` | atMostOne `--limit`, `--all` |
+| `ingest plans` | requires: `--dialect` → `--plan-source`; requires: `--plan-source` → `--dialect` |
+| `init` | atMostOne `--check`, `--no-agents-md`; atMostOne `--check`, `--policy`, `--no-policy`; atMostOne `--check`, `--providers`; atMostOne `--check`, `--language`; atMostOne `--check`, `--dry-run` |
+| `ledger compact` | requires: `--commit` → `--plan-digest`; requires: `--plan-digest` → `--commit` |
+| `migrate` | atMostOne `--revert`, `--relayed-via`; requires: `--commit` → `--plan-digest`; requires: `--plan-digest` → `--commit`; requires: `--backup` → `--revert`; requires: `--relayed-via` → `--commit`; requires: `--actor` → `--relayed-via`; requires: `--approver` → `--relayed-via`; requires: `--note` → `--relayed-via` |
+| `policy approve` | requires: `--actor` → `--relayed-via`; requires: `--relayed-via` → `--note`; validator `--relayed-via`, `--note` (`USAGE`) |
+| `purge` | requires: `--commit` → `--plan-digest`; requires: `--plan-digest` → `--commit`; validator `--before` (`USAGE`) |
+| `query` | atMostOne `--plugin`, `--history`; atMostOne `--limit`, `--all`; forbids: `--kind` = `scenario`/`session`/`run`/`event`/`handoff`/`review`/`divergence`/`trajectory`/`strategy_item`/`evidence`/`subject`/`finding` → `--change` (`QUERY_INVALID_ARGUMENT`); forbids: `--kind` = `scenario`/`session`/`run`/`event`/`handoff`/`review`/`divergence`/`trajectory`/`strategy_item`/`evidence`/`finding` → `--status` (`QUERY_INVALID_ARGUMENT`); forbids: `--kind` = `change`/`task`/`scenario`/`session`/`run`/`event`/`handoff`/`review`/`divergence`/`trajectory`/`strategy_item`/`evidence`/`finding` → `--domain` (`QUERY_INVALID_ARGUMENT`); validator `--kind`, `--status` (`QUERY_INVALID_ARGUMENT`); validator `--since` (`USAGE`) |
+| `retrieve` | exactlyOne `--regime`, `--domain`; requires: `--subject` → `--domain`; validator `--for-role`, `--regime` (`USAGE`) |
+| `review change` | exactlyOne `--upstream-ref`, `--original-spec-ref` |
+| `review scenario` | exactlyOne `--upstream-ref`, `--original-spec-ref` |
+| `scenario new` | requires: `--change` → `--flow` |
+| `schema` | atMostOne `--path`, `--errors`, `--error`, `--warnings`, `--warning` |
+| `strategy approval-payload` | validator `--approval-at` (`USAGE`) |
+| `strategy promote` | requires: `--evaluation` → `--approval`; requires: `--approval` → `--evaluation`; requires: `--signature-file` → `--approval` |
+| `strategy rollback` | validator `--approval-at` (`USAGE`) |
+| `tier age` | requires: `--commit` → `--plan-digest`; requires: `--plan-digest` → `--commit` |
+
 ### Added
 
 - Fixture keys (all optional; L1 and L2 keys such as `fields`, `domainRejects` and `search` are still ignored at L0): `contractVersion`, `globalOptions` (tool-wide options with a value, each an argv fragment such as `["--repo", "."]`), `warnings` (warning code names) and `commands`, an object keyed by command id whose entries hold `ok` (invocations that succeed, run in JSON mode; the checker reads their `meta.next` and `meta.page`), `refused` and `missingValue` (the invocation with one required value left out).

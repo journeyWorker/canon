@@ -115,7 +115,7 @@ canon demo review --json
 ```
 ```text
 # Mint a Run manifest with retrieved guidance and context/policy lineage
-canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <ID>] [--skill-digest <DIGEST>] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
+canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <ID>] [--skill-digest <DIGEST> (with --skill)] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
 ```
 ```bash
 canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer --json
@@ -307,7 +307,7 @@ canon report snapshot snapshot-out --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20 --json

@@ -125,13 +125,38 @@ pub enum DefaultValue {
     None(()),
 }
 
-/// The `domain` of an argument: a JSON Schema in the profile of spec 10.7.4.
+/// The `domain` of an argument: a JSON Schema in the profile of spec 10.7.4. Only the members a domain of a number or a text may
+/// carry are typed here; which of them fit which `valueType`, the safe-integer bounds and the I-Regexp form of `pattern` are
+/// checked by [`crate::domain::profile_problems`].
 #[derive(Debug, Clone, Serialize, JsonSchema)]
-#[schemars(schema_with = "domain_schema")]
-pub struct DomainSchema(pub Value);
+#[serde(rename_all = "camelCase")]
+#[schemars(extend("minProperties" = 1))]
+pub struct DomainSchema {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive_minimum: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusive_maximum: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multiple_of: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_length: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_length: Option<u64>,
+    /// `^`, an I-Regexp body and `$`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+}
 
-fn domain_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
-    schemars::json_schema!({ "type": "object", "minProperties": 1 })
+/// A value an `if.in` list holds: an integer or a text (the valid values of an `enum`, `string` or `integer` argument).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ConditionValue {
+    Integer(i64),
+    Text(String),
 }
 
 /// The five rules of a constraint (spec 10.8.1).
@@ -168,6 +193,7 @@ impl RuleKind {
 pub struct ConditionDoc {
     pub name: String,
     #[serde(rename = "in", skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<Vec<ConditionValue>>")]
     pub values: Option<Vec<Value>>,
 }
 

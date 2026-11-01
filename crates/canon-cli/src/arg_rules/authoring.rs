@@ -15,9 +15,9 @@ const NAME_AT_VERSION: &str = "^[^@]+@[^@]+$";
 /// A context pack id: `sha256:` and 64 lower-case hex digits.
 const PACK_ID: &str = "^sha256:[0-9a-f]{64}$";
 /// A line of text that is not blank and holds no CR or LF (`subject move --reason`).
-const REASON: &str = concat!("^[^\n\r]*[^", white_space!(), "][^\n\r]*$");
+const REASON: &str = concat!("^[^\\n\\r]*[^", white_space!(), "][^\\n\\r]*$");
 /// The human's answer (`--approver`, `--note` of an approval): once trimmed, not empty and one line.
-const ANSWER: &str = concat!("^[", white_space!(), "]*[^", white_space!(), "]([^\n\r]*[^", white_space!(), "])?[", white_space!(), "]*$");
+const ANSWER: &str = concat!("^[", white_space!(), "]*[^", white_space!(), "]([^\\n\\r]*[^", white_space!(), "])?[", white_space!(), "]*$");
 /// The tool a relayed approval names (`--relayed-via`): one token, no white space, parenthesis or quote.
 const RELAY_TOKEN: &str = concat!("^[^", white_space!(), "()\"']+$");
 /// The relaying agent's actor id (`--actor` with `--relayed-via`): once trimmed, one such token.

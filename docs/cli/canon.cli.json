@@ -418,6 +418,26 @@
     },
     {
       "command": "artifacts move",
+      "constraints": [
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        }
+      ],
       "effect": "destructive",
       "errors": [
         "ARTIFACTS_MOVE_REFUSED",
@@ -741,6 +761,9 @@
       "options": [
         {
           "default": 25,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Per-file size limit for the artifact store, in MiB",
           "name": "max-artifact-mib",
           "repeatable": false,
@@ -1304,6 +1327,26 @@
     },
     {
       "command": "brief approve",
+      "constraints": [
+        {
+          "if": {
+            "name": "actor"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        },
+        {
+          "if": {
+            "name": "digest"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "APPROVAL_INCOMPLETE",
@@ -1353,6 +1396,9 @@
         {
           "default": null,
           "defaultNote": "the repo's only live change",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The changes to approve, one answer for all, none written unless every one is approvable (default: the repo's only live change)",
           "name": "change",
           "required": false,
@@ -1364,6 +1410,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "help": "Who approved (the human, not the agent)",
           "name": "approver",
           "repeatable": false,
@@ -1373,6 +1422,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "help": "The human's own words",
           "name": "note",
           "repeatable": false,
@@ -1382,6 +1434,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+$"
+          },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
           "name": "relayed-via",
           "repeatable": false,
@@ -1392,6 +1447,9 @@
         {
           "default": null,
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
           "name": "actor",
@@ -1402,6 +1460,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^=]+=sha256:[^\u0000]*$"
+          },
           "help": "With --relayed-via, the digest `canon brief show --body` showed the human, as `<change>=<sha256:digest>`, once per change; a brief whose digest differs is refused",
           "name": "digest",
           "repeatable": true,
@@ -1978,6 +2039,31 @@
         }
       },
       "summary": "Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers",
+      "validators": [
+        {
+          "arguments": [
+            "relayed-via",
+            "digest",
+            "change"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names, for every change it approves, the digest the human was shown (`--digest <change>=sha256:<digest>`, once per change) and no digest of a change it does not approve. With no change operand the repo's only live change is read, and its digest is checked then.",
+          "rejects": [
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --json",
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:0123456789abcdef --digest other=sha256:0123456789abcdef --json"
+          ]
+        },
+        {
+          "arguments": [
+            "digest"
+          ],
+          "code": "USAGE",
+          "description": "`--digest` names a change once: two entries for the same change must carry the same digest.",
+          "rejects": [
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:aa --digest add-login=sha256:bb --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": []
       }
@@ -2006,6 +2092,9 @@
         {
           "default": null,
           "defaultNote": "the repo's only live change",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change to read (default: the repo's only live change)",
           "name": "change",
           "required": false,
@@ -2304,6 +2393,9 @@
         {
           "default": null,
           "defaultNote": "the repo's only live change",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change to read (default: the repo's only live change)",
           "name": "change",
           "required": false,
@@ -2570,6 +2662,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change's slug (its change_id)",
           "name": "slug",
           "required": true,
@@ -2581,6 +2676,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The existing subject to adopt the change under",
           "name": "subject",
           "repeatable": false,
@@ -4866,6 +4964,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
           "help": "Context pack id (sha256:<64 hex digits>)",
           "name": "id",
           "required": true,
@@ -5262,6 +5363,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
           "help": "Context pack id (sha256:<64 hex digits>)",
           "name": "id",
           "required": true,
@@ -5411,6 +5515,10 @@
         },
         {
           "default": 4173,
+          "domain": {
+            "maximum": 65535,
+            "minimum": 0
+          },
           "help": "Local port to bind (0 = OS-assigned free port)",
           "name": "port",
           "repeatable": false,
@@ -6247,6 +6355,19 @@
     },
     {
       "command": "dispatch begin",
+      "constraints": [
+        {
+          "code": "DISPATCH_INVALID_ARGUMENT",
+          "help": "A skill digest is the digest of a named skill.",
+          "if": {
+            "name": "skill-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "skill"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -6294,6 +6415,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "Role about to run; must equal --regime's leading segment",
           "name": "role",
@@ -6322,6 +6446,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -6376,6 +6503,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^@]+@[^@]+$"
+          },
           "help": "Registered prompt bundle to select (`name@version`)",
           "name": "prompt-bundle",
           "repeatable": false,
@@ -6385,6 +6515,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*#[0-9]+(\\.[0-9]+)*$"
+          },
           "help": "Plan task this run serves (<change_id>#<n>); validated against the plan corpus",
           "name": "task",
           "repeatable": false,
@@ -6394,6 +6527,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "RunId (ULID) of the run that dispatched this one",
           "name": "parent-run",
           "repeatable": false,
@@ -7010,6 +7146,19 @@
         }
       },
       "summary": "Mint a Run manifest with retrieved guidance and context/policy lineage",
+      "validators": [
+        {
+          "arguments": [
+            "role",
+            "regime"
+          ],
+          "code": "DISPATCH_ROLE_REGIME_MISMATCH",
+          "description": "`--role` must equal the first segment of `--regime` (`<role>/<repo>/<area>/<hash>`).",
+          "rejects": [
+            "canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role reviewer"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -7227,6 +7376,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "The RunId (ULID) minted by `canon dispatch begin`",
           "name": "run",
           "required": true,
@@ -7644,6 +7796,26 @@
     },
     {
       "command": "divergence accept",
+      "constraints": [
+        {
+          "if": {
+            "name": "approver"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        },
+        {
+          "if": {
+            "name": "note"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        }
+      ],
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records first",
       "errors": [
@@ -7690,6 +7862,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The accepted scenarios (`<area>.<surface>.<nn>`), one acceptance each, all or nothing",
           "name": "scenario",
           "required": true,
@@ -7701,6 +7876,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -7710,6 +7888,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "Why the gap is accepted",
           "name": "reason",
           "repeatable": false,
@@ -7719,6 +7900,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "Where the gap is tracked: an issue URL or reference",
           "name": "tracking",
           "repeatable": false,
@@ -7728,6 +7912,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence",
           "name": "expiry",
           "repeatable": false,
@@ -7747,6 +7934,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^reviewer$"
+          },
           "env": "CANON_ROLE",
           "help": "Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)",
           "name": "role",
@@ -7757,6 +7947,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence",
           "name": "session",
           "repeatable": false,
@@ -8231,12 +8424,48 @@
         }
       },
       "summary": "Accept a divergent scenario as a tracked known gap (a reviewer step): its latest evidence must be divergent and not the accepting actor's or session's. The acceptance pins that evidence, so new evidence ends it, and lapses at --expiry; until then the ship guard counts the cell as covered while `status` and `gate check` list it as `accepted-divergence`",
+      "validators": [
+        {
+          "arguments": [
+            "expiry"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2026-02-30 --role reviewer"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": []
       }
     },
     {
       "command": "divergence add",
+      "constraints": [
+        {
+          "names": [
+            "promote",
+            "no-promote"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "code": "DIVERGENCE_INVALID_ARGUMENT",
+          "help": "A deferred divergence records why it is deferred and when the deferral lapses.",
+          "if": {
+            "in": [
+              "deferred"
+            ],
+            "name": "state"
+          },
+          "rule": "requires",
+          "then": [
+            "reason",
+            "expiry"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -8280,6 +8509,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The scenario (`<area>.<surface>.<nn>`)",
           "name": "scenario",
           "required": true,
@@ -8291,6 +8523,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -8333,6 +8568,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
           "name": "expiry",
           "repeatable": false,
@@ -8342,6 +8580,10 @@
         },
         {
           "default": 1,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 0
+          },
           "help": "The review round this version belongs to (1-based)",
           "name": "round",
           "repeatable": false,
@@ -8360,6 +8602,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -8379,6 +8624,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "name": "role",
@@ -8851,6 +9099,18 @@
         }
       },
       "summary": "Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write: { promote: auto }`)",
+      "validators": [
+        {
+          "arguments": [
+            "expiry"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon divergence add auth.login.01 --actor alice --role reviewer --expiry 2026-02-30"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "implementer",
@@ -8904,6 +9164,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The scenario (`<area>.<surface>.<nn>`)",
           "name": "scenario",
           "required": true,
@@ -8915,6 +9178,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -8933,6 +9199,10 @@
         },
         {
           "default": 1,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 0
+          },
           "help": "The review round this version belongs to (1-based)",
           "name": "round",
           "repeatable": false,
@@ -8951,6 +9221,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -8969,6 +9242,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "expiry",
           "repeatable": false,
@@ -8979,6 +9255,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "name": "role",
@@ -9376,6 +9655,18 @@
         }
       },
       "summary": "Directly record a deferred divergence (requires --reason/--expiry)",
+      "validators": [
+        {
+          "arguments": [
+            "expiry"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon divergence defer auth.login.01 --actor alice --reason \"waiting on the vendor\" --expiry 2026-02-30 --role reviewer"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "implementer",
@@ -9385,6 +9676,15 @@
     },
     {
       "command": "divergence list",
+      "constraints": [
+        {
+          "names": [
+            "limit",
+            "all"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "read",
       "errors": [
         "CONFIG_MISSING",
@@ -9417,6 +9717,9 @@
         {
           "default": null,
           "defaultNote": "now",
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "Governs Deferred expiry; defaults to now",
           "name": "as-of",
           "repeatable": false,
@@ -9435,6 +9738,9 @@
         },
         {
           "default": 100,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -9617,6 +9923,18 @@
         }
       },
       "summary": "List the current divergence burn-down state",
+      "validators": [
+        {
+          "arguments": [
+            "as-of"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon divergence list --as-of 2026-02-30"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "planner",
@@ -9670,6 +9988,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The scenario (`<area>.<surface>.<nn>`)",
           "name": "scenario",
           "required": true,
@@ -9681,6 +10002,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -9699,6 +10023,10 @@
         },
         {
           "default": 1,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 0
+          },
           "help": "The review round this version belongs to (1-based)",
           "name": "round",
           "repeatable": false,
@@ -9717,6 +10045,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -9736,6 +10067,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "name": "role",
@@ -10132,6 +10466,141 @@
     },
     {
       "command": "evidence add",
+      "constraints": [
+        {
+          "names": [
+            "promote",
+            "no-promote"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "names": [
+            "class",
+            "report"
+          ],
+          "rule": "atLeastOne"
+        },
+        {
+          "names": [
+            "ref",
+            "report"
+          ],
+          "rule": "atLeastOne"
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "A record needs a coverage subject: a task, a scenario, or one record per scenario of a report.",
+          "names": [
+            "task",
+            "scenario",
+            "all-scenarios"
+          ],
+          "rule": "atLeastOne"
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "--all-scenarios writes one record per scenario its report owns, so it names no single subject.",
+          "if": {
+            "name": "all-scenarios"
+          },
+          "rule": "forbids",
+          "then": [
+            "scenario",
+            "task",
+            "report-case",
+            "approver",
+            "approval-role",
+            "signature-file",
+            "approval-at"
+          ]
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "--all-scenarios splits a --report by the scenario each case belongs to.",
+          "if": {
+            "name": "all-scenarios"
+          },
+          "rule": "requires",
+          "then": [
+            "report"
+          ]
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "--report-case names a case of a --report.",
+          "if": {
+            "name": "report-case"
+          },
+          "rule": "requires",
+          "then": [
+            "report"
+          ]
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "The captured output backs a --summary.",
+          "if": {
+            "name": "command-result"
+          },
+          "rule": "requires",
+          "then": [
+            "summary"
+          ]
+        },
+        {
+          "code": "EVIDENCE_APPROVAL_INVALID",
+          "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
+          "if": {
+            "name": "approver"
+          },
+          "rule": "requires",
+          "then": [
+            "approval-role",
+            "signature-file",
+            "approval-at"
+          ]
+        },
+        {
+          "code": "EVIDENCE_APPROVAL_INVALID",
+          "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
+          "if": {
+            "name": "approval-role"
+          },
+          "rule": "requires",
+          "then": [
+            "approver",
+            "signature-file",
+            "approval-at"
+          ]
+        },
+        {
+          "code": "EVIDENCE_APPROVAL_INVALID",
+          "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
+          "if": {
+            "name": "signature-file"
+          },
+          "rule": "requires",
+          "then": [
+            "approver",
+            "approval-role",
+            "approval-at"
+          ]
+        },
+        {
+          "code": "EVIDENCE_APPROVAL_INVALID",
+          "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
+          "if": {
+            "name": "approval-at"
+          },
+          "rule": "requires",
+          "then": [
+            "approver",
+            "approval-role",
+            "signature-file"
+          ]
+        }
+      ],
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records first",
       "errors": [
@@ -10189,6 +10658,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*#[0-9]+(\\.[0-9]+)*$"
+          },
           "help": "Plan task this evidence attests to (<change_id>#<n>); required unless --scenario is given",
           "name": "task",
           "repeatable": false,
@@ -10198,6 +10670,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
           "name": "project",
           "repeatable": false,
@@ -10208,6 +10683,9 @@
         {
           "default": null,
           "defaultNote": "test-run when a --report is given",
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`",
           "name": "class",
           "repeatable": false,
@@ -10218,6 +10696,9 @@
         {
           "default": null,
           "defaultNote": "the --report paths, comma-separated, when one is given",
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon",
           "name": "ref",
           "repeatable": false,
@@ -10242,6 +10723,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)",
           "name": "summary",
           "repeatable": false,
@@ -10260,6 +10744,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "Scenario this evidence also joins to",
           "name": "scenario",
           "repeatable": false,
@@ -10269,6 +10756,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "RunId (ULID) of the run that produced this evidence",
           "name": "run",
           "repeatable": false,
@@ -10278,6 +10768,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
           "name": "surface-ref",
           "repeatable": true,
@@ -10287,6 +10780,9 @@
         },
         {
           "default": "canon",
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "name": "actor",
           "repeatable": false,
@@ -10297,6 +10793,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared",
           "name": "role",
@@ -10307,6 +10806,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count",
           "name": "session",
           "repeatable": false,
@@ -10316,6 +10818,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "Human approval identity; authentication comes only from the detached signature",
           "name": "approver",
           "repeatable": false,
@@ -10346,6 +10851,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
           "name": "approval-at",
           "repeatable": false,
@@ -10373,6 +10881,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^(junit|cucumber|swift-testing):[^\u0000]+$"
+          },
           "help": "EXPERIMENTAL: bind and parse a test report, `junit:<path>`, `cucumber:<path>` or `swift-testing:<path>`; repeatable",
           "name": "report",
           "repeatable": true,
@@ -10399,6 +10910,9 @@
         },
         {
           "default": 25,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused",
           "name": "max-artifact-mib",
           "repeatable": false,
@@ -10408,6 +10922,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
           "name": "override-reason",
           "repeatable": false,
@@ -11153,6 +11670,53 @@
         }
       },
       "summary": "Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)",
+      "validators": [
+        {
+          "arguments": [
+            "approval-at"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30"
+          ]
+        },
+        {
+          "arguments": [
+            "surface-ref"
+          ],
+          "code": "USAGE",
+          "description": "A risk surface is `effect:<kebab-slug>` (lowercase letters and digits in hyphen-separated parts) or a repository-relative path: not absolute and with no `..` component.",
+          "rejects": [
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --surface-ref /etc/passwd",
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --surface-ref ../outside",
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --surface-ref effect:Bad"
+          ]
+        },
+        {
+          "arguments": [
+            "class"
+          ],
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "description": "`--class audit` is refused: an external evaluator's re-audit is `canon evidence audit`.",
+          "rejects": [
+            "canon evidence add --scenario auth.login.01 --class audit --ref \"npm test\" --role implementer"
+          ]
+        },
+        {
+          "arguments": [
+            "artifact",
+            "scenario",
+            "all-scenarios"
+          ],
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "description": "An `--artifact` binds to one record. Without `--all-scenarios` a scoped `--artifact <scenario-id>=<path>` must name the record's own `--scenario`; with `--all-scenarios` every `--artifact` must be scoped (a bare path would bind to every record of the batch). The part before the first `=` is a scope only when it is shaped like a scenario id.",
+          "rejects": [
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact auth.login.02=shot.png",
+            "canon evidence add --all-scenarios --report junit:report.xml --role implementer --artifact shot.png"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "implementer"
@@ -11161,6 +11725,17 @@
     },
     {
       "command": "evidence approval-payload",
+      "constraints": [
+        {
+          "code": "EVIDENCE_REFUSED",
+          "help": "An approval is for a task or a scenario.",
+          "names": [
+            "task",
+            "scenario"
+          ],
+          "rule": "atLeastOne"
+        }
+      ],
       "effect": "read",
       "errors": [
         "CONFIG_MISSING",
@@ -11183,6 +11758,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*#[0-9]+(\\.[0-9]+)*$"
+          },
           "help": "The plan task the approval is for (<change_id>#<n>); give this or --scenario",
           "name": "task",
           "repeatable": false,
@@ -11192,6 +11770,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id for --scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -11201,6 +11782,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The scenario the approval is for; give this or --task",
           "name": "scenario",
           "repeatable": false,
@@ -11210,6 +11794,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "The dispatch run the approved work belongs to",
           "name": "run",
           "repeatable": false,
@@ -11228,6 +11815,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)",
           "name": "surface-ref",
           "repeatable": true,
@@ -11237,6 +11827,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "Who approved (the human whose detached signature the payload is for)",
           "name": "approver",
           "repeatable": false,
@@ -11246,6 +11839,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
           "name": "approval-at",
           "repeatable": false,
@@ -11342,6 +11938,30 @@
         }
       },
       "summary": "Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`",
+      "validators": [
+        {
+          "arguments": [
+            "approval-at"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30"
+          ]
+        },
+        {
+          "arguments": [
+            "surface-ref"
+          ],
+          "code": "USAGE",
+          "description": "A risk surface is `effect:<kebab-slug>` (lowercase letters and digits in hyphen-separated parts) or a repository-relative path: not absolute and with no `..` component.",
+          "rejects": [
+            "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --surface-ref /etc/passwd",
+            "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --surface-ref ../outside",
+            "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --surface-ref effect:Bad"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "implementer",
@@ -11351,6 +11971,37 @@
     },
     {
       "command": "evidence audit",
+      "constraints": [
+        {
+          "names": [
+            "promote",
+            "no-promote"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "--report-case names a case of a --report.",
+          "if": {
+            "name": "report-case"
+          },
+          "rule": "requires",
+          "then": [
+            "report"
+          ]
+        },
+        {
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "help": "The captured output backs a --summary.",
+          "if": {
+            "name": "command-result"
+          },
+          "rule": "requires",
+          "then": [
+            "summary"
+          ]
+        }
+      ],
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records first",
       "errors": [
@@ -11412,6 +12063,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The re-audited scenario (`<area>.<surface>.<nn>`)",
           "name": "scenario",
           "required": true,
@@ -11423,6 +12077,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none",
           "name": "project",
           "repeatable": false,
@@ -11432,6 +12089,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon",
           "name": "ref",
           "repeatable": false,
@@ -11441,6 +12101,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "One-line note (scanned for fabrication markers; line breaks refused)",
           "name": "summary",
           "repeatable": false,
@@ -11459,6 +12122,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "RunId (ULID) of the run that produced this evidence",
           "name": "run",
           "repeatable": false,
@@ -11468,6 +12134,9 @@
         },
         {
           "default": "canon",
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "name": "actor",
           "repeatable": false,
@@ -11478,6 +12147,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared",
           "name": "role",
@@ -11488,6 +12160,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The attesting session (recorded as actor.session_id)",
           "name": "session",
           "repeatable": false,
@@ -11515,6 +12190,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^(junit|cucumber|swift-testing):[^\u0000]+$"
+          },
           "help": "EXPERIMENTAL: bind and parse a test report, `junit:<path>`, `cucumber:<path>` or `swift-testing:<path>`; repeatable",
           "name": "report",
           "repeatable": true,
@@ -11533,6 +12211,9 @@
         },
         {
           "default": 25,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused",
           "name": "max-artifact-mib",
           "repeatable": false,
@@ -11542,6 +12223,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The external evaluator that re-audited the scenario (canon never runs it)",
           "name": "evaluator",
           "repeatable": false,
@@ -11551,6 +12235,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The evaluator's version",
           "name": "evaluator-version",
           "repeatable": false,
@@ -11560,6 +12247,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9a-f]{64}$"
+          },
           "help": "sha256 of the evaluator (64 lowercase hex)",
           "name": "evaluator-digest",
           "repeatable": false,
@@ -11583,6 +12273,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
           "name": "override-reason",
           "repeatable": false,
@@ -12296,6 +12989,19 @@
         }
       },
       "summary": "Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)",
+      "validators": [
+        {
+          "arguments": [
+            "artifact",
+            "scenario"
+          ],
+          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "description": "An `--artifact` binds to one record: a scoped `--artifact <scenario-id>=<path>` must name the audited scenario. The part before the first `=` is a scope only when it is shaped like a scenario id.",
+          "rejects": [
+            "canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact auth.login.02=shot.png"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "implementer"
@@ -12304,6 +13010,15 @@
     },
     {
       "command": "export",
+      "constraints": [
+        {
+          "names": [
+            "limit",
+            "all"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "write",
       "effectNote": "writes the --output file (mode 0600) and one audit line",
       "errors": [
@@ -12368,6 +13083,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "before",
           "repeatable": false,
@@ -12377,6 +13095,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "after",
           "repeatable": false,
@@ -12424,6 +13145,9 @@
         },
         {
           "default": 100,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -13081,6 +13805,31 @@
         }
       },
       "summary": "Export a redacted retention manifest without deleting records",
+      "validators": [
+        {
+          "arguments": [
+            "before",
+            "after"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon export --kind change --before 2026-02-30 --json",
+            "canon export --kind change --after 2026-02-30 --json"
+          ]
+        },
+        {
+          "arguments": [
+            "after",
+            "before"
+          ],
+          "code": "USAGE",
+          "description": "`--after` (inclusive) is not later than `--before` (exclusive); an equal pair is an empty window, a reversed pair is refused before anything is read or written, with `--dry-run` and `--output` too.",
+          "rejects": [
+            "canon export --kind change --before 2026-01-02 --after 2026-02-01 --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -13129,6 +13878,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$"
+          },
           "help": "<area>.<surface> the fresh .feature file scaffolds",
           "name": "surface",
           "required": true,
@@ -13159,6 +13911,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -13168,6 +13923,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "name": "project",
           "repeatable": false,
@@ -13539,6 +14297,51 @@
     },
     {
       "command": "finding add",
+      "constraints": [
+        {
+          "names": [
+            "promote",
+            "no-promote"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "code": "FINDING_INVALID_ARGUMENT",
+          "help": "A finding names the commit that introduced the defect or says it is not known, never both.",
+          "names": [
+            "introduced-rev",
+            "introduced-unknown"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+          "help": "Only a `fixed` finding was closed by a commit.",
+          "if": {
+            "name": "resolution-rev"
+          },
+          "rule": "requires",
+          "then": [
+            "disposition"
+          ]
+        },
+        {
+          "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+          "help": "Only a `fixed` finding was closed by a commit.",
+          "if": {
+            "in": [
+              "open",
+              "rejected",
+              "deferred"
+            ],
+            "name": "disposition"
+          },
+          "rule": "forbids",
+          "then": [
+            "resolution-rev"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -13589,6 +14392,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change under review (e.g. s43-findings-are-records) — first component of the natural key",
           "name": "change",
           "repeatable": false,
@@ -13598,6 +14404,10 @@
         },
         {
           "default": null,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 1
+          },
           "help": "Which review round on this change raised it (1-based)",
           "name": "round",
           "repeatable": false,
@@ -13607,6 +14417,10 @@
         },
         {
           "default": null,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 1
+          },
           "help": "This finding's index within the round (1-based). Required, never auto-assigned; a collision is refused",
           "name": "seq",
           "repeatable": false,
@@ -13645,6 +14459,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
           "name": "actor",
           "repeatable": false,
@@ -13654,6 +14471,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)",
           "name": "summary",
           "repeatable": false,
@@ -13682,6 +14502,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "The SOURCED introducing commit, any git revision (resolved to the full sha). Leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff",
           "name": "introduced-rev",
           "repeatable": false,
@@ -13699,6 +14522,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
           "name": "review",
           "repeatable": false,
@@ -13708,6 +14534,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "Where in the tree, as path/to/file.rs:120-134 (line breaks refused)",
           "name": "file-ref",
           "repeatable": false,
@@ -13717,6 +14546,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "A scenario this finding is about (repeatable). After a `fixed` close, fresh evidence for these scenarios alone re-verifies the fix; with none named, every evidenced scenario of the subject does. Each must be a scenario the index knows; a close inherits the list",
           "name": "scenario",
           "repeatable": true,
@@ -13726,6 +14558,9 @@
         },
         {
           "default": "reviewer",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "Attribution only — unlike `canon evidence add`, no partition key derives from it",
           "name": "role",
@@ -13736,6 +14571,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The authoring session (recorded as actor.session_id)",
           "name": "session",
           "repeatable": false,
@@ -14343,6 +15181,30 @@
         }
       },
       "summary": "Record one code-review finding (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)",
+      "validators": [
+        {
+          "arguments": [
+            "severity",
+            "introduced-rev",
+            "introduced-unknown"
+          ],
+          "code": "FINDING_INTRODUCED_REQUIRED",
+          "description": "A new `blocker` or `should-fix` finding needs `--introduced-rev` (the commit that introduced the defect) or `--introduced-unknown` (it is not known); a `note` needs neither.",
+          "rejects": [
+            "canon finding add --change add-login --round 1 --seq 2 --severity blocker --actor alice --summary \"Token is logged\""
+          ]
+        },
+        {
+          "arguments": [
+            "introduced-rev"
+          ],
+          "code": "USAGE",
+          "description": "`--introduced-rev` names the commit that introduced the defect: the value `self` is refused (to record a defect found in one's own work, set `--actor`).",
+          "rejects": [
+            "canon finding add --change add-login --round 1 --seq 2 --severity note --actor alice --summary \"Token is logged\" --introduced-rev self"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "reviewer"
@@ -14351,6 +15213,46 @@
     },
     {
       "command": "finding close",
+      "constraints": [
+        {
+          "names": [
+            "promote",
+            "no-promote"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "code": "FINDING_REASON_REQUIRED",
+          "help": "A rejected or deferred finding records why.",
+          "if": {
+            "in": [
+              "rejected",
+              "deferred"
+            ],
+            "name": "disposition"
+          },
+          "rule": "requires",
+          "then": [
+            "reason"
+          ]
+        },
+        {
+          "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+          "help": "Only a `fixed` finding was closed by a commit.",
+          "if": {
+            "in": [
+              "open",
+              "rejected",
+              "deferred"
+            ],
+            "name": "disposition"
+          },
+          "rule": "forbids",
+          "then": [
+            "resolution-rev"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -14399,6 +15301,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change under review — first component of the natural key",
           "name": "change",
           "required": true,
@@ -14410,6 +15315,10 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 1
+          },
           "help": "Which review round raised it (1-based)",
           "name": "round",
           "repeatable": false,
@@ -14419,6 +15328,10 @@
         },
         {
           "default": null,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 1
+          },
           "help": "The finding's index within the round (1-based)",
           "name": "seq",
           "repeatable": false,
@@ -14453,6 +15366,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          },
           "help": "Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`",
           "name": "reason",
           "repeatable": false,
@@ -14471,6 +15387,9 @@
         },
         {
           "default": "reviewer",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "Attribution only — no partition key derives from it",
           "name": "role",
@@ -14481,6 +15400,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The session that authored the TRANSITION (recorded as actor.session_id)",
           "name": "session",
           "repeatable": false,
@@ -15004,6 +15926,15 @@
     },
     {
       "command": "finding list",
+      "constraints": [
+        {
+          "names": [
+            "limit",
+            "all"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "read",
       "errors": [
         "CONFIG_MISSING",
@@ -15022,6 +15953,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change whose findings to list",
           "name": "change",
           "repeatable": false,
@@ -15059,6 +15993,9 @@
         },
         {
           "default": 100,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -15594,6 +16531,10 @@
         },
         {
           "default": 30,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 0
+          },
           "help": "Hook timeout in seconds",
           "name": "timeout",
           "repeatable": false,
@@ -16428,6 +17369,26 @@
     },
     {
       "command": "ingest plans",
+      "constraints": [
+        {
+          "if": {
+            "name": "dialect"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-source"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-source"
+          },
+          "rule": "requires",
+          "then": [
+            "dialect"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -17303,6 +18264,9 @@
         },
         {
           "default": 30,
+          "domain": {
+            "minimum": 0
+          },
           "help": "Seconds between polls",
           "name": "interval-secs",
           "repeatable": false,
@@ -17340,6 +18304,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)",
           "name": "run",
           "repeatable": false,
@@ -17958,6 +18925,9 @@
         },
         {
           "default": 30,
+          "domain": {
+            "minimum": 0
+          },
           "help": "Seconds between polls",
           "name": "interval-secs",
           "repeatable": false,
@@ -18818,6 +19788,44 @@
     },
     {
       "command": "init",
+      "constraints": [
+        {
+          "names": [
+            "check",
+            "no-agents-md"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "names": [
+            "check",
+            "policy",
+            "no-policy"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "names": [
+            "check",
+            "providers"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "names": [
+            "check",
+            "language"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "names": [
+            "check",
+            "dry-run"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "write",
       "effectNote": "--check writes nothing",
       "errors": [
@@ -18913,6 +19921,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "help": "Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml",
           "name": "language",
           "repeatable": false,
@@ -19857,6 +20868,26 @@
     },
     {
       "command": "ledger compact",
+      "constraints": [
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        }
+      ],
       "effect": "destructive",
       "errors": [
         "CONFIG_MISSING",
@@ -20154,6 +21185,78 @@
     },
     {
       "command": "migrate",
+      "constraints": [
+        {
+          "names": [
+            "revert",
+            "relayed-via"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        },
+        {
+          "if": {
+            "name": "backup"
+          },
+          "rule": "requires",
+          "then": [
+            "revert"
+          ]
+        },
+        {
+          "if": {
+            "name": "relayed-via"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        },
+        {
+          "if": {
+            "name": "actor"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        },
+        {
+          "if": {
+            "name": "approver"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        },
+        {
+          "if": {
+            "name": "note"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        }
+      ],
       "effect": "destructive",
       "errors": [
         "CONFIG_MISSING",
@@ -21116,6 +22219,26 @@
     },
     {
       "command": "policy approve",
+      "constraints": [
+        {
+          "if": {
+            "name": "actor"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        },
+        {
+          "if": {
+            "name": "relayed-via"
+          },
+          "rule": "requires",
+          "then": [
+            "note"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -21153,6 +22276,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "Who approved it (a human's name or id)",
           "name": "approver",
           "repeatable": false,
@@ -21171,6 +22297,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+$"
+          },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --note carries the human's answer",
           "name": "relayed-via",
           "repeatable": false,
@@ -21181,6 +22310,9 @@
         {
           "default": null,
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
           "name": "actor",
@@ -21606,6 +22738,19 @@
         }
       },
       "summary": "Approve the current .canon/policy.yaml (written directly; nothing to promote)",
+      "validators": [
+        {
+          "arguments": [
+            "relayed-via",
+            "note"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval carries the human's answer word for word: with `--relayed-via`, `--note` is not blank.",
+          "rejects": [
+            "canon policy approve --approver alice --relayed-via ask --actor impl --note \" \" --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": []
       }
@@ -21844,6 +22989,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^@]+@[^@]+$"
+          },
           "help": "The bundle to register, `NAME@VERSION`",
           "name": "bundle",
           "required": true,
@@ -22320,6 +23468,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^@]+@[^@]+$"
+          },
           "help": "The bundle to show, `NAME@VERSION`",
           "name": "bundle",
           "required": true,
@@ -22496,6 +23647,26 @@
     },
     {
       "command": "purge",
+      "constraints": [
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        }
+      ],
       "effect": "destructive",
       "effectNote": "a committed run writes one audit line; a preview writes nothing",
       "errors": [
@@ -22546,6 +23717,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "before",
           "repeatable": false,
@@ -22844,6 +24018,18 @@
         }
       },
       "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
+      "validators": [
+        {
+          "arguments": [
+            "before"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon purge --kind session --before 2026-02-30 --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -22852,6 +24038,97 @@
     },
     {
       "command": "query",
+      "constraints": [
+        {
+          "names": [
+            "plugin",
+            "history"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "names": [
+            "limit",
+            "all"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "code": "QUERY_INVALID_ARGUMENT",
+          "help": "`--change` applies only to `--kind change` and `--kind task`.",
+          "if": {
+            "in": [
+              "scenario",
+              "session",
+              "run",
+              "event",
+              "handoff",
+              "review",
+              "divergence",
+              "trajectory",
+              "strategy_item",
+              "evidence",
+              "subject",
+              "finding"
+            ],
+            "name": "kind"
+          },
+          "rule": "forbids",
+          "then": [
+            "change"
+          ]
+        },
+        {
+          "code": "QUERY_INVALID_ARGUMENT",
+          "help": "`--status` applies only to `--kind change`, `--kind task` and `--kind subject`.",
+          "if": {
+            "in": [
+              "scenario",
+              "session",
+              "run",
+              "event",
+              "handoff",
+              "review",
+              "divergence",
+              "trajectory",
+              "strategy_item",
+              "evidence",
+              "finding"
+            ],
+            "name": "kind"
+          },
+          "rule": "forbids",
+          "then": [
+            "status"
+          ]
+        },
+        {
+          "code": "QUERY_INVALID_ARGUMENT",
+          "help": "`--domain` applies only to `--kind subject`.",
+          "if": {
+            "in": [
+              "change",
+              "task",
+              "scenario",
+              "session",
+              "run",
+              "event",
+              "handoff",
+              "review",
+              "divergence",
+              "trajectory",
+              "strategy_item",
+              "evidence",
+              "finding"
+            ],
+            "name": "kind"
+          },
+          "rule": "forbids",
+          "then": [
+            "domain"
+          ]
+        }
+      ],
       "effect": "read",
       "effectNote": "appends one line to .canon/audit/access.jsonl; a refused run writes none",
       "errors": [
@@ -22896,6 +24173,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "Only records with at >= <since> (RFC3339/ISO-8601)",
           "name": "since",
           "repeatable": false,
@@ -22943,6 +24223,9 @@
         {
           "default": null,
           "defaultNote": "the repo's only live change",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Scope --kind change/task to one ChangeId (other kinds exit 2)",
           "name": "change",
           "repeatable": false,
@@ -22978,6 +24261,9 @@
         },
         {
           "default": 100,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -23208,6 +24494,29 @@
         }
       },
       "summary": "Read stored records across every storage tier",
+      "validators": [
+        {
+          "arguments": [
+            "kind",
+            "status"
+          ],
+          "code": "QUERY_INVALID_ARGUMENT",
+          "description": "`--status` is one of the statuses of the queried kind: `open`, `done` for `task`; `proposed`, `in_progress`, `completed`, `archived` for `change`; `proposed`, `specced`, `building`, `verifying`, `shipped`, `retired` for `subject`.",
+          "rejects": [
+            "canon query --kind task --status proposed --json"
+          ]
+        },
+        {
+          "arguments": [
+            "since"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon query --kind evidence --since 2026-02-30 --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "planner",
@@ -23234,6 +24543,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+          },
           "help": "The <role> segment (canonicalized)",
           "name": "role-segment",
           "repeatable": false,
@@ -23243,6 +24555,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+          },
           "help": "The <repo> segment (canonicalized)",
           "name": "repo-name",
           "repeatable": false,
@@ -23252,6 +24567,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+          },
           "help": "The <area> segment (canonicalized)",
           "name": "area",
           "repeatable": false,
@@ -23261,6 +24579,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9A-Fa-f]{6,64}[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "help": "The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)",
           "name": "hash",
           "repeatable": false,
@@ -24149,6 +25470,24 @@
     },
     {
       "command": "retrieve",
+      "constraints": [
+        {
+          "names": [
+            "regime",
+            "domain"
+          ],
+          "rule": "exactlyOne"
+        },
+        {
+          "if": {
+            "name": "subject"
+          },
+          "rule": "requires",
+          "then": [
+            "domain"
+          ]
+        }
+      ],
       "effect": "read",
       "errors": [
         "INTERNAL",
@@ -24164,6 +25503,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Role scope; with --regime must equal its leading segment",
           "name": "for-role",
           "repeatable": false,
@@ -24173,6 +25515,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[0-9a-f]{6,64}$"
+          },
           "help": "Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject",
           "name": "regime",
           "repeatable": false,
@@ -24191,6 +25536,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime",
           "name": "subject",
           "repeatable": false,
@@ -24200,6 +25548,9 @@
         },
         {
           "default": 5,
+          "domain": {
+            "minimum": 0
+          },
           "help": "Cap on the guidance items returned",
           "name": "limit",
           "repeatable": false,
@@ -24286,6 +25637,19 @@
         }
       },
       "summary": "Fetch role-scoped strategy guidance",
+      "validators": [
+        {
+          "arguments": [
+            "for-role",
+            "regime"
+          ],
+          "code": "USAGE",
+          "description": "`--for-role` equals the first segment of `--regime` (the role of the regime key).",
+          "rejects": [
+            "canon retrieve --for-role reviewer --regime dev/canon/join-spine/9c93d024b1a2 --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "planner",
@@ -24297,6 +25661,15 @@
     },
     {
       "command": "review change",
+      "constraints": [
+        {
+          "names": [
+            "upstream-ref",
+            "original-spec-ref"
+          ],
+          "rule": "exactlyOne"
+        }
+      ],
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records first",
       "errors": [
@@ -24345,6 +25718,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The chore change to review",
           "name": "change",
           "required": true,
@@ -24356,6 +25732,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -24402,6 +25781,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to",
           "name": "role",
@@ -24412,6 +25794,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "name": "session",
           "repeatable": false,
@@ -24435,6 +25820,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The reviewer runtime's provider (e.g. anthropic, openai)",
           "name": "reviewer-provider",
           "repeatable": false,
@@ -24444,6 +25832,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The reviewer runtime's model id",
           "name": "reviewer-model",
           "repeatable": false,
@@ -24453,6 +25844,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The harness that ran the reviewer (e.g. omp, codex, claude)",
           "name": "reviewer-harness",
           "repeatable": false,
@@ -24471,6 +25865,9 @@
         },
         {
           "default": 25,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused",
           "name": "max-artifact-mib",
           "repeatable": false,
@@ -25013,6 +26410,15 @@
     },
     {
       "command": "review scenario",
+      "constraints": [
+        {
+          "names": [
+            "upstream-ref",
+            "original-spec-ref"
+          ],
+          "rule": "exactlyOne"
+        }
+      ],
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records first",
       "errors": [
@@ -25060,6 +26466,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "The reviewed scenarios (`<area>.<surface>.<nn>`), one review each, all or nothing. Each must have a record (`canon inventory sync`), or nothing is written (exit 2)",
           "name": "scenario",
           "required": true,
@@ -25071,6 +26480,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "name": "project",
           "repeatable": false,
@@ -25117,6 +26529,9 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "env": "CANON_ROLE",
           "help": "The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to",
           "name": "role",
@@ -25127,6 +26542,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "name": "session",
           "repeatable": false,
@@ -25150,6 +26568,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The reviewer runtime's provider (e.g. anthropic, openai)",
           "name": "reviewer-provider",
           "repeatable": false,
@@ -25159,6 +26580,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The reviewer runtime's model id",
           "name": "reviewer-model",
           "repeatable": false,
@@ -25168,6 +26592,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The harness that ran the reviewer (e.g. omp, codex, claude)",
           "name": "reviewer-harness",
           "repeatable": false,
@@ -25186,6 +26613,9 @@
         },
         {
           "default": 25,
+          "domain": {
+            "minimum": 1
+          },
           "help": "Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused",
           "name": "max-artifact-mib",
           "repeatable": false,
@@ -25726,6 +27156,17 @@
     },
     {
       "command": "scenario new",
+      "constraints": [
+        {
+          "if": {
+            "name": "change"
+          },
+          "rule": "requires",
+          "then": [
+            "flow"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -25772,6 +27213,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^@?[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$"
+          },
           "help": "<area>.<surface>.<nn> scenario tag",
           "name": "tag",
           "required": true,
@@ -25792,6 +27236,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Optional subject id tag to pin above the scenario",
           "name": "subject",
           "repeatable": false,
@@ -25801,6 +27248,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Optional lane tag to classify the scenario",
           "name": "lane",
           "repeatable": false,
@@ -25810,6 +27260,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Optional case tag: which path of the behavior this scenario specifies (`happy`, `failure`, `edge` in the base vocabulary)",
           "name": "case",
           "repeatable": false,
@@ -25829,6 +27282,9 @@
         {
           "default": null,
           "defaultNote": "the --subject's newest adopted change",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change whose brief defines --flow (default: --subject's newest adopted change)",
           "name": "change",
           "repeatable": false,
@@ -25848,6 +27304,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -25867,6 +27326,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "help": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "name": "project",
           "repeatable": false,
@@ -26296,6 +27758,18 @@
     },
     {
       "command": "schema",
+      "constraints": [
+        {
+          "names": [
+            "path",
+            "errors",
+            "error",
+            "warnings",
+            "warning"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "read",
       "errors": [
         "INTERNAL",
@@ -26396,6 +27870,13 @@
             "command": {
               "type": "string"
             },
+            "constraints": {
+              "description": "Every relation between arguments the parser or the command enforces without reading state (spec 10.8.1); absent when there is none.",
+              "items": {
+                "$ref": "#/schemas/ConstraintDoc"
+              },
+              "type": "array"
+            },
             "effect": {
               "$ref": "#/schemas/Effect"
             },
@@ -26477,6 +27958,13 @@
             },
             "summary": {
               "type": "string"
+            },
+            "validators": {
+              "description": "The stateless checks neither a domain nor a constraint can say (spec 10.8.3); absent when there is none.",
+              "items": {
+                "$ref": "#/schemas/ValidatorDoc"
+              },
+              "type": "array"
             }
           },
           "required": [
@@ -26491,6 +27979,96 @@
             "outputs",
             "examples",
             "schemas"
+          ],
+          "type": "object"
+        },
+        "ConditionDoc": {
+          "description": "The `if` of a `requires` or `forbids` rule: `{name}` holds when the argument is given, `{name, in}` when it is given and\none of its values is in `in`.",
+          "properties": {
+            "in": {
+              "items": {
+                "$ref": "#/schemas/ConditionValue"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "ConditionValue": {
+          "anyOf": [
+            {
+              "format": "int64",
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "A value an `if.in` list holds: an integer or a text (the valid values of an `enum`, `string` or `integer` argument)."
+        },
+        "ConstraintDoc": {
+          "description": "One rule of a command's `constraints` (spec 10.8).",
+          "properties": {
+            "code": {
+              "description": "The registered code a violation produces; absent: `USAGE`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "help": {
+              "description": "One sentence saying what the rule means in the command's own words.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "if": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ConditionDoc"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When a `requires` or `forbids` applies."
+            },
+            "names": {
+              "description": "The operands and options of an `atLeastOne`, `exactlyOne` or `atMostOne`.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "rule": {
+              "$ref": "#/schemas/RuleKind"
+            },
+            "then": {
+              "description": "What a `requires` demands and a `forbids` refuses.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "rule"
           ],
           "type": "object"
         },
@@ -26521,6 +28099,71 @@
             }
           ],
           "description": "The `default` of an option or an operand: typed by the argument's `valueType`, so its JSON type is one of these."
+        },
+        "DomainSchema": {
+          "description": "The `domain` of an argument: a JSON Schema in the profile of spec 10.7.4. Only the members a domain of a number or a text may\ncarry are typed here; which of them fit which `valueType`, the safe-integer bounds and the I-Regexp form of `pattern` are\nchecked by [`crate::domain::profile_problems`].",
+          "minProperties": 1,
+          "properties": {
+            "exclusiveMaximum": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "exclusiveMinimum": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "maxLength": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "maximum": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "minLength": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "minimum": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "multipleOf": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "pattern": {
+              "description": "`^`, an I-Regexp body and `$`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
         },
         "Effect": {
           "description": "What running a command does to the repository and the machine (spec 12.1).",
@@ -26758,6 +28401,17 @@
                 "null"
               ]
             },
+            "domain": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/DomainSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The restrictions of each value of the operand beyond its `valueType` (spec 10.7.4)."
+            },
             "help": {
               "type": "string"
             },
@@ -26813,6 +28467,17 @@
                 "string",
                 "null"
               ]
+            },
+            "domain": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/DomainSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The restrictions of the option's own value beyond its `valueType` (spec 10.7.4)."
             },
             "env": {
               "description": "The environment variable the parser reads when the option is absent.",
@@ -26963,6 +28628,36 @@
           ],
           "type": "object"
         },
+        "RuleKind": {
+          "description": "The five rules of a constraint (spec 10.8.1).",
+          "oneOf": [
+            {
+              "const": "atLeastOne",
+              "description": "At least one of `names` is given.",
+              "type": "string"
+            },
+            {
+              "const": "exactlyOne",
+              "description": "Exactly one of `names` is given.",
+              "type": "string"
+            },
+            {
+              "const": "atMostOne",
+              "description": "At most one of `names` is given.",
+              "type": "string"
+            },
+            {
+              "const": "requires",
+              "description": "When `if` holds, every name in `then` is given.",
+              "type": "string"
+            },
+            {
+              "const": "forbids",
+              "description": "When `if` holds, no name in `then` is given.",
+              "type": "string"
+            }
+          ]
+        },
         "SchemaReport": {
           "anyOf": [
             {
@@ -27049,6 +28744,40 @@
             "path",
             "kind",
             "summary"
+          ],
+          "type": "object"
+        },
+        "ValidatorDoc": {
+          "description": "One stateless check a domain and the five rules cannot say (spec 10.8.3).",
+          "properties": {
+            "arguments": {
+              "description": "The names of the operands and options it reads.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "code": {
+              "description": "The registered code its failure produces, with exit 2.",
+              "type": "string"
+            },
+            "description": {
+              "description": "What it checks, in one or two plain sentences.",
+              "type": "string"
+            },
+            "rejects": {
+              "description": "Complete invocations that satisfy every requirement, constraint and domain and that this validator refuses.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "arguments",
+            "code",
+            "description",
+            "rejects"
           ],
           "type": "object"
         },
@@ -27186,6 +28915,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+          },
           "help": "The text to find, read as typed: quotes and words such as AND are not syntax",
           "name": "text",
           "required": true,
@@ -27224,6 +28956,10 @@
         },
         {
           "default": 1,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 0
+          },
           "help": "How many edges away from a hit its neighbors are listed (0: none)",
           "name": "expand",
           "repeatable": false,
@@ -27233,6 +28969,10 @@
         },
         {
           "default": 20,
+          "domain": {
+            "maximum": 4294967295,
+            "minimum": 1
+          },
           "help": "The most hits to list, best first (there is no next page)",
           "name": "limit",
           "repeatable": false,
@@ -27714,6 +29454,9 @@
         {
           "default": null,
           "defaultNote": "the providers `skills install` would use",
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+          },
           "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
           "name": "providers",
           "repeatable": false,
@@ -27940,6 +29683,9 @@
         {
           "default": null,
           "defaultNote": "the providers `skills install` would use",
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+          },
           "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
           "name": "providers",
           "repeatable": false,
@@ -28065,6 +29811,9 @@
         {
           "default": null,
           "defaultNote": "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories",
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+          },
           "help": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
           "name": "providers",
           "repeatable": false,
@@ -29493,6 +31242,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "The StrategyId (ULID) whose approval payload is printed",
           "name": "strategy",
           "required": true,
@@ -29522,6 +31274,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
           "name": "approval-at",
           "repeatable": false,
@@ -29614,6 +31369,18 @@
         }
       },
       "summary": "The unsigned approval payload bytes an external signer signs (a read: identical arguments give identical bytes)",
+      "validators": [
+        {
+          "arguments": [
+            "approval-at"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30 --json"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -29622,6 +31389,35 @@
     },
     {
       "command": "strategy promote",
+      "constraints": [
+        {
+          "if": {
+            "name": "evaluation"
+          },
+          "rule": "requires",
+          "then": [
+            "approval"
+          ]
+        },
+        {
+          "if": {
+            "name": "approval"
+          },
+          "rule": "requires",
+          "then": [
+            "evaluation"
+          ]
+        },
+        {
+          "if": {
+            "name": "signature-file"
+          },
+          "rule": "requires",
+          "then": [
+            "approval"
+          ]
+        }
+      ],
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
@@ -29661,6 +31457,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "The StrategyId (ULID) to promote",
           "name": "strategy",
           "required": true,
@@ -30135,6 +31934,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$"
+          },
           "help": "The StrategyId (ULID) to roll back",
           "name": "strategy",
           "required": true,
@@ -30173,6 +31975,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          },
           "help": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
           "name": "approval-at",
           "repeatable": false,
@@ -30621,6 +32426,18 @@
         }
       },
       "summary": "Disable an active strategy with durable rollback provenance",
+      "validators": [
+        {
+          "arguments": [
+            "approval-at"
+          ],
+          "code": "USAGE",
+          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
+          "rejects": [
+            "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -30667,6 +32484,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The subject to adopt the change under",
           "name": "subject",
           "required": true,
@@ -30678,6 +32498,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The imported Change's id",
           "name": "change",
           "repeatable": false,
@@ -31316,6 +33139,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The subject to move",
           "name": "id",
           "required": true,
@@ -31344,6 +33170,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r]*$"
+          },
           "help": "Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories",
           "name": "override-reason",
           "repeatable": false,
@@ -31353,6 +33182,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r]*$"
+          },
           "help": "Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor",
           "name": "reason",
           "repeatable": false,
@@ -31371,6 +33203,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -32163,6 +33998,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The subject's kebab-slug id",
           "name": "id",
           "required": true,
@@ -32174,6 +34012,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The subject's domain (kebab slug)",
           "name": "domain",
           "repeatable": false,
@@ -32201,6 +34042,9 @@
         },
         {
           "default": "implementer",
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The accountable owning role",
           "name": "owner-role",
           "repeatable": false,
@@ -32219,6 +34063,9 @@
         },
         {
           "default": null,
+          "domain": {
+            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          },
           "help": "The acting session (recorded as actor.session_id); optional",
           "name": "session",
           "repeatable": false,
@@ -32855,6 +34702,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The subject to show",
           "name": "id",
           "required": true,
@@ -33238,6 +35088,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The subject to take the change out of",
           "name": "subject",
           "required": true,
@@ -33249,6 +35102,9 @@
       "options": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "The change to take out of the subject",
           "name": "change",
           "repeatable": false,
@@ -33884,6 +35740,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*#[0-9]+(\\.[0-9]+)*$"
+          },
           "help": "The task id (<change_id>#<n>)",
           "name": "task",
           "required": true,
@@ -34237,6 +36096,26 @@
     },
     {
       "command": "tier age",
+      "constraints": [
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        }
+      ],
       "effect": "destructive",
       "errors": [
         "CONFIG_MISSING",
@@ -34513,6 +36392,9 @@
       "operands": [
         {
           "default": null,
+          "domain": {
+            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+          },
           "help": "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)",
           "name": "id",
           "required": true,

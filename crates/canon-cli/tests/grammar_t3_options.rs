@@ -322,7 +322,8 @@ fn json_repo_and_as_mean_the_same_everywhere() {
 }
 
 // ---------------------------------------------------------------------------
-// conflictsWith / requires, enforced at parse time.
+// the conflicts clap declares (`conflicts_with`, `ArgGroup`), enforced at parse time. clap has no getter for `requires`:
+// those and the handlers' relations are the `constraints` of the documents, driven through the binary by `tests/arg_rules.rs`.
 
 /// A value that parses, by the value name the grammar gives it.
 fn sample(arg: &clap::Arg) -> String {
@@ -369,9 +370,9 @@ fn required_line(cmd: &clap::Command, path: &str, skip: &[&str]) -> Vec<String> 
 }
 
 #[test]
-fn every_conflict_and_requirement_clap_declares_is_enforced_when_parsing() {
+fn every_conflict_clap_declares_is_enforced_when_parsing() {
     let root = canon_cli::cli::command();
-    let (mut conflicts, mut requires) = (0, 0);
+    let mut conflicts = 0;
     let mut problems = Vec::new();
     for leaf in leaves() {
         let path = path_of(leaf);
@@ -398,25 +399,8 @@ fn every_conflict_and_requirement_clap_declares_is_enforced_when_parsing() {
                 }
             }
         }
-        for (option, needed) in &relations.requires {
-            requires += 1;
-            let own = arg_of(&format!("--{option}"));
-            let skip: Vec<&str> = std::iter::once(own.get_id().as_str()).chain(needed.iter().map(|n| arg_of(n).get_id().as_str())).collect();
-            let mut line = required_line(cmd, &path, &skip);
-            line.extend(given(own));
-            match root.clone().try_get_matches_from(std::iter::once("canon".to_string()).chain(line.iter().cloned())) {
-                Err(e) if e.kind() == ErrorKind::MissingRequiredArgument => {
-                    let missing = e.get(ContextKind::InvalidArg).map(std::string::ToString::to_string).unwrap_or_default();
-                    if !needed.iter().any(|n| missing.contains(n.as_str())) {
-                        problems.push(format!("`{path}`: --{option} without {needed:?} is refused for another reason: {missing}"));
-                    }
-                }
-                Err(e) => problems.push(format!("`{path}`: --{option} without {needed:?} fails, but not as a missing argument ({:?}): {}", e.kind(), e.to_string().lines().next().unwrap_or_default())),
-                Ok(_) => problems.push(format!("`{path}`: --{option} requires {needed:?} and parses without: {line:?}")),
-            }
-        }
     }
-    assert!(conflicts > 20 && requires > 3, "clap declares conflicts ({conflicts}) and requirements ({requires})");
+    assert!(conflicts > 20, "clap declares conflicts ({conflicts})");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 

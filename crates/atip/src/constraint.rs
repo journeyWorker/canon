@@ -404,7 +404,7 @@ pub fn document_problems(options: &[OptionDoc], operands: &[OperandDoc], constra
                 problems.push(format!("{label}: `{name}` is neither an operand nor an option"));
             }
         }
-        if !errors.iter().any(|known| *known == validator.code) {
+        if !errors.contains(&validator.code) {
             problems.push(format!("{label}: the code {} is not in errors", validator.code));
         }
         if validator.description.trim().is_empty() {
