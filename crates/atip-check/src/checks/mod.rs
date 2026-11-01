@@ -591,7 +591,7 @@ pub(crate) fn run_checks(
         .collect();
     let conditions = judge.seen.into_inner();
     Ok(Judged {
-        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()),
+        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()).with_unprobed_writes(l1.map(|l1| l1.unprobed_writes.clone()).unwrap_or_default()),
         conditions,
     })
 }

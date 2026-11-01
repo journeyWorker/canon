@@ -1,4 +1,4 @@
-//! The 30 L1 checks of approaches/checker.md 6 (contract 1.1): self-description, arguments, data.
+//! The 31 L1 checks of approaches/checker.md 6 (contract 1.1): self-description, arguments, data.
 //!
 //! The invocations are made by [`super::l1_plan`]; each check here reads the log and the documents the run read from
 //! `schema`. **One owner per pass condition**, as at L0: a condition is judged by exactly one check, so breaking one
@@ -948,6 +948,9 @@ impl<'a> Judge<'a> {
                 judged = true;
                 c.holds("names-a-command", names_command(&l1.docs, &argv).is_some(), || format!("{} has a next entry {:?} that names no command of the tool", self.label(index), argv.join(" ")));
             }
+        }
+        if l1.nexts_dropped > 0 {
+            c.notes.push(format!("{} next entries of read commands were not followed: the run follows at most 300", l1.nexts_dropped));
         }
         for run in &l1.nexts {
             c.own(run.call);
