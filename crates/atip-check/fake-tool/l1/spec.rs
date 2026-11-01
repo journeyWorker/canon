@@ -207,6 +207,8 @@ pub struct Output {
     pub fields: Option<Value>,
     /// The `schemaVersion` of the output: `1.0` for a report, the format version for a `schema` answer.
     pub version: &'static str,
+    /// The report of a batch input (spec 11.11).
+    pub batch: bool,
 }
 
 /// A leaf command.
@@ -295,6 +297,7 @@ impl Command {
             when: None,
             fields: None,
             version: "1.0",
+            batch: false,
         });
         self.schemas.push((schema, schema_value));
         self
@@ -306,6 +309,20 @@ impl Command {
             when: Some(when),
             fields: None,
             version: "1.0",
+            batch: false,
+        });
+        self.schemas.push((schema, schema_value));
+        self
+    }
+
+    /// An output that is the report of a batch input, chosen by `when`.
+    pub fn output_batch(mut self, schema: &'static str, when: &'static str, schema_value: Value) -> Self {
+        self.outputs.push(Output {
+            schema,
+            when: Some(when),
+            fields: None,
+            version: "1.0",
+            batch: true,
         });
         self.schemas.push((schema, schema_value));
         self
@@ -416,16 +433,12 @@ fn state_report(name: &'static str) -> (&'static str, Value) {
     )
 }
 
-fn paged_read(id: &'static str, summary: &'static str, report: &'static str) -> Command {
+/// A read command that reports the state: no argument but the tool-wide ones, and no page (only `member list` pages).
+fn state_read(id: &'static str, summary: &'static str, report: &'static str) -> Command {
     let (name, schema) = state_report(report);
     Command::new(id, summary)
-        .options(vec![Arg::option(
-            "cursor",
-            "string",
-            "Resume after the last item of the previous page (meta.page.nextCursor)",
-        )
-        .value("CURSOR")])
-        .errors(&["CURSOR_INVALID", "STATE_ODD", "USAGE"])
+        .options(Vec::new())
+        .errors(&["STATE_ODD", "USAGE"])
         .output(name, schema)
 }
 
@@ -718,13 +731,39 @@ fn touch() -> Command {
             Arg::option("name", "string", "What to touch").value("NAME").required(),
             Arg::option("input", "string", "The arguments as inline JSON").value("JSON").flag_only(),
         ])
-        .errors(&["INPUT_CONFLICT", "INPUT_INVALID", "INPUT_TOO_LARGE", "USAGE"])
+        .errors(&["BATCH_INCOMPLETE", "INPUT_CONFLICT", "INPUT_INVALID", "INPUT_TOO_LARGE", "USAGE"])
         .output(
             "TouchReport",
             json!({
                 "type": "object",
                 "required": ["touched"],
                 "properties": {"touched": {"type": "boolean"}},
+                "additionalProperties": false
+            }),
+        )
+        .output_batch(
+            "TouchBatchReport",
+            "--input is a list of documents",
+            json!({
+                "type": "object",
+                "required": ["items"],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["index", "status"],
+                            "properties": {
+                                "index": {"type": "integer", "minimum": 0},
+                                "status": {"enum": ["written", "unchanged", "failed", "skipped"]},
+                                "data": {"$ref": "#/schemas/TouchReport"},
+                                "error": {"type": "object"}
+                            },
+                            "additionalProperties": false
+                        }
+                    }
+                },
                 "additionalProperties": false
             }),
         )
@@ -749,7 +788,8 @@ fn touch() -> Command {
             "option": "--input",
             "schemaRef": "#/schemas/TouchInput",
             "argumentsRef": "#/schemas/TouchArguments",
-            "batch": false,
+            "batch": true,
+            "maxItems": MAX_BATCH_ITEMS,
             "maxBytes": MAX_INPUT_BYTES,
             "example": {"name": "log"}
         }))
@@ -761,6 +801,9 @@ fn touch() -> Command {
 
 /// The most bytes `touch --input` accepts.
 pub const MAX_INPUT_BYTES: usize = 4096;
+
+/// The most documents a batch of `touch --input` holds.
+pub const MAX_BATCH_ITEMS: usize = 8;
 
 /// Every leaf command of the tool, in the order of the tree.
 pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
@@ -779,7 +822,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
                 }),
             )
             .examples(&["{tool} init --json"]),
-        paged_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
+        state_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
         member_list(shape.is_1_1),
         member_search(),
         member_tag(),
@@ -792,7 +835,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
                 json!({"type": "object", "additionalProperties": false}),
             )
             .examples(&["{tool} reject --json"]),
-        paged_read("status", "Report the state of the tool", "StatusReport")
+        state_read("status", "Report the state of the tool", "StatusReport")
             .examples(&["{tool} status --json"]),
         Command::new("team add", "Add a team; writes team.txt")
             .writes("replay-safe")

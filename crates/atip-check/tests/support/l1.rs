@@ -101,6 +101,7 @@ fn l1_commands(is_1_1: bool) -> Value {
         "schema": {"ok": [["schema", "--errors", "--json"]]},
         "member list": {
             "ok": [["member", "list", "--team", "core", "--limit", "2", "--sort", "name", "--json"]],
+            "paged": [["member", "list", "--team", "core", "--limit", "1", "--sort", "name", "--json"]],
             "fields": fields
         },
         "member search": {
@@ -233,17 +234,6 @@ fn string_option(name: &str, value_name: &str) -> Value {
     json!({"name": name, "valueType": "string", "valueName": value_name, "required": false, "repeatable": false, "default": null, "help": "A seeded option"})
 }
 
-/// The schema and output a seeded batch output of `touch` adds.
-fn touch_batch_ops() -> Vec<Value> {
-    vec![
-        add("/schemas/TouchBatch", json!({"type": "object", "additionalProperties": false})),
-        add(
-            "/outputs/-",
-            json!({"kind": "report", "schemaRef": "#/schemas/TouchBatch", "schemaVersion": "1.0", "batch": true}),
-        ),
-    ]
-}
-
 fn registry_patch(ops: &[Value], entry_ops: &[(&str, Vec<Value>)]) -> Value {
     let mut entries: Vec<(&str, Vec<Value>)> = vec![("--errors", ops.to_vec())];
     entries.extend(entry_ops.iter().cloned());
@@ -275,11 +265,6 @@ pub fn l1_cases() -> Vec<Case> {
         config: l1_config(&extra),
         tweak: None,
     };
-    let touch_batch = {
-        let mut ops = vec![set("/input/batch", json!(true)), add("/input/maxItems", json!(8))];
-        ops.extend(touch_batch_ops());
-        ops
-    };
     vec![
         // tree
         case("tree/answered", json!({"treeAnswer": "usage"})),
@@ -303,33 +288,32 @@ pub fn l1_cases() -> Vec<Case> {
         // walk
         case("walk/answered", json!({"schemaUnknown": ["touch"]})),
         case("walk/valid", patch(&[("member tag", vec![remove("/summary")])])),
-        case(
-            "walk/kind",
-            patch(&[(
-                "<tree>",
-                vec![
-                    set(&format!("/commands/{}/kind", tree_index("team")), json!("command")),
-                    add(&format!("/commands/{}/effect", tree_index("team")), json!("read")),
-                ],
-            )]),
-        ),
+        // The document of `init` says it is a group; the tree is untouched.
+        case("walk/kind", patch(&[("init", vec![set("/kind", json!("group"))])])),
         case(
             "walk/group-path",
             patch(&[("team", vec![set("/command", json!("teams")), set("/path", json!(["teams"]))])]),
         ),
         case("walk/group-children", patch(&[("member", vec![remove("/commands/2")])])),
-        case("walk/rule-1", patch(&[("member list", vec![set("/command", json!("member lst"))])])),
+        case("walk/rule-1", patch(&[("init", vec![set("/command", json!("ini"))])])),
         case(
             "walk/rule-2-refs",
-            patch(&[("member list", vec![set("/outputs/0/schemaRef", json!("#/schemas/Missing"))])]),
+            patch(&[("init", vec![set("/outputs/0/schemaRef", json!("#/schemas/Missing"))])]),
         ),
         case(
             "walk/rule-2-compile",
             patch(&[("member list", vec![add("/schemas/Broken", json!({"pattern": "("}))])]),
         ),
+        // A third output, distinguished by its `when`, with the schema of the first.
         case(
             "walk/rule-2-outputs",
-            patch(&[("member search", vec![set("/outputs/1/schemaRef", json!("#/schemas/MemberSearchReport"))])]),
+            patch(&[(
+                "member search",
+                vec![add(
+                    "/outputs/-",
+                    json!({"kind": "report", "schemaRef": "#/schemas/MemberSearchReport", "schemaVersion": "1.0", "when": "--quiet"}),
+                )],
+            )]),
         ),
         case(
             "walk/rule-3-defaults",
@@ -337,22 +321,16 @@ pub fn l1_cases() -> Vec<Case> {
         ),
         case(
             "walk/rule-3-domain-profile",
-            patch(&[(
-                "member tag",
-                vec![set("/options/name=note/domain", json!({"maxLength": 80, "minimum": 1}))],
-            )]),
-        ),
-        case(
-            "walk/rule-3-domain-pattern",
-            patch(&[("member tag", vec![set("/options/name=tag/domain/pattern", json!("^\\d+$"))])]),
+            // A domain on a switch: a switch has two values and no domain (spec 10.7.4).
+            patch(&[("member search", vec![add("/options/name=quiet/domain", json!({"minimum": 1}))])]),
         ),
         case(
             "walk/rule-3-domain-compile",
-            patch(&[("member tag", vec![set("/options/name=tag/domain/pattern", json!("^a{2,1}$"))])]),
+            patch(&[("member search", vec![set("/options/name=verbose/domain", json!({"maximum": "x"}))])]),
         ),
         case(
             "walk/rule-4-names",
-            patch(&[("member tag", vec![set("/constraints/0/then", json!(["nosuch"]))])]),
+            patch(&[("member tag", vec![set("/constraints/0/if/name", json!("nosuch"))])]),
         ),
         case(
             "walk/rule-4-codes",
@@ -362,7 +340,11 @@ pub fn l1_cases() -> Vec<Case> {
             "walk/rule-4-relation-once",
             patch(&[("member tag", vec![copy("/constraints/0", "/constraints/-")])]),
         ),
-        case("walk/rule-5", patch(&[("touch", touch_batch_ops())])),
+        // `touch` is a batch command: its document says the input is no batch, and the batch output stays.
+        case(
+            "walk/rule-5",
+            patch(&[("touch", vec![set("/input/batch", json!(false)), remove("/input/maxItems")])]),
+        ),
         case("walk/rule-6", patch(&[("member search", vec![remove("/outputs/1/when")])])),
         case(
             "walk/rule-7",
@@ -440,7 +422,10 @@ pub fn l1_cases() -> Vec<Case> {
             "reserved-applicable/input-codes",
             patch(&[("touch", vec![remove_value("/errors", json!("INPUT_CONFLICT"))])]),
         ),
-        case("reserved-applicable/batch-code", patch(&[("touch", touch_batch)])),
+        case(
+            "reserved-applicable/batch-code",
+            patch(&[("touch", vec![remove_value("/errors", json!("BATCH_INCOMPLETE"))])]),
+        ),
         case(
             "reserved-applicable/commit-code",
             patch(&[("member tag", vec![add("/options/-", {
@@ -453,9 +438,10 @@ pub fn l1_cases() -> Vec<Case> {
             "reserved-applicable/operation-code",
             patch(&[("member tag", vec![add("/options/-", string_option("operation", "KEY"))])]),
         ),
+        // `reject` is never run with --cursor: its document offers a cursor and does not list CURSOR_INVALID.
         case(
             "reserved-applicable/cursor-code",
-            patch(&[("status", vec![remove_value("/errors", json!("CURSOR_INVALID"))])]),
+            patch(&[("reject", vec![add("/options/-", string_option("cursor", "CURSOR"))])]),
         ),
         // codes-known
         case(
@@ -463,7 +449,7 @@ pub fn l1_cases() -> Vec<Case> {
             patch(&[("member tag", vec![remove_value("/errors", json!("MEMBER_NOT_FOUND"))])]),
         ),
         // groups-not-runnable
-        case("groups-not-runnable/command-required", json!({"groupRuns": "member"})),
+        case("groups-not-runnable/command-required", json!({"groupRunnable": true})),
         case("groups-not-runnable/expected-is-the-groups-verbs", json!({"groupExpectedWrong": true})),
         // grammar
         case(
@@ -506,7 +492,7 @@ pub fn l1_cases() -> Vec<Case> {
         case("defaults/help-agrees", json!({"helpDefaultDiffers": true})),
         // deterministic (SHOULD)
         case("deterministic/tree-bytes", json!({"treeNondeterministic": true})),
-        case("deterministic/doc-bytes", json!({"docNondeterministic": ["member list"]})),
+        case("deterministic/doc-bytes", json!({"docNondeterministic": ["touch"]})),
         // examples
         case(
             "examples/tool-name",
@@ -573,7 +559,7 @@ pub fn l1_cases() -> Vec<Case> {
                     json!("fake member search --filter '{\"team\":\"ghost\"}' --exact --json"),
                 )],
             )]);
-            config["ghostFilterCode"] = json!("NOT_A_CODE");
+            config["ghostFilterCrash"] = json!(true);
             config
         }),
         // constraints
@@ -598,7 +584,7 @@ pub fn l1_cases() -> Vec<Case> {
         // patterns
         case(
             "patterns/form",
-            patch(&[("member search", vec![set("/options/name=tag/domain/pattern", json!("^[a&&b]+$"))])]),
+            patch(&[("member search", vec![set("/options/name=tag/domain/pattern", json!("^[a-z0-9&&a-z]+$"))])]),
         ),
         case(
             "patterns/rust-compiles",
@@ -622,6 +608,9 @@ pub fn l1_cases() -> Vec<Case> {
         // next
         case("next/names-a-command", json!({"nextBogusCommand": true})),
         case("next/read-next-not-usage", json!({"nextUsage": true})),
+        // hint-command (SHOULD): the refusal of `member tag 99` carries `fake member lst --json`, one command line that
+        // names no command (L0.hint-form still holds).
+        case("hint-command/parses-as-a-command", json!({"hintNoCommand": true})),
         // paging
         case("paging/returned-at-most-limit", json!({"limitIgnored": true})),
         case("paging/next-page-follows", json!({"cursorRepeats": true})),
@@ -635,7 +624,7 @@ pub fn l1_cases() -> Vec<Case> {
     ]
 }
 
-/// The `patterns/engines-agree` case that can be made, and it PASSES: the published pattern `^\p{L}$` of `tag`
+/// The `patterns/engines-agree` case that can be made, and it PASSES: the published pattern `^\p{L}+$` of `tag`
 /// with the fixture's `domainRejects` value U+11DB0 (a letter in Unicode 17, unassigned in Unicode 16) is the one
 /// disagreement the restricted I-Regexp form allows, a Unicode-version difference between the two engines' tables.
 /// The checker's report must name the code point and both Unicode versions and pass; no engine difference in the
@@ -649,7 +638,7 @@ pub fn l1_engine_difference_case() -> Case {
         condition: "patterns/engines-agree",
         config: l1_config(&patch(&[(
             "member search",
-            vec![set("/options/name=tag/domain/pattern", json!("^\\p{L}$"))],
+            vec![set("/options/name=tag/domain/pattern", json!("^\\p{L}+$"))],
         )])),
         tweak: Some(reject_the_code_point),
     }

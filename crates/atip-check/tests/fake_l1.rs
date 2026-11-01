@@ -557,7 +557,9 @@ fn atip_checkl1_fake_touch_takes_its_arguments_inline_and_refuses_what_the_regis
     let fake = Fake::standard();
     let doc = fake.command_doc("touch");
     let input = &doc["input"];
-    assert_eq!((input["option"].as_str(), input["batch"].clone()), (Some("--input"), json!(false)));
+    assert_eq!((input["option"].as_str(), input["batch"].clone(), input["maxItems"].clone()), (Some("--input"), json!(true), json!(8)));
+    assert_eq!(doc["outputs"].as_array().map(Vec::len), Some(2));
+    assert_eq!(doc["outputs"][1]["batch"], true);
     let fragment = validator(&doc, input["schemaRef"].as_str().expect("schemaRef"));
     assert!(fragment.is_valid(&input["example"]));
     let arguments = validator(&doc, input["argumentsRef"].as_str().expect("argumentsRef"));
@@ -585,6 +587,21 @@ fn atip_checkl1_fake_touch_takes_its_arguments_inline_and_refuses_what_the_regis
     assert_eq!(fake.refused(&["touch", "--input", &big])["code"], "INPUT_TOO_LARGE");
     let missing = fake.refused(&["touch"]);
     assert_eq!((missing["code"].as_str(), missing["field"].as_str()), (Some("USAGE"), Some("--name")));
+    // A batch: one report with an item per document, validated against the batch output; refused whole when a document is wrong.
+    let batch = fake.ok(&["touch", "--input", "[{\"name\":\"a\"},{\"name\":\"b\"}]"]);
+    assert_eq!(batch["meta"]["output"], "TouchBatchReport");
+    assert_data_valid(&doc, &batch);
+    assert_eq!(batch["data"]["items"].as_array().map(Vec::len), Some(2));
+    let single = fake.ok(&["touch", "--name", "a"]);
+    assert_eq!(single["meta"]["output"], "TouchReport");
+    assert_data_valid(&doc, &single);
+    let wrong = fake.refused(&["touch", "--input", "[{\"name\":\"a\"},{\"bogus\":1}]"]);
+    assert_eq!((wrong["code"].as_str(), wrong["field"].as_str()), (Some("INPUT_INVALID"), Some("/1/bogus")));
+    let many = format!("[{}]", vec!["{\"name\":\"a\"}"; 9].join(","));
+    assert_eq!(fake.refused(&["touch", "--input", &many])["code"], "INPUT_TOO_LARGE");
+    assert_eq!(fake.refused(&["touch", "--input", "[]"])["code"], "INPUT_INVALID");
+    let nameless = fake.refused(&["touch", "--input", "[{\"name\":\"a\"},{}]"]);
+    assert_eq!((nameless["code"].as_str(), nameless["field"].as_str()), (Some("USAGE"), Some("/1/name")));
 }
 
 // ---- paging and projection ----
@@ -800,14 +817,14 @@ fn atip_checkl1_fake_the_l1_tool_passes_every_l0_check() {
 
 /// Every condition of the L1 checks the lead's checker judges (checker.md 6), as `<check>/<condition>`.
 fn conditions() -> BTreeSet<String> {
-    let table: [(&str, &[&str]); 30] = [
+    let table: [(&str, &[&str]); 31] = [
         ("tree", &["answered", "valid", "level", "groups-first", "unique-ids", "entry-path"]),
         ("no-state", &["answers-in-an-empty-directory", "writes-nothing"]),
         (
             "walk",
             &[
                 "answered", "valid", "kind", "group-path", "group-children", "rule-1", "rule-2-refs", "rule-2-compile",
-                "rule-2-outputs", "rule-3-defaults", "rule-3-domain-profile", "rule-3-domain-pattern",
+                "rule-2-outputs", "rule-3-defaults", "rule-3-domain-profile",
                 "rule-3-domain-compile", "rule-4-names", "rule-4-codes", "rule-4-relation-once", "rule-5", "rule-6",
                 "rule-7", "rule-9", "rule-10", "rule-11", "rule-13",
             ],
@@ -842,6 +859,7 @@ fn conditions() -> BTreeSet<String> {
         ("next", &["names-a-command", "read-next-not-usage"]),
         ("paging", &["returned-at-most-limit", "next-page-follows", "changed-filter-refused"]),
         ("fields", &["meta-fields", "no-unselected", "selected-present", "projected-schema", "unknown-path-refused"]),
+        ("hint-command", &["parses-as-a-command"]),
     ];
     table
         .iter()
@@ -890,10 +908,11 @@ fn probes(case: &Case) -> Vec<Vec<String>> {
         "registry/reserved-exit" => &[&["schema", "--errors"]],
         "warnings/unknown-code-refused" => &[&["schema", "--warning", "NOSUCH_XYZ"]],
         "warnings/meaning-agrees" => &[&["schema", "--warnings"]],
-        "groups-not-runnable/command-required" | "groups-not-runnable/expected-is-the-groups-verbs" => &[&["member"]],
+        "groups-not-runnable/command-required" => &[&["team"]],
+        "groups-not-runnable/expected-is-the-groups-verbs" => &[&["member"]],
         "help-line/mentions-schema" => &[&["--help"]],
         "defaults/help-agrees" => &[&["member", "list", "--help"]],
-        "deterministic/doc-bytes" => &[&["schema", "member", "list"]],
+        "deterministic/doc-bytes" => &[&["schema", "touch"]],
         "example-runs/not-usage" => &[&["member", "list", "--team", "ghost"]],
         "example-runs/exit-or-registered-code" => &[&["member", "search", "--filter", "{\"team\":\"ghost\"}", "--exact"]],
         "constraints/refused" => &[&["member", "search", "--exact"]],
@@ -906,6 +925,7 @@ fn probes(case: &Case) -> Vec<Vec<String>> {
         }
         "output-data/data-validates" | "output-data/schema-version" => &[&["member", "search", "cy", "--exact"]],
         "next/names-a-command" | "next/read-next-not-usage" => &[&["status"]],
+        "hint-command/parses-as-a-command" => &[&["member", "tag", "99", "--tag", "core"]],
         "paging/returned-at-most-limit" | "paging/next-page-follows" | "paging/changed-filter-refused" => {
             &[&["member", "list", "--team", "core", "--limit", "1"]]
         }
@@ -974,8 +994,10 @@ fn atip_checkl1_fake_every_seeded_case_changes_the_output_it_claims_to() {
             };
             // Two runs of the seeded tool differ (`deterministic`), or the seeded one differs from the conforming one.
             assert!(standard != other, "{} on {probe:?}: the seeded tool answers as the conforming one", case.condition);
-            // The answer of a seeded document is still an envelope (the help is text).
-            if !probe.iter().any(|word| word == "--help") {
+            // The answer of a seeded document is still an envelope (the help is text; the crash prints nothing).
+            if case.condition == "example-runs/exit-or-registered-code" && probe.first().map(String::as_str) != Some("schema") {
+                assert_eq!((other.0, other.1.as_str()), (1, ""), "the seeded run ends with exit 1 and no output");
+            } else if !probe.iter().any(|word| word == "--help") {
                 let document: Value = serde_json::from_str(&other.1).unwrap_or_else(|error| panic!("{}: {error}: {}", case.condition, other.1));
                 assert!(atip::envelope_problems(&document).is_empty(), "{}: {:?}", case.condition, atip::envelope_problems(&document));
             }
@@ -986,6 +1008,36 @@ fn atip_checkl1_fake_every_seeded_case_changes_the_output_it_claims_to() {
     writing.ok(&["schema"]);
     assert!(writing.dir().join("schema-cache.txt").exists());
     assert!(!conforming.dir().join("schema-cache.txt").exists());
+}
+
+#[test]
+fn atip_checkl1_fake_a_fixture_registry_read_from_the_schema_passes_l0_registry() {
+    let harness = Harness::new();
+    let config = l1_standard_config();
+    let mut fixture = harness.l1_fixture(&config);
+    fixture["registry"] = json!("from-schema");
+    fixture.as_object_mut().expect("object").remove("warnings");
+    let fixture_path = harness.write("fixture.json", &fixture);
+    let bin = l1_bin(&harness, &config);
+    let work = harness.path("cwd");
+    std::fs::create_dir_all(&work).expect("cwd");
+    let tmp = harness.path("tmp");
+    std::fs::create_dir_all(&tmp).expect("tmp");
+    let output = support::atip_in(
+        &work,
+        &tmp,
+        &[
+            "check",
+            "--bin",
+            bin.to_str().expect("utf8"),
+            "--level",
+            "L1",
+            "--fixture",
+            fixture_path.to_str().expect("utf8"),
+            "--json",
+        ],
+    );
+    assert_eq!(output.check("L0.registry")["result"], "pass", "{}", output.stdout);
 }
 
 #[test]
