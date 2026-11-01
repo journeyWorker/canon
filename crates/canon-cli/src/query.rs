@@ -713,6 +713,7 @@ fn change_record(raw: &RawRecord) -> Value {
 pub struct QueryReport {
     pub kind: &'static str,
     pub since: Option<String>,
+    /// The records in this answer: report content, not paging state (`meta.page` is the paging).
     pub count: usize,
     /// Records the tiers reported as violations and the query left out.
     pub violations: usize,

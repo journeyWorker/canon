@@ -117,8 +117,8 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("evidence approval-payload").out(&[artifact("application/octet-stream", "EvidenceApprovalPayloadReport")]),
     leaf("artifacts store").idem(ReplaySafe).out(&[report("ArtifactsStoreReport")]),
     leaf("export").idem(ReplaySafe).out(&[
-        when(artifact("application/json", "ExportReport"), "neither --output nor --dry-run is given"),
-        when(report("ExportWrittenReport"), "--output is given and --dry-run is not"),
+        when(artifact("application/json", "ExportReport"), "--dry-run is not given, and --output is not given or --json is not (in text mode the manifest goes to stdout or to the --output file)"),
+        when(report("ExportWrittenReport"), "--json and --output are given and --dry-run is not"),
         when(report("ExportPreviewReport"), "--dry-run is given"),
     ]),
     leaf("feature new").idem(Once).out(&[report("FeatureNewReport")]),

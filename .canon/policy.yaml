@@ -41,6 +41,13 @@ spec_coverage:
   # change blocks (0.13: canon's own 257 scenarios were reviewed to get here).
   require_review: {}
 
+# Evidence goes stale past this many commits behind HEAD. The default (50)
+# is smaller than one canon release (0.33: about 60 commits, 0.34: over 100),
+# so every release re-attested the whole suite. Changed files still make
+# evidence stale through the surface check; this is only the backstop.
+staleness:
+  max_commits_behind: 300
+
 
 # Authenticated risk approvals use external SSH trust. Uncomment and pin a
 # protected allowed-signers file (outside ordinary repo writes for production):

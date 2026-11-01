@@ -666,3 +666,81 @@ fn atip_paging_15_the_camel_case_alias_of_a_snake_case_key_and_the_snake_case_al
         assert!(!help.contains("camelCase and snake_case both match"), "{command}: {help}");
     }
 }
+
+#[test]
+fn atip_paging_16_a_batch_takes_no_fields_and_fields_is_a_flag_a_document_cannot_set() {
+    let repo = repo();
+    let before = snapshot(repo.path());
+    let (a, b) = (repo.path().join("a.json"), repo.path().join("b.json"));
+    let (a, b) = (a.to_str().unwrap(), b.to_str().unwrap());
+    // `--fields` is a flag: a `fields` key of a document is INPUT_INVALID / FLAG_ONLY_KEY, at plan time, whatever the element.
+    let batch = format!(r#"[{{"kind":"subject","output":"{a}"}},{{"kind":"subject","output":"{b}","fields":"id"}}]"#);
+    let refused = canon(repo.path(), &["export", "--json", "--input", &batch]);
+    let error = error_of(&refused);
+    assert_eq!((error["code"].as_str(), error["reason"].as_str(), error["field"].as_str()), (Some("INPUT_INVALID"), Some("FLAG_ONLY_KEY"), Some("/items/1/fields")), "{error}");
+    assert_ne!(error["code"], "BATCH_INCOMPLETE");
+    assert_eq!(snapshot(repo.path()), before, "nothing was written, the first element included: no file, no audit line");
+    // A single document is refused the same way.
+    let single = canon(repo.path(), &["export", "--json", "--input", r#"{"kind":"subject","fields":"id"}"#]);
+    let error = error_of(&single);
+    assert_eq!((error["code"].as_str(), error["reason"].as_str(), error["field"].as_str()), (Some("INPUT_INVALID"), Some("FLAG_ONLY_KEY"), Some("/fields")), "{error}");
+    // `--fields` on the command line of a batch is read against the batch output, which declares no fields: USAGE.
+    let plain = format!(r#"[{{"kind":"subject","output":"{a}"}},{{"kind":"subject","output":"{b}"}}]"#);
+    let error = error_of(&canon(repo.path(), &["export", "--json", "--input", &plain, "--fields", "id"]));
+    assert_eq!((error["code"].as_str(), error["field"].as_str()), (Some("USAGE"), Some("--fields")), "{error}");
+    assert_eq!(snapshot(repo.path()), before, "a refusal at plan time writes nothing");
+    // The same batch without `--fields` runs.
+    let ran = canon(repo.path(), &["export", "--json", "--input", &plain]);
+    assert!(ran.status.success(), "{}{}", String::from_utf8_lossy(&ran.stdout), String::from_utf8_lossy(&ran.stderr));
+    // The command document says so: the batch output has no `fields`, the option is flag only and the fragment has no `fields` key.
+    let doc = command_doc(repo.path(), "export");
+    let batch_output = doc["outputs"].as_array().unwrap().iter().find(|output| output["batch"] == true).unwrap();
+    assert!(batch_output.get("fields").is_none());
+    let option = doc["options"].as_array().unwrap().iter().find(|option| option["name"] == "fields").unwrap();
+    assert_eq!(option["flagOnly"], true);
+    let fragment = doc["input"]["schemaRef"].as_str().unwrap().trim_start_matches("#/schemas/");
+    assert!(doc["schemas"][fragment]["properties"].get("fields").is_none(), "the fragment holds no `fields`");
+    for command in SIX {
+        let doc = command_doc(repo.path(), command);
+        let option = doc["options"].as_array().unwrap().iter().find(|option| option["name"] == "fields").unwrap();
+        assert_eq!(option["flagOnly"], true, "{command}");
+    }
+}
+
+/// The cursor named in a text-mode listing (`... next cursor: <hex>  (rerun ...`), wherever it was printed.
+fn text_cursor(output: &Output) -> String {
+    let text = format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    let after = text.split("next cursor: ").nth(1).unwrap_or_else(|| panic!("a next cursor in {text}"));
+    after.split_whitespace().next().unwrap().to_string()
+}
+
+#[test]
+fn atip_paging_17_the_output_mode_does_not_bind_a_cursor_an_explicit_default_does_and_text_mode_checks_fields() {
+    let repo = repo();
+    // Issued in text mode, used with --json; issued with --json, used in text mode.
+    let text = canon(repo.path(), &["query", "--kind", "subject", "--limit", "1"]);
+    assert!(text.status.success(), "{}", String::from_utf8_lossy(&text.stderr));
+    let from_text = text_cursor(&text);
+    let with_json = json(&canon(repo.path(), &["query", "--kind", "subject", "--limit", "1", "--cursor", &from_text, "--json"]));
+    assert_eq!(with_json["ok"], true, "{with_json}");
+    assert_eq!(with_json["meta"]["page"]["returned"], 1);
+    let (_, from_json) = first_page(repo.path(), &["query", "--kind", "subject", "--json"]);
+    let in_text = canon(repo.path(), &["query", "--kind", "subject", "--limit", "1", "--cursor", &from_json]);
+    assert!(in_text.status.success(), "{}", String::from_utf8_lossy(&in_text.stderr));
+    assert_eq!(from_text, from_json, "the same call has the same cursor in either mode");
+    // An argument equal to its default still changes the call: `--repo .` is not the omitted `--repo`.
+    let (_, cursor) = first_page(repo.path(), &["query", "--kind", "subject", "--json"]);
+    let explicit = error_of(&canon(repo.path(), &["query", "--kind", "subject", "--repo", ".", "--limit", "1", "--cursor", &cursor, "--json"]));
+    assert_eq!((explicit["code"].as_str(), explicit["reason"].as_str()), (Some("CURSOR_INVALID"), Some("ARGUMENTS_CHANGED")), "{explicit}");
+    // `--fields` is read the same in text mode: an unknown path is USAGE, a declared one is accepted.
+    let before = snapshot(repo.path());
+    for args in [vec!["query", "--kind", "subject", "--fields", "nosuch"], vec!["finding", "list", "--change", "add-login", "--fields", "resolution_sha"], vec!["status", "--fields", "nosuch"]] {
+        let out = canon(repo.path(), &args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        assert!(out.stdout.is_empty(), "{args:?}: a refusal prints no report");
+        assert!(String::from_utf8_lossy(&out.stderr).contains("--fields"), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+    assert_eq!(snapshot(repo.path()), before);
+    assert!(canon(repo.path(), &["query", "--kind", "subject", "--fields", "subject_id"]).status.success());
+    assert!(canon(repo.path(), &["finding", "list", "--change", "add-login", "--fields", "summary"]).status.success());
+}
