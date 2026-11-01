@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T15:34:58.610973Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "01aa559313c2a5b88a2a4d834a6417f4969a3b90",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "c518cecd523d9dd4e9245880d0f6aa2c27e527e6",
+  "reviewer": "rev-constraints",
+  "round": 1,
+  "scenario_ids": [
+    "atip.constraints.11"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[spec fidelity] a negative 64-bit value written with a space (`--max-artifact-mib -9007199254740992`, `--limit -1`) is exit 2 USAGE but its `field` is the token clap reads as a flag (`-9`, `-1`), not the option (spec 7.1.1, brief F5 says the field is the argument); the `--opt=-N` form that scenario 11 and its test use names the option correctly; also `-0` is refused by the u64 options (`--interval-secs -0`, `retrieve --limit -0`) though it is in the declared domain and matches the contract's integer grammar; blast radius: every integer option, argv only",
+  "worktree_dirty": false
+}
