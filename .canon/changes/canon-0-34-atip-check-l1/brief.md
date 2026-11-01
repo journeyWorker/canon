@@ -31,7 +31,7 @@ waive:
 
 # atip check가 L1 검사를 돌리고 canon이 L1을 통과한다
 
-Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md §2-§7, spec 10.13, 17
+Source: https://github.com/journeyWorker/atip tag v1.1.2, approaches/checker.md §2-§7, spec 10.13, 17
 
 ## Intent
 
@@ -50,7 +50,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 2. F2 도구 작성자는 자기서술 검사 결과를 읽는다 → 트리, 그룹, 명령 문서, 레지스트리, 문법, 예시가 검증된다 → 어느 문서의 어느 규칙이 깨졌는지 안다.
 3. F3 도구 작성자는 인수 검사 결과를 읽는다 → 제약과 도메인과 검증자와 숫자 범위가 실제 호출로 시험된다 → 선언한 것을 파서가 거절하지 않으면 실패로 안다.
 4. F4 도구 작성자는 데이터 검사 결과를 읽는다 → 출력 스키마, 다음 단계, 쪽 나누기, `--fields`가 시험된다 → 보고서가 선언대로 나오는지 안다.
-5. F5 도구 작성자는 fixture에 L1 항목을 쓴다 → 검사가 필요한 호출이 있고 없음을 구분한다 → fixture를 빼서 통과할 수 없다.
+5. F5 도구 작성자는 fixture에 L1 항목을 쓴다 → 검사가 필요한 호출이 있고 없음을 구분하고, fixture에 올리지 않은 쓰기 명령은 보고에 이름으로 남는다 → fixture를 빼서 통과할 수 없고 올리지 않은 명령을 숨길 수도 없다.
 6. F6 검사기 개발자는 시험을 돌린다 → L1 검사마다 위반을 심은 가짜 도구가 그 검사만 실패시킨다 → 검사기를 믿을 수 있다.
 7. F7 canon 개발자는 CI에서 canon에 L1을 돌린다 → canon이 L1 검사를 모두 통과한다 → ==**0.34가 L1을 주장할 수 있다.**==
 
@@ -110,10 +110,11 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
   - 다른 답은 유니코드 판 차이일 때만 통과한다. 한 코드 포인트이고 패턴이 카테고리를 쓰며 두 엔진이 그 카테고리를 다르게 알 때다. 보고가 두 판과 코드 포인트를 적는다.
   - 그 밖의 불일치는 실패다.
 - `numbers`: `integer` 인수에 `9007199254740992`와 `-9007199254740992`를 주면 exit 2로 거절되고 반올림된 값으로 받아들여지지 않는다.
-- `validators`: 모든 검증자의 `rejects` 호출을 `setup` 없이 만든 fixture 환경의 사본에서 돌린다. exit 2와 선언한 `code`가 나오고 `field`가 검증자의 `arguments` 중 하나이고 아무것도 쓰이지 않는다.
+- `validators`: 모든 검증자의 `rejects` 호출을 `prepare`도 `setup`도 돌리지 않은 빈 디렉터리에서 돌린다. exit 2와 선언한 `code`가 나오고 `field`가 검증자의 `arguments` 중 하나이고 아무것도 쓰이지 않는다.
   - 검증자는 상태를 읽지 않고 모든 선행 조건보다 먼저 돈다(계약 10.8.3).
   - 저장소가 초기화되지 않았다는 코드처럼 선행 조건 코드가 검증자의 코드 대신 나오면 실패다.
-- 위 검사는 `read` 명령과 fixture의 `commands`에 올라 있는 쓰기 명령에만 호출을 만든다. 올라 있지 않은 쓰기 명령은 이 검사들이 제공되지 않음이다.
+- 위 검사의 대상 집합은 `read` 명령과 fixture의 `commands`에 올라 있는 쓰기 명령이다(계약의 표현). 올라 있지 않은 쓰기 명령은 이 집합 밖이다. 그래서 그 명령 때문에 검사가 제공되지 않음이 되지 않는다.
+- 검사기는 올라 있지 않은 쓰기 명령마다 이름을 보고에 정보로 싣는다. `constraints`, `domains`, `validators`의 보고에 `unlisted`가 있고 명령 id 목록이다. fixture가 쓰기 명령을 조용히 숨길 수 없다. 이 목록은 결과를 바꾸지 않는다.
 
 ### F4 데이터 검사
 
@@ -133,10 +134,13 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 ### F5 fixture
 
 - L1에서 읽는 키가 늘어난다. `commands`의 항목은 명령 id를 키로 하고 `ok`(통과 호출 목록), `missingValue`, `paged`(`nextCursor`를 돌려주는 호출 목록), `fields`(선택 목록), `domainRejects`(인수별 값 목록)를 가진다. `search`는 L2 키라 무시한다.
-- `prepare`는 L0의 키와 같다. 셸 없는 argv 배열 목록이고 `setup` 전에 템플릿에서 한 번 돈다. 부작용 기준선은 `prepare`와 `setup` 뒤에 잡고, `prepare`는 환경만 만든다. 0이 아닌 종료는 검사기 오류다. L1은 `prepare`가 만든 환경에서 `validators`가 `setup` 없이 돌 때도 같은 환경을 쓴다.
+- `prepare`는 L0의 키와 같다. 셸 없는 argv 배열 목록이고 `setup` 전에 템플릿에서 한 번 돈다. 부작용 기준선은 `prepare`와 `setup` 뒤에 잡고, `prepare`는 환경만 만든다.
+  - 0이 아닌 종료나 시험 대상 바이너리를 실행하는 `prepare` 단계는 `PREPARE_FAILED`(exit 2)다. 검사기 오류이고 보고가 모든 단계를 나열한다.
+  - 0이 아닌 종료로 끝나는 `setup` 단계는 `SETUP_FAILED`(exit 2)다. `FIXTURE_INVALID`와 같은 부류의 fixture 오류이고 어떤 검사 결과도 만들지 않는다.
+  - `validators`는 `prepare`와 `setup` 없이 빈 디렉터리에서 돌므로 두 단계의 영향을 받지 않는다.
 - `registry`에는 `"from-schema"`를 쓸 수 있다. 그러면 오류와 경고 레지스트리를 도구의 `schema --errors --json`과 `--warnings --json`에서 가져오고 fixture와 비교하지 않는다. canon의 fixture는 이 값을 쓸 수 있다.
 - 필요한 항목이 없고 관찰한 위반도 없으면 해당 검사는 제공되지 않음이고, MUST이면 레벨이 통과하지 못한다. 항목이 없어도 이미 관찰한 위반은 실패다.
-- 검사기는 fixture에 올라 있지 않은 `write`나 `destructive` 명령을 돌리지 않는다.
+- 검사기는 fixture에 올라 있지 않은 `write`나 `destructive` 명령을 돌리지 않고, 그 이름을 보고에 싣는다.
 
 ### F6 시험
 
@@ -145,7 +149,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
   - `--limit 0`을 받으면 `domains`, `9007199254740993`을 받으면 `numbers`, `^[a&&b]+$`를 선언하면 `patterns`.
   - 예시가 제약을 어기면 `examples`, 보고서에 필수 필드가 빠지면 `output-data`, `--fields`가 고르지 않은 멤버를 남기면 `fields`.
   - 힌트가 없는 명령을 가리키면 `hint-command`(권고만), 선행 조건 코드를 검증자보다 먼저 내면 `validators`.
-- 정규식 시험은 계약 저장소의 `scripts/regex-cases.json`을 쓴다. 두 엔진의 답이 그 기록과 같고, 기록된 유니코드 판 차이만 통과한다. 계약 저장소의 예시 `schema-*`는 `L1.tree`와 `L1.walk`가 통과시키고 `invalid/`의 L1 위반 예시는 거부한다. 사본은 태그 `v1.1.1`에 고정한다.
+- 정규식 시험은 계약 저장소의 `scripts/regex-cases.json`을 쓴다. 두 엔진의 답이 그 기록과 같고, 기록된 유니코드 판 차이만 통과한다. 계약 저장소의 예시 `schema-*`는 `L1.tree`와 `L1.walk`가 통과시키고 `invalid/`의 L1 위반 예시는 거부한다. 사본은 태그 `v1.1.2`에 고정한다.
 - 정상 가짜 도구는 L1의 적용되는 모든 검사를 통과한다. 검사기를 자기 자신에게 돌려도 통과한다. 검사기는 L0 도구이므로 `--level L0`이다.
 
 ### F7 canon에 대한 실행
@@ -166,15 +170,17 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 - F3:
   - 선언했지만 강제하지 않는 제약, 경계를 받아들이는 도메인, 거절하지 않는 `rejects`, 반올림해 받는 정수는 각 소유 검사만 실패한다. 다른 규칙도 같이 깨지는 제약은 `entailed`이고 레벨이 통과한다.
   - `^[a&&b]+$`와 `^\p{L}{1,500}$` 패턴은 `patterns`가 실패한다. 기록된 유니코드 판 차이는 통과하고 보고가 두 판을 적는다. 그 밖의 불일치는 실패다.
-  - 실패 경로: fixture에 올리지 않은 쓰기 명령은 돌리지 않고 해당 검사가 제공되지 않음이다.
-  - 검증자의 `rejects`를 초기화하지 않은 환경에서 돌렸을 때 선행 조건 코드를 내는 가짜 도구는 `validators`만 실패한다.
+  - 실패 경로: fixture에 올리지 않은 쓰기 명령은 돌리지 않는다. 그 때문에 `constraints`, `domains`, `validators`가 제공되지 않음이 되지 않고, 보고의 `unlisted`가 그 명령 id를 싣는다.
+  - 검증자의 `rejects`를 `prepare`와 `setup`이 없는 빈 디렉터리에서 돌렸을 때 선행 조건 코드를 내는 가짜 도구는 `validators`만 실패한다. `prepare`나 `setup`이 있는 fixture에서도 `rejects`는 그 단계 없이 돈다.
 - F4:
   - 필수 필드가 빠진 보고서는 `output-data`, 투영이 고르지 않은 멤버를 남기면 `fields`, 필터를 바꿔 쓴 cursor를 받아들이면 `paging`이 실패한다.
   - 실패 경로: `--fields`나 쪽 나누기를 제공하지 않는 도구에서 두 검사가 해당 없음이다. 쪽을 나누는 명령이 있는데 `paged` 호출도 관찰한 `nextCursor`도 없으면 `paging`은 제공되지 않음이다.
 - F5:
   - fixture에서 필요한 `commands` 항목을 빼면 해당 MUST 검사가 제공되지 않음이고 종료 코드는 1이다. 관찰한 위반은 실패다.
   - 모양이 틀린 fixture는 exit 2, `FIXTURE_INVALID`다.
-  - 실패 경로: 0이 아닌 종료 값으로 끝나는 `prepare`는 exit 2, `PREPARE_FAILED`이고 어떤 검사 결과도 만들지 않는다. `prepare`가 만든 파일은 효과 판정(`L1.validators`의 아무것도 쓰이지 않는다는 조건 포함)에서 변화로 세지 않는다.
+  - 실패 경로: 0이 아닌 종료 값으로 끝나는 `prepare` 단계, 시험 대상 바이너리를 실행하는 `prepare` 단계는 exit 2, `PREPARE_FAILED`이고 어떤 검사 결과도 만들지 않는다. `prepare`가 만든 파일은 효과 판정에서 변화로 세지 않는다.
+  - 실패 경로: 0이 아닌 종료 값으로 끝나는 `setup` 단계는 exit 2, `SETUP_FAILED`이고 `data.checks`에 검사 결과가 하나도 없다. 도구 실패로 보고되지 않는다.
+  - fixture가 쓰기 명령 하나를 `commands`에 올리지 않으면, 검사기는 그 명령을 돌리지 않고 보고에 이름을 싣는다. 그 때문에 어떤 검사도 제공되지 않음이 되지 않는다.
 - F6:
   - ==**L1 검사 id 31개 모두에 대해 위반 설정 시험이 있다.**== 그 검사 하나만 실패한다.
   - 정규식 기록의 모든 사례에서 두 엔진의 답이 기록과 같다. 정상 가짜 도구와 검사기 자신이 통과한다.
@@ -186,10 +192,12 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 ## Questions and assumptions
 
 - 계약 저자가 정했다. `atip check`는 L1을 연다. `L1.patterns`의 ECMAScript 엔진은 `regress` 크레이트 같은 것을 이 변경에서 검토한다.
-- 가정: 1.1 주장의 L1에서 적용되는 L1 검사는 31개이고 MUST 25개, SHOULD 6개다. 검사기 문서 v1.1.1의 L1 표를 센 것이다. canon은 경고 레지스트리, 쪽 나누기, `--fields`를 모두 제공하므로 조건부 검사 셋이 모두 적용된다.
-- 계약 저자가 정했다. 계약 1.1.1은 패치이고 `meta.contractVersion`은 `"1.1"`로 남는다. 1.1.0 검사기를 통과한 도구도 1.1.1 규칙을 이미 지켜야 했다. 단 `L1.validators`는 `setup` 없이 돌고, `L0.page`와 `L1.paging`은 `paged` 호출이 없으면 제공되지 않음이다.
+- 가정: 1.1 주장의 L1에서 적용되는 L1 검사는 31개이고 MUST 25개, SHOULD 6개다. 검사기 문서 v1.1.2의 L1 표를 센 것이다. canon은 경고 레지스트리, 쪽 나누기, `--fields`를 모두 제공하므로 조건부 검사 셋이 모두 적용된다.
+- 계약 저자가 정했다. 계약 1.1.2는 1.1.1 위의 엄격한 패치이고 `meta.contractVersion`은 `"1.1"`로 남는다. 1.1.1 검사기를 통과한 도구는 1.1.2에서도 통과한다. 단, 쪽 나누기 `--cursor x`에 종료 0이나 다른 코드로 답하는 L0 명령은 쪽 나누기로 읽혀 `paged`가 필요하다.
+- 계약 저자가 정했다. `prepare`는 아무 프로그램의 argv 배열이고 셸이 없다. `setup` 전에 한 번 돌고 `env`를 쓴다. 단계가 실패하거나 시험 대상 바이너리를 실행하면 fixture 오류이고, `setup` 단계의 실패도 fixture 오류다. 부작용 기준선은 둘이 끝난 뒤에 잡고, `L1.validators`는 `prepare` 없이 돈다.
+- 가정: `setup` 실패의 이름은 `SETUP_FAILED`(exit 2)로 정하고 `FIXTURE_INVALID`와 같은 부류로 둔다. 계약은 이름을 정하지 않았다.
 - 가정: 정규식 엔진은 `regress`를 먼저 평가한다. ECMAScript `u`와 맞는지는 계약 저장소의 기록(`regex-cases.json`)으로 증명한다. 안 맞으면 다른 엔진으로 바꾸고 이유를 보고한다. 계약 저자의 답이 정한 범위다.
-- 가정: 검사기는 canon의 쓰기 명령 일부만 fixture에 올린다. 올리지 않은 쓰기 명령의 제약, 도메인, 검증자는 canon 자신의 테스트(`constraints_hold`)가 증명한다. 계약의 소유 분담과 같다.
+- 가정: 검사기는 canon의 쓰기 명령 일부만 fixture에 올린다. 올리지 않은 쓰기 명령은 계약상 이 검사들의 대상 집합 밖이다. 검사기가 보고에 이름을 싣고, 그 명령의 제약, 도메인, 검증자는 canon 자신의 테스트(`constraints_hold`)가 증명한다.
 - 가정: 검사 id마다 소유하는 판정이 하나이므로 L1에서도 한 위반은 한 검사만 실패시킨다.
 - 가정: L2 검사는 0.35에 온다. `L2.input-usage`도 그때다.
 - 정책 질문은 없다. CI 잡의 레벨 주장은 gate가 요구하는 것을 바꾸지 않는다.
