@@ -4,13 +4,15 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.34.0 — 2026-11-02
+
+canon adopts atip/1 1.1.2 and meets its L1: `canon schema` is the contract's self-description, every argument declares its constraints, domain and validators, paging cursors and `--fields` follow the contract, and `atip check` runs the 28 L0 and 31 L1 checks.
+
 ### Breaking
 
-canon follows atip/1 **1.1.1** (the patch that makes the contract's own schema refuse a written-out `contractVersion` of `"1.0"`; `meta.contractVersion` stays `"1.1"`). The vendored `envelope.schema.json` is the v1.1.1 one; the other contract schemas are the v1.1.0 ones, which 1.1.1 did not change, and `atip::envelope_problems` no longer checks `"1.0"` beside the schema.
+canon adopts atip/1 **1.1.2** (https://github.com/journeyWorker/atip: spec 6.6, 7.1 to 7.6, 9.13, 10.1 to 10.13, 15.6, 15.7; `meta.contractVersion` stays `1.1`). The vendored contract schemas in `crates/atip/schema/` are the v1.1.0 ones, except `envelope.schema.json` (v1.1.1, which makes the schema itself refuse a written-out `"1.0"`), pinned by digest; `atip::envelope_problems` no longer checks `"1.0"` beside the schema. The 0.33 names below are deleted, with no aliases; every consumer in this repository (the guides the binary carries, the website in English and Korean, the dashboard, the npm launcher, the dogfood trace check, the conformance corpus, the command spec and the scenario sentences) moved to the new names in the same change. A caller written for 1.0 reads `meta.contractVersion` first; a caller that ignores unknown members (the contract requires it, 15.6) keeps working.
 
-canon adopts atip/1 **1.1** (https://github.com/journeyWorker/atip, tag v1.1.0: spec 6.6, 7.1 to 7.6, 9.13, 10.1, 15.6, 15.7). The 0.33 names below are deleted, with no aliases; every consumer in this repository (the guides the binary carries, the website in English and Korean, the dashboard, the npm launcher, the dogfood trace check, the conformance corpus, the command spec and the scenario sentences) moved to the new names in the same change. A caller written for 1.0 reads `meta.contractVersion` first; a caller that ignores unknown members (the contract requires it, 15.6) keeps working.
-
-**The envelope and `schema`.** The vendored contract schemas in `crates/atip/schema/` are the v1.1.0 ones, byte for byte, pinned by digest.
+**The envelope and `schema`.**
 
 | 0.33 | 0.34 |
 |---|---|
@@ -35,8 +37,6 @@ These codes are in both registries, with the same meaning, because the same situ
 | `x-canon.reason` `batch-unsupported` | `BATCH_UNSUPPORTED` |
 | a fault in the document (pointer `field`) had no reason | `UNKNOWN_KEY` (a key that is no option of the command), `FLAG_ONLY_KEY` (a key that names a flag-only option), `INVALID_VALUE` (a value of the wrong type, outside its closed set, or `null`) |
 | `INPUT_TOO_LARGE` had none | `TOO_MANY_BYTES` (the source is over 8 MiB), `TOO_MANY_ITEMS` (a batch is over 10000 items) |
-
-**Refusals write nothing.** A refusal changes nothing (spec 8.2), `.git` included: the code tree that `gate check`, `evidence add` and the commands that bind a commit compute is built in a scratch object directory, so none of them leaves a blob or a tree in `.git/objects` any more. `canon trace` refuses before it writes `.canon/index`.
 
 **Wrong calls.**
 
@@ -86,8 +86,6 @@ A hint is now exactly one of a command line, a template with `<UPPER_CASE>` plac
 | `--as` and `--skills-source` read `CANON_ROLE` and `CANON_SKILLS_SOURCE` without saying so | each command's document declares the variables it reads: `env: "CANON_ROLE"` on `--as` and on attribution `--role`, `env: "CANON_SKILLS_SOURCE"` on `--skills-source` of `skills install`, `skills check` and `skills doctor`, `env: "CANON_ACTOR"` on `--actor` of `brief approve`, `migrate` and `policy approve` (spec 16.3) |
 | `canon schema` warned `UNKNOWN_ROLE_IGNORED` about a bad `CANON_ROLE` | `canon schema` does not read `CANON_ROLE` at all (spec 10.2.2, 16.3): its `--as` declares no `env`, and the answer is byte-equal with and without the variable. `canon context` and `canon skills show` still warn |
 | `skills install|check|doctor --providers` had no `defaultNote` although the help describes the default | `defaultNote` says how it is found |
-
-The shared part of the projection is in the `atip` crate (`atip::doc`: the typed documents, with their JSON Schema; `atip::project`: the tree and its paths, value types, typed defaults, the `--input` fragment schema, the schemas a command carries, the help line, and clap's declared relations). canon's own tables (`effect`, `idempotency`, error codes, outputs, roles, examples) stay in `canon-cli`.
 
 **`atip check`.** The `atip-check` crate (19 L0 checks in 0.33) now runs the 28 L0 checks of atip/1 1.1 (https://github.com/journeyWorker/atip, tag v1.1.0, `approaches/checker.md`). A fixture written for 0.33 needs the changes below; nothing is read under the old name.
 
@@ -158,8 +156,6 @@ A batch runs the whole stateless stage on every element (domains, constraints, v
 
 The 64-bit integer options are `--max-artifact-mib` (`artifacts store`, `evidence add`, `evidence audit`, `review scenario`, `review change`), `--interval-secs` (`ingest sessions`, `ingest records`), the paging `--limit` (`query`, `export`, `finding list`, `divergence list`) and `retrieve --limit`. The 32-bit and 16-bit options (`--round`, `--seq`, `--port`, `--expand`, `--timeout`, `search --limit`) are bounded by their Rust type, which their `domain` states; nothing new is refused for them.
 
-The conformance corpus was regenerated and differs in eight expectations: three command documents of `schema` (they carry `constraints`, `validators` and `domain`) and five refusals of `evidence add` (they carry `field`).
-
 The relations declared in 0.34 (every command with a rule or a validator; a domain is listed in `canon schema <command> --json` under the option):
 
 | Command | Constraints and validators |
@@ -222,29 +218,33 @@ The relations declared in 0.34 (every command with a rule or a validator; a doma
 | `export`'s `when` said the manifest was the answer when neither `--output` nor `--dry-run` was given | `ExportReport` is the answer when `--dry-run` is not given and `--output` is not given or `--json` is not (in text mode the manifest goes to stdout, or to the `--output` file); `ExportWrittenReport` when `--json` and `--output` are given and `--dry-run` is not; `ExportPreviewReport` with `--dry-run`. `export --fields` help says which output it is read against |
 | `query`'s `data.count` and `export`'s `data.recordCount` look like `meta.page.returned` | unchanged, and deliberate: they are report content (the records of the answer), not paging state; removing them would break consumers for no gain. The reports hold no `page`, `nextCursor`, `returned`, `hasMore` or `meta` member |
 
-`canon query --kind <k>` and the other five outputs are checked by `tests/atip_paging_fields.rs`: every declaration against spec 10.13 rule 11 (projectable cut nodes, every path a member of the record schema, arrays crossed only with `[]`), seeded violations of each rule, and a projected answer of each output against its published schema.
 
 ### Added
-
-- Fixture keys (all optional; L1 and L2 keys such as `fields`, `domainRejects` and `search` are still ignored at L0): `contractVersion`, `globalOptions` (tool-wide options with a value, each an argv fragment such as `["--repo", "."]`), `warnings` (warning code names) and `commands`, an object keyed by command id whose entries hold `ok` (invocations that succeed, run in JSON mode; the checker reads their `meta.next` and `meta.page`), `refused` and `missingValue` (the invocation with one required value left out).
-- `L0.no-prompt` runs each `missingValue` twice: with stdin closed (the control run), then with stdin and stdout on one pseudo-terminal in canonical mode with echo off and output untranslated, with the deadline twice the control run's time plus two seconds (at most the fixture's time limit). A tool that refuses like the control run passes; one still running at the deadline that ends or prints within two seconds of the end-of-file character, or that has printed a prompt, fails; one that is merely slow and silent is `unprovided`. The terminal output is read to its end and the tail of a long one stays in the report.
-- `L0.registry` compares `schema --errors --json`, `--error <CODE>` and, for a 1.1 claim, `--warnings --json` and `--warning <CODE>` with the fixture (codes, exits, `retryable`, reason names, warning codes), validates each entry against the `registry-entry` and `warning-entry` schemas, requires every code, reason and warning code any invocation emitted to be registered, and requires `schema --error <warning-only code>` to refuse with the hint `<tool> schema --warning <CODE> --json`. A tool without `schema --errors` is `unsupported` (does not apply).
-- `L0.refusal-effects` also compares what the fixture's `probe` reports before and after a refused invocation (a probe whose answer differs between two untouched copies is not held against the tool).
-- `L0.next` and `L0.page` apply to canon: the checker reads the `meta.next` and `meta.page` of every answer of the run, including the `ok` invocations of the fixture, and asks each fixture command for `--cursor x` to learn whether it pages (a tool that pages but whose fixture lists no paging call is `unprovided`).
-- The contract repository's examples are test input, pinned at tag v1.1.0: `report-*`, `schema-error*`, `schema-warning*` and `stream-*` (`crates/atip-check/tests/fixtures/atip-examples/`, with `TABLE.md` saying what each should do).
-- The fake tool of the checker's tests has a seeded violation for every pass condition of the 28 checks (about seventy), and each is required to fail exactly its owner; a violation that two checks report fails the suite.
-
-- Fixture keys for L1: in `commands.<id>`, `paged` (invocations that return `meta.page.nextCursor`), `fields` (selections, each a list of field paths: include a nested path, an `[]` path and, for a map, a key) and `domainRejects` (per argument, values outside a `pattern` or a structural domain); at the top, `prepare` (argv arrays of any program, no shell, run once in the template directory before `setup` with `env` applied: environment preparation such as `git init` and an empty commit, never judged as a refusal effect) and `"registry": "from-schema"`. A missing entry makes the checks that need it `unprovided`; a violation the run observed is still `fail`. Unknown members of `commands` (`batchFailsAt`, `search`, ...) are L2's and ignored.
-- `L1.validators` runs every `rejects` invocation in a copy of the fixture state made without `setup` (the fixture's environment only), because a validator reads no state (spec 10.8.3): a tool that answers a precondition code there fails.
-- The checker's tests plant one violation per pass condition of the 31 L1 checks (about a hundred and ten) in the fake tool (`atip-fake-tool` is now also a conforming L1 tool: a grouped tree, command documents derived from one model the enforcement is derived from, a paging and projecting command, a command with constraints of every kind, domains and a validator, a batch write); each is required to fail exactly its owner. The ECMAScript and Rust engines answer every case of `scripts/regex-cases.json` as recorded, and the contract's `schema-*` examples and the data examples (`report-*` with `--fields`) are judged by the same functions a run calls (`tests/l1_examples.rs`), each rejected by the checks of its row and no other.
-- CI job `atip-l1` and `just atip` run `atip check --level L1` on the canon binary. canon meets L1 with one SHOULD advisory: `L1.one-meaning-values` reports that `--kind` takes disjoint value sets on `gate promote` (`evidence`, `finding`, `divergence`) and `purge` (`session`, `run`, `event`, `trajectory`). Both sets are subsets of the record-kind enum of `query` and `export`, which spec 9.6 allows, so it is left as is.
-- `atip check --help` names every fixture key it reads (`prepare` and `paged` among them). `L1.next` follows at most 300 `meta.next` entries of read commands and says in its notes how many it left.
+- `atip check --level L1` (31 checks over `canon schema`, arguments and data) and 28 L0 checks for a 1.1 claim; `--contract <MAJOR.MINOR>`; `data.contractVersion` and `data.prepare` in a run; the reasons `PREPARE_FAILED` and `SHOULD_FAILED` (warning).
+- Fixture keys (all optional): `contractVersion`, `globalOptions`, `warnings`, `registry: "from-schema"`, `prepare`, and in `commands.<id>`: `ok`, `refused`, `missingValue`, `paged`, `fields`, `domainRejects`. A missing entry makes the checks that need it `unprovided`; a violation the run observed is still `fail`. `atip check --help` names every key.
+- `L0.no-prompt` runs each `missingValue` on a pseudo-terminal; `L0.registry` compares the registry, the warning registry and the reasons with the fixture and requires every emitted code, reason and warning to be registered; `L0.refusal-effects` compares the fixture's `probe` before and after a refusal.
+- `L1.validators` runs every `rejects` call without `setup`; `L1.next` follows at most 300 `meta.next` entries of read commands and says how many it left.
+- `canon schema --warnings`, `--warning <CODE>`, `reasons` in registry rows, `constraints`, `domain` and `validators` in every command document, `outputs[].fields`, `meta.fields`.
+- CI job `atip-l1` and `just atip` run L1 on the canon binary. canon meets L1 with one SHOULD advisory: `L1.one-meaning-values` reports that `--kind` takes disjoint value sets on `gate promote` and `purge`; both are subsets of the record-kind enum of `query` and `export`, which spec 9.6 allows.
+- The contract repository's examples (tag v1.1.0, `crates/atip-check/tests/fixtures/atip-examples/`) and about 180 planted violations of the fake tool `atip-fake-tool` (now also a conforming L1 tool) are test input; each violation must fail exactly its owner.
 
 ### Changed
+- canon's fixture (`crates/canon-cli/tests/atip/canon.fixture.json`) claims 1.1 and serves L0 and L1: `prepare` makes a git repository with one empty commit, `setup` creates two subjects, a change with two findings and two scenarios with a divergence each, `commands` lists `paged` and `fields`; `registry` and `warnings` are generated from `canon schema` (`CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it). `atip`'s own fixture (`crates/atip-check/atip.fixture.json`) claims 1.1.
+- The shared part of the schema projection is in the `atip` crate (`atip::doc`, `atip::project`, `atip::fields`); canon's tables (`effect`, `idempotency`, error codes, outputs, roles, examples) stay in `canon-cli`.
+- The conformance corpus was regenerated; the new expectations are `atip-1-1-*`, the `schema` command documents and five `evidence add` refusals (they carry `field`).
 
-- canon's fixture (`crates/canon-cli/tests/atip/canon.fixture.json`) claims 1.1: `contractVersion`, `setup` that creates two subjects (so a listing has a second page), `globalOptions` (`--repo .`), `commands` (`query --kind subject --limit 1` for the page and the next step, `status`, and `finding close` without `--seq` for `missingValue`), and a `registry` and `warnings` generated from `canon schema --errors --json` and `--warnings --json` (`CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it). CI job `atip-l0` and `just atip` run unchanged; they are green when the binary prints the 1.1 output of 0.34 and canon passes every applicable check (26 for canon: `L0.usage-hint` observes no `USAGE` without a `field` and is `unsupported`).
-- `atip`'s own fixture (`crates/atip-check/atip.fixture.json`) claims 1.1, declares the checker's reasons and its warning `SHOULD_FAILED`, and holds the refusal and the missing value of `atip check`.
-- canon's fixture also serves L1: `prepare` makes a git repository with one empty commit (findings and divergences refuse `NO_COMMIT` without one), `setup` creates two subjects, a change with two findings and two scenarios with a divergence each (so `query`, `finding list` and `divergence list` have a second page), and `commands` lists `paged` and `fields` for the three that page and `--fields`. The `domainRejects` of the arguments whose domains have a pattern come with `canon-0-34-atip-constraints`.
+### Fixed
+- A refusal changes nothing (spec 8.2), `.git` included: the code tree that `gate check`, `evidence add` and the commands that bind a commit compute is built in a scratch object directory, so none of them leaves a blob or a tree in `.git/objects`; `canon trace` refuses before it writes `.canon/index`.
+- Handler refusals of a declared relation, domain or validator now name the option in `field`, and `EVIDENCE_APPROVAL_INVALID` from the arguments alone answers in a directory with no repository.
+
+### Upgrading
+- Read `meta.contractVersion` (`1.1`) before the 1.1 names; ignore members and enum values you do not know.
+- Look a warning code up with `canon schema --warning <CODE> --json`, not `--error`; an unknown code is `USAGE`, not `UNKNOWN_ERROR_CODE`.
+- Read `error.reason` (`UNREADABLE`, `STDIN_TTY`, `EMPTY`, `NOT_JSON`, `NOT_OBJECT`, `BATCH_UNSUPPORTED`, ...) instead of `error.x-canon.reason`.
+- Read `canon schema` with the new names (the first table of the `canon schema` section); `docs/cli/canon.cli.json` is `specVersion` `"2"`.
+- Spell `--fields` paths as the member's own key (`change_ids` for a record, `resolutionSha` for a report), drop `--fields` from `--input` documents and from batches, and start a listing again without `--cursor` if the cursor came from 0.33 or earlier.
+- Fix the calls now refused: `export --after` later than `--before`, integer options above 2^53-1.
+- An `atip check` fixture written for 0.33: replace `registry` and `warnings` prose rows by names (or `"registry": "from-schema"`), add `contractVersion`, and expect `FIXTURE_INVALID` for a row with `meaning` or `fix`.
 
 ## 0.33.0 — 2026-11-01
 
