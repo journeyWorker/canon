@@ -224,14 +224,23 @@ pub fn drive_domain(doc: &Value, argument: &Value) -> Vec<String> {
         }
         let words = words_of(doc, &provision.example, &assignment);
         if code == "USAGE" {
+            // clap's value parser first, in process; a value it accepts is then asked of the binary (a handler's own USAGE).
             match (inside, rule_support::clap_refusal(&words)) {
-                (false, None) => problems.push(format!("{tag}: `{}` was accepted", words.join(" "))),
-                (false, Some((blamed, message))) if !blames(&blamed, name, value_name) => problems.push(format!("{tag}: refused for something else: {message}")),
-                (true, Some((blamed, message))) if blames(&blamed, name, value_name) => problems.push(format!("{tag}: `{}` was refused for it: {message}", words.join(" "))),
-                (true, Some((_, message))) => problems.push(format!("{tag}: the call is refused for something else: {message}")),
-                _ => {}
+                (false, Some((blamed, message))) if !blames(&blamed, name, value_name) => {
+                    problems.push(format!("{tag}: refused for something else: {message}"));
+                    continue;
+                }
+                (true, Some((blamed, message))) if blames(&blamed, name, value_name) => {
+                    problems.push(format!("{tag}: `{}` was refused for it: {message}", words.join(" ")));
+                    continue;
+                }
+                (true, Some((_, message))) => {
+                    problems.push(format!("{tag}: the call is refused for something else: {message}"));
+                    continue;
+                }
+                (false, Some(_)) => continue,
+                (_, None) => {}
             }
-            continue;
         }
         let outcome = run_call(&provision, home(), &words, declared_role(path, &assignment));
         let names = [format!("--{name}"), name.to_string(), format!("<{value_name}>"), value_name.to_string()];

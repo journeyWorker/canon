@@ -575,12 +575,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     if args.round == 0 || args.seq == 0 {
         return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
             args.round, args.seq
-        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding add", args.json);
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding add", args.json);
     }
 
     for (flag, value) in [("--actor", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
-            return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag).emit("canon finding add", args.json);
         }
     }
 
@@ -597,7 +597,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
         ("--actor", Some(args.actor_id.as_str())),
     ] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
+        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag).emit("canon finding add", args.json);
     }
 
     // The coherence pair, as a NAMED diagnostic rather than a second
@@ -880,7 +880,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     if args.round == 0 || args.seq == 0 {
         return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
             args.round, args.seq
-        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding close", args.json);
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding close", args.json);
     }
 
     // The same coherence pair `add` enforces, in this command's own
