@@ -258,8 +258,8 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   has blockers; the approval step appears only when the brief is clean and
   unapproved.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
-  for everything), and project fields with `--fields a,b` (`status`, `export`,
-  `query`, `finding list`, `divergence list`, `context`).
+  for everything); a cursor holds only for the call that issued it, so change nothing but `--limit`, `--all` and `--fields` (`CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED` otherwise). Project fields with `--fields a,b`
+  (`status`, `export`, `query`, `finding list`, `divergence list`, `context`): the paths `canon schema <command> --json` lists under `outputs[].fields`, spelled as the answer spells them; `meta.fields` lists what was kept.
 - `--override-reason <text>` is the only way to proceed past a waivable
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`
   for the human. There is no `--force`. `brief approve`, `policy approve`,

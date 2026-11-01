@@ -540,16 +540,6 @@ pub struct FindingListReport<'a> {
 
 impl crate::reports::Report for FindingListReport<'_> {}
 
-/// `canon finding list --fields`: each finding keeps only the requested members.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FindingListFieldsReport<'a> {
-    pub change_id: &'a str,
-    pub findings: Vec<crate::json_out::Projected<FindingRow<'static>>>,
-}
-
-impl crate::reports::Report for FindingListFieldsReport<'_> {}
-
 /// `canon finding add` (module doc). Returns the process exit code.
 ///
 /// Order matters and is not incidental: every refusal below happens
@@ -1086,7 +1076,7 @@ pub struct FindingListArgs {
     pub json: bool,
     pub page: crate::paging::Page,
     /// `--fields`: the row fields `--json` keeps.
-    pub fields: Option<Vec<String>>,
+    pub fields: Option<String>,
 }
 
 /// The current version of every committed finding on `change_id`, one
@@ -1141,14 +1131,10 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
     if args.open {
         findings.retain(|f| f.disposition() == FindingDisposition::Open);
     }
-    if let Some(requested) = &args.fields {
-        let known: std::collections::BTreeSet<String> = LIST_FIELDS.iter().map(std::string::ToString::to_string).collect();
-        if let Err(e) = crate::paging::check_fields("canon finding list", requested, &known) {
-            return e.emit("canon finding list", args.json);
-        }
+    if let Err(e) = crate::fields::select("finding list", args.fields.as_deref(), None) {
+        return e.emit("canon finding list", args.json);
     }
-    let scope = format!("finding list:{}", args.change_id);
-    let (findings, meta) = match crate::paging::paginate(&scope, findings, |f| format!("{}-{}", f.round, f.seq), &args.page) {
+    let (findings, meta) = match crate::paging::paginate("finding list", findings, |f| format!("{}-{}", f.round, f.seq), &args.page) {
         Ok(paged) => paged,
         Err(e) => return e.emit("canon finding list", args.json),
     };
@@ -1165,15 +1151,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
             file_ref: f.file_ref.as_deref(),
             reason: f.reason.as_deref(),
         });
-        match &args.fields {
-            Some(fields) => {
-                let findings = rows
-                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a finding row serializes"), fields)))
-                    .collect();
-                crate::json_out::data_with_meta("finding list", &FindingListFieldsReport { change_id: args.change_id.as_str(), findings }, meta.to_json());
-            }
-            None => crate::json_out::data_with_meta("finding list", &FindingListReport { change_id: args.change_id.as_str(), findings: rows.collect() }, meta.to_json()),
-        }
+        crate::json_out::data_with_meta("finding list", &FindingListReport { change_id: args.change_id.as_str(), findings: rows.collect() }, meta.to_json());
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
@@ -1188,9 +1166,6 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
     }
     0
 }
-
-/// The JSON fields of one `finding list` row, which `--fields` may name.
-const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolutionSha", "fileRef", "reason"];
 
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded and carries the

@@ -116,7 +116,11 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("evidence audit").idem(ContentKeyed).out(&[report("EvidenceAuditReport")]),
     leaf("evidence approval-payload").out(&[artifact("application/octet-stream", "EvidenceApprovalPayloadReport")]),
     leaf("artifacts store").idem(ReplaySafe).out(&[report("ArtifactsStoreReport")]),
-    leaf("export").idem(ReplaySafe).out(&[artifact("application/json", "ExportReport")]),
+    leaf("export").idem(ReplaySafe).out(&[
+        when(artifact("application/json", "ExportReport"), "neither --output nor --dry-run is given"),
+        when(report("ExportWrittenReport"), "--output is given and --dry-run is not"),
+        when(report("ExportPreviewReport"), "--dry-run is given"),
+    ]),
     leaf("feature new").idem(Once).out(&[report("FeatureNewReport")]),
     leaf("finding add").idem(ContentKeyed).out(&[report("FindingAddReport")]),
     leaf("finding close").idem(ReplaySafe).out(&[report("FindingCloseReport")]),

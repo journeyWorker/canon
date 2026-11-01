@@ -131,7 +131,7 @@ pub struct FindingListArgs {
     pub repo: crate::cli::RepoArgs,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref; camelCase and snake_case both match
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of each finding (comma-separated field paths: severity, disposition, reviewer, summary, resolutionSha, fileRef, reason; round and seq are always kept)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }

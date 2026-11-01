@@ -76,9 +76,9 @@ pub struct StatusArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// With --json, keep only these top-level report fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of the report (comma-separated field paths; `canon schema status --json` lists them under outputs[].fields.paths)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -88,9 +88,9 @@ pub struct ContextArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these sections of the surface (comma-separated field paths; `canon schema context --json` lists them under outputs[].fields.paths)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -163,9 +163,9 @@ pub struct QueryArgs {
     /// Return at most this many records per page, `--cursor` to continue, `--all` for every record
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of each record (comma-separated field paths; `canon schema query --json` lists them under outputs[].fields.paths)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -225,9 +225,9 @@ pub struct ExportArgs {
     pub include_sensitive: bool,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,
     #[command(flatten)]

@@ -1,21 +1,29 @@
-//! Bounded collections and field projection (0.20 D4).
+//! Bounded listings (0.20 D4; the cursor is bound to its call since 0.34, atip/1 spec 6.9).
 //!
 //! `query`, `finding list`, `divergence list` and `export` return at most
 //! `--limit` records (default [`DEFAULT_LIMIT`]); `--all` lifts the bound and
 //! `--cursor` resumes after the last record of the previous page. The JSON
 //! `meta.page` carries `returned`, `total` and, while more remain,
 //! `nextCursor` (and `meta.next` the same call with it); human mode ends with
-//! a line naming the next cursor when more remain.
+//! a line naming the next cursor when more remain. Field selection (`--fields`)
+//! is [`crate::fields`].
 //!
-//! A cursor is opaque to the caller. It names the command and kind it came
-//! from (`scope`) and the key of the last record it returned, so it stays
-//! valid while the result set is unchanged and is refused (`CURSOR_INVALID`)
-//! when handed to a different listing or when that record is gone.
+//! A cursor is opaque to the caller. It names the command (`scope`), a digest
+//! of every argument of the call that issued it except `--limit`, `--all`,
+//! `--cursor` and `--fields` (the binding, [`bind_arguments`]) and the key of
+//! the last record it returned. A call with another cursor is refused
+//! (`CURSOR_INVALID`, exit 2, nothing written) with the reason that says why:
+//! `FOREIGN` (not a cursor this command issued), `ARGUMENTS_CHANGED` (issued for
+//! other arguments, so a changed filter never skips or repeats a record without
+//! saying so) or `EXPIRED` (issued for these arguments, but the record it points
+//! after is gone).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::sync::OnceLock;
 
-use clap::Args;
+use clap::{Args, ArgMatches, Command};
 use serde_json::{json, Value};
+use sha2::{Digest as _, Sha256};
 
 use crate::cli_error::{CliError, CliErrorExt as _};
 
@@ -24,6 +32,9 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 pub const DEFAULT_LIMIT: usize = 100;
 
 const SEPARATOR: char = '\u{1f}';
+
+/// The options that change how much of a listing one call returns, never which records it lists: a cursor is not bound to them.
+const PAGING_ARGS: [&str; 4] = ["limit", "all", "cursor", "fields"];
 
 /// The paging flags shared by every bounded listing.
 #[derive(Args, Debug, Clone, Default)]
@@ -42,8 +53,44 @@ pub struct PageFlags {
 impl PageFlags {
     pub fn page(&self) -> Page {
         let limit = if self.all { None } else { Some(self.limit.map_or(DEFAULT_LIMIT, |n| usize::try_from(n).unwrap_or(usize::MAX))) };
-        Page { limit, cursor: self.cursor.clone() }
+        Page { limit, cursor: self.cursor.clone(), binding: bound_arguments().to_string() }
     }
+}
+
+static BINDING: OnceLock<String> = OnceLock::new();
+
+/// Records the arguments of this run a cursor is bound to: the explicit arguments of the leaf command, each with its
+/// values, except [`PAGING_ARGS`]. Called once by `main`, after the parse. Spelling, order and `--kind=x` against
+/// `--kind x` do not matter: the digest is of what clap read.
+pub fn bind_arguments(command_tree: &Command, parsed: &ArgMatches) {
+    let mut leaf = parsed;
+    let mut leaf_command = command_tree;
+    while let Some((name, sub)) = leaf.subcommand() {
+        let Some(found) = leaf_command.find_subcommand(name) else { break };
+        leaf_command = found;
+        leaf = sub;
+    }
+    let _ = BINDING.set(binding_of(leaf_command, leaf));
+}
+
+fn binding_of(command: &Command, matches: &ArgMatches) -> String {
+    let mut given: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for arg in command.get_arguments() {
+        let id = arg.get_id().as_str();
+        if PAGING_ARGS.contains(&id) || !matches.try_contains_id(id).is_ok_and(|present| present) || matches.value_source(id) != Some(clap::parser::ValueSource::CommandLine) {
+            continue;
+        }
+        let values = matches.get_raw(id).map(|raw| raw.map(|value| value.to_string_lossy().into_owned()).collect()).unwrap_or_default();
+        given.insert(id.to_string(), values);
+    }
+    let canonical = given.iter().map(|(id, values)| format!("{id}={}", values.join("\u{1e}"))).collect::<Vec<_>>().join("\u{1f}");
+    let digest = Sha256::digest(canonical.as_bytes());
+    digest.iter().take(8).map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// The binding recorded by [`bind_arguments`]; empty when none was (a test that builds a [`Page`] by hand).
+fn bound_arguments() -> &'static str {
+    BINDING.get().map_or("", String::as_str)
 }
 
 /// A resolved page request. `limit: None` is `--all`.
@@ -51,11 +98,13 @@ impl PageFlags {
 pub struct Page {
     pub limit: Option<usize>,
     pub cursor: Option<String>,
+    /// The digest of the call's arguments a cursor is bound to ([`bind_arguments`]).
+    pub binding: String,
 }
 
 impl Page {
     pub fn first_page() -> Self {
-        Page { limit: Some(DEFAULT_LIMIT), cursor: None }
+        Page { limit: Some(DEFAULT_LIMIT), cursor: None, binding: String::new() }
     }
 }
 
@@ -89,32 +138,30 @@ impl PageMeta {
     }
 }
 
-fn encode(scope: &str, key: &str) -> String {
-    format!("{scope}{SEPARATOR}{key}").bytes().map(|b| format!("{b:02x}")).collect()
+fn encode(scope: &str, binding: &str, key: &str) -> String {
+    format!("{scope}{SEPARATOR}{binding}{SEPARATOR}{key}").bytes().map(|b| format!("{b:02x}")).collect()
 }
 
-fn decode(cursor: &str) -> Option<(String, String)> {
+/// `(scope, binding, key)` of a cursor canon issued; `None` for anything else (a 0.33 cursor included: it has no binding).
+fn decode(cursor: &str) -> Option<(String, String, String)> {
     if cursor.is_empty() || !cursor.len().is_multiple_of(2) || !cursor.is_ascii() {
         return None;
     }
     let bytes: Option<Vec<u8>> = (0..cursor.len()).step_by(2).map(|i| u8::from_str_radix(&cursor[i..i + 2], 16).ok()).collect();
     let text = String::from_utf8(bytes?).ok()?;
-    text.split_once(SEPARATOR).map(|(scope, key)| (scope.to_string(), key.to_string()))
+    let mut parts = text.splitn(3, SEPARATOR);
+    Some((parts.next()?.to_string(), parts.next()?.to_string(), parts.next()?.to_string()))
 }
 
-/// The record key a cursor points after, when the cursor is one canon issued.
-pub fn cursor_key(cursor: &str) -> Option<String> {
-    decode(cursor).map(|(_, key)| key)
-}
-
-fn invalid_cursor(why: &str) -> CliError {
-    CliError::refused("CURSOR_INVALID", why.to_string()).field("--cursor").hint("drop --cursor to start from the first page, or pass the `nextCursor` this same command returned")
+fn invalid_cursor(reason: &'static str, why: &str, hint: &str) -> CliError {
+    CliError::refused("CURSOR_INVALID", why.to_string()).reason(reason).field("--cursor").hint(hint.to_string())
 }
 
 /// Cuts one page out of `items`, which must already be in their final,
 /// deterministic order. `key` names one record uniquely (equal keys are told
-/// apart by their order of appearance). `scope` identifies the listing — the
-/// command and what it lists — so a cursor from another listing is refused.
+/// apart by their order of appearance). `scope` is the command, so a cursor of
+/// another command is refused; `page.binding` is the call's arguments, so a
+/// cursor of this command issued for other arguments is refused.
 pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page: &Page) -> Result<(Vec<T>, PageMeta), CliError> {
     let total = items.len();
     // Keys are built in order and only as far as the page needs: up to the
@@ -133,9 +180,17 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
     let start = match &page.cursor {
         None => 0,
         Some(cursor) => {
-            let (cursor_scope, last) = decode(cursor).ok_or_else(|| invalid_cursor("the cursor is not one canon issued"))?;
+            const START_OVER: &str = "drop --cursor to start from the first page, or pass the `nextCursor` this same command returned";
+            let (cursor_scope, binding, last) = decode(cursor).ok_or_else(|| invalid_cursor("FOREIGN", "the cursor is not one this command issued", START_OVER))?;
             if cursor_scope != scope {
-                return Err(invalid_cursor(&format!("the cursor belongs to `{cursor_scope}`, not `{scope}`")));
+                return Err(invalid_cursor("FOREIGN", &format!("the cursor was issued by `canon {cursor_scope}`, not `canon {scope}`"), START_OVER));
+            }
+            if binding != page.binding {
+                return Err(invalid_cursor(
+                    "ARGUMENTS_CHANGED",
+                    "the cursor was issued for a call with other arguments: a cursor is bound to every argument except --limit, --all, --cursor and --fields",
+                    "repeat the call that issued the cursor and change only --limit, --all or --fields, or drop --cursor to start from the first page",
+                ));
             }
             let mut found = None;
             while found.is_none() && keys.len() < total {
@@ -145,78 +200,18 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
                     found = Some(keys.len() - 1);
                 }
             }
-            found.ok_or_else(|| invalid_cursor("the record the cursor points after is no longer in the result (the store or the filters changed)"))? + 1
+            found.ok_or_else(|| invalid_cursor("EXPIRED", "the record the cursor points after is no longer in the result (the store changed since it was issued)", "drop --cursor to start from the first page"))? + 1
         }
     };
 
     let end = page.limit.map_or(total, |limit| start.saturating_add(limit).min(total));
     let next_cursor = (end < total).then(|| {
         extend_to(end, &mut keys);
-        encode(scope, &keys[end - 1])
+        encode(scope, &page.binding, &keys[end - 1])
     });
     let slice: Vec<T> = items.into_iter().skip(start).take(end - start).collect();
     let meta = PageMeta { returned: slice.len(), total, next_cursor };
     Ok((slice, meta))
-}
-
-/// A field name compared without its case style: lowercase, `_` and `-` dropped, so
-/// `scenarioId`, `scenario_id` and `Scenario-ID` are one field.
-pub fn normalize(name: &str) -> String {
-    name.chars().filter(|c| *c != '_' && *c != '-').flat_map(char::to_lowercase).collect()
-}
-
-/// Refuses (`USAGE`, `field` `--fields`) any requested `--fields` name that `known` does not hold, in either case
-/// style (`scenarioId` or `scenario_id`); `suggestions` carries the nearest known fields.
-pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String>) -> Result<(), CliError> {
-    let normal: Vec<(String, &String)> = known.iter().map(|k| (normalize(k), k)).collect();
-    let unknown: Vec<&str> = requested.iter().map(String::as_str).filter(|f| !normal.iter().any(|(n, _)| *n == normalize(f))).collect();
-    if unknown.is_empty() {
-        return Ok(());
-    }
-    let list = known.iter().map(String::as_str).collect::<Vec<_>>().join(", ");
-    let mut suggestions: Vec<String> = Vec::new();
-    for field in &unknown {
-        let wanted = normalize(field);
-        for near in crate::suggest::nearest(&wanted, normal.iter().map(|(n, _)| n.as_str())) {
-            if let Some((_, original)) = normal.iter().find(|(n, _)| *n == near) {
-                if !suggestions.contains(original) {
-                    suggestions.push((*original).clone());
-                }
-            }
-        }
-    }
-    suggestions.truncate(3);
-    Err(CliError::refused("USAGE", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", ")))
-        .hint(format!("known fields: {list} (a comma list; camelCase or snake_case both match)"))
-        .field("--fields")
-        .expected(known.iter().cloned())
-        .received(unknown.join(","))
-        .suggestions(suggestions))
-}
-
-/// [`check_fields`] against a fixed list of field names.
-pub fn check_known(command: &str, requested: &[String], known: &[&str]) -> Result<(), CliError> {
-    check_fields(command, requested, &known.iter().map(std::string::ToString::to_string).collect())
-}
-
-/// Whether `fields` names `member`, in either case style.
-pub fn wants(fields: &[String], member: &str) -> bool {
-    let member = normalize(member);
-    fields.iter().any(|f| normalize(f) == member)
-}
-
-/// Keeps only `fields` of an object record, matched in either case style; the record's own keys are
-/// kept as they are. A field the record happens not to carry is omitted.
-pub fn project(record: &Value, fields: &[String]) -> Value {
-    let Some(object) = record.as_object() else { return record.clone() };
-    let mut out = serde_json::Map::new();
-    for field in fields {
-        let wanted = normalize(field);
-        for (key, value) in object.iter().filter(|(key, _)| normalize(key) == wanted) {
-            out.insert(key.clone(), value.clone());
-        }
-    }
-    Value::Object(out)
 }
 
 #[cfg(test)]
@@ -224,7 +219,11 @@ mod tests {
     use super::*;
 
     fn page(limit: Option<usize>, cursor: Option<String>) -> Page {
-        Page { limit, cursor }
+        Page { limit, cursor, binding: "b1".to_string() }
+    }
+
+    fn reason_of(error: &CliError) -> Option<&'static str> {
+        error.reason_name()
     }
 
     #[test]
@@ -261,13 +260,74 @@ mod tests {
     }
 
     #[test]
-    fn a_cursor_from_another_scope_or_garbage_is_refused() {
+    fn a_cursor_of_another_command_or_garbage_is_foreign() {
         let items = vec!["a", "b", "c"];
-        let (_, meta) = paginate("query:handoff", items.clone(), std::string::ToString::to_string, &page(Some(1), None)).unwrap();
+        let (_, meta) = paginate("query", items.clone(), std::string::ToString::to_string, &page(Some(1), None)).unwrap();
         let cursor = meta.next_cursor.unwrap();
-        for bad in [cursor.clone(), "zz".to_string(), String::new()] {
-            let err = paginate("query:run", items.clone(), std::string::ToString::to_string, &page(Some(1), Some(bad))).unwrap_err();
-            assert_eq!(err.code, "CURSOR_INVALID");
+        for bad in [cursor.clone(), "zz".to_string(), String::new(), "0102".to_string()] {
+            let err = paginate("export", items.clone(), std::string::ToString::to_string, &page(Some(1), Some(bad))).unwrap_err();
+            assert_eq!((err.code, reason_of(&err)), ("CURSOR_INVALID", Some("FOREIGN")));
+            assert_eq!(err.field_name(), Some("--cursor"));
         }
+    }
+
+    #[test]
+    fn a_cursor_of_this_command_with_other_arguments_is_arguments_changed_and_the_page_size_is_free() {
+        let items = vec!["a", "b", "c", "d"];
+        let (_, meta) = paginate("query", items.clone(), std::string::ToString::to_string, &page(Some(1), None)).unwrap();
+        let cursor = meta.next_cursor.unwrap();
+        let changed = Page { limit: Some(1), cursor: Some(cursor.clone()), binding: "b2".to_string() };
+        let err = paginate("query", items.clone(), std::string::ToString::to_string, &changed).unwrap_err();
+        assert_eq!((err.code, reason_of(&err)), ("CURSOR_INVALID", Some("ARGUMENTS_CHANGED")));
+        let (rows, _) = paginate("query", items.clone(), std::string::ToString::to_string, &page(Some(2), Some(cursor.clone()))).unwrap();
+        assert_eq!(rows, ["b", "c"], "--limit does not bind the cursor");
+        let (rest, meta) = paginate("query", items, std::string::ToString::to_string, &page(None, Some(cursor))).unwrap();
+        assert_eq!(rest, ["b", "c", "d"], "--all does not bind it either");
+        assert!(meta.next_cursor.is_none());
+    }
+
+    #[test]
+    fn a_cursor_whose_record_is_gone_is_expired() {
+        let (_, meta) = paginate("query", vec!["a", "b", "c"], std::string::ToString::to_string, &page(Some(2), None)).unwrap();
+        let cursor = meta.next_cursor.unwrap();
+        let err = paginate("query", vec!["a", "c"], std::string::ToString::to_string, &page(Some(2), Some(cursor))).unwrap_err();
+        assert_eq!((err.code, reason_of(&err)), ("CURSOR_INVALID", Some("EXPIRED")));
+    }
+
+    #[test]
+    fn a_0_33_cursor_has_no_binding_and_is_foreign() {
+        // `<scope> 0x1f <key>` in hex: the format before the binding.
+        let old: String = format!("query:subject{SEPARATOR}a#1").bytes().map(|b| format!("{b:02x}")).collect();
+        let err = paginate("query", vec!["a", "b"], std::string::ToString::to_string, &page(Some(1), Some(old))).unwrap_err();
+        assert_eq!(reason_of(&err), Some("FOREIGN"));
+    }
+
+    #[test]
+    fn the_binding_ignores_spelling_and_order_and_the_paging_options_and_nothing_else() {
+        fn tree() -> Command {
+            Command::new("t").subcommand(
+                Command::new("list")
+                    .arg(clap::Arg::new("kind").long("kind").value_name("K"))
+                    .arg(clap::Arg::new("since").long("since").value_name("T"))
+                    .arg(clap::Arg::new("json").long("json").action(clap::ArgAction::SetTrue))
+                    .arg(clap::Arg::new("limit").long("limit").value_name("N"))
+                    .arg(clap::Arg::new("all").long("all").action(clap::ArgAction::SetTrue))
+                    .arg(clap::Arg::new("cursor").long("cursor").value_name("C"))
+                    .arg(clap::Arg::new("fields").long("fields").value_name("F")),
+            )
+        }
+        let bind = |args: &[&str]| {
+            let command = tree();
+            let matches = command.clone().try_get_matches_from(std::iter::once("t").chain(std::iter::once("list")).chain(args.iter().copied())).unwrap();
+            let (_, leaf) = matches.subcommand().unwrap();
+            binding_of(command.find_subcommand("list").unwrap(), leaf)
+        };
+        let base = bind(&["--kind", "subject", "--since", "2030-01-01"]);
+        assert_eq!(base, bind(&["--since", "2030-01-01", "--kind=subject"]), "order and spelling");
+        assert_eq!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--limit", "3", "--cursor", "x", "--fields", "a"]), "paging options");
+        assert_eq!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--all"]), "--all is the unbounded --limit");
+        assert_ne!(base, bind(&["--kind", "handoff", "--since", "2030-01-01"]), "--kind");
+        assert_ne!(base, bind(&["--kind", "subject"]), "a dropped filter");
+        assert_ne!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--json"]), "a flag");
     }
 }

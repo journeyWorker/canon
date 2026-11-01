@@ -145,6 +145,9 @@ pub struct Meta {
     pub coverage: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<PageInfo>,
+    /// The field paths `data` was projected to with `--fields`, the always-kept ones included (spec 6.10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<String>>,
     /// canon's own metadata: what `data` cannot hold.
     #[serde(rename = "x-canon", skip_serializing_if = "Option::is_none")]
     pub x_canon: Option<Map<String, Value>>,
@@ -217,38 +220,6 @@ impl JsonSchema for NoData {
 
 impl Report for NoData {
     const STATE_IN_DATA: bool = false;
-}
-
-/// A `--fields` projection of a typed report: some of its top-level members. It
-/// serializes as the projected value and validates against the report's schema
-/// without `required`.
-#[derive(Debug, Clone, Serialize)]
-#[serde(transparent)]
-pub struct Projected<R>(pub Value, #[serde(skip)] std::marker::PhantomData<R>);
-
-impl<R> Projected<R> {
-    pub fn new(value: Value) -> Self {
-        Self(value, std::marker::PhantomData)
-    }
-}
-
-impl<R: JsonSchema> JsonSchema for Projected<R> {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        format!("Projected{}", R::schema_name()).into()
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        let mut schema = R::json_schema(generator);
-        if let Some(object) = schema.as_object_mut() {
-            object.remove("required");
-            object.insert("description".to_string(), json!("A `--fields` projection: the requested top-level members of the full report"));
-        }
-        schema
-    }
-}
-
-impl<R: Report> Report for Projected<R> {
-    const SCHEMA_VERSION: &'static str = R::SCHEMA_VERSION;
 }
 
 /// `Some(Some(dir))`: the leaf took `--repo dir`; `Some(None)`: it takes `--repo` and was not given one;
@@ -538,6 +509,7 @@ fn build_meta(command: &str, schema_version: String, output: Option<String>, aft
         warnings: (!warnings.is_empty()).then_some(warnings),
         coverage,
         page,
+        fields: None,
         x_canon: (!x_canon.is_empty()).then_some(x_canon),
     };
     (meta, pushed_out)
@@ -550,14 +522,30 @@ fn success_text<R: Report>(command: &str, data: &R, after: Option<&After>, extra
     let (mut meta, pushed_out) = build_meta(command, schema_version_of::<R>(&id), output, after, extra);
     state.next_omitted += pushed_out;
     let in_data = R::STATE_IN_DATA && carries_state(&id);
-    let text = if in_data && !state.is_empty() {
-        let wrapped = WithState { report: data, unchanged: state.unchanged.then_some(true), waiting_on: state.waiting_on.as_ref(), next_omitted: (state.next_omitted > 0).then_some(state.next_omitted) };
-        atip::line(&Success { ok: true, data: &wrapped, meta })
+    let wrapped = if in_data && !state.is_empty() {
+        Some(WithState { report: data, unchanged: state.unchanged.then_some(true), waiting_on: state.waiting_on.as_ref(), next_omitted: (state.next_omitted > 0).then_some(state.next_omitted) })
     } else {
         if !state.is_empty() {
             state.into_x_canon(meta.x_canon.get_or_insert_with(Map::new));
         }
-        atip::line(&Success { ok: true, data, meta })
+        None
+    };
+    let text = match crate::fields::active() {
+        // `--fields`: the records of `data` are cut to the kept paths after the whole report, its state included, is serialized.
+        Some(active) => {
+            let mut projected = match &wrapped {
+                Some(wrapped) => serde_json::to_value(wrapped),
+                None => serde_json::to_value(data),
+            }
+            .expect("a report serializes");
+            active.projection.apply(&mut projected);
+            meta.fields = Some(active.projection.meta_fields());
+            atip::line(&Success { ok: true, data: &projected, meta })
+        }
+        None => match &wrapped {
+            Some(wrapped) => atip::line(&Success { ok: true, data: wrapped, meta }),
+            None => atip::line(&Success { ok: true, data, meta }),
+        },
     };
     #[cfg(debug_assertions)]
     validate::<R>(&id, &text);
@@ -687,6 +675,12 @@ fn validate<R: Report>(command: &str, text: &str) {
         assert!(crate::cli_error::warning_info(code).is_some(), "warning code {code} is not in cli_error::all_warnings()");
     }
     let Some(data) = document.get("data") else { return };
+    if let (Some(active), true) = (crate::fields::active(), document["meta"].get("fields").is_some()) {
+        // A projected answer is held to the schema with `required` reduced to the members that are present (spec 6.10).
+        let problems = atip::fields::projected_problems(&active.doc, &active.root, &active.projection.records, &active.projection.kept, data);
+        assert!(problems.is_empty(), "the projected `data` breaks the schema of {} with `required` reduced: {problems:?}\n{text}", std::any::type_name::<R>());
+        return;
+    }
     let validator = REPORTS
         .lock()
         .expect("the validator cache is not poisoned")

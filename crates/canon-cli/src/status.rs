@@ -416,11 +416,9 @@ fn policy_diagnosis(policy: &PolicyResolution) -> Option<Warning> {
 }
 
 /// `canon status`: resolve, report, exit `0`.
-pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
-    if let Some(requested) = fields {
-        if let Err(e) = crate::paging::check_known("canon status", requested, &REPORT_FIELDS) {
-            return e.emit("canon status", json);
-        }
+pub fn run(repo: &Path, json: bool, fields: Option<&str>) -> u8 {
+    if let Err(e) = crate::fields::select("status", fields, None) {
+        return e.emit("canon status", json);
     }
     let repo = resolve_repo_root(repo);
     crate::legacy::announce(&repo);
@@ -437,16 +435,9 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
             meta = serde_json::json!({});
         }
         meta["coverage"] = coverage.meta()["coverage"].clone();
-        match (&error, fields) {
-            (Some(error), _) => return error.emit_with_data_and_meta("canon status", true, &report, meta),
-            (None, Some(requested)) => {
-                let projected = serde_json::to_value(&report).map(|v| crate::paging::project(&v, requested));
-                match projected {
-                    Ok(value) => crate::json_out::data_with_next_and_meta("status", &crate::json_out::Projected::<StatusReport>::new(value), &after, meta),
-                    Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
-                }
-            }
-            (None, None) => crate::json_out::data_with_next_and_meta("status", &report, &after, meta),
+        match &error {
+            Some(error) => return error.emit_with_data_and_meta("canon status", true, &report, meta),
+            None => crate::json_out::data_with_next_and_meta("status", &report, &after, meta),
         }
     } else {
         print!("{}", render(&report));
@@ -515,10 +506,6 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
     }
     (mine, waiting)
 }
-
-/// The top-level fields of the `--json` report, which `--fields` may name.
-/// `audits` is omitted from a report that has none.
-const REPORT_FIELDS: [&str; 8] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "danglingReferences"];
 
 /// Build the report for an already-resolved repo root. The caller has
 /// refreshed a stale scenario index (a writer that reports does, first);

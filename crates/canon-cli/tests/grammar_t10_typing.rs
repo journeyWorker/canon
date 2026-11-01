@@ -26,6 +26,7 @@ const OPAQUE: &[(&str, &str)] = &[
     ("EmbeddedSchema", "an embedded JSON Schema of a command document: its shape is JSON Schema's own, published by the draft"),
     ("InputExample", "an example `--input` document: its keys are the command's option names, so its shape is that command's `<Name>Input` schema, published beside it"),
     ("LedgerRecord", "a ledger record embedded verbatim keeps its own snake_case schema (crates/canon-model/schemas)"),
+    ("QueryRecord", "a ledger record of any kind: each kind keeps its own snake_case schema (crates/canon-model/schemas), and `--fields` selects the members they declare"),
 ];
 
 fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
