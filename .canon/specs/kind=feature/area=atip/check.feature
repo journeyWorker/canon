@@ -825,3 +825,14 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given canon wrapped so that every hint of its errors is prose that starts with `canon ` and is not one command line
     When atip check runs at L0 with the committed fixture
     Then L0.hint-form is fail naming the hint and no other check fails, so the CI job goes red
+
+  # canon: {"schema":1,"at":"2026-11-01T19:32:20Z","actor":{"agent_id":"impl-atip-check-1-1","role":"implementer","session_id":"s-0-34-check-1-1"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-34-atip-check-1-1.F2
+  @atip.check.76
+  Scenario: A violation of a 1.1 check is read in the result as its owner, with the rule that broke and the reason
+    Given a fake tool with one planted violation of a check that 1.1 added: a missing contractVersion, an error on stderr, an unknown meta member or an unregistered reason
+    When the tool author reads the result of atip check, as data.checks and as text
+    Then the check that owns the violation is fail with its rule numbers, the reason that says what broke and the invocation that decided it, the error names that check, and every other check passes or does not apply
