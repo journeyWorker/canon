@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "warnings",
+    "warnings": [
+      {
+        "code": "MEMBER_ARCHIVED",
+        "meaning": "The member was archived; the report shows it as it was when archived",
+        "fix": "acme member restore <MEMBER> --json brings it back, if it should be active"
+      },
+      {
+        "code": "TEAM_SIZE_ESTIMATED",
+        "meaning": "page.total is an estimate because the team is larger than the count limit",
+        "fix": "Page to the end with --cursor for an exact count"
+      }
+    ]
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "errors",
+    "errors": [
+      {
+        "code": "COMMAND_REQUIRED",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A group or the bare tool was run without a command",
+        "fix": "Pick one of `expected`"
+      },
+      {
+        "code": "CURSOR_INVALID",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The --cursor was not printed by this command with these arguments",
+        "fix": "Start again without --cursor"
+      },
+      {
+        "code": "ENTRY_STALE",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "The entry was read from a cache older than a day; as a warning the report still holds it",
+        "fix": "ledger sync --json refreshes the cache"
+      },
+      {
+        "code": "INTERNAL",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A bug in acme",
+        "fix": "Report it with the command line and the message"
+      },
+      {
+        "code": "LEDGER_NOT_FOUND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "No ledger has this name",
+        "fix": "ledger list --json shows the ledgers"
+      },
+      {
+        "code": "UNKNOWN_COMMAND",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "A command word is not in the tree",
+        "fix": "Pick one of `expected`"
+      },
+      {
+        "code": "USAGE",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The command line does not parse or does not satisfy the command's requirements",
+        "fix": "Run acme schema <COMMAND> --json"
+      }
+    ]
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "ledger",
+    "toolVersion": "2.3.0",
+    "warnings": [
+      {
+        "code": "CACHE_COLD",
+        "message": "The schema cache was rebuilt"
+      }
+    ]
+  }
+}

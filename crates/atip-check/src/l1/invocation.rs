@@ -287,26 +287,27 @@ pub fn parse(doc: &CommandDoc, words: &[String]) -> Result<Invocation, String> {
 /// operands (after one `--` when any of them starts with `-`).
 ///
 /// Items keep their order; the `--` is written before the first operand that is not a plain word (empty, or starting with `-`
-/// other than exactly `-`), and what `parse` produced has only operands after such a word. An option placed after one by hand
-/// would be read back as an operand.
+/// other than exactly `-`), and the options that come after that operand in `items` are written before the `--`, because
+/// everything after it is an operand. (What `parse` produced has only operands after such a word.)
 pub fn render(invocation: &Invocation) -> Vec<String> {
     let mut argv = invocation.before.clone();
     argv.extend(invocation.path.iter().cloned());
-    let mut ended = false;
-    for item in &invocation.items {
-        match item {
-            Item::Operand(value) => {
-                if !ended && !plain(value) {
-                    argv.push("--".to_string());
-                    ended = true;
-                }
-                argv.push(value.clone());
-            }
-            Item::Option {
-                name,
-                value: Some(value),
-            } => argv.push(format!("--{name}={value}")),
-            Item::Option { name, value: None } => argv.push(format!("--{name}")),
+    let ends_at = invocation
+        .items
+        .iter()
+        .position(|item| matches!(item, Item::Operand(value) if !plain(value)));
+    let word = |item: &Item| match item {
+        Item::Operand(value) => value.clone(),
+        Item::Option { name, value: Some(value) } => format!("--{name}={value}"),
+        Item::Option { name, value: None } => format!("--{name}"),
+    };
+    match ends_at {
+        None => argv.extend(invocation.items.iter().map(word)),
+        Some(at) => {
+            argv.extend(invocation.items[..at].iter().map(word));
+            argv.extend(invocation.items[at..].iter().filter(|item| matches!(item, Item::Option { .. })).map(word));
+            argv.push("--".to_string());
+            argv.extend(invocation.items[at..].iter().filter(|item| matches!(item, Item::Operand(_))).map(word));
         }
     }
     argv
@@ -427,6 +428,27 @@ fn valid_value(arg: &Arg, value: &Value) -> bool {
 type DomainCache = Mutex<HashMap<String, Result<Arc<Validator>, String>>>;
 
 /// The validators of the arguments' domains, compiled once per domain.
+/// `value` without its `pattern` keywords, at any depth; with `only_bad`, only those that are not of the form of spec 10.7.4 or that Rust refuses.
+fn strip_patterns(value: &mut Value, only_bad: bool) {
+    match value {
+        Value::Object(members) => {
+            let bad = match members.get("pattern") {
+                Some(Value::String(pattern)) => {
+                    !only_bad || super::regex::form_problem(pattern).is_some() || super::regex::rust_problem(pattern).is_some()
+                }
+                Some(_) => true,
+                None => false,
+            };
+            if bad {
+                members.remove("pattern");
+            }
+            members.values_mut().for_each(|member| strip_patterns(member, only_bad));
+        }
+        Value::Array(items) => items.iter_mut().for_each(|item| strip_patterns(item, only_bad)),
+        _ => {}
+    }
+}
+
 fn domain_validator(domain: &Value) -> Result<Arc<Validator>, String> {
     static CACHE: OnceLock<DomainCache> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
@@ -436,7 +458,22 @@ fn domain_validator(domain: &Value) -> Result<Arc<Validator>, String> {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     guard
         .entry(key)
-        .or_insert_with(|| schemas().validator(domain).map(Arc::new))
+        .or_insert_with(|| {
+            // A domain whose `pattern` does not compile is `L1.patterns`' to report (and its other rules `L1.walk`'s):
+            // the value is judged against the rest of the domain.
+            // A `pattern` that is not of the form, or that Rust refuses, is `L1.patterns`' to report: the value is judged against the rest.
+            let mut judged = domain.clone();
+            strip_patterns(&mut judged, true);
+            schemas().validator(&judged).or_else(|first| {
+                let mut stripped = domain.clone();
+                strip_patterns(&mut stripped, false);
+                if stripped == judged {
+                    Err(first)
+                } else {
+                    schemas().validator(&stripped)
+                }
+            }).map(Arc::new)
+        })
         .clone()
 }
 
@@ -460,6 +497,10 @@ pub fn value_problem(arg: &Arg, value: &Value) -> Option<String> {
         return Some(format!("{value} is not a valid {} value", arg.value_type));
     }
     let domain = arg.domain.as_ref()?;
+    // A domain outside the profile of its valueType is `L1.walk`'s (rule 3): a value is not judged against it.
+    if !super::rules::domain_profile_problems(arg).is_empty() {
+        return None;
+    }
     match domain_validator(domain) {
         Ok(validator) => schema_problems(&validator, &normalised)
             .map(|why| format!("{value} is outside the domain of {}: {why}", arg.name)),
@@ -557,6 +598,16 @@ fn values_of(doc: &CommandDoc, args: &Args, name: &str) -> Vec<Value> {
 pub fn violated_constraints(doc: &CommandDoc, args: &Args) -> Vec<usize> {
     let mut violated = Vec::new();
     for (index, constraint) in doc.constraints.iter().enumerate() {
+        // A rule that names an argument the command does not have is `L1.walk`'s (rule 4), not a rule an invocation can break.
+        let names_unknown = constraint
+            .names
+            .iter()
+            .chain(constraint.if_name.iter())
+            .chain(constraint.then.iter())
+            .any(|name| doc.arg(name).is_none());
+        if names_unknown {
+            continue;
+        }
         let count = constraint
             .names
             .iter()
@@ -888,10 +939,8 @@ fn inline_documents(doc: &CommandDoc, text: &str, problems: &mut Vec<String>) ->
     }
     let fragment = match doc.compile_ref(&input.schema_ref) {
         Ok(fragment) => Some(fragment),
-        Err(reason) => {
-            problems.push(format!("the fragment schema does not compile: {reason}"));
-            None
-        }
+        // A schema that does not compile is `L1.walk`'s (rule 2): the documents are not judged against it.
+        Err(_) => None,
     };
     let documents: Vec<&Value> = match &parsed {
         Value::Array(items) => items.iter().collect(),
@@ -1090,9 +1139,6 @@ pub fn check_line(
                             format!("the argument object fails argumentsRef: {why}"),
                         ));
                     }
-                }
-                Some(Err(reason)) if arguments.is_empty() => {
-                    arguments.push(format!("argumentsRef does not compile: {reason}"));
                 }
                 _ => {}
             }

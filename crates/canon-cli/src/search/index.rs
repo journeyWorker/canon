@@ -125,6 +125,22 @@ pub fn open(repo: &Path, corpus: &Corpus, warnings: &mut Vec<(&'static str, Stri
     }
 }
 
+/// The index for `corpus` without touching the repository: the file when it is fresh, else one built in
+/// memory (`info.rebuilt` is then true, and nothing is written, deleted or warned about). A run that may still
+/// refuse reads through this; [`open`] persists the file for a run that answers (spec 8.2: a refusal changes
+/// nothing).
+pub fn probe(repo: &Path, corpus: &Corpus) -> Result<Index, IndexError> {
+    let unread_stores = corpus.unread.clone();
+    let info = |nodes, edges, rebuilt| IndexInfo { path: paths::INDEX_FILE.to_string(), nodes, edges, rebuilt, unread_stores: unread_stores.clone(), in_memory: false };
+    if let Existing::Fresh(conn, nodes, edges) = existing(&repo.join(paths::INDEX_FILE), &corpus.fingerprint) {
+        return Ok(Index { conn, info: info(nodes, edges, false) });
+    }
+    let graph = super::graph::build(corpus);
+    let conn = Connection::open_in_memory()?;
+    populate(&conn, &graph, corpus)?;
+    Ok(Index { conn, info: info(graph.nodes.len(), graph.edges.len(), true) })
+}
+
 fn in_memory(graph: &Graph, corpus: &Corpus, warnings: &mut Vec<(&'static str, String)>, why: &str, info: IndexInfo) -> Result<Index, IndexError> {
     let conn = Connection::open_in_memory()?;
     populate(&conn, graph, corpus)?;

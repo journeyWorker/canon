@@ -1,0 +1,88 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "skills show",
+    "path": [
+      "skills",
+      "show"
+    ],
+    "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
+    "effect": "read",
+    "operands": [
+      {
+        "name": "name",
+        "valueName": "NAME",
+        "valueType": "string",
+        "required": false,
+        "variadic": false,
+        "default": null,
+        "defaultNote": "the default guide, `canon` (proposed: optional per spec 14.2; required today)",
+        "help": "A guide built into the binary: `canon`, or the stem of a reference file such as `role-implementer`"
+      }
+    ],
+    "options": [
+      {
+        "name": "full",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "With `canon`: append every reference after the core guide"
+      },
+      {
+        "name": "as",
+        "valueName": "ROLE",
+        "valueType": "enum",
+        "possibleValues": [
+          "planner",
+          "implementer",
+          "reviewer",
+          "orchestrator"
+        ],
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "env": "CANON_ROLE",
+        "flagOnly": true,
+        "help": "The role you act as; overrides CANON_ROLE"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "INTERNAL",
+      "UNKNOWN_ROLE",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "artifact",
+        "mediaType": "text/markdown",
+        "schemaVersion": "2.0"
+      }
+    ],
+    "examples": [
+      "canon skills show canon --full --json"
+    ],
+    "schemas": {
+      "SkillsShowReport": {
+        "$ref": "https://atip.dev/1/guide.schema.json"
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0"
+  }
+}

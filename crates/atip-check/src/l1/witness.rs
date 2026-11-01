@@ -313,7 +313,6 @@ pub fn plan_constraints(doc: &CommandDoc, base: &Invocation) -> Vec<GroupPlan> {
         states: Vec<State>,
         violated: Vec<usize>,
         required_broken: bool,
-        args: Args,
     }
     let mut configs: Vec<Config> = Vec::new();
     let mut counter = vec![0_usize; pools.len()];
@@ -324,7 +323,6 @@ pub fn plan_constraints(doc: &CommandDoc, base: &Invocation) -> Vec<GroupPlan> {
                 states,
                 violated: violated_constraints(doc, &applied),
                 required_broken: !requirement_problems(doc, &applied).is_empty(),
-                args: applied,
             });
         }
         let mut at = 0;

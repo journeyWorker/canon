@@ -135,8 +135,8 @@ fn gitignore_warning(repo: &std::path::Path) -> Option<String> {
     crate::init::index_ignore_gap(repo)
 }
 
-/// Read the inputs and bring the index up to date; the failure is the exit code already emitted.
-fn open_index(command: &str, repo: &std::path::Path, json: bool) -> Result<Index, ExitCode> {
+/// Read the inputs: the corpus the index is built from. The failure is the exit code already emitted.
+fn load_corpus(command: &str, repo: &std::path::Path, json: bool) -> Result<Corpus, ExitCode> {
     if let Some(gap) = gitignore_warning(repo) {
         crate::json_out::warn("SEARCH_GITIGNORE_MISSING", format!("{command}: {gap}"));
     }
@@ -149,15 +149,26 @@ fn open_index(command: &str, repo: &std::path::Path, json: bool) -> Result<Index
             return Err(ExitCode::from(CliError::failed("SEARCH_INDEX_FAILED", format!("the records the index is built from cannot be read: {why}")).hint("fix or restore what the message names, then run the command again; `canon gate check` shows the state of the ledger").emit(command, json)));
         }
     };
-    let mut warnings = Vec::new();
-    let opened = index::open(repo, &corpus, &mut warnings);
-    for (code, warning) in warnings {
-        crate::json_out::warn(code, format!("{command}: {warning}"));
-    }
     if let Some(why) = &corpus.references_unchecked {
         crate::json_out::warn("REFERENCES_UNCHECKED", format!("{command}: the references of the records were not checked, so the index holds no placeholder node ({why})"));
     }
+    Ok(corpus)
+}
+
+/// Bring the index file up to date with `corpus`, building and writing it when it is missing or stale.
+fn persist_index(command: &str, repo: &std::path::Path, json: bool, corpus: &Corpus) -> Result<Index, ExitCode> {
+    let mut warnings = Vec::new();
+    let opened = index::open(repo, corpus, &mut warnings);
+    for (code, warning) in warnings {
+        crate::json_out::warn(code, format!("{command}: {warning}"));
+    }
     opened.map_err(|error| ExitCode::from(CliError::failed("SEARCH_INDEX_FAILED", error.to_string()).hint("delete `.canon/index` and run the command again; the index is rebuilt from the records").emit(command, json)))
+}
+
+/// Read the inputs and bring the index up to date; the failure is the exit code already emitted.
+fn open_index(command: &str, repo: &std::path::Path, json: bool) -> Result<Index, ExitCode> {
+    let corpus = load_corpus(command, repo, json)?;
+    persist_index(command, repo, json, &corpus)
 }
 
 fn index_failed(command: &str, json: bool, error: &IndexError) -> ExitCode {
@@ -246,21 +257,45 @@ fn format_search(report: &SearchReport) -> String {
 pub(crate) fn run_trace(args: TraceArgs) -> ExitCode {
     let TraceArgs { id, repo, json } = args;
     let command = "canon trace";
-    let index = match open_index(command, &repo, json) {
-        Ok(index) => index,
+    // A refusal changes nothing (spec 8.2): the index file is derived state, and a run that refuses must not
+    // create or rewrite it. The operand is judged first, then against an index that is only read, or built in
+    // memory; the file is written only for a run that answers.
+    let refusal = |refusal: &trace::TraceError| {
+        let shapes = trace::SHAPES;
+        let error = match refusal {
+            trace::TraceError::Unrecognized => CliError::refused("TRACE_OPERAND_INVALID", format!("`{id}` is none of the three things canon trace takes; it takes {shapes}")).hint("pass a review id, a commit sha or a finding key"),
+            trace::TraceError::NotFound => CliError::refused("TRACE_NOT_FOUND", format!("no record says `{id}`; it takes {shapes}")).hint("pass an id a record carries: `canon query --kind finding` shows finding keys, `canon query --kind review --json` review ids"),
+            trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_NOT_FOUND", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).hint("pass more characters of the sha"),
+        };
+        ExitCode::from(error.field("id").emit("canon trace", json))
+    };
+    if !trace::is_recognized(&id) {
+        return refusal(&trace::TraceError::Unrecognized);
+    }
+    let corpus = match load_corpus(command, &repo, json) {
+        Ok(corpus) => corpus,
         Err(code) => return code,
+    };
+    let read = match index::probe(&repo, &corpus) {
+        Ok(index) => index,
+        Err(error) => return index_failed(command, json, &error),
+    };
+    match trace::trace(&read, &id) {
+        Ok(Ok(_)) => {}
+        Ok(Err(why)) => return refusal(&why),
+        Err(error) => return index_failed(command, json, &error),
+    }
+    let index = if read.info.rebuilt {
+        match persist_index(command, &repo, json, &corpus) {
+            Ok(index) => index,
+            Err(code) => return code,
+        }
+    } else {
+        read
     };
     let chain = match trace::trace(&index, &id) {
         Ok(Ok(chain)) => chain,
-        Ok(Err(refusal)) => {
-            let shapes = trace::SHAPES;
-            let error = match &refusal {
-                trace::TraceError::Unrecognized => CliError::refused("TRACE_OPERAND_INVALID", format!("`{id}` is none of the three things canon trace takes; it takes {shapes}")).hint("pass a review id, a commit sha or a finding key"),
-                trace::TraceError::NotFound => CliError::refused("TRACE_NOT_FOUND", format!("no record says `{id}`; it takes {shapes}")).hint("pass an id a record carries: `canon query --kind finding` shows finding keys, `canon query --kind review --json` review ids"),
-                trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_NOT_FOUND", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).hint("pass more characters of the sha"),
-            };
-            return ExitCode::from(error.field("id").emit("canon trace", json));
-        }
+        Ok(Err(why)) => return refusal(&why),
         Err(error) => return index_failed(command, json, &error),
     };
     let archived = chain.items.iter().filter(|item| item.archived).count();

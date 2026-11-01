@@ -90,6 +90,12 @@ fn is_finding_key(text: &str) -> bool {
     matches!((seq, round, change), (Some(s), Some(r), Some(c)) if !c.is_empty() && !s.is_empty() && !r.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && r.bytes().all(|b| b.is_ascii_digit()))
 }
 
+/// Whether `operand` has one of the three shapes: judged from the text alone, so a refusal of a malformed
+/// operand needs no index.
+pub fn is_recognized(operand: &str) -> bool {
+    starts_of(&[], operand.trim()) != Err(TraceError::Unrecognized)
+}
+
 /// Trace `operand` through `index`.
 pub fn trace(index: &Index, operand: &str) -> Result<Result<Chain, TraceError>, IndexError> {
     let operand = operand.trim();

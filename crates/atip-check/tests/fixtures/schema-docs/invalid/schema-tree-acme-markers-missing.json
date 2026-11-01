@@ -1,0 +1,165 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "tree",
+    "level": "L1",
+    "commands": [
+      {
+        "command": "build",
+        "path": [
+          "build"
+        ],
+        "kind": "command",
+        "summary": "Build the project, streaming one event per step",
+        "effect": "write"
+      },
+      {
+        "command": "deploy",
+        "path": [
+          "deploy"
+        ],
+        "kind": "group",
+        "summary": "Deployments: start, status"
+      },
+      {
+        "command": "deploy start",
+        "path": [
+          "deploy",
+          "start"
+        ],
+        "kind": "command",
+        "summary": "Start deploying the project to an environment; the deployment runs on a worker and is followed with deploy status",
+        "effect": "write"
+      },
+      {
+        "command": "deploy status",
+        "path": [
+          "deploy",
+          "status"
+        ],
+        "kind": "command",
+        "summary": "Show a deployment's state, or wait until it ends",
+        "effect": "read"
+      },
+      {
+        "command": "filter",
+        "path": [
+          "filter"
+        ],
+        "kind": "group",
+        "summary": "Member filters: test"
+      },
+      {
+        "command": "filter test",
+        "path": [
+          "filter",
+          "test"
+        ],
+        "kind": "command",
+        "summary": "Count the members a JSON filter matches (true matches everyone, false no one)",
+        "effect": "read"
+      },
+      {
+        "command": "lint",
+        "path": [
+          "lint"
+        ],
+        "kind": "command",
+        "summary": "Check project files for problems; with no file, the project file acme.yaml",
+        "effect": "read"
+      },
+      {
+        "command": "member",
+        "path": [
+          "member"
+        ],
+        "kind": "group",
+        "summary": "Team members: export, list, roster, show, tag"
+      },
+      {
+        "command": "member export",
+        "path": [
+          "member",
+          "export"
+        ],
+        "kind": "command",
+        "summary": "Export a team's members in the directory's paged envelope (records at /items/items)",
+        "effect": "read"
+      },
+      {
+        "command": "member list",
+        "path": [
+          "member",
+          "list"
+        ],
+        "kind": "command",
+        "summary": "List the members of a team, a page at a time",
+        "effect": "read"
+      },
+      {
+        "command": "member roster",
+        "path": [
+          "member",
+          "roster"
+        ],
+        "kind": "command",
+        "summary": "Print a team's roster as published to the directory (records under the key member/list)",
+        "effect": "read"
+      },
+      {
+        "command": "member show",
+        "path": [
+          "member",
+          "show"
+        ],
+        "kind": "command",
+        "summary": "Show one member by number",
+        "effect": "read"
+      },
+      {
+        "command": "member tag",
+        "path": [
+          "member",
+          "tag"
+        ],
+        "kind": "command",
+        "summary": "Add a tag to a member",
+        "effect": "write"
+      },
+      {
+        "command": "page",
+        "path": [
+          "page"
+        ],
+        "kind": "group",
+        "summary": "Wiki pages: label"
+      },
+      {
+        "command": "page label",
+        "path": [
+          "page",
+          "label"
+        ],
+        "kind": "command",
+        "summary": "Add labels to a wiki page, recording each change in the page's label history",
+        "effect": "write"
+      },
+      {
+        "command": "schema",
+        "path": [
+          "schema"
+        ],
+        "kind": "command",
+        "summary": "Describe the CLI",
+        "effect": "read"
+      }
+    ]
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

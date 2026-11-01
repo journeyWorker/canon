@@ -347,12 +347,20 @@ pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>
         Ok(resolved) => resolved,
         Err(unknown) => {
             let hint = if unknown.resolved.is_empty() { "canon schema --json".to_string() } else { format!("canon schema {} --json", unknown.resolved.join(" ")) };
-            return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", unknown.message()).received(unknown.word.clone()).expected(unknown.expected.clone()).suggestions(unknown.suggestions.clone()).hint(hint).emit("canon schema", json);
+            return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", unknown.message()).field("command").received(unknown.word.clone()).expected(unknown.expected.clone()).suggestions(unknown.suggestions.clone()).hint(hint).emit("canon schema", json);
         }
     };
     let report = match &resolved {
         atip::project::Resolved::Tree => spec::tree(root, as_role).map(SchemaReport::Tree),
-        atip::project::Resolved::Group(path) => spec::group(root, path).map(SchemaReport::Group),
+        atip::project::Resolved::Group(path) => {
+            // A role's tree omits a group that holds none of its commands: its group document would be empty (spec 10.4).
+            if let Some(role) = as_role.filter(|role| !spec::is_listed(root, path, *role)) {
+                let message = format!("`{}` holds no command for the role `{}`", path.join(" "), role.as_str());
+                let expected = spec::listed_children(root, &path[..path.len() - 1], role);
+                return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", message).field("command").received(path[path.len() - 1].clone()).expected(expected).hint(format!("canon schema --as {} --json", role.as_str())).emit("canon schema", json);
+            }
+            spec::group(root, path, as_role).map(SchemaReport::Group)
+        }
         atip::project::Resolved::Command(path) => spec::command(root, path).map(|doc| SchemaReport::Command(Box::new(doc))),
     }
     .expect("the command spec is built from the tables the tests keep whole");

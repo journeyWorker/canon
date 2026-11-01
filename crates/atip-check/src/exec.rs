@@ -53,6 +53,8 @@ pub struct Call {
     pub measure: bool,
     /// Run in an empty directory with an empty `HOME` and only `PATH`, `HOME` and `LANG` in the environment: no fixture state, no fixture variables (`L1.no-state`).
     pub empty: bool,
+    /// Run in an empty directory and an empty `HOME` with the fixture's environment: the fixture state without its `setup` (`L1.validators`: a validator reads no state, spec 10.8.3).
+    pub without_setup: bool,
 }
 
 impl Call {
@@ -69,6 +71,7 @@ impl Call {
             limit: None,
             measure: false,
             empty: false,
+            without_setup: false,
         }
     }
 
@@ -97,6 +100,13 @@ impl Call {
     #[must_use]
     pub fn measured(mut self) -> Self {
         self.measure = true;
+        self
+    }
+
+    /// The same call in a copy of the fixture state made without `setup`: an empty directory and `HOME`, the fixture's environment.
+    #[must_use]
+    pub fn without_setup(mut self) -> Self {
+        self.without_setup = true;
         self
     }
 
@@ -300,12 +310,12 @@ impl Runner {
 
     /// Runs `call` once in its own fresh copy of the template (an empty one for a call in the empty state).
     pub fn run(&mut self, call: &Call) -> Result<Outcome, RunError> {
-        let (number, sequence) = self.sequence(call.empty)?;
+        let (number, sequence) = self.sequence(call.empty || call.without_setup)?;
         let mut outcome = self
             .execute(call, &sequence)
             .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
         outcome.sequence = number;
-        let before = if call.empty { Snapshot::new() } else { self.template_files.clone() };
+        let before = if call.empty || call.without_setup { Snapshot::new() } else { self.template_files.clone() };
         self.after_call(&mut outcome, &sequence, &before)?;
         Ok(outcome)
     }

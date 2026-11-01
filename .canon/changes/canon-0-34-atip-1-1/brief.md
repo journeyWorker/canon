@@ -34,7 +34,7 @@ waive:
 
 # canon이 atip/1 1.1을 채택한다: contractVersion, reason, 경고 레지스트리
 
-Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 6.6, 7.1-7.6, 8.3.1, 9.13, 10.1, 15.6, 15.7, CHANGELOG 1.1.0
+Source: https://github.com/journeyWorker/atip tag v1.1.1, spec 6.6, 7.1-7.6, 8.3.1, 9.13, 10.1, 15.6, 15.7, CHANGELOG 1.1.0과 1.1.1
 
 ## Intent
 
@@ -65,6 +65,7 @@ canon 0.33은 atip/1 1.0의 L0를 따르고, 출력에 1.1의 멤버가 없다. 
 - `schema --errors`, `--error`, `--warnings`, `--warning`의 답은 `data.kind`(`errors`, `error`, `warnings`, `warning`)를 가진다. 0.33은 `data.kind`가 없다. 이 답들의 `meta.schemaVersion`은 `"1.1"`이다. 다른 출력의 `schemaVersion`은 그 출력의 판이고 지금 그대로다.
 - 트리, 그룹, 명령 문서의 모양은 `canon-0-34-atip-schema-doc`가 바꾼다. 그 답의 `meta.schemaVersion`도 `"1.1"`이어야 하므로 두 변경은 같은 릴리스에 싣는다. 이 변경만 먼저 병합하면 1.0 모양의 트리가 1.1 표시를 갖게 된다.
 - stream 시작 줄은 canon에 stream이 생기는 0.35 일이다.
+- 계약 봉투 스키마 사본을 태그 `v1.1.1`로 다시 가져온다. 이 판의 `contractVersion` 패턴이 `"1.0"`을 거부하므로, 같은 일을 하던 별도의 `"1.0"` 거절 검증 코드는 지운다. 봉투 검증은 스키마 하나가 한다.
 
 ### F2 reason
 
@@ -107,7 +108,7 @@ canon 0.33은 atip/1 1.0의 L0를 따르고, 출력에 1.1의 멤버가 없다. 
 
 - F1:
   - `canon status --json`과 `canon nosuch --json`의 meta에 `contract: "atip/1"`과 `contractVersion: "1.1"`이 있다. `canon schema --errors --json`은 `data.kind: "errors"`이고 `meta.schemaVersion`이 `"1.1"`이다.
-  - ==**모든 봉투가 계약 봉투 스키마를 통과한다.**== `contractVersion: "1.0"`이거나 `contract` 없이 `contractVersion`만 있는 봉투는 검증에서 거부된다.
+  - ==**모든 봉투가 계약 봉투 스키마를 통과한다.**== `contractVersion: "1.0"`이거나 `contract` 없이 `contractVersion`만 있는 봉투는 스키마 검증에서 거부된다. 스키마 사본의 digest가 `v1.1.1`의 것과 같고, 사본의 한 글자를 바꾸면 digest 테스트가 실패한다.
 - F2:
   - `--input` 형식 오류 다섯 가지는 `UNREADABLE`, `STDIN_TTY`, `EMPTY`, `NOT_JSON`, `BATCH_UNSUPPORTED`를 낸다. 조각 스키마 위반 세 가지는 `UNKNOWN_KEY`, `FLAG_ONLY_KEY`, `INVALID_VALUE`를 내고, 객체가 아닌 문서는 `NOT_OBJECT`다. 크기 초과는 `TOO_MANY_BYTES`와 `TOO_MANY_ITEMS`다.
   - 오류와 `details` 항목에 `x-canon`의 reason이 없다. 내보내는 모든 reason이 레지스트리의 그 코드 아래에 있음을 테스트가 확인한다.
@@ -148,4 +149,4 @@ canon 0.33은 atip/1 1.0의 L0를 따르고, 출력에 1.1의 멤버가 없다. 
 - 8.3.1의 보수적 판정을 쓰는 일.
 - 0.35의 `--input` 처리 순서, 배치 보고서, 계획 digest, `skills show`, stream.
 
-Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:67d60ae716ddcb168d2beb3d84ac3e644a17cdbceebdee607dc413081d48c192)
+Approved: Journey Hwang 2026-11-01T11:53:57Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:4f38a6eccca1a2cc59f73fb290ed1598392f748f35e1b7f68ee1e1a840c96482)

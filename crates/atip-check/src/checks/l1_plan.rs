@@ -107,6 +107,8 @@ pub(crate) struct NextRun {
 #[derive(Debug, Clone)]
 pub(crate) struct PagingRun {
     pub command: String,
+    /// The invocation asked for one item (`--limit 1`); a command with no `--limit` is paged as the fixture or the run gave it.
+    pub limited: bool,
     pub first: usize,
     pub next: Option<usize>,
     pub changed: Vec<(String, usize)>,
@@ -158,6 +160,8 @@ pub(crate) struct L1Run {
     pub validators: Vec<ValidatorRun>,
     pub nexts: Vec<NextRun>,
     pub paging: Vec<PagingRun>,
+    /// Paging commands (their documents declare `--cursor`) the run could not page: the command and why.
+    pub paging_gaps: Vec<(String, String)>,
     pub fields: Vec<FieldsRun>,
     pub unknown_fields: Vec<UnknownFieldRun>,
 }
@@ -280,7 +284,13 @@ impl Run<'_> {
             run.group_errors = Some(self.invoke(Call::new(words))?);
         }
         let tool = run.docs.tool.clone();
-        let docs: Vec<CommandDoc> = run.docs.commands.values().cloned().collect();
+        // The plans are keyed by the id the tree gives a command, whatever `command` the document says of itself (`L1.walk` judges that).
+        let docs: Vec<CommandDoc> = run
+            .docs
+            .commands
+            .iter()
+            .map(|(id, doc)| CommandDoc { command: id.clone(), ..doc.clone() })
+            .collect();
         // `--help` of the commands that have a default to compare with.
         for doc in &docs {
             if doc.options.iter().any(|option| !option.default.is_null() && !matches!(option.name.as_str(), "json")) {
@@ -442,7 +452,7 @@ impl Run<'_> {
                 let Some(words) = invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| word == tool)) else {
                     continue;
                 };
-                let call = self.invoke(Call::new(words[1..].iter().cloned()))?;
+                let call = self.invoke(Call::new(words[1..].iter().cloned()).without_setup())?;
                 run.validators.push(ValidatorRun { command: doc.command.clone(), validator: index, line: line.clone(), call });
             }
         }
@@ -464,20 +474,65 @@ impl Run<'_> {
             })
     }
 
-    fn plan_paging(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation]) -> Result<(), RunError> {
-        if !doc.has_option("cursor") || !doc.has_option("limit") {
+    /// The invocations to page: the fixture's `paged` ones, else each observed one whose answer carried `meta.page.nextCursor`
+    /// (approaches/checker.md 6, L1.paging), at most three. A command whose document declares `--cursor` with neither is a gap.
+    fn plan_paging(&mut self, run: &mut L1Run, doc: &CommandDoc, _bases: &[Invocation]) -> Result<(), RunError> {
+        if !doc.has_option("cursor") {
             return Ok(());
         }
-        let Some(base) = bases.first() else {
-            return Ok(());
+        let mut candidates: Vec<Invocation> = Vec::new();
+        let listed: Vec<Vec<String>> = self
+            .fixture
+            .commands
+            .as_ref()
+            .and_then(|commands| commands.get(&doc.command))
+            .map(|entry| entry.paged.iter().map(|argv| in_json_mode(argv)).collect())
+            .unwrap_or_default();
+        let observed = || -> Vec<Vec<String>> {
+            self.log
+                .iter()
+                .filter(|outcome| {
+                    first_document(&outcome.stdout).is_some_and(|document| {
+                        document.get("ok") == Some(&Value::Bool(true))
+                            && document.pointer("/meta/command").and_then(Value::as_str) == Some(doc.command.as_str())
+                            && document.pointer("/meta/page/nextCursor").is_some_and(Value::is_string)
+                    })
+                })
+                .map(|outcome| outcome.call.argv.clone())
+                .collect()
         };
+        let sources = if listed.is_empty() { observed() } else { listed };
+        for argv in sources {
+            if let Ok(parsed) = invocation::parse(doc, &argv) {
+                if !candidates.iter().any(|known| invocation::render(known) == invocation::render(&parsed)) {
+                    candidates.push(parsed);
+                }
+            }
+        }
+        candidates.truncate(3);
+        if candidates.is_empty() {
+            run.paging_gaps.push((
+                doc.command.clone(),
+                "its document declares --cursor and the fixture lists no `paged` invocation of it, and no run saw a meta.page.nextCursor from it".to_string(),
+            ));
+            return Ok(());
+        }
+        for base in candidates {
+            self.plan_paging_of(run, doc, &base)?;
+        }
+        Ok(())
+    }
+
+    fn plan_paging_of(&mut self, run: &mut L1Run, doc: &CommandDoc, base: &Invocation) -> Result<(), RunError> {
         let mut limited = base.clone();
         invocation::remove_option(&mut limited, "all");
         invocation::remove_option(&mut limited, "cursor");
-        invocation::set_option(&mut limited, "limit", Some("1".to_string()));
+        if doc.has_option("limit") {
+            invocation::set_option(&mut limited, "limit", Some("1".to_string()));
+        }
         let first = self.invoke(Call::new(invocation::render(&limited)))?;
         let sequence = self.log[first].sequence;
-        let mut paging = PagingRun { command: doc.command.clone(), first, next: None, changed: Vec::new(), why_not: None };
+        let mut paging = PagingRun { command: doc.command.clone(), limited: doc.has_option("limit"), first, next: None, changed: Vec::new(), why_not: None };
         let document = first_document(&self.log[first].stdout).filter(|document| document.get("ok") == Some(&Value::Bool(true)));
         let cursor = document
             .as_ref()
@@ -529,7 +584,8 @@ impl Run<'_> {
                 if option.is_flag() {
                     invocation::set_option(&mut changed, &option.name, None);
                 } else {
-                    let Some(word) = witness::generate(option, &[]) else { continue };
+                    let defaults = [option.default.clone()];
+                    let Some(word) = witness::generate(option, &defaults) else { continue };
                     invocation::set_option(&mut changed, &option.name, Some(word));
                 }
                 variants.push((format!("--{} added", option.name), invocation::render(&changed)));

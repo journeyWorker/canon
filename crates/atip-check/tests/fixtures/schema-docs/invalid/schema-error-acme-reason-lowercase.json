@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "error",
+    "error": {
+      "code": "INPUT_INVALID",
+      "exit": 2,
+      "retryable": false,
+      "meaning": "--input cannot be read or framed, or a document fails the fragment schema",
+      "fix": "Fix the key `field` points at",
+      "reasons": [
+        {
+          "reason": "unreadable",
+          "meaning": "The file --input names cannot be read",
+          "fix": "Check the path; it is relative to the working directory"
+        },
+        {
+          "reason": "NOT_JSON",
+          "meaning": "The --input value is not JSON; a shell that removed the quotes around an inline document is the usual cause",
+          "fix": "Quote the whole document in single quotes, or pass it on stdin with --input -"
+        },
+        {
+          "reason": "UNKNOWN_KEY",
+          "meaning": "A document key is not an option of the command",
+          "fix": "Use the keys the command's input schema lists: acme schema <COMMAND> --json"
+        },
+        {
+          "reason": "INVALID_VALUE",
+          "meaning": "A document value has the wrong type or is outside its set",
+          "fix": "Fix the value `field` points at"
+        }
+      ]
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

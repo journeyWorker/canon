@@ -31,7 +31,7 @@ waive:
 
 # schema 자기 서술을 atip/1 L1 문서로 낸다
 
-Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 4.7, 9, 10.1-10.7, 10.9-10.10, 10.12-10.13, approaches/rust.md §3-§5, approaches/migration.md §1 L1 표, §3.1 3번
+Source: https://github.com/journeyWorker/atip tag v1.1.1, spec 4.7, 9, 10.1-10.7, 10.9-10.10, 10.12-10.13, approaches/rust.md §3-§5, approaches/migration.md §1 L1 표, §3.1 3번
 
 ## Intent
 
@@ -69,8 +69,8 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 4.7, 9, 10.1-10.7
 
 - `canon schema <그룹>`은 `kind: "group"`, `command`, `path`, `summary`, `commands`(직접 자식 항목)다. 명령 경로는 `kind: "command"`인 명령 문서다.
 - 경로는 낱말 여러 개나 따옴표로 묶은 한 문자열 모두 받고 둘의 답이 같다.
-- 모르는 경로는 exit 2, `UNKNOWN_COMMAND`, `expected`가 처음 모르는 자리의 유효한 낱말이다. 옛 답에는 `expected`와 `suggestions`가 없었다.
-- 경로, `--errors`, `--error`, `--warnings`, `--warning`을 겹쳐 주면 exit 2, `USAGE`다.
+- 모르는 경로는 exit 2, `UNKNOWN_COMMAND`이다. `expected`는 처음 모르는 자리의 유효한 낱말이고, 유효한 낱말이 없으면 생략한다. 명령 뒤에 낱말을 더 준 `schema finding close nosuch`가 그 경우다. `field`가 있으면 `command`다. 옛 답에는 `expected`와 `suggestions`가 없었다.
+- 경로, `--errors`, `--error`, `--warnings`, `--warning`을 겹쳐 주면 exit 2, `USAGE`다. 이 배타는 `schema` 명령 문서의 `atMostOne` 규칙으로 선언되고, `USAGE`의 `field`는 어긋난 인수의 이름이다. 경로는 `PATH`, 옵션은 쓴 그대로다.
 - 그룹을 `canon <그룹> --json`으로 실행하면 `COMMAND_REQUIRED`이고 `expected`가 그 그룹의 명령이다. 지금과 같다.
 
 ### F3 옵션과 인수
@@ -80,7 +80,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 4.7, 9, 10.1-10.7
   - `bool`은 `switch`, 정수형은 `integer`, `PathBuf`는 `path`, 닫힌 값 집합은 `enum`이다.
   - 사용자 정의 파서 26개(id 종류, 시각, `NAME@VERSION`, `FORMAT:PATH` 등)는 표에 값 타입을 적는다. 표가 없는 사용자 정의 파서가 있으면 생성이 실패한다. 추측으로 `string`을 쓰지 않는다.
 - 기본값은 옵션의 타입으로 파싱한 값이다. `"100"`은 `100`이다. `--help`가 약속한 기본값은 모두 실린다. 지금 `--limit`의 도움말은 "default 100"인데 기본값은 `[]`다.
-- ==**실행 시 계산되는 기본값은 `null`과 `defaultNote`다.**== 필수 옵션의 기본값은 `null`이고 스위치의 기본값은 `false`다.
+- ==**실행 시 계산되는 기본값은 `null`과 `defaultNote`다.**== 필수 옵션의 기본값은 `null`이다. 스위치의 기본값은 언제나 `false`이고, 설정 파일이 그 동작을 켜는 경우 `defaultNote`가 말한다.
 - `flagOnly: true`는 `--input` 문서에 쓸 수 없는 옵션이다. `json`, `input`, `commit`, `plan-digest`는 항상 그렇다. canon이 이미 문서에서 거절하는 옵션 집합과 같다.
 - `env`는 옵션이 읽는 환경 변수다. 지금은 `--actor`의 `CANON_ACTOR`다.
 - 같은 이름의 옵션은 모든 명령에서 `valueName`과 `valueType`이 같다. `--limit`은 쪽 크기, `retrieve`, `search`에서 모두 정수 `N`이다.
@@ -123,8 +123,8 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 4.7, 9, 10.1-10.7
   - 실패 경로: 저장소 밖 빈 디렉터리에서도 `schema`가 답하고 아무것도 쓰지 않는다.
 - F2:
   - `canon schema finding --json`은 `kind: "group"`이고 직접 자식 3개를 낸다. `schema "finding close"`와 `schema finding close`의 답이 같다.
-  - `canon schema finding nosuch --json`은 exit 2, `UNKNOWN_COMMAND`이고 `expected`가 `finding`의 명령이다.
-  - 실패 경로: `schema finding --errors`는 exit 2, `USAGE`다. `canon finding --json`은 `COMMAND_REQUIRED`다.
+  - `canon schema finding nosuch --json`은 exit 2, `UNKNOWN_COMMAND`이고 `expected`가 `finding`의 명령이다. `canon schema finding close nosuch --json`은 `UNKNOWN_COMMAND`이고 `expected`가 없다.
+  - 실패 경로: `schema finding --errors`는 exit 2, `USAGE`다. `canon schema` 명령 문서에 이 배타를 말하는 `atMostOne` 규칙이 있다. `canon finding --json`은 `COMMAND_REQUIRED`다.
 - F3:
   - `canon schema finding close --json`에서 `round`의 `valueType`이 `integer`이고, `evidence add`의 `--max-artifact-mib`의 `default`가 숫자 `25`다. `--limit`이 있는 쪽 나누기 명령의 기본값이 `100`이다. `--actor`에 `env`가 `CANON_ACTOR`다.
   - `json`과 `input`이 `flagOnly: true`이다. `-id`로 끝나는 옵션 이름이 없다.
@@ -163,4 +163,4 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 4.7, 9, 10.1-10.7
 - `schema --search`(알려진 SHOULD 공백, backlog).
 - L2(0.35): `--input` 처리 순서와 조각 병합, 배치 포인터, 계획 digest 형식, `--operation`, stream 선언(`dashboard`), `skills show`의 data 모양.
 
-Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:cfa5f36c309494f7d5b055314cef3809eaf058f6b8f2b31ede1b4f2e30a029df)
+Approved: Journey Hwang 2026-11-01T11:53:57Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:8d0c259743c0b69b72a55b89de931351796e785ee1f77890c463fdacce808f6b)
