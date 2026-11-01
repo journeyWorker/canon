@@ -911,26 +911,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         || args.approval_signature_file.is_some()
         || args.approval_at.is_some();
     if approval_requested {
-        if args.approval_by.is_none()
-            || args.approval_role.is_none()
-            || args.approval_signature_file.is_none()
-            || args.approval_at.is_none()
-        {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "authenticated approval requires --approver, --approval-role human, --signature-file and --approval-at").field(first_missing_approval_option(args)).hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
-        let approver = args.approval_by.as_deref().unwrap_or_default();
-        if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").field("--approver").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
-        if args.approval_role.as_ref().is_none_or(|role| role.as_str() != "human") {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").field("--approval-role").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
-        if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").field("--approval-at").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
+        // Its arguments were checked by `validators::check` (`check_approval`); what is left reads the signature file.
         let signature_path = args.approval_signature_file.as_ref().expect("approval_requested implies --signature-file");
         if !signature_path.is_file() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).field("--signature-file").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).field("--signature-file").reason("SIGNATURE_MISMATCH").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
     }
     if args.summary.is_none() && args.command_result.is_some() {
@@ -1117,23 +1101,23 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         let signature = match std::fs::read(signature_path) {
             Ok(signature) => signature,
             Err(error) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("read detached signature: {error}")).hint("pass --signature-file <path> pointing at a readable armored SSH signature over the bytes `canon evidence approval-payload` prints").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("read detached signature: {error}")).reason("SIGNATURE_MISMATCH").hint("pass --signature-file <path> pointing at a readable armored SSH signature over the bytes `canon evidence approval-payload` prints").emit(&args.full(), args.json);
             }
         };
         let allowed_signers = match canon_gate::policy::allowed_signers_path(&repo) {
             Ok(Some(path)) => path,
             Ok(None) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "no policy-pinned allowed_signers verifier is configured").hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and approve the change with `canon policy approve --approver <name>`, then record the approval again").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "no policy-pinned allowed_signers verifier is configured").reason("SIGNATURE_MISMATCH").hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and approve the change with `canon policy approve --approver <name>`, then record the approval again").emit(&args.full(), args.json);
             }
             Err(error) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("approval policy is malformed: {error}")).hint("fix the approval settings in .canon/policy.yaml, then run `canon policy approve --approver <name>`").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("approval policy is malformed: {error}")).reason("SIGNATURE_MISMATCH").hint("fix the approval settings in .canon/policy.yaml, then run `canon policy approve --approver <name>`").emit(&args.full(), args.json);
             }
         };
         if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
-            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
+            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).reason("SIGNATURE_MISMATCH").hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
         }
         let Ok(signature) = String::from_utf8(signature) else {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").reason("SIGNATURE_MISMATCH").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
         };
         record = record.with_approval(EvidenceApproval {
             approver: approver.clone(),
@@ -1360,20 +1344,6 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), ArgRefusal> {
     Ok(())
 }
 
-/// The first of the four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) the
-/// call left out: they go together, so giving one of them needs the other three.
-fn first_missing_approval_option(args: &EvidenceArgs) -> &'static str {
-    if args.approval_by.is_none() {
-        "--approver"
-    } else if args.approval_role.is_none() {
-        "--approval-role"
-    } else if args.approval_signature_file.is_none() {
-        "--signature-file"
-    } else {
-        "--approval-at"
-    }
-}
-
 /// `canon evidence add`: `--class audit` is `canon evidence audit`'s; `--artifact` binds to one record.
 pub(crate) fn check_add(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<(), CliError> {
     if args.class.as_deref() == Some(AUDIT_KIND) {
@@ -1381,7 +1351,36 @@ pub(crate) fn check_add(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<
             .field("--class")
             .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`"));
     }
-    check_artifact_scopes(&args.artifacts, args.all_scenarios, args.scenario_id.as_ref())
+    check_artifact_scopes(&args.artifacts, args.all_scenarios, args.scenario_id.as_ref())?;
+    check_approval(args)
+}
+
+const APPROVAL_HINT: &str = "pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign";
+
+/// The authenticated approval's arguments alone (spec 10.8.3, the validator of `EVIDENCE_APPROVAL_INVALID`, reason `MALFORMED`): the four
+/// go together, the approver is one trimmed line, the role is `human`, the time is RFC 3339. That the signature file exists and verifies
+/// reads state and is the precondition's, reason `SIGNATURE_MISMATCH`.
+pub(crate) fn check_approval(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<(), CliError> {
+    let refuse = |message: &str, field: &str| Err(CliError::refused("EVIDENCE_APPROVAL_INVALID", message).reason("MALFORMED").field(field).hint(APPROVAL_HINT));
+    let given = [args.approver.is_some(), args.approval_role.is_some(), args.signature_file.is_some(), args.approval_at.is_some()];
+    // `--all-scenarios` forbids the approval options: that rule (a constraint, which precedes a validator, spec 11.7) refuses first.
+    if !given.iter().any(|one| *one) || args.all_scenarios {
+        return Ok(());
+    }
+    if let Some(at) = given.iter().position(|one| !*one) {
+        return refuse("authenticated approval requires --approver, --approval-role human, --signature-file and --approval-at", ["--approver", "--approval-role", "--signature-file", "--approval-at"][at]);
+    }
+    let approver = args.approver.as_deref().unwrap_or_default();
+    if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
+        return refuse("approval identity must be a non-empty trimmed single-line value", "--approver");
+    }
+    if args.approval_role.as_ref().is_none_or(|role| role.as_str() != "human") {
+        return refuse("only the human approval role can satisfy risk approval", "--approval-role");
+    }
+    if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
+        return refuse("--approval-at must be an RFC3339 timestamp", "--approval-at");
+    }
+    Ok(())
 }
 
 /// `canon evidence audit`: `--artifact` binds to the audited scenario's record.

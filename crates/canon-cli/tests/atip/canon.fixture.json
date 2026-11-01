@@ -588,6 +588,10 @@
     {
       "code": "EVIDENCE_APPROVAL_INVALID",
       "exit": 2,
+      "reasons": [
+        "MALFORMED",
+        "SIGNATURE_MISMATCH"
+      ],
       "retryable": false
     },
     {

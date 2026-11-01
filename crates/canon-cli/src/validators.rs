@@ -11,6 +11,7 @@ use std::process::ExitCode;
 
 use crate::cli::{Cli, Command};
 use crate::cli::brief::BriefCommand;
+use crate::cli::DivergenceCliCommand;
 use crate::cli::evidence::EvidenceCommand;
 use crate::cli::finding::FindingCommand;
 use crate::cli::policy::PolicyCommand;
@@ -20,7 +21,9 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 pub fn check(cli: &Cli) -> Option<ExitCode> {
     let (label, json, result): (&str, bool, Result<(), CliError>) = match &cli.command {
         Command::Brief { action: BriefCommand::Approve(args) } => ("canon brief approve", args.json, crate::brief_approve::check_approve(args)),
-        Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", args.json, crate::relay::check_arguments(&crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() })),
+        Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", args.json, crate::relay::check_arguments("canon policy approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() }).and_then(|()| crate::policy_approval::check_approver(&args.approver))),
+        Command::Divergence { action: DivergenceCliCommand::Accept(args) } => ("canon divergence accept", args.json, crate::relay::check_arguments("canon divergence accept", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: Some(&args.actor_id), approver: args.approver.as_deref(), note: args.note.as_deref() })),
+        Command::Migrate(args) => ("canon migrate", args.json, crate::relay::check_arguments("canon migrate", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: args.approver.as_deref(), note: args.note.as_deref() })),
         Command::Evidence { action } => match &**action {
             EvidenceCommand::Add(args) => ("canon evidence add", args.json, crate::evidence::check_add(args)),
             EvidenceCommand::Audit(args) => ("canon evidence audit", args.json, crate::evidence::check_audit(args)),

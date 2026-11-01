@@ -40,7 +40,7 @@ fn atip_constraints_07_brief_approve_one_change_with_two_digests_is_refused_befo
 
 #[test]
 fn atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before_any_state_is_read() {
-    refused_in_an_empty_directory("policy approve", &["relayed-via", "note"], "USAGE");
+    refused_in_an_empty_directory("policy approve", &["relayed-via", "approver", "note"], "USAGE");
 }
 
 #[test]

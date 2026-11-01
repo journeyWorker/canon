@@ -718,6 +718,18 @@
         }
       },
       "summary": "Move the local artifact blobs to an object-store tier, verify them, and remove the local copies",
+      "validators": [
+        {
+          "arguments": [
+            "input"
+          ],
+          "code": "INPUT_INVALID",
+          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
+          "rejects": [
+            "canon artifacts move --tier cold --input '[{},{}]'"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -1366,6 +1378,7 @@
         "INTERNAL",
         "NO_BRIEF",
         "POLICY_APPROVAL_FAILED",
+        "POLICY_APPROVAL_REFUSED",
         "RELAY_DIGEST_MISMATCH",
         "SPEC_ROOTS_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -1410,9 +1423,6 @@
       "options": [
         {
           "default": null,
-          "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
-          },
           "help": "Who approved (the human, not the agent)",
           "name": "approver",
           "repeatable": false,
@@ -1422,9 +1432,6 @@
         },
         {
           "default": null,
-          "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
-          },
           "help": "The human's own words",
           "name": "note",
           "repeatable": false,
@@ -2043,14 +2050,61 @@
         {
           "arguments": [
             "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.",
+          "rejects": [
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:0123456789abcdef"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "actor"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word.",
+          "rejects": [
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --digest add-login=sha256:0123456789abcdef"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "approver",
+            "note"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.",
+          "rejects": [
+            "canon brief approve add-login --approver \" \" --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef",
+            "canon brief approve add-login --approver alice --note \" \" --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef"
+          ]
+        },
+        {
+          "arguments": [
+            "approver",
+            "note"
+          ],
+          "code": "APPROVAL_INCOMPLETE",
+          "description": "The human's own answer (`--approver` and `--note`) is one line and, written by the human without `--relayed-via`, not blank once trimmed (a blank answer under `--relayed-via` is the relayed validator's, `USAGE`).",
+          "rejects": [
+            "canon brief approve add-login --approver \" \" --note ok",
+            "canon brief approve add-login --approver alice --note \" \""
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
             "digest",
             "change"
           ],
           "code": "USAGE",
           "description": "A relayed approval names, for every change it approves, the digest the human was shown (`--digest <change>=sha256:<digest>`, once per change) and no digest of a change it does not approve. With no change operand the repo's only live change is read, and its digest is checked then.",
           "rejects": [
-            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --json",
-            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:0123456789abcdef --digest other=sha256:0123456789abcdef --json"
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor impl",
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef --digest other=sha256:0123456789abcdef"
           ]
         },
         {
@@ -2060,7 +2114,7 @@
           "code": "USAGE",
           "description": "`--digest` names a change once: two entries for the same change must carry the same digest.",
           "rejects": [
-            "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:aa --digest add-login=sha256:bb --json"
+            "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:aa --digest add-login=sha256:bb"
           ]
         }
       ],
@@ -5677,6 +5731,18 @@
         }
       },
       "summary": "Serve the local status dashboard",
+      "validators": [
+        {
+          "arguments": [
+            "input"
+          ],
+          "code": "INPUT_INVALID",
+          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
+          "rejects": [
+            "canon dashboard --input '[{},{}]'"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -8449,6 +8515,30 @@
           "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.",
           "rejects": [
             "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2026-02-30 --role reviewer"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.",
+          "rejects": [
+            "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --approver alice --note ok"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "approver",
+            "note"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.",
+          "rejects": [
+            "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver \" \" --note ok",
+            "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver alice --note \" \""
           ]
         }
       ],
@@ -11703,6 +11793,19 @@
       "validators": [
         {
           "arguments": [
+            "input",
+            "report",
+            "artifact"
+          ],
+          "code": "USAGE",
+          "description": "`--input -` reads the document from stdin, and no other option reads stdin in the same call: a value `-` (or `<format>:-`) of another option is refused.",
+          "rejects": [
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --report junit:- --input -",
+            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact - --input -"
+          ]
+        },
+        {
+          "arguments": [
             "approval-at"
           ],
           "code": "USAGE",
@@ -13020,6 +13123,17 @@
       },
       "summary": "Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)",
       "validators": [
+        {
+          "arguments": [
+            "input",
+            "artifact"
+          ],
+          "code": "USAGE",
+          "description": "`--input -` reads the document from stdin, and no other option reads stdin in the same call: a value `-` (or `<format>:-`) of another option is refused.",
+          "rejects": [
+            "canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact - --input -"
+          ]
+        },
         {
           "arguments": [
             "artifact",
@@ -21355,6 +21469,18 @@
         }
       },
       "summary": "Move superseded versions of every record out of the ledger into the archive",
+      "validators": [
+        {
+          "arguments": [
+            "input"
+          ],
+          "code": "INPUT_INVALID",
+          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
+          "rejects": [
+            "canon ledger compact --input '[{},{}]'"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -21891,6 +22017,53 @@
         }
       },
       "summary": "Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.28 hooks, scripts and skill stub (backed up under .canon/migrate-backup/), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins",
+      "validators": [
+        {
+          "arguments": [
+            "input"
+          ],
+          "code": "INPUT_INVALID",
+          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
+          "rejects": [
+            "canon migrate --input '[{},{}]'"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.",
+          "rejects": [
+            "canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "actor"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word.",
+          "rejects": [
+            "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --approver alice --note ok"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "approver",
+            "note"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.",
+          "rejects": [
+            "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver \" \" --note ok",
+            "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -22454,9 +22627,6 @@
       "options": [
         {
           "default": null,
-          "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
-          },
           "help": "Who approved it (a human's name or id)",
           "name": "approver",
           "repeatable": false,
@@ -22920,12 +23090,46 @@
         {
           "arguments": [
             "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.",
+          "rejects": [
+            "canon policy approve --approver alice --note ok --relayed-via ask --actor impl"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "actor"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word.",
+          "rejects": [
+            "canon policy approve --approver alice --note ok --relayed-via ask --as implementer"
+          ]
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "approver",
             "note"
           ],
           "code": "USAGE",
-          "description": "A relayed approval carries the human's answer word for word: with `--relayed-via`, `--note` is not blank.",
+          "description": "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.",
           "rejects": [
-            "canon policy approve --approver alice --relayed-via ask --actor impl --note \" \" --json"
+            "canon policy approve --approver alice --relayed-via ask --as implementer --actor impl --note \" \"",
+            "canon policy approve --approver \" \" --note ok --relayed-via ask --as implementer --actor impl"
+          ]
+        },
+        {
+          "arguments": [
+            "approver"
+          ],
+          "code": "POLICY_APPROVAL_REFUSED",
+          "description": "The human's name (`--approver`) is not blank once trimmed (a blank name under `--relayed-via` is the relayed validator's, `USAGE`).",
+          "rejects": [
+            "canon policy approve --approver \" \""
           ]
         }
       ],
@@ -24197,6 +24401,16 @@
       },
       "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
       "validators": [
+        {
+          "arguments": [
+            "input"
+          ],
+          "code": "INPUT_INVALID",
+          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
+          "rejects": [
+            "canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'"
+          ]
+        },
         {
           "arguments": [
             "before"
@@ -37015,6 +37229,18 @@
         }
       },
       "summary": "Apply canon.yaml aging rules, moving old records to their destination tier",
+      "validators": [
+        {
+          "arguments": [
+            "input"
+          ],
+          "code": "INPUT_INVALID",
+          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
+          "rejects": [
+            "canon tier age --input '[{},{}]'"
+          ]
+        }
+      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -37742,6 +37968,18 @@
       "exit": 2,
       "fix": "Attach a well-formed human approval that verifies against the brief.",
       "meaning": "the human approval attached to an attestation is missing, malformed or fails verification",
+      "reasons": [
+        {
+          "fix": "Pass `--approver`, `--approval-role human`, `--signature-file` and `--approval-at` together, the approver one trimmed line.",
+          "meaning": "the approval arguments are incomplete or not well formed (a missing member of the four, a blank or multi-line approver, a role that is not human): raised from the arguments alone, before any state is read",
+          "reason": "MALFORMED"
+        },
+        {
+          "fix": "Sign the exact bytes `canon evidence approval-payload` prints with a key the policy's `allowed_signers` lists, and pass that signature file.",
+          "meaning": "the signature cannot stand for the approval: the file is missing or unreadable, is not armored SSH signature text, no policy-pinned `allowed_signers` verifier is configured, or the signature does not verify over the payload with a listed key",
+          "reason": "SIGNATURE_MISMATCH"
+        }
+      ],
       "retryable": false
     },
     {

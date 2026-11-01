@@ -212,6 +212,17 @@ static SHARED: Tables = Tables {
 /// the option's domain, that the date exists is this.
 pub const CALENDAR: &str = "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.";
 
+/// `--input -` reads the document from stdin; one stdin is one reader (`input.rs`), so no other option's value is `-` (or `<format>:-`).
+pub const STDIN_DESCRIPTION: &str = "`--input -` reads the document from stdin, and no other option reads stdin in the same call: a value `-` (or `<format>:-`) of another option is refused.";
+/// A leaf that binds one plan (or serves until stopped) takes one JSON object as `--input`, never a batch.
+pub const BATCH_DESCRIPTION: &str = "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.";
+
+/// What the validators of a relayed approval say (`brief approve`, `policy approve`, `divergence accept`, `migrate`): the environment is
+/// a stateless input (spec 11.7), so the role and the actor the variables fill are read here, not by a precondition.
+pub const ROLE_DESCRIPTION: &str = "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.";
+pub const ACTOR_DESCRIPTION: &str = "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word.";
+pub const ANSWER_RELAYED: &str = "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.";
+
 /// `--commit` and `--plan-digest` go together (0.28 D6): the bare run is the preview.
 const SAFETY: &[Rule] = &[Rule::requires("commit", &["plan-digest"]), Rule::requires("plan-digest", &["commit"])];
 

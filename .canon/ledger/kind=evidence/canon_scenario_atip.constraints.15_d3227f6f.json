@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-constraints",
+    "role": "implementer",
+    "session_id": "s-0-34-constraints-r2"
+  },
+  "at": "2026-11-01T14:59:36.787241Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "22eae6a8b7a3ebbdaaf300eb260b13b06ad045dfc3c0f5983091342b0664b3b8"
+    }
+  ],
+  "code_tree": "01aa559313c2a5b88a2a4d834a6417f4969a3b90",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-constraints.xml"
+  },
+  "evidence_sha": "27a5faa8a0ba4465842a431d9d7f1cb383bf1886",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 41,
+  "scenario_id": "atip.constraints.15",
+  "schema": 1,
+  "staging_id": "9b66fc95",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

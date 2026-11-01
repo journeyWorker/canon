@@ -739,7 +739,8 @@ fn atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a
     let mut missing = Vec::new();
     let mut emitted: BTreeSet<String> = BTreeSet::new();
     for (file, text) in live_sources() {
-        if file.ends_with("cli_error.rs") || file.ends_with("schema_codes.rs") {
+        // The tables of `arg_rules/` DECLARE the code of a validator; they construct no error.
+        if file.ends_with("cli_error.rs") || file.ends_with("schema_codes.rs") || file.contains("/arg_rules/") {
             continue;
         }
         for code in ["INPUT_INVALID", "INPUT_TOO_LARGE"] {
@@ -766,8 +767,10 @@ fn atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a
     assert!(sites >= 5, "the scan saw {sites} sites");
     assert!(missing.is_empty(), "{}", missing.join("\n"));
     let registered: BTreeSet<String> = ["INPUT_INVALID", "INPUT_TOO_LARGE"].iter().flat_map(|code| canon_cli::cli_error::code_info(code).unwrap().reasons.iter().map(|r| r.reason.to_string())).collect();
+    // The reasons of other codes are emitted by their own sites (`EVIDENCE_APPROVAL_INVALID`: `MALFORMED`, `SIGNATURE_MISMATCH`).
+    let others: BTreeSet<String> = canon_cli::cli_error::code_info("EVIDENCE_APPROVAL_INVALID").unwrap().reasons.iter().map(|r| r.reason.to_string()).collect();
     for reason in &emitted {
-        if reason.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+        if reason.chars().all(|c| c.is_ascii_uppercase() || c == '_') && !others.contains(reason) {
             assert!(registered.contains(reason), "{reason} is emitted and not registered under INPUT_INVALID or INPUT_TOO_LARGE");
         }
     }

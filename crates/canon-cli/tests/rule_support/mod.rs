@@ -487,6 +487,7 @@ pub struct Outcome {
     pub ok: bool,
     pub code: Option<String>,
     pub field: Option<String>,
+    pub reason: Option<String>,
     pub message: Option<String>,
     /// The paths the call changed in the repo.
     pub changed: Vec<PathBuf>,
@@ -513,6 +514,7 @@ pub fn run_call(provision: &Provision, home: &Path, words: &[String], role: Opti
         ok: document["ok"] == true,
         code: document["error"]["code"].as_str().map(str::to_string),
         field: document["error"]["field"].as_str().map(str::to_string),
+        reason: document["error"]["reason"].as_str().map(str::to_string),
         message: document["error"]["message"].as_str().map(str::to_string),
         changed: harness::changed(&before, &tree(&repo)),
         stdout,
@@ -617,16 +619,24 @@ pub fn repair(doc: &Value, example: &[String], rules: &[ConstraintDoc], assignme
 /// no `canon.yaml`, nothing to read. A validator refuses here with its own code, before any precondition or state read
 /// (spec 10.8.3, 11.7 step 6).
 pub fn run_empty(words: &[String], role: Option<&str>) -> Outcome {
+    let envs: Vec<(&str, &str)> = role.map(|role| ("CANON_ROLE", role)).into_iter().collect();
+    run_empty_with(words, &envs)
+}
+
+/// [`run_empty`] with the variables of `envs` set (and no others).
+pub fn run_empty_with(words: &[String], envs: &[(&str, &str)]) -> Outcome {
     let scratch = TempDir::new().expect("a scratch directory");
     let home = TempDir::new().expect("an empty home");
     let before = tree(scratch.path());
     let mut argv = words.to_vec();
     argv.push("--json".to_string());
-    let mut envs: Vec<(&str, &str)> = Vec::new();
-    if let Some(role) = role {
-        envs.push(("CANON_ROLE", role));
+    // No ambient `CANON_*` at all: the environment is an input of a validator (spec 11.7), and the checker's own is empty.
+    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_canon"));
+    command.args(&argv).current_dir(scratch.path()).env_clear().env("HOME", home.path()).env("PATH", std::env::var_os("PATH").unwrap_or_default());
+    for (key, value) in envs {
+        command.env(key, value);
     }
-    let output = canon_in(scratch.path(), home.path(), &argv, &envs);
+    let output = command.output().expect("spawn the canon binary");
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let document: Value = serde_json::from_str(&stdout).unwrap_or(Value::Null);
     Outcome {
@@ -634,6 +644,7 @@ pub fn run_empty(words: &[String], role: Option<&str>) -> Outcome {
         ok: document["ok"] == true,
         code: document["error"]["code"].as_str().map(str::to_string),
         field: document["error"]["field"].as_str().map(str::to_string),
+        reason: document["error"]["reason"].as_str().map(str::to_string),
         message: document["error"]["message"].as_str().map(str::to_string),
         changed: harness::changed(&before, &tree(scratch.path())),
         stdout,
