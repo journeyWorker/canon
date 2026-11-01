@@ -162,6 +162,26 @@ fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_
 }
 
 #[test]
+fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1() {
+    let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
+    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
+    assert!(report.passed, "{}", report.text());
+    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.1", 28 + 31));
+    let failing: Vec<&str> = report.checks.iter().filter(|check| matches!(check.result, atip_check::report::CheckResult::Fail | atip_check::report::CheckResult::Unprovided)).map(|check| check.id).collect();
+    // The one advisory canon does not meet: `--kind` names the set of ledger kinds on `gate promote` and the kinds `gate purge` can delete, which share no value (L1.one-meaning-values, a SHOULD).
+    assert_eq!(failing, ["L1.one-meaning-values"], "no MUST check fails or is unprovided for canon, and the one advisory is the known one:\n{}", report.text());
+    assert_eq!(report.advisories(), 1);
+    // The tree says the level the claim is (L1.tree), and the fixture names every step it made outside canon.
+    assert_eq!(report.find("L1.tree").map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{}", report.text());
+    assert!(report.prepare.iter().all(|step| step.first().is_some_and(|program| program == "git")), "{:?}", report.prepare);
+    assert_eq!(report.prepare.len(), 2);
+    // The checks that probe the arguments and the data were exercised, not skipped for lack of a fixture entry.
+    for id in ["L1.constraints", "L1.domains", "L1.patterns", "L1.numbers", "L1.validators", "L1.paging", "L1.fields", "L1.output-data"] {
+        assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
+    }
+}
+
+#[test]
 fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
     // canon with one planted violation: every error that has a hint also prints `"x-was-hint":null` before it, the way canon 0.32 printed a member it had no value for; the hint itself stays, so only L0.no-null owns the violation.
     let dir = tempfile::tempdir().expect("tempdir");
