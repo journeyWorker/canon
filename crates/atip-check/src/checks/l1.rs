@@ -134,6 +134,13 @@ impl<'a> Judge<'a> {
         self.envelope(index).filter(|document| document.get("ok") == Some(&Value::Bool(true)))
     }
 
+    /// Whether `code` is `USAGE` or its registered finer replacement (spec 7.2.2: `UNKNOWN_OPTION`, `OPTION_REQUIRED`, registered with exit 2).
+    fn is_usage(&self, code: Option<&str>) -> bool {
+        code.is_some_and(|code| {
+            code == "USAGE" || (matches!(code, "UNKNOWN_OPTION" | "OPTION_REQUIRED") && self.row(code).is_some_and(|row| row.exit == 2))
+        })
+    }
+
     /// The failure `(code, field)` of an invocation's envelope.
     fn failure(&self, index: usize) -> Option<(Option<&str>, Option<&str>)> {
         self.envelope(index)
@@ -318,11 +325,25 @@ impl<'a> Judge<'a> {
         let expect = |c: &mut Conditions<'a>, condition: &'static str, index: usize, code: &str| {
             c.own(index);
             let failure = self.failure(index);
-            c.holds(condition, failure.is_some_and(|(found, _)| found == Some(code)), || {
+            c.holds(condition, failure.is_some_and(|(found, _)| found == Some(code) || (code == "USAGE" && self.is_usage(found))), || {
                 format!("{} {}, expected {code}", self.label(index), refusal_text(self.envelope(index), self.at(index).exit))
             });
         };
         expect(&mut c, "unknown-path", l1.unknown_path, "UNKNOWN_COMMAND");
+        // `expected` is there only when there are valid words to name, and `field`, when present, is `command` (spec 10.1.2).
+        let refusal = self.envelope(l1.unknown_path).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
+        if let Some(refusal) = refusal.filter(|refusal| refusal.pointer("/error/code").and_then(Value::as_str) == Some("UNKNOWN_COMMAND")) {
+            let empty_expected = refusal.pointer("/error/expected").and_then(Value::as_array).is_some_and(Vec::is_empty);
+            let field = refusal.pointer("/error/field").and_then(Value::as_str);
+            c.holds("unknown-path-shape", !empty_expected && field.is_none_or(|field| field == "command"), || {
+                format!(
+                    "{} has {}{}: `expected` is left out when there is nothing to name, and `field`, when there is one, is \"command\"",
+                    self.label(l1.unknown_path),
+                    if empty_expected { "an empty `expected` " } else { "" },
+                    field.map_or(String::new(), |field| format!("field {field:?}"))
+                )
+            });
+        }
         expect(&mut c, "overlap", l1.overlap, "USAGE");
         if let Some(index) = l1.group_errors {
             expect(&mut c, "group-with-errors", index, "USAGE");
@@ -446,7 +467,7 @@ impl<'a> Judge<'a> {
         if let Some(index) = self.l1().unknown_warning {
             c.own(index);
             let failure = self.failure(index);
-            c.holds("unknown-code-refused", failure.is_some_and(|(code, field)| code == Some("USAGE") && field == Some("--warning")), || {
+            c.holds("unknown-code-refused", failure.is_some_and(|(code, field)| self.is_usage(code) && field == Some("--warning")), || {
                 format!("{} {}, expected USAGE on --warning", self.label(index), refusal_text(self.envelope(index), self.at(index).exit))
             });
         }
@@ -467,19 +488,8 @@ impl<'a> Judge<'a> {
             return self.no_tree(c);
         }
         for doc in self.docs().commands.values() {
-            let lists = |codes: &[&str]| -> Vec<String> {
-                codes.iter().filter(|code| !doc.errors.iter().any(|known| known == *code)).map(|code| (*code).to_string()).collect()
-            };
-            let features: [(&'static str, bool, &[&str]); 5] = [
-                ("input-codes", doc.input.is_some(), &["INPUT_INVALID", "INPUT_CONFLICT", "INPUT_TOO_LARGE"]),
-                ("batch-code", doc.input.as_ref().is_some_and(|input| input.batch), &["BATCH_INCOMPLETE"]),
-                ("commit-code", doc.has_option("commit"), &["PLAN_STALE"]),
-                ("operation-code", doc.has_option("operation"), &["OPERATION_REUSED"]),
-                ("cursor-code", doc.has_option("cursor"), &["CURSOR_INVALID"]),
-            ];
-            for (condition, offered, codes) in features {
-                let missing = if offered { lists(codes) } else { Vec::new() };
-                c.holds(condition, missing.is_empty(), || format!("{} offers the feature of {} but does not list {} in errors", doc.command, codes.join(", "), missing.join(", ")));
+            for (condition, problem) in documents::reserved_applicable_findings(doc) {
+                c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
             }
         }
         c.finish(!self.docs().commands.is_empty())
@@ -623,11 +633,9 @@ impl<'a> Judge<'a> {
         let tool = &self.docs().tool;
         let mut judged = false;
         for doc in self.docs().commands.values() {
-            for line in &doc.examples {
-                judged = true;
-                for (condition, problem) in invocation::check_line(doc, tool, line, true) {
-                    c.holds(condition, problem.is_none(), || format!("{}: example `{line}`: {}", doc.command, problem.clone().unwrap_or_default()));
-                }
+            judged |= !doc.examples.is_empty();
+            for (condition, problem) in documents::examples_findings(doc, tool) {
+                c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
             }
         }
         c.finish(judged)
@@ -642,7 +650,7 @@ impl<'a> Judge<'a> {
         for run in &l1.examples {
             c.own(run.call);
             let failure = self.failure(run.call);
-            c.holds("not-usage", failure.is_none_or(|(code, _)| code != Some("USAGE")), || {
+            c.holds("not-usage", failure.is_none_or(|(code, _)| !self.is_usage(code)), || {
                 format!("the example `{}` of {} was refused as a usage problem: {}", run.line, run.command, refusal_text(self.envelope(run.call), self.at(run.call).exit))
             });
             let ran = self.at(run.call).exit == Exit::Code(0) || failure.is_some();
@@ -682,7 +690,7 @@ impl<'a> Judge<'a> {
                         format!("{}: `{}` violates only {labels} and was not refused: {}", run.command, words.join(" "), refusal_text(self.envelope(call), self.at(call).exit))
                     });
                     let code = self.failure(call).and_then(|(code, _)| code);
-                    let declared = code.is_some_and(|code| run.group.codes.contains(code));
+                    let declared = code.is_some_and(|code| run.group.codes.contains(code) || (run.group.codes.contains("USAGE") && self.is_usage(Some(code))));
                     if refused {
                         c.holds("declared-code", declared, || {
                             format!("{}: `{}` violates only {labels} and was refused with {}, the rule declares {}", run.command, words.join(" "), code.unwrap_or("no code"), run.group.codes.iter().cloned().collect::<Vec<_>>().join(", "))
@@ -787,24 +795,6 @@ impl<'a> Judge<'a> {
         c.finish(true)
     }
 
-    /// The patterns of a domain schema, recursively through the positions the profile allows.
-    fn patterns_of(domain: &Value, found: &mut Vec<String>) {
-        let Some(object) = domain.as_object() else { return };
-        if let Some(pattern) = object.get("pattern").and_then(Value::as_str) {
-            found.push(pattern.to_string());
-        }
-        if let Some(properties) = object.get("properties").and_then(Value::as_object) {
-            for child in properties.values() {
-                Self::patterns_of(child, found);
-            }
-        }
-        for key in ["items", "additionalProperties"] {
-            if let Some(child) = object.get(key) {
-                Self::patterns_of(child, found);
-            }
-        }
-    }
-
     fn l1_patterns(&'a self) -> Finding {
         let mut c = self.check("L1.patterns");
         if self.docs().tree.is_none() {
@@ -813,11 +803,19 @@ impl<'a> Judge<'a> {
         let mut judged = false;
         let mut unprovided: Vec<String> = Vec::new();
         for doc in self.docs().commands.values() {
+            for (condition, problem) in documents::pattern_findings(doc) {
+                judged = true;
+                c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
+            }
             for arg in doc.args() {
                 let Some(domain) = &arg.domain else { continue };
-                let mut patterns = Vec::new();
-                Self::patterns_of(domain, &mut patterns);
-                if patterns.is_empty() {
+                let patterns: Vec<String> = documents::domain_patterns(doc)
+                    .into_iter()
+                    .filter(|(spelling, _)| *spelling == arg.spelling())
+                    .filter_map(|(_, pattern)| pattern.ok())
+                    .collect();
+                let _ = domain;
+                if patterns.is_empty() && documents::domain_patterns(doc).iter().all(|(spelling, _)| *spelling != arg.spelling()) {
                     continue;
                 }
                 // The values to compare: the fixture's rejects and the value each `ok` invocation gives the argument.
@@ -838,11 +836,7 @@ impl<'a> Judge<'a> {
                 }
                 for pattern in patterns {
                     judged = true;
-                    let form = regex::form_problem(&pattern);
-                    c.holds("form", form.is_none(), || format!("{}: the pattern {pattern:?} of {} {}", doc.command, arg.spelling(), form.clone().unwrap_or_default()));
-                    let rust = regex::rust_problem(&pattern);
-                    c.holds("rust-compiles", rust.is_none(), || format!("{}: the pattern {pattern:?} of {}: {}", doc.command, arg.spelling(), rust.clone().unwrap_or_default()));
-                    if form.is_some() || rust.is_some() {
+                    if regex::form_problem(&pattern).is_some() || regex::rust_problem(&pattern).is_some() {
                         continue;
                     }
                     if values.is_empty() {
@@ -952,7 +946,7 @@ impl<'a> Judge<'a> {
         }
         for run in &l1.nexts {
             c.own(run.call);
-            let usage = self.failure(run.call).is_some_and(|(code, _)| code == Some("USAGE"));
+            let usage = self.failure(run.call).is_some_and(|(code, _)| self.is_usage(code));
             c.holds("read-next-not-usage", !usage, || format!("{}: its next entry `{}` was refused as a usage problem: {}", self.label(run.source), run.argv.join(" "), refusal_text(self.envelope(run.call), self.at(run.call).exit)));
         }
         c.finish(judged)
@@ -1145,7 +1139,7 @@ impl<'a> Judge<'a> {
         for run in &l1.unknown_fields {
             c.own(run.call);
             let failure = self.failure(run.call);
-            c.holds("unknown-path-refused", failure.is_some_and(|(code, field)| code == Some("USAGE") && field == Some("--fields")), || {
+            c.holds("unknown-path-refused", failure.is_some_and(|(code, field)| self.is_usage(code) && field == Some("--fields")), || {
                 format!("{}: {} {}, expected USAGE on --fields", run.command, self.label(run.call), refusal_text(self.envelope(run.call), self.at(run.call).exit))
             });
         }

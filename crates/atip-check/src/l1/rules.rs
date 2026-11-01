@@ -371,6 +371,16 @@ fn domain_keywords(value_type: &str) -> Option<Vec<&'static str>> {
     }
 }
 
+/// What is wrong with the domain of `arg` against the profile of its valueType (spec 10.7.4), as rule 3 reports it; a value is not judged against such a domain.
+pub fn domain_profile_problems(arg: &Arg) -> Vec<String> {
+    let Some(domain) = arg.domain.as_ref().filter(|domain| !domain.is_null()) else {
+        return Vec::new();
+    };
+    let mut state = DomainState::default();
+    state.walk(arg, domain, &format!("the domain of {}", arg.name));
+    state.profile
+}
+
 /// What rule 3 finds in the domain of one argument.
 #[derive(Debug, Default)]
 struct DomainState {

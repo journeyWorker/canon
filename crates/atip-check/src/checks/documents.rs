@@ -9,7 +9,9 @@ use std::collections::BTreeSet;
 use serde_json::Value;
 
 use crate::claim::Claim;
+use crate::l1::invocation;
 use crate::l1::model::CommandDoc;
+use crate::l1::regex;
 use crate::l1::project;
 use crate::schema::schemas;
 
@@ -124,6 +126,18 @@ pub fn is_upper_snake(name: &str) -> bool {
 /// `L1.output-data`, for one success envelope of `doc`: `data-validates`, `schema-version`. Empty when the envelope names no output
 /// of the command, carries `meta.fields` (`L1.fields` judges a projection) or belongs to a stream (`L2.stream`).
 pub fn output_findings(doc: &CommandDoc, document: &Value) -> Vec<Finding> {
+    if document.get("ok") == Some(&Value::Bool(false)) {
+        // A failure carries the version of the output the command would have printed (spec 6.11): the one output, or the one `meta.output` names.
+        let name = document.pointer("/meta/output").and_then(Value::as_str);
+        let Some(output) = doc.output(name) else { return Vec::new() };
+        let version = document.pointer("/meta/schemaVersion").and_then(Value::as_str);
+        return vec![(
+            "schema-version",
+            (version != Some(output.schema_version.as_str())).then(|| {
+                format!("{}: meta.schemaVersion is {}, the output {} is {}", doc.command, version.unwrap_or("missing"), output.name(), output.schema_version)
+            }),
+        )];
+    }
     if document.pointer("/meta/fields").is_some() {
         return Vec::new();
     }
@@ -167,8 +181,14 @@ pub fn fields_findings(doc: &CommandDoc, document: &Value, kept: &[String], unpr
         return Vec::new();
     };
     let data = document.get("data").unwrap_or(&Value::Null);
+    // A path that is not declared (a key of a declared map only for a document that declares 1.1) is not one a selection may name (spec 6.10).
+    let v11 = document.pointer("/meta/contractVersion").is_some();
+    let undeclared: Vec<&String> = kept.iter().filter(|path| !project::selectable(doc, output, path, v11)).collect();
     let leaks = project::leaks(data, output, kept);
     let mut findings: Vec<Finding> = vec![(
+        "selection-declared",
+        (!undeclared.is_empty()).then(|| format!("{}: meta.fields names {}, which the output does not declare", doc.command, undeclared.iter().map(|path| path.as_str()).collect::<Vec<_>>().join(", "))),
+    ), (
         "no-unselected",
         (!leaks.is_empty()).then(|| format!("{}: members nothing selected: {}", doc.command, join(&leaks[..leaks.len().min(3)]))),
     )];
@@ -226,6 +246,19 @@ fn neutralise_words(value: &mut Value) {
     }
 }
 
+fn plain_patterns(value: &mut Value) {
+    match value {
+        Value::Object(members) => {
+            if members.get("pattern").is_some_and(Value::is_string) {
+                members.insert("pattern".to_string(), Value::String("^x$".to_string()));
+            }
+            members.values_mut().for_each(plain_patterns);
+        }
+        Value::Array(items) => items.iter_mut().for_each(plain_patterns),
+        _ => {}
+    }
+}
+
 /// `data` of a tree, group or command document with the words and shapes of `L1.grammar` made right (see [`schema_doc_problems`]).
 fn neutralise_grammar(data: &mut Value) {
     for key in ["commands"] {
@@ -244,6 +277,10 @@ fn neutralise_grammar(data: &mut Value) {
         let Some(list) = data.get_mut(key).and_then(Value::as_array_mut) else { continue };
         for (at, arg) in list.iter_mut().enumerate() {
             let Some(object) = arg.as_object_mut() else { continue };
+            // A `pattern` is `L1.patterns`' (its form, anchors and compile): the schema judges the document with a plain one.
+            if let Some(domain) = object.get_mut("domain") {
+                plain_patterns(domain);
+            }
             let name = object.get("name").and_then(Value::as_str).unwrap_or_default().to_string();
             if key == "options" {
                 let fixed = kebab_for(&name, at);
@@ -321,6 +358,92 @@ pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandD
         ("no-id-suffix", (!no_id.is_empty()).then(|| format!("an option name ends in -id (spec 9.5): {}", join(&no_id[..no_id.len().min(3)])))),
         ("reserved-shape", (!shapes.is_empty()).then(|| format!("a reserved option has not its reserved shape (spec 9.8): {}", join(&shapes[..shapes.len().min(3)])))),
     ]
+}
+
+
+/// Every `pattern` of a domain schema, at the positions the profile allows (spec 10.7.4): `Err` with a description for one that is not a string.
+fn patterns_of(domain: &Value, found: &mut Vec<Result<String, String>>) {
+    let Some(object) = domain.as_object() else { return };
+    match object.get("pattern") {
+        Some(Value::String(pattern)) => found.push(Ok(pattern.clone())),
+        Some(other) => found.push(Err(format!("pattern {other} is not a string"))),
+        None => {}
+    }
+    if let Some(properties) = object.get("properties").and_then(Value::as_object) {
+        for child in properties.values() {
+            patterns_of(child, found);
+        }
+    }
+    for key in ["items", "additionalProperties"] {
+        if let Some(child) = object.get(key) {
+            patterns_of(child, found);
+        }
+    }
+}
+
+/// The patterns of the domains of `doc`: the argument's spelling and the pattern, or what is wrong with a `pattern` that is not a string.
+pub fn domain_patterns(doc: &CommandDoc) -> Vec<(String, Result<String, String>)> {
+    let mut all = Vec::new();
+    for arg in doc.args() {
+        let Some(domain) = &arg.domain else { continue };
+        let mut found = Vec::new();
+        patterns_of(domain, &mut found);
+        all.extend(found.into_iter().map(|pattern| (arg.spelling(), pattern)));
+    }
+    all
+}
+
+/// `L1.patterns`, for the patterns of one command document: `form` (the restricted I-Regexp form and an ECMAScript `u` compile) and
+/// `rust-compiles` (the Rust `regex` crate at its default limits), one pair of each per pattern. The comparison of the two engines on a value
+/// (`engines-agree`) needs values and is a run's.
+pub fn pattern_findings(doc: &CommandDoc) -> Vec<Finding> {
+    let mut findings: Vec<Finding> = Vec::new();
+    for (spelling, pattern) in domain_patterns(doc) {
+        let (form, rust) = match &pattern {
+            Ok(pattern) => (regex::form_problem(pattern), regex::rust_problem(pattern)),
+            Err(why) => (Some(why.clone()), None),
+        };
+        let shown = pattern.clone().unwrap_or_default();
+        findings.push(("form", form.map(|why| format!("{}: the pattern {shown:?} of {spelling} {why}", doc.command))));
+        findings.push(("rust-compiles", rust.map(|why| format!("{}: the pattern {shown:?} of {spelling}: {why}", doc.command))));
+    }
+    findings
+}
+
+/// `L1.examples`, for one command document: the nine conditions of `invocation::check_line` for each line of `examples`.
+pub fn examples_findings(doc: &CommandDoc, tool: &str) -> Vec<Finding> {
+    let mut findings: Vec<Finding> = Vec::new();
+    for line in &doc.examples {
+        for (condition, problem) in invocation::check_line(doc, tool, line, true) {
+            findings.push((condition, problem.map(|why| format!("{}: example `{line}`: {why}", doc.command))));
+        }
+    }
+    findings
+}
+
+
+/// `L1.reserved-applicable`, for one command document: the reserved codes of the features the command offers are in its `errors`.
+pub fn reserved_applicable_findings(doc: &CommandDoc) -> Vec<Finding> {
+    let lists = |codes: &[&str]| -> Vec<String> {
+        codes.iter().filter(|code| !doc.errors.iter().any(|known| known == *code)).map(|code| (*code).to_string()).collect()
+    };
+    let features: [(&'static str, bool, &[&str]); 5] = [
+        ("input-codes", doc.input.is_some(), &["INPUT_INVALID", "INPUT_CONFLICT", "INPUT_TOO_LARGE"]),
+        ("batch-code", doc.input.as_ref().is_some_and(|input| input.batch), &["BATCH_INCOMPLETE"]),
+        ("commit-code", doc.has_option("commit"), &["PLAN_STALE"]),
+        ("operation-code", doc.has_option("operation"), &["OPERATION_REUSED"]),
+        ("cursor-code", doc.has_option("cursor"), &["CURSOR_INVALID"]),
+    ];
+    features
+        .into_iter()
+        .map(|(condition, offered, codes)| {
+            let missing = if offered { lists(codes) } else { Vec::new() };
+            (
+                condition,
+                (!missing.is_empty()).then(|| format!("{} offers the feature of {} but does not list {} in errors", doc.command, codes.join(", "), missing.join(", "))),
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]

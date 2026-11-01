@@ -428,14 +428,23 @@ fn valid_value(arg: &Arg, value: &Value) -> bool {
 type DomainCache = Mutex<HashMap<String, Result<Arc<Validator>, String>>>;
 
 /// The validators of the arguments' domains, compiled once per domain.
-/// `value` without its `pattern` keywords, at any depth.
-fn strip_patterns(value: &mut Value) {
+/// `value` without its `pattern` keywords, at any depth; with `only_bad`, only those that are not of the form of spec 10.7.4 or that Rust refuses.
+fn strip_patterns(value: &mut Value, only_bad: bool) {
     match value {
         Value::Object(members) => {
-            members.remove("pattern");
-            members.values_mut().for_each(strip_patterns);
+            let bad = match members.get("pattern") {
+                Some(Value::String(pattern)) => {
+                    !only_bad || super::regex::form_problem(pattern).is_some() || super::regex::rust_problem(pattern).is_some()
+                }
+                Some(_) => true,
+                None => false,
+            };
+            if bad {
+                members.remove("pattern");
+            }
+            members.values_mut().for_each(|member| strip_patterns(member, only_bad));
         }
-        Value::Array(items) => items.iter_mut().for_each(strip_patterns),
+        Value::Array(items) => items.iter_mut().for_each(|item| strip_patterns(item, only_bad)),
         _ => {}
     }
 }
@@ -452,10 +461,13 @@ fn domain_validator(domain: &Value) -> Result<Arc<Validator>, String> {
         .or_insert_with(|| {
             // A domain whose `pattern` does not compile is `L1.patterns`' to report (and its other rules `L1.walk`'s):
             // the value is judged against the rest of the domain.
-            schemas().validator(domain).or_else(|first| {
+            // A `pattern` that is not of the form, or that Rust refuses, is `L1.patterns`' to report: the value is judged against the rest.
+            let mut judged = domain.clone();
+            strip_patterns(&mut judged, true);
+            schemas().validator(&judged).or_else(|first| {
                 let mut stripped = domain.clone();
-                strip_patterns(&mut stripped);
-                if stripped == *domain {
+                strip_patterns(&mut stripped, false);
+                if stripped == judged {
                     Err(first)
                 } else {
                     schemas().validator(&stripped)
@@ -485,6 +497,10 @@ pub fn value_problem(arg: &Arg, value: &Value) -> Option<String> {
         return Some(format!("{value} is not a valid {} value", arg.value_type));
     }
     let domain = arg.domain.as_ref()?;
+    // A domain outside the profile of its valueType is `L1.walk`'s (rule 3): a value is not judged against it.
+    if !super::rules::domain_profile_problems(arg).is_empty() {
+        return None;
+    }
     match domain_validator(domain) {
         Ok(validator) => schema_problems(&validator, &normalised)
             .map(|why| format!("{value} is outside the domain of {}: {why}", arg.name)),
@@ -923,10 +939,8 @@ fn inline_documents(doc: &CommandDoc, text: &str, problems: &mut Vec<String>) ->
     }
     let fragment = match doc.compile_ref(&input.schema_ref) {
         Ok(fragment) => Some(fragment),
-        Err(reason) => {
-            problems.push(format!("the fragment schema does not compile: {reason}"));
-            None
-        }
+        // A schema that does not compile is `L1.walk`'s (rule 2): the documents are not judged against it.
+        Err(_) => None,
     };
     let documents: Vec<&Value> = match &parsed {
         Value::Array(items) => items.iter().collect(),
@@ -1125,9 +1139,6 @@ pub fn check_line(
                             format!("the argument object fails argumentsRef: {why}"),
                         ));
                     }
-                }
-                Some(Err(reason)) if arguments.is_empty() => {
-                    arguments.push(format!("argumentsRef does not compile: {reason}"));
                 }
                 _ => {}
             }

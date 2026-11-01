@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "tree",
+    "level": "L2",
+    "commands": []
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0"
+  }
+}
