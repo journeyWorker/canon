@@ -614,9 +614,6 @@
         "INTERNAL",
         "NO_BRIEF",
         "POLICY_APPROVAL_FAILED",
-        "POLICY_APPROVAL_UNREADABLE",
-        "POLICY_CHANGED_SINCE_APPROVAL",
-        "POLICY_NOT_APPROVED",
         "RELAY_DIGEST_MISMATCH",
         "SPEC_ROOTS_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -633,7 +630,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BATCH_INCOMPLETE, BRIEF_WRITE_FAILED, INTERNAL, POLICY_APPROVAL_FAILED, POLICY_APPROVAL_UNREADABLE, POLICY_CHANGED_SINCE_APPROVAL, POLICY_NOT_APPROVED"
+          "meaning": "failed: BATCH_INCOMPLETE, BRIEF_WRITE_FAILED, INTERNAL, POLICY_APPROVAL_FAILED"
         },
         {
           "code": 2,
@@ -2072,7 +2069,6 @@
         "DISPATCH_NOT_RUNNING",
         "DISPATCH_ROLE_REGIME_MISMATCH",
         "DISPATCH_RUN_NOT_FOUND",
-        "DISPATCH_TIER_NOT_PERSISTED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -2097,7 +2093,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BATCH_INCOMPLETE, DISPATCH_END_IN_PROGRESS, DISPATCH_TIER_NOT_PERSISTED, INTERNAL, SERIALIZE_FAILED, WRITE_FAILED"
+          "meaning": "failed: BATCH_INCOMPLETE, DISPATCH_END_IN_PROGRESS, INTERNAL, SERIALIZE_FAILED, WRITE_FAILED"
         },
         {
           "code": 2,
@@ -2402,7 +2398,6 @@
         "DISPATCH_NOT_RUNNING",
         "DISPATCH_ROLE_REGIME_MISMATCH",
         "DISPATCH_RUN_NOT_FOUND",
-        "DISPATCH_TIER_NOT_PERSISTED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -2427,7 +2422,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BATCH_INCOMPLETE, DISPATCH_END_IN_PROGRESS, DISPATCH_TIER_NOT_PERSISTED, INTERNAL, SERIALIZE_FAILED, WRITE_FAILED"
+          "meaning": "failed: BATCH_INCOMPLETE, DISPATCH_END_IN_PROGRESS, INTERNAL, SERIALIZE_FAILED, WRITE_FAILED"
         },
         {
           "code": 2,
@@ -7832,9 +7827,6 @@
         "INTERNAL",
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
-        "POLICY_APPROVAL_UNREADABLE",
-        "POLICY_CHANGED_SINCE_APPROVAL",
-        "POLICY_NOT_APPROVED",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -7849,7 +7841,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BATCH_INCOMPLETE, INTERNAL, POLICY_APPROVAL_FAILED, POLICY_APPROVAL_UNREADABLE, POLICY_CHANGED_SINCE_APPROVAL, POLICY_NOT_APPROVED"
+          "meaning": "failed: BATCH_INCOMPLETE, INTERNAL, POLICY_APPROVAL_FAILED"
         },
         {
           "code": 2,
@@ -10179,7 +10171,6 @@
       "errorCodes": [
         "INTERNAL",
         "UNKNOWN_COMMAND",
-        "UNKNOWN_ERROR_CODE",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -10231,10 +10222,12 @@
           "aliases": [],
           "conflictsWith": [
             "--error",
+            "--warning",
+            "--warnings",
             "path"
           ],
           "default": [],
-          "help": "Print every error code any command can emit, with its meaning, instead of a command",
+          "help": "Print every error code any command can emit, with its meaning and reasons, instead of a command",
           "kind": "flag",
           "name": "errors",
           "possibleValues": [],
@@ -10245,12 +10238,47 @@
           "aliases": [],
           "conflictsWith": [
             "--errors",
+            "--warning",
+            "--warnings",
             "path"
           ],
           "default": [],
-          "help": "Show one error code: its meaning, exit, retryable and fix (an unknown code exits 2)",
+          "help": "Show one error code: its meaning, exit, retryable, fix and reasons (an unknown code, or a code that is only a warning, exits 2)",
           "kind": "value",
           "name": "error",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "CODE"
+        },
+        {
+          "aliases": [],
+          "conflictsWith": [
+            "--error",
+            "--errors",
+            "--warning",
+            "path"
+          ],
+          "default": [],
+          "help": "Print every warning code, with its meaning, instead of a command",
+          "kind": "flag",
+          "name": "warnings",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "conflictsWith": [
+            "--error",
+            "--errors",
+            "--warnings",
+            "path"
+          ],
+          "default": [],
+          "help": "Show one warning code: its meaning and fix (an unknown code exits 2)",
+          "kind": "value",
+          "name": "warning",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -10262,7 +10290,7 @@
           "kind": "report",
           "report": "SchemaReport",
           "schemaRef": "#/schemas/SchemaReport",
-          "schemaVersion": "1.0"
+          "schemaVersion": "1.1"
         }
       ],
       "path": [
@@ -11601,10 +11629,8 @@
         "INTERNAL",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
-        "OVERRIDE_RECORDED",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
-        "SUBJECT_REOPENED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -11754,7 +11780,6 @@
         "INTERNAL",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
-        "OVERRIDE_RECORDED",
         "POLICY_APPROVAL_UNREADABLE",
         "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
@@ -11764,7 +11789,6 @@
         "SUBJECT_INVALID_TRANSITION",
         "SUBJECT_NOT_FOUND",
         "SUBJECT_REASON_REQUIRED",
-        "SUBJECT_REOPENED",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED"
@@ -11955,13 +11979,11 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
-        "OVERRIDE_RECORDED",
         "REPO_UNREADABLE",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_EXISTS",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_INVALID_ARGUMENT",
-        "SUBJECT_REOPENED",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED"
@@ -11976,7 +11998,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BATCH_INCOMPLETE, CHANGE_ADOPTION_INCOMPLETE, INTERNAL, OVERRIDE_RECORDED, SUBJECT_GATE_VIOLATION, SUBJECT_REOPENED, WRITE_FAILED"
+          "meaning": "failed: BATCH_INCOMPLETE, CHANGE_ADOPTION_INCOMPLETE, INTERNAL, SUBJECT_GATE_VIOLATION, WRITE_FAILED"
         },
         {
           "code": 2,
@@ -12172,12 +12194,10 @@
         "CHANGE_ADOPTION_INCOMPLETE",
         "CONFIG_MISSING",
         "INTERNAL",
-        "OVERRIDE_RECORDED",
         "REPO_UNREADABLE",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_NOT_FOUND",
-        "SUBJECT_REOPENED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -12191,7 +12211,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: CHANGE_ADOPTION_INCOMPLETE, INTERNAL, OVERRIDE_RECORDED, SUBJECT_GATE_VIOLATION, SUBJECT_REOPENED"
+          "meaning": "failed: CHANGE_ADOPTION_INCOMPLETE, INTERNAL, SUBJECT_GATE_VIOLATION"
         },
         {
           "code": 2,
@@ -12270,10 +12290,8 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
-        "OVERRIDE_RECORDED",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
-        "SUBJECT_REOPENED",
         "SUBJECT_UNADOPT_REFUSED",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -12897,13 +12915,6 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_ADOPTION_UNAPPROVED",
-      "exit": 1,
-      "fix": "Have the human approve the brief with `canon brief approve`, or take the adoption back with `canon subject unadopt`.",
-      "meaning": "a change was adopted into a building, verifying or shipped subject while its brief is not approved; the subject's existing scenarios keep accepting evidence, but scenarios tagged for the change wait for the approval",
-      "retryable": false
-    },
-    {
       "code": "BRIEF_APPROVE_REFUSED",
       "exit": 2,
       "fix": "Resolve what each refused id names (`canon brief check` lists blocker findings), then ask the human to approve again.",
@@ -12925,13 +12936,6 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_DRAFT_PENDING",
-      "exit": 1,
-      "fix": "Tag a scenario for the draft change or have the human approve its brief if it belongs to this transition; otherwise ignore the note.",
-      "meaning": "a subject transition ran while a change of the subject is a pending draft (never approved, not a chore, no scenario tagged for it), so the transition does not judge that change",
-      "retryable": false
-    },
-    {
       "code": "BRIEF_HAS_BLOCKERS",
       "exit": 1,
       "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
@@ -12946,13 +12950,6 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_OVERRIDE_ON_RECORD",
-      "exit": 1,
-      "fix": "Have the human approve the brief with `canon brief approve`, then attest the evidence again.",
-      "meaning": "an evidence record was attested while its brief was not approved, under `--override-reason`; the waiver stays on the record",
-      "retryable": false
-    },
-    {
       "code": "BRIEF_UNAPPROVABLE",
       "exit": 2,
       "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
@@ -12964,13 +12961,6 @@
       "exit": 1,
       "fix": "Have the human approve the subject's brief with `canon brief approve` before attesting.",
       "meaning": "an attestation was refused because the subject's brief has no human approval",
-      "retryable": false
-    },
-    {
-      "code": "BRIEF_UNAPPROVED_NOT_ENFORCED",
-      "exit": 1,
-      "fix": "Give the change a brief with `canon change new`, or fix the `plans:` section of canon.yaml, then have the human approve the brief.",
-      "meaning": "a subject moved past a brief that is not approved but cannot be enforced (the change has no brief canon reads, or the `plans:` section is unreadable)",
       "retryable": false
     },
     {
@@ -13149,13 +13139,6 @@
       "retryable": true
     },
     {
-      "code": "DASHBOARD_SNAPSHOT_UNAVAILABLE",
-      "exit": 1,
-      "fix": "Run `canon report snapshot` for the repo, or pass a readable --snapshot directory, then start the dashboard again.",
-      "meaning": "the dashboard started without a readable panels snapshot, so its panels page shows the reason instead of panels",
-      "retryable": false
-    },
-    {
       "code": "DEMO_NOT_INITIALIZED",
       "exit": 2,
       "fix": "Run `canon demo init` before `canon demo review`.",
@@ -13167,13 +13150,6 @@
       "exit": 2,
       "fix": "Nothing to do: the run is already ended; start a new dispatch run if more work is needed.",
       "meaning": "the dispatch run was already ended",
-      "retryable": false
-    },
-    {
-      "code": "DISPATCH_DIFF_RECORDS_UNAVAILABLE",
-      "exit": 1,
-      "fix": "Fix the tier routing or store the message names, then run `canon dispatch diff` again.",
-      "meaning": "`dispatch diff` could not read the task or run records of a tier, so that side of the diff is empty",
       "retryable": false
     },
     {
@@ -13219,24 +13195,10 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_RUN_COPIES_DIVERGE",
-      "exit": 1,
-      "fix": "Run `canon dispatch end` or `canon ingest sessions` to bring the two copies back together.",
-      "meaning": "a run's tier copy and its dispatch manifest differ; the tier copy is used",
-      "retryable": false
-    },
-    {
       "code": "DISPATCH_RUN_NOT_FOUND",
       "exit": 2,
       "fix": "Pass the id of an existing dispatch run.",
       "meaning": "no dispatch manifest for that run id",
-      "retryable": false
-    },
-    {
-      "code": "DISPATCH_TIER_NOT_PERSISTED",
-      "exit": 1,
-      "fix": "Fix the tier the message names, then run `canon ingest sessions` so the tier holds the run.",
-      "meaning": "a dispatch begin or end could not be persisted to the run's routed tier; the manifest file is the only home of the record",
       "retryable": false
     },
     {
@@ -13530,7 +13492,54 @@
       "code": "INPUT_INVALID",
       "exit": 2,
       "fix": "Pass one JSON object, a JSON array, or a file or `-` with one object per line, using only the keys `canon schema <command> --json` lists under `inputs`; `canon schema <command> --json` shows an example.",
-      "meaning": "`--input` cannot be read or framed (empty, not JSON or NDJSON, a file or stdin that cannot be read, stdin a terminal, an array on a leaf that takes one object) or the document breaks its fragment schema (an unknown key, a value of the wrong type, null); `field` is `--input` for a fault in the value itself and carries `x-canon.reason` (`unreadable`, `tty`, `empty`, `syntax` or `batch-unsupported`), and is a JSON pointer with no reason for a fault in the document",
+      "meaning": "`--input` cannot be read or framed (empty, not JSON or NDJSON, not an object, a file or stdin that cannot be read, stdin a terminal, an array on a leaf that takes one object) or the document breaks its fragment schema (an unknown key, a flag-only key, a value of the wrong type, null); `field` is `--input` for a fault in the value itself and a JSON pointer for a fault in the document; `reason` says which",
+      "reasons": [
+        {
+          "fix": "Pass one JSON object and run the command once per item.",
+          "meaning": "the document is an array or NDJSON and the command takes one object",
+          "reason": "BATCH_UNSUPPORTED"
+        },
+        {
+          "fix": "Pass inline JSON, a file path, or `-` with a document on stdin.",
+          "meaning": "the `--input` value or its source holds no JSON",
+          "reason": "EMPTY"
+        },
+        {
+          "fix": "Drop the key and pass the flag on the command line.",
+          "meaning": "a document key names a command-line flag that a document cannot set",
+          "reason": "FLAG_ONLY_KEY"
+        },
+        {
+          "fix": "Give the key a value of the type `canon schema <command> --json` lists under `inputs`, or omit the key.",
+          "meaning": "a document value has the wrong type, is outside its closed set or is null",
+          "reason": "INVALID_VALUE"
+        },
+        {
+          "fix": "Fix the JSON, or put one object per line in a file and pass its path.",
+          "meaning": "the source is not JSON, nor NDJSON where a file or stdin allows it",
+          "reason": "NOT_JSON"
+        },
+        {
+          "fix": "Pass an object, or an array of objects.",
+          "meaning": "the document, or an item of a batch, is JSON but not an object",
+          "reason": "NOT_OBJECT"
+        },
+        {
+          "fix": "Pipe the document in, or pass it inline or as a file.",
+          "meaning": "`--input -` reads stdin and stdin is a terminal",
+          "reason": "STDIN_TTY"
+        },
+        {
+          "fix": "Use only the keys `canon schema <command> --json` lists under `inputs`.",
+          "meaning": "a document key is not an option of the command",
+          "reason": "UNKNOWN_KEY"
+        },
+        {
+          "fix": "Give a readable UTF-8 file, or pass the document inline.",
+          "meaning": "the file named by `--input` cannot be read, or is not UTF-8 text",
+          "reason": "UNREADABLE"
+        }
+      ],
       "retryable": false
     },
     {
@@ -13538,6 +13547,18 @@
       "exit": 2,
       "fix": "Split the batch into several runs, each under the limit.",
       "meaning": "the `--input` document is over 8 MiB or a batch is over 10000 elements",
+      "reasons": [
+        {
+          "fix": "Shrink the document, or split a batch into several runs.",
+          "meaning": "the `--input` source is over 8 MiB",
+          "reason": "TOO_MANY_BYTES"
+        },
+        {
+          "fix": "Split the batch into several runs, each under the limit.",
+          "meaning": "a batch is over 10000 items",
+          "reason": "TOO_MANY_ITEMS"
+        }
+      ],
       "retryable": false
     },
     {
@@ -13660,55 +13681,6 @@
       "retryable": false
     },
     {
-      "code": "LEDGER_KIND_ROUTED_AWAY",
-      "exit": 1,
-      "fix": "Route the kind to the `local` rung in canon.yaml, then run `canon status` again.",
-      "meaning": "a record kind is routed away from the `local` rung that status reads, so its records are not counted",
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_NO_SCENARIOS",
-      "exit": 1,
-      "fix": "Run `canon inventory sync` to index the scenarios the .feature files hold.",
-      "meaning": "the ledger holds no scenario records, so every subject reads as owning none",
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_RECORDS_UNREADABLE",
-      "exit": 2,
-      "fix": "Run `canon gate check` to name the unreadable records, then repair or rename them.",
-      "meaning": "ledger record files could not be read and are not counted",
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_ROLLBACK_NOT_RESTORED",
-      "exit": 1,
-      "fix": "Copy the archived versions back from the archive beside the ledger.",
-      "meaning": "a batch write was rolled back but the archived versions its records had replaced were not put back",
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_UNREADABLE",
-      "exit": 2,
-      "fix": "Run `canon init --check` to see what is wrong in canon.yaml, fix it, then run the command again.",
-      "meaning": "the repo's ledger could not be read, so nothing could be counted",
-      "retryable": false
-    },
-    {
-      "code": "LEGACY_GUIDE_STALE",
-      "exit": 1,
-      "fix": "Do not follow the old skill files; run `canon migrate --json`, then read `canon skills show canon`.",
-      "meaning": "the installed canon skill files are the 0.27 guide and name commands later versions removed",
-      "retryable": false
-    },
-    {
-      "code": "LEGACY_STATE_FOUND",
-      "exit": 2,
-      "fix": "Run `canon migrate --json` to preview the upgrade, then apply it as the preview says.",
-      "meaning": "the repo holds 0.27-era canon state that later versions do not read",
-      "retryable": false
-    },
-    {
       "code": "MIGRATE_INDEX_FAILED",
       "exit": 1,
       "fix": "Run `canon inventory sync` to rebuild the scenario index.",
@@ -13765,45 +13737,10 @@
       "retryable": false
     },
     {
-      "code": "OLD_BRIEF_FORMAT_FOUND",
-      "exit": 2,
-      "fix": "Run `canon migrate --json` to preview the rewrite, then apply it as the preview says.",
-      "meaning": "a read command found briefs in the format canon 0.30 and earlier wrote; the commands that write and judge them are refused until they are rewritten",
-      "retryable": false
-    },
-    {
       "code": "OLD_LAYOUT",
       "exit": 2,
       "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
       "meaning": "a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written",
-      "retryable": false
-    },
-    {
-      "code": "OLD_LAYOUT_FOUND",
-      "exit": 2,
-      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
-      "meaning": "a read command found a ledger laid out by canon 0.29, so the records named by the old rule are not counted and writes are refused",
-      "retryable": false
-    },
-    {
-      "code": "OVERRIDE_REASON_UNUSED",
-      "exit": 1,
-      "fix": "Drop --override-reason; the command needed no override.",
-      "meaning": "`--override-reason` was given but nothing was refused, so no override was recorded",
-      "retryable": false
-    },
-    {
-      "code": "OVERRIDE_RECORDED",
-      "exit": 1,
-      "fix": "Have the human review the recorded waiver and close the gap it names.",
-      "meaning": "a refusal was waived under `--override-reason` and the waiver is recorded; a gap that appears later is not covered",
-      "retryable": false
-    },
-    {
-      "code": "OVERRIDE_REFUSAL_WAIVED",
-      "exit": 1,
-      "fix": "Close the gap the waived refusal names, so the waiver is no longer needed.",
-      "meaning": "a refusal was waived under `--override-reason`",
       "retryable": false
     },
     {
@@ -13870,41 +13807,6 @@
       "retryable": false
     },
     {
-      "code": "POLICY_MISSING",
-      "exit": 1,
-      "fix": "Write `.canon/policy.yaml` with a `spec_coverage` section and have the human approve it.",
-      "meaning": "`.canon/policy.yaml` does not exist, so the gate requires no evidence, failure cases or review",
-      "retryable": false
-    },
-    {
-      "code": "POLICY_NOT_APPROVED",
-      "exit": 1,
-      "fix": "Have a human review the policy and run `canon policy approve --approver <who>`.",
-      "meaning": "`.canon/policy.yaml` has no approval record",
-      "retryable": false
-    },
-    {
-      "code": "POLICY_SPEC_COVERAGE_ABSENT",
-      "exit": 1,
-      "fix": "Add a `spec_coverage` section to `.canon/policy.yaml` and have the human approve it.",
-      "meaning": "the policy has no `spec_coverage` section, so the gate requires no evidence, failure cases or review",
-      "retryable": false
-    },
-    {
-      "code": "POLICY_SPEC_COVERAGE_INVALID",
-      "exit": 2,
-      "fix": "Fix the `spec_coverage` section of `.canon/policy.yaml`; `canon gate check` reports what is wrong.",
-      "meaning": "the policy's `spec_coverage` section is unusable, so the gate refuses and the review guard cannot read whether review is required",
-      "retryable": false
-    },
-    {
-      "code": "POLICY_UNREADABLE",
-      "exit": 2,
-      "fix": "Fix `.canon/policy.yaml` so it parses, then have the human approve it.",
-      "meaning": "`.canon/policy.yaml` cannot be read and falls back to defaults, so the gate requires no evidence, failure cases or review",
-      "retryable": false
-    },
-    {
       "code": "PROMOTE_FAILED",
       "exit": 1,
       "fix": "Fix the ledger problem the error names, then run `canon gate promote` again.",
@@ -13940,20 +13842,6 @@
       "retryable": false
     },
     {
-      "code": "QUERY_PLUGIN_DIAGNOSTIC",
-      "exit": 1,
-      "fix": "Read the diagnostic in the message and fix the plugin or the record it names.",
-      "meaning": "a `query --plugin` projection reported a diagnostic; the records are listed without that projection where it failed",
-      "retryable": false
-    },
-    {
-      "code": "REFERENCES_UNCHECKED",
-      "exit": 1,
-      "fix": "Make the sources readable (the message names the cause), then run the command again.",
-      "meaning": "the sources that records refer to could not be read, so references to missing sources were not checked",
-      "retryable": false
-    },
-    {
       "code": "REGIME_KEY_INVALID",
       "exit": 2,
       "fix": "Pass a well-formed regime key; every part must be non-empty and valid.",
@@ -13979,13 +13867,6 @@
       "exit": 1,
       "fix": "Run `canon report build` or `canon report snapshot` to refresh the report.",
       "meaning": "`report check` found the report missing or out of date",
-      "retryable": false
-    },
-    {
-      "code": "REPORT_TIER_NOT_READ_DIRECTLY",
-      "exit": 1,
-      "fix": "Route the kinds the message names to a rung the report reads, then run the report again.",
-      "meaning": "a report was built from a ledger where some record kinds are not read directly from their routed tier",
       "retryable": false
     },
     {
@@ -14031,13 +13912,6 @@
       "retryable": false
     },
     {
-      "code": "RETRIEVE_REGIME_FELL_BACK",
-      "exit": 1,
-      "fix": "Pass the regime that holds the guidance you want with --regime, or record guidance under the requested regime.",
-      "meaning": "`retrieve` served guidance from a regime derived by fallback instead of the one asked for",
-      "retryable": false
-    },
-    {
       "code": "REVIEW_ARTIFACT_REFUSED",
       "exit": 2,
       "fix": "Bind an artifact that exists inside the repository and passes the rules named in the error.",
@@ -14052,24 +13926,10 @@
       "retryable": false
     },
     {
-      "code": "REVIEW_RECORDS_UNMIGRATED",
-      "exit": 1,
-      "fix": "Run `canon migrate` to rewrite the old reviews to what the evidence says.",
-      "meaning": "scenarios have a review that predates review pinning and does not count until it is rewritten",
-      "retryable": false
-    },
-    {
       "code": "REVIEW_SCENARIO_NOT_INDEXED",
       "exit": 2,
       "fix": "Run `canon inventory sync`, then review the scenario again.",
       "meaning": "a reviewed scenario has no indexed record; run `canon inventory sync`",
-      "retryable": false
-    },
-    {
-      "code": "ROLE_UNKNOWN_RECORDED",
-      "exit": 1,
-      "fix": "Pass planner, implementer, reviewer, orchestrator or a role the policy names.",
-      "meaning": "`--as` or `--role` names a role that is not a known role or one the policy names; the command runs and records the value as given",
       "retryable": false
     },
     {
@@ -14080,34 +13940,6 @@
       "retryable": false
     },
     {
-      "code": "SCENARIO_INDEX_CHECK_FAILED",
-      "exit": 1,
-      "fix": "Run `canon inventory sync` and read the error it names.",
-      "meaning": "whether the scenario index is stale could not be checked",
-      "retryable": false
-    },
-    {
-      "code": "SCENARIO_INDEX_NOT_REFRESHED",
-      "exit": 1,
-      "fix": "Run `canon inventory sync`; it names each format violation, duplicate id or lock problem to fix.",
-      "meaning": "the scenario index is stale and could not be refreshed, so graded answers may describe specs the files no longer say",
-      "retryable": false
-    },
-    {
-      "code": "SCENARIO_INDEX_REFRESHED",
-      "exit": 1,
-      "fix": "Run `canon inventory sync` to list any tag diagnostics the refresh found.",
-      "meaning": "a read command refreshed a stale scenario index from changed .feature files and reports what it wrote",
-      "retryable": false
-    },
-    {
-      "code": "SCENARIO_SUBJECT_UNKNOWN",
-      "exit": 1,
-      "fix": "Create the subject with `canon subject new`, or correct the `@subject` tag.",
-      "meaning": "scenarios are tagged `@subject:<id>` but no subject with that id exists",
-      "retryable": false
-    },
-    {
       "code": "SCENARIO_TAG_EXISTS",
       "exit": 2,
       "fix": "Choose a tag that is not already used, or edit the existing scenario.",
@@ -14115,31 +13947,10 @@
       "retryable": false
     },
     {
-      "code": "SEARCH_GITIGNORE_MISSING",
-      "exit": 1,
-      "fix": "Run `canon init` or `canon migrate` to add the line to .gitignore.",
-      "meaning": "the repo's .gitignore lacks the line of the search index directory",
-      "retryable": false
-    },
-    {
       "code": "SEARCH_INDEX_FAILED",
       "exit": 1,
       "fix": "Fix or restore what the message names (an unreadable store, a record file), then run the command again; the index is derived, so deleting `.canon/index` is always safe.",
       "meaning": "`search` or `trace` could not read the records the index is built from, or could not build or read the index",
-      "retryable": false
-    },
-    {
-      "code": "SEARCH_INDEX_IN_MEMORY",
-      "exit": 1,
-      "fix": "Make `.canon/index` writable, then run the command again.",
-      "meaning": "the search index file could not be written or deleted, so the index was built in memory for this run",
-      "retryable": false
-    },
-    {
-      "code": "SEARCH_INDEX_REBUILT",
-      "exit": 1,
-      "fix": "Nothing to do; if it recurs, check the disk and permissions of `.canon/index`.",
-      "meaning": "the search index file was not a usable database, so it was deleted and rebuilt",
       "retryable": false
     },
     {
@@ -14199,13 +14010,6 @@
       "retryable": false
     },
     {
-      "code": "STRATEGY_DEMOTED",
-      "exit": 1,
-      "fix": "Review the contradicting trajectory before promoting the strategy again.",
-      "meaning": "later contradictory evidence demoted an active strategy while its promotion was blocked",
-      "retryable": false
-    },
-    {
       "code": "SUBJECT_ADOPT_REFUSED",
       "exit": 2,
       "fix": "Fix the problem the error names, then run `canon subject adopt` again.",
@@ -14248,24 +14052,10 @@
       "retryable": false
     },
     {
-      "code": "SUBJECT_OVERRIDE_ON_RECORD",
-      "exit": 1,
-      "fix": "Close the gaps the waiver names, then move the subject again without an override.",
-      "meaning": "a subject stands in its status under a recorded `--override-reason` waiver of gate refusals",
-      "retryable": false
-    },
-    {
       "code": "SUBJECT_REASON_REQUIRED",
       "exit": 2,
       "fix": "Pass --reason when reopening a shipped subject with `canon subject move`.",
       "meaning": "reopening a shipped subject needs --reason",
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_REOPENED",
-      "exit": 1,
-      "fix": "Keep the follow-up in its change, then scenario, evidence and review, before shipping again.",
-      "meaning": "a shipped subject was reopened for a follow-up change; shipping again runs every guard",
       "retryable": false
     },
     {
@@ -14283,31 +14073,10 @@
       "retryable": false
     },
     {
-      "code": "TASK_PROOF_IS_CANON_COMMAND",
-      "exit": 1,
-      "fix": "Bind the artifact or report that proves the task with `canon evidence add --artifact <path>`.",
-      "meaning": "a task was flipped on evidence that binds no file and cites a canon command, which reports on canon's own records and proves nothing",
-      "retryable": false
-    },
-    {
-      "code": "TASK_REIMPORT_INCOMPLETE",
-      "exit": 1,
-      "fix": "Run `canon ingest plans` to see why the change did not import.",
-      "meaning": "a task was flipped but its change did not re-import cleanly, so the task status record may disagree with the plan",
-      "retryable": false
-    },
-    {
       "code": "TASK_ROW_NOT_FOUND",
       "exit": 2,
       "fix": "Restore the task's row in its plan document, then run `canon task done` again.",
       "meaning": "the task's row is missing from its plan document",
-      "retryable": false
-    },
-    {
-      "code": "TASK_STATUS_NOT_REFRESHED",
-      "exit": 1,
-      "fix": "Run `canon ingest plans` so the task records match the plan.",
-      "meaning": "a task was flipped but its status record was not refreshed, so `canon query --kind task` may not match the plan",
       "retryable": false
     },
     {
@@ -14346,24 +14115,10 @@
       "retryable": false
     },
     {
-      "code": "UNKNOWN_ERROR_CODE",
-      "exit": 2,
-      "fix": "Run `canon schema --errors` to list every code.",
-      "meaning": "`canon schema --error <CODE>` was given a code canon does not have",
-      "retryable": false
-    },
-    {
       "code": "UNKNOWN_ROLE",
       "exit": 2,
       "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
       "meaning": "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)",
-      "retryable": false
-    },
-    {
-      "code": "UNKNOWN_ROLE_IGNORED",
-      "exit": 2,
-      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
-      "meaning": "`CANON_ROLE` holds a value that is not a role and was ignored, because the command (`schema`, `context`, `skills show`) does not depend on the role",
       "retryable": false
     },
     {
@@ -16299,8 +16054,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -16538,8 +16300,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -16729,8 +16498,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -17029,8 +16805,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -17379,8 +17162,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -17561,8 +17351,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -17809,8 +17606,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -18112,8 +17916,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -18319,8 +18130,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -18504,8 +18322,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -18680,8 +18505,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -18856,8 +18688,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -19019,8 +18858,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -19335,8 +19181,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -19651,8 +19504,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -20065,8 +19925,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -20245,8 +20112,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -20470,8 +20344,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -20680,8 +20561,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -20866,8 +20754,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -21205,8 +21100,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -21842,8 +21744,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -22070,8 +21979,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -22599,8 +22515,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -22798,8 +22721,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -23072,8 +23002,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -23357,8 +23294,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -23580,8 +23524,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -23828,8 +23779,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -24004,8 +23962,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -24202,8 +24167,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -24435,8 +24407,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -24668,8 +24647,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -24909,8 +24895,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -25169,8 +25162,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -25361,8 +25361,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -25616,8 +25623,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -26054,8 +26068,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -26492,8 +26513,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -26930,8 +26958,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -27326,8 +27361,15 @@
             "message": {
               "type": "string"
             },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "received": {
-              "description": "The value that was refused, with secrets redacted.",
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
               "type": [
                 "string",
                 "null"
@@ -37404,9 +37446,14 @@
           "properties": {
             "error": {
               "$ref": "#/$defs/ErrorRow"
+            },
+            "kind": {
+              "const": "error",
+              "type": "string"
             }
           },
           "required": [
+            "kind",
             "error"
           ],
           "type": "object"
@@ -37419,9 +37466,14 @@
                 "$ref": "#/$defs/ErrorRow"
               },
               "type": "array"
+            },
+            "kind": {
+              "const": "errors",
+              "type": "string"
             }
           },
           "required": [
+            "kind",
             "errors"
           ],
           "type": "object"
@@ -37443,6 +37495,13 @@
             },
             "meaning": {
               "type": "string"
+            },
+            "reasons": {
+              "description": "The situations under the code that need another next action; absent when the code has none.",
+              "items": {
+                "$ref": "#/$defs/ReasonRow"
+              },
+              "type": "array"
             },
             "retryable": {
               "description": "Whether running the same command again, unchanged, can succeed.",
@@ -37941,6 +38000,27 @@
             }
           ]
         },
+        "ReasonRow": {
+          "description": "One reason registered under an error code (spec 7.6).",
+          "properties": {
+            "fix": {
+              "description": "What the caller does next in this situation.",
+              "type": "string"
+            },
+            "meaning": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason",
+            "meaning",
+            "fix"
+          ],
+          "type": "object"
+        },
         "Role": {
           "enum": [
             "planner",
@@ -37949,6 +38029,64 @@
             "orchestrator"
           ],
           "type": "string"
+        },
+        "WarningEntry": {
+          "description": "`canon schema --warning <CODE>`: the one warning registry row.",
+          "properties": {
+            "kind": {
+              "const": "warning",
+              "type": "string"
+            },
+            "warning": {
+              "$ref": "#/$defs/WarningRow"
+            }
+          },
+          "required": [
+            "kind",
+            "warning"
+          ],
+          "type": "object"
+        },
+        "WarningList": {
+          "description": "`canon schema --warnings`: every warning code.",
+          "properties": {
+            "kind": {
+              "const": "warnings",
+              "type": "string"
+            },
+            "warnings": {
+              "items": {
+                "$ref": "#/$defs/WarningRow"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "warnings"
+          ],
+          "type": "object"
+        },
+        "WarningRow": {
+          "description": "One warning code of the warning registry (spec 7.5.2): no exit and no retryability.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "fix": {
+              "description": "One sentence telling the caller what to do about the warning.",
+              "type": "string"
+            },
+            "meaning": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "meaning",
+            "fix"
+          ],
+          "type": "object"
         }
       },
       "$id": "urn:canon:report:SchemaReport",
@@ -37965,6 +38103,12 @@
         },
         {
           "$ref": "#/$defs/ErrorEntry"
+        },
+        {
+          "$ref": "#/$defs/WarningList"
+        },
+        {
+          "$ref": "#/$defs/WarningEntry"
         }
       ],
       "description": "`canon schema`'s report (`SchemaReport`): the command listing, one command's\nnode of the generated spec, or the error registry.",
@@ -41683,5 +41827,267 @@
       "type": "object"
     }
   },
-  "specVersion": "1"
+  "specVersion": "1",
+  "warnings": [
+    {
+      "code": "BRIEF_ADOPTION_UNAPPROVED",
+      "fix": "Have the human approve the brief with `canon brief approve`, or take the adoption back with `canon subject unadopt`.",
+      "meaning": "a change was adopted into a building, verifying or shipped subject while its brief is not approved; the subject's existing scenarios keep accepting evidence, but scenarios tagged for the change wait for the approval"
+    },
+    {
+      "code": "BRIEF_DRAFT_PENDING",
+      "fix": "Tag a scenario for the draft change or have the human approve its brief if it belongs to this transition; otherwise ignore the note.",
+      "meaning": "a subject transition ran while a change of the subject is a pending draft (never approved, not a chore, no scenario tagged for it), so the transition does not judge that change"
+    },
+    {
+      "code": "BRIEF_OVERRIDE_ON_RECORD",
+      "fix": "Have the human approve the brief with `canon brief approve`, then attest the evidence again.",
+      "meaning": "an evidence record was attested while its brief was not approved, under `--override-reason`; the waiver stays on the record"
+    },
+    {
+      "code": "BRIEF_UNAPPROVED_NOT_ENFORCED",
+      "fix": "Give the change a brief with `canon change new`, or fix the `plans:` section of canon.yaml, then have the human approve the brief.",
+      "meaning": "a subject moved past a brief that is not approved but cannot be enforced (the change has no brief canon reads, or the `plans:` section is unreadable)"
+    },
+    {
+      "code": "CONFIG_MISSING",
+      "fix": "Run `canon init` or pass --repo <DIR> to a directory holding canon.yaml.",
+      "meaning": "canon.yaml does not exist"
+    },
+    {
+      "code": "CONFIG_UNREADABLE",
+      "fix": "Fix the canon.yaml, policy or setting named in the error, then run `canon init --check` to confirm.",
+      "meaning": "canon.yaml, policy or a setting it carries could not be read or is invalid"
+    },
+    {
+      "code": "DASHBOARD_SNAPSHOT_UNAVAILABLE",
+      "fix": "Run `canon report snapshot` for the repo, or pass a readable --snapshot directory, then start the dashboard again.",
+      "meaning": "the dashboard started without a readable panels snapshot, so its panels page shows the reason instead of panels"
+    },
+    {
+      "code": "DISPATCH_DIFF_RECORDS_UNAVAILABLE",
+      "fix": "Fix the tier routing or store the message names, then run `canon dispatch diff` again.",
+      "meaning": "`dispatch diff` could not read the task or run records of a tier, so that side of the diff is empty"
+    },
+    {
+      "code": "DISPATCH_MANIFEST_MISMATCH",
+      "fix": "Rename the manifest to match its run id, or correct the run id inside it.",
+      "meaning": "the manifest's run id differs from its file name"
+    },
+    {
+      "code": "DISPATCH_MANIFEST_UNREADABLE",
+      "fix": "Restore the dispatch manifest as a readable run record.",
+      "meaning": "the dispatch manifest is not a readable run record"
+    },
+    {
+      "code": "DISPATCH_RUN_COPIES_DIVERGE",
+      "fix": "Run `canon dispatch end` or `canon ingest sessions` to bring the two copies back together.",
+      "meaning": "a run's tier copy and its dispatch manifest differ; the tier copy is used"
+    },
+    {
+      "code": "DISPATCH_TIER_NOT_PERSISTED",
+      "fix": "Fix the tier the message names, then run `canon ingest sessions` so the tier holds the run.",
+      "meaning": "a dispatch begin or end could not be persisted to the run's routed tier; the manifest file is the only home of the record"
+    },
+    {
+      "code": "LAYOUT_MIGRATION_REQUIRED",
+      "fix": "Run `canon migrate` to move the spec root to the current layout.",
+      "meaning": "the spec root uses a pre-0.17 layout; run `canon migrate`"
+    },
+    {
+      "code": "LEDGER_KIND_ROUTED_AWAY",
+      "fix": "Route the kind to the `local` rung in canon.yaml, then run `canon status` again.",
+      "meaning": "a record kind is routed away from the `local` rung that status reads, so its records are not counted"
+    },
+    {
+      "code": "LEDGER_NO_SCENARIOS",
+      "fix": "Run `canon inventory sync` to index the scenarios the .feature files hold.",
+      "meaning": "the ledger holds no scenario records, so every subject reads as owning none"
+    },
+    {
+      "code": "LEDGER_RECORDS_UNREADABLE",
+      "fix": "Run `canon gate check` to name the unreadable records, then repair or rename them.",
+      "meaning": "ledger record files could not be read and are not counted"
+    },
+    {
+      "code": "LEDGER_ROLLBACK_NOT_RESTORED",
+      "fix": "Copy the archived versions back from the archive beside the ledger.",
+      "meaning": "a batch write was rolled back but the archived versions its records had replaced were not put back"
+    },
+    {
+      "code": "LEDGER_UNREADABLE",
+      "fix": "Run `canon init --check` to see what is wrong in canon.yaml, fix it, then run the command again.",
+      "meaning": "the repo's ledger could not be read, so nothing could be counted"
+    },
+    {
+      "code": "LEGACY_GUIDE_STALE",
+      "fix": "Do not follow the old skill files; run `canon migrate --json`, then read `canon skills show canon`.",
+      "meaning": "the installed canon skill files are the 0.27 guide and name commands later versions removed"
+    },
+    {
+      "code": "LEGACY_STATE_FOUND",
+      "fix": "Run `canon migrate --json` to preview the upgrade, then apply it as the preview says.",
+      "meaning": "the repo holds 0.27-era canon state that later versions do not read"
+    },
+    {
+      "code": "OLD_BRIEF_FORMAT_FOUND",
+      "fix": "Run `canon migrate --json` to preview the rewrite, then apply it as the preview says.",
+      "meaning": "a read command found briefs in the format canon 0.30 and earlier wrote; the commands that write and judge them are refused until they are rewritten"
+    },
+    {
+      "code": "OLD_LAYOUT_FOUND",
+      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "a read command found a ledger laid out by canon 0.29, so the records named by the old rule are not counted and writes are refused"
+    },
+    {
+      "code": "OVERRIDE_REASON_UNUSED",
+      "fix": "Drop --override-reason; the command needed no override.",
+      "meaning": "`--override-reason` was given but nothing was refused, so no override was recorded"
+    },
+    {
+      "code": "OVERRIDE_RECORDED",
+      "fix": "Have the human review the recorded waiver and close the gap it names.",
+      "meaning": "a refusal was waived under `--override-reason` and the waiver is recorded; a gap that appears later is not covered"
+    },
+    {
+      "code": "OVERRIDE_REFUSAL_WAIVED",
+      "fix": "Close the gap the waived refusal names, so the waiver is no longer needed.",
+      "meaning": "a refusal was waived under `--override-reason`"
+    },
+    {
+      "code": "POLICY_APPROVAL_UNREADABLE",
+      "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
+      "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 1), and `--override-reason` does not waive it"
+    },
+    {
+      "code": "POLICY_CHANGED_SINCE_APPROVAL",
+      "fix": "Restore `.canon/policy.yaml` to the approved bytes, or have the human run `canon policy approve` again.",
+      "meaning": "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it"
+    },
+    {
+      "code": "POLICY_MISSING",
+      "fix": "Write `.canon/policy.yaml` with a `spec_coverage` section and have the human approve it.",
+      "meaning": "`.canon/policy.yaml` does not exist, so the gate requires no evidence, failure cases or review"
+    },
+    {
+      "code": "POLICY_NOT_APPROVED",
+      "fix": "Have a human review the policy and run `canon policy approve --approver <who>`.",
+      "meaning": "`.canon/policy.yaml` has no approval record"
+    },
+    {
+      "code": "POLICY_SPEC_COVERAGE_ABSENT",
+      "fix": "Add a `spec_coverage` section to `.canon/policy.yaml` and have the human approve it.",
+      "meaning": "the policy has no `spec_coverage` section, so the gate requires no evidence, failure cases or review"
+    },
+    {
+      "code": "POLICY_SPEC_COVERAGE_INVALID",
+      "fix": "Fix the `spec_coverage` section of `.canon/policy.yaml`; `canon gate check` reports what is wrong.",
+      "meaning": "the policy's `spec_coverage` section is unusable, so the gate refuses and the review guard cannot read whether review is required"
+    },
+    {
+      "code": "POLICY_UNREADABLE",
+      "fix": "Fix `.canon/policy.yaml` so it parses, then have the human approve it.",
+      "meaning": "`.canon/policy.yaml` cannot be read and falls back to defaults, so the gate requires no evidence, failure cases or review"
+    },
+    {
+      "code": "QUERY_PLUGIN_DIAGNOSTIC",
+      "fix": "Read the diagnostic in the message and fix the plugin or the record it names.",
+      "meaning": "a `query --plugin` projection reported a diagnostic; the records are listed without that projection where it failed"
+    },
+    {
+      "code": "REFERENCES_UNCHECKED",
+      "fix": "Make the sources readable (the message names the cause), then run the command again.",
+      "meaning": "the sources that records refer to could not be read, so references to missing sources were not checked"
+    },
+    {
+      "code": "REPORT_TIER_NOT_READ_DIRECTLY",
+      "fix": "Route the kinds the message names to a rung the report reads, then run the report again.",
+      "meaning": "a report was built from a ledger where some record kinds are not read directly from their routed tier"
+    },
+    {
+      "code": "RETRIEVE_REGIME_FELL_BACK",
+      "fix": "Pass the regime that holds the guidance you want with --regime, or record guidance under the requested regime.",
+      "meaning": "`retrieve` served guidance from a regime derived by fallback instead of the one asked for"
+    },
+    {
+      "code": "REVIEW_RECORDS_UNMIGRATED",
+      "fix": "Run `canon migrate` to rewrite the old reviews to what the evidence says.",
+      "meaning": "scenarios have a review that predates review pinning and does not count until it is rewritten"
+    },
+    {
+      "code": "ROLE_UNKNOWN_RECORDED",
+      "fix": "Pass planner, implementer, reviewer, orchestrator or a role the policy names.",
+      "meaning": "`--as` or `--role` names a role that is not a known role or one the policy names; the command runs and records the value as given"
+    },
+    {
+      "code": "SCENARIO_INDEX_CHECK_FAILED",
+      "fix": "Run `canon inventory sync` and read the error it names.",
+      "meaning": "whether the scenario index is stale could not be checked"
+    },
+    {
+      "code": "SCENARIO_INDEX_NOT_REFRESHED",
+      "fix": "Run `canon inventory sync`; it names each format violation, duplicate id or lock problem to fix.",
+      "meaning": "the scenario index is stale and could not be refreshed, so graded answers may describe specs the files no longer say"
+    },
+    {
+      "code": "SCENARIO_INDEX_REFRESHED",
+      "fix": "Run `canon inventory sync` to list any tag diagnostics the refresh found.",
+      "meaning": "a read command refreshed a stale scenario index from changed .feature files and reports what it wrote"
+    },
+    {
+      "code": "SCENARIO_SUBJECT_UNKNOWN",
+      "fix": "Create the subject with `canon subject new`, or correct the `@subject` tag.",
+      "meaning": "scenarios are tagged `@subject:<id>` but no subject with that id exists"
+    },
+    {
+      "code": "SEARCH_GITIGNORE_MISSING",
+      "fix": "Run `canon init` or `canon migrate` to add the line to .gitignore.",
+      "meaning": "the repo's .gitignore lacks the line of the search index directory"
+    },
+    {
+      "code": "SEARCH_INDEX_IN_MEMORY",
+      "fix": "Make `.canon/index` writable, then run the command again.",
+      "meaning": "the search index file could not be written or deleted, so the index was built in memory for this run"
+    },
+    {
+      "code": "SEARCH_INDEX_REBUILT",
+      "fix": "Nothing to do; if it recurs, check the disk and permissions of `.canon/index`.",
+      "meaning": "the search index file was not a usable database, so it was deleted and rebuilt"
+    },
+    {
+      "code": "STRATEGY_DEMOTED",
+      "fix": "Review the contradicting trajectory before promoting the strategy again.",
+      "meaning": "later contradictory evidence demoted an active strategy while its promotion was blocked"
+    },
+    {
+      "code": "SUBJECT_OVERRIDE_ON_RECORD",
+      "fix": "Close the gaps the waiver names, then move the subject again without an override.",
+      "meaning": "a subject stands in its status under a recorded `--override-reason` waiver of gate refusals"
+    },
+    {
+      "code": "SUBJECT_REOPENED",
+      "fix": "Keep the follow-up in its change, then scenario, evidence and review, before shipping again.",
+      "meaning": "a shipped subject was reopened for a follow-up change; shipping again runs every guard"
+    },
+    {
+      "code": "TASK_PROOF_IS_CANON_COMMAND",
+      "fix": "Bind the artifact or report that proves the task with `canon evidence add --artifact <path>`.",
+      "meaning": "a task was flipped on evidence that binds no file and cites a canon command, which reports on canon's own records and proves nothing"
+    },
+    {
+      "code": "TASK_REIMPORT_INCOMPLETE",
+      "fix": "Run `canon ingest plans` to see why the change did not import.",
+      "meaning": "a task was flipped but its change did not re-import cleanly, so the task status record may disagree with the plan"
+    },
+    {
+      "code": "TASK_STATUS_NOT_REFRESHED",
+      "fix": "Run `canon ingest plans` so the task records match the plan.",
+      "meaning": "a task was flipped but its status record was not refreshed, so `canon query --kind task` may not match the plan"
+    },
+    {
+      "code": "UNKNOWN_ROLE_IGNORED",
+      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
+      "meaning": "`CANON_ROLE` holds a value that is not a role and was ignored, because the command (`schema`, `context`, `skills show`) does not depend on the role"
+    }
+  ]
 }

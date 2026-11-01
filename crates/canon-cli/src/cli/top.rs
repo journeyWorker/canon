@@ -287,12 +287,18 @@ pub struct SchemaArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// Print every error code any command can emit, with its meaning, instead of a command
-    #[arg(long, conflicts_with_all = ["path", "error"])]
+    /// Print every error code any command can emit, with its meaning and reasons, instead of a command
+    #[arg(long, conflicts_with_all = ["path", "error", "warnings", "warning"])]
     pub errors: bool,
-    /// Show one error code: its meaning, exit, retryable and fix (an unknown code exits 2)
-    #[arg(long, value_name = "CODE", conflicts_with = "path")]
+    /// Show one error code: its meaning, exit, retryable, fix and reasons (an unknown code, or a code that is only a warning, exits 2)
+    #[arg(long, value_name = "CODE", conflicts_with_all = ["path", "warnings", "warning"])]
     pub error: Option<String>,
+    /// Print every warning code, with its meaning, instead of a command
+    #[arg(long, conflicts_with_all = ["path", "warning"])]
+    pub warnings: bool,
+    /// Show one warning code: its meaning and fix (an unknown code exits 2)
+    #[arg(long, value_name = "CODE", conflicts_with = "path")]
+    pub warning: Option<String>,
 }
 
 /// The shells `canon completion` writes a script for.

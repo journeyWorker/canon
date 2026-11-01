@@ -23,6 +23,13 @@
 //! node. Output order is deterministic: leaves sort by canonical path,
 //! operands and options keep their declaration order.
 //!
+//! The registries (0.34, contract 1.1): `--errors` and `--error <CODE>` print the
+//! error registry with each code's reasons, `--warnings` and `--warning <CODE>`
+//! the warning registry ([`crate::cli_error::all_warnings`]). Each answer names
+//! itself in `data.kind` (`errors`, `error`, `warnings`, `warning`). A path and
+//! the four options exclude one another; an unknown code, or a code of the other
+//! registry, is `USAGE` with the option as `field`.
+//!
 //! 0.21 adds three things the table and clap cannot say alone. `roles` says
 //! which roles' steps use a command ([`CommandMeta::roles`]); bare `canon
 //! schema` lists every command, and `--as <ROLE>` lists only that role's
@@ -270,7 +277,17 @@ pub struct ListSchema {
 /// `canon schema --errors`: every error code.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorList {
+    #[schemars(extend("const" = "errors"))]
+    kind: &'static str,
     errors: Vec<spec::ErrorRow>,
+}
+
+/// `canon schema --warnings`: every warning code.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct WarningList {
+    #[schemars(extend("const" = "warnings"))]
+    kind: &'static str,
+    warnings: Vec<spec::WarningRow>,
 }
 
 /// `canon schema`'s report (`SchemaReport`): the command listing, one command's
@@ -282,15 +299,43 @@ pub enum SchemaReport<'a> {
     Command(&'a spec::Node),
     Errors(ErrorList),
     Error(ErrorEntry),
+    Warnings(WarningList),
+    Warning(WarningEntry),
 }
 
 /// `canon schema --error <CODE>`: the one registry row.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorEntry {
+    #[schemars(extend("const" = "error"))]
+    kind: &'static str,
     pub error: spec::ErrorRow,
 }
 
-impl crate::json_out::Report for SchemaReport<'_> {}
+/// `canon schema --warning <CODE>`: the one warning registry row.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct WarningEntry {
+    #[schemars(extend("const" = "warning"))]
+    kind: &'static str,
+    pub warning: spec::WarningRow,
+}
+
+impl crate::json_out::Report for SchemaReport<'_> {
+    /// The version of the self-description format is the contract version canon implements (spec 10.1.4).
+    const SCHEMA_VERSION: &'static str = crate::json_out::CONTRACT_VERSION;
+}
+
+/// The registry options of `canon schema`, which exclude a path and one another.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Registry<'a> {
+    /// `--errors`
+    pub errors: bool,
+    /// `--error <CODE>`
+    pub error: Option<&'a str>,
+    /// `--warnings`
+    pub warnings: bool,
+    /// `--warning <CODE>`
+    pub warning: Option<&'a str>,
+}
 
 /// Why a command path did not resolve.
 #[derive(Debug, PartialEq, Eq)]
@@ -419,15 +464,23 @@ fn list_entries(nodes: &[Node], under: &[String], role: Option<Role>) -> Vec<Lis
 /// does not resolve is a refusal (exit 2) on stderr naming the nearest matches.
 /// The listing is unfiltered; `as_role` (the `--as` flag, never `CANON_ROLE`)
 /// keeps only that role's commands. `--errors` lists every error code and
-/// `--error <CODE>` shows one (unknown: exit 2). A command's own schema is its
-/// node of the generated spec ([`crate::spec`]).
-pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: Option<&str>, as_role: Option<Role>) -> u8 {
-    if errors {
+/// `--error <CODE>` shows one, `--warnings` and `--warning <CODE>` the same for
+/// the warning registry (an unknown code is `USAGE`, exit 2). A command's own
+/// schema is its node of the generated spec ([`crate::spec`]).
+pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>, as_role: Option<Role>) -> u8 {
+    if registry.errors {
         print_errors(json);
         return 0;
     }
-    if let Some(code) = error {
+    if let Some(code) = registry.error {
         return print_error(code, json);
+    }
+    if registry.warnings {
+        print_warnings(json);
+        return 0;
+    }
+    if let Some(code) = registry.warning {
+        return print_warning(code, json);
     }
     // Building the tree first copies a parent's `global = true` flags (`brief --json`) down to its leaves.
     let mut built = root.clone();
@@ -472,7 +525,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: O
 fn print_errors(json: bool) {
     let entries = spec::error_rows();
     if json {
-        crate::json_out::data("schema", &SchemaReport::Errors(ErrorList { errors: entries }));
+        crate::json_out::data("schema", &SchemaReport::Errors(ErrorList { kind: "errors", errors: entries }));
     } else {
         let width = entries.iter().map(|e| e.code.len()).max().unwrap_or(0);
         for e in &entries {
@@ -481,20 +534,59 @@ fn print_errors(json: bool) {
     }
 }
 
-/// `canon schema --error <CODE>`: one registry row; an unknown code is a refusal.
+/// `canon schema --warnings`: the whole warning registry, sorted by code.
+fn print_warnings(json: bool) {
+    let entries = spec::warning_rows();
+    if json {
+        crate::json_out::data("schema", &SchemaReport::Warnings(WarningList { kind: "warnings", warnings: entries }));
+    } else {
+        let width = entries.iter().map(|e| e.code.len()).max().unwrap_or(0);
+        for e in &entries {
+            println!("{:<width$}  {}", e.code, e.meaning);
+        }
+    }
+}
+
+/// The registered codes that contain `code` or are contained in it, for `suggestions`.
+fn near_codes(code: &str, known: impl Iterator<Item = &'static str>) -> Vec<String> {
+    known.filter(|known| known.contains(code) || code.contains(known)).take(5).map(str::to_string).collect()
+}
+
+/// `canon schema --error <CODE>`: one registry row. An unknown code, or a code that is only a
+/// warning, is `USAGE` with `field` `--error` (spec 7.3.4).
 fn print_error(code: &str, json: bool) -> u8 {
     let Some(row) = spec::error_rows().into_iter().find(|row| row.code == code) else {
-        let nearest: Vec<&str> = crate::cli_error::all_codes().iter().map(|info| info.code).filter(|known| known.contains(code) || code.contains(known)).take(5).collect();
-        let mut error = crate::cli_error::CliError::refused("UNKNOWN_ERROR_CODE", format!("`{code}` is not an error code canon has")).field("--error").received(code).hint("`canon schema --errors` lists every code");
-        if !nearest.is_empty() {
-            error = error.suggestions(nearest.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
-        }
-        return error.emit("canon schema", json);
+        // A code that is only a warning points at the warning registry; any other unknown code at the list.
+        let (hint, nearest) = if crate::cli_error::warning_info(code).is_some() {
+            (format!("canon schema --warning {code} --json"), Vec::new())
+        } else {
+            ("canon schema --errors --json".to_string(), near_codes(code, crate::cli_error::all_codes().iter().map(|info| info.code)))
+        };
+        return crate::cli_error::CliError::refused("USAGE", format!("`{code}` is not an error code canon has")).field("--error").received(code).suggestions(nearest).hint(hint).emit("canon schema", json);
     };
     if json {
-        crate::json_out::data("schema", &SchemaReport::Error(ErrorEntry { error: row }));
+        crate::json_out::data("schema", &SchemaReport::Error(ErrorEntry { kind: "error", error: row }));
     } else {
         println!("{}  exit {}  retryable: {}", row.code, row.exit, row.retryable);
+        println!("  {}", row.meaning);
+        println!("  fix: {}", row.fix);
+        for reason in &row.reasons {
+            println!("  reason {}: {} ({})", reason.reason, reason.meaning, reason.fix);
+        }
+    }
+    0
+}
+
+/// `canon schema --warning <CODE>`: one warning registry row; an unknown code is `USAGE` with `field` `--warning`.
+fn print_warning(code: &str, json: bool) -> u8 {
+    let Some(row) = spec::warning_rows().into_iter().find(|row| row.code == code) else {
+        let nearest = near_codes(code, crate::cli_error::all_warnings().iter().map(|info| info.code));
+        return crate::cli_error::CliError::refused("USAGE", format!("`{code}` is not a warning code canon has")).field("--warning").received(code).suggestions(nearest).hint("canon schema --warnings --json").emit("canon schema", json);
+    };
+    if json {
+        crate::json_out::data("schema", &SchemaReport::Warning(WarningEntry { kind: "warning", warning: row }));
+    } else {
+        println!("{}", row.code);
         println!("  {}", row.meaning);
         println!("  fix: {}", row.fix);
     }

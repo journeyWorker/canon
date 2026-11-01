@@ -1,4 +1,4 @@
 canon: USAGE: the argument '--policy <LEVEL>' cannot be used with '--no-policy'
   field: --policy
   expected: light, standard, strict
-  hint: a working call: canon init; `canon schema init` lists every argument
+  hint: a working call: canon init; `canon schema init --json` lists every argument

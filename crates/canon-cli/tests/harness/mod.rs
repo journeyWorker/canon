@@ -374,6 +374,11 @@ pub fn validate_document(document: &Value) -> Vec<String> {
     for problem in atip::envelope_problems(document) {
         problems.push(format!("the envelope: {problem}"));
     }
+    // A failure without `data` can come from a group, or from no command at all (`canon finding --bogus`,
+    // `canon nosuch`): it has no leaf whose output it could follow, and the envelope schema is all there is to check.
+    if ok == Some(false) && document.get("data").is_none() {
+        return problems;
+    }
     let Some(command) = document["meta"]["command"].as_str() else {
         problems.push("meta.command is missing".into());
         return problems;

@@ -138,7 +138,7 @@ const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "diverge
 
 /// A code on one of these lines is a warning (`meta.warnings`), not an error a command ends with: it is
 /// in the registry but belongs to no command's error list.
-const WARNING_SITES: &[&str] = &["warn_err!(", "json_out::warn(", "warn_at(", "Warning::new(", "warnings.push(("];
+const WARNING_SITES: &[&str] = &["warn_err!(", "json_out::warn(", "warn_at(", "Warning::new(", "warnings.push((", "warning("];
 
 /// Codes of the parse: the command word is wrong, or missing. No leaf ends with them (the parse fails
 /// before any leaf is known); `canon schema` has its own `UNKNOWN_COMMAND` for a path it is asked about.
@@ -208,7 +208,7 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
 fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BTreeSet<&'static str>) {
     let mut warned: BTreeSet<&'static str> = BTreeSet::new();
     let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
-    let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).filter(|c| !GLOBAL.contains(c)).collect();
+    let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).chain(canon_cli::cli_error::all_warnings().iter().map(|info| info.code)).filter(|c| !GLOBAL.contains(c)).collect::<BTreeSet<_>>().into_iter().collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
     let mut files: Vec<PathBuf> = ["", "run", "search"]
@@ -233,8 +233,10 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
         }
         let mut file_has_codes = false;
         for (i, line) in lines.iter().enumerate() {
+            // A warning call may wrap: the code literal is then alone on the line after `warn_err!(`.
+            let wrapped = i > 0 && lines[i - 1].trim_end().ends_with('(') && WARNING_SITES.iter().any(|marker| lines[i - 1].contains(marker));
             for code in codes.iter().filter(|c| line.contains(&format!("\"{c}\""))) {
-                if WARNING_SITES.iter().any(|marker| line.contains(marker)) {
+                if wrapped || WARNING_SITES.iter().any(|marker| line.contains(marker)) {
                     warned.insert(code);
                     continue;
                 }
@@ -341,8 +343,30 @@ fn the_schema_error_codes_are_the_codes_the_sources_emit() {
 fn every_registered_code_is_emitted_by_some_command() {
     let (table, warned) = derive_with_warnings();
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
-    let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !warned.contains(c) && !PARSER_CODES.contains(c) && !AWAITING_WIRING.contains(c)).collect();
-    assert!(orphans.is_empty(), "registered but attributed to no command: {orphans:?}");
+    let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !PARSER_CODES.contains(c) && !AWAITING_WIRING.contains(c)).collect();
+    assert!(orphans.is_empty(), "registered as an error but attributed to no command: {orphans:?}");
+    let _ = warned;
+}
+
+/// A code said only as a warning is in the warning registry and not in the error registry; one said both ways is in
+/// both, with the same `meaning` (spec 7.5.3); every code of the warning registry is said as a warning somewhere.
+#[test]
+fn atip_contract11_07_warning_only_codes_are_in_the_warning_registry_and_dual_codes_in_both_with_one_meaning() {
+    let (table, warned) = derive_with_warnings();
+    let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
+    let errors: BTreeSet<&str> = all_codes().iter().map(|info| info.code).collect();
+    let warnings: BTreeSet<&str> = canon_cli::cli_error::all_warnings().iter().map(|info| info.code).collect();
+    for code in &warned {
+        assert!(warnings.contains(code), "`{code}` is said as a warning and is not in the warning registry");
+        if emitted.contains(code) {
+            let (error, warning) = (canon_cli::cli_error::code_info(code).expect("an emitted code is registered"), canon_cli::cli_error::warning_info(code).expect("a warned code is registered"));
+            assert_eq!(error.meaning, warning.meaning, "`{code}` is both an error and a warning: the two registries must say the same thing");
+        } else {
+            assert!(!errors.contains(code), "`{code}` is only ever a warning and must leave the error registry");
+        }
+    }
+    let unsaid: Vec<&&str> = warnings.iter().filter(|code| !warned.contains(*code)).collect();
+    assert!(unsaid.is_empty(), "in the warning registry but said as a warning nowhere: {unsaid:?}");
 }
 
 /// A code the sources name for one command only is listed under that command's leaves and no other (a file default must not spread it).

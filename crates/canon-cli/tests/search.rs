@@ -111,7 +111,7 @@ fn warnings(output: &Output) -> Vec<String> {
             w.iter()
                 .map(|warning| {
                     let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning carries a code: {warning}"));
-                    assert!(canon_cli::cli_error::code_info(code).is_some(), "the warning code {code} is registered");
+                    assert!(canon_cli::cli_error::warning_info(code).is_some(), "the warning code {code} is in the warning registry");
                     warning["message"].as_str().unwrap().to_string()
                 })
                 .collect()

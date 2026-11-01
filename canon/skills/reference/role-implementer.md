@@ -177,7 +177,7 @@ canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=
 ```
 ```text
 # Describe canon's own commands
-canon schema [<PATH>]* [--errors | --error <CODE>]
+canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add

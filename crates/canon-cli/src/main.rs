@@ -75,7 +75,7 @@ fn run() -> ExitCode {
     let mut command = cli::command();
     command.build();
     // `--input` becomes ordinary arguments (or runs a batch) before clap parses.
-    let args = match canon_cli::input::expand(&command, relocate_json(std::env::args_os().collect())) {
+    let args = match canon_cli::input::expand(&command, canon_cli::run::entry::hoist_tool_wide_options(&command, relocate_json(std::env::args_os().collect()))) {
         Expanded::Argv(args) => args,
         Expanded::Exit(code) => return code,
     };

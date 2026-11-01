@@ -214,18 +214,26 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - Pass `--json` and read stdout as one document, nothing on stderr. Success is
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in
-  `data`). `meta` carries `tool`, `toolVersion`, `contract` (`atip/1`), `schemaVersion`,
+  `data`). `meta` carries `tool`, `toolVersion`, `contract` (`atip/1`),
+  `contractVersion` (`1.1`), `schemaVersion`,
   `command`, and when present `next`, `warnings` (`[{code, message}]`) and
   `page`; a repeated write that changed nothing reports `data.unchanged: true`.
-  Absent members are omitted, never `null` or `[]`. A paged list puts
+  Absent members are omitted, never `null` or `[]` (a value you sent empty comes back as `received: ""`).
+  Read the members you know and ignore the ones you do not: a later canon
+  adds members, and a value of a closed set you have not seen (a `severity`, an
+  `outcome`, a `reason`) is one item to leave out, never a reason to reject the document. A paged list puts
   `meta.page.nextCursor` on the call's `meta.next` as `--cursor <nextCursor>`;
   no `nextCursor` means no more.
-  On failure branch on `error.code`, fix the option `error.field` names
+  On failure branch on `error.code`, and on `error.reason` where the code has
+  reasons (`INPUT_INVALID` says `NOT_JSON`, `UNKNOWN_KEY`, `STDIN_TTY`, … so you
+  know whether to fix the JSON or the shell); fix the option `error.field` names
   using the `error.expected` values (`field` is an option name, or a JSON
   pointer such as `/items/2/scenario` into an `--input` document), and
-  follow `error.hint`: every refusal carries a working invocation. The codes
-  are stable; `canon schema --errors --json` lists them and
-  `canon schema --error <CODE>` explains one.
+  follow `error.hint`: it is one runnable command line that starts with `canon`, the
+  same with `<PLACEHOLDER>`s you fill in, or one sentence. The codes
+  are stable; `canon schema --errors --json` lists them with their reasons and
+  `canon schema --error <CODE>` explains one. A warning code (`meta.warnings`) is in
+  `canon schema --warnings --json`; `canon schema --warning <CODE>` explains one.
 - **Exit codes:** only 0, 1 and 2 exist: 0 ok; 1 the command ran and its answer
   is negative or incomplete (a failed check, a violation, `unverifiable` when
   nothing was examined, a partly failed batch); 2 refused to run (usage,

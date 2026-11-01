@@ -132,4 +132,6 @@ to	STATE	state a subject moves to
 tracking	TEXT	where an accepted gap is tracked
 upstream-ref	TEXT	upstream provenance reference
 verdict	VERDICT	verdict of a piece of evidence
+warning	CODE	warning code to explain
+warnings	-	mode: list every warning code
 watch	-	mode: keep polling

@@ -488,6 +488,15 @@ fn global_options(root: &Command) -> Vec<OptionSpec> {
     root.get_arguments().filter(|a| a.is_global_set() && !is_builtin(a)).map(|a| option_spec(root, a, &no_conflicts)).collect()
 }
 
+/// One reason registered under an error code (spec 7.6).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ReasonRow {
+    pub reason: &'static str,
+    pub meaning: &'static str,
+    /// What the caller does next in this situation.
+    pub fix: &'static str,
+}
+
 /// One error code of the registry.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorRow {
@@ -499,11 +508,38 @@ pub struct ErrorRow {
     pub retryable: bool,
     /// One sentence telling the caller what to do about the code.
     pub fix: &'static str,
+    /// The situations under the code that need another next action; absent when the code has none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub reasons: Vec<ReasonRow>,
 }
 
 /// Every registered error code, sorted by code.
 pub fn error_rows() -> Vec<ErrorRow> {
-    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: i32::from(info.exit), retryable: info.retryable, fix: info.fix }).collect()
+    crate::cli_error::all_codes()
+        .iter()
+        .map(|info| ErrorRow {
+            code: info.code,
+            meaning: info.meaning,
+            exit: i32::from(info.exit),
+            retryable: info.retryable,
+            fix: info.fix,
+            reasons: info.reasons.iter().map(|reason| ReasonRow { reason: reason.reason, meaning: reason.meaning, fix: reason.fix }).collect(),
+        })
+        .collect()
+}
+
+/// One warning code of the warning registry (spec 7.5.2): no exit and no retryability.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct WarningRow {
+    pub code: &'static str,
+    pub meaning: &'static str,
+    /// One sentence telling the caller what to do about the warning.
+    pub fix: &'static str,
+}
+
+/// Every registered warning code, sorted by code.
+pub fn warning_rows() -> Vec<WarningRow> {
+    crate::cli_error::all_warnings().iter().map(|info| WarningRow { code: info.code, meaning: info.meaning, fix: info.fix }).collect()
 }
 
 /// Every removed spelling with its replacement (the CHANGELOG's Upgrading tables
@@ -571,6 +607,7 @@ pub fn generate() -> Value {
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
         "contract": crate::json_out::CONTRACT,
         "errors": error_rows(),
+        "warnings": warning_rows(),
         "removed": removed_rows(),
         "commands": nodes,
         "schemas": schemas(&nodes),

@@ -50,9 +50,15 @@ fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
 }
 
 /// What breaks the envelope schema in `document`: one line per violation,
-/// empty when the document is a conforming envelope.
+/// empty when the document is a conforming envelope. The schema alone cannot say that
+/// `meta.contractVersion` is never `"1.0"` written out (spec 10.13 rule 16: an absent value means 1.0), so that
+/// rule is checked here beside it.
 pub fn envelope_problems(document: &Value) -> Vec<String> {
-    problems_of(&ENVELOPE, document)
+    let mut problems = problems_of(&ENVELOPE, document);
+    if document.pointer("/meta/contractVersion").and_then(Value::as_str) == Some("1.0") {
+        problems.push("\"1.0\" is never written out as meta.contractVersion: absent means 1.0 (spec 10.13 rule 16) at /meta/contractVersion".to_string());
+    }
+    problems
 }
 
 /// What breaks the error-object schema in `error` (the `error` member of a failure envelope), empty when it conforms.
@@ -120,17 +126,21 @@ mod tests {
     }
 
     #[test]
-    fn atip_1_1_01_contract_version_is_valid_only_with_contract() {
+    fn atip_contract11_02_a_contract_version_without_contract_or_of_another_major_or_written_as_1_0_is_refused() {
         let mut without = meta();
         without.as_object_mut().expect("meta is an object").remove("contract");
         assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": without })).is_empty(), "`contractVersion` without `contract` is refused");
         let mut lone = meta();
         lone["contractVersion"] = json!("2.0");
         assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": lone })).is_empty(), "another major is refused");
+        let mut written = meta();
+        written["contractVersion"] = json!("1.0");
+        assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": written })).is_empty(), "1.0 is never written out");
+        assert_eq!(envelope_problems(&json!({ "ok": true, "data": {}, "meta": meta() })), Vec::<String>::new(), "contract atip/1 with contractVersion 1.1 passes");
     }
 
     #[test]
-    fn atip_1_1_02_a_reason_and_a_warning_row_validate() {
+    fn atip_contract11_03_a_reason_and_a_warning_row_validate() {
         let failure = json!({ "ok": false, "error": { "code": "INPUT_INVALID", "reason": "NOT_JSON", "message": "m", "retryable": false, "field": "--input", "received": "" }, "meta": meta() });
         assert_eq!(envelope_problems(&failure), Vec::<String>::new());
         let lower = json!({ "code": "INPUT_INVALID", "reason": "not_json", "message": "m", "retryable": false });

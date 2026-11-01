@@ -127,12 +127,14 @@ fn error_returns_that_codes_row_and_an_unknown_code_exits_2() {
     assert_eq!(out.status.code(), Some(2));
     let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
     assert_eq!(body["ok"], false);
-    assert_eq!(body["error"]["code"], "UNKNOWN_ERROR_CODE", "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("--error")), "{body}");
 }
 
 #[test]
 fn errors_error_and_an_operand_conflict() {
     assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_MISSING"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--warnings", "--warning", "OLD_LAYOUT_FOUND"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--warning", "OLD_LAYOUT_FOUND", "evidence", "add"]).status.code(), Some(2));
     assert_eq!(canon(&["schema", "--error", "CONFIG_MISSING", "evidence", "add"]).status.code(), Some(2));
     assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_MISSING", "evidence", "add"]).status.code(), Some(2));
 }

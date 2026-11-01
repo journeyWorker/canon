@@ -1,0 +1,21 @@
+description: "atip/1 1.1 (0.34): every `--input` fault is INPUT_INVALID or INPUT_TOO_LARGE with the contract's reserved `error.reason` and no `x-canon`: NOT_JSON, EMPTY, UNREADABLE, NOT_OBJECT, BATCH_UNSUPPORTED, UNKNOWN_KEY, FLAG_ONLY_KEY, INVALID_VALUE and TOO_MANY_ITEMS, each with exit 2, and every envelope names contractVersion 1.1"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [scenario, new, --input, "{ not json", --json]
+    exit: 2
+  - args: [scenario, new, --input, "", --json]
+    exit: 2
+  - args: [scenario, new, --input, no-such-file.json, --json]
+    exit: 2
+  - args: [scenario, new, --input, "[{\"operands\":[\"a.b.01\"],\"title\":\"t\"}, 3]", --json]
+    exit: 2
+  - args: [purge, --input, "[{\"repo\":\".\"}]", --json]
+    exit: 2
+  - args: [scenario, new, --input, "{\"operands\":[\"a.b.01\"],\"title\":\"t\",\"nosuch\":1}", --json]
+    exit: 2
+  - args: [scenario, new, --input, "{\"operands\":[\"a.b.01\"],\"title\":\"t\",\"json\":true}", --json]
+    exit: 2
+  - args: [scenario, new, --input, "{\"operands\":[\"a.b.01\"],\"title\":true}", --json]
+    exit: 2

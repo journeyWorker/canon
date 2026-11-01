@@ -4,6 +4,50 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Breaking
+
+canon adopts atip/1 **1.1** (https://github.com/journeyWorker/atip, tag v1.1.0: spec 6.6, 7.1 to 7.6, 9.13, 10.1, 15.6, 15.7). The 0.33 names below are deleted, with no aliases; every consumer in this repository (the guides the binary carries, the website in English and Korean, the dashboard, the npm launcher, the dogfood trace check, the conformance corpus, the command spec and the scenario sentences) moved to the new names in the same change. A caller written for 1.0 reads `meta.contractVersion` first; a caller that ignores unknown members (the contract requires it, 15.6) keeps working.
+
+**The envelope and `schema`.** The vendored contract schemas in `crates/atip/schema/` are the v1.1.0 ones, byte for byte, pinned by digest.
+
+| 0.33 | 0.34 |
+|---|---|
+| `meta.contract` alone | `meta.contract` (`atip/1`) and `meta.contractVersion` (`1.1`) on every envelope, success and failure alike; the value is never `1.0` |
+| `canon schema --errors` and `--error <CODE>` answers without `data.kind` | `data.kind` is `errors` or `error`; the answer's `meta.schemaVersion` is `1.1` (so is every `canon schema` answer's: the tree, group and command shapes follow with `canon-0-34-atip-schema-doc`, which ships in the same release) |
+| no warning registry | `canon schema --warnings --json` (`data.kind` `warnings`) and `canon schema --warning <CODE> --json` (`data.kind` `warning`): rows are `{code, meaning, fix}`, with no exit and no retryability. `canon schema <path>`, `--errors`, `--error`, `--warnings` and `--warning` exclude one another (`USAGE`) |
+| a warning-only code is an error registry row with `exit: 1` | it left the error registry: `canon schema --errors` no longer lists it and `canon schema --error <CODE>` on it is `USAGE` (`field` `--error`, `hint` `canon schema --warning <CODE> --json`). **A 1.0 caller that looked a warning code up with `--error` no longer finds it there: read `--warnings` first.** The codes that moved are listed below |
+| `UNKNOWN_ERROR_CODE` (`canon schema --error NOPE`) | `USAGE`, `field` `--error`, `received` the code, `hint` `canon schema --errors --json` (the same for an unknown `--warning` code: `field` `--warning`) |
+
+The warning-only codes that moved to the warning registry (45): `BRIEF_ADOPTION_UNAPPROVED`, `BRIEF_DRAFT_PENDING`, `BRIEF_OVERRIDE_ON_RECORD`, `BRIEF_UNAPPROVED_NOT_ENFORCED`, `DASHBOARD_SNAPSHOT_UNAVAILABLE`, `DISPATCH_DIFF_RECORDS_UNAVAILABLE`, `DISPATCH_RUN_COPIES_DIVERGE`, `DISPATCH_TIER_NOT_PERSISTED`, `LEDGER_KIND_ROUTED_AWAY`, `LEDGER_NO_SCENARIOS`, `LEDGER_RECORDS_UNREADABLE`, `LEDGER_ROLLBACK_NOT_RESTORED`, `LEDGER_UNREADABLE`, `LEGACY_GUIDE_STALE`, `LEGACY_STATE_FOUND`, `OLD_BRIEF_FORMAT_FOUND`, `OLD_LAYOUT_FOUND`, `OVERRIDE_REASON_UNUSED`, `OVERRIDE_RECORDED`, `OVERRIDE_REFUSAL_WAIVED`, `POLICY_MISSING`, `POLICY_NOT_APPROVED`, `POLICY_SPEC_COVERAGE_ABSENT`, `POLICY_SPEC_COVERAGE_INVALID`, `POLICY_UNREADABLE`, `QUERY_PLUGIN_DIAGNOSTIC`, `REFERENCES_UNCHECKED`, `REPORT_TIER_NOT_READ_DIRECTLY`, `RETRIEVE_REGIME_FELL_BACK`, `REVIEW_RECORDS_UNMIGRATED`, `ROLE_UNKNOWN_RECORDED`, `SCENARIO_INDEX_CHECK_FAILED`, `SCENARIO_INDEX_NOT_REFRESHED`, `SCENARIO_INDEX_REFRESHED`, `SCENARIO_SUBJECT_UNKNOWN`, `SEARCH_GITIGNORE_MISSING`, `SEARCH_INDEX_IN_MEMORY`, `SEARCH_INDEX_REBUILT`, `STRATEGY_DEMOTED`, `SUBJECT_OVERRIDE_ON_RECORD`, `SUBJECT_REOPENED`, `TASK_PROOF_IS_CANON_COMMAND`, `TASK_REIMPORT_INCOMPLETE`, `TASK_STATUS_NOT_REFRESHED`, `UNKNOWN_ROLE_IGNORED`.
+
+These codes are in both registries, with the same meaning, because the same situation is an error in some invocations and a warning in others (spec 7.5.3): `CONFIG_MISSING`, `CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE`, `LAYOUT_MIGRATION_REQUIRED`, `POLICY_APPROVAL_UNREADABLE`, `POLICY_CHANGED_SINCE_APPROVAL`.
+
+**Reasons.** `error.reason` is a member of the error (spec 7.1, 7.6) and the registry lists the reasons of a code in `reasons: [{reason, meaning, fix}]` (`canon schema --errors`, `--error INPUT_INVALID`). A reason never changes the code's exit or `retryable`; an error without one is still complete.
+
+| 0.33 | 0.34 |
+|---|---|
+| `error.x-canon.reason` `unreadable` (`INPUT_INVALID`, `field` `--input`) | `error.reason` `UNREADABLE` |
+| `x-canon.reason` `tty` | `STDIN_TTY` |
+| `x-canon.reason` `empty` | `EMPTY` |
+| `x-canon.reason` `syntax` | `NOT_JSON` (the source is not JSON), or `NOT_OBJECT` (it is JSON, but the document or an item of a batch is not an object) |
+| `x-canon.reason` `batch-unsupported` | `BATCH_UNSUPPORTED` |
+| a fault in the document (pointer `field`) had no reason | `UNKNOWN_KEY` (a key that is no option of the command), `FLAG_ONLY_KEY` (a key that names a flag-only option), `INVALID_VALUE` (a value of the wrong type, outside its closed set, or `null`) |
+| `INPUT_TOO_LARGE` had none | `TOO_MANY_BYTES` (the source is over 8 MiB), `TOO_MANY_ITEMS` (a batch is over 10000 items) |
+
+**Wrong calls.**
+
+| Call | 0.33 | 0.34 |
+|---|---|---|
+| an empty value (`canon finding add --change ""`) | `USAGE` without `received` | `USAGE` with `received: ""`; a value that was never sent still has no `received` |
+| `canon finding --repo . --json`, `canon finding --as planner --json` (a tool-wide option after a group word) | `USAGE` | `COMMAND_REQUIRED`, `expected` the commands of the group; `--repo` and `--as` do nothing on a group and are not an error there (`canon finding --repo . list …` runs `list` with `--repo .`). `canon finding --bogus` is still `USAGE` |
+| a `USAGE` that cannot name its argument | any hint | no `field`, and `hint` is `canon schema <command> --json` (`canon schema --json` when no command resolved) |
+| `canon retrieve` with no scope | hint prose that started with `canon retrieve …` and went on in a sentence | hint `canon retrieve --for-role <ROLE> --domain <DOMAIN>` |
+| `canon subject move <S> --to verifying` without `--reason` | hint with a lowercase placeholder | hint `canon subject move <S> --to verifying --reason <REASON> --as <ROLE>` |
+
+A hint is now exactly one of a command line, a template with `<UPPER_CASE>` placeholders, or one sentence of prose; a hint that starts with `canon ` holds that one command line and nothing else (spec 7.1.2). A test reads every hint in the sources and in the conformance corpus and holds it to that.
+
+**Consumers.** The dashboard's briefs page, the npm launcher and `evals/dogfood/trace_check.py` read only the members they know, skip an enum string they do not know (an approval `outcome`, a finding `severity`) instead of rejecting the document, and have tests that feed them a document with members and values from a later minor (contract 15.6). The guides teach the same.
+
 ## 0.33.0 — 2026-11-01
 
 ### Breaking

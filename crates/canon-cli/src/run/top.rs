@@ -228,7 +228,7 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
             use crate::retrieve::RetrieveCliError as E;
             // How the call scopes the retrieval is its usage; only a regime key that cannot be derived is the retrieval's own failure.
             let error = match &e {
-                E::NoScope => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>, or --regime <KEY> (`canon regime show` prints a valid key)"),
+                E::NoScope => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>"),
                 E::ScopeConflict => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("pass --regime or --domain, not both"),
                 E::SubjectWithoutDomain => CliError::refused("USAGE", e.to_string()).field("--subject").hint("add --domain <DOMAIN>, or drop --subject"),
                 E::RoleRegimeMismatch { regime_role, .. } => CliError::refused("USAGE", e.to_string()).field("--regime").received(regime_role.clone()).hint("pass the same role to --for-role and --regime (`canon regime show` prints a valid key)"),

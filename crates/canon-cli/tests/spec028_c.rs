@@ -227,7 +227,7 @@ fn context_capability_31_json_mode_carries_warnings_in_meta_and_leaves_stderr_em
     let warnings = body["meta"]["warnings"].as_array().expect("meta.warnings");
     let warning = warnings.iter().find(|w| w["message"].as_str().is_some_and(|m| m.contains("reviwer"))).unwrap_or_else(|| panic!("a warning names `reviwer`: {body}"));
     let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning has a code: {body}"));
-    assert!(canon_cli::cli_error::code_info(code).is_some(), "the warning code {code} is registered: {body}");
+    assert!(canon_cli::cli_error::warning_info(code).is_some(), "the warning code {code} is in the warning registry: {body}");
 
     let human = finding("2", false);
     assert_eq!(human.status.code(), Some(0), "{}", stderr(&human));

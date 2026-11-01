@@ -411,12 +411,17 @@ fn refused(code: &'static str, message: impl Into<String>, hint: impl Into<Strin
 }
 
 /// An `INPUT_INVALID` for a fault in the value of `--input` itself (spec of the contract 11.7 steps 1-2):
-/// `field` is `--input`, and `x-canon.reason` says which of the five framing faults it is
-/// (`unreadable`, `tty`, `empty`, `syntax`, `batch-unsupported`), because the contract's one code
-/// cannot tell a caller to re-read a file from fixing JSON. A fault in the document against its fragment
-/// schema has a pointer `field` and no reason.
+/// `field` is `--input`, and `reason` is the contract's reserved name (7.2.3) of the framing fault
+/// (`UNREADABLE`, `STDIN_TTY`, `EMPTY`, `NOT_JSON`, `NOT_OBJECT`, `BATCH_UNSUPPORTED`), because the contract's
+/// one code cannot tell a caller to re-read a file from fixing JSON. A fault in the document against its
+/// fragment schema has a pointer `field` and the reason of [`invalid`].
 fn framing(reason: &'static str, message: impl Into<String>, hint: impl Into<String>) -> CliError {
-    refused("INPUT_INVALID", message, hint).field("--input").extension("x-canon", serde_json::json!({ "reason": reason }))
+    refused("INPUT_INVALID", message, hint).reason(reason).field("--input")
+}
+
+/// An `INPUT_INVALID` for a value of the document of the wrong type, or `null` (reason `INVALID_VALUE`).
+fn invalid(message: impl Into<String>, hint: impl Into<String>) -> CliError {
+    refused("INPUT_INVALID", message, hint).reason("INVALID_VALUE")
 }
 
 const SCHEMA_HINT: &str = "`canon schema <command> --json` shows the document keys under `inputs` with an example";
@@ -437,40 +442,41 @@ enum Document {
     Batch(Vec<Value>),
 }
 
-fn too_large(what: &str) -> CliError {
-    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit")
+/// `INPUT_TOO_LARGE`: `reason` is `TOO_MANY_BYTES` (the source) or `TOO_MANY_ITEMS` (a batch).
+fn too_large(reason: &'static str, what: &str) -> CliError {
+    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit").reason(reason)
 }
 
 /// Reads at most [`MAX_BYTES`] from `reader`; one byte more is `INPUT_TOO_LARGE`.
 #[expect(clippy::map_err_ignore, reason = "`refused` takes a message and a hint, no source; the message already says the input is not UTF-8")]
 fn read_capped(reader: impl Read, what: &str) -> Result<String, CliError> {
     let mut bytes = Vec::new();
-    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| framing("unreadable", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
+    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| framing("UNREADABLE", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
     if bytes.len() as u64 > MAX_BYTES {
-        return Err(too_large(what));
+        return Err(too_large("TOO_MANY_BYTES", what));
     }
-    String::from_utf8(bytes).map_err(|_| framing("unreadable", format!("{what} is not UTF-8 text"), "write the document as UTF-8 JSON"))
+    String::from_utf8(bytes).map_err(|_| framing("UNREADABLE", format!("{what} is not UTF-8 text"), "write the document as UTF-8 JSON"))
 }
 
 fn load(value: &str) -> Result<(String, Source), CliError> {
     if value.trim_start().starts_with(['{', '[']) {
         if value.len() as u64 > MAX_BYTES {
-            return Err(too_large("the inline document"));
+            return Err(too_large("TOO_MANY_BYTES", "the inline document"));
         }
         return Ok((value.to_string(), Source::Inline));
     }
     if value == "-" {
         if std::io::stdin().is_terminal() {
-            return Err(framing("tty", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file"));
+            return Err(framing("STDIN_TTY", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file"));
         }
         return Ok((read_capped(std::io::stdin().lock(), "stdin")?, Source::Stdin));
     }
     if value.is_empty() {
-        return Err(framing("empty", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin"));
+        return Err(framing("EMPTY", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin"));
     }
-    let file = std::fs::File::open(value).map_err(|e| framing("unreadable", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin"))?;
+    let file = std::fs::File::open(value).map_err(|e| framing("UNREADABLE", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin"))?;
     if file.metadata().is_ok_and(|m| m.len() > MAX_BYTES) {
-        return Err(too_large(&format!("`{value}`")));
+        return Err(too_large("TOO_MANY_BYTES", &format!("`{value}`")));
     }
     Ok((read_capped(file, &format!("`{value}`"))?, Source::File))
 }
@@ -479,10 +485,10 @@ fn load(value: &str) -> Result<(String, Source), CliError> {
 fn frame(text: &str, source: Source) -> Result<Document, CliError> {
     match serde_json::from_str::<Value>(text) {
         Ok(Value::Object(object)) => Ok(Document::One(object)),
-        Ok(Value::Array(items)) if items.len() > MAX_ELEMENTS => Err(too_large(&format!("the array ({} elements)", items.len()))),
+        Ok(Value::Array(items)) if items.len() > MAX_ELEMENTS => Err(too_large("TOO_MANY_ITEMS", &format!("the array ({} elements)", items.len()))),
         Ok(Value::Array(items)) => Ok(Document::Batch(items)),
-        Ok(_) => Err(framing("syntax", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
-        Err(error) if source == Source::Inline => Err(framing("syntax", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")),
+        Ok(_) => Err(framing("NOT_OBJECT", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
+        Err(error) if source == Source::Inline => Err(framing("NOT_JSON", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")),
         Err(_) => {
             let mut items = Vec::new();
             for (n, line) in text.lines().enumerate() {
@@ -491,15 +497,15 @@ fn frame(text: &str, source: Source) -> Result<Document, CliError> {
                     continue;
                 }
                 if items.len() == MAX_ELEMENTS {
-                    return Err(too_large(&format!("the NDJSON input (more than {MAX_ELEMENTS} lines)")));
+                    return Err(too_large("TOO_MANY_ITEMS", &format!("the NDJSON input (more than {MAX_ELEMENTS} lines)")));
                 }
                 match serde_json::from_str::<Value>(line) {
                     Ok(value) => items.push(value),
-                    Err(error) => return Err(framing("syntax", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array")),
+                    Err(error) => return Err(framing("NOT_JSON", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array")),
                 }
             }
             if items.is_empty() {
-                return Err(framing("empty", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT));
+                return Err(framing("EMPTY", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT));
             }
             Ok(Document::Batch(items))
         }
@@ -527,12 +533,12 @@ fn scalar(value: &Value, pointer: &str, expected: &str) -> Result<String, CliErr
         Value::String(s) => Ok(s.clone()),
         Value::Number(n) => Ok(n.to_string()),
         Value::Null => Err(null_refusal(pointer)),
-        other => Err(refused("INPUT_INVALID", format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+        other => Err(invalid(format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
     }
 }
 
 fn null_refusal(pointer: &str) -> CliError {
-    refused("INPUT_INVALID", format!("`{pointer}` is null: canon has no clear-to-default, so omit the key"), "drop the key to get the option's default").field(pointer)
+    invalid(format!("`{pointer}` is null: canon has no clear-to-default, so omit the key"), "drop the key to get the option's default").field(pointer)
 }
 
 fn type_name(value: &Value) -> &'static str {
@@ -577,7 +583,7 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
             let items = match value {
                 Value::Array(items) => items,
                 Value::Null => return Err(null_refusal(&pointer)),
-                other => return Err(refused("INPUT_INVALID", format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+                other => return Err(invalid(format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             };
             let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string")).collect::<Result<Vec<_>, _>>()?;
             out.push(Setting { key: name.clone(), long: None, values, flag: None, negatable: false, count: false });
@@ -596,19 +602,19 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
                 }
                 (false, None) => SCHEMA_HINT.to_string(),
             };
-            return Err(CliError::refused("INPUT_INVALID", message).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
+            return Err(CliError::refused("INPUT_INVALID", message).reason(if forbidden { "FLAG_ONLY_KEY" } else { "UNKNOWN_KEY" }).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
         };
         let setting = match (key.kind, value) {
             (_, Value::Null) => return Err(null_refusal(&pointer)),
             (Kind::Flag, Value::Bool(on)) => Setting { key: name.clone(), long: Some(key.long.clone()), values: Vec::new(), flag: Some(*on), negatable: key.negatable, count: false },
-            (Kind::Flag, other) => return Err(refused("INPUT_INVALID", format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Flag, other) => return Err(invalid(format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Count, Value::Number(n)) if n.as_u64().is_some() => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![n.to_string()], flag: None, negatable: false, count: true },
-            (Kind::Count, other) => return Err(refused("INPUT_INVALID", format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Count, other) => return Err(invalid(format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Value, Value::Array(items)) if key.repeatable => {
                 let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string or number")).collect::<Result<Vec<_>, _>>()?;
                 Setting { key: name.clone(), long: Some(key.long.clone()), values, flag: None, negatable: false, count: false }
             }
-            (Kind::Value, other) if key.repeatable => return Err(refused("INPUT_INVALID", format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Value, other) if key.repeatable => return Err(invalid(format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Value, other) => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![scalar(other, &pointer, if key.integer { "a number" } else { "a string or number" })?], flag: None, negatable: false, count: false },
         };
         out.push(setting);
@@ -765,7 +771,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     };
     drop(text);
     if matches!(document, Document::Batch(_)) && !batch_supported(&command_name["canon ".len()..]) {
-        return fail(framing("batch-unsupported", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan"));
+        return fail(framing("BATCH_UNSUPPORTED", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan"));
     }
 
     // The command line without `--input`.
@@ -880,7 +886,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     for (i, item) in items.iter().enumerate() {
         let prefix = format!("/items/{i}");
         let Some(object) = item.as_object() else {
-            return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).field(prefix).received(item.to_string()));
+            return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).reason("NOT_OBJECT").field(prefix).received(item.to_string()));
         };
         let argv = match settings(leaf, object, &prefix).and_then(|s| assemble(base, &s, &prefix)) {
             Ok(argv) => argv,

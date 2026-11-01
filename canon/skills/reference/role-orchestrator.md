@@ -314,7 +314,7 @@ canon retrieve --for-role reviewer --domain dev --limit 20
 ```
 ```text
 # Describe canon's own commands
-canon schema [<PATH>]* [--errors | --error <CODE>]
+canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add

@@ -1001,7 +1001,7 @@ pub fn run_move(
             subject_id.as_str()
         ))
         .field("--reason")
-        .hint(format!("canon subject move {} --to verifying --reason \"<why it reopens>\" --as <role>", subject_id.as_str()))
+        .hint(format!("canon subject move {} --to verifying --reason <REASON> --as <ROLE>", subject_id.as_str()))
         .emit("canon subject move", json);
     }
     if let Some(code) = crate::write_mode::refuse_unwritable_kinds(&canon_yaml_path, &[RecordKind::Subject], "canon subject move", json) {

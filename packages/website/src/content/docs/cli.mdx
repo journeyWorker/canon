@@ -364,7 +364,8 @@ it.
 canon schema                      # every command, its effect, one line each
 canon schema purge --json         # arguments, options, exits, errorCodes
 canon schema evidence add --json  # the --input schema and an example
-canon schema --errors --json      # every stable error code and its meaning
+canon schema --errors --json      # every stable error code, its meaning and its reasons
+canon schema --warnings --json    # every warning code (meta.warnings) and its meaning
 ```
 
 `data` carries `command`, `effect` (`read`, `write` or `destructive`),
@@ -383,12 +384,17 @@ always matches the installed binary.
 stderr: `{"ok": true, "data": …, "meta": …}` on success and
 `{"ok": false, "error": …, "meta": …}` on failure (an exit 1 partial report
 also carries `data`). The envelope follows atip/1. `meta` carries
-`schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`) and the
+`schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`),
+`contractVersion` (`1.1`, on every envelope) and the
 resolved `command`, plus `output` (the report name, for a command that
 declares several), `context` (`{repo}`), `next`, `warnings`, `coverage`, `page`
 and `x-canon` (canon-only extras) where they apply. A member with no value is
 absent, never `null` and never `[]`. `--json` is accepted anywhere before `--`,
-including at the root and on a group (`canon --json`, `canon finding --json`).
+including at the root and on a group (`canon --json`, `canon finding --json`);
+`--repo` and `--as` are accepted there too and do nothing on a group:
+a group with only those options answers `COMMAND_REQUIRED`, not `USAGE`.
+A reader keeps the members it knows and ignores the rest: a later canon adds
+members, and a value of a closed set it has not seen is one item to leave out.
 
 ```json
 {
@@ -397,8 +403,9 @@ including at the root and on a group (`canon --json`, `canon finding --json`).
   "meta": {
     "schemaVersion": "1.0",
     "tool": "canon",
-    "toolVersion": "0.33.0",
+    "toolVersion": "0.34.0",
     "contract": "atip/1",
+    "contractVersion": "1.1",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [
@@ -416,9 +423,15 @@ including at the root and on a group (`canon --json`, `canon finding --json`).
 **Errors.** Every failure prints `canon: CODE: message` as the first stderr
 line, then indented `field:`, `expected:` and `hint:` lines; in text mode
 stdout stays empty. With `--json`, `error` is `{code, message, retryable}`,
-plus `hint`, `field` (the option at fault), `expected` (its valid values),
-`received` and `suggestions` when canon can name them; `retryable` is always
-present, the rest are absent otherwise. Codes are stable strings. A
+plus `reason` (which of the situations registered under the code this is),
+`hint` (one command line that starts with `canon`, the same with
+`<PLACEHOLDER>`s, or one sentence), `field` (the option at fault), `expected` (its valid values),
+`received` (what was given, `""` for an empty value) and `suggestions` when
+canon can name them; `retryable` is always present, the rest are absent
+otherwise. A `USAGE` that cannot name an argument has no `field` and its `hint` is
+`canon schema <command> --json`. Codes are stable strings; `canon schema
+--error <CODE>` explains one with its reasons, and a code that is only a
+warning is explained by `canon schema --warning <CODE>`. A
 command-line parse error is `USAGE`, an unknown command is `UNKNOWN_COMMAND`
 (`expected` lists the valid words at that level), a call with no command at all
 (`canon --json`, `canon finding --json`) is `COMMAND_REQUIRED`, and a panic in
@@ -435,9 +448,12 @@ option names in camelCase, and `operands` is an array. A JSON array or NDJSON
 is a batch: it is validated whole before anything is written, and the report
 has one entry per element in `data.items[]` (`written`, `unchanged`, `failed`
 or `skipped`); a batch where an element failed is `BATCH_INCOMPLETE` (exit 1).
-An input canon cannot use (an unknown key, a wrong type, an unreadable file,
-`-` on a terminal, a batch the command does not take) is `INPUT_INVALID`, with
-the distinction in `message` and `field`; `-` together with another stdin
+An input canon cannot use is `INPUT_INVALID` with a `reason`:
+`UNREADABLE` (a file that cannot be read), `STDIN_TTY` (`-` on a terminal), `EMPTY`,
+`NOT_JSON`, `NOT_OBJECT`, `BATCH_UNSUPPORTED` (a batch the command does not
+take), and for a document that breaks its schema (`field` is a pointer) `UNKNOWN_KEY`,
+`FLAG_ONLY_KEY` or `INVALID_VALUE`; a source over the limits is `INPUT_TOO_LARGE`
+with `TOO_MANY_BYTES` or `TOO_MANY_ITEMS`; `-` together with another stdin
 reader is `USAGE` with `field` `--input`. `canon schema <command> --json` shows
 the input schema.
 
