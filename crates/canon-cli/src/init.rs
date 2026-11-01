@@ -739,7 +739,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                return CliError::refused("INIT_INVALID_ARGUMENT", e.clone()).field("--providers").hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.clone()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
             }
         }
     };

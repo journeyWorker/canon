@@ -5,13 +5,6 @@ use atip::domain::Domain;
 
 use super::{DomainRow, Scope, Tables, CALENDAR, NOT_BLANK};
 
-/// White space as `str::trim` and `char::is_whitespace` read it (the macro of the parent module is declared after this module).
-macro_rules! white_space {
-    () => {
-        " \t\n\u{b}\u{c}\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}"
-    };
-}
-
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
 const LANGUAGE: &str = concat!("^[", white_space!(), "]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[", white_space!(), "]*$");

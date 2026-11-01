@@ -25,6 +25,9 @@ use tempfile::TempDir;
 use super::harness::{self, canon_in, copy_dir, tree};
 
 pub mod sites;
+mod samples_authoring;
+mod samples_evidence;
+mod samples_reads;
 mod sites_authoring;
 mod sites_evidence;
 mod sites_reads;
@@ -204,7 +207,7 @@ pub fn document_problems(doc: &Value, words: &[String]) -> Vec<String> {
 pub fn sample(doc: &Value, example: &[String], argument: &Value) -> String {
     let name = argument["name"].as_str().unwrap_or_default();
     let path = doc["command"].as_str().unwrap_or_default();
-    if let Some(value) = SAMPLES.iter().find(|(command, argument, _)| *command == path && *argument == name).map(|(_, _, value)| (*value).to_string()) {
+    if let Some(value) = SAMPLES.iter().chain(samples_evidence::SAMPLES).chain(samples_authoring::SAMPLES).chain(samples_reads::SAMPLES).find(|(command, argument, _)| *command == path && *argument == name).map(|(_, _, value)| (*value).to_string()) {
         return value;
     }
     if let Ok(parsed) = parse_call(doc, example) {
@@ -471,6 +474,10 @@ pub struct Provision {
 /// The provisioned repo of the command `path`, built from the fixture at `base`.
 pub fn provision(path: &str, base: &Path, home: &Path) -> Provision {
     let case = harness::case(path, base, home);
+    // A writer refreshes a stale scenario index before it reads its own arguments, and that is the writer's doing, not the
+    // refusal's: the template starts with the index current, so a refused call is seen to write nothing.
+    let envs: Vec<(&str, &str)> = case.envs.iter().map(|(key, value)| (key.as_str(), value.as_str())).chain(std::iter::once(("CANON_ROLE", "implementer"))).collect();
+    let _ = canon_in(&case.dir, home, &["inventory".to_string(), "sync".to_string(), "--json".to_string()], &envs);
     Provision { template: case.dir.clone(), envs: case.envs.clone(), example: case.argv.clone(), _case: case }
 }
 

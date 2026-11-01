@@ -259,7 +259,18 @@ pub(crate) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, js
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json))
+            // The argument at fault: a segment that canonicalizing leaves empty, else the hash.
+            let empty = |segment: &str| segment.chars().all(|c| c.is_whitespace() || c == '/');
+            let field = if empty(role) {
+                "--role-segment"
+            } else if empty(repo) {
+                "--repo-name"
+            } else if empty(area) {
+                "--area"
+            } else {
+                "--hash"
+            };
+            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).field(field).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json))
         }
     }
 }

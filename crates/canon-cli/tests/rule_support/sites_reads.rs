@@ -3,6 +3,7 @@
 use super::sites::{site, Kind, Site};
 
 pub const SITES: &[Site] = &[
+    site("dashboard_briefs.rs:status_of:APPROVAL_INCOMPLETE#1", Kind::Other("the HTTP status the dashboard gives a refusal code (a table of codes to 400), not a check of an argument")),
     site("init.rs:run_init_in:INIT_INVALID_ARGUMENT#1", Kind::Domain { command: "init", argument: "language" }),
     site("init.rs:run_init_in:INIT_INVALID_ARGUMENT#2", Kind::Precondition("`--providers` is parsed only when canon.yaml does not exist yet (choose_skills); with a canon.yaml it is ignored with a note, and the prompt path reads the terminal")),
     site("input.rs:expand:USAGE#1", Kind::Other("`--input` is expanded to argv before clap runs, for every command that has it: a second `--input` is a fault of the expansion's own syntax")),
