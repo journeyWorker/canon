@@ -368,7 +368,9 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&App
         Err(e) => {
             // A missing or unreadable policy and a blank approver are refused before anything is written; a failed write of the approval is a failure during the work.
             let code = if matches!(e, PolicyApprovalError::WriteApproval { .. }) { "POLICY_APPROVAL_FAILED" } else { "POLICY_APPROVAL_REFUSED" };
-            CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
+            let refusal = CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again");
+            let refusal = if matches!(e, PolicyApprovalError::BlankApprover) { refusal.field("--approver") } else { refusal };
+            refusal.emit("canon policy approve", json)
         }
     }
 }

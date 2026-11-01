@@ -488,7 +488,7 @@ pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
     // BEFORE `Subject::new` so a malformed value is a clean refusal
     // here, never the model's debug-assert panic.
     if SubjectId::parse(domain).is_err() {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("domain `{domain}` is not a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")).hint("`canon schema subject new` lists the accepted arguments and their forms").field("--domain").emit("canon subject new", json);
     }
 
     // Membership is a SEPARATE question from shape, and needs the
@@ -965,7 +965,7 @@ pub fn run_move(
         ("--reason", reason, "the transition note, with the actor"),
     ] {
         if text.is_some_and(|text| text.trim().is_empty() || text.contains(['\n', '\r'])) {
-            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).hint("`canon schema subject move` lists the accepted arguments and their forms").emit("canon subject move", json);
+            return CliError::refused("SUBJECT_INVALID_ARGUMENT", format!("{flag} must be one non-empty line; it is recorded on the subject as {recorded}")).hint("`canon schema subject move` lists the accepted arguments and their forms").field(flag).emit("canon subject move", json);
         }
     }
 

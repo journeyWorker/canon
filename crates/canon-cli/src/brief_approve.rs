@@ -261,10 +261,10 @@ fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
     let (by, note) = (by.trim(), note.trim());
     for (flag, value) in [("--approver", by), ("--note", note)] {
         if value.is_empty() {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty")));
+            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty")).field(flag));
         }
         if value.contains(['\n', '\r']) {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line")));
+            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line")).field(flag));
         }
     }
     Ok((by.to_string(), note.to_string()))
