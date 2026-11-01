@@ -1,0 +1,114 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "member roster",
+    "path": [
+      "member",
+      "roster"
+    ],
+    "summary": "Print a team's roster as published to the directory (records under the key member/list)",
+    "effect": "read",
+    "operands": [],
+    "options": [
+      {
+        "name": "team",
+        "valueName": "TEAM",
+        "valueType": "string",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "short": "t",
+        "help": "The team"
+      },
+      {
+        "name": "fields",
+        "valueName": "FIELDS",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Keep only these roster fields"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "INTERNAL",
+      "TEAM_NOT_FOUND",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/RosterReport",
+        "schemaVersion": "1.0",
+        "fields": {
+          "records": "/member~1list",
+          "keep": [
+            "id"
+          ],
+          "paths": [
+            "name",
+            "email"
+          ]
+        }
+      }
+    ],
+    "examples": [
+      "acme member roster -t core --fields email --json"
+    ],
+    "schemas": {
+      "RosterReport": {
+        "type": "object",
+        "required": [
+          "member/list"
+        ],
+        "properties": {
+          "member/list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/schemas/RosterRow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RosterRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

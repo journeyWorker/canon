@@ -1,0 +1,142 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "member export",
+    "path": [
+      "member",
+      "export"
+    ],
+    "summary": "Export a team's members in the directory's paged envelope (records at /items/items)",
+    "effect": "read",
+    "operands": [],
+    "options": [
+      {
+        "name": "team",
+        "valueName": "TEAM",
+        "valueType": "string",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "short": "t",
+        "help": "The team"
+      },
+      {
+        "name": "fields",
+        "valueName": "FIELDS",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Keep only these member fields"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "INTERNAL",
+      "TEAM_NOT_FOUND",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/ExportResult",
+        "schemaVersion": "1.0",
+        "fields": {
+          "records": "/items/items",
+          "keep": [
+            "id"
+          ],
+          "paths": [
+            "name",
+            "email"
+          ]
+        }
+      }
+    ],
+    "examples": [
+      "acme member export -t core --fields email --json"
+    ],
+    "schemas": {
+      "ExportReport": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "$ref": "#/schemas/ExportPage"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExportPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/schemas/ExportRow"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExportRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExportResult": {
+        "description": "null when the team has not been exported yet.",
+        "anyOf": [
+          {
+            "$ref": "#/schemas/ExportReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}
