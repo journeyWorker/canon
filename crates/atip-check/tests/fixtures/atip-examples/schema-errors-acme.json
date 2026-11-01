@@ -29,7 +29,19 @@
         "exit": 2,
         "retryable": false,
         "meaning": "The --cursor was not printed by this command with these arguments",
-        "fix": "Start again without --cursor"
+        "fix": "Start again without --cursor",
+        "reasons": [
+          {
+            "reason": "FOREIGN",
+            "meaning": "The cursor was not printed by this command",
+            "fix": "Start again without --cursor"
+          },
+          {
+            "reason": "ARGUMENTS_CHANGED",
+            "meaning": "The cursor was printed for other filter arguments",
+            "fix": "Repeat the first page's arguments with the cursor, or start again without --cursor"
+          }
+        ]
       },
       {
         "code": "DEPLOYMENT_NOT_FOUND",
@@ -78,7 +90,29 @@
         "exit": 2,
         "retryable": false,
         "meaning": "--input cannot be read or framed, or a document fails the fragment schema",
-        "fix": "Fix the key `field` points at"
+        "fix": "Fix the key `field` points at",
+        "reasons": [
+          {
+            "reason": "UNREADABLE",
+            "meaning": "The file --input names cannot be read",
+            "fix": "Check the path; it is relative to the working directory"
+          },
+          {
+            "reason": "NOT_JSON",
+            "meaning": "The --input value is not JSON; a shell that removed the quotes around an inline document is the usual cause",
+            "fix": "Quote the whole document in single quotes, or pass it on stdin with --input -"
+          },
+          {
+            "reason": "UNKNOWN_KEY",
+            "meaning": "A document key is not an option of the command",
+            "fix": "Use the keys the command's input schema lists: acme schema <COMMAND> --json"
+          },
+          {
+            "reason": "INVALID_VALUE",
+            "meaning": "A document value has the wrong type or is outside its set",
+            "fix": "Fix the value `field` points at"
+          }
+        ]
       },
       {
         "code": "INPUT_TOO_LARGE",
@@ -106,7 +140,19 @@
         "exit": 2,
         "retryable": false,
         "meaning": "No member has this number",
-        "fix": "List the members: acme member list --team <TEAM>"
+        "fix": "List the members: acme member list --team <TEAM>",
+        "reasons": [
+          {
+            "reason": "NEVER_EXISTED",
+            "meaning": "No member ever had this number",
+            "fix": "acme member list -t <TEAM> --json shows the numbers"
+          },
+          {
+            "reason": "ARCHIVED",
+            "meaning": "The member was archived",
+            "fix": "acme member restore <MEMBER> --json brings it back"
+          }
+        ]
       },
       {
         "code": "OPERATION_REUSED",
@@ -162,7 +208,8 @@
   "meta": {
     "command": "schema",
     "contract": "atip/1",
-    "schemaVersion": "1.0",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
     "tool": "acme",
     "toolVersion": "1.0.0"
   }

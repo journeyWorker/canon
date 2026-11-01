@@ -1,0 +1,38 @@
+{
+  "ok": false,
+  "error": {
+    "code": "INPUT_INVALID",
+    "message": "The --input document has 2 problems",
+    "retryable": false,
+    "field": "--input",
+    "details": [
+      {
+        "code": "INPUT_INVALID",
+        "reason": "UNKNOWN_KEY",
+        "message": "colour is not an option of member tag",
+        "field": "/colour",
+        "suggestions": [
+          "tag"
+        ]
+      },
+      {
+        "code": "INPUT_INVALID",
+        "reason": "INVALID_VALUE",
+        "message": "operands[0] must be an integer",
+        "field": "/operands/0",
+        "expected": [
+          "an integer"
+        ],
+        "received": "seven"
+      }
+    ]
+  },
+  "meta": {
+    "command": "member tag",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

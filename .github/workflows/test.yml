@@ -202,11 +202,15 @@ jobs:
 
   # 0.33: canon claims atip/1 L0, and the shared checker is what holds it to that
   # (approaches/checker.md in https://github.com/journeyWorker/atip). `atip check`
-  # runs the built binary from outside (argv, stdout, stderr, exit status, files)
-  # and reports the 16 L0 checks; the MUST ones failing, or missing a fixture
-  # entry, fail the job. The fixture is `crates/canon-cli/tests/atip/canon.fixture.json`;
-  # its registry is generated from `canon schema --errors --json` and a test
-  # compares the two. The checker also runs on itself: it follows the contract it checks.
+  # runs the built binary from outside (argv, stdout, stderr, exit status, files,
+  # a terminal) and reports the 28 L0 checks of contract 1.1; the MUST ones failing,
+  # or missing a fixture entry, fail the job. 0.34: the fixture claims 1.1
+  # (`contractVersion`), so canon is judged on the 27 checks that apply to it, and
+  # the job is green only with the 1.1 output of `canon-0-34-atip-1-1` in the binary.
+  # The fixture is `crates/canon-cli/tests/atip/canon.fixture.json`; its registry
+  # and warning list are generated from `canon schema --errors --json` and
+  # `--warnings --json` and a test compares them. The checker also runs on itself:
+  # it follows the contract it checks.
   atip-l0:
     name: atip check L0 (canon and the checker itself)
     runs-on: ubuntu-latest

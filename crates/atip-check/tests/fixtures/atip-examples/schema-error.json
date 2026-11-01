@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "error",
+    "error": {
+      "code": "PLAN_STALE",
+      "exit": 2,
+      "retryable": false,
+      "meaning": "What the plan digest covers changed since the preview",
+      "fix": "Run the command without --commit to preview again, then commit with the new digest"
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0"
+  }
+}

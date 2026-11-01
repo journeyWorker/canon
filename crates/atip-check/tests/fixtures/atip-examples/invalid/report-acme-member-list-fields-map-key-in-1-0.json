@@ -1,0 +1,47 @@
+{
+  "ok": true,
+  "data": {
+    "team": "core",
+    "members": [
+      {
+        "id": 1,
+        "attributes": {
+          "region": "eu"
+        }
+      },
+      {
+        "id": 2,
+        "attributes": {
+          "region": "us"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "command": "member list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0",
+    "fields": [
+      "id",
+      "attributes.region"
+    ],
+    "page": {
+      "returned": 2,
+      "total": 2
+    },
+    "next": [
+      {
+        "command": "acme member show 1 --json",
+        "argv": [
+          "member",
+          "show",
+          "1",
+          "--json"
+        ],
+        "reason": "the first member in full"
+      }
+    ]
+  }
+}

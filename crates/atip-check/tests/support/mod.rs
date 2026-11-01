@@ -10,6 +10,9 @@ use serde_json::{json, Value};
 pub const ATIP: &str = env!("CARGO_BIN_EXE_atip");
 pub const FAKE_TOOL: &str = env!("CARGO_BIN_EXE_atip-fake-tool");
 
+/// The number of L0 checks of contract 1.1.
+pub const CHECKS: usize = 28;
+
 /// The result of one run of `atip`.
 #[derive(Debug)]
 pub struct Output {
@@ -44,6 +47,17 @@ impl Output {
                 )
             })
             .collect()
+    }
+
+    /// The check `id` of `data.checks`.
+    pub fn check(&self, id: &str) -> Value {
+        self.envelope()["data"]["checks"]
+            .as_array()
+            .expect("data.checks")
+            .iter()
+            .find(|check| check["id"] == id)
+            .cloned()
+            .unwrap_or_else(|| panic!("{id} is not in data.checks"))
     }
 }
 
@@ -86,19 +100,38 @@ impl Harness {
     }
 
     /// The fixture of a fake tool configured by `config`: the standard one with `FAKE_ATIP_CONFIG` pointing at it.
+    /// A fake tool that claims 1.0 (`"claims": "1.0"`) has the 1.0 registry and no `contractVersion`.
     pub fn fixture(&self, config: &Value) -> Value {
         let config_path = self.write("fake-config.json", config);
-        json!({
+        let remote = self.path("remote");
+        std::fs::create_dir_all(&remote).expect("remote");
+        let is_1_1 = config["claims"] != "1.0";
+        let mut fixture = json!({
             "setup": [["init"]],
-            "env": {"FAKE_ATIP_CONFIG": config_path},
+            "env": {"FAKE_ATIP_CONFIG": config_path, "FAKE_ATIP_REMOTE": remote},
             "timeoutSeconds": 20,
             "probe": "status",
-            "registry": standard_registry(),
-        })
+            "globalOptions": [["--repo", "."]],
+            "registry": standard_registry(is_1_1),
+            "commands": {
+                "items": {"ok": [["items", "--json"]]},
+                "touch": {
+                    "missingValue": [["touch", "--json"]],
+                    "refused": [["touch", "--input", "nope", "--json"]]
+                },
+                "team add": {"ok": [["team", "add", "--json"]]},
+                "reject": {"refused": [["reject", "--json"]]}
+            }
+        });
+        if is_1_1 {
+            fixture["contractVersion"] = json!("1.1");
+            fixture["warnings"] = json!(["STALE_VIEW"]);
+        }
+        fixture
     }
 
-    /// `atip check --bin <fake tool> --level L0 --fixture <fixture> [--json]`.
-    pub fn check(&self, fixture: &Value, json: bool) -> Output {
+    /// `atip check --bin <fake tool> --level L0 --fixture <fixture> [--json]`, with `extra` arguments after.
+    pub fn check_with(&self, fixture: &Value, json: bool, extra: &[&str]) -> Output {
         let fixture_path = self.write("fixture.json", fixture);
         let mut args = vec![
             "check",
@@ -109,6 +142,7 @@ impl Harness {
             "--fixture",
             fixture_path.to_str().expect("utf8"),
         ];
+        args.extend(extra);
         if json {
             args.push("--json");
         }
@@ -119,21 +153,33 @@ impl Harness {
         atip_in(&work, &tmp, &args)
     }
 
+    /// `atip check --bin <fake tool> --level L0 --fixture <fixture> [--json]`.
+    pub fn check(&self, fixture: &Value, json: bool) -> Output {
+        self.check_with(fixture, json, &[])
+    }
+
     /// The check run as JSON against a fake tool configured by `config`.
     pub fn check_config(&self, config: &Value) -> Output {
         self.check(&self.fixture(config), true)
     }
 }
 
-/// The registry rows a conforming fake tool has: the four reserved codes it can produce and `STATE_ODD`, a code with exit 1.
-pub fn standard_registry() -> Value {
-    json!([
-        {"code": "USAGE", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"},
-        {"code": "UNKNOWN_COMMAND", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"},
-        {"code": "COMMAND_REQUIRED", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"},
-        {"code": "INTERNAL", "exit": 1, "retryable": false, "meaning": "m", "fix": "f"},
-        {"code": "STATE_ODD", "exit": 1, "retryable": false, "meaning": "m", "fix": "f"}
-    ])
+/// The registry rows a conforming fake tool has, by name only: the reserved codes it can produce, `STATE_ODD`, a
+/// code with exit 1, `CURSOR_INVALID` and `INPUT_INVALID` with its reasons (a 1.1 tool).
+pub fn standard_registry(with_reasons: bool) -> Value {
+    let mut rows = json!([
+        {"code": "COMMAND_REQUIRED", "exit": 2, "retryable": false},
+        {"code": "CURSOR_INVALID", "exit": 2, "retryable": false},
+        {"code": "INPUT_INVALID", "exit": 2, "retryable": false},
+        {"code": "INTERNAL", "exit": 1, "retryable": false},
+        {"code": "STATE_ODD", "exit": 1, "retryable": false},
+        {"code": "UNKNOWN_COMMAND", "exit": 2, "retryable": false},
+        {"code": "USAGE", "exit": 2, "retryable": false}
+    ]);
+    if with_reasons {
+        rows[2]["reasons"] = json!(["NOT_JSON", "UNKNOWN_KEY"]);
+    }
+    rows
 }
 
 /// One pass condition of one L0 check, and the fake tool configuration (and fixture change) that breaks that condition and no other.
@@ -154,6 +200,11 @@ impl Case {
         )
     }
 
+    /// Whether the fake tool of the case claims 1.1.
+    pub fn is_1_1(&self) -> bool {
+        self.config["claims"] != "1.0"
+    }
+
     /// The fixture the case runs with.
     pub fn fixture(&self, harness: &Harness) -> Value {
         let mut fixture = harness.fixture(&self.config);
@@ -165,10 +216,15 @@ impl Case {
 }
 
 fn unknown_command_exit_1(fixture: &mut Value) {
-    fixture["registry"][1]["exit"] = json!(1);
+    let rows = fixture["registry"].as_array_mut().expect("registry");
+    for row in rows {
+        if row["code"] == "UNKNOWN_COMMAND" {
+            row["exit"] = json!(1);
+        }
+    }
 }
 
-/// Every pass condition of the 19 L0 checks, each with the configuration that breaks it: the seeded violations of
+/// Every pass condition of the 28 L0 checks, each with the configuration that breaks it: the seeded violations of
 /// approaches/checker.md 7.2, one per condition. The tests require that exactly the owner of the condition fails.
 pub fn cases() -> Vec<Case> {
     let case = |condition, config| Case {
@@ -182,6 +238,7 @@ pub fn cases() -> Vec<Case> {
             "version/stdout-non-empty",
             json!({"versionFormat": "empty"}),
         ),
+        case("version/stderr-empty", json!({"versionStderr": true})),
         case(
             "version-format/tool-version-line",
             json!({"versionFormat": "bare"}),
@@ -207,10 +264,6 @@ pub fn cases() -> Vec<Case> {
             json!({"unknownCommandSchemaVersion": "2.0"}),
         ),
         case(
-            "unknown-command/stderr-carries-no-error",
-            json!({"mirrorStderrFor": ["unknown-command"]}),
-        ),
-        case(
             "unknown-command-text/exit-2",
             json!({"textUnknownCommandExit": 1}),
         ),
@@ -227,11 +280,7 @@ pub fn cases() -> Vec<Case> {
             json!({"textErrorPrefix": "error"}),
         ),
         case("bare/envelope", json!({"bareText": true})),
-        case("bare/code", json!({"bareCode": "USAGE"})),
-        case(
-            "bare/stderr-carries-no-error",
-            json!({"mirrorStderrFor": ["bare"]}),
-        ),
+        case("bare/code", json!({"bareCode": "UNKNOWN_COMMAND"})),
         case(
             "unknown-option/code-is-a-refusal",
             json!({"unknownOptionCode": "STATE_ODD"}),
@@ -243,10 +292,6 @@ pub fn cases() -> Vec<Case> {
         case(
             "unknown-option/meta-command",
             json!({"unknownOptionOmitsCommand": true}),
-        ),
-        case(
-            "unknown-option/stderr-carries-no-error",
-            json!({"mirrorStderrFor": ["unknown-option"]}),
         ),
         case(
             "json-mode-preparse/json-first",
@@ -263,10 +308,6 @@ pub fn cases() -> Vec<Case> {
         case("ok-exit/exit-range", json!({"dashdashExit3": true})),
         case("ok-exit/ok-iff-exit-0", json!({"probeSuccessExit": 1})),
         case(
-            "ok-exit/code-registered",
-            json!({"unknownOptionCode": "NOT_REGISTERED"}),
-        ),
-        case(
             "ok-exit/exit-is-registered",
             json!({"unknownOptionExit": 1}),
         ),
@@ -277,20 +318,12 @@ pub fn cases() -> Vec<Case> {
         case("ok-exit/no-data-on-refusal", json!({"dataOnRefusal": true})),
         Case {
             condition: "ok-exit/reserved-codes",
-            config: json!({"unknownCommandExit": 1}),
+            config: json!({"unknownCommandExit": 1, "reservedUnknownCommandExit": 1}),
             tweak: Some(unknown_command_exit_1),
         },
-        case(
-            "ok-exit/schema-errors-match",
-            json!({"offersSchemaErrors": true, "schemaErrorsDrift": true}),
-        ),
-        case(
-            "refusal-effects/refusal-changes-nothing",
-            json!({"refusalWrites": true}),
-        ),
-        case("no-null/valid-envelope", json!({"hintNull": true})),
+        case("no-null/no-null", json!({"hintNull": true})),
+        case("envelope/valid-envelope", json!({"metaUnknownMember": true})),
         case("compact/no-indentation", json!({"pretty": true})),
-        case("contract/meta-contract", json!({"omitContract": true})),
         case(
             "one-document/one-document-one-newline",
             json!({"probeTwoDocuments": true}),
@@ -319,10 +352,41 @@ pub fn cases() -> Vec<Case> {
             "no-env-switch/same-data-keys",
             json!({"envChangesDataKeys": true}),
         ),
-        case("no-env-switch/no-prompt", json!({"promptOnStdin": true})),
         case(
             "no-env-switch-text/same-envelope-kind",
             json!({"ciSwitchesText": true}),
+        ),
+        case(
+            "contract/meta-contract",
+            json!({"claims": "1.0", "omitContract": true}),
+        ),
+        case(
+            "contract-version/markers-present",
+            json!({"omitContractVersion": true}),
+        ),
+        case(
+            "contract-version/version-is-claim",
+            json!({"contractVersionSays": "1.0"}),
+        ),
+        case(
+            "contract-version/no-contract-version",
+            json!({"claims": "1.0", "emitsMarkers": true}),
+        ),
+        case(
+            "contract-version/no-later-members",
+            json!({"claims": "1.0", "reasonIn10": true}),
+        ),
+        case(
+            "contract-version/schema-version-is-claim",
+            json!({"schemaAnswerVersion": "1.0"}),
+        ),
+        case(
+            "stderr-result/stderr-carries-no-result",
+            json!({"mirrorStderrFor": ["unknown-command"]}),
+        ),
+        case(
+            "stderr-quiet/stderr-empty",
+            json!({"noiseStderrFor": ["status"]}),
         ),
         case("next/entries-valid", json!({"nextEmptyArgv": true})),
         case("next/no-placeholder", json!({"nextPlaceholder": true})),
@@ -333,6 +397,73 @@ pub fn cases() -> Vec<Case> {
         ),
         case("page/page-valid", json!({"pageBadShape": true})),
         case("page/next-cursor-entry", json!({"pageNoCursorEntry": true})),
+        case(
+            "refusal-effects/refusal-changes-nothing",
+            json!({"refusalWrites": true}),
+        ),
+        case(
+            "refusal-effects/refusal-changes-no-remote-state",
+            json!({"refusalWritesRemote": true}),
+        ),
+        case(
+            "no-prompt/refuses-on-a-terminal",
+            json!({"promptOnMissing": true}),
+        ),
+        case("registry/kind", json!({"errorsKind": "list"})),
+        case(
+            "registry/entries-valid",
+            json!({"registryEntryInvalid": true}),
+        ),
+        case(
+            "registry/error-answers",
+            json!({"errorAnswerDiffers": true}),
+        ),
+        case(
+            "registry/registry-is-the-fixtures",
+            json!({"schemaErrorsDrift": true}),
+        ),
+        case("registry/warnings-kind", json!({"warningsKind": "list"})),
+        case(
+            "registry/warning-entries-valid",
+            json!({"warningEntryInvalid": true}),
+        ),
+        case(
+            "registry/warning-answers",
+            json!({"warningAnswerDiffers": true}),
+        ),
+        case(
+            "registry/warning-only-code-refused",
+            json!({"warningOnlyErrorAnswers": true}),
+        ),
+        case(
+            "registry/warnings-are-the-fixtures",
+            json!({"warningsDrift": true}),
+        ),
+        case(
+            "registry/emitted-codes-registered",
+            json!({"unknownOptionCode": "NOT_REGISTERED"}),
+        ),
+        case(
+            "registry/emitted-reasons-registered",
+            json!({"unregisteredReason": true}),
+        ),
+        case(
+            "registry/emitted-warnings-registered",
+            json!({"unregisteredWarning": true}),
+        ),
+        case("usage-hint/hint-names-the-schema", json!({"usageNoHint": true})),
+        case(
+            "hint-form/hint-is-one-command-line",
+            json!({"proseHintStartsWithTool": true}),
+        ),
+        case(
+            "global-on-group/group-is-not-runnable",
+            json!({"groupRunnable": true}),
+        ),
+        case(
+            "global-on-group/option-after-group-is-no-error",
+            json!({"groupRejectsGlobal": true}),
+        ),
     ]
 }
 
@@ -348,8 +479,8 @@ pub fn cases_of(id: &str) -> Vec<Case> {
 /// and every other check passes (or does not apply). `Err` says why not.
 pub fn case_verdict(data: &Value, owner: &str) -> Result<(), String> {
     let checks = data["checks"].as_array().ok_or("data.checks is missing")?;
-    if checks.len() != 19 {
-        return Err(format!("{} checks, expected 19", checks.len()));
+    if checks.len() != CHECKS {
+        return Err(format!("{} checks, expected {CHECKS}", checks.len()));
     }
     for check in checks {
         let id = check["id"].as_str().unwrap_or_default();

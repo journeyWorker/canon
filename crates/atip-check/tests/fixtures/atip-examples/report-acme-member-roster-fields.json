@@ -15,6 +15,7 @@
   "meta": {
     "command": "member roster",
     "contract": "atip/1",
+    "contractVersion": "1.1",
     "schemaVersion": "1.0",
     "tool": "acme",
     "toolVersion": "1.0.0",

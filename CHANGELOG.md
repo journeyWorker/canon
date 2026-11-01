@@ -4,6 +4,38 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Breaking
+
+`atip check` (the `atip-check` crate, 0.33 had it at 19 L0 checks) now runs the 28 L0 checks of atip/1 1.1 (https://github.com/journeyWorker/atip, tag v1.1.0, `approaches/checker.md`). A fixture written for 0.33 needs the changes below; nothing is read under the old name.
+
+| 0.33 | 0.34 |
+|---|---|
+| 19 L0 checks (15 MUST, 4 SHOULD) | 28 L0 checks: the 19 plus `L0.envelope`, `L0.contract-version`, `L0.stderr-result`, `L0.stderr-quiet`, `L0.no-prompt`, `L0.registry`, `L0.usage-hint`, `L0.hint-form`, `L0.global-on-group`; a claim of 1.1 leaves 27 applicable (21 MUST, 6 SHOULD: `L0.contract` is a 1.0 rule), a claim of 1.0 leaves 27 (`L0.hint-form` does not apply) |
+| the envelope schema was judged inside `L0.no-null`, `L0.ok-exit` and `L0.contract` | `L0.envelope` judges the envelope schema; `L0.no-null` only `null` in `meta` and `error`; `L0.ok-exit` only the exit, `ok` and `retryable` against the registry; `L0.contract-version` the members of a later minor |
+| `L0.no-env-switch` failed a probe that waited for input | `L0.no-prompt` runs the fixture's `missingValue` invocation on a terminal; `L0.no-env-switch` no longer waits for input |
+| stderr judged by `L0.ok-exit`, `L0.unknown-command`, `L0.version` and others | `L0.stderr-result` (MUST: the error or the result on stderr) and `L0.stderr-quiet` (SHOULD: anything else on stderr in JSON mode) own it; `L0.version` still needs an empty stderr |
+| registry rows `{code, exit, retryable, meaning, fix}` | `{code, exit, retryable, reasons?}`: names only, no prose; a row with `meaning` or `fix` is `FIXTURE_INVALID` |
+| `atip check --bin <b> --level L0 --fixture <f>` | the same, plus `--contract <MAJOR.MINOR>` (`1.0` or `1.1`); the claim is `--contract`, else the fixture's `contractVersion`, else `1.0`; two that differ are `USAGE` and no binary runs |
+| `FIXTURE_INVALID` without a reason | `FIXTURE_INVALID` has the reasons `NOT_JSON`, `SETUP_FAILED`, `UNREADABLE`, `WRONG_SHAPE` (`error.reason`) |
+| the checker's own envelopes: `meta.contract` | also `meta.contractVersion: "1.1"`, `error.reason` where a code has reasons, and the warning `SHOULD_FAILED` in `meta.warnings` when a SHOULD check failed and the level is met |
+| `data` of a run: `level`, `passed`, `checks` | also `data.contractVersion`, the minor the checks judged |
+| a fixture of a check that lacks an entry it needs: `unprovided` | unchanged, and a violation the run saw is `fail` whatever the fixture lacks |
+
+### Added
+
+- Fixture keys (all optional; L1 and L2 keys such as `fields`, `domainRejects` and `search` are still ignored at L0): `contractVersion`, `globalOptions` (tool-wide options with a value, each an argv fragment such as `["--repo", "."]`), `warnings` (warning code names) and `commands`, an object keyed by command id whose entries hold `ok` (invocations that succeed, run in JSON mode; the checker reads their `meta.next` and `meta.page`), `refused` and `missingValue` (the invocation with one required value left out).
+- `L0.no-prompt` runs each `missingValue` twice: with stdin closed (the control run), then with stdin and stdout on one pseudo-terminal in canonical mode with echo off and output untranslated, with the deadline twice the control run's time plus two seconds (at most the fixture's time limit). A tool that refuses like the control run passes; one still running at the deadline that ends or prints within two seconds of the end-of-file character, or that has printed a prompt, fails; one that is merely slow and silent is `unprovided`. The terminal output is read to its end and the tail of a long one stays in the report.
+- `L0.registry` compares `schema --errors --json`, `--error <CODE>` and, for a 1.1 claim, `--warnings --json` and `--warning <CODE>` with the fixture (codes, exits, `retryable`, reason names, warning codes), validates each entry against the `registry-entry` and `warning-entry` schemas, requires every code, reason and warning code any invocation emitted to be registered, and requires `schema --error <warning-only code>` to refuse with the hint `<tool> schema --warning <CODE> --json`. A tool without `schema --errors` is `unsupported` (does not apply).
+- `L0.refusal-effects` also compares what the fixture's `probe` reports before and after a refused invocation (a probe whose answer differs between two untouched copies is not held against the tool).
+- `L0.next` and `L0.page` apply to canon: the checker reads the `meta.next` and `meta.page` of every answer of the run, including the `ok` invocations of the fixture, and asks each fixture command for `--cursor x` to learn whether it pages (a tool that pages but whose fixture lists no paging call is `unprovided`).
+- The contract repository's examples are test input, pinned at tag v1.1.0: `report-*`, `schema-error*`, `schema-warning*` and `stream-*` (`crates/atip-check/tests/fixtures/atip-examples/`, with `TABLE.md` saying what each should do).
+- The fake tool of the checker's tests has a seeded violation for every pass condition of the 28 checks (about seventy), and each is required to fail exactly its owner; a violation that two checks report fails the suite.
+
+### Changed
+
+- canon's fixture (`crates/canon-cli/tests/atip/canon.fixture.json`) claims 1.1: `contractVersion`, `setup` that creates two subjects (so a listing has a second page), `globalOptions` (`--repo .`), `commands` (`query --kind subject --limit 1` for the page and the next step, `status`, and `finding close` without `--seq` for `missingValue`), and a `registry` and `warnings` generated from `canon schema --errors --json` and `--warnings --json` (`CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it). CI job `atip-l0` and `just atip` run unchanged; they are green when the binary prints the 1.1 output of 0.34 and canon passes the 27 applicable checks.
+- `atip`'s own fixture (`crates/atip-check/atip.fixture.json`) claims 1.1, declares the checker's reasons and its warning `SHOULD_FAILED`, and holds the refusal and the missing value of `atip check`.
+
 ## 0.33.0 — 2026-11-01
 
 ### Breaking

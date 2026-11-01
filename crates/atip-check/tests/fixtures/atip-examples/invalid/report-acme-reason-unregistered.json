@@ -1,0 +1,19 @@
+{
+  "ok": false,
+  "error": {
+    "code": "INPUT_INVALID",
+    "reason": "SHELL_ATE_QUOTES",
+    "message": "--input is not JSON: it starts with operands:, so the shell probably removed the quotes",
+    "retryable": false,
+    "field": "--input",
+    "hint": "acme member tag --input '{\"operands\":[7],\"tag\":\"core\"}' --json"
+  },
+  "meta": {
+    "command": "member tag",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.0",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

@@ -25,7 +25,8 @@
         "error": {
           "code": "MEMBER_NOT_FOUND",
           "message": "no member has number 8",
-          "retryable": false
+          "retryable": false,
+          "reason": "NEVER_EXISTED"
         }
       }
     ]
@@ -33,6 +34,7 @@
   "meta": {
     "command": "member tag",
     "contract": "atip/1",
+    "contractVersion": "1.1",
     "schemaVersion": "1.0",
     "tool": "acme",
     "toolVersion": "1.0.0",
