@@ -4,14 +4,15 @@
     "role": "reviewer",
     "session_id": "s-0-34-atip-1-1-rev"
   },
-  "at": "2026-11-01T08:38:15.267301Z",
-  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "at": "2026-11-01T09:02:47.904340Z",
+  "code_tree": "7b922d4ecb8731dc64185a47646a3df53e18cf5b",
   "kind": "review",
-  "pin": "99e3ea117de8f4e6fdbce0b55c0d74d61ffc2136",
+  "pin": "338f7751ec7422b07a97a87e3b68da8aec8b2a6e",
   "pins": {
     "checks": [
       {
         "checks": [
+          "junit:atip_contract11_13_a_revived_name_in_a_scanned_file_fails_the_scan",
           "junit:atip_contract11_13_reviving_one_of_the_old_names_fails_the_check",
           "junit:atip_contract11_13_the_0_33_names_are_gone_from_every_guide_page_script_spec_and_scenario"
         ],
@@ -26,7 +27,7 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-34-atip-1-1/brief.md"
   },
-  "review_id": "01M6B44RF3EKW4BQCT7Z355AG5",
+  "review_id": "01M6B5HPK0B4CMF3F7SMATZXXM",
   "reviewer": "rev-atip-1-1",
   "reviewer_harness": "omp",
   "scenario_id": "atip.contract11.13",

@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T09:02:47.904340Z",
+  "code_tree": "7b922d4ecb8731dc64185a47646a3df53e18cf5b",
+  "kind": "review",
+  "pin": "338f7751ec7422b07a97a87e3b68da8aec8b2a6e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon",
+          "junit:atip_contract11_10_every_hint_in_the_sources_is_a_command_line_a_template_or_prose",
+          "junit:atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule",
+          "junit:atip_contract11_10_every_hint_the_conformance_corpus_froze_follows_the_same_rule",
+          "junit:atip_contract11_10_the_rule_catches_prose_after_a_command_and_a_lowercase_placeholder"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "90e6a9927e9ab532c94c4c4bc4785d0a801ea27cd69330331a2f8057003ffc4e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-1-1/brief.md"
+  },
+  "review_id": "01M6B5HPK0B4CMF3F7SMATZXXM",
+  "reviewer": "rev-atip-1-1",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.contract11.10",
+  "schema": 2,
+  "worktree_dirty": false
+}
