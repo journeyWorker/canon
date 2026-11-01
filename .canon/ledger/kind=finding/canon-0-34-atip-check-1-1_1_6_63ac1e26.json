@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:32:50.176803Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md:80; .github/workflows/test.yml:208",
+  "introduced_by": "165bd0d311572ee692ba8d3ccd6659236182bd6d",
+  "kind": "finding",
+  "resolution_code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "resolution_sha": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.41"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "[standards] The CHANGELOG and the workflow comment say canon passes `the 27 applicable checks` / `is judged on the 27 checks that apply to it`. Run on the committed fixture, canon has 26 applicable (21 MUST pass, 5 of 7 SHOULD pass; L0.contract and L0.usage-hint are `unsupported`), as scenario atip.check.41 and the canon test say, and as the ATIP author ruled for this case (L0.usage-hint is unsupported when no field-less USAGE is observed, an S check that does not affect the level). Verified: `atip check --bin canon --level L0 --fixture crates/canon-cli/tests/atip/canon.fixture.json` exits 0, 26 pass, 2 unsupported, usage-hint reason `no envelope the run saw carries what this check judges`, never `unprovided`. Fix: say 26 in CHANGELOG.md:80 and test.yml:208 (27 is the figure for a tool whose USAGE answers include one without a field). Blast radius: release notes and a CI comment only; the brief's 27 stays as written and is superseded by the author's ruling.",
+  "worktree_dirty": false
+}

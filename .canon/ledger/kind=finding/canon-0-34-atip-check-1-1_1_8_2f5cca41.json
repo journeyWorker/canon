@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:32:50.616904Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip/canon.fixture.json",
+  "introduced_by": "254cd6f4b0785b890131cd0a8f44857a6aab0b16",
+  "kind": "finding",
+  "resolution_code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "resolution_sha": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.41",
+    "atip.check.43"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[standards] The canon fixture has no `timeoutSeconds`, so the default 30 s applies to every invocation and to `init` in `setup`. On this shared, loaded machine a debug-build run of the checker on canon took 22 to 50 s wall, and one run ended with exit 2 FIXTURE_INVALID `the setup command init ran over the 30 second limit`; the next three runs passed. Not reproducible on demand and not a checker defect, but the CI job and `just atip` are exposed to it on a slow runner. Proposal: add `timeoutSeconds` (for example 120) to the generated fixture. Blast radius: the CI job `atip-l0` and `just atip`.",
+  "worktree_dirty": false
+}

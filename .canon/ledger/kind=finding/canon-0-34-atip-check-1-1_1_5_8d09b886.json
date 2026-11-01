@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:32:49.966065Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=atip/check.feature:atip.check.37",
+  "introduced_by": "165bd0d311572ee692ba8d3ccd6659236182bd6d",
+  "kind": "finding",
+  "resolution_code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "resolution_sha": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.37",
+    "atip.check.38",
+    "atip.check.40"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] Three scenarios were not brought to 1.1 and state things the bound tests do not assert. atip.check.37 Then says `17 checks pass and L0.next and L0.page not applicable`; the test (self_check.rs:80-100) asserts `18 MUST passed ... 6 not applicable` and 22 pass, with L0.next, L0.page, L0.registry, L0.contract, L0.usage-hint and L0.global-on-group unsupported. atip.check.38 Given/When say `three contract schemas` compared with `the originals at 365244c` (the v1.0.0 commit); the test pins five schemas (envelope, error, registry-entry, warning-entry, stream-line) at v1.1.0. atip.check.40 lists `a fix reworded`, which the test does not do (the fixture holds no prose); it does a retryable flip, a dropped warning and a changed call instead. Fix: rewrite the three texts to what the tests assert. Blast radius: scenario digests change, so evidence and reviews of these three must be re-bound.",
+  "worktree_dirty": false
+}

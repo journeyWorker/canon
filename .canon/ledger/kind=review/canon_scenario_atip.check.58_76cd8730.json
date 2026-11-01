@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:33:01.416443Z",
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "kind": "review",
+  "pin": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_58_a_tool_that_claims_1_0_is_held_to_no_member_of_1_1_and_to_no_hint_form",
+          "junit:claim::tests::atip_check_58_a_hint_that_starts_with_the_tool_is_one_command_line_or_it_is_not",
+          "junit:claim::tests::atip_check_58_a_one_zero_claim_finds_each_member_of_a_later_minor",
+          "junit:claim::tests::atip_check_58_nulls_inside_meta_and_error_are_found_and_dropped_for_the_schema",
+          "junit:claim::tests::atip_check_58_the_schemas_mark_exactly_what_this_module_knows_as_later_than_1_0"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c740fc0a76d54041b0e314d21bc3f1ac35978689e1ba973e1f179e38477e3cc2",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B791K8KHGMPHG9ETBKMDQW",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.58",
+  "schema": 2,
+  "worktree_dirty": false
+}

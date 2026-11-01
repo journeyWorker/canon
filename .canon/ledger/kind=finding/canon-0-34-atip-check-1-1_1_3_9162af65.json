@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:32:49.538947Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "fixed",
+  "file_ref": "crates/atip-check/src/checks/mod.rs:1336-1349",
+  "introduced_by": "165bd0d311572ee692ba8d3ccd6659236182bd6d",
+  "kind": "finding",
+  "resolution_code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "resolution_sha": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.56",
+    "atip.check.59",
+    "atip.check.65"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[standards] One owner per pass condition is broken for a document that is not an envelope: L0.contract-version walks documents_of_json_runs (any JSON value) instead of envelopes(), so its `markers-present` condition fires on a document with no `meta` object. checker.md row L0.contract-version says `every envelope`; L0.envelope owns a document that is not one. Reproduced: fake tool whose `team add --json` prints {\"ok\":true,\"data\":{}} fails both L0.envelope (`meta is a required property`) and L0.contract-version (`meta has no contract and contractVersion`), so a single seeded violation fails two MUST checks. The same holds for a probe that prints `[1]` or {\"foo\":1} (L0.envelope, L0.contract-version, L0.json-mode-preparse, L0.no-env-switch; the last two are legitimate owners of their own rules). The seeded set (atip_check_56) has no case for a document without meta, so the check passes the brief's `one violation, one owner` claim without covering this one. Fix: judge contract-version on envelopes() (is_envelope documents) only, and add a seeded case. Blast radius: every tool that prints a document without `meta` gets a second MUST failure, which hides which rule the author broke.",
+  "worktree_dirty": false
+}
