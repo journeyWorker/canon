@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T08:22:28.897918Z",
+  "attachments": [
+    {
+      "case": "atip_check_52_a_violation_seen_is_a_failure_even_when_the_fixture_lacks_the_entry_and_nothing_seen_is_unprovided",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r2-junit.xml",
+      "sha256": "d4427505e1182e2529a650c14fe1db13c1ce2986150d1b410d9b20e61a10de8e"
+    },
+    {
+      "case": "atip_check_52_a_violation_the_run_observed_is_a_failure_even_when_the_fixture_lacks_the_entry",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r2-junit.xml",
+      "sha256": "d4427505e1182e2529a650c14fe1db13c1ce2986150d1b410d9b20e61a10de8e"
+    }
+  ],
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r2-junit.xml"
+  },
+  "evidence_sha": "6c66123948d7420ff149962cc2bd0acd7ba82649",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 325,
+  "scenario_id": "atip.check.52",
+  "schema": 1,
+  "staging_id": "e2a3223a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
