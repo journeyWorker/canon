@@ -739,7 +739,7 @@ fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and
     // A broken domain (the shape of a time) before the calendar, a calendar when nothing else is broken.
     assert_refused(&empty("canon query --kind change --since tomorrow", None), "USAGE", "--since");
     let shape = empty("canon query --kind change --since tomorrow", None);
-    assert!(shape.message.unwrap_or_default().contains("pattern"), "the shape is the declared domain's");
+    assert!(shape.message.unwrap_or_default().contains("invalid timestamp"), "the shape is the declared domain's");
     let calendar = empty("canon query --kind change --since 2026-02-30", None);
     assert_refused(&calendar, "USAGE", "--since");
     assert!(calendar.message.unwrap_or_default().contains("2026-02-30"));
