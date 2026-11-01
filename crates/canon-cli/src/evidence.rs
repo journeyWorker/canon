@@ -1363,7 +1363,8 @@ const APPROVAL_HINT: &str = "pass --approver, --approval-role human, --signature
 pub(crate) fn check_approval(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<(), CliError> {
     let refuse = |message: &str, field: &str| Err(CliError::refused("EVIDENCE_APPROVAL_INVALID", message).reason("MALFORMED").field(field).hint(APPROVAL_HINT));
     let given = [args.approver.is_some(), args.approval_role.is_some(), args.signature_file.is_some(), args.approval_at.is_some()];
-    if !given.iter().any(|one| *one) {
+    // `--all-scenarios` forbids the approval options: that rule (a constraint, which precedes a validator, spec 11.7) refuses first.
+    if !given.iter().any(|one| *one) || args.all_scenarios {
         return Ok(());
     }
     if let Some(at) = given.iter().position(|one| !*one) {
