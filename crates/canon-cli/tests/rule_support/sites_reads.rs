@@ -9,7 +9,7 @@ pub const SITES: &[Site] = &[
     site("input.rs:expand:USAGE#1", Kind::Other("`--input` is expanded to argv before clap runs, for every command that has it: a second `--input` is a fault of the expansion's own syntax")),
     site("input.rs:expand:USAGE#2", Kind::Other("`--input` is expanded to argv before clap runs: an `--input` without a value is a fault of the expansion's own syntax")),
     site("input.rs:expand:USAGE#3", Kind::Undeclared("`--input -` and another stdin-reading option cannot both read stdin: a relation between `--input` and an option that differs per command, found while expanding argv before clap; ATIP feedback: no rule says 'these two read the same stream'")),
-    site("paging.rs:check_fields:USAGE#1", Kind::Other("the paging change's (`--fields` names of query/export/status/context): not declared here")),
+    site("fields.rs:refusal:USAGE#1", Kind::Other("the paging change's: `--fields` takes the paths a command declares under `outputs[].fields.paths` (spec 10.9.1), a closed set that belongs to the output, not a domain, a constraint or a validator of the argument")),
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#1", Kind::Rule { command: "query", rule: "forbids", arguments: &["kind", "change"] }),
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#2", Kind::Validator { command: "query", arguments: &["kind", "status"] }),
     site("retention.rs:check_window:USAGE#1", Kind::Validator { command: "export", arguments: &["after", "before"] }),

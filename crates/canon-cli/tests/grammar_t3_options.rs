@@ -17,7 +17,7 @@ mod harness;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use clap::error::{ContextKind, ErrorKind};
+use clap::error::ErrorKind;
 use harness::*;
 use serde_json::Value;
 
