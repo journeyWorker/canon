@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T08:04:24.939567Z",
+  "attachments": [
+    {
+      "case": "atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-junit.xml",
+      "sha256": "141d04c90e00556eaa4684e71f94f9be62eb14465bc39e16e4e8c9d13e26113a"
+    }
+  ],
+  "code_tree": "7d832b72fdf933bc7ed4db78f06a3f3faf1fc1aa",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-junit.xml"
+  },
+  "evidence_sha": "b424782a812aad0b7a06b48ea6d0c4f557e54905",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 111,
+  "scenario_id": "atip.l0.26",
+  "schema": 1,
+  "staging_id": "5fc1c24b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
