@@ -388,7 +388,7 @@ impl Run<'_> {
     }
 
     fn plan_domains(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation]) -> Result<(), RunError> {
-        for arg in doc.args().filter(|arg| arg.domain.is_some()) {
+        for arg in doc.args().filter(|arg| arg.domain.is_some() && crate::l1::rules::domain_profile_problems(arg).is_empty()) {
             let plan = witness::domain_plan(arg);
             let rejects: Vec<String> = self
                 .fixture

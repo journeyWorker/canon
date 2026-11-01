@@ -330,18 +330,12 @@ impl<'a> Judge<'a> {
             });
         };
         expect(&mut c, "unknown-path", l1.unknown_path, "UNKNOWN_COMMAND");
-        // `expected` is there only when there are valid words to name, and `field`, when present, is `command` (spec 10.1.2).
+        // `field`, when the refusal has one, is `command` (spec 10.1.2; an empty `expected` is the envelope schema's: it requires at least one word).
         let refusal = self.envelope(l1.unknown_path).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
         if let Some(refusal) = refusal.filter(|refusal| refusal.pointer("/error/code").and_then(Value::as_str) == Some("UNKNOWN_COMMAND")) {
-            let empty_expected = refusal.pointer("/error/expected").and_then(Value::as_array).is_some_and(Vec::is_empty);
             let field = refusal.pointer("/error/field").and_then(Value::as_str);
-            c.holds("unknown-path-shape", !empty_expected && field.is_none_or(|field| field == "command"), || {
-                format!(
-                    "{} has {}{}: `expected` is left out when there is nothing to name, and `field`, when there is one, is \"command\"",
-                    self.label(l1.unknown_path),
-                    if empty_expected { "an empty `expected` " } else { "" },
-                    field.map_or(String::new(), |field| format!("field {field:?}"))
-                )
+            c.holds("unknown-path-shape", field.is_none_or(|field| field == "command"), || {
+                format!("{} has the field {}, which must be \"command\" when there is one", self.label(l1.unknown_path), field.unwrap_or_default())
             });
         }
         expect(&mut c, "overlap", l1.overlap, "USAGE");
@@ -1132,6 +1126,10 @@ impl<'a> Judge<'a> {
             stated.sort();
             c.holds("meta-fields", stated == kept, || format!("{} has meta.fields {stated:?}, the selection and `keep` make {kept:?}", self.label(run.projected)));
             for (condition, problem) in documents::fields_findings(doc, projected, &kept, Some(plain)) {
+                // A selection the tool refused as USAGE is `unknown-path-refused`'s; a document that names an undeclared path is judged from its report alone.
+                if condition == "selection-declared" {
+                    continue;
+                }
                 c.holds(condition, problem.is_none(), || format!("{}: {}", self.label(run.projected), problem.clone().unwrap_or_default()));
             }
             c.observe(run.projected);

@@ -233,6 +233,17 @@ fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool, cache
                     2,
                 );
             }
+            // Seeded: the refusal of an unknown path names another field than `command` (spec 10.1.2).
+            if tool.flag("schemaUnknownField") {
+                return tool.fail(
+                    "usage",
+                    "UNKNOWN_COMMAND",
+                    &format!("{word} is not a command"),
+                    Some("schema"),
+                    &[("field", json!("PATH")), ("expected", json!(expected))],
+                    2,
+                );
+            }
             return tool.unknown_command(word, &expected, Some("schema"));
         }
         current = candidate;

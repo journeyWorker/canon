@@ -289,7 +289,7 @@ const REPORTS: &[(&str, &[&str])] = &[
 ];
 
 #[test]
-fn atip_checkl1_contract_examples_every_self_description_example_is_judged_by_its_owner_checks() {
+fn atip_checkl1_26_contract_examples_every_self_description_example_is_judged_by_its_owner_checks() {
     let mut judged = 0;
     for (directory, prefix) in [(dir("schema-docs"), ""), (dir("schema-docs/invalid"), "invalid/")] {
         for path in names_in(&directory) {
@@ -317,7 +317,7 @@ fn atip_checkl1_contract_examples_every_self_description_example_is_judged_by_it
 }
 
 #[test]
-fn atip_checkl1_contract_examples_every_invalid_self_description_example_with_one_rule_is_rejected_by_one_check() {
+fn atip_checkl1_26_contract_examples_every_invalid_self_description_example_with_one_rule_is_rejected_by_one_check() {
     // One owner per pass condition: an invalid example that breaks one rule is rejected by the checks of that rule only. The row of each file says which.
     let multi: Vec<&str> = SCHEMA_DOCS.iter().filter(|(_, found)| found.iter().map(|entry| entry.split('/').next().unwrap_or_default()).collect::<std::collections::BTreeSet<_>>().len() > 1).map(|(name, _)| *name).collect();
     for name in &multi {
@@ -330,7 +330,7 @@ fn atip_checkl1_contract_examples_every_invalid_self_description_example_with_on
 }
 
 #[test]
-fn atip_checkl1_contract_examples_every_report_example_is_judged_by_the_data_checks() {
+fn atip_checkl1_27_contract_examples_every_report_example_is_judged_by_the_data_checks() {
     let directory = dir("atip-examples");
     let mut judged = 0;
     for sub in ["", "invalid"] {

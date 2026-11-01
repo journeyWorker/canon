@@ -240,6 +240,19 @@ fn registry_patch(ops: &[Value], entry_ops: &[(&str, Vec<Value>)]) -> Value {
     patch(&entries)
 }
 
+/// The fixture with `"registry": "from-schema"` (and so no `warnings`): nothing is compared with the tool's registry.
+fn from_schema(fixture: &mut Value) {
+    fixture["registry"] = json!("from-schema");
+    if let Some(object) = fixture.as_object_mut() {
+        object.remove("warnings");
+    }
+}
+
+fn with_fixture(mut case: Case, tweak: fn(&mut Value)) -> Case {
+    case.tweak = Some(tweak);
+    case
+}
+
 const INPUT_INVALID: &str = "/errors/code=INPUT_INVALID";
 
 /// The `NOT_JSON`/`UNKNOWN_KEY` reasons live under `INPUT_INVALID` in both answers: `--errors` (`/errors/code=…`)
@@ -370,6 +383,7 @@ pub fn l1_cases() -> Vec<Case> {
         case("quoted-path/same-answer", json!({"quotedPathDiffers": true})),
         // schema-errors
         case("schema-errors/unknown-path", json!({"schemaUnknownCode": "USAGE"})),
+        case("schema-errors/unknown-path-shape", json!({"schemaUnknownField": true})),
         case("schema-errors/overlap", json!({"schemaOverlapAnswers": true})),
         case("schema-errors/group-with-errors", json!({"schemaGroupErrorsAnswers": true})),
         case("schema-errors/unknown-error-code", json!({"schemaErrorUnknownCode": "UNKNOWN_COMMAND"})),
@@ -389,13 +403,20 @@ pub fn l1_cases() -> Vec<Case> {
             patch(&[("member list", vec![add("/errors/-", json!("NOT_REGISTERED"))])]),
         ),
         // reasons
-        case(
-            "reasons/reason-form",
-            reason_patch(|base| vec![set(&format!("{base}/reason=UNKNOWN_KEY/reason"), json!("unknown-key"))]),
+        // The fixture cannot hold a reason that is not UPPER_SNAKE_CASE or one listed twice (`FIXTURE_INVALID`): these two take the registry from the tool.
+        with_fixture(
+            case(
+                "reasons/reason-form",
+                reason_patch(|base| vec![set(&format!("{base}/reason=UNKNOWN_KEY/reason"), json!("unknown-key"))]),
+            ),
+            from_schema,
         ),
-        case(
-            "reasons/reasons-unique",
-            reason_patch(|base| vec![copy(&format!("{base}/0"), &format!("{base}/-"))]),
+        with_fixture(
+            case(
+                "reasons/reasons-unique",
+                reason_patch(|base| vec![copy(&format!("{base}/0"), &format!("{base}/-"))]),
+            ),
+            from_schema,
         ),
         case(
             "reasons/no-exit-on-reason",

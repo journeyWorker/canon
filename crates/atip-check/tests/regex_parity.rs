@@ -23,7 +23,7 @@ fn name(case: &Value) -> String {
 }
 
 #[test]
-fn atip_checkl1_regex_the_ecmascript_engine_answers_every_recorded_case_as_the_record_says() {
+fn atip_checkl1_25_regex_the_ecmascript_engine_answers_every_recorded_case_as_the_record_says() {
     let cases = cases();
     assert!(cases.len() >= 60, "{}", cases.len());
     for case in &cases {
@@ -33,7 +33,7 @@ fn atip_checkl1_regex_the_ecmascript_engine_answers_every_recorded_case_as_the_r
 }
 
 #[test]
-fn atip_checkl1_regex_the_rust_engine_answers_every_recorded_case_as_the_record_says() {
+fn atip_checkl1_25_regex_the_rust_engine_answers_every_recorded_case_as_the_record_says() {
     for case in &cases() {
         let got = rust_answer(case["pattern"].as_str().expect("pattern"), case["value"].as_str().expect("value")).recorded();
         assert_eq!(got, case["rust"], "Rust: {}", name(case));
@@ -41,7 +41,7 @@ fn atip_checkl1_regex_the_rust_engine_answers_every_recorded_case_as_the_record_
 }
 
 #[test]
-fn atip_checkl1_regex_the_form_of_every_recorded_pattern_is_the_one_the_record_says() {
+fn atip_checkl1_25_regex_the_form_of_every_recorded_pattern_is_the_one_the_record_says() {
     for case in &cases() {
         let pattern = case["pattern"].as_str().expect("pattern");
         let of_form = form_problem(pattern).is_none();
@@ -50,7 +50,7 @@ fn atip_checkl1_regex_the_form_of_every_recorded_pattern_is_the_one_the_record_s
 }
 
 #[test]
-fn atip_checkl1_regex_a_pattern_of_the_form_that_both_engines_compile_agrees_unless_the_record_names_a_unicode_version_difference() {
+fn atip_checkl1_25_regex_a_pattern_of_the_form_that_both_engines_compile_agrees_unless_the_record_names_a_unicode_version_difference() {
     let mut differences = 0;
     for case in &cases() {
         let (pattern, value) = (case["pattern"].as_str().expect("pattern"), case["value"].as_str().expect("value"));
@@ -82,7 +82,7 @@ fn atip_checkl1_regex_a_pattern_of_the_form_that_both_engines_compile_agrees_unl
 }
 
 #[test]
-fn atip_checkl1_regex_a_pattern_outside_the_form_that_the_engines_read_differently_is_not_a_version_difference() {
+fn atip_checkl1_25_regex_a_pattern_outside_the_form_that_the_engines_read_differently_is_not_a_version_difference() {
     // `^[a&&b]+$` is not of the form; on "a" ECMAScript accepts and Rust rejects, and no code point or category explains it.
     assert!(form_problem("^[a&&b]+$").is_some());
     assert!(matches!(compare("^[a&&b]+$", "a"), Comparison::Differs { ecmascript: true, rust: false }));
