@@ -471,6 +471,10 @@ pub struct Provision {
 /// The provisioned repo of the command `path`, built from the fixture at `base`.
 pub fn provision(path: &str, base: &Path, home: &Path) -> Provision {
     let case = harness::case(path, base, home);
+    // A writer refreshes a stale scenario index before it reads its own arguments, and that is the writer's doing, not the
+    // refusal's: the template starts with the index current, so a refused call is seen to write nothing.
+    let envs: Vec<(&str, &str)> = case.envs.iter().map(|(key, value)| (key.as_str(), value.as_str())).chain(std::iter::once(("CANON_ROLE", "implementer"))).collect();
+    let _ = canon_in(&case.dir, home, &["inventory".to_string(), "sync".to_string(), "--json".to_string()], &envs);
     Provision { template: case.dir.clone(), envs: case.envs.clone(), example: case.argv.clone(), _case: case }
 }
 
