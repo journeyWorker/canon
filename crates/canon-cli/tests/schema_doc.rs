@@ -289,6 +289,9 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l1()
     let reviewer = serde_json::from_slice::<Value>(&run(&["schema", "--as", "reviewer", "--json"], dir.path(), None).stdout).expect("JSON");
     let listed = reviewer["data"]["commands"].as_array().expect("commands");
     assert!(!listed.is_empty() && listed.len() < entries.len());
+    assert_eq!(reviewer["data"]["x-canon"], json!({ "as": "reviewer" }), "a filtered tree names the role in x-canon.as");
+    assert_eq!(atip::schema_doc_problems(&reviewer), Vec::<String>::new());
+    assert!(first["data"].get("x-canon").is_none(), "an unfiltered tree has no x-canon");
     for entry in listed {
         if entry["kind"] == "command" {
             assert!(names(&entry["x-canon"], "roles").contains(&"reviewer".to_string()), "{entry}");
@@ -300,6 +303,8 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l1()
     let by_env = run(&["schema", "--json"], dir.path(), Some("reviewer"));
     let without = run(&["schema", "--json"], dir.path(), None);
     assert_eq!(by_env.stdout, without.stdout, "CANON_ROLE does not change the answer");
+    let bad = run(&["schema", "--as", "janitor", "--json"], dir.path(), None);
+    assert_eq!(bad.status.code(), Some(2), "an unknown role is refused, not listed as a filter");
 }
 
 /// atip.schemadoc.02: `schema` answers from an empty directory with no environment and writes nothing.

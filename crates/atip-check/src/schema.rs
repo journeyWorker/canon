@@ -28,6 +28,7 @@ pub struct Schemas {
     registry_entry: Validator,
     warning_entry: Validator,
     schema_doc: Validator,
+    stream_line: Validator,
 }
 
 /// One thing wrong with a document: where (a JSON pointer, `/` for the root) and what.
@@ -82,6 +83,10 @@ impl Schemas {
             atip::schema::WARNING_ENTRY_SCHEMA,
         )?;
         let schema_doc = parse("schema-doc.schema.json", atip::schema::SCHEMA_DOC_SCHEMA)?;
+        let stream_line = parse(
+            "stream-line.schema.json",
+            atip::schema::STREAM_LINE_SCHEMA,
+        )?;
         let registry = [
             (ERROR_ID, error),
             (ENVELOPE_ID, envelope.clone()),
@@ -95,10 +100,7 @@ impl Schemas {
                 "https://atip.dev/1/batch-report.schema.json",
                 parse("batch-report.schema.json", atip::schema::BATCH_REPORT_SCHEMA)?,
             ),
-            (
-                "https://atip.dev/1/stream-line.schema.json",
-                parse("stream-line.schema.json", atip::schema::STREAM_LINE_SCHEMA)?,
-            ),
+            ("https://atip.dev/1/stream-line.schema.json", stream_line.clone()),
             (SCHEMA_DOC_ID, schema_doc.clone()),
         ]
         .into_iter()
@@ -120,6 +122,7 @@ impl Schemas {
             registry_entry: build(&registry_entry)?,
             warning_entry: build(&warning_entry)?,
             schema_doc: build(&schema_doc)?,
+            stream_line: build(&stream_line)?,
             registry,
         })
     }
@@ -158,6 +161,14 @@ impl Schemas {
     /// The problems of `row` against the registry-entry schema, empty when it validates.
     pub fn registry_entry_problems(&self, row: &Value) -> Vec<String> {
         problem_list(&self.registry_entry, row)
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    /// The problems of one NDJSON line of a stream against the stream-line schema, empty when it validates.
+    pub fn stream_line_problems(&self, line: &Value) -> Vec<String> {
+        problem_list(&self.stream_line, line)
             .iter()
             .map(ToString::to_string)
             .collect()

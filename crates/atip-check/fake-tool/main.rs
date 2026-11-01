@@ -571,6 +571,15 @@ impl Tool {
                 &[("field", json!("--warning")), ("received", json!(code))],
             );
         }
+        if is_1_1 && options.is_empty() {
+            if let Some(shape) = self.config.get("schemaTree").and_then(Value::as_str) {
+                let mut commands = vec![json!({"command": "items", "path": ["items"], "kind": "command", "summary": "items", "effect": "read"})];
+                if shape == "groups" {
+                    commands.push(json!({"command": "team", "path": ["team"], "kind": "group", "summary": "teams"}));
+                }
+                return self.success("schema", json!({"kind": "tree", "level": "L1", "commands": commands}));
+            }
+        }
         self.refuse(
             "USAGE",
             "schema takes --errors here",
@@ -879,6 +888,19 @@ fn team(tool: &Tool, words: &[String], repo_given: bool) -> ExitCode {
         ),
         Some("add") if tool.flag("teamAddNoEnvelope") && tool.json => {
             println!("{}", json!({"ok": true, "data": {}}));
+            ExitCode::SUCCESS
+        }
+        // A stream command (13.5): a start line, an event, an end line holding the envelope.
+        Some("add") if tool.flag("teamAddStream") && tool.json => {
+            let version = tool.text("streamStartContractVersion", "1.1");
+            let mut start = json!({"type": "start", "contract": "atip/1", "tool": tool.name(), "toolVersion": "1.2.3", "command": "team add", "schemaVersion": "1.0"});
+            if version != "none" {
+                start["contractVersion"] = json!(version);
+            }
+            println!("{start}");
+            println!("{}", json!({"type": "event", "data": {"step": "add"}}));
+            let result = json!({"ok": true, "data": {"added": true}, "meta": tool.meta(Some("team add"))});
+            println!("{}", json!({"type": "end", "result": result}));
             ExitCode::SUCCESS
         }
         // A document that is no envelope but carries an error code no registry has: only L0.envelope may judge it.

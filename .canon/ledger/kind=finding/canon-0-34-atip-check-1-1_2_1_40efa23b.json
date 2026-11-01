@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T10:28:01.242051Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "disposition": "fixed",
+  "file_ref": "crates/atip-check/src/checks/mod.rs:1726",
+  "introduced_by": "10cdac9e3c8006fea7835e3e812562f1370ab9ff",
+  "kind": "finding",
+  "resolution_code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "resolution_sha": "93f0bd4b37bf0b627bff92103b70cfaf4d712603",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "reviewer": "rev-check-1-1",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.69"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[standards] Round 2 also moved the L0.registry emitted-code, reason and warning conditions from documents_of_json_runs() to envelopes(), but no test notices: reverting that one line (registry judging every JSON document again) leaves the whole atip-check suite green, because no seeded case prints a non-envelope document that carries an error.code. Only the L0.contract-version half of finding 3 is pinned (atip_check_64). Behavior is as the author ruled (a non-envelope is L0.envelope's alone); the gap is a missing seed. Blast radius: a non-envelope document with an unregistered error code. Not blocking.",
+  "worktree_dirty": false
+}

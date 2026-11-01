@@ -180,7 +180,8 @@ fn entry(node: &Node<'_>) -> Built<TreeEntry> {
 }
 
 /// `canon schema --json`: every group and command, a group before its commands. `role` (`--as`) keeps the commands
-/// of that role and the groups that hold one; nothing else, the environment included, filters it (spec 10.2.2).
+/// of that role and the groups that hold one, and the tree names the role in `x-canon.as`; nothing else, the environment
+/// included, filters it (spec 10.2.2).
 pub fn tree(root: &Command, role: Option<Role>) -> Built<TreeDoc> {
     let nodes = project::nodes(root);
     let mut entries = Vec::with_capacity(nodes.len());
@@ -194,7 +195,9 @@ pub fn tree(root: &Command, role: Option<Role>) -> Built<TreeDoc> {
             entries.push(entry(node)?);
         }
     }
-    Ok(TreeDoc { kind: TreeDoc::KIND, level: LEVEL.to_string(), commands: entries })
+    // A filtered tree says so (spec 10.2.2, 10.12): the role is `x-canon.as`, and an unfiltered tree has no `x-canon`.
+    let extensions = role.map(|role| ("x-canon".to_string(), json!({ "as": role.as_str() }))).into_iter().collect();
+    Ok(TreeDoc { kind: TreeDoc::KIND, level: LEVEL.to_string(), commands: entries, extensions })
 }
 
 /// `canon schema <GROUP> --json`.

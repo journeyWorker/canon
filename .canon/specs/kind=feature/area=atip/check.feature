@@ -712,9 +712,9 @@ Feature: atip check: the atip/1 L0 conformance checker
   @flow:canon-0-34-atip-check-1-1.F5
   @atip.check.65
   Scenario: L0.contract-version fails on a missing or wrong marker, or a member of a later minor than the claim
-    Given fake tools whose answers lack the 1.1 markers, say another minor, or (claiming 1.0) carry a 1.1 member or the wrong schemaVersion in a schema answer
+    Given fake tools whose answers lack the 1.1 markers, say another minor, or (claiming 1.0) carry a 1.1 member or the wrong schemaVersion in a schema answer, and a streaming command whose start line lacks or mis-states contractVersion
     When atip check runs
-    Then L0.contract-version is fail naming the condition and no other check fails
+    Then L0.contract-version is fail naming the condition (for a stream, its start line and the envelope of its end line), and no other check fails; a stream with the markers passes every check, its lines judged by the stream-line schema
 
   # canon: {"schema":1,"at":"2026-11-01T07:27:52Z","actor":{"agent_id":"impl-atip-check-1-1","role":"implementer","session_id":"s-0-34-check-1-1"}}
   @subject:atip-check
@@ -789,9 +789,9 @@ Feature: atip check: the atip/1 L0 conformance checker
   @flow:canon-0-34-atip-check-1-1.F5
   @atip.check.72
   Scenario: L0.global-on-group reports an advisory when a tool-wide option after a group word is an error
-    Given a fake tool whose group word rejects a tool-wide option
+    Given a fake tool whose group word rejects a tool-wide option, and fixtures with no command id of two words next to a tool whose schema lists groups, lists none, or offers no list
     When atip check runs with the fixture's globalOptions
-    Then L0.global-on-group is fail, a SHOULD, so the level is met
+    Then L0.global-on-group is fail, a SHOULD, so the level is met; with no group in the fixture it is unprovided, and unsupported only when the tool's schema lists no group at all
 
   # canon: {"schema":1,"at":"2026-11-01T07:28:19Z","actor":{"agent_id":"impl-atip-check-1-1","role":"implementer","session_id":"s-0-34-check-1-1"}}
   @subject:atip-check

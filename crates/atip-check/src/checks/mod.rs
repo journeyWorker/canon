@@ -247,6 +247,8 @@ struct Invocations {
     probe: Option<ProbeCalls>,
     commands: Vec<CommandCalls>,
     group: Option<GroupCalls>,
+    /// `schema --json`: the tool's tree of commands, when it offers one (the groups it has).
+    schema_tree: usize,
     /// What the probe reports in an untouched copy, twice the same; `None` when it does not (or there is no probe).
     remote_baseline: Option<Value>,
 }
@@ -341,6 +343,7 @@ impl Run<'_> {
         };
         let commands = self.invoke_commands()?;
         let group = self.invoke_group()?;
+        let schema_tree = self.invoke(Call::new(["schema", "--json"]))?;
         Ok(Invocations {
             version,
             unknown_command,
@@ -354,6 +357,7 @@ impl Run<'_> {
             probe,
             commands,
             group,
+            schema_tree,
             remote_baseline,
         })
     }
@@ -1207,7 +1211,12 @@ impl<'a> Judge<'a> {
     fn envelope_check(&'a self) -> Finding {
         let mut c = self.check("L0.envelope");
         for (index, document) in self.documents_of_json_runs() {
-            let found = rules::envelope_problems(document, self.claim);
+            // A tool emits envelopes or stream lines (13.5): a stream is judged line by line by the stream-line schema.
+            let found = if rules::is_stream_start(document) {
+                stream_lines(&self.at(index).stdout).iter().flat_map(rules::stream_line_problems).collect()
+            } else {
+                rules::envelope_problems(document, self.claim)
+            };
             c.holds("valid-envelope", found.is_empty(), || {
                 format!(
                     "{} printed a document the envelope schema rejects: {}",
@@ -1255,6 +1264,10 @@ impl<'a> Judge<'a> {
                 continue;
             }
             if self.at(index).exit == Exit::TimedOut {
+                continue;
+            }
+            // A stream is NDJSON by design (13.5): its lines are `L0.envelope`'s.
+            if self.documents[index].as_ref().is_some_and(rules::is_stream_start) {
                 continue;
             }
             c.observe(index);
@@ -1396,6 +1409,25 @@ impl<'a> Judge<'a> {
             for (condition, problem) in rules::contract_version_findings(document, self.claim) {
                 c.holds(condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())
+                });
+                if problem.is_some() {
+                    c.observe(index);
+                }
+            }
+        }
+        // The start line of a stream carries the markers of an envelope's meta, and the end line holds an envelope.
+        for (index, document) in self.documents_of_json_runs() {
+            if !rules::is_stream_start(document) {
+                continue;
+            }
+            let lines = stream_lines(&self.at(index).stdout);
+            let end = lines.iter().rev().find(|line| line.get("type").and_then(Value::as_str) == Some("end")).and_then(|line| line.get("result"));
+            let findings = rules::stream_start_findings(document, self.claim)
+                .into_iter()
+                .chain(end.filter(|result| is_envelope(result)).map(|result| rules::contract_version_findings(result, self.claim)).into_iter().flatten());
+            for (condition, problem) in findings {
+                c.holds(condition, problem.is_none(), || {
+                    format!("{} (a stream): {}", self.label(index), problem.clone().unwrap_or_default())
                 });
                 if problem.is_some() {
                     c.observe(index);
@@ -1865,12 +1897,28 @@ impl<'a> Judge<'a> {
         let Some(options) = &self.fixture.global_options else {
             return c.finish_as(End::Unprovided("the fixture has no `globalOptions`".to_string()));
         };
+        if options.is_empty() {
+            return c.finish_as(End::Unsupported("the fixture lists no tool-wide option".to_string()));
+        }
         let Some(group) = &self.calls.group else {
-            return c.finish_as(End::Unsupported(if options.is_empty() {
-                "the fixture lists no tool-wide option".to_string()
-            } else {
-                "no command of the fixture has a group word".to_string()
-            }));
+            // The fixture gives no group to run. Only the tool's own schema can show there are none; else it is unprovided.
+            let tree = self.envelope(self.calls.schema_tree).filter(|document| {
+                document.get("ok") == Some(&Value::Bool(true)) && document.pointer("/data/kind").and_then(Value::as_str) == Some("tree")
+            });
+            let groups = tree.map(|document| {
+                document
+                    .pointer("/data/commands")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter(|entry| entry.get("kind").and_then(Value::as_str) == Some("group"))
+                    .count()
+            });
+            return c.finish_as(match groups {
+                Some(0) => End::Unsupported("the tool's schema lists no group".to_string()),
+                Some(_) => End::Unprovided("no command of the fixture has a group word (a command id of two words), and the tool's schema lists groups".to_string()),
+                None => End::Unprovided("no command of the fixture has a group word (a command id of two words), and the tool's schema shows no list of groups to rule them out".to_string()),
+            });
         };
         let answers = |index: usize| {
             self.envelope(index)
@@ -2085,6 +2133,14 @@ fn data_keys(document: &Value) -> BTreeSet<&str> {
 fn is_envelope(document: &Value) -> bool {
     document.get("ok").is_some_and(Value::is_boolean)
         && document.get("meta").is_some_and(Value::is_object)
+}
+
+/// Every line of `stdout` that is JSON: the lines of a stream.
+fn stream_lines(stdout: &[u8]) -> Vec<Value> {
+    String::from_utf8_lossy(stdout)
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .collect()
 }
 
 /// The first JSON value of `stdout` (indentation allowed), when it starts with one.

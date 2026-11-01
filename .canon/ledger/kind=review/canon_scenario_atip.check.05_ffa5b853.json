@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T10:28:12.128638Z",
+  "code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "kind": "review",
+  "pin": "93f0bd4b37bf0b627bff92103b70cfaf4d712603",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_05_text_mode_prints_a_line_per_check_and_a_summary_and_a_failed_level_prints_on_stderr_with_stdout_empty",
+          "junit:output::tests::atip_check_05_the_text_form_is_code_message_then_the_members_that_exist",
+          "junit:report::tests::atip_check_05_the_text_has_a_line_per_check_and_one_summary"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f2d668eb417f93302c25c4a959c57c763b0e76597a4dd4e46c474162aefc9668",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6BAE2Q007EFAFAXB5378N96",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.05",
+  "schema": 2,
+  "worktree_dirty": false
+}

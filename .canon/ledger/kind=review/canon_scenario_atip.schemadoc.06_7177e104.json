@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-schema-doc",
+    "role": "reviewer",
+    "session_id": "s-0-34-schema-doc-rev"
+  },
+  "at": "2026-11-01T10:34:30.919362Z",
+  "code_tree": "5054cd1f165b16ecd65498d8c29a9d0e3caa935b",
+  "kind": "review",
+  "pin": "9655dc4cf7a280f3031fe6cccc94a13a14f8a317",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation",
+          "junit:project::tests::atip_schemadoc_06_a_custom_parser_without_a_table_entry_fails_and_with_one_passes",
+          "junit:project::tests::atip_schemadoc_06_a_default_is_parsed_with_its_type_and_one_that_does_not_parse_fails"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "8b9257a7ffd139a83dd995c50efa3e836b6809de6a6ce916b3fde7ddcaed475c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-schema-doc/brief.md"
+  },
+  "review_id": "01M6BASMM748DX92RVSMQCY00B",
+  "reviewer": "rev-schema-doc",
+  "scenario_id": "atip.schemadoc.06",
+  "schema": 2,
+  "worktree_dirty": false
+}
