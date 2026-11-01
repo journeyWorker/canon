@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-paging-fields",
+    "role": "implementer",
+    "session_id": "s-0-34-paging-fields"
+  },
+  "at": "2026-11-01T13:13:32.704867Z",
+  "attachments": [
+    {
+      "case": "atip_paging_15_the_camel_case_alias_of_a_snake_case_key_and_the_snake_case_alias_of_a_report_member_are_gone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-paging-fields.xml",
+      "sha256": "d736014bc5658cef095c519c6bfe78171005512b3cd8f332e7403982e1cbf016"
+    }
+  ],
+  "code_tree": "01c22c3ff6f286b3485b64eba07f3be53fbde8aa",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-paging-fields.xml"
+  },
+  "evidence_sha": "3fe9f54cf5db8d52e81fa40dda834baa35434def",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "atip.paging.15",
+  "schema": 1,
+  "staging_id": "c945dc75",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
