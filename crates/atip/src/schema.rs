@@ -23,6 +23,11 @@ pub const WARNING_ENTRY_SCHEMA: &str = include_str!("../schema/warning-entry.sch
 /// `schema/stream-line.schema.json`: one line of a stream (since 1.0; `canon` has no stream before 0.35).
 pub const STREAM_LINE_SCHEMA: &str = include_str!("../schema/stream-line.schema.json");
 
+/// `meta.contract`: the contract every document follows.
+pub const CONTRACT: &str = "atip/1";
+/// `meta.contractVersion`: the minor of the contract the vendored schemas are (spec 15.7). The value is never `"1.0"` written out.
+pub const CONTRACT_VERSION: &str = "1.1";
+
 /// `$id` of the error schema, which the envelope and the registry entry `$ref`.
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
 
@@ -38,6 +43,7 @@ fn compile(text: &str) -> Validator {
 static ENVELOPE: LazyLock<Validator> = LazyLock::new(|| compile(ENVELOPE_SCHEMA));
 static ERROR: LazyLock<Validator> = LazyLock::new(|| compile(ERROR_SCHEMA));
 static REGISTRY_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(REGISTRY_ENTRY_SCHEMA));
+static WARNING_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(WARNING_ENTRY_SCHEMA));
 
 fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
     validator.iter_errors(document).map(|error| format!("{error} at {}", error.instance_path())).collect()
@@ -57,6 +63,11 @@ pub fn error_problems(error: &Value) -> Vec<String> {
 /// What breaks the registry-entry schema in `row`, empty when it conforms.
 pub fn registry_entry_problems(row: &Value) -> Vec<String> {
     problems_of(&REGISTRY_ENTRY, row)
+}
+
+/// What breaks the warning-entry schema in `row` (one row of the warning registry, since 1.1), empty when it conforms.
+pub fn warning_entry_problems(row: &Value) -> Vec<String> {
+    problems_of(&WARNING_ENTRY, row)
 }
 
 #[cfg(test)]
@@ -98,14 +109,36 @@ mod tests {
 
     #[test]
     fn an_error_object_with_a_tool_extension_passes_and_one_with_an_empty_member_does_not() {
-        let with_extension = json!({ "code": "INPUT_INVALID", "message": "m", "retryable": false, "field": "--input", "x-canon": { "reason": "tty" } });
+        let with_extension = json!({ "code": "INPUT_INVALID", "message": "m", "retryable": false, "field": "--input", "x-canon": { "note": "n" } });
         assert_eq!(error_problems(&with_extension), Vec::<String>::new());
         assert!(!error_problems(&json!({ "code": "USAGE", "message": "m", "retryable": false, "hint": "" })).is_empty());
         assert!(!error_problems(&json!({ "code": "USAGE", "message": "m", "retryable": false, "unknown": 1 })).is_empty());
     }
 
     fn meta() -> Value {
-        json!({ "schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.33.0", "contract": "atip/1", "command": "status" })
+        json!({ "schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.34.0", "contract": CONTRACT, "contractVersion": CONTRACT_VERSION, "command": "status" })
+    }
+
+    #[test]
+    fn atip_1_1_01_contract_version_is_valid_only_with_contract() {
+        let mut without = meta();
+        without.as_object_mut().expect("meta is an object").remove("contract");
+        assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": without })).is_empty(), "`contractVersion` without `contract` is refused");
+        let mut lone = meta();
+        lone["contractVersion"] = json!("2.0");
+        assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": lone })).is_empty(), "another major is refused");
+    }
+
+    #[test]
+    fn atip_1_1_02_a_reason_and_a_warning_row_validate() {
+        let failure = json!({ "ok": false, "error": { "code": "INPUT_INVALID", "reason": "NOT_JSON", "message": "m", "retryable": false, "field": "--input", "received": "" }, "meta": meta() });
+        assert_eq!(envelope_problems(&failure), Vec::<String>::new());
+        let lower = json!({ "code": "INPUT_INVALID", "reason": "not_json", "message": "m", "retryable": false });
+        assert!(!error_problems(&lower).is_empty(), "a reason is UPPER_SNAKE_CASE");
+        assert!(warning_entry_problems(&json!({ "code": "OLD_LAYOUT_FOUND", "meaning": "m", "fix": "f" })).is_empty());
+        assert!(!warning_entry_problems(&json!({ "code": "OLD_LAYOUT_FOUND", "meaning": "m", "fix": "f", "exit": 1 })).is_empty(), "a warning row has no exit");
+        let with_reasons = json!({ "code": "INPUT_INVALID", "exit": 2, "retryable": false, "meaning": "m", "fix": "f", "reasons": [{ "reason": "NOT_JSON", "meaning": "m", "fix": "f" }] });
+        assert!(registry_entry_problems(&with_reasons).is_empty());
     }
 
     #[test]
