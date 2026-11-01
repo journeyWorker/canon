@@ -1,9 +1,10 @@
-//! The tool's fixture file (approaches/checker.md 5), the L0 keys of it.
+//! The tool's fixture file (approaches/checker.md 5), the L0 and L1 keys of it.
 //!
 //! A fixture is a JSON object. At L0 the checker reads `contractVersion`, `setup`, `env`, `timeoutSeconds`,
 //! `probe`, `globalOptions`, `registry`, `warnings` and, in `commands`, the invocations `ok`, `refused` and
-//! `missingValue`. The other members of `commands` (`fields`, `domainRejects`, `batchFailsAt`, ...), `search`
-//! and any other member belong to L1 and L2 and are ignored when present.
+//! `missingValue`. At L1 it also reads, in `commands`, `fields` (selections) and `domainRejects` (values outside a
+//! pattern or a structural domain, by argument). The other members of `commands` (`batchFailsAt`, `preview`,
+//! `allowedEffects`, `async`, ...), `search` and any other member belong to L2 and are ignored when present.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -28,15 +29,19 @@ pub struct RegistryRow {
     pub reasons: Option<Vec<String>>,
 }
 
-/// The L0 invocations of one command: argv arrays, each run in its own copy of the state.
+/// The invocations of one command: argv arrays, each run in its own copy of the state, and the L1 lists.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CommandEntry {
-    /// Invocations that succeed; the checker reads their envelopes (`meta.next`, `meta.page`).
+    /// Invocations that succeed; the checker reads their envelopes (`meta.next`, `meta.page`) and builds its probes from them.
     pub ok: Vec<Vec<String>>,
     /// Invocations that are refused.
     pub refused: Vec<Vec<String>>,
     /// Invocations of the command with one required value left out (`L0.no-prompt`).
     pub missing_value: Vec<Vec<String>>,
+    /// `--fields` selections: each a list of field paths (`L1.fields`).
+    pub fields: Vec<Vec<String>>,
+    /// Values outside a `pattern` or a structural domain, by argument name: the fixture author knows them, the checker cannot generate them (`L1.domains`, `L1.patterns`).
+    pub domain_rejects: BTreeMap<String, Vec<String>>,
 }
 
 /// What the checker reads from a fixture.
@@ -397,10 +402,45 @@ fn commands(value: &Value) -> Result<BTreeMap<String, CommandEntry>, String> {
                 ok: list("ok")?,
                 refused: list("refused")?,
                 missing_value: list("missingValue")?,
+                fields: list("fields")?,
+                domain_rejects: domain_rejects(entry.get("domainRejects"), id)?,
             },
         );
     }
     Ok(entries)
+}
+
+/// `domainRejects` of command `id`: an object of argument name to a list of values (strings, as argv words).
+fn domain_rejects(value: Option<&Value>, id: &str) -> Result<BTreeMap<String, Vec<String>>, String> {
+    let Some(value) = value else {
+        return Ok(BTreeMap::new());
+    };
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("`commands/{id}/domainRejects` must be an object of argument name to a list of values"))?;
+    let mut rejects = BTreeMap::new();
+    for (name, values) in object {
+        let at = format!("commands/{id}/domainRejects/{name}");
+        if name.is_empty() || name.starts_with('-') {
+            return Err(format!("`{at}`: the key is an argument name without dashes (`limit`, not `--limit`)"));
+        }
+        let list = values
+            .as_array()
+            .filter(|list| !list.is_empty())
+            .ok_or_else(|| format!("`{at}` must be a non-empty array of values"))?;
+        let strings = list
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                item.as_str()
+                    .filter(|text| !text.contains('\0'))
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("`{at}/{index}` must be a string (a JSON value is written as its text)"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        rejects.insert(name.clone(), strings);
+    }
+    Ok(rejects)
 }
 
 #[cfg(test)]
