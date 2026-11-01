@@ -315,6 +315,10 @@ pub enum Command {
     Completion(CompletionArgs),
 }
 
+/// The largest integer a JSON parser, JavaScript and a Rust `i64` all read the same: ±(2^53-1) (atip/1 spec 10.7.5). An
+/// integer option that parses into a 64-bit type is refused outside it, never rounded into it.
+pub const SAFE_INTEGER: u64 = atip::domain::SAFE_INTEGER as u64;
+
 /// `--promote`/`--no-promote`, flattened into every staged write
 /// (0.16 D2; `crate::write_mode`).
 #[derive(clap::Args, Debug, Clone, Copy)]

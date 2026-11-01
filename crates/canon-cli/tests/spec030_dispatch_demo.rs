@@ -269,7 +269,7 @@ fn dispatch_manifest_21_prompt_add_refuses_an_operand_that_is_not_name_at_versio
     let d = dir.path();
     let before = snapshot(d);
     let b = refused(d, &["prompt", "add", "reviewer", "--manifest", "pm.json"], 2, "USAGE");
-    assert_eq!(b["error"]["field"], "<NAME@VERSION>");
+    assert_eq!(b["error"]["field"], "NAME@VERSION");
     assert!(b["error"]["message"].as_str().unwrap().contains("NAME@VERSION"), "{b}");
     assert_eq!(snapshot(d), before);
 }

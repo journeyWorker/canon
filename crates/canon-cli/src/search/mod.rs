@@ -181,7 +181,7 @@ pub(crate) fn run_search(args: SearchArgs) -> ExitCode {
     let command = "canon search";
     let query = text.trim();
     if query.is_empty() {
-        let error = CliError::refused("SEARCH_QUERY_EMPTY", "the search text is empty or only spaces").field("text").hint("pass the text to find, e.g. `canon search \"timeout\"`");
+        let error = CliError::refused("SEARCH_QUERY_EMPTY", "the search text is empty or only spaces").field("TEXT").hint("pass the text to find, e.g. `canon search \"timeout\"`");
         return ExitCode::from(error.emit("canon search", json));
     }
     let index = match open_index(command, &repo, json) {
@@ -267,7 +267,7 @@ pub(crate) fn run_trace(args: TraceArgs) -> ExitCode {
             trace::TraceError::NotFound => CliError::refused("TRACE_NOT_FOUND", format!("no record says `{id}`; it takes {shapes}")).hint("pass an id a record carries: `canon query --kind finding` shows finding keys, `canon query --kind review --json` review ids"),
             trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_NOT_FOUND", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).hint("pass more characters of the sha"),
         };
-        ExitCode::from(error.field("id").emit("canon trace", json))
+        ExitCode::from(error.field("ID").emit("canon trace", json))
     };
     if !trace::is_recognized(&id) {
         return refusal(&trace::TraceError::Unrecognized);

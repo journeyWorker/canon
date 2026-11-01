@@ -73,19 +73,10 @@ fn leaves(spec: &Value) -> impl Iterator<Item = &Value> {
     spec["commands"].as_array().expect("commands").iter()
 }
 
-/// What clap declares about how the options of `leaf` go together: the guides write it as `a | b` and `[--a --b <V>]`.
-/// The spec file does not carry it (constraints are published in their own change); the clap tree does.
+/// What the document of `leaf` says about how its arguments go together: the guides write it as `a | b` and `[--a --b <V>]`.
+/// It is the `constraints` of the command document, so a guide and `canon schema` say one thing.
 fn relations(leaf: &Value) -> atip::project::Relations {
-    static ROOT: std::sync::LazyLock<clap::Command> = std::sync::LazyLock::new(|| {
-        let mut root = canon_cli::cli::command();
-        root.build();
-        root
-    });
-    let mut node = &*ROOT;
-    for word in leaf["path"].as_array().expect("path") {
-        node = node.find_subcommand(word.as_str().expect("word")).expect("a command of the tree");
-    }
-    atip::project::relations(node)
+    atip::project::Relations::from_json(&leaf["constraints"])
 }
 
 /// Every group name that has a table, sorted (`top` first).

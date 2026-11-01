@@ -261,10 +261,10 @@ fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
     let (by, note) = (by.trim(), note.trim());
     for (flag, value) in [("--approver", by), ("--note", note)] {
         if value.is_empty() {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty")));
+            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty")).field(flag));
         }
         if value.contains(['\n', '\r']) {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line")));
+            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line")).field(flag));
         }
     }
     Ok((by.to_string(), note.to_string()))
@@ -408,24 +408,48 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
     Err(crate::dashboard_briefs::changed_since_page_load(brief))
 }
 
-/// `canon brief approve`. Returns the process exit code. One id (or none: the
-/// only live change) prints what it always printed; several print one entry
-/// each.
-pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, relay: Option<&ApprovalRelay>, shown: &BTreeMap<String, String>, json: bool) -> u8 {
-    let repo = resolve_repo_root(repo);
-    if relay.is_some() {
-        // Every id names the digest its brief showed, and nothing else: refused before any brief is read.
-        let missing = changes.iter().find(|c| !shown.contains_key(c.as_str()));
-        let stray = shown.keys().find(|k| !changes.is_empty() && !changes.iter().any(|c| c.as_str() == k.as_str()));
+/// `canon brief approve`: the `--digest` entries are `<change>=sha256:<digest>` and name a change
+/// once; a relayed approval names, for every change it approves, the digest the human was shown,
+/// and no digest of another change.
+pub(crate) fn check_approve(args: &crate::cli::brief::BriefApproveArgs) -> Result<(), CliError> {
+    crate::relay::check_arguments(&crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: Some(&args.note) })?;
+    let shown = shown_digests(&args.digests)?;
+    if args.relayed_via.is_some() {
+        // Every id names the digest its brief showed, and nothing else.
+        let missing = args.change_ids.iter().find(|c| !shown.contains_key(c.as_str()));
+        let stray = shown.keys().find(|k| !args.change_ids.is_empty() && !args.change_ids.iter().any(|c| c.as_str() == k.as_str()));
         let refusal = match (missing, stray) {
             (Some(c), _) => Some(format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", c.as_str())),
             (_, Some(k)) => Some(format!("--digest names `{k}`, which is not one of the changes approved")),
             _ => None,
         };
         if let Some(message) = refusal {
-            return CliError::refused("USAGE", message).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")).emit("canon brief approve", json);
+            return Err(CliError::refused("USAGE", message).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")));
         }
     }
+    Ok(())
+}
+
+/// The digests a relayed `canon brief approve` names, by change. `Err` for an entry that is not
+/// `<change>=sha256:<digest>` and for a change named twice with different digests.
+pub(crate) fn shown_digests(entries: &[String]) -> Result<BTreeMap<String, String>, CliError> {
+    let mut shown: BTreeMap<String, String> = BTreeMap::new();
+    for entry in entries {
+        let Some((change, digest)) = entry.split_once('=').filter(|(c, d)| !c.is_empty() && d.starts_with("sha256:")) else {
+            return Err(CliError::refused("USAGE", format!("--digest takes `<change>=<sha256:digest>`, got `{entry}`")).field("--digest").hint("copy the change id and the `digest:` line `canon brief show <change> --body` printed"));
+        };
+        if let Some(earlier) = shown.insert(change.to_string(), digest.to_string()).filter(|earlier| earlier != digest) {
+            return Err(CliError::refused("USAGE", format!("--digest names `{change}` twice with different digests ({earlier} and {digest})")).field("--digest").hint("pass one digest per change"));
+        }
+    }
+    Ok(shown)
+}
+
+/// `canon brief approve`. Returns the process exit code. One id (or none: the
+/// only live change) prints what it always printed; several print one entry
+/// each.
+pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, relay: Option<&ApprovalRelay>, shown: &BTreeMap<String, String>, json: bool) -> u8 {
+    let repo = resolve_repo_root(repo);
     let items: Vec<Item<'_>> = if changes.is_empty() { vec![Item { change: None, expected_sha256: None }] } else { changes.iter().map(|change| Item { change: Some(change), expected_sha256: None }).collect() };
     let opts = Opts { relay, shown: relay.map(|_| shown) };
     let many = match approve_all_with(&repo, &items, by, note, opts) {

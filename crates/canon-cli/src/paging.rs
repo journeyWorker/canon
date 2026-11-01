@@ -41,7 +41,7 @@ const PAGING_ARGS: [&str; 5] = ["limit", "all", "cursor", "fields", "json"];
 #[derive(Args, Debug, Clone, Default)]
 pub struct PageFlags {
     /// Return at most this many records per page
-    #[arg(long, value_parser = clap::value_parser!(u64).range(1..), conflicts_with = "all", value_name = "N", default_value = "100")]
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=crate::cli::SAFE_INTEGER), conflicts_with = "all", value_name = "N", default_value = "100")]
     pub limit: Option<u64>,
     /// Resume after the last record of the previous page (the `nextCursor` it reported)
     #[arg(long, value_name = "CURSOR")]

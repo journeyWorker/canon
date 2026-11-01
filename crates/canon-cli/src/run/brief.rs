@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::process::ExitCode;
 
 use crate::cli::brief::{BriefApproveArgs, BriefCheckArgs, BriefCommand, BriefShowArgs};
-use crate::cli_error::{CliError, CliErrorExt as _};
+use crate::cli_error::CliErrorExt as _;
 
 pub fn run(cmd: BriefCommand) -> ExitCode {
     ExitCode::from(match cmd {
@@ -22,15 +22,8 @@ pub fn run(cmd: BriefCommand) -> ExitCode {
                 Ok(relay) => relay,
                 Err(e) => return ExitCode::from(e.emit("canon brief approve", json)),
             };
-            let mut shown_digests: BTreeMap<String, String> = BTreeMap::new();
-            for entry in &digests {
-                let Some((change, digest)) = entry.split_once('=').filter(|(c, d)| !c.is_empty() && d.starts_with("sha256:")) else {
-                    return ExitCode::from(CliError::refused("USAGE", format!("--digest takes `<change>=<sha256:digest>`, got `{entry}`")).field("--digest").hint("copy the change id and the `digest:` line `canon brief show <change> --body` printed").emit("canon brief approve", json));
-                };
-                if let Some(earlier) = shown_digests.insert(change.to_string(), digest.to_string()).filter(|earlier| earlier != digest) {
-                    return ExitCode::from(CliError::refused("USAGE", format!("--digest names `{change}` twice with different digests ({earlier} and {digest})")).field("--digest").hint("pass one digest per change").emit("canon brief approve", json));
-                }
-            }
+            // The entries were checked by `validators::check` before this ran.
+            let shown_digests: BTreeMap<String, String> = crate::brief_approve::shown_digests(&digests).unwrap_or_default();
             crate::brief_approve::run_approve(&repo, &change_ids, &approver, &note, relay.as_ref(), &shown_digests, json)
         }
     })

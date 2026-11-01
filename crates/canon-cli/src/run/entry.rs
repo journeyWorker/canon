@@ -99,12 +99,13 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
         }
         _ => {
             if let Some(arg) = string(ContextKind::InvalidArg).map(first_word) {
-                usage = usage.field(arg);
+                usage = usage.field(crate::arg_rules::argument_name(&arg));
             }
             if error.kind() == ErrorKind::MissingRequiredArgument {
                 if let Some(ContextValue::Strings(names)) = error.get(ContextKind::InvalidArg) {
-                    let names: Vec<&str> = names.iter().map(|name| name.split_whitespace().next().unwrap_or_default()).collect();
-                    usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(names.first().copied().unwrap_or_default());
+                    let names: Vec<String> = names.iter().flat_map(|name| crate::arg_rules::missing_names(name)).collect();
+                    let field = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &names).or_else(|| names.first().cloned()).unwrap_or_default();
+                    usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(field);
                 }
             }
             if let Some(value) = string(ContextKind::InvalidValue) {

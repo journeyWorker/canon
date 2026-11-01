@@ -120,7 +120,7 @@ pub struct RetrieveArgs {
     #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
     /// Cap on the guidance items returned
-    #[arg(long, value_name = "N", default_value = "5")]
+    #[arg(long, value_name = "N", default_value = "5", value_parser = clap::builder::TypedValueParser::map(clap::value_parser!(u64).range(0..=crate::cli::SAFE_INTEGER), |n| usize::try_from(n).unwrap_or(usize::MAX)))]
     pub limit: Option<usize>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

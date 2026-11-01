@@ -17,14 +17,6 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
     let QueryArgs { kind, since, repo, json, plugin_id: plugin, history, change_id, status, domain, include_sensitive, page, fields } = args;
     let repo = repo.as_path();
     let page = page.page();
-    // s19 `query-scope-filters` design D5: kind-gating + status-domain
-    // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
-    // fault here is a clean, nothing-read `2`, never a store error.
-    if let Err(e) = crate::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
-        e.to_cli_error().emit("canon query", json);
-        return ExitCode::from(2);
-    }
-
     if let Err(err) = crate::retention::validate_sensitive(repo, include_sensitive) {
         CliError::refused("QUERY_INVALID_ARGUMENT", err.to_string()).hint("`canon schema query` lists the accepted arguments and their forms").emit("canon query", json);
         return ExitCode::from(2);
@@ -113,7 +105,7 @@ pub(crate) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
             // A corpus root that is not a directory holds no files to find wrong: it must not read as clean.
             if !resolved.is_dir() {
                 let error = CliError::refused("REPO_UNREADABLE", format!("`{}` is not a directory, so there is no corpus to check", resolved.display()))
-                    .field("dir")
+                    .field("DIR")
                     .hint("pass the corpus directory, e.g. `canon format .canon/specs`, relative to the current directory or to --repo");
                 return ExitCode::from(error.emit("canon format", json));
             }
@@ -226,7 +218,7 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
             // How the call scopes the retrieval is its usage; only a regime key that cannot be derived is the retrieval's own failure.
             let error = match &e {
                 E::NoScope => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>"),
-                E::ScopeConflict => CliError::refused("USAGE", e.to_string()).field("--regime").expected(["--regime", "--domain"]).hint("pass --regime or --domain, not both"),
+                E::ScopeConflict => CliError::refused("USAGE", e.to_string()).field(if domain.is_none() { "--subject" } else { "--regime" }).expected(["--regime", "--domain"]).hint("pass --regime or --domain, not both"),
                 E::SubjectWithoutDomain => CliError::refused("USAGE", e.to_string()).field("--subject").hint("add --domain <DOMAIN>, or drop --subject"),
                 E::RoleRegimeMismatch { regime_role, .. } => CliError::refused("USAGE", e.to_string()).field("--regime").received(regime_role.clone()).hint("pass the same role to --for-role and --regime (`canon regime show` prints a valid key)"),
                 E::DerivationFailed { .. } => CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name"),
@@ -256,7 +248,18 @@ pub(crate) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, js
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json))
+            // The argument at fault: a segment that canonicalizing leaves empty, else the hash.
+            let empty = |segment: &str| segment.chars().all(|c| c.is_whitespace() || c == '/');
+            let field = if empty(role) {
+                "--role-segment"
+            } else if empty(repo) {
+                "--repo-name"
+            } else if empty(area) {
+                "--area"
+            } else {
+                "--hash"
+            };
+            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).field(field).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json))
         }
     }
 }

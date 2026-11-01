@@ -24,7 +24,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use atip::doc::{CommandDoc, EntryKind, GroupDoc, InputDoc, OperandDoc, OptionDoc, OutputDoc, OutputKind, TreeDoc, TreeEntry, ValueType};
+use atip::doc::{CommandDoc, EntryKind, GroupDoc, InputDoc, OperandDoc, OptionDoc, OutputDoc, OutputKind, TreeDoc, TreeEntry, ValidatorDoc, ValueType};
+use atip::domain::Domain;
 use atip::project::{self, Node};
 use clap::Command;
 use serde::Serialize;
@@ -250,7 +251,7 @@ pub fn group(root: &Command, path: &[String], role: Option<Role>) -> Built<Group
 }
 
 /// The reserved codes of the features a command has (spec 7.2.1, 10.13 rule 4), with the codes it emits.
-fn errors_of(path: &str, options: &[OptionDoc], batch: bool) -> Vec<String> {
+fn errors_of(path: &str, options: &[OptionDoc], operands: &[OperandDoc], batch: bool) -> Vec<String> {
     let mut codes: BTreeSet<String> = error_codes(path).into_iter().map(str::to_string).collect();
     codes.insert("USAGE".to_string());
     let has = |name: &str| options.iter().any(|option| option.name == name);
@@ -266,6 +267,8 @@ fn errors_of(path: &str, options: &[OptionDoc], batch: bool) -> Vec<String> {
     if has("cursor") {
         codes.insert(feature_codes::CURSOR.to_string());
     }
+    let arguments: Vec<(String, Option<String>)> = options.iter().map(|option| (option.name.clone(), option.value_name.clone())).chain(operands.iter().map(|operand| (operand.name.clone(), Some(operand.value_name.clone())))).collect();
+    codes.extend(crate::arg_rules::codes_for(path, &arguments).into_iter().map(str::to_string));
     codes.into_iter().collect()
 }
 
@@ -321,6 +324,21 @@ fn examples_of(path: &str) -> Built<Vec<String>> {
     Ok(vec![format!("{example} --json")])
 }
 
+/// The `domain` of the argument `name` of `path`: what its Rust integer type carries (`implicit`), merged with the row of
+/// the tool's table, when there is one. A row for an `enum` or a `switch` argument is left out: those have no domain.
+fn domain_of(path: &str, name: &str, value_name: Option<&str>, value_type: ValueType, implicit: Option<Value>) -> Built<Option<Value>> {
+    let Some(row) = crate::arg_rules::domain_for(path, name, value_name) else { return Ok(implicit) };
+    let fits = match (&row.domain, value_type) {
+        (_, ValueType::Enum | ValueType::Switch) => return Ok(implicit),
+        (Domain::Integer { .. }, ValueType::Integer | ValueType::Count) | (Domain::Text { .. }, ValueType::String | ValueType::Path) => true,
+        _ => false,
+    };
+    if !fits {
+        return Err(format!("`{path}`: the domain of `{name}` is {:?} and the argument is a {}", row.domain, value_type.as_str()));
+    }
+    atip::domain::merge(implicit, Some(row.domain.to_value())).map_err(|problem| format!("`{path}`: the domain of `{name}`: {problem}"))
+}
+
 fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     let path = node.command.as_str();
     let meta = meta_for(path).ok_or_else(|| format!("`{path}` has no row in the metadata table"))?;
@@ -334,6 +352,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
         if operand.default.is_null() && !operand.required {
             operand.default_note = default_note(path, &operand.name).map(str::to_string);
         }
+        operand.domain = domain_of(path, &operand.name, Some(&operand.value_name), operand.value_type, operand.domain.take())?;
         operands.push(operand);
     }
     let mut options = Vec::new();
@@ -343,12 +362,22 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
         if (option.default.is_null() && !option.required) || option.name == "promote" {
             option.default_note = default_note(path, &option.name).map(str::to_string);
         }
+        option.domain = domain_of(path, &option.name, option.value_name.as_deref(), option.value_type, option.domain.take())?;
         options.push(option);
     }
     let mut schemas = BTreeMap::new();
     let input = input_of(path, node.cmd, &operands, &options, &mut schemas);
     let batch = input.as_ref().is_some_and(|input| input.batch);
     let outputs = outputs_of(path, batch, &mut schemas)?;
+    let mut constraints = atip::constraint::clap_rules(node.cmd);
+    constraints.extend(crate::arg_rules::rules_for(path).iter().map(atip::constraint::Rule::doc));
+    let validators: Vec<ValidatorDoc> = crate::arg_rules::validators_for(path).iter().map(atip::constraint::Validator::doc).collect();
+    let examples = examples_of(path)?;
+    let errors = errors_of(path, &options, &operands, batch);
+    let problems = atip::constraint::document_problems(&options, &operands, &constraints, &validators, &errors, &examples);
+    if !problems.is_empty() {
+        return Err(format!("`{path}`: {}", problems.join("; ")));
+    }
     Ok(CommandDoc {
         kind: CommandDoc::KIND,
         command: node.command.clone(),
@@ -357,12 +386,14 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
         effect: meta.effect,
         idempotency: facts.idempotency,
         effect_note: meta.effect_note.map(str::to_string),
-        errors: errors_of(path, &options, batch),
+        errors,
         operands,
         options,
+        constraints,
+        validators,
         outputs,
         input,
-        examples: examples_of(path)?,
+        examples,
         schemas,
         extensions: x_canon(path),
     })

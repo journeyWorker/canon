@@ -338,6 +338,9 @@ impl DispatchError {
         if let Self::RoleRegimeMismatch { regime_role, .. } = self {
             error = error.field("--role").expected([regime_role.clone()]);
         }
+        if matches!(self, Self::SkillDigestWithoutId) {
+            error = error.field("--skill");
+        }
         error
     }
 }

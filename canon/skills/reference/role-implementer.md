@@ -93,7 +93,7 @@ canon divergence resolve auth.login.01 --actor alice --role reviewer --json
 ```
 ```text
 # Record one attributed EvidenceRecord for a task or scenario
-canon evidence add [--task <TASK_ID>] [--project <PROJECT_ID>] [--class <CLASS>] [--ref <TEXT>] [--verdict <faithful|not-applicable|divergent>] [--summary <TEXT>] [--command-result <TEXT>] [--scenario <SCENARIO_ID>] [--run <RUN_ID>] [--surface-ref <PATH_OR_EFFECT>]* [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--approver <NAME>] [--approval-role <human>] [--signature-file <FILE>] [--approval-at <TIMESTAMP>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--all-scenarios] [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+canon evidence add [--task <TASK_ID> | --all-scenarios] [--project <PROJECT_ID>] [--class <CLASS>] [--ref <TEXT>] [--verdict <faithful|not-applicable|divergent>] [--summary <TEXT>] [--command-result <TEXT> (with --summary)] [--scenario <SCENARIO_ID> | --all-scenarios] [--run <RUN_ID>] [--surface-ref <PATH_OR_EFFECT>]* [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--approver <NAME> | --all-scenarios] [--approval-role <human> | --all-scenarios] [--signature-file <FILE> | --all-scenarios] [--approval-at <TIMESTAMP> | --all-scenarios] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME> | --all-scenarios]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer --json
@@ -107,7 +107,7 @@ canon evidence approval-payload --scenario auth.login.01 --project root --approv
 ```
 ```text
 # Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
-canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT>] [--run <RUN_ID>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT> (with --summary)] [--run <RUN_ID>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME> (with --report)]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json
@@ -163,7 +163,7 @@ canon query --kind evidence --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20 --json

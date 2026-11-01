@@ -1,0 +1,132 @@
+Feature: atip constraints: the relations, domains and validators of the command documents
+  # canon: {"schema":1,"at":"2026-11-01T10:58:38Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+
+  # canon: {"schema":1,"at":"2026-11-01T10:58:51Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F1
+  @atip.constraints.01
+  Scenario: What clap enforces is in the constraints of the command document: the options that conflict with --check, --policy with --no-policy, the exactly-one pair of review scenario, and the --commit and --plan-digest pair
+    Given a built canon
+    When canon schema init --json, schema review scenario --json and schema purge --json run
+    Then init lists --check with each option it conflicts with and --policy with --no-policy as atMostOne, review scenario lists exactlyOne --upstream-ref and --original-spec-ref, purge lists the two requires of --commit and --plan-digest, and no command states one relation twice
+
+  # canon: {"schema":1,"at":"2026-11-01T10:59:19Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F1
+  @atip.constraints.02
+  Scenario: A relation stated twice in one command is found, and --commit without --plan-digest is USAGE naming --plan-digest
+    Given a built canon and a document with the same atMostOne written twice
+    When the document check runs, and canon purge runs with only --commit, then with only --plan-digest
+    Then the check names the relation as stated twice; each purge exits 2 with USAGE and field --plan-digest, then --commit
+
+  # canon: {"schema":1,"at":"2026-11-01T10:59:32Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.03
+  Scenario: The relations the handlers enforce are constraints with their codes, and every declared rule is refused with its code when broken and not refused for it when met
+    Given a built canon and the story repo
+    When canon schema retrieve, finding close, finding add and evidence add run, and every declared rule of every command is driven through the binary with a call that breaks only it and a call that meets it
+    Then retrieve lists exactlyOne regime or domain and subject requires domain; finding close demands --reason for rejected or deferred with FINDING_REASON_REQUIRED; each breaking call exits 2 with the rule's code and a field that is one of its arguments and writes nothing; each meeting call is not refused for the rule
+
+  # canon: {"schema":1,"at":"2026-11-01T10:59:43Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.04
+  Scenario: A handler check that no document declares and no table classifies fails the survey of the sources, and a classified check that is gone fails it too
+    Given a built canon and the source of its handlers
+    When a new refusal of an argument that no document declares is added to a handler, and a classified check is deleted
+    Then the survey names the new refusal and the stale classification, and passes when neither is there
+
+  # canon: {"schema":1,"at":"2026-11-01T10:59:55Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F3
+  @atip.constraints.05
+  Scenario: Every domain agrees with the real parser just inside and just outside its bounds, with the code its row names
+    Given a built canon and the story repo
+    When every domain of every command is asked of the parser with a value just inside and a value just outside it
+    Then the parser agrees at every bound with the code the row names: finding close --round 0 is FINDING_INVALID_ARGUMENT, query --limit 0 and --max-artifact-mib 0 are USAGE, an id outside its pattern is refused
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:03Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F3
+  @atip.constraints.06
+  Scenario: A pattern that is not a restricted I-Regexp, one the Rust regex refuses, a keyword outside the profile and a default outside its domain are each found, and every id pattern agrees with its Rust parser
+    Given domains that leave the contract's profile
+    When the document check and the id pattern comparison run
+    Then a pattern with an alternation outside parentheses, a class escape or a dot, a pattern the Rust regex refuses, a keyword outside the profile of the value type, a bound beyond 2^53-1 and a default outside the domain are each named; each id pattern accepts and refuses what its Rust parser does, and the time pattern admits everything the time parser accepts
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:10Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F4
+  @atip.constraints.07
+  Scenario: Every validator refuses every call it rejects with its code, and an impossible calendar date is refused by all 12 time options
+    Given a built canon and the story repo
+    When the rejects call of every validator runs, and --since, --before, --after, --expiry, --as-of and --approval-at are each given 2026-02-30
+    Then every rejects call exits 2 with the validator's code and a field that is one of its arguments and writes nothing; each of the 12 time options is named by the calendar validator of its command and refuses the date
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:15Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F4
+  @atip.constraints.08
+  Scenario: An export window whose --after is later than its --before is USAGE naming --after and writes nothing, and an equal or ordered window still succeeds
+    Given a built canon and the story repo
+    When canon export --kind change --before 2026-01-02 --after 2026-02-01 runs, also with --dry-run and with --output, and with an equal pair and an earlier --after
+    Then the late --after exits 2 with USAGE and field --after before any read or write and no output file; the equal pair and the ordered pair exit 0
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:20Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F4
+  @atip.constraints.09
+  Scenario: A validator whose rejects call is accepted, is refused with another code or is also an example is found
+    Given a validator whose rejects call the binary accepts, one whose code the binary does not give and one whose rejects is also an example
+    When the validator sweep runs on each
+    Then each is found with the reason
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:25Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F5
+  @atip.constraints.10
+  Scenario: The edge of the safe integer range, 9007199254740991, is accepted by every 64-bit integer option and no declared domain goes beyond it
+    Given a built canon and the story repo
+    When the 64-bit integer options run with 9007199254740991
+    Then every one accepts it, and no declared domain maximum is above it
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:32Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F5
+  @atip.constraints.11
+  Scenario: A 64-bit integer option outside plus or minus 2^53-1 is refused with USAGE naming the option and is never rounded into range
+    Given a built canon and the story repo
+    When the 64-bit integer options run with 9007199254740992, 9007199254740993, 18446744073709551616, -9007199254740992 and -1
+    Then every one exits 2 with USAGE and the option as field; 9007199254740993 is not read as 9007199254740992
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:38Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F6
+  @atip.constraints.12
+  Scenario: Every example meets the constraints and the domains of its command, and the guides and the checked-in spec read the constraints of the documents
+    Given a built canon
+    When every example of every command is read against its own constraints and domains, and the guides read the relations from the constraints
+    Then every example satisfies them and parses with the real parser; the relations a guide writes are the rules the document lists
+
+  # canon: {"schema":1,"at":"2026-11-01T11:00:43Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F6
+  @atip.constraints.13
+  Scenario: A constraint, a code or a domain declared with no check behind it is found by the sweeps
+    Given a constraint declared with no check behind it, a rule with a code the binary does not give and a domain the parser does not hold
+    When the rule and the domain sweeps run on each
+    Then each is found: the call that should break the rule is not refused for it, and the value outside the domain is accepted

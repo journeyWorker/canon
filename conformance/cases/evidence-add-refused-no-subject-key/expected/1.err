@@ -1,2 +1,3 @@
 canon: EVIDENCE_INVALID_ARGUMENT: give --task, --scenario, or both; a record with neither carries no coverage subject and no gate can read it back
+  field: --task
   hint: `canon schema evidence add` lists the accepted arguments and their forms

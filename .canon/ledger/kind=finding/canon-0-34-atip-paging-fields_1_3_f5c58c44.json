@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-paging-fields",
+    "role": "reviewer",
+    "session_id": "s-0-34-paging-fields-rev"
+  },
+  "at": "2026-11-01T14:10:06.925680Z",
+  "change_id": "canon-0-34-atip-paging-fields",
+  "code_tree": "85d3f2121351444d5a0ad8272b73f661db6e001d",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/cli/top.rs (export --fields help); docs/cli/canon.cli.json",
+  "introduced_by": "67ea7ee00f6c6800f4d14a0b3dec9fceefd6fe07",
+  "kind": "finding",
+  "reason": "verified at 90d27a5d: help names the output per mode; when strings cover text-mode --output and --json --output",
+  "resolution_code_tree": "01c22c3ff6f286b3485b64eba07f3be53fbde8aa",
+  "resolution_sha": "90d27a5d36241b7c56e1011856a261312e4191c5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "637392a78a5c591c4e2cf7a6a2585367a735bcf0",
+  "reviewer": "rev-paging-fields",
+  "round": 1,
+  "scenario_ids": [
+    "atip.paging.13"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[spec fidelity] The export --fields help (`With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)`) is the 0.33 text. It is wrong for --dry-run and --json --output (the paths are those of the preview and the written answer) and for text mode, where --fields works without --json (it cuts the file or the stdout manifest). The ExportReport `when` ('neither --output nor --dry-run is given') does not cover text-mode --output, where --fields id is read against ExportReport and recordCount is refused although the written answer declares it. Blast radius: help, canon.cli.json, website cli.mdx; the behaviour is as the changelog row says.",
+  "worktree_dirty": false
+}

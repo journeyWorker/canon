@@ -140,3 +140,13 @@ Feature: ATIP 1.1 contract
     Given a repo with a finding and no index, and a repo whose index is fresh or stale
     When canon trace is given an id no record says, a sha prefix no record has, an operand with no shape, and canon search is given an empty text
     Then each exits 2 with TRACE_NOT_FOUND, TRACE_OPERAND_INVALID or SEARCH_QUERY_EMPTY, no file under the repo changes, and no index directory or file appears; a fresh or stale index stays as it was, and a trace that answers still writes the index
+
+  # canon: {"schema":1,"at":"2026-11-01T13:29:54Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-34-atip-1-1.F4
+  @atip.contract11.15
+  Scenario: A refusal, or a read, leaves the repository as it was, .git included: the code tree is computed in a scratch object directory
+    Given a git repo whose work tree has an untracked code file, and the commands that read or refuse run in it
+    When the code tree is computed, and each read leaf is given an id or a value it refuses
+    Then every refusal exits 2 with its code and no file in the work tree or under .git is added, removed or changed (the index file and logs aside), and the code tree is the same id twice

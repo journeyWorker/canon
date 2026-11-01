@@ -540,6 +540,49 @@ pub struct FindingListReport<'a> {
 
 impl crate::reports::Report for FindingListReport<'_> {}
 
+/// `canon finding add`: the checks of the arguments alone, in the order the handler ran them.
+pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Option<u8> {
+    if args.round == 0 || args.seq == 0 {
+        return Some(CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
+            args.round, args.seq
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding add", args.json));
+    }
+    for (flag, value) in [("--actor", args.actor_id.as_str()), ("--summary", args.summary.as_str())] {
+        if value.trim().is_empty() {
+            return Some(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag).emit("canon finding add", args.json));
+        }
+    }
+    // The free-text fields: a line separator would append a second row to the one the finding is rendered as. Checked through the row grammar's OWN separator set.
+    for (flag, value) in [
+        ("--summary", Some(args.summary.as_str())),
+        ("--actor", Some(args.actor_id.as_str())),
+        ("--file-ref", args.file_ref.as_deref()),
+    ] {
+        let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
+        return Some(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag).emit("canon finding add", args.json));
+    }
+    // The coherence pair: `fixed` takes `--resolution-rev` or its default `HEAD`, so only the other direction can be wrong.
+    if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
+        if disposition != FindingDisposition::Fixed {
+            return Some(CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
+                disposition.as_str()
+            )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev").emit("canon finding add", args.json));
+        }
+    }
+    // The 0.30 rule: a commit or an explicit "not known", never both, and a defect finding owes one of them.
+    if args.introduced_rev.is_some() && args.introduced_unknown {
+        return Some(CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
+            .hint("drop --introduced-rev, or drop --introduced-unknown")
+            .field("--introduced-unknown").emit("canon finding add", args.json));
+    }
+    if args.introduced_rev.is_none() && !args.introduced_unknown && matches!(args.severity, FindingSeverity::Blocker | FindingSeverity::ShouldFix) {
+        return Some(CliError::refused("FINDING_INTRODUCED_REQUIRED", format!("a new {} finding needs --introduced-rev <rev> (the commit that introduced the defect) or --introduced-unknown (it is not known); a note needs neither", severity_slug(args.severity)))
+            .hint("pass --introduced-rev <rev> when the introducing commit was established, else --introduced-unknown; never guess a commit")
+            .field("--introduced-rev").emit("canon finding add", args.json));
+    }
+    None
+}
+
 /// `canon finding add` (module doc). Returns the process exit code.
 ///
 /// Order matters and is not incidental: every refusal below happens
@@ -562,59 +605,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
         }
     };
 
-    if args.round == 0 || args.seq == 0 {
-        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
-            args.round, args.seq
-        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding add", args.json);
-    }
-
-    for (flag, value) in [("--actor", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
-        if value.trim().is_empty() {
-            return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
-        }
-    }
-
-    // The free-text fields, refused before anything is staged (module
-    // doc's line-break section). Checked through the row grammar's OWN
-    // separator set rather than a local `contains('\n')`, so this
-    // refusal cannot disagree with `canon evidence add`'s or with
-    // `canon_ingest::reject_multi_line_note`'s about which inputs are
-    // safe to put in a row.
-    for (flag, value) in [
-        ("--summary", Some(args.summary.as_str())),
-        ("--actor", Some(args.reviewer.as_str())),
-        ("--file-ref", args.file_ref.as_deref()),
-        ("--actor", Some(args.actor_id.as_str())),
-    ] {
-        let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
-    }
-
-    // The coherence pair, as a NAMED diagnostic rather than a second
-    // enforcement layer (module doc): `fixed` takes `--resolution-rev` or
-    // its default `HEAD`, so only the other direction can be wrong.
-    if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
-        if disposition != FindingDisposition::Fixed {
-            return CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
-                disposition.as_str()
-            )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev").emit("canon finding add", args.json);
-        }
-    }
-
-    // The 0.30 rule (module doc): a commit or an explicit "not known", never
-    // both, and a defect finding owes one of them.
-    if args.introduced_rev.is_some() && args.introduced_unknown {
-        return CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
-            .hint("drop --introduced-rev, or drop --introduced-unknown")
-            .field("--introduced-unknown")
-            .emit("canon finding add", args.json);
-    }
-    if args.introduced_rev.is_none() && !args.introduced_unknown && matches!(args.severity, FindingSeverity::Blocker | FindingSeverity::ShouldFix) {
-        return CliError::refused("FINDING_INTRODUCED_REQUIRED", format!("a new {} finding needs --introduced-rev <rev> (the commit that introduced the defect) or --introduced-unknown (it is not known); a note needs neither", severity_slug(args.severity)))
-            .hint("pass --introduced-rev <rev> when the introducing commit was established, else --introduced-unknown; never guess a commit")
-            .field("--introduced-rev")
-            .emit("canon finding add", args.json);
-    }
+    // The arguments alone were checked by `crate::validators::check` before this ran (`canon finding add`).
 
     // Every commit option is resolved by git to the full sha the record
     // stores (module doc); the code tree each saw is recorded with it.
@@ -870,7 +861,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     if args.round == 0 || args.seq == 0 {
         return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
             args.round, args.seq
-        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding close", args.json);
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding close", args.json);
     }
 
     // The same coherence pair `add` enforces, in this command's own
@@ -1600,69 +1591,6 @@ mod tests {
         fixed.disposition = FindingDisposition::Fixed;
         assert_eq!(run_add(dir.path(), &fixed), 0);
         assert_eq!(staged_bodies(dir.path())[0]["resolution_sha"].as_str(), Some(head.as_str()));
-    }
-
-    /// Every non-`Fixed` disposition, not just `Open` — `rejected` and
-    /// `deferred` clear `resolution_sha` in the model, so a CLI that
-    /// only refused the `Open` case would silently DROP a sha the
-    /// caller supplied.
-    #[test]
-    fn a_resolution_sha_with_any_non_fixed_disposition_is_refused() {
-        for disposition in [FindingDisposition::Open, FindingDisposition::Rejected, FindingDisposition::Deferred] {
-            let dir = repo();
-            let mut incoherent = args("s43-findings-are-records", 4, 1);
-            incoherent.disposition = disposition;
-            incoherent.resolution_rev = Some("HEAD".to_string());
-            assert_eq!(run_add(dir.path(), &incoherent), 2, "{disposition:?} must not accept a resolution sha");
-            assert!(staged_bodies(dir.path()).is_empty(), "{disposition:?} staged something");
-        }
-    }
-
-    /// Every member of the IMPORTED set, over every free-text field —
-    /// so a later edit that narrows the check to `'\n'`, or that misses
-    /// a field, fails here.
-    #[test]
-    fn every_row_line_break_in_every_free_text_field_is_refused() {
-        for separator in canon_ingest::task_rows::ROW_LINE_BREAKS {
-            for field in ["summary", "reviewer", "file_ref", "actor_id"] {
-                let dir = repo();
-                let mut forged = args("s43-findings-are-records", 5, 1);
-                let injected = format!("ok{separator}| forged | row |");
-                match field {
-                    "summary" => forged.summary = injected,
-                    "reviewer" => forged.reviewer = injected,
-                    "file_ref" => forged.file_ref = Some(injected),
-                    _ => forged.actor_id = injected,
-                }
-                assert_eq!(run_add(dir.path(), &forged), 2, "{field} accepted separator {separator:?}");
-                assert!(staged_bodies(dir.path()).is_empty(), "{field} staged a forged row for {separator:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn an_empty_reviewer_or_summary_is_refused() {
-        for blank in ["", "   "] {
-            let dir = repo();
-            let mut empty_summary = args("s43-findings-are-records", 6, 1);
-            empty_summary.summary = blank.to_string();
-            assert_eq!(run_add(dir.path(), &empty_summary), 2);
-
-            let mut empty_reviewer = args("s43-findings-are-records", 6, 1);
-            empty_reviewer.reviewer = blank.to_string();
-            assert_eq!(run_add(dir.path(), &empty_reviewer), 2);
-            assert!(staged_bodies(dir.path()).is_empty());
-        }
-    }
-
-    /// `round`/`seq` are 1-based in the model and zero-padded into the
-    /// natural key; a `0` would sort ahead of every real finding.
-    #[test]
-    fn a_zero_round_or_seq_is_refused() {
-        let dir = repo();
-        assert_eq!(run_add(dir.path(), &args("s43-findings-are-records", 0, 1)), 2);
-        assert_eq!(run_add(dir.path(), &args("s43-findings-are-records", 1, 0)), 2);
-        assert!(staged_bodies(dir.path()).is_empty());
     }
 
     #[test]

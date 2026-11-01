@@ -126,7 +126,7 @@ fn required_one_of(path: &str) -> Vec<Vec<String>> {
     let mut root = canon_cli::cli::command();
     root.build();
     let node = path.split(' ').fold(&root, |cmd, word| cmd.find_subcommand(word).expect("a command of the tree"));
-    atip::project::relations(node).required_one_of
+    atip::project::Relations::from_constraints(&atip::constraint::clap_rules(node)).required_one_of
 }
 
 #[test]
