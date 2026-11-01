@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T10:10:19.490776Z",
+  "attachments": [
+    {
+      "case": "atip_check_67_l0_stderr_quiet_reports_an_advisory_when_stderr_is_not_empty_in_json_mode",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    }
+  ],
+  "code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r4-junit.xml"
+  },
+  "evidence_sha": "e328721b1ac7c1ff1a8710a59a3b84b2c4860a4c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 490,
+  "scenario_id": "atip.check.67",
+  "schema": 1,
+  "staging_id": "a221ef53",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
