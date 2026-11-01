@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atip.dev/1/envelope.schema.json",
   "title": "atip/1 envelope",
-  "description": "The one JSON document a command prints on stdout with --json (spec section 6). `ok` is true exactly when the exit code is 0.",
+  "description": "The one JSON document a command prints on stdout with --json (spec section 6). `ok` is true exactly when the exit code is 0. Closed for tools of the current minor; callers read it open (spec 15.8). Members added after 1.0 carry `x-atip-since`.",
   "oneOf": [
     { "$ref": "#/$defs/success" },
     { "$ref": "#/$defs/failure" }
@@ -41,6 +41,12 @@
         "contract": {
           "description": "Required on `schema` answers, SHOULD elsewhere (spec 6.6).",
           "const": "atip/1"
+        },
+        "contractVersion": {
+          "description": "The contract version the tool implements, <major>.<minor>; absent means 1.0 (spec 15.7). Set with `contract` by every tool that implements 1.1 or later.",
+          "x-atip-since": "1.1",
+          "type": "string",
+          "pattern": "^1\\.(0|[1-9][0-9]*)$"
         },
         "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
         "tool": {
@@ -85,6 +91,7 @@
       "patternProperties": {
         "^x-[a-z][a-z0-9-]*$": true
       },
+      "dependentRequired": { "contractVersion": ["contract"] },
       "additionalProperties": false
     },
     "schemaVersion": {
@@ -93,9 +100,15 @@
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
     },
     "fieldPath": {
-      "description": "A dot path into a record; `[]` after a name descends into each element of a list.",
+      "description": "A path into a record (spec 6.10). The first branch is the 1.0 grammar, unchanged: `name`, `.name` and `[]` after a name. The second, since 1.1, also admits a bracketed key `[\"…\"]` for a member whose name is not an identifier, the empty name included and U+0000 excluded, since argv cannot carry it (spec 6.10); inside the quotes only `\\\"` and `\\\\` are escapes. Brackets are valid only for such names (spec 10.13 rule 15) and only in documents that declare 1.1 (rule 16).",
       "type": "string",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[\\])?)*$"
+      "anyOf": [
+        { "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[\\])?(\\.[A-Za-z_][A-Za-z0-9_]*(\\[\\])?)*$" },
+        {
+          "x-atip-since": "1.1",
+          "pattern": "^([A-Za-z_][A-Za-z0-9_]*|\\[\"(?:[^\"\\\\\\u0000]|\\\\[\"\\\\])*\"\\])(\\[\\])?((\\.[A-Za-z_][A-Za-z0-9_]*|\\[\"(?:[^\"\\\\\\u0000]|\\\\[\"\\\\])*\"\\])(\\[\\])?)*$"
+        }
+      ]
     },
     "nextStep": {
       "type": "object",

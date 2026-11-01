@@ -18,6 +18,10 @@ pub const ENVELOPE_SCHEMA: &str = include_str!("../schema/envelope.schema.json")
 pub const ERROR_SCHEMA: &str = include_str!("../schema/error.schema.json");
 /// `schema/registry-entry.schema.json`: one row of a tool's error registry.
 pub const REGISTRY_ENTRY_SCHEMA: &str = include_str!("../schema/registry-entry.schema.json");
+/// `schema/warning-entry.schema.json`: one row of a tool's warning registry (since 1.1).
+pub const WARNING_ENTRY_SCHEMA: &str = include_str!("../schema/warning-entry.schema.json");
+/// `schema/stream-line.schema.json`: one line of a stream (since 1.0; `canon` has no stream before 0.35).
+pub const STREAM_LINE_SCHEMA: &str = include_str!("../schema/stream-line.schema.json");
 
 /// `$id` of the error schema, which the envelope and the registry entry `$ref`.
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
@@ -69,15 +73,19 @@ mod tests {
     /// The digests of the files as the atip repository published them. A
     /// changed copy fails here; re-vendoring updates the file and its digest
     /// together.
-    const ENVELOPE_DIGEST: &str = "055ace2ffb10eddba2c62fdff63155a83be4a8c1ba6ece73f6922f561ac8b299";
-    const ERROR_DIGEST: &str = "49afaa3bf93d848b1e477b19b3969680b4a0818e46dbdc6c54db248d4ecfdcfb";
-    const REGISTRY_ENTRY_DIGEST: &str = "411228ac4a2cc79ef4079161e9d015c5352bca49953aa33bf7007d0b100daedc";
+    const ENVELOPE_DIGEST: &str = "d8b42e992a7750f857b7b9286925645ee4401ead264e3d27ff62db382a902a37";
+    const ERROR_DIGEST: &str = "b89419efd8731950ac458a59e3631b50cf29f0168c141e087a2dfa18a15d4903";
+    const REGISTRY_ENTRY_DIGEST: &str = "18e73eec11f662d6c19e18574a1c1d3424f037f0ad5d232f24ab0a56fab28622";
+    const WARNING_ENTRY_DIGEST: &str = "66d2eaaea38eaf723343c262dea4b710bcd1b22dc547124f68f0abc2ee0fcfde";
+    const STREAM_LINE_DIGEST: &str = "cfa0647e4907a9447a992be8f9226b5873dc9b3cae89b5a9073c5fafef75c145";
 
     #[test]
     fn atip_l0_07_the_vendored_schemas_are_the_published_bytes() {
         assert_eq!(digest(ENVELOPE_SCHEMA), ENVELOPE_DIGEST);
         assert_eq!(digest(ERROR_SCHEMA), ERROR_DIGEST);
         assert_eq!(digest(REGISTRY_ENTRY_SCHEMA), REGISTRY_ENTRY_DIGEST);
+        assert_eq!(digest(WARNING_ENTRY_SCHEMA), WARNING_ENTRY_DIGEST);
+        assert_eq!(digest(STREAM_LINE_SCHEMA), STREAM_LINE_DIGEST);
     }
 
     /// A copy with one character changed no longer matches the pin: the pin test above would fail on it.

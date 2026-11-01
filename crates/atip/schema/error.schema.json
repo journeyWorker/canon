@@ -2,15 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atip.dev/1/error.schema.json",
   "title": "atip/1 error object",
-  "description": "The `error` member of a failure envelope (spec section 7). Optional members are omitted when absent, never null.",
+  "description": "The `error` member of a failure envelope (spec section 7). Optional members are omitted when absent, never null. Closed for tools of the current minor; callers read it open (spec 15.8).",
   "type": "object",
   "required": ["code", "message", "retryable"],
   "properties": {
     "code": { "$ref": "#/$defs/code" },
+    "reason": { "$ref": "#/$defs/reason" },
     "message": { "type": "string", "minLength": 1 },
     "retryable": { "type": "boolean" },
     "hint": {
-      "description": "One runnable invocation that fixes or explains the failure, or one sentence when no command applies.",
+      "description": "Exactly one of: a runnable invocation, a command template with <UPPER_CASE> placeholders, or one sentence (spec 7.1.2). A hint that starts with the tool name splits like meta.next[].command.",
       "type": "string",
       "minLength": 1
     },
@@ -52,11 +53,18 @@
       "type": "string",
       "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"
     },
+    "reason": {
+      "description": "Which of the situations registered under the error's code this is; registered in that code's registry entry (spec 7.6).",
+      "x-atip-since": "1.1",
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"
+    },
     "detail": {
       "type": "object",
       "required": ["code", "message"],
       "properties": {
         "code": { "$ref": "#/$defs/code" },
+        "reason": { "$ref": "#/$defs/reason" },
         "message": { "type": "string", "minLength": 1 },
         "hint": { "type": "string", "minLength": 1 },
         "field": { "type": "string", "minLength": 1 },

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atip.dev/1/registry-entry.schema.json",
   "title": "atip/1 error registry entry",
-  "description": "One row of a tool's error registry (spec section 7.3). The exit of an error is fixed here, never at the call site.",
+  "description": "One row of a tool's error registry (spec section 7.3). The exit of an error is fixed here, never at the call site. Closed for tools of the current minor; callers read it open (spec 15.8).",
   "type": "object",
   "required": ["code", "exit", "retryable", "meaning", "fix"],
   "properties": {
@@ -20,10 +20,36 @@
       "description": "What the caller does next, in one or two sentences; a runnable command when there is one.",
       "type": "string",
       "minLength": 1
+    },
+    "reasons": {
+      "description": "The situations under this code that need different next actions (spec 7.6). Each reason is unique within the code (spec 10.13 rule 14) and shares the code's exit and retryable.",
+      "x-atip-since": "1.1",
+      "type": "array",
+      "items": { "$ref": "#/$defs/reason" },
+      "minItems": 1
     }
   },
   "patternProperties": {
     "^x-[a-z][a-z0-9-]*$": true
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "reason": {
+      "type": "object",
+      "required": ["reason", "meaning", "fix"],
+      "properties": {
+        "reason": { "$ref": "error.schema.json#/$defs/reason" },
+        "meaning": { "type": "string", "minLength": 1 },
+        "fix": {
+          "description": "What the caller does next in this situation, in one or two sentences; a runnable command when there is one.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "patternProperties": {
+        "^x-[a-z][a-z0-9-]*$": true
+      },
+      "additionalProperties": false
+    }
+  }
 }
