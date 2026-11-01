@@ -613,3 +613,30 @@ pub fn repair(doc: &Value, example: &[String], rules: &[ConstraintDoc], assignme
     }
     Err(format!("the rules of `{}` do not settle for {assignment:?}", doc["command"]))
 }
+
+/// Runs `words` (a command line without `canon`) with `--json` in an EMPTY directory with an empty HOME and no `setup`: no repo,
+/// no `canon.yaml`, nothing to read. A validator refuses here with its own code, before any precondition or state read
+/// (spec 10.8.3, 11.7 step 6).
+pub fn run_empty(words: &[String], role: Option<&str>) -> Outcome {
+    let scratch = TempDir::new().expect("a scratch directory");
+    let home = TempDir::new().expect("an empty home");
+    let before = tree(scratch.path());
+    let mut argv = words.to_vec();
+    argv.push("--json".to_string());
+    let mut envs: Vec<(&str, &str)> = Vec::new();
+    if let Some(role) = role {
+        envs.push(("CANON_ROLE", role));
+    }
+    let output: Output = canon_in(scratch.path(), home.path(), &argv, &envs);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let document: Value = serde_json::from_str(&stdout).unwrap_or(Value::Null);
+    Outcome {
+        exit: output.status.code().unwrap_or(-1),
+        ok: document["ok"] == true,
+        code: document["error"]["code"].as_str().map(str::to_string),
+        field: document["error"]["field"].as_str().map(str::to_string),
+        message: document["error"]["message"].as_str().map(str::to_string),
+        changed: harness::changed(&before, &tree(scratch.path())),
+        stdout,
+    }
+}

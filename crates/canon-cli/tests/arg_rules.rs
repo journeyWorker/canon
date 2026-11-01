@@ -302,7 +302,6 @@ fn atip_constraints_05_every_declared_domain_agrees_with_the_parser_just_inside_
 /// example, and is refused with the validator's code, exit 2, naming one of its arguments, writing nothing.
 pub fn drive_validator(doc: &Value, validator: &Value) -> Vec<String> {
     let path = doc["command"].as_str().unwrap_or_default();
-    let provision = provisioned(path);
     let code = validator["code"].as_str().unwrap_or_default();
     let arguments: Vec<String> = validator["arguments"].as_array().into_iter().flatten().filter_map(|name| name.as_str().map(str::to_string)).collect();
     let examples: Vec<&str> = doc["examples"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
@@ -323,7 +322,7 @@ pub fn drive_validator(doc: &Value, validator: &Value) -> Vec<String> {
         }
         words.retain(|word| word != "--json");
         let role = declared_role(path, &rule_support::parse_call(doc, &words).map(|parsed| parsed.text).unwrap_or_default());
-        let outcome = run_call(&provision, home(), &words, role);
+        let outcome = rule_support::run_empty(&words, role);
         let names: Vec<String> = arguments.iter().flat_map(|name| [format!("--{name}"), name.clone()]).collect();
         let operand_fields: Vec<String> = arguments.iter().filter_map(|name| argument_value_name(doc, name)).flat_map(|value_name| [value_name.clone(), format!("<{value_name}>")]).collect();
         if outcome.ok || outcome.exit != 2 || outcome.code.as_deref() != Some(code) {
