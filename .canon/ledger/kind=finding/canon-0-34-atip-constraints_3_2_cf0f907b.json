@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T18:58:54.640763Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "e0f1eaf7589003cf343776fd9cc0cab93360375d",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "f86c34401b799acbb8c576fe65f5bf573af1fb0e",
+  "reviewer": "rev-constraints",
+  "round": 3,
+  "scenario_ids": [
+    "atip.constraints.24"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec fidelity] residual of 2.2: four of the 12 time options still run the calendar in clap's value parser (`crate::divergence::parse_timestamp` in cli/divergence.rs: `--expiry` of divergence accept, add and defer, and `--as-of` of divergence list), so they answer before the declared domains and constraints; `divergence add --state deferred --expiry 2026-02-30` (no --reason) is USAGE at --expiry, not DIVERGENCE_INVALID_ARGUMENT at --reason; `divergence accept ... --expiry 2026-02-30 --approver a` is USAGE at --expiry, not the requires of --relayed-via; `divergence list --as-of 2026-02-30 --limit 1 --all` is USAGE at --as-of, not the atMostOne of --limit and --all, and with `--limit 0` the as-of again answers before the domain; the other eight (`--since`, `--before`, `--after`, `--approval-at` x3, purge --before, query --since) are correct; scenario 24 states the calendar of 'a time option' and its test covers only evidence add and query, which is why this passed; also the conformance hint of a validator refusal is now only the schema pointer instead of a working call (finding add --introduced-rev self); exit 2 and nothing written; blast radius: divergence accept/add/defer/list only",
+  "worktree_dirty": false
+}
