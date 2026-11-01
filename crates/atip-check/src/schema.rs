@@ -1,6 +1,6 @@
 //! The contract schemas, as the checker reads them.
 //!
-//! The three schemas are the originals the `atip` crate embeds (`atip::schema`):
+//! The schemas are the originals the `atip` crate embeds (`atip::schema`):
 //! this module parses them and builds the validators, it never rewrites a
 //! schema. They are JSON Schema 2020-12; `format` is an annotation, never an
 //! assertion (the checker's authors decided it so, because a format a tool
@@ -14,8 +14,9 @@ use serde_json::Value;
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
 const REGISTRY_ENTRY_ID: &str = "https://atip.dev/1/registry-entry.schema.json";
 const ENVELOPE_ID: &str = "https://atip.dev/1/envelope.schema.json";
+const WARNING_ENTRY_ID: &str = "https://atip.dev/1/warning-entry.schema.json";
 
-/// The validators of the three contract schemas.
+/// The validators of the contract schemas.
 #[derive(Debug)]
 pub struct Schemas {
     registry: Registry<'static>,
@@ -24,6 +25,7 @@ pub struct Schemas {
     success: Validator,
     failure: Validator,
     registry_entry: Validator,
+    warning_entry: Validator,
 }
 
 /// One thing wrong with a document: where (a JSON pointer, `/` for the root) and what.
@@ -71,10 +73,15 @@ impl Schemas {
             "registry-entry.schema.json",
             atip::schema::REGISTRY_ENTRY_SCHEMA,
         )?;
+        let warning_entry = parse(
+            "warning-entry.schema.json",
+            atip::schema::WARNING_ENTRY_SCHEMA,
+        )?;
         let registry = Registry::new()
             .add(ERROR_ID, error)
             .and_then(|builder| builder.add(ENVELOPE_ID, envelope.clone()))
             .and_then(|builder| builder.add(REGISTRY_ENTRY_ID, registry_entry.clone()))
+            .and_then(|builder| builder.add(WARNING_ENTRY_ID, warning_entry.clone()))
             .and_then(jsonschema::RegistryBuilder::prepare)
             .map_err(|error| error.to_string())?;
         let build = |schema: &Value| {
@@ -90,6 +97,7 @@ impl Schemas {
             success: branch("success")?,
             failure: branch("failure")?,
             registry_entry: build(&registry_entry)?,
+            warning_entry: build(&warning_entry)?,
             registry,
         })
     }
@@ -123,6 +131,14 @@ impl Schemas {
     /// The problems of `row` against the registry-entry schema, empty when it validates.
     pub fn registry_entry_problems(&self, row: &Value) -> Vec<String> {
         problem_list(&self.registry_entry, row)
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    /// The problems of `row` against the warning-entry schema, empty when it validates.
+    pub fn warning_entry_problems(&self, row: &Value) -> Vec<String> {
+        problem_list(&self.warning_entry, row)
             .iter()
             .map(ToString::to_string)
             .collect()

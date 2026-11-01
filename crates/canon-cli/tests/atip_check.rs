@@ -1,7 +1,9 @@
-//! `atip check` against canon (0.33, `canon-0-33-atip-check` F6).
+//! `atip check` against canon (0.34, `canon-0-34-atip-check-1-1` F6; 0.33 `canon-0-33-atip-check`).
 //!
-//! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: `setup` is `init`, `probe` is
-//! `status`, and `registry` is generated from `canon schema --errors --json`, never written by hand.
+//! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: it claims 1.1; `setup` is `init` and two
+//! subjects (so a listing has a second page); `probe` is `status`; `globalOptions` is `--repo .`; `commands` holds a paging call
+//! that also emits a next step (`query`) and the refusal of a missing value (`finding close` without `--seq`); `registry`
+//! and `warnings` are generated from `canon schema --errors --json` and `--warnings --json`, never written by hand.
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
 //! committed file differs from what the binary says. The CI job `atip-l0` and `just atip` run the same
 //! `atip check` on the same binary and fixture.
@@ -29,28 +31,59 @@ fn fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/atip/canon.fixture.json")
 }
 
-/// The registry rows of a `canon schema --errors --json` answer: the five members a registry row has, and nothing else.
+/// The registry rows of a `canon schema --errors --json` answer as a fixture lists them: the code, the exit, `retryable` and
+/// the names of the reasons (when it has any), no prose.
 fn registry_rows(answer: &Value) -> Vec<Value> {
     let errors = answer["data"]["errors"].as_array().expect("data.errors of the --errors answer");
     errors
         .iter()
         .map(|row| {
             let mut kept = serde_json::Map::new();
-            for key in ["code", "exit", "retryable", "meaning", "fix"] {
+            for key in ["code", "exit", "retryable"] {
                 kept.insert(key.to_string(), row[key].clone());
+            }
+            let reasons: Vec<Value> = row["reasons"].as_array().into_iter().flatten().map(|reason| reason["reason"].clone()).collect();
+            if !reasons.is_empty() {
+                kept.insert("reasons".to_string(), Value::Array(reasons));
             }
             Value::Object(kept)
         })
         .collect()
 }
 
-/// The fixture as the binary says it should be: `setup` `init`, `probe` `status`, the registry from `canon schema --errors --json`.
-fn generate() -> Value {
+/// The warning codes of a `canon schema --warnings --json` answer.
+fn warning_codes(answer: &Value) -> Vec<Value> {
+    let warnings = answer["data"]["warnings"].as_array().expect("data.warnings of the --warnings answer");
+    warnings.iter().map(|row| row["code"].clone()).collect()
+}
+
+/// The answer of `canon <args> --json` in an empty directory.
+fn answer(args: &[&str]) -> Value {
     let dir = tempfile::tempdir().expect("tempdir");
-    let output = Command::new(CANON).args(["schema", "--errors", "--json"]).current_dir(dir.path()).output().expect("run canon");
+    let output = Command::new(CANON).args(args).arg("--json").current_dir(dir.path()).output().expect("run canon");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let answer: Value = serde_json::from_slice(&output.stdout).expect("the --errors answer is JSON");
-    json!({"setup": [["init"]], "probe": "status", "registry": registry_rows(&answer)})
+    serde_json::from_slice(&output.stdout).expect("the answer is JSON")
+}
+
+/// The fixture as the binary says it should be: the registry and the warnings from `canon schema`, the rest as written here.
+fn generate() -> Value {
+    json!({
+        "contractVersion": "1.1",
+        "setup": [
+            ["init"],
+            ["subject", "new", "alpha", "--domain", "core", "--title", "Alpha"],
+            ["subject", "new", "beta", "--domain", "core", "--title", "Beta"]
+        ],
+        "probe": "status",
+        "globalOptions": [["--repo", "."]],
+        "registry": registry_rows(&answer(&["schema", "--errors"])),
+        "warnings": warning_codes(&answer(&["schema", "--warnings"])),
+        "commands": {
+            "query": {"ok": [["query", "--kind", "subject", "--limit", "1", "--json"]]},
+            "status": {"ok": [["status", "--json"]]},
+            "finding close": {"missingValue": [["finding", "close", "add-login", "--round", "1", "--disposition", "fixed", "--json"]]}
+        }
+    })
 }
 
 fn rendered(fixture: &Value) -> String {
@@ -64,7 +97,7 @@ fn drift(committed: &str, generated: &Value) -> Option<String> {
 }
 
 #[test]
-fn atip_check_39_the_canon_fixtures_registry_equals_the_one_generated_from_canon_schema_errors() {
+fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generated_from_canon_schema() {
     let generated = generate();
     if std::env::var_os("CANON_BLESS_ATIP_FIXTURE").is_some() {
         std::fs::write(fixture_path(), rendered(&generated)).expect("write the fixture");
@@ -72,15 +105,19 @@ fn atip_check_39_the_canon_fixtures_registry_equals_the_one_generated_from_canon
     let committed = std::fs::read_to_string(fixture_path()).expect("tests/atip/canon.fixture.json");
     assert_eq!(drift(&committed, &generated), None, "run CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check and commit the fixture");
     let fixture: Value = serde_json::from_str(&committed).expect("the fixture is JSON");
-    assert_eq!((fixture["setup"].clone(), fixture["probe"].clone()), (json!([["init"]]), json!("status")));
+    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.1"), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
-    assert_eq!(keys, ["probe", "registry", "setup"], "the L0 keys only");
+    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "probe", "registry", "setup", "warnings"], "the L0 keys only");
     for row in fixture["registry"].as_array().expect("registry") {
         let mut members: Vec<&str> = row.as_object().expect("row").keys().map(String::as_str).collect();
         members.sort_unstable();
-        assert_eq!(members, ["code", "exit", "fix", "meaning", "retryable"]);
+        assert!(members == ["code", "exit", "retryable"] || members == ["code", "exit", "reasons", "retryable"], "a registry row names codes and reasons and carries no prose: {members:?}");
     }
+    assert!(!fixture["warnings"].as_array().expect("warnings").is_empty(), "canon has warnings to list");
+    // The calls the L0 checks need: a page and a next step, and a refusal of a missing value.
+    assert!(fixture["commands"]["query"]["ok"].as_array().is_some_and(|calls| !calls.is_empty()));
+    assert!(fixture["commands"]["finding close"]["missingValue"].as_array().is_some_and(|calls| !calls.is_empty()));
 }
 
 #[test]
@@ -95,31 +132,40 @@ fn atip_check_40_a_stale_registry_in_the_canon_fixture_fails_the_generation_test
     for (name, text) in [
         ("a row dropped", stale(&|f| drop(f["registry"].as_array_mut().expect("registry").pop()))),
         ("an exit changed", stale(&|f| f["registry"][0]["exit"] = json!(if f["registry"][0]["exit"] == 1 { 2 } else { 1 }))),
-        ("a fix reworded", stale(&|f| f["registry"][0]["fix"] = json!("reworded by hand"))),
-        ("a member added", stale(&|f| f["registry"][0]["x-note"] = json!("by hand"))),
-        ("a key added", stale(&|f| f["commands"] = json!({}))),
+        ("a retryable flipped", stale(&|f| f["registry"][0]["retryable"] = json!(!f["registry"][0]["retryable"].as_bool().unwrap_or(false)))),
+        ("a member added", stale(&|f| f["registry"][0]["meaning"] = json!("by hand"))),
+        ("a warning dropped", stale(&|f| drop(f["warnings"].as_array_mut().expect("warnings").pop()))),
+        ("a call changed", stale(&|f| f["commands"]["query"]["ok"] = json!([["query"]]))),
+        ("a key added", stale(&|f| f["env"] = json!({}))),
     ] {
         assert!(drift(&text, &generated).is_some(), "{name} must be noticed");
     }
     assert_eq!(drift(&rendered(&committed), &generated), None);
-    // A member of the answer outside the five a registry row has is dropped by the generator.
-    let answer = json!({"data": {"errors": [{"code": "X", "exit": 2, "retryable": false, "meaning": "m", "fix": "f", "surplus": 1, "x-canon": {}}]}});
-    assert_eq!(registry_rows(&answer), [json!({"code": "X", "exit": 2, "retryable": false, "meaning": "m", "fix": "f"})]);
+    // The prose of the answer, and any member outside a fixture row, is dropped by the generator; reasons are kept by name.
+    let answer = json!({"data": {"errors": [{"code": "X", "exit": 2, "retryable": false, "meaning": "m", "fix": "f", "surplus": 1, "x-canon": {}, "reasons": [{"reason": "R", "meaning": "m", "fix": "f"}]}]}});
+    assert_eq!(registry_rows(&answer), [json!({"code": "X", "exit": 2, "retryable": false, "reasons": ["R"]})]);
 }
 
 fn run_checker(bin: &Path) -> atip_check::report::Report {
-    let args = CheckArgs { bin: bin.into(), level: Level::L0, fixture: fixture_path().into() };
+    let args = CheckArgs { bin: bin.into(), level: Level::L0, fixture: fixture_path().into(), contract: None };
     check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message))
 }
 
 #[test]
-fn atip_check_41_canon_passes_the_19_l0_checks_through_the_committed_fixture() {
+fn atip_check_41_canon_passes_the_27_applicable_of_the_28_l0_checks_through_the_committed_fixture() {
     let report = run_checker(Path::new(CANON));
     assert!(report.passed, "{}", report.text());
-    assert_eq!(report.checks.len(), 19);
-    // A check that does not apply (`L0.next`, `L0.page`, when no call the run makes carries a next step or a page) is not a failure.
+    assert_eq!(report.checks.len(), 28);
+    assert_eq!(report.contract_version, "1.1");
+    // The fixture has a paging call and a next-step call, so these two are judged, and only `L0.contract` (a 1.0 rule) does not apply.
+    for id in ["L0.next", "L0.page"] {
+        assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
+    }
+    assert_eq!(report.find("L0.contract").map(|check| check.result), Some(atip_check::report::CheckResult::Unsupported));
+    let applicable = report.checks.iter().filter(|check| check.result != atip_check::report::CheckResult::Unsupported).count();
+    assert_eq!(applicable, 27, "{}", report.text());
     let failing: Vec<&str> = report.checks.iter().filter(|check| !matches!(check.result, atip_check::report::CheckResult::Pass | atip_check::report::CheckResult::Unsupported)).map(|check| check.id).collect();
-    assert!(failing.is_empty(), "the 15 MUST and 4 SHOULD checks all pass or do not apply for canon: {failing:?}\n{}", report.text());
+    assert!(failing.is_empty(), "the 21 MUST and 6 SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
 }
 
 #[test]

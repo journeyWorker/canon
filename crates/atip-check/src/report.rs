@@ -3,6 +3,8 @@
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::claim::Claim;
+
 /// Whether a failure of the check fails the level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -54,21 +56,30 @@ pub struct Check {
 #[derive(Debug, Clone, Serialize)]
 pub struct Report {
     pub level: &'static str,
+    /// The contract minor the tool claimed and the checks judged.
+    #[serde(rename = "contractVersion")]
+    pub contract_version: &'static str,
     pub passed: bool,
     pub checks: Vec<Check>,
 }
 
 impl Report {
-    pub fn new(level: &'static str, checks: Vec<Check>) -> Self {
+    pub fn new(level: &'static str, claim: Claim, checks: Vec<Check>) -> Self {
         let passed = !checks.iter().any(|check| {
             check.strength == Strength::Must
                 && matches!(check.result, CheckResult::Fail | CheckResult::Unprovided)
         });
         Self {
             level,
+            contract_version: claim.as_str(),
             passed,
             checks,
         }
+    }
+
+    /// How many SHOULD checks failed.
+    pub fn advisories(&self) -> usize {
+        self.count(Strength::Should, CheckResult::Fail)
     }
 
     pub fn find(&self, id: &str) -> Option<&Check> {
@@ -139,6 +150,7 @@ impl Check {
 #[cfg(test)]
 mod tests {
     use super::{Check, CheckResult, Report, Strength};
+    use crate::claim::Claim;
 
     fn check(id: &'static str, strength: Strength, result: CheckResult) -> Check {
         Check {
@@ -157,6 +169,7 @@ mod tests {
         let all = |result| {
             Report::new(
                 "L0",
+                Claim::V1_1,
                 vec![
                     check("L0.a", Strength::Must, CheckResult::Pass),
                     check("L0.b", Strength::Must, result),
@@ -173,6 +186,7 @@ mod tests {
         );
         let advisory = Report::new(
             "L0",
+            Claim::V1_1,
             vec![check("L0.a", Strength::Should, CheckResult::Fail)],
         );
         assert!(advisory.passed, "a SHOULD failure never fails the level");
@@ -184,6 +198,7 @@ mod tests {
         failing.reason = Some("it broke".to_string());
         let report = Report::new(
             "L0",
+            Claim::V1_1,
             vec![check("L0.a", Strength::Should, CheckResult::Pass), failing],
         );
         let text = report.text();

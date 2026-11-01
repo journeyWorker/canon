@@ -16,7 +16,7 @@ use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -44,8 +44,9 @@ pub struct Call {
     pub env: Vec<(String, String)>,
     /// Stdout on a pseudo-terminal.
     pub pty: bool,
-    /// Stdin on a pseudo-terminal that never sends anything: a process that reads it waits (a prompt).
-    pub stdin_pty: bool,
+    /// Stdin and stdout on one pseudo-terminal in canonical mode with echo off and output untranslated, for the call
+    /// that must refuse and not prompt (`L0.no-prompt`, approaches/checker.md 3): see [`Runner::run_on_terminal`].
+    pub terminal: bool,
     /// A time limit shorter than the fixture's, for the call that must not wait.
     pub limit: Option<Duration>,
 }
@@ -60,7 +61,7 @@ impl Call {
             argv: argv.into_iter().map(Into::into).collect(),
             env: Vec::new(),
             pty: false,
-            stdin_pty: false,
+            terminal: false,
             limit: None,
         }
     }
@@ -79,11 +80,10 @@ impl Call {
         self
     }
 
-    /// The same call with stdin on a terminal nobody types on, and at most `limit` to finish.
+    /// The same call with stdin and stdout on a canonical-mode terminal.
     #[must_use]
-    pub fn waiting_on_stdin(mut self, limit: Duration) -> Self {
-        self.stdin_pty = true;
-        self.limit = Some(limit);
+    pub fn on_terminal(mut self) -> Self {
+        self.terminal = true;
         self
     }
 
@@ -102,6 +102,21 @@ pub struct Outcome {
     pub stderr: Vec<u8>,
     /// The paths the invocation changed in its working directory (`./path`) and in `HOME` (`~/path`); measured only when it exited 2.
     pub changes: Vec<String>,
+    /// How long the invocation ran.
+    pub elapsed: Duration,
+    /// What a terminal run saw at its deadline, when the process was still running then.
+    pub at_deadline: Option<AtDeadline>,
+    /// The stdout of the fixture's probe, run in the same copy after the invocation exited 2; `None` when it was not run.
+    pub probe_after: Option<Vec<u8>>,
+}
+
+/// What a terminal run showed when it was still running at its deadline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AtDeadline {
+    /// What the process had printed on the terminal by then.
+    pub output: Vec<u8>,
+    /// Whether the process exited or printed within two seconds after the checker wrote the end-of-file character.
+    pub reacted_to_eof: bool,
 }
 
 /// Why the checker could not run the binary or build the template.
@@ -125,6 +140,8 @@ pub struct Runner {
     fixture_env: Vec<(String, String)>,
     timeout: Duration,
     sequences: usize,
+    /// The probe command with `--json`: asked for the remote state after a refusal.
+    probe: Option<Vec<String>>,
 }
 
 impl Runner {
@@ -151,6 +168,10 @@ impl Runner {
                 .collect(),
             timeout: fixture.timeout,
             sequences: 0,
+            probe: fixture.probe.clone().map(|mut words| {
+                words.push("--json".to_string());
+                words
+            }),
         };
         for command in &fixture.setup {
             let template = runner.template.clone();
@@ -187,8 +208,29 @@ impl Runner {
         Ok(all)
     }
 
-    /// Runs `call` once in its own fresh copy of the template.
-    pub fn run(&mut self, call: &Call) -> Result<Outcome, RunError> {
+    /// The data the probe reports in a copy nobody has touched, when it reports the same twice in two copies (a
+    /// probe whose answer depends on the time or the path cannot show a remote change); `None` without a probe.
+    pub fn remote_baseline(&mut self) -> Result<Option<serde_json::Value>, RunError> {
+        let Some(probe) = self.probe.clone() else {
+            return Ok(None);
+        };
+        let mut states = Vec::new();
+        for _ in 0..2 {
+            let outcome = self.run_plain(&Call::new(probe.iter().cloned()))?;
+            let data = serde_json::from_slice::<serde_json::Value>(&outcome.stdout)
+                .ok()
+                .filter(|document| document.get("ok") == Some(&serde_json::Value::Bool(true)))
+                .and_then(|document| document.get("data").cloned());
+            states.push(data);
+        }
+        Ok(match (states.pop().flatten(), states.pop().flatten()) {
+            (Some(second), Some(first)) if first == second => Some(first),
+            _ => None,
+        })
+    }
+
+    /// A fresh copy of the template as the next sequence's directory.
+    fn sequence(&mut self) -> Result<PathBuf, RunError> {
         self.sequences += 1;
         let sequence = self
             .scratch
@@ -198,18 +240,54 @@ impl Runner {
             copy_tree(&self.template.join(part), &sequence.join(part))
                 .map_err(|error| RunError::Scratch(error.to_string()))?;
         }
+        Ok(sequence)
+    }
+
+    fn run_plain(&mut self, call: &Call) -> Result<Outcome, RunError> {
+        let sequence = self.sequence()?;
+        self.execute(call, &sequence)
+            .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))
+    }
+
+    /// What a refusal left behind: the changed paths of the directory and `HOME`, and the probe's answer.
+    fn after_refusal(&self, outcome: &mut Outcome, sequence: &Path) -> Result<(), RunError> {
+        if outcome.exit != Exit::Code(2) {
+            return Ok(());
+        }
+        let after = Self::both(sequence).map_err(|error| RunError::Scratch(error.to_string()))?;
+        outcome.changes = changed(&self.template_files, &after);
+        if let Some(probe) = &self.probe {
+            outcome.probe_after = self
+                .execute(&Call::new(probe.iter().cloned()), sequence)
+                .ok()
+                .map(|probed| probed.stdout);
+        }
+        Ok(())
+    }
+
+    /// Runs `call` once in its own fresh copy of the template.
+    pub fn run(&mut self, call: &Call) -> Result<Outcome, RunError> {
+        let sequence = self.sequence()?;
         let mut outcome = self
             .execute(call, &sequence)
             .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
-        if outcome.exit == Exit::Code(2) {
-            let after =
-                Self::both(&sequence).map_err(|error| RunError::Scratch(error.to_string()))?;
-            outcome.changes = changed(&self.template_files, &after);
-        }
+        self.after_refusal(&mut outcome, &sequence)?;
         Ok(outcome)
     }
 
-    fn execute(&self, call: &Call, root: &Path) -> std::io::Result<Outcome> {
+    /// Runs `call` with stdin and stdout on one terminal (canonical input, no echo, output untranslated), in its
+    /// own fresh copy. A process still running after `deadline` gets the end-of-file character at the start of a
+    /// line and two more seconds; [`Outcome::at_deadline`] says what it did.
+    pub fn run_on_terminal(&mut self, call: &Call, deadline: Duration) -> Result<Outcome, RunError> {
+        let sequence = self.sequence()?;
+        let mut outcome = self
+            .execute_terminal(call, &sequence, deadline)
+            .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
+        self.after_refusal(&mut outcome, &sequence)?;
+        Ok(outcome)
+    }
+
+    fn command(&self, call: &Call, root: &Path) -> Command {
         let mut command = Command::new(&self.bin);
         command
             .args(&call.argv)
@@ -226,9 +304,14 @@ impl Runner {
             .stdin(Stdio::null())
             .stderr(Stdio::piped())
             .process_group(0);
-        // Terminals: stdout's slave end goes to the child and a copy stays here until the output has been read;
-        // stdin's pair is only held, so a process that reads it waits.
-        let mut keep: Vec<std::os::fd::OwnedFd> = Vec::new();
+        command
+    }
+
+    fn execute(&self, call: &Call, root: &Path) -> std::io::Result<Outcome> {
+        let started = Instant::now();
+        let mut command = self.command(call, root);
+        // A terminal on stdout: the slave end goes to the child and a copy stays here until the output has been read.
+        let buffer = Arc::new(Mutex::new(Vec::new()));
         let stdout_terminal = if call.pty {
             let pty = raw_terminal()?;
             let kept = pty.slave.try_clone()?;
@@ -238,16 +321,13 @@ impl Runner {
             command.stdout(Stdio::piped());
             None
         };
-        if call.stdin_pty {
-            let pty = nix::pty::openpty(None, None).map_err(std::io::Error::from)?;
-            command.stdin(Stdio::from(pty.slave));
-            keep.push(pty.master);
-        }
         let mut child = command.spawn()?;
         drop(command);
         let ended = Arc::new(AtomicBool::new(false));
         let stdout = match (stdout_terminal, child.stdout.take()) {
-            (Some((master, slave)), _) => terminal_reader(master, slave, Arc::clone(&ended)),
+            (Some((master, slave)), _) => {
+                terminal_reader(master, slave, Arc::clone(&ended), Arc::clone(&buffer))
+            }
             (None, Some(pipe)) => reader(pipe),
             (None, None) => thread::spawn(Vec::new),
         };
@@ -260,13 +340,89 @@ impl Runner {
         kill_group(&child);
         ended.store(true, Ordering::Release);
         let stdout = stdout.join().unwrap_or_default();
-        drop(keep);
         Ok(Outcome {
             call: call.clone(),
             exit,
             stdout,
             stderr: stderr.join().unwrap_or_default(),
             changes: Vec::new(),
+            elapsed: started.elapsed(),
+            at_deadline: None,
+            probe_after: None,
+        })
+    }
+
+    /// The run of [`Runner::run_on_terminal`].
+    fn execute_terminal(&self, call: &Call, root: &Path, deadline: Duration) -> std::io::Result<Outcome> {
+        let started = Instant::now();
+        let mut command = self.command(call, root);
+        let pty = canonical_terminal()?;
+        let end_of_file = pty.end_of_file;
+        let kept = pty.slave.try_clone()?;
+        command.stdin(Stdio::from(pty.slave.try_clone()?));
+        command.stdout(Stdio::from(pty.slave));
+        let master = std::fs::File::from(pty.master);
+        let mut writer = master.try_clone()?;
+        let mut child = command.spawn()?;
+        drop(command);
+        let ended = Arc::new(AtomicBool::new(false));
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let stdout = terminal_reader(master, kept, Arc::clone(&ended), Arc::clone(&buffer));
+        let stderr = child
+            .stderr
+            .take()
+            .map_or_else(|| thread::spawn(Vec::new), reader);
+        let printed = || buffer.lock().map_or(0, |bytes| bytes.len());
+        let mut at_deadline = None;
+        let exit = loop {
+            if let Some(status) = child.try_wait()? {
+                break exit_of(status);
+            }
+            if started.elapsed() >= deadline {
+                let output = buffer.lock().map(|bytes| bytes.clone()).unwrap_or_default();
+                std::io::Write::write_all(&mut writer, &[end_of_file])?;
+                let grace = Instant::now();
+                let mut reacted = false;
+                let mut ended_by = None;
+                while grace.elapsed() < Duration::from_secs(2) {
+                    if let Some(status) = child.try_wait()? {
+                        reacted = true;
+                        ended_by = Some(exit_of(status));
+                        break;
+                    }
+                    if printed() > output.len() {
+                        reacted = true;
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(5));
+                }
+                at_deadline = Some(AtDeadline {
+                    output,
+                    reacted_to_eof: reacted,
+                });
+                if let Some(exit) = ended_by {
+                    break exit;
+                }
+                kill_group(&child);
+                child.kill().unwrap_or_default();
+                child.wait()?;
+                break Exit::TimedOut;
+            }
+            thread::sleep(Duration::from_millis(5));
+        };
+        kill_group(&child);
+        ended.store(true, Ordering::Release);
+        stdout.join().unwrap_or_default();
+        let output = buffer.lock().map(|bytes| bytes.clone()).unwrap_or_default();
+        Ok(Outcome {
+            call: call.clone(),
+            exit,
+            stdout: output,
+            stderr: stderr.join().unwrap_or_default(),
+            changes: Vec::new(),
+            elapsed: started.elapsed(),
+            at_deadline,
+            probe_after: None,
         })
     }
 }
@@ -281,7 +437,35 @@ fn raw_terminal() -> std::io::Result<nix::pty::OpenptyResult> {
     Ok(pty)
 }
 
-/// Reads a terminal's master end to its end of file.
+/// A pseudo-terminal as an interactive session has it: input in canonical mode (`ICANON`) with echo off, so that the
+/// end-of-file character written at the start of a line makes a reader's `read` return 0; output untranslated
+/// (`OPOST` off, so a `\n` the tool writes arrives as `\n`, not `\r\n`).
+struct CanonicalTerminal {
+    master: std::os::fd::OwnedFd,
+    slave: std::os::fd::OwnedFd,
+    end_of_file: u8,
+}
+
+fn canonical_terminal() -> std::io::Result<CanonicalTerminal> {
+    use nix::sys::termios::{tcgetattr, tcsetattr, InputFlags, LocalFlags, OutputFlags, SetArg, SpecialCharacterIndices};
+    let pty = nix::pty::openpty(None, None).map_err(std::io::Error::from)?;
+    let mut settings = tcgetattr(&pty.slave).map_err(std::io::Error::from)?;
+    settings.local_flags.insert(LocalFlags::ICANON);
+    settings
+        .local_flags
+        .remove(LocalFlags::ECHO | LocalFlags::ECHOE | LocalFlags::ECHOK | LocalFlags::ECHONL);
+    settings.output_flags.remove(OutputFlags::OPOST);
+    settings.input_flags.remove(InputFlags::ICRNL | InputFlags::INLCR | InputFlags::IGNCR);
+    tcsetattr(&pty.slave, SetArg::TCSANOW, &settings).map_err(std::io::Error::from)?;
+    let end_of_file = settings.control_chars[SpecialCharacterIndices::VEOF as usize];
+    Ok(CanonicalTerminal {
+        master: pty.master,
+        slave: pty.slave,
+        end_of_file,
+    })
+}
+
+/// Reads a terminal's master end to its end of file, into `buffer` as it goes.
 ///
 /// While the process runs, and until nothing more is waiting after it ended (`ended`), `slave` stays open here:
 /// closing the last slave end before the master has been read can throw unread output away, so the master never
@@ -291,9 +475,14 @@ fn terminal_reader(
     mut master: std::fs::File,
     slave: std::os::fd::OwnedFd,
     ended: Arc<AtomicBool>,
+    buffer: Arc<Mutex<Vec<u8>>>,
 ) -> JoinHandle<Vec<u8>> {
+    let push = move |buffer: &Arc<Mutex<Vec<u8>>>, bytes: &[u8]| {
+        if let Ok(mut all) = buffer.lock() {
+            all.extend_from_slice(bytes);
+        }
+    };
     thread::spawn(move || {
-        let mut bytes = Vec::new();
         let mut chunk = [0u8; 8192];
         loop {
             let ended_before = ended.load(Ordering::Acquire);
@@ -305,8 +494,8 @@ fn terminal_reader(
                 nix::poll::poll(&mut fds, nix::poll::PollTimeout::from(20u8)).unwrap_or(0) > 0;
             if waiting {
                 match master.read(&mut chunk) {
-                    Ok(read) if read > 0 => bytes.extend_from_slice(&chunk[..read]),
-                    _ => return bytes,
+                    Ok(read) if read > 0 => push(&buffer, &chunk[..read]),
+                    _ => break,
                 }
             } else if ended_before {
                 break;
@@ -317,9 +506,9 @@ fn terminal_reader(
             if read == 0 {
                 break;
             }
-            bytes.extend_from_slice(&chunk[..read]);
+            push(&buffer, &chunk[..read]);
         }
-        bytes
+        buffer.lock().map(|all| all.clone()).unwrap_or_default()
     })
 }
 
@@ -392,8 +581,7 @@ mod tests {
                 .collect(),
             env: [("FIXTURE_VAR".to_string(), "yes".to_string())].into(),
             timeout,
-            probe: None,
-            registry: None,
+            ..Fixture::empty()
         }
     }
 

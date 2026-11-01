@@ -70,7 +70,7 @@ fn proves(id: &str) {
 }
 
 #[test]
-fn atip_check_07_l0_version_fails_when_version_exits_nonzero_or_prints_nothing() {
+fn atip_check_07_l0_version_fails_when_version_exits_nonzero_prints_nothing_or_prints_on_stderr() {
     proves("L0.version");
 }
 
@@ -105,19 +105,16 @@ fn atip_check_12_l0_bare_fails_when_a_call_with_no_command_is_not_a_command_requ
 #[test]
 fn atip_check_13_l0_unknown_option_fails_on_the_code_the_field_or_the_command_of_the_envelope() {
     proves("L0.unknown-option");
-    // A USAGE registered with exit 1 is not a refusal code either.
+    // A USAGE registered with exit 1 is not a refusal code either (the tool prints no registry, so the fixture's is the one).
     let harness = Harness::new();
-    let mut fixture = harness.fixture(&json!({}));
-    fixture["registry"][0]["exit"] = json!(1);
+    let mut fixture = harness.fixture(&json!({"noSchema": true}));
+    for row in fixture["registry"].as_array_mut().expect("registry") {
+        if row["code"] == "USAGE" {
+            row["exit"] = json!(1);
+        }
+    }
     let output = harness.check(&fixture, true);
-    let check = output.envelope()["data"]["checks"]
-        .as_array()
-        .expect("checks")
-        .iter()
-        .find(|check| check["id"] == "L0.unknown-option")
-        .cloned()
-        .expect("check");
-    assert_eq!(check["result"], "fail", "{check}");
+    assert_eq!(output.check("L0.unknown-option")["result"], "fail", "{}", output.stdout);
 }
 
 #[test]
@@ -163,20 +160,13 @@ fn atip_check_19_l0_one_document_fails_when_stdout_is_not_exactly_one_document_a
 }
 
 #[test]
-fn atip_check_20_l0_no_env_switch_fails_when_the_environment_a_terminal_or_a_wait_for_input_changes_the_probe(
-) {
+fn atip_check_20_l0_no_env_switch_fails_when_the_environment_or_a_terminal_changes_the_probe() {
     proves("L0.no-env-switch");
     // The terminal alone: a tool that drops JSON when stdout is a terminal.
     let harness = Harness::new();
     let output = harness.check_config(&json!({"ttySwitchesJson": true}));
     case_verdict(&output.envelope()["data"], "L0.no-env-switch").expect("only no-env-switch fails");
-    let check = output.envelope()["data"]["checks"]
-        .as_array()
-        .expect("checks")
-        .iter()
-        .find(|check| check["id"] == "L0.no-env-switch")
-        .cloned()
-        .expect("check");
+    let check = output.check("L0.no-env-switch");
     assert!(
         check["reason"]
             .as_str()
@@ -192,31 +182,25 @@ fn atip_check_21_l0_no_env_switch_text_fails_when_ci_turns_text_mode_into_json()
 }
 
 #[test]
-fn atip_check_22_l0_contract_reports_an_advisory_when_meta_contract_is_missing() {
+fn atip_check_22_l0_contract_reports_an_advisory_when_a_1_0_tool_omits_meta_contract() {
     proves("L0.contract");
 }
 
 #[test]
-fn atip_check_30_l0_refusal_effects_fails_when_a_refusal_writes_in_the_working_directory_or_in_home(
+fn atip_check_30_l0_refusal_effects_fails_when_a_refusal_writes_in_the_working_directory_home_or_a_remote_the_probe_reports(
 ) {
     proves("L0.refusal-effects");
     let harness = Harness::new();
     let output = harness.check_config(&json!({"refusalWritesHome": true}));
     case_verdict(&output.envelope()["data"], "L0.refusal-effects")
         .expect("only refusal-effects fails");
-    let check = output.envelope()["data"]["checks"]
-        .as_array()
-        .expect("checks")
-        .iter()
-        .find(|check| check["id"] == "L0.refusal-effects")
-        .cloned()
-        .expect("check");
     assert!(
-        check["reason"]
+        output.check("L0.refusal-effects")["reason"]
             .as_str()
             .unwrap_or_default()
             .contains("~/telemetry.log"),
-        "{check}"
+        "{}",
+        output.stdout
     );
 }
 
@@ -231,6 +215,56 @@ fn atip_check_45_l0_page_fails_on_a_malformed_page_or_a_next_cursor_with_no_curs
     proves("L0.page");
 }
 
+#[test]
+fn atip_check_64_l0_envelope_fails_when_a_document_breaks_the_envelope_schema_and_not_for_what_other_checks_own(
+) {
+    proves("L0.envelope");
+}
+
+#[test]
+fn atip_check_65_l0_contract_version_fails_on_a_missing_or_wrong_marker_or_a_member_of_a_later_minor() {
+    proves("L0.contract-version");
+}
+
+#[test]
+fn atip_check_66_l0_stderr_result_fails_when_stderr_carries_the_error_or_the_result() {
+    proves("L0.stderr-result");
+}
+
+#[test]
+fn atip_check_67_l0_stderr_quiet_reports_an_advisory_when_stderr_is_not_empty_in_json_mode() {
+    proves("L0.stderr-quiet");
+}
+
+#[test]
+fn atip_check_68_l0_no_prompt_fails_when_a_missing_value_makes_the_tool_wait_on_a_terminal() {
+    proves("L0.no-prompt");
+}
+
+#[test]
+fn atip_check_69_l0_registry_fails_when_the_tools_registries_or_what_it_emitted_disagree_with_the_contract_and_the_fixture(
+) {
+    proves("L0.registry");
+}
+
+#[test]
+fn atip_check_70_l0_usage_hint_reports_an_advisory_for_a_usage_without_field_whose_hint_is_not_the_schema_of_the_command(
+) {
+    proves("L0.usage-hint");
+}
+
+#[test]
+fn atip_check_71_l0_hint_form_fails_when_a_hint_that_starts_with_the_tool_name_is_not_one_command_line(
+) {
+    proves("L0.hint-form");
+}
+
+#[test]
+fn atip_check_72_l0_global_on_group_reports_an_advisory_when_a_tool_wide_option_after_a_group_is_an_error(
+) {
+    proves("L0.global-on-group");
+}
+
 /// The check's id, the verdict on the planted violation and the verdict with the check forced to pass.
 type Forced = (String, Result<(), String>, Result<(), String>);
 
@@ -239,6 +273,7 @@ fn args_for(harness: &Harness, fixture: &Value) -> CheckArgs {
         bin: FAKE_TOOL.into(),
         level: Level::L0,
         fixture: harness.write("fixture.json", fixture).into(),
+        contract: None,
     }
 }
 
@@ -264,15 +299,16 @@ fn in_parallel<T: Send>(jobs: Vec<Box<dyn FnOnce() -> T + Send>>) -> Vec<T> {
 #[test]
 fn atip_check_56_each_pass_condition_fails_exactly_its_owner_and_a_run_with_the_condition_switched_off_does_not(
 ) {
-    // Every condition a conforming run judges has a case, and every case names a condition that is judged.
-    let harness = Harness::new();
-    let args = args_for(
-        &harness,
-        &harness.fixture(&json!({"offersSchemaErrors": true})),
-    );
-    let (report, judged): (_, BTreeSet<String>) =
-        check_binary_mutated(&args, &[], &[]).expect("a report");
-    assert!(report.passed, "{}", report.text());
+    // Every condition a conforming run judges has a case, and every case names a condition that is judged: the
+    // conditions of a 1.1 claim and those of a 1.0 claim together.
+    let mut judged: BTreeSet<String> = BTreeSet::new();
+    for config in [json!({}), json!({"claims": "1.0"})] {
+        let harness = Harness::new();
+        let args = args_for(&harness, &harness.fixture(&config));
+        let (report, conditions) = check_binary_mutated(&args, &[], &[]).expect("a report");
+        assert!(report.passed, "{config}: {}", report.text());
+        judged.extend(conditions);
+    }
     let named: BTreeSet<String> = cases()
         .iter()
         .map(|case| case.condition.to_string())
@@ -328,30 +364,23 @@ fn atip_check_56_each_pass_condition_fails_exactly_its_owner_and_a_run_with_the_
 }
 
 #[test]
+fn atip_check_61_a_violation_that_fails_two_checks_fails_the_seeded_test_that_named_one() {
+    // `hintNull` is no-null's; with `pageBadShape` (page's) in the same tool, the seeded verdict for no-null is refused:
+    // a case whose planted violation has a second owner cannot pass the suite.
+    let harness = Harness::new();
+    let output = harness.check_config(&json!({"hintNull": true, "pageBadShape": true}));
+    let why = case_verdict(&output.envelope()["data"], "L0.no-null")
+        .expect_err("a second failing check is refused");
+    assert!(why.contains("L0.page") && why.contains("only L0.no-null was seeded"), "{why}");
+    // And one planted violation that the checker attributes to no one fails the verdict as well.
+    let clean = harness.check_config(&json!({}));
+    let why = case_verdict(&clean.envelope()["data"], "L0.no-null").expect_err("no failure");
+    assert!(why.contains("expected fail"), "{why}");
+}
+
+#[test]
 fn atip_check_36_a_check_forced_to_always_pass_makes_its_seeded_violation_test_fail() {
-    let owners: Vec<String> = [
-        "L0.version",
-        "L0.version-format",
-        "L0.unknown-command",
-        "L0.unknown-command-text",
-        "L0.text-error-form",
-        "L0.bare",
-        "L0.unknown-option",
-        "L0.json-mode-preparse",
-        "L0.after-dashdash",
-        "L0.ok-exit",
-        "L0.refusal-effects",
-        "L0.no-null",
-        "L0.compact",
-        "L0.one-document",
-        "L0.no-env-switch",
-        "L0.no-env-switch-text",
-        "L0.next",
-        "L0.page",
-        "L0.contract",
-    ]
-    .map(String::from)
-    .to_vec();
+    let owners: Vec<String> = atip_check::checks::ids().map(String::from).to_vec();
     assert_eq!(
         owners
             .iter()
