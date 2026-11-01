@@ -1,0 +1,22 @@
+# bun test packages/dashboard/test/envelope-tolerance.test.ts
+bun test v1.4.4 (38afee6c8)
+
+ 4 pass
+ 0 fail
+ 14 expect() calls
+Ran 4 tests across 1 file. [6.00ms]
+
+# bun test packages/cli/test/launcher.test.ts
+bun test v1.4.4 (38afee6c8)
+
+ 5 pass
+ 0 fail
+ 7 expect() calls
+Ran 5 tests across 1 file. [713.00ms]
+
+# python3 -m unittest evals.dogfood.test_trace_check
+....................................
+----------------------------------------------------------------------
+Ran 36 tests in 0.362s
+
+OK
