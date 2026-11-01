@@ -199,6 +199,11 @@ pub fn all_codes() -> &'static [CodeInfo] {
     CODES
 }
 
+const APPROVAL_INVALID_REASONS: &[ReasonInfo] = &[
+    ReasonInfo { reason: "MALFORMED", meaning: "the approval arguments are incomplete or not well formed (a missing member of the four, a blank or multi-line approver, a role that is not human): raised from the arguments alone, before any state is read", fix: "Pass `--approver`, `--approval-role human`, `--signature-file` and `--approval-at` together, the approver one trimmed line." },
+    ReasonInfo { reason: "SIGNATURE_MISMATCH", meaning: "the signature cannot stand for the approval: the file is missing or unreadable, is not armored SSH signature text, no policy-pinned `allowed_signers` verifier is configured, or the signature does not verify over the payload with a listed key", fix: "Sign the exact bytes `canon evidence approval-payload` prints with a key the policy's `allowed_signers` lists, and pass that signature file." },
+];
+
 const INPUT_INVALID_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "BATCH_UNSUPPORTED", meaning: "the document is an array or NDJSON and the command takes one object", fix: "Pass one JSON object and run the command once per item." },
     ReasonInfo { reason: "EMPTY", meaning: "the `--input` value or its source holds no JSON", fix: "Pass inline JSON, a file path, or `-` with a document on stdin." },
@@ -276,7 +281,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "DIVERGENCE_ACCEPT_REFUSED", meaning: "a divergence acceptance was refused: not a reviewer, the evidence is not divergent, or it was attested by the accepting actor or session", exit: 2, retryable: false, fix: "Accept only divergent evidence as a reviewer whose actor and session did not attest it; `canon divergence list` shows candidates.", reasons: &[] },
     CodeInfo { code: "DIVERGENCE_INVALID_ARGUMENT", meaning: "a divergence flag value is invalid", exit: 2, retryable: false, fix: "Correct the divergence flag value; see `canon schema` for the command's options.", reasons: &[] },
     CodeInfo { code: "DIVERGENCE_REFUSED", meaning: "a divergence candidate was refused by a gate rule", exit: 1, retryable: false, fix: "Resolve the gate rule the error names, then run `canon gate promote --kind divergence` again.", reasons: &[] },
-    CodeInfo { code: "EVIDENCE_APPROVAL_INVALID", meaning: "the human approval attached to an attestation is missing, malformed or fails verification", exit: 2, retryable: false, fix: "Attach a well-formed human approval that verifies against the brief.", reasons: &[] },
+    CodeInfo { code: "EVIDENCE_APPROVAL_INVALID", meaning: "the human approval attached to an attestation is missing, malformed or fails verification", exit: 2, retryable: false, fix: "Attach a well-formed human approval that verifies against the brief.", reasons: APPROVAL_INVALID_REASONS },
     CodeInfo { code: "EVIDENCE_BATCH_REFUSED", meaning: "a batch attestation was refused by the gate while its records were being promoted; every record and blob the run wrote was removed", exit: 1, retryable: false, fix: "Fix the entry the error names and submit the whole batch again; nothing was kept.", reasons: &[] },
     CodeInfo { code: "EVIDENCE_BIND_REFUSED", meaning: "a --report or --file binding was refused", exit: 2, retryable: false, fix: "Pass a --report or --file that exists inside the repository and passes the binding rules named in the error.", reasons: &[] },
     CodeInfo { code: "EVIDENCE_CONTRACT_MISMATCH", meaning: "the record's kind and ref differ from the task's typed evidence contract", exit: 1, retryable: false, fix: "Record evidence whose kind and ref match the task's typed evidence contract.", reasons: &[] },

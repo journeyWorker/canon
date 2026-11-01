@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, CALENDAR, NOT_BLANK};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, BATCH_DESCRIPTION, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION};
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
@@ -74,6 +74,53 @@ pub(super) static TABLES: Tables = Tables {
                     code: "USAGE",
                     description: "`--after` (inclusive) is not later than `--before` (exclusive); an equal pair is an empty window, a reversed pair is refused before anything is read or written, with `--dry-run` and `--output` too.",
                     rejects: &["canon export --kind change --before 2026-01-02 --after 2026-02-01 --json"],
+                },
+            ],
+        ),
+        (
+            "artifacts move",
+            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon artifacts move --tier cold --input '[{},{}]'"] }],
+        ),
+        (
+            "dashboard",
+            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon dashboard --input '[{},{}]'"] }],
+        ),
+        (
+            "ledger compact",
+            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon ledger compact --input '[{},{}]'"] }],
+        ),
+        (
+            "purge",
+            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'"] }],
+        ),
+        (
+            "tier age",
+            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon tier age --input '[{},{}]'"] }],
+        ),
+        (
+            "migrate",
+            &[
+                Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon migrate --input '[{},{}]'"] },
+                Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "actor"],
+                    code: "USAGE",
+                    description: ACTOR_DESCRIPTION,
+                    rejects: &["canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --approver alice --note ok"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "approver", "note"],
+                    code: "USAGE",
+                    description: ANSWER_RELAYED,
+                    rejects: &[
+                        "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver \" \" --note ok",
+                        "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice",
+                    ],
                 },
             ],
         ),

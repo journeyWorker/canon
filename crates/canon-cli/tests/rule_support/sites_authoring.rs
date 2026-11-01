@@ -4,8 +4,8 @@ use super::sites::{site, Kind, Site};
 
 pub const SITES: &[Site] = &[
     // brief approve: the human's answer is checked before anything is read
-    site("brief_approve.rs:answer:APPROVAL_INCOMPLETE#1", Kind::Domain { command: "brief approve", argument: "approver" }),
-    site("brief_approve.rs:answer:APPROVAL_INCOMPLETE#2", Kind::Domain { command: "brief approve", argument: "note" }),
+    site("brief_approve.rs:answer:APPROVAL_INCOMPLETE#1", Kind::Validator { command: "brief approve", arguments: &["approver", "note"] }),
+    site("brief_approve.rs:answer:APPROVAL_INCOMPLETE#2", Kind::Validator { command: "brief approve", arguments: &["approver", "note"] }),
     site("brief_approve.rs:hint_for:APPROVAL_INCOMPLETE#1", Kind::Other("the next step the hint names for the code; not a check")),
     site("brief_approve.rs:check_approve:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["digest", "change"] }),
     site("brief_approve.rs:verify_shown:USAGE#1", Kind::Precondition("a relayed approval of the repo's only live change (no operand names it) needs the digest the human was shown: the change is read from the repo first")),
@@ -20,13 +20,14 @@ pub const SITES: &[Site] = &[
     site("learn.rs:run_rollback:LEARN_INVALID_ARGUMENT#1", Kind::Precondition("the id is parsed after the strategy is looked up in the store (an unknown strategy is refused first), so a bad --contradicting-trajectory is only reached after a state read")),
     site("learn.rs:run_rollback:LEARN_INVALID_ARGUMENT#2", Kind::Unreachable("--approval-at is normalised to RFC 3339 by clap's value parser before the handler runs; the calendar check is the validator of `strategy rollback`")),
     // policy approve
-    site("policy_approval.rs:run_approve:POLICY_APPROVAL_REFUSED#1", Kind::Domain { command: "policy approve", argument: "approver" }),
+    site("policy_approval.rs:run_approve:POLICY_APPROVAL_REFUSED#1", Kind::Precondition("the code of the policy record's own refusals (no policy file, an unreadable one); a blank approver is refused before it, by `check_approver`")),
+    site("policy_approval.rs:check_approver:POLICY_APPROVAL_REFUSED#1", Kind::Validator { command: "policy approve", arguments: &["approver"] }),
     // relayed approvals
-    site("relay.rs:authorize:USAGE#1", Kind::Undeclared("--relayed-via is refused unless an agent role is declared (--as or CANON_ROLE): the ambient role is the environment, not an argument of the call")),
+    site("relay.rs:check_role:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["relayed-via", "as"] }),
     site("relay.rs:check_via:USAGE#1", Kind::Domain { command: "brief approve", argument: "relayed-via" }),
-    site("relay.rs:check_actor:USAGE#1", Kind::Domain { command: "brief approve", argument: "actor" }),
+    site("relay.rs:check_actor:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["relayed-via", "actor"] }),
     site("relay.rs:check_actor:USAGE#2", Kind::Domain { command: "brief approve", argument: "actor" }),
-    site("relay.rs:check_answer:USAGE#1", Kind::Validator { command: "policy approve", arguments: &["relayed-via", "note"] }),
+    site("relay.rs:check_answer:USAGE#1", Kind::Validator { command: "policy approve", arguments: &["relayed-via", "approver", "note"] }),
     // brief approve --digest
     site("brief_approve.rs:shown_digests:USAGE#1", Kind::Domain { command: "brief approve", argument: "digest" }),
     site("brief_approve.rs:shown_digests:USAGE#2", Kind::Validator { command: "brief approve", arguments: &["digest"] }),

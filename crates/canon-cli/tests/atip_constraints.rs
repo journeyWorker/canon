@@ -451,3 +451,135 @@ fn atip_constraints_12_the_guides_and_the_spec_read_the_constraints_of_the_docum
         }
     }
 }
+
+// ------------------------------------------------------------------------------------------ the follow-up round
+// (the ATIP author's answers: a relay is a relation, the environment is a stateless input, one code with reasons, the shape of `--input`)
+
+fn words(line: &str) -> Vec<String> {
+    let mut all = atip::split_argv(line);
+    assert_eq!(all.remove(0), "canon");
+    all
+}
+
+fn validator_of<'a>(doc: &'a Value, arguments: &[&str]) -> Option<&'a Value> {
+    doc["validators"].as_array().into_iter().flatten().find(|validator| validator["arguments"] == json!(arguments))
+}
+
+/// atip.constraints.14: `--approver` and `--note` are no domain (the code depends on `--relayed-via`): a validator per code, and the
+/// environment's role and actor are validators over `--relayed-via` with `env` declared on `--as` and `--actor`.
+#[test]
+fn atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_the_environment_is_declared() {
+    for command in ["brief approve", "policy approve", "divergence accept", "migrate"] {
+        let doc = leaf(command);
+        let role = validator_of(doc, &["relayed-via", "as"]).unwrap_or_else(|| panic!("`{command}`: no role validator: {:?}", doc["validators"]));
+        assert_eq!(role["code"], "USAGE");
+        let answer = validator_of(doc, &["relayed-via", "approver", "note"]).unwrap_or_else(|| panic!("`{command}`: no answer validator"));
+        assert_eq!(answer["code"], "USAGE");
+        assert_eq!(harness::option(doc, "as").expect("--as")["env"], "CANON_ROLE", "`{command}`");
+    }
+    for command in ["brief approve", "policy approve", "migrate"] {
+        let doc = leaf(command);
+        assert!(validator_of(doc, &["relayed-via", "actor"]).is_some_and(|validator| validator["code"] == "USAGE"), "`{command}`");
+        assert_eq!(harness::option(doc, "actor").expect("--actor")["env"], "CANON_ACTOR", "`{command}`");
+        // The environment is not "given" for a constraint: `--actor` still requires `--relayed-via` as a rule.
+        assert!(rules(doc, "requires").iter().any(|rule| rule["if"]["name"] == "actor" && rule["then"] == json!(["relayed-via"])), "`{command}`: {:?}", doc["constraints"]);
+    }
+    // The human's own answer has a code of its own, and no domain claims one code for both paths.
+    let brief = leaf("brief approve");
+    assert!(validator_of(brief, &["approver", "note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INCOMPLETE"));
+    assert!(validator_of(leaf("policy approve"), &["approver"]).is_some_and(|validator| validator["code"] == "POLICY_APPROVAL_REFUSED"));
+    for (command, argument) in [("brief approve", "approver"), ("brief approve", "note"), ("policy approve", "approver")] {
+        assert!(harness::option(leaf(command), argument).expect("the option").get("domain").is_none(), "`{command}` --{argument} has a domain");
+    }
+}
+
+/// atip.constraints.15: each of them refuses in an empty directory with no repository, with its code and the argument at fault;
+/// the environment fills the actor and the role; the human's blank answer is `APPROVAL_INCOMPLETE`.
+#[test]
+fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refused_before_any_state_is_read() {
+    let digest = "--digest add-login=sha256:0123456789abcdef";
+    let check = |line: &str, envs: &[(&str, &str)], code: &str, field: &str| {
+        let outcome = rule_support::run_empty_with(&words(line), envs);
+        assert!(!outcome.ok && outcome.exit == 2, "{line}: {outcome:?}");
+        assert_eq!(outcome.code.as_deref(), Some(code), "{line}: {outcome:?}");
+        assert_eq!(outcome.field.as_deref(), Some(field), "{line}: {outcome:?}");
+        assert!(outcome.changed.is_empty(), "{line}: wrote {:?}", outcome.changed);
+    };
+    for command in ["canon brief approve add-login", "canon policy approve"] {
+        let extra = if command.contains("brief") { digest } else { "" };
+        let base = format!("{command} --approver alice --note ok --relayed-via ask {extra}");
+        check(&format!("{base} --actor impl"), &[], "USAGE", "--relayed-via");
+        check(&base, &[("CANON_ROLE", "implementer")], "USAGE", "--actor");
+        check(&format!("{base} --as implementer --actor impl --approver \" \""), &[], "USAGE", "--approver");
+        check(&format!("{base} --as implementer --actor impl --note \" \""), &[], "USAGE", "--note");
+        // The environment is a stateless input: CANON_ACTOR and CANON_ROLE fill them, and the call goes on to the repository (`CONFIG_MISSING`).
+        let outcome = rule_support::run_empty_with(&words(&base), &[("CANON_ROLE", "implementer"), ("CANON_ACTOR", "impl")]);
+        assert_eq!(outcome.code.as_deref(), Some("CONFIG_MISSING"), "{command}: {outcome:?}");
+    }
+    check("canon brief approve add-login --approver \" \" --note ok", &[], "APPROVAL_INCOMPLETE", "--approver");
+    check("canon brief approve add-login --approver alice --note \" \"", &[], "APPROVAL_INCOMPLETE", "--note");
+    check("canon policy approve --approver \" \"", &[], "POLICY_APPROVAL_REFUSED", "--approver");
+    check("canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok", &[], "USAGE", "--relayed-via");
+    check("canon divergence accept auth.login.01 --actor alice --reason why --tracking t --relayed-via ask --approver alice --note ok", &[], "USAGE", "--relayed-via");
+}
+
+/// atip.constraints.16: the shape of `--input` is a validator: a batch on a command that takes one object, and `--input -` beside another
+/// stdin reader. Each is refused in an empty directory.
+#[test]
+fn atip_constraints_16_the_shape_of_input_is_a_validator_and_is_refused_before_any_state_is_read() {
+    for (command, line) in [
+        ("artifacts move", "canon artifacts move --tier cold --input '[{},{}]'"),
+        ("dashboard", "canon dashboard --input '[{},{}]'"),
+        ("ledger compact", "canon ledger compact --input '[{},{}]'"),
+        ("migrate", "canon migrate --input '[{},{}]'"),
+        ("purge", "canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'"),
+        ("tier age", "canon tier age --input '[{},{}]'"),
+    ] {
+        let validator = validator_of(leaf(command), &["input"]).unwrap_or_else(|| panic!("`{command}`: no `input` validator"));
+        assert_eq!(validator["code"], "INPUT_INVALID");
+        assert!(validator["rejects"].as_array().is_some_and(|calls| calls.contains(&json!(line))), "{validator}");
+        let outcome = rule_support::run_empty(&words(line), None);
+        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.reason.as_deref(), outcome.field.as_deref()), (2, Some("INPUT_INVALID"), Some("BATCH_UNSUPPORTED"), Some("--input")), "{command}: {outcome:?}");
+        assert!(outcome.changed.is_empty());
+        // One object is the way in: the same call with one object is not refused for its shape.
+        let one = line.replace("'[{},{}]'", "'{}'");
+        assert_ne!(rule_support::run_empty(&words(&one), None).reason.as_deref(), Some("BATCH_UNSUPPORTED"), "{one}");
+    }
+    for (command, line) in [
+        ("evidence add", "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --report junit:- --input -"),
+        ("evidence add", "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact - --input -"),
+    ] {
+        assert!(validator_of(leaf(command), &["input", "report", "artifact"]).is_some_and(|validator| validator["rejects"].as_array().is_some_and(|calls| calls.contains(&json!(line)))));
+        let outcome = rule_support::run_empty(&words(line), None);
+        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.field.as_deref()), (2, Some("USAGE"), Some("--input")), "{outcome:?}");
+        assert!(outcome.message.is_some_and(|message| message.contains("both read stdin")));
+    }
+}
+
+/// atip.constraints.17: `EVIDENCE_APPROVAL_INVALID` is one code with two reasons, both exit 2: `MALFORMED` from the arguments alone (before
+/// any state is read), `SIGNATURE_MISMATCH` from what reading the signature decides.
+#[test]
+fn atip_constraints_17_one_approval_code_has_a_reason_for_the_arguments_and_one_for_the_signature() {
+    let registry = run(&["schema", "--error", "EVIDENCE_APPROVAL_INVALID"]);
+    assert_eq!(registry.exit, 0, "{}", registry.body);
+    let reasons: Vec<&str> = registry.body["data"]["error"]["reasons"].as_array().into_iter().flatten().filter_map(|row| row["reason"].as_str()).collect();
+    assert_eq!(reasons, ["MALFORMED", "SIGNATURE_MISMATCH"], "{}", registry.body);
+    assert_eq!(registry.body["data"]["error"]["exit"], 2);
+    // The arguments alone, in an empty directory: each member of the four missing, and a blank approver.
+    let add = "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer";
+    for (extra, field) in [
+        ("--approver alice", "--approval-role"),
+        ("--approver alice --approval-role human", "--signature-file"),
+        ("--approver alice --approval-role human --signature-file nope.sig", "--approval-at"),
+        ("--approval-role human --signature-file nope.sig --approval-at 2030-01-01T00:00:00Z", "--approver"),
+        ("--approver \" \" --approval-role human --signature-file nope.sig --approval-at 2030-01-01T00:00:00Z", "--approver"),
+    ] {
+        let outcome = rule_support::run_empty(&words(&format!("{add} {extra}")), None);
+        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.reason.as_deref(), outcome.field.as_deref()), (2, Some("EVIDENCE_APPROVAL_INVALID"), Some("MALFORMED"), Some(field)), "{extra}: {outcome:?}");
+        assert!(outcome.changed.is_empty());
+    }
+    // A well-formed set whose signature file is not there: the precondition, in the repository.
+    let signed = run(&["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--approver", "alice", "--approval-role", "human", "--signature-file", "nope.sig", "--approval-at", "2030-01-01T00:00:00Z"]);
+    refused(&signed, "EVIDENCE_APPROVAL_INVALID", "--signature-file");
+    assert_eq!(signed.body["error"]["reason"], "SIGNATURE_MISMATCH", "{}", signed.body);
+}

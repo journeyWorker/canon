@@ -321,8 +321,8 @@ pub fn drive_validator(doc: &Value, validator: &Value) -> Vec<String> {
             problems.push(format!("{tag}: {problem}"));
         }
         words.retain(|word| word != "--json");
-        let role = declared_role(path, &rule_support::parse_call(doc, &words).map(|parsed| parsed.text).unwrap_or_default());
-        let outcome = rule_support::run_empty(&words, role);
+        // The call carries what it needs (`--as`, `--role`): the environment of a validator is empty.
+        let outcome = rule_support::run_empty(&words, None);
         let names: Vec<String> = arguments.iter().flat_map(|name| [format!("--{name}"), name.clone()]).collect();
         let operand_fields: Vec<String> = arguments.iter().filter_map(|name| argument_value_name(doc, name)).flat_map(|value_name| [value_name.clone(), format!("<{value_name}>")]).collect();
         if outcome.ok || outcome.exit != 2 || outcome.code.as_deref() != Some(code) {

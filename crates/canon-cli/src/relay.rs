@@ -127,17 +127,34 @@ fn check_actor(actor: &str) -> Result<(), crate::cli_error::CliError> {
     Ok(())
 }
 
-/// The arguments of a relayed approval that need no state: the tool is one word, an `--actor` given
-/// is one word, and the human's name and answer are not blank. Stateless: `canon brief approve` and
-/// `canon policy approve` are refused with it before any state is read (`validators::check`), and
-/// [`authorize`] holds every relayed act to the same checks, in the same order.
-pub(crate) fn check_arguments(call: &Call<'_>) -> Result<(), crate::cli_error::CliError> {
+/// The arguments of a relayed approval that need no state, in the order [`authorize`] holds them: an agent role is declared
+/// (`--as` or `CANON_ROLE`), the tool is one word, the actor (`--actor`, else `CANON_ACTOR`) is named and one word, and the
+/// human's name and answer are not blank. The environment is a stateless input (spec 11.7), so these are validators:
+/// `canon brief approve`, `canon policy approve`, `canon divergence accept` and `canon migrate` are refused with them before
+/// any state is read (`validators::check`), and [`authorize`] holds every relayed act to the same checks.
+pub(crate) fn check_arguments(command: &str, call: &Call<'_>) -> Result<(), crate::cli_error::CliError> {
     let Some(tool) = call.via else { return Ok(()) };
+    check_role(command)?;
     check_via(tool)?;
-    if let Some(actor) = call.actor {
-        check_actor(actor.trim())?;
-    }
+    check_actor_of(call)?;
     check_answer(call)
+}
+
+/// A relayed approval is an agent's: a role is declared for it.
+fn check_role(command: &str) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::{CliError, CliErrorExt as _};
+    if crate::role::Role::current(None).is_none() {
+        return Err(CliError::refused("USAGE", format!("{FLAG} records a human's answer on behalf of an agent, and no agent role is declared for `{command}`"))
+            .field(FLAG)
+            .hint("declare the role you act as (`--as <role>` or CANON_ROLE) to relay a human's answer; in the human's own shell, run the call without the relay option"));
+    }
+    Ok(())
+}
+
+/// The actor that records the relayed approval: `--actor`, else the environment's.
+fn check_actor_of(call: &Call<'_>) -> Result<(), crate::cli_error::CliError> {
+    let actor = call.actor.map(str::to_string).or_else(|| std::env::var(ACTOR_ENV).ok()).unwrap_or_default();
+    check_actor(actor.trim())
 }
 
 /// A relayed approval carries the human's own name and answer: with `--relayed-via`, neither
@@ -167,11 +184,7 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
     let role = Role::current(None);
     let (role, tool) = match (role, call.via) {
         (None, None) => return Ok(None),
-        (None, Some(_)) => {
-            return Err(CliError::refused("USAGE", format!("{FLAG} records a human's answer on behalf of an agent, and no agent role is declared for `{command}`"))
-                .field(FLAG)
-                .hint("declare the role you act as (`--as <role>` or CANON_ROLE) to relay a human's answer; in the human's own shell, run the call without the relay option"));
-        }
+        (None, Some(_)) => return check_role(command).map(|()| None),
         (Some(role), None) => {
             return Err(CliError::refused("HUMAN_ONLY", format!("`{command}` records a human's decision and is not available to the {role} role without the relay option"))
                 .field("--as")
@@ -193,11 +206,10 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
             return Err(CliError::refused("CONFIG_UNREADABLE", e).hint("fix the `approval:` section of canon.yaml (`canon init --check` names the problem), then run the call again"));
         }
     }
-    let env_actor = std::env::var(ACTOR_ENV).ok();
-    let actor = call.actor.map(str::to_string).or(env_actor).unwrap_or_default();
-    let actor = actor.trim();
-    check_actor(actor)?;
+    check_actor_of(&call)?;
     check_answer(&call)?;
+    let actor = call.actor.map(str::to_string).or_else(|| std::env::var(ACTOR_ENV).ok()).unwrap_or_default();
+    let actor = actor.trim();
     Ok(Some(ApprovalRelay { role: role.as_str().to_string(), actor: actor.to_string(), tool: tool.to_string(), approver: None, answer: None }))
 }
 

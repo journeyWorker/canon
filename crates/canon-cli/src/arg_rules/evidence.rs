@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, CALENDAR, NOT_BLANK, ONE_LINE, ONE_LINE_NOT_BLANK, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE};
+use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, STDIN_DESCRIPTION, CALENDAR, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, ONE_LINE_NOT_BLANK, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE};
 
 /// A text that neither starts nor ends with white space, is not empty, and carries no `\n` and no `\r`: the approver of
 /// `evidence add` (the handler refuses only those two line breaks, unlike the shared `TRIMMED_ONE_LINE`).
@@ -88,13 +88,51 @@ pub(super) static TABLES: Tables = Tables {
             }],
         ),
         (
-            "divergence accept",
+            "evidence add",
             &[Validator {
-                arguments: &["expiry"],
+                arguments: &["input", "report", "artifact"],
                 code: "USAGE",
-                description: CALENDAR,
-                rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2026-02-30 --role reviewer"],
+                description: STDIN_DESCRIPTION,
+                rejects: &[
+                    "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --report junit:- --input -",
+                    "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact - --input -",
+                ],
             }],
+        ),
+        (
+            "evidence audit",
+            &[Validator {
+                arguments: &["input", "artifact"],
+                code: "USAGE",
+                description: STDIN_DESCRIPTION,
+                rejects: &["canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact - --input -"],
+            }],
+        ),
+        (
+            "divergence accept",
+            &[
+                Validator {
+                    arguments: &["expiry"],
+                    code: "USAGE",
+                    description: CALENDAR,
+                    rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2026-02-30 --role reviewer"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --approver alice --note ok"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "approver", "note"],
+                    code: "USAGE",
+                    description: ANSWER_RELAYED,
+                    rejects: &[
+                        "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver \" \" --note ok",
+                        "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver alice --note \" \"",
+                    ],
+                },
+            ],
         ),
         (
             "divergence list",

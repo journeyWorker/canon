@@ -130,3 +130,43 @@ Feature: atip constraints: the relations, domains and validators of the command 
     Given a constraint declared with no check behind it, a rule with a code the binary does not give and a domain the parser does not hold
     When the rule and the domain sweeps run on each
     Then each is found: the call that should break the rule is not refused for it, and the value outside the domain is accepted
+
+  # canon: {"schema":1,"at":"2026-11-01T14:23:07Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.14
+  Scenario: A relayed approval is a relation: its role, its actor and its answer are validators over --relayed-via, the environment is declared on --as and --actor, and the human's blank answer has its own code
+    Given a built canon
+    When canon schema brief approve, policy approve, divergence accept and migrate run
+    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INCOMPLETE or POLICY_APPROVAL_REFUSED
+
+  # canon: {"schema":1,"at":"2026-11-01T14:23:12Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.15
+  Scenario: A relayed approval without a role, an actor or an answer, and a blank human answer, are refused in an empty directory with their codes, and CANON_ACTOR and CANON_ROLE fill the first two
+    Given an empty directory with an empty HOME and no CANON_ROLE or CANON_ACTOR
+    When brief approve and policy approve run relayed without a role, with a role and no actor, and with a blank approver or note, and unrelayed with a blank answer; then with CANON_ROLE and CANON_ACTOR set
+    Then each refusal is exit 2 with its code (USAGE naming --relayed-via, --actor, --approver or --note, APPROVAL_INCOMPLETE, POLICY_APPROVAL_REFUSED) and writes nothing; with the two variables set the call goes on to the repository and answers CONFIG_MISSING
+
+  # canon: {"schema":1,"at":"2026-11-01T14:23:16Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F4
+  @atip.constraints.16
+  Scenario: A batch on a command that takes one object, and --input - beside another stdin reader, are validators over input and are refused in an empty directory
+    Given an empty directory with an empty HOME
+    When purge, ledger compact, tier age, artifacts move, dashboard and migrate run with --input a two-object array, and evidence add runs with --input - and --report junit:- or --artifact -
+    Then each array is exit 2, INPUT_INVALID, reason BATCH_UNSUPPORTED, field --input, and the same call with one object is not; the stdin pair is USAGE naming --input; nothing is written
+
+  # canon: {"schema":1,"at":"2026-11-01T14:23:19Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.17
+  Scenario: EVIDENCE_APPROVAL_INVALID is one code with the reasons MALFORMED, from the arguments alone, and SIGNATURE_MISMATCH, from the signature
+    Given a built canon and the story repo
+    When canon schema --error EVIDENCE_APPROVAL_INVALID runs, evidence add runs with one to three of the four approval options or a blank approver in an empty directory, and with all four and a signature file that does not exist in the repo
+    Then the registry lists the reasons MALFORMED and SIGNATURE_MISMATCH under the code, exit 2; the incomplete sets are MALFORMED naming the missing option; the missing file is SIGNATURE_MISMATCH naming --signature-file

@@ -412,7 +412,9 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
 /// once; a relayed approval names, for every change it approves, the digest the human was shown,
 /// and no digest of another change.
 pub(crate) fn check_approve(args: &crate::cli::brief::BriefApproveArgs) -> Result<(), CliError> {
-    crate::relay::check_arguments(&crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: Some(&args.note) })?;
+    crate::relay::check_arguments("canon brief approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: Some(&args.note) })?;
+    // The human's answer: one line each, not blank (a relayed blank answer was refused above, with its own code).
+    answer(&args.approver, &args.note)?;
     let shown = shown_digests(&args.digests)?;
     if args.relayed_via.is_some() {
         // Every id names the digest its brief showed, and nothing else.

@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, KEBAB, NOT_BLANK, TASK_ID};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, KEBAB, ROLE_DESCRIPTION, TASK_ID};
 
 /// A scenario tag as `scenario new` reads it: `<area>.<surface>.<nn>` with at most one leading `@` (the form a scenario
 /// body writes it in).
@@ -16,8 +16,6 @@ const NAME_AT_VERSION: &str = "^[^@]+@[^@]+$";
 const PACK_ID: &str = "^sha256:[0-9a-f]{64}$";
 /// A line of text that is not blank and holds no CR or LF (`subject move --reason`).
 const REASON: &str = concat!("^[^\\n\\r]*[^", white_space!(), "][^\\n\\r]*$");
-/// The human's answer (`--approver`, `--note` of an approval): once trimmed, not empty and one line.
-const ANSWER: &str = concat!("^[", white_space!(), "]*[^", white_space!(), "]([^\\n\\r]*[^", white_space!(), "])?[", white_space!(), "]*$");
 /// The tool a relayed approval names (`--relayed-via`): one token, no white space, parenthesis or quote.
 const RELAY_TOKEN: &str = concat!("^[^", white_space!(), "()\"']+$");
 /// The relaying agent's actor id (`--actor` with `--relayed-via`): once trimmed, one such token.
@@ -37,30 +35,80 @@ pub(super) static TABLES: Tables = Tables {
             "brief approve",
             &[
                 Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:0123456789abcdef"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "actor"],
+                    code: "USAGE",
+                    description: ACTOR_DESCRIPTION,
+                    rejects: &["canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --digest add-login=sha256:0123456789abcdef"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "approver", "note"],
+                    code: "USAGE",
+                    description: ANSWER_RELAYED,
+                    rejects: &[
+                        "canon brief approve add-login --approver \" \" --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef",
+                        "canon brief approve add-login --approver alice --note \" \" --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef",
+                    ],
+                },
+                Validator {
+                    arguments: &["approver", "note"],
+                    code: "APPROVAL_INCOMPLETE",
+                    description: "The human's own answer (`--approver` and `--note`) is one line and, written by the human without `--relayed-via`, not blank once trimmed (a blank answer under `--relayed-via` is the relayed validator's, `USAGE`).",
+                    rejects: &["canon brief approve add-login --approver \" \" --note ok", "canon brief approve add-login --approver alice --note \" \""],
+                },
+                Validator {
                     arguments: &["relayed-via", "digest", "change"],
                     code: "USAGE",
                     description: "A relayed approval names, for every change it approves, the digest the human was shown (`--digest <change>=sha256:<digest>`, once per change) and no digest of a change it does not approve. With no change operand the repo's only live change is read, and its digest is checked then.",
                     rejects: &[
-                        "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --json",
-                        "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:0123456789abcdef --digest other=sha256:0123456789abcdef --json",
+                        "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor impl",
+                        "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef --digest other=sha256:0123456789abcdef",
                     ],
                 },
                 Validator {
                     arguments: &["digest"],
                     code: "USAGE",
                     description: "`--digest` names a change once: two entries for the same change must carry the same digest.",
-                    rejects: &["canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:aa --digest add-login=sha256:bb --json"],
+                    rejects: &["canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:aa --digest add-login=sha256:bb"],
                 },
             ],
         ),
         (
             "policy approve",
-            &[Validator {
-                arguments: &["relayed-via", "note"],
-                code: "USAGE",
-                description: "A relayed approval carries the human's answer word for word: with `--relayed-via`, `--note` is not blank.",
-                rejects: &["canon policy approve --approver alice --relayed-via ask --actor impl --note \" \" --json"],
-            }],
+            &[
+                Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon policy approve --approver alice --note ok --relayed-via ask --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "actor"],
+                    code: "USAGE",
+                    description: ACTOR_DESCRIPTION,
+                    rejects: &["canon policy approve --approver alice --note ok --relayed-via ask --as implementer"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "approver", "note"],
+                    code: "USAGE",
+                    description: ANSWER_RELAYED,
+                    rejects: &[
+                        "canon policy approve --approver alice --relayed-via ask --as implementer --actor impl --note \" \"",
+                        "canon policy approve --approver \" \" --note ok --relayed-via ask --as implementer --actor impl",
+                    ],
+                },
+                Validator {
+                    arguments: &["approver"],
+                    code: "POLICY_APPROVAL_REFUSED",
+                    description: "The human's name (`--approver`) is not blank once trimmed (a blank name under `--relayed-via` is the relayed validator's, `USAGE`).",
+                    rejects: &["canon policy approve --approver \" \""],
+                },
+            ],
         ),
         (
             "strategy approval-payload",
@@ -94,10 +142,6 @@ pub(super) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["scenario new"], "lane"), Domain::matching(KEBAB), "USAGE").inside(&["a", "a-1"]).outside(&["A", "a_b", "-a", "a-", "a--b", ""]),
         DomainRow::new(Scope::Arguments(&["scenario new"], "case"), Domain::matching(KEBAB), "USAGE").inside(&["a", "a-1"]).outside(&["A", "a_b", "-a", "a-", "a--b", ""]),
         DomainRow::new(Scope::Arguments(&["feature new"], "surface"), Domain::matching(SURFACE), "USAGE").inside(&["auth.login", "a-.-b", "1.2"]).outside(&["auth", "auth.login.01", "Auth.login", ".login", "auth.", "a_b.c", ""]),
-        // The answer of an approval: the human's own words, one line once trimmed.
-        DomainRow::new(Scope::Arguments(&["brief approve"], "approver"), Domain::matching(ANSWER), "APPROVAL_INCOMPLETE").inside(&["Ana", " Ana ", "Ana\n", "a\u{85}b"]).outside(&["", " ", "\t", "\n", "a\nb", "a\rb", " a\nb "]),
-        DomainRow::new(Scope::Arguments(&["brief approve"], "note"), Domain::matching(ANSWER), "APPROVAL_INCOMPLETE").inside(&["Go.", " go ", "go\n", "a\u{85}b"]).outside(&["", " ", "\t", "\n", "a\nb", "a\rb", " a\nb "]),
-        DomainRow::new(Scope::Arguments(&["policy approve"], "approver"), Domain::matching(NOT_BLANK), "POLICY_APPROVAL_REFUSED").inside(&["Ana", " a ", "a\nb"]).outside(&["", " ", "\t", "\n", "\u{85}"]),
         // The tool and the actor of a relayed approval.
         DomainRow::new(Scope::Arguments(&["brief approve", "policy approve"], "relayed-via"), Domain::matching(RELAY_TOKEN), "USAGE").inside(&["ask", "AskUserQuestion", "chat"]).outside(&["", " ", "a b", "a(b", "a)b", "a\"b", "a'b", "a\tb", "a\nb"]),
         DomainRow::new(Scope::Arguments(&["brief approve", "policy approve"], "actor"), Domain::matching(RELAY_ACTOR), "USAGE").inside(&["impl", " impl ", "impl\n"]).outside(&["", " ", "\t", "a b", "a(b", "a)b", "a\"b", "a'b", " a b "]),
