@@ -36,6 +36,8 @@ These codes are in both registries, with the same meaning, because the same situ
 | a fault in the document (pointer `field`) had no reason | `UNKNOWN_KEY` (a key that is no option of the command), `FLAG_ONLY_KEY` (a key that names a flag-only option), `INVALID_VALUE` (a value of the wrong type, outside its closed set, or `null`) |
 | `INPUT_TOO_LARGE` had none | `TOO_MANY_BYTES` (the source is over 8 MiB), `TOO_MANY_ITEMS` (a batch is over 10000 items) |
 
+**Refusals write nothing.** A refusal changes nothing (spec 8.2), `.git` included: the code tree that `gate check`, `evidence add` and the commands that bind a commit compute is built in a scratch object directory, so none of them leaves a blob or a tree in `.git/objects` any more. `canon trace` refuses before it writes `.canon/index`.
+
 **Wrong calls.**
 
 | Call | 0.33 | 0.34 |
