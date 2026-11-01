@@ -1,0 +1,167 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "build",
+    "path": [
+      "build"
+    ],
+    "summary": "Build the project, streaming one event per step",
+    "effect": "write",
+    "idempotency": "replay-safe",
+    "operands": [],
+    "options": [
+      {
+        "name": "quiet",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Print no step events, only the result"
+      },
+      {
+        "name": "verbose",
+        "valueType": "count",
+        "short": "v",
+        "required": false,
+        "repeatable": true,
+        "default": 3,
+        "domain": {
+          "maximum": 2
+        },
+        "help": "Print more detail per step: -v adds timings, -vv adds commands (at most twice)"
+      },
+      {
+        "name": "input",
+        "valueName": "JSON|FILE|-",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "flagOnly": true,
+        "help": "The arguments as one JSON document"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "BUILD_FAILED",
+      "INPUT_CONFLICT",
+      "INPUT_INVALID",
+      "INPUT_TOO_LARGE",
+      "INTERNAL",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "stream",
+        "mediaType": "application/x-ndjson",
+        "schemaRef": "#/schemas/BuildResult",
+        "eventRef": "#/schemas/BuildEvent",
+        "schemaVersion": "1.0"
+      },
+      {
+        "kind": "stream",
+        "mediaType": "application/x-ndjson",
+        "schemaRef": "#/schemas/BuildQuietResult",
+        "eventRef": "#/schemas/NoEvent",
+        "schemaVersion": "1.0",
+        "when": "--quiet"
+      }
+    ],
+    "input": {
+      "option": "--input",
+      "schemaRef": "#/schemas/BuildInput",
+      "batch": false,
+      "maxBytes": 4096,
+      "example": {
+        "quiet": true
+      }
+    },
+    "examples": [
+      "acme build --json",
+      "acme build -v -v --json",
+      "acme build --quiet --json"
+    ],
+    "schemas": {
+      "BuildResult": {
+        "type": "object",
+        "required": [
+          "artifacts"
+        ],
+        "properties": {
+          "artifacts": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "BuildQuietResult": {
+        "type": "object",
+        "required": [
+          "artifacts",
+          "quiet"
+        ],
+        "properties": {
+          "artifacts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "quiet": {
+            "const": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BuildEvent": {
+        "type": "object",
+        "required": [
+          "step",
+          "status"
+        ],
+        "properties": {
+          "step": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "started",
+              "done"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "NoEvent": false,
+      "BuildInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "quiet": {
+            "type": "boolean"
+          },
+          "verbose": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

@@ -1,0 +1,358 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "purge",
+    "path": [
+      "purge"
+    ],
+    "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
+    "effect": "destructive",
+    "idempotency": "replay-safe",
+    "effectNote": "a committed run appends one line to .canon/audit/access.jsonl when it deleted something; a preview writes nothing",
+    "operands": [],
+    "options": [
+      {
+        "name": "kind",
+        "valueName": "KIND",
+        "valueType": "enum",
+        "possibleValues": [
+          "session",
+          "run",
+          "event",
+          "trajectory"
+        ],
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "help": "The record kind to purge (session, run, event or trajectory)"
+      },
+      {
+        "name": "before",
+        "valueName": "TIMESTAMP",
+        "valueType": "string",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "help": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+        "domain": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9:.+Z\\-]+)?$"
+        }
+      },
+      {
+        "name": "commit",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Act on the previewed plan; needs --plan-digest"
+      },
+      {
+        "name": "plan-digest",
+        "valueName": "DIGEST",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "flagOnly": true,
+        "help": "The planDigest the preview printed"
+      },
+      {
+        "name": "repo",
+        "valueName": "DIR",
+        "valueType": "path",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "defaultNote": "the nearest ancestor directory holding a canon.yaml",
+        "flagOnly": true,
+        "help": "The repo to act on"
+      },
+      {
+        "name": "as",
+        "valueName": "ROLE",
+        "valueType": "enum",
+        "possibleValues": [
+          "planner",
+          "implementer",
+          "reviewer",
+          "orchestrator"
+        ],
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "env": "CANON_ROLE",
+        "flagOnly": true,
+        "help": "The role you act as; overrides CANON_ROLE"
+      },
+      {
+        "name": "input",
+        "valueName": "JSON|FILE|-",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "flagOnly": true,
+        "help": "The arguments as one JSON object (inline, a file, or - for stdin)"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "validators": [
+      {
+        "arguments": [
+          "before"
+        ],
+        "code": "RETENTION_PURGE_FAILED",
+        "description": "--before is an RFC 3339 timestamp, or a date YYYY-MM-DD meaning UTC midnight, that exists in the calendar: the pattern of its domain admits 2026-02-30, this check refuses it.",
+        "rejects": [
+          "canon purge --kind session --before 2026-02-30 --json"
+        ]
+      }
+    ],
+    "constraints": [
+      {
+        "rule": "requires",
+        "if": {
+          "name": "commit"
+        },
+        "then": [
+          "plan-digest"
+        ]
+      },
+      {
+        "rule": "requires",
+        "if": {
+          "name": "plan-digest"
+        },
+        "then": [
+          "commit"
+        ]
+      }
+    ],
+    "errors": [
+      "CONFIG_MISSING",
+      "INPUT_CONFLICT",
+      "INPUT_INVALID",
+      "INPUT_TOO_LARGE",
+      "INTERNAL",
+      "OLD_LAYOUT",
+      "PLAN_STALE",
+      "RETENTION_PURGE_FAILED",
+      "UNKNOWN_ROLE",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/PurgeReport",
+        "schemaVersion": "1.0"
+      }
+    ],
+    "input": {
+      "option": "--input",
+      "schemaRef": "#/schemas/PurgeInput",
+      "batch": false,
+      "maxBytes": 8388608,
+      "example": {
+        "kind": "session",
+        "before": "2020-01-01T00:00:00Z"
+      }
+    },
+    "examples": [
+      "canon purge --kind session --before 2020-01-01T00:00:00Z --json"
+    ],
+    "schemas": {
+      "PurgeReport": {
+        "description": "`canon purge`'s `data`: the plan (`planDigest`, `effects[]`, `committed`)\nand what each rung matched and deleted.",
+        "properties": {
+          "before": {
+            "type": "string"
+          },
+          "committed": {
+            "description": "`true` once the run acted, `false` for a preview.",
+            "type": "boolean"
+          },
+          "effects": {
+            "description": "Everything the run would do, in the order it does it.",
+            "items": {
+              "$ref": "#/schemas/Effect"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "learnStore": {
+            "anyOf": [
+              {
+                "$ref": "#/schemas/PurgeLearnStore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "planDigest": {
+            "description": "The plan digest to pass to --plan-digest. canon's own description (a hex digest of the effects) is superseded by spec 12.6: `sha256:` and the digest of the plan's effects and every input that determines them (proposed).",
+            "type": "string"
+          },
+          "rungs": {
+            "items": {
+              "$ref": "#/schemas/PurgeRung"
+            },
+            "type": "array"
+          },
+          "sourceScope": {
+            "type": "string"
+          },
+          "unavailable": {
+            "description": "Rungs the plan could not reach.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "before",
+          "sourceScope",
+          "rungs",
+          "unavailable",
+          "planDigest",
+          "effects",
+          "committed"
+        ],
+        "title": "PurgeReport",
+        "type": "object"
+      },
+      "Effect": {
+        "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+        "properties": {
+          "action": {
+            "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+            "type": "string"
+          },
+          "detail": {
+            "description": "Where it goes, or why, when `action` alone does not say.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "description": "The file acted on, relative to the repo.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "record": {
+            "description": "The record acted on (an id, key or digest) when it is not a file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "PurgeLearnStore": {
+        "description": "The learn store's counts in a `trajectory` purge report.",
+        "properties": {
+          "backend": {
+            "type": "string"
+          },
+          "deleted": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "matched": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backend",
+          "matched",
+          "deleted"
+        ],
+        "type": "object"
+      },
+      "PurgeRung": {
+        "description": "One rung's counts in a purge report.",
+        "properties": {
+          "backend": {
+            "type": "string"
+          },
+          "deleted": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "matched": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rung": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "rung",
+          "backend",
+          "matched",
+          "deleted"
+        ],
+        "type": "object"
+      },
+      "PurgeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "session",
+              "run",
+              "event",
+              "trajectory"
+            ]
+          },
+          "before": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "x-canon": {
+      "roles": [
+        "orchestrator"
+      ]
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

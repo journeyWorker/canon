@@ -1,0 +1,177 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "filter test",
+    "path": [
+      "filter",
+      "test"
+    ],
+    "summary": "Count the members a JSON filter matches (true matches everyone, false no one)",
+    "effect": "read",
+    "operands": [
+      {
+        "name": "filter",
+        "valueName": "FILTER_JSON",
+        "valueType": "json",
+        "required": true,
+        "variadic": false,
+        "default": null,
+        "help": "The filter: an object of field conditions, or true/false",
+        "domain": {
+          "oneOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    ],
+    "options": [
+      {
+        "name": "scope",
+        "valueName": "JSON",
+        "valueType": "json",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Restrict the count to members matching this JSON value; {\"$ref\": \"<member>\"} names one member",
+        "domain": {
+          "properties": {
+            "$ref": {
+              "type": "string"
+            }
+          },
+          "description": "A member reference may be given as {\"$ref\": \"<member>\"}."
+        }
+      },
+      {
+        "name": "input",
+        "valueName": "JSON|FILE|-",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "flagOnly": true,
+        "help": "The arguments as one JSON document (inline, a file, or - for stdin)"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "INPUT_CONFLICT",
+      "INPUT_INVALID",
+      "INPUT_TOO_LARGE",
+      "INTERNAL",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/FilterTestReport",
+        "schemaVersion": "1.0"
+      }
+    ],
+    "input": {
+      "option": "--input",
+      "schemaRef": "#/schemas/FilterTestInput",
+      "argumentsRef": "#/schemas/FilterTestArguments",
+      "batch": false,
+      "maxBytes": 65536,
+      "example": {
+        "operands": [
+          true
+        ]
+      }
+    },
+    "examples": [
+      "acme filter test '{\"tag\":\"core\"}' --json",
+      "acme filter test --input '{\"operands\":[false]}' --json",
+      "acme filter test true --scope '{\"a\":1,\"b\":2}' --input '{\"scope\":{\"b\":2,\"a\":1}}' --json"
+    ],
+    "schemas": {
+      "FilterTestReport": {
+        "type": "object",
+        "required": [
+          "matched"
+        ],
+        "properties": {
+          "matched": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "FilterTestInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operands": {
+            "type": "array",
+            "items": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "scope": {
+            "not": {
+              "type": "null"
+            }
+          }
+        }
+      },
+      "FilterTestArguments": {
+        "type": "object",
+        "required": [
+          "operands"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "operands": {
+            "type": "array",
+            "items": {
+              "type": [
+                "object",
+                "boolean"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "scope": {
+            "not": {
+              "type": "null"
+            },
+            "properties": {
+              "$ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}
