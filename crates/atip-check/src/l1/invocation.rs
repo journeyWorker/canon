@@ -1326,9 +1326,9 @@ mod tests {
             "options": [
                 {"name": "out", "valueType": "string", "short": "o", "required": false, "repeatable": false, "default": null},
                 {"name": "level", "valueType": "integer", "required": false, "repeatable": false, "default": 3,
-                 "domain": {"type": "integer", "minimum": 1, "maximum": 9}},
+                 "domain": {"minimum": 1, "maximum": 9}},
                 {"name": "verbose", "valueType": "count", "short": "v", "required": false, "repeatable": true, "default": 0,
-                 "domain": {"type": "integer", "maximum": 2}},
+                 "domain": {"maximum": 2}},
                 {"name": "dry-run", "valueType": "switch", "short": "d", "required": false, "repeatable": false, "default": false},
                 {"name": "tag", "valueType": "string", "required": false, "repeatable": true, "default": null},
                 {"name": "mode", "valueType": "enum", "possibleValues": ["a", "b"], "required": false, "repeatable": false, "default": null},

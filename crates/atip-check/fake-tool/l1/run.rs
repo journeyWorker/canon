@@ -194,6 +194,10 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
             .any(|word| word.contains(char::is_whitespace));
         return schema_path(tool, &model, &words, quoted, &cache);
     }
+    // The L0 tests' older seeding of a tree of one or two entries: the unchanged answer of the L0 fake.
+    if tool.config.get("schemaTree").is_some() {
+        return tool.schema(&[]);
+    }
     if tool.config.get("treeAnswer").and_then(Value::as_str) == Some("usage") {
         return tool.refuse(
             "USAGE",

@@ -214,6 +214,12 @@ impl Runner {
         for command in &fixture.prepare {
             let template = runner.template.clone();
             let Some((program, args)) = command.split_first() else { continue };
+            if resolves_to(program, &template, &runner.bin) {
+                return Err(RunError::Prepare(format!(
+                    "the prepare command `{}` runs the binary under test: the state the tool keeps is built by `setup`, through the tool's own argv",
+                    command.join(" ")
+                )));
+            }
             let mut call = Call::new(args.iter().cloned());
             call.program = Some(program.clone());
             let outcome = runner
@@ -655,6 +661,17 @@ fn exit_of(status: ExitStatus) -> Exit {
 }
 
 /// The last 200 characters of `bytes` as text, for a failure message.
+/// Whether `program` (a path, or a name looked up on `PATH`) is the same file as `bin`.
+fn resolves_to(program: &str, directory: &Path, bin: &Path) -> bool {
+    let Ok(bin) = bin.canonicalize() else { return false };
+    let candidates: Vec<PathBuf> = if program.contains('/') {
+        vec![directory.join(program)]
+    } else {
+        std::env::var_os("PATH").map(|path| std::env::split_paths(&path).map(|dir| dir.join(program)).collect()).unwrap_or_default()
+    };
+    candidates.iter().any(|candidate| candidate.canonicalize().is_ok_and(|resolved| resolved == bin))
+}
+
 fn tail(bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes);
     let text = text.trim();
@@ -872,14 +889,14 @@ mod tests {
     #[test]
     fn atip_checkl1_prepare_programs_run_before_setup_with_the_fixture_environment_and_are_not_a_change_a_refusal_made() {
         let mut prepared = fixture(&[&["-c", "cat prepared.txt >&2; echo \"$FIXTURE_VAR\" >&2; exit 2"]], Duration::from_secs(10));
-        prepared.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
+        prepared.prepare = vec![vec!["/usr/bin/env".to_string(), "sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
         let runner = Runner::new("/bin/sh".as_ref(), &prepared);
         let error = runner.expect_err("the setup command exits 2");
         let super::RunError::Setup(reason) = error else { panic!("a setup error") };
         assert!(reason.contains("prepared") && reason.contains("yes"), "the program ran first, with the fixture's variable: {reason}");
         // A refusal that changes nothing is not charged with the file the prepare command made.
         let mut quiet = fixture(&[], Duration::from_secs(10));
-        quiet.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
+        quiet.prepare = vec![vec!["/usr/bin/env".to_string(), "sh".to_string(), "-c".to_string(), "echo prepared > prepared.txt".to_string()]];
         let mut runner = Runner::new("/bin/sh".as_ref(), &quiet).expect("runner");
         let outcome = runner.run(&sh("test -f prepared.txt; exit 2")).expect("run");
         assert_eq!(outcome.exit, Exit::Code(2));
@@ -889,7 +906,7 @@ mod tests {
     #[test]
     fn atip_checkl1_a_failing_prepare_command_is_a_defect_of_the_fixture_named_by_its_command() {
         let mut failing = fixture(&[], Duration::from_secs(10));
-        failing.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "echo no git >&2; exit 4".to_string()]];
+        failing.prepare = vec![vec!["/usr/bin/env".to_string(), "sh".to_string(), "-c".to_string(), "echo no git >&2; exit 4".to_string()]];
         let error = Runner::new("/bin/sh".as_ref(), &failing).expect_err("prepare fails");
         let super::RunError::Prepare(reason) = error else { panic!("a prepare error") };
         assert!(reason.contains("exited 4") && reason.contains("no git"), "{reason}");
@@ -897,5 +914,16 @@ mod tests {
         missing.prepare = vec![vec!["/nonexistent/atip-prepare".to_string()]];
         let error = Runner::new("/bin/sh".as_ref(), &missing).expect_err("prepare cannot start");
         assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("cannot be started")));
+    }
+
+    #[test]
+    fn atip_checkl1_a_prepare_step_that_runs_the_binary_under_test_is_a_fixture_error() {
+        let mut fixture = fixture(&[], Duration::from_secs(10));
+        fixture.prepare = vec![vec!["/bin/sh".to_string(), "-c".to_string(), "true".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &fixture).expect_err("the prepare step is the binary");
+        assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("runs the binary under test")));
+        fixture.prepare = vec![vec!["sh".to_string(), "-c".to_string(), "true".to_string()]];
+        let error = Runner::new("/bin/sh".as_ref(), &fixture).expect_err("found on PATH");
+        assert!(matches!(error, super::RunError::Prepare(reason) if reason.contains("runs the binary under test")));
     }
 }

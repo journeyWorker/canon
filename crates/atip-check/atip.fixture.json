@@ -38,6 +38,7 @@
       "exit": 2,
       "reasons": [
         "NOT_JSON",
+        "PREPARE_FAILED",
         "SETUP_FAILED",
         "UNREADABLE",
         "WRONG_SHAPE"

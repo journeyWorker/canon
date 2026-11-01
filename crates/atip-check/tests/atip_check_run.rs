@@ -1023,7 +1023,7 @@ fn atip_check_73_whether_the_tool_pages_is_decided_by_asking_each_command_for_a_
         check_of(&withheld.envelope()["data"], "L0.page")["reason"]
             .as_str()
             .unwrap_or_default()
-            .contains("list an `ok` invocation that pages")
+            .contains("list an invocation that pages under `paged`")
     );
     // A tool that pages and shows no page in a fixture that lists none is unprovided as well, with `commands` or without.
     let mut no_commands = harness.fixture(&json!({"noNextNoPage": true}));

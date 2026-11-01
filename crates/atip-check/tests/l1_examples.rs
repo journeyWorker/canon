@@ -138,7 +138,7 @@ fn names_in(directory: &Path) -> Vec<PathBuf> {
 /// A document that mutates one name leaves the other documents that read it inconsistent, so the checks that read those are listed too
 /// (`schema-option-id-suffix`, `schema-domain-pattern-unrecorded`, `schema-unknown-value-type`: every example line then names the old option or value).
 const SCHEMA_DOCS: &[(&str, &[&str])] = &[
-    ("invalid/schema-artifact-without-schemaref.json", &["L1.walk/rule-2-compile", "L1.walk/valid"]),
+    ("invalid/schema-artifact-without-schemaref.json", &["L1.walk/valid"]),
     ("invalid/schema-batch-without-batch-output.json", &["L1.walk/rule-5", "L1.walk/valid"]),
     ("invalid/schema-command-missing-reserved-code.json", &["L1.reserved-applicable/cursor-code"]),
     ("invalid/schema-constraint-code-not-in-errors.json", &["L1.walk/rule-4-codes"]),
@@ -286,6 +286,7 @@ const REPORTS: &[(&str, &[&str])] = &[
     ("invalid/report-next-placeholder.json", &["L1.output-data/data-validates"]),
     ("invalid/report-next-without-json.json", &["L1.output-data/data-validates"]),
     ("invalid/report-output-missing.json", &["L1.output-data/data-validates"]),
+    ("invalid/report-skills-show-markdown-key.json", &["L1.output-data/data-validates"]),
 ];
 
 #[test]
@@ -413,4 +414,25 @@ fn atip_checkl1_26_the_embedded_guide_schema_is_the_original_of_the_contract_tag
     use sha2::{Digest, Sha256};
     let digest: String = Sha256::digest(atip_check::schema::GUIDE_SCHEMA.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect();
     assert_eq!(digest, "43229f3cfbd518307b1e6071b9e12adad114c0da4f8fdba695c06d2e16c47d3f", "schema/guide.schema.json of v1.1.1 (16544ec22c022335eab4a0df17bf59e7508c67e8)");
+}
+
+/// Prints the rows of `REPORTS` as the checks find them now; run by hand when the checks change, and read the diff.
+#[test]
+#[ignore = "drafts the table by hand"]
+fn draft_the_report_table() {
+    let directory = dir("atip-examples");
+    for sub in ["", "invalid"] {
+        let mut files: Vec<PathBuf> = std::fs::read_dir(directory.join(sub))
+            .expect("dir")
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "json") && path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("report-")))
+            .collect();
+        files.sort();
+        for path in files {
+            if let Some(report) = load(&path) {
+                println!("REPORT {sub}/{} => {}", path.file_name().and_then(|n| n.to_str()).unwrap_or_default(), report_rejected_by(&report).join(" "));
+            }
+        }
+    }
 }

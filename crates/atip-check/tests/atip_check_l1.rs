@@ -422,6 +422,15 @@ fn atip_checkl1_23_prepare_programs_run_before_setup_and_their_effects_are_not_j
     let output = run_fixture(&harness, &config, &fixture, "L1");
     assert_eq!((output.code, output.envelope()["data"]["passed"].as_bool()), (Some(0), Some(true)), "{}", output.stdout);
     assert_eq!(check_of(&output.envelope()["data"], "L0.refusal-effects")["result"], "pass", "{}", output.stdout);
+    // The report lists every prepare step with its argv (contract 1.1.2).
+    assert_eq!(output.envelope()["data"]["prepare"], json!([["/bin/sh", "-c", "echo environment > prepared.txt"]]), "{}", output.stdout);
+    // A prepare step that runs the binary under test is a fixture error whatever it does: the tool's own state is `setup`'s.
+    fixture["prepare"] = json!([[l1_bin(&harness, &config).to_str().expect("utf8"), "init", "--json"]]);
+    let output = run_fixture(&harness, &config, &fixture, "L1");
+    let document = output.envelope();
+    assert_eq!((output.code, document["error"]["code"].as_str(), document["error"]["reason"].as_str()), (Some(2), Some("FIXTURE_INVALID"), Some("PREPARE_FAILED")), "{}", output.stdout);
+    assert!(document["error"]["message"].as_str().unwrap_or_default().contains("runs the binary under test"), "{}", output.stdout);
+    assert!(document["data"].is_null() || document.get("data").is_none(), "a fixture error reports no check: {}", output.stdout);
     fixture["prepare"] = json!([["/bin/sh", "-c", "echo no repository >&2; exit 3"]]);
     let output = run_fixture(&harness, &config, &fixture, "L1");
     let document = output.envelope();

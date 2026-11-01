@@ -591,7 +591,7 @@ pub(crate) fn run_checks(
         .collect();
     let conditions = judge.seen.into_inner();
     Ok(Judged {
-        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks),
+        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()),
         conditions,
     })
 }
@@ -1812,9 +1812,7 @@ impl<'a> Judge<'a> {
             }
         }
         self.emitted_conditions(&mut c);
-        let end = if !offered && self.fixture.registry_from_schema {
-            End::Unprovided("the fixture says `\"registry\": \"from-schema\"` and the tool does not offer schema --errors, so there is no registry to take".to_string())
-        } else if !offered {
+        let end = if !offered {
             End::Unsupported("the tool does not offer schema --errors".to_string())
         } else if self.fixture.registry_from_schema {
             End::Exercised(true)
