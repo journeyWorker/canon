@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-paging-fields",
+    "role": "reviewer",
+    "session_id": "s-0-34-paging-fields-rev"
+  },
+  "at": "2026-11-01T12:54:10.529858Z",
+  "code_tree": "85d3f2121351444d5a0ad8272b73f661db6e001d",
+  "kind": "review",
+  "pin": "637392a78a5c591c4e2cf7a6a2585367a735bcf0",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_paging_10_bracketed_paths_and_array_paths_project_as_the_contract_shows"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "90481488e79a6ad49c6b4e75fbaa76fed8a10baa5fd3cf633ac346d3bae32263",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-paging-fields/brief.md"
+  },
+  "review_id": "01M6BJSBV1GY6Q8M071BJ8KNKH",
+  "reviewer": "rev-paging-fields",
+  "scenario_id": "atip.paging.10",
+  "schema": 2,
+  "worktree_dirty": false
+}
