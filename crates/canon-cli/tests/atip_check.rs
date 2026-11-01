@@ -152,7 +152,7 @@ fn run_checker(bin: &Path) -> atip_check::report::Report {
 }
 
 #[test]
-fn atip_check_41_canon_passes_the_27_applicable_of_the_28_l0_checks_through_the_committed_fixture() {
+fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_committed_fixture() {
     let report = run_checker(Path::new(CANON));
     assert!(report.passed, "{}", report.text());
     assert_eq!(report.checks.len(), 28);
@@ -162,18 +162,19 @@ fn atip_check_41_canon_passes_the_27_applicable_of_the_28_l0_checks_through_the_
         assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
     }
     assert_eq!(report.find("L0.contract").map(|check| check.result), Some(atip_check::report::CheckResult::Unsupported));
-    let applicable = report.checks.iter().filter(|check| check.result != atip_check::report::CheckResult::Unsupported).count();
-    assert_eq!(applicable, 27, "{}", report.text());
+    // `L0.usage-hint` judges every `USAGE` without a `field`, and every `USAGE` canon prints names its field (7.1.3): none is observed, so it does not apply.
+    let not_applicable: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Unsupported).map(|check| check.id).collect();
+    assert_eq!(not_applicable, ["L0.contract", "L0.usage-hint"], "{}", report.text());
     let failing: Vec<&str> = report.checks.iter().filter(|check| !matches!(check.result, atip_check::report::CheckResult::Pass | atip_check::report::CheckResult::Unsupported)).map(|check| check.id).collect();
-    assert!(failing.is_empty(), "the 21 MUST and 6 SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
+    assert!(failing.is_empty(), "the 21 MUST and 5 SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
 }
 
 #[test]
 fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
-    // canon with one planted violation: every error that has a hint prints `"hint":null` instead (and keeps the text under `x-was-hint`), the way canon 0.32 printed a hint it had none for.
+    // canon with one planted violation: every error that has a hint also prints `"x-was-hint":null` before it, the way canon 0.32 printed a member it had no value for; the hint itself stays, so only L0.no-null owns the violation.
     let dir = tempfile::tempdir().expect("tempdir");
     let wrapper = dir.path().join("canon-with-null-hints");
-    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"/\"hint\":null,\"x-was-hint\":\"/'; fi\nexit $code\n");
+    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"/\"x-was-hint\":null,\"hint\":\"/'; fi\nexit $code\n");
     std::fs::write(&wrapper, script).expect("write");
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let report = run_checker(&wrapper);
@@ -183,6 +184,23 @@ fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
     assert!(check.reason.as_deref().unwrap_or_default().contains("hint"), "{:?}", check.reason);
     let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail).map(|check| check.id).collect();
     assert_eq!(failing, ["L0.no-null"], "the planted null is the only thing wrong: {}", report.text());
+}
+
+#[test]
+fn atip_check_75_a_canon_whose_hint_is_prose_starting_with_its_name_fails_l0_hint_form() {
+    // canon with one planted violation: every "a working call: ..." hint is replaced by prose that starts with `canon ` and is not one command line.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let wrapper = dir.path().join("canon-with-prose-hints");
+    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"a working call: /\"hint\":\"canon can'\"'\"'t run this; try: /'; fi\nexit $code\n");
+    std::fs::write(&wrapper, script).expect("write");
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let report = run_checker(&wrapper);
+    assert!(!report.passed, "{}", report.text());
+    let check = report.find("L0.hint-form").expect("L0.hint-form");
+    assert_eq!(check.result, atip_check::report::CheckResult::Fail, "{}", report.text());
+    assert!(check.reason.as_deref().unwrap_or_default().contains("not one command line"), "{:?}", check.reason);
+    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail).map(|check| check.id).collect();
+    assert_eq!(failing, ["L0.hint-form"], "the prose hint is the only thing wrong: {}", report.text());
 }
 
 /// The `run:` commands of the workflow job `job` in test.yml.
