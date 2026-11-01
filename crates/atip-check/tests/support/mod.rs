@@ -2,6 +2,8 @@
 
 #![allow(dead_code, reason = "each integration test uses a part of this module")]
 
+pub mod l1;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
