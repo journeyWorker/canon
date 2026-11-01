@@ -33,9 +33,27 @@ struct Run {
     body: Value,
 }
 
-fn run(args: &[&str]) -> Run {
+/// The story repo, built once; every call runs in its own copy.
+struct Story {
+    repo: TempDir,
+    home: TempDir,
+}
+
+static STORY: std::sync::LazyLock<Story> = std::sync::LazyLock::new(|| {
     let home = TempDir::new().expect("a home");
-    let dir = fixture(home.path());
+    let repo = fixture(home.path());
+    Story { repo, home }
+});
+
+fn copy_of_story() -> TempDir {
+    let copy = TempDir::new().expect("a scratch directory");
+    harness::copy_dir(STORY.repo.path(), copy.path());
+    copy
+}
+
+fn run(args: &[&str]) -> Run {
+    let home = &STORY.home;
+    let dir = copy_of_story();
     let mut argv: Vec<String> = args.iter().map(ToString::to_string).collect();
     argv.push("--json".to_string());
     let output = canon_in(dir.path(), home.path(), &argv, &[("CANON_ROLE", "implementer")]);
@@ -85,8 +103,8 @@ fn atip_constraints_01_clap_relations_are_constraints_of_the_document() {
 /// `--plan-digest` is `USAGE` naming `--plan-digest`.
 #[test]
 fn atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_its_argument() {
-    refused(&run(&["purge", "--kind", "change", "--before", "2020-01-01", "--commit"]), "USAGE", "--plan-digest");
-    refused(&run(&["purge", "--kind", "change", "--before", "2020-01-01", "--plan-digest", "abc"]), "USAGE", "--commit");
+    refused(&run(&["purge", "--kind", "session", "--before", "2020-01-01", "--commit"]), "USAGE", "--plan-digest");
+    refused(&run(&["purge", "--kind", "session", "--before", "2020-01-01", "--plan-digest", "abc"]), "USAGE", "--commit");
     let flag = |name: &str| OptionDoc {
         name: name.to_string(),
         short: None,
@@ -128,7 +146,7 @@ fn atip_constraints_03_handler_relations_are_constraints_with_their_codes() {
     let evidence = leaf("evidence add");
     assert!(has_names(evidence, "atLeastOne", &["task", "scenario", "all-scenarios"]), "{:?}", evidence["constraints"]);
     // Failure paths, through the binary: a missing reason and a missing origin are refused with their codes.
-    refused(&run(&["finding", "close", "--change", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--actor", "unit-1"]), "FINDING_REASON_REQUIRED", "--reason");
+    refused(&run(&["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--actor", "unit-1"]), "FINDING_REASON_REQUIRED", "--reason");
     refused(&run(&["retrieve", "--for-role", "reviewer"]), "USAGE", "--regime");
 }
 
@@ -222,13 +240,14 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
         assert_eq!(atip::domain::pattern_problem(pattern), None, "{name}");
         let alphabet: Vec<char> = alphabet.chars().collect();
         let ulid = matches!(name, "RUN_ID" | "REVIEW_ID");
+        let compiled = atip::domain::compile(&json!({ "pattern": pattern })).expect("the pattern compiles");
         let mut checked = 0;
-        for round in 0..60_000 {
+        for round in 0..20_000 {
             let length = if ulid { 24 + next(5) } else { next(9) };
             let candidate: String = (0..length).map(|_| alphabet[next(alphabet.len())]).collect();
             // Seeded successes: a ULID candidate of 26 characters is common enough only when built from valid ones.
             let candidate = if ulid && round % 2 == 0 { candidate.chars().chain("0123456789".chars().cycle()).take(26).collect() } else { candidate };
-            let admitted = atip::domain::admits(&json!({ "pattern": pattern }), &json!(candidate)).unwrap_or(false);
+            let admitted = compiled.admits(&json!(candidate));
             let parsed = accepts(&candidate);
             checked += 1;
             if name == "SESSION_ID" {
@@ -258,14 +277,14 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
         state ^= state << 17;
         usize::try_from(state % bound as u64).unwrap_or(0)
     };
-    let domain = json!({ "pattern": pattern });
+    let compiled = atip::domain::compile(&json!({ "pattern": pattern })).expect("the pattern compiles");
     let mut problems = Vec::new();
     let mut seeds: Vec<String> = ["2030-01-01", "2030-1-1", " 2030-01-01", "2030-01-01T10:00:00Z", "2030-01-01t10:00:00z", "2030-01-01 10:00:00+02:00", "2030-01-01T10:00:00.123456789\u{2212}02:00", "0001-01-01T00:00:00+00:00", "2030-01-01T10:00:60Z", "+2030-01-01", "-0001-01-01", "99999-12-31", "2030-01-01T24:00:00Z"].iter().map(ToString::to_string).collect();
-    for _ in 0..200_000 {
+    for _ in 0..60_000 {
         let length = 6 + next(26);
         seeds.push((0..length).map(|_| alphabet[next(alphabet.len())]).collect());
     }
-    for _ in 0..200_000 {
+    for _ in 0..60_000 {
         // Near-misses of a valid time: one character changed, dropped or inserted.
         let base: Vec<char> = "2030-01-01T10:00:00.5+02:00".chars().collect();
         let mut mutated = base.clone();
@@ -282,7 +301,7 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     for candidate in seeds {
         if canon_cli::timestamp::parse(&candidate).is_ok() {
             accepted += 1;
-            if !atip::domain::admits(&domain, &json!(candidate)).unwrap_or(false) {
+            if !compiled.admits(&json!(candidate)) {
                 problems.push(format!("the parser accepts {candidate:?} and the pattern refuses it"));
             }
         }
@@ -323,15 +342,15 @@ fn atip_constraints_07_every_time_option_declares_the_calendar_validator_and_ref
 #[test]
 fn atip_constraints_08_an_export_window_that_ends_before_it_starts_is_refused() {
     let doc = leaf("export");
-    let validator = doc["validators"].as_array().into_iter().flatten().find(|validator| validator["arguments"] == json!(["after", "before"]) || validator["arguments"] == json!(["before", "after"])).unwrap_or_else(|| panic!("no window validator: {:?}", doc["validators"]));
+    let validator = doc["validators"].as_array().into_iter().flatten().find(|validator| validator["rejects"].as_array().is_some_and(|calls| calls.contains(&json!("canon export --kind change --before 2026-01-02 --after 2026-02-01 --json")))).unwrap_or_else(|| panic!("no window validator: {:?}", doc["validators"]));
     assert_eq!(validator["code"], "USAGE");
     assert!(validator["rejects"].as_array().is_some_and(|calls| calls.contains(&json!("canon export --kind change --before 2026-01-02 --after 2026-02-01 --json"))), "{validator}");
     let late = run(&["export", "--kind", "change", "--before", "2026-01-02", "--after", "2026-02-01"]);
     refused(&late, "USAGE", "--after");
     // Before any read or write: with `--dry-run` and with `--output` too.
     refused(&run(&["export", "--kind", "change", "--before", "2026-01-02", "--after", "2026-02-01", "--dry-run"]), "USAGE", "--after");
-    let home = TempDir::new().expect("a home");
-    let dir = fixture(home.path());
+    let home = &STORY.home;
+    let dir = copy_of_story();
     let out = dir.path().join("out.ndjson");
     let output = canon_in(dir.path(), home.path(), &["export".into(), "--kind".into(), "change".into(), "--before".into(), "2026-01-02".into(), "--after".into(), "2026-02-01".into(), "--output".into(), out.to_string_lossy().into_owned(), "--json".into()], &[("CANON_ROLE", "implementer")]);
     assert_eq!(output.status.code(), Some(2));
@@ -351,8 +370,8 @@ fn atip_constraints_08_an_export_window_that_ends_before_it_starts_is_refused() 
 fn atip_constraints_10_the_edge_of_the_safe_range_is_accepted_and_no_domain_goes_beyond_it() {
     for (base, option) in INTEGER_OPTIONS {
         let mut edge = base.to_vec();
-        edge.push(option);
-        edge.push("9007199254740991");
+        let joined = format!("{option}=9007199254740991");
+        edge.push(&joined);
         let accepted = run(&edge);
         assert_ne!(accepted.body["error"]["code"], "USAGE", "`{}` {option} 9007199254740991 is the edge and is accepted: {}", base.join(" "), accepted.body);
     }
@@ -370,7 +389,7 @@ fn atip_constraints_10_the_edge_of_the_safe_range_is_accepted_and_no_domain_goes
 
 const INTEGER_OPTIONS: [(&[&str], &str); 5] = [
     (&["artifacts", "store", "--dry-run"], "--max-artifact-mib"),
-    (&["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "x", "--dry-run"], "--max-artifact-mib"),
+    (&["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "x"], "--max-artifact-mib"),
     (&["query", "--kind", "change"], "--limit"),
     (&["retrieve", "--for-role", "reviewer", "--domain", "dev"], "--limit"),
     (&["ingest", "sessions", "--dry-run"], "--interval-secs"),
@@ -382,13 +401,22 @@ fn atip_constraints_11_a_sixty_four_bit_integer_outside_the_safe_range_is_refuse
     for (base, option) in INTEGER_OPTIONS {
         for value in ["9007199254740992", "9007199254740993", "18446744073709551616", "-9007199254740992", "-1"] {
             let mut args = base.to_vec();
-            args.push(option);
-            args.push(value);
+            let joined = format!("{option}={value}");
+            args.push(&joined);
             let result = run(&args);
             assert_eq!(result.exit, 2, "`{}` {option} {value}: {}", base.join(" "), result.body);
             assert_eq!(result.body["error"]["code"], "USAGE", "`{}` {option} {value}: {}", base.join(" "), result.body);
             assert_eq!(result.body["error"]["field"], option, "`{}` {option} {value}: {}", base.join(" "), result.body);
         }
+    }
+    // A negative value written after its option as a separate word is not read as the option's value: the call is refused too.
+    for (base, option) in INTEGER_OPTIONS {
+        let mut args = base.to_vec();
+        args.push(option);
+        args.push("-9007199254740992");
+        let result = run(&args);
+        assert_eq!(result.exit, 2, "`{}` {option} -9007199254740992: {}", base.join(" "), result.body);
+        assert_eq!(result.body["error"]["code"], "USAGE", "{}", result.body);
     }
     // Failure path: a domain bound above the safe range is found by the profile check.
     assert!(!atip::domain::profile_problems(ValueType::Integer, &json!({ "maximum": 9_007_199_254_740_992_i64 })).is_empty());

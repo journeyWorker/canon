@@ -393,6 +393,27 @@ pub fn admits(domain: &Value, value: &Value) -> Result<bool, String> {
     Ok(validator.is_valid(value))
 }
 
+/// A domain compiled once, for a caller that asks it of many values.
+pub struct Compiled(Validator);
+
+impl std::fmt::Debug for Compiled {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Compiled(..)")
+    }
+}
+
+impl Compiled {
+    /// Whether `value` is inside the domain.
+    pub fn admits(&self, value: &Value) -> bool {
+        self.0.is_valid(value)
+    }
+}
+
+/// Compiles `domain` so that many values can be asked of it without compiling it each time.
+pub fn compile(domain: &Value) -> Result<Compiled, String> {
+    jsonschema::validator_for(domain).map(Compiled).map_err(|error| format!("the domain {domain} does not compile: {error}"))
+}
+
 /// The restriction the Rust type of an integer argument carries, which no `valueType` says: an unsigned type refuses
 /// a negative value and a narrow one its overflow. `None` for a type the safe range already bounds (`i64`).
 pub fn implicit(bits: u32, signed: bool) -> Option<Domain> {
