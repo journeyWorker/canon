@@ -132,7 +132,7 @@ fn given_of(matches: &ArgMatches, args: &[&Arg]) -> std::collections::BTreeMap<S
 }
 
 /// The `field` of the argument `name` (spec 7.1.1): an option as written, an operand by its value name.
-pub(super) fn field_of(args: &[&Arg], name: &str) -> String {
+pub(crate) fn field_of(args: &[&Arg], name: &str) -> String {
     match args.iter().find(|arg| atip::constraint::name_of(arg) == name) {
         Some(arg) if arg.is_positional() => atip::project::value_name(arg),
         _ => format!("--{name}"),
@@ -163,7 +163,7 @@ fn message_of(args: &[&Arg], rule: &ConstraintDoc, given: &Given) -> String {
 }
 
 /// What an integer bound says: `must be an integer of at least 1`.
-pub(super) fn integer_says(minimum: Option<i64>, maximum: Option<i64>) -> String {
+pub(crate) fn integer_says(minimum: Option<i64>, maximum: Option<i64>) -> String {
     match (minimum, maximum) {
         (Some(minimum), Some(maximum)) => format!("must be an integer from {minimum} to {maximum}"),
         (Some(minimum), None) => format!("must be an integer of at least {minimum}"),

@@ -21,7 +21,7 @@ const RUNTIME_LABEL: &str = SESSION_ID;
 /// The message the commands that take `--approver` give for a partial approval.
 const APPROVAL_TOGETHER: &str = "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.";
 
-pub(super) static TABLES: Tables = Tables {
+pub(crate) static TABLES: Tables = Tables {
     rules: &[
         ("divergence accept", &[Rule::requires("approver", &["relayed-via"]), Rule::requires("note", &["relayed-via"])]),
         ("divergence add", &[Rule::requires_in("state", &["deferred"], &["reason", "expiry"]).code("DIVERGENCE_INVALID_ARGUMENT").help("A deferred divergence records why it is deferred and when the deferral lapses.")]),
