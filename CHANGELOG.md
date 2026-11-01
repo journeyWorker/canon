@@ -48,9 +48,7 @@ A hint is now exactly one of a command line, a template with `<UPPER_CASE>` plac
 
 **Consumers.** The dashboard's briefs page, the npm launcher and `evals/dogfood/trace_check.py` read only the members they know, skip an enum string they do not know (an approval `outcome`, a finding `severity`) instead of rejecting the document, and have tests that feed them a document with members and values from a later minor (contract 15.6). The guides teach the same.
 
-||||||| f0bff142
-
-`atip check` (the `atip-check` crate, 0.33 had it at 19 L0 checks) now runs the 28 L0 checks of atip/1 1.1 (https://github.com/journeyWorker/atip, tag v1.1.0, `approaches/checker.md`). A fixture written for 0.33 needs the changes below; nothing is read under the old name.
+**`atip check`.** The `atip-check` crate (19 L0 checks in 0.33) now runs the 28 L0 checks of atip/1 1.1 (https://github.com/journeyWorker/atip, tag v1.1.0, `approaches/checker.md`). A fixture written for 0.33 needs the changes below; nothing is read under the old name.
 
 | 0.33 | 0.34 |
 |---|---|
@@ -77,7 +75,7 @@ A hint is now exactly one of a command line, a template with `<UPPER_CASE>` plac
 
 ### Changed
 
-- canon's fixture (`crates/canon-cli/tests/atip/canon.fixture.json`) claims 1.1: `contractVersion`, `setup` that creates two subjects (so a listing has a second page), `globalOptions` (`--repo .`), `commands` (`query --kind subject --limit 1` for the page and the next step, `status`, and `finding close` without `--seq` for `missingValue`), and a `registry` and `warnings` generated from `canon schema --errors --json` and `--warnings --json` (`CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it). CI job `atip-l0` and `just atip` run unchanged; they are green when the binary prints the 1.1 output of 0.34 and canon passes the 27 applicable checks.
+- canon's fixture (`crates/canon-cli/tests/atip/canon.fixture.json`) claims 1.1: `contractVersion`, `setup` that creates two subjects (so a listing has a second page), `globalOptions` (`--repo .`), `commands` (`query --kind subject --limit 1` for the page and the next step, `status`, and `finding close` without `--seq` for `missingValue`), and a `registry` and `warnings` generated from `canon schema --errors --json` and `--warnings --json` (`CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it). CI job `atip-l0` and `just atip` run unchanged; they are green when the binary prints the 1.1 output of 0.34 and canon passes every applicable check (26 for canon: `L0.usage-hint` observes no `USAGE` without a `field` and is `unsupported`).
 - `atip`'s own fixture (`crates/atip-check/atip.fixture.json`) claims 1.1, declares the checker's reasons and its warning `SHOULD_FAILED`, and holds the refusal and the missing value of `atip check`.
 
 ## 0.33.0 — 2026-11-01
