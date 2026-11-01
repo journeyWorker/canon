@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-l1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-l1-rev"
+  },
+  "at": "2026-11-01T15:49:29.917565Z",
+  "change_id": "canon-0-34-atip-check-l1",
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/app.rs:183",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "reviewer": "rev-check-l1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl1.14",
+    "atip.checkl1.23"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The checker follows contract 1.1.2 (strict patch of the 1.1.1 the brief and scenarios pin; I diffed the vendored schemas, 204 examples, regex-cases.json and guide.schema against both tags: byte-identical), but two 1.1.2 behaviours have no test: (a) a failing `setup` step is FIXTURE_INVALID reason SETUP_FAILED with no check reported (grep SETUP_FAILED in tests: none; I ran canon's fixture with a failing setup step by hand: exit 2, SETUP_FAILED, no data, correct); (b) L1.validators runs in an empty directory without `prepare` (exec.rs Call.without_setup) and no seeded case depends on `prepare`; by hand, a wrapper tool whose rejects answers another code when a prepare-made file is absent fails only L1.validators, as 1.1.2 says. Brief F5 still says validators reuse the environment `prepare` made ('L1은 prepare가 만든 환경에서 validators가 setup 없이 돌 때도 같은 환경을 쓴다'): that sentence is stale against 1.1.2 and the CHANGELOG/workflow comments also say 'contract 1.1.1'. Brief defect for the human; tests for (a) and (b) for the implementer. Blast radius: a canon validator that needs the git repository `prepare` makes would fail here, not in canon's own tests.",
+  "worktree_dirty": false
+}

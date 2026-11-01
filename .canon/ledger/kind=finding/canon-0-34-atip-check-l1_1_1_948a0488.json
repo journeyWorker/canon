@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-l1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-l1-rev"
+  },
+  "at": "2026-11-01T15:49:29.144849Z",
+  "change_id": "canon-0-34-atip-check-l1",
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/tests/atip_check_l1.rs:281",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "reviewer": "rev-check-l1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl1.15"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] Scenario 15's Then step 'the checks that would probe it report what the fixture lacks' is not what the checker does, and its bound test does not check it. Probe: conforming fake with the write `member tag` removed from `commands` passes L1 with every check pass (only L0.contract unsupported); nothing is `unprovided` and the report names no skipped write. atip_checkl1_15_* is titled 'its checks are unprovided' but asserts only that the write is never run. The behaviour follows checker.md's populations of L1.constraints/domains/validators ('writes listed in the fixture') and is the only reading under which canon passes with 41 unlisted writes, but it contradicts brief F3 acceptance ('해당 검사가 제공되지 않음이다'), F5 flow ('fixture를 빼서 통과할 수 없다') and checker.md §5 ('A command with no fixture entry makes its stateful checks unprovided'). Human/brief author decides: amend scenario 15 and the brief to 'outside the population, not run', or have the report name unlisted writes in notes. Blast radius: a tool can drop a write command from `commands` and escape its constraints, domains, validators, paging and fields probes; canon's unlisted writes rest on canon's own tests (constraints_hold, atip_paging_fields).",
+  "worktree_dirty": false
+}

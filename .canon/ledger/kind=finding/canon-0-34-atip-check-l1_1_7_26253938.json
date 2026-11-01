@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-l1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-l1-rev"
+  },
+  "at": "2026-11-01T15:49:33.530257Z",
+  "change_id": "canon-0-34-atip-check-l1",
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip/canon.fixture.src.json",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "reviewer": "rev-check-l1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl1.30",
+    "atip.checkl1.31"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[spec-fidelity] Brief F7 says canon's `commands` holds every `read` command and some writes. The fixture lists 18 of 31 read commands plus `finding close`; the 13 absent (adapter authorize/validate, artifacts verify, completion, context, dispatch diff, format, gate check, policy show, report check, schema, selftest, skills show) have no domains, validators or cursor, and `schema`'s one constraint was exercised anyway (the run refuses `schema evidence add --errors`); their examples run under L1.example-runs. `--fields` selections exist for 3 of the 6 commands that declare `--fields` (divergence list, finding list, query; not context, status, export) and L1.fields is unprovided only when no selection exists at all; `export` (write, unlisted) declares --cursor and --fields and is never probed. I logged every canon call of a full L1 run: the only unlisted writes touched are `--help` calls; no unlisted write command ran. The brief's own assumption leaves those to canon's tests, so this is a note. The F7 red path (an example that does not parse) is proven by the test on the fake; on canon itself, a wrapper that breaks `finding list`'s first example turns only L1.examples red (exit 1, LEVEL_NOT_MET).",
+  "worktree_dirty": false
+}
