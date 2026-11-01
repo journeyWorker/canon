@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:07:44.118779Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/rules.rs:216-224",
+  "introduced_by": "165bd0d311572ee692ba8d3ccd6659236182bd6d",
+  "kind": "finding",
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.69"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] L0.registry judges a refused `schema --error <warning-only code>` only when it already has field `--error` and `error.received` naming the code, and then only the hint. checker.md row L0.registry and the ATIP author's ruling say it MUST be USAGE, field `--error`, exit 2, with hint `<tool> schema --warning <CODE> --json`. Reproduced on atip-fake-tool wrapped to change that one answer: error.code INPUT_INVALID, error.code UNKNOWN_COMMAND, field `--errors`, and `received` dropped each give L0.registry pass and exit 0 (only an exit of 1 is caught, by L0.ok-exit, so that is the wrong owner). The seeded cases cover only `warningOnlyErrorAnswers` (an entry answered); the fake's `warningOnlyErrorNoHint` flag is used by no test, and the hint rule is killed only by the contract-example test atip_check_35 (mutation of the hint comparison survives the fake-tool seeds). Fix: in rules::registry_findings, for every failed answer to `--error <code>` with code warning-only, require code USAGE, field `--error` and the hint; add one seeded case per part. Blast radius: a canon that answered a warning-only code with another code or field would still pass the CI job.",
+  "worktree_dirty": false
+}

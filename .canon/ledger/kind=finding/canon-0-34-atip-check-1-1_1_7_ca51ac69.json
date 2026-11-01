@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:07:48.395083Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/tests/atip_examples.rs:27",
+  "introduced_by": "165bd0d311572ee692ba8d3ccd6659236182bd6d",
+  "kind": "finding",
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards] The PINNED constant says `v1.1.0 (da069df042b1140915d6a5e674b306bf7b5cfd187)`; the tag peels to da69df042b1140915d6a5e674b306bf7b5cfd187 (the constant has a stray 0 and is 41 characters). The five schema digests and every copied example (all report-*, schema-error*, schema-warning*, stream-* examples and 82 invalid files) are byte-identical to v1.1.0, so only the message text is wrong. Fix: correct the commit id. Blast radius: assertion message only.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:07:44.937166Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/mod.rs:1440-1457",
+  "introduced_by": "165bd0d311572ee692ba8d3ccd6659236182bd6d",
+  "kind": "finding",
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.73",
+    "atip.check.45"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[standards] L0.page reports `unsupported` without having observed every listed command refuse `--cursor x`: a command listed without an `ok` invocation whose cursor probe is inconclusive (cursor_verdict Unknown and !cursor_from_ok) is dropped from `verdicts`, so one listed command that refuses `--cursor` as an unknown option is enough. The ATIP author's rule is unsupported only by observing `--cursor x --json` refusals, and a paging tool that omits its paged call is unprovided. Reproduced: fake tool with `items` (pages) listed only under `refused` and answering `items --cursor x --json` with USAGE field `--name` (it needs an operand), plus `team add` (ok, refuses --cursor): L0.page is `unsupported` with the reason `each refuses --cursor as an option it does not have`, which is false for `items`; (that fixture lacks a missingValue, so exit 1 there comes from L0.no-prompt only). The test atip_check_73 only uses a pageable command that needs no operand, so it hits CURSOR_INVALID. Fix: treat an inconclusive probe of any listed command as unprovided (or probe with the command's missingValue/refused argv), and say in the reason which command was inconclusive. Blast radius: only fixtures that list a paging command without an `ok` invocation; canon's own fixture is not affected (L0.page passes there).",
+  "worktree_dirty": false
+}
