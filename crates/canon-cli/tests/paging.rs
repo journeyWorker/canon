@@ -122,21 +122,22 @@ fn fields_projects_records_and_an_unknown_field_is_refused() {
 }
 
 #[test]
-fn fields_match_in_either_case_style_and_an_unknown_one_gets_suggestions() {
+fn a_field_path_is_the_records_own_key_and_an_unknown_one_gets_suggestions() {
     let fixture = five_trajectories();
-    let plain = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--all", "--fields", "reward,at"]);
-    let mixed = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--all", "--fields", "Reward,AT"]);
-    assert!(mixed.status.success(), "{}", stderr(&mixed));
-    assert_eq!(json(&mixed)["data"]["records"], json(&plain)["data"]["records"], "the case style of a field name changes nothing");
-
-    // A snake_case record field is also reachable by its camelCase spelling, and the output key stays as stored.
+    // One spelling per member (spec 6.10): neither another case nor the camelCase of a snake_case key selects it.
     let snake = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "1"]);
     let record = json(&snake)["data"]["records"][0].clone();
     let key = record.as_object().unwrap().keys().find(|k| k.contains('_')).expect("a trajectory record has a snake_case field").clone();
     let camel: String = key.split('_').enumerate().map(|(i, w)| if i == 0 { w.to_string() } else { w[..1].to_uppercase() + &w[1..] }).collect();
-    let by_camel = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "1", "--fields", &camel]);
-    assert!(by_camel.status.success(), "{}", stderr(&by_camel));
-    let projected = json(&by_camel)["data"]["records"][0].clone();
+    for wrong in ["Reward", "REWARD", camel.as_str()] {
+        let refused = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "1", "--fields", wrong]);
+        assert_eq!(refused.status.code(), Some(2), "{wrong}");
+        assert_eq!(json(&refused)["error"]["code"], "USAGE", "{wrong}");
+        assert_eq!(json(&refused)["error"]["field"], "--fields", "{wrong}");
+    }
+    let by_key = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "1", "--fields", &key]);
+    assert!(by_key.status.success(), "{}", stderr(&by_key));
+    let projected = json(&by_key)["data"]["records"][0].clone();
     assert_eq!(projected.as_object().unwrap().keys().collect::<Vec<_>>(), vec![&key], "{projected}");
 
     let bad = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--fields", "rewrd"]);

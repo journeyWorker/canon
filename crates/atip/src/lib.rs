@@ -11,6 +11,10 @@
 //!   use them ([`envelope_problems`], [`registry_entry_problems`]).
 //! - [`doc`]: the documents `schema --json` answers with (tree, group, command,
 //!   option, operand, output, input), typed and deriving `JsonSchema`.
+//! - [`fields`]: field paths and projection (spec 6.10): the path grammar, the
+//!   projection of a record, the `fields` declaration of an output with the checks
+//!   spec 10.13 puts on it, and the validation of a projected answer against the
+//!   output's schema with `required` reduced.
 //! - [`project`]: the generic projection of a clap tree onto those documents:
 //!   the tree and its paths, `valueType`, typed defaults, the `--input`
 //!   fragment schema, the schemas a command document carries, and the help
@@ -28,6 +32,7 @@ pub mod doc;
 pub mod domain;
 pub mod envelope;
 pub mod error;
+pub mod fields;
 pub mod project;
 pub mod schema;
 pub mod shell;

@@ -216,6 +216,12 @@ const INPUT_TOO_LARGE_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "TOO_MANY_ITEMS", meaning: "a batch is over 10000 items", fix: "Split the batch into several runs, each under the limit." },
 ];
 
+const CURSOR_INVALID_REASONS: &[ReasonInfo] = &[
+    ReasonInfo { reason: "ARGUMENTS_CHANGED", meaning: "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor and --fields", fix: "Repeat the call with the arguments that issued the cursor, or restart without --cursor." },
+    ReasonInfo { reason: "EXPIRED", meaning: "this command issued the cursor for these arguments but the record it points after is gone", fix: "Restart the listing without --cursor." },
+    ReasonInfo { reason: "FOREIGN", meaning: "the cursor is not one this command issued, or is not a cursor", fix: "Pass the `nextCursor` this same command returned, or restart without --cursor." },
+];
+
 const CODES: &[CodeInfo] = &[
     CodeInfo { code: "ADAPTER_EXECUTION_NOT_AUTHORIZED", meaning: "the adapter response did not authorize execution", exit: 1, retryable: false, fix: "Have the adapter return a response that authorizes execution, or do not run the command through this adapter.", reasons: &[] },
     CodeInfo { code: "ADAPTER_REFUSED", meaning: "`adapter validate` could not read the response file, or `adapter authorize` refused: its response is unreadable, breaks a rule, or the policy file is broken", exit: 2, retryable: false, fix: "Fix the response file, or the policy file `.canon/policy.yaml` when the message names it, then run the command again; `adapter validate` re-checks a response.", reasons: &[] },
@@ -251,7 +257,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "CONTEXT_PACK_TAMPERED", meaning: "a context pack is stale or was changed after it was created", exit: 1, retryable: false, fix: "Discard the stale or altered pack and build a new one.", reasons: &[] },
     CodeInfo { code: "CONTEXT_SECRET_DETECTED", meaning: "a selected context input contains plaintext secret material", exit: 2, retryable: false, fix: "Remove the plaintext secret from the selected input or deselect it, then build the pack again.", reasons: &[] },
     CodeInfo { code: "CONTEXT_UNSAFE_PATH", meaning: "a selected path is absolute, leaves the repository, or contains a symlink", exit: 2, retryable: false, fix: "Select only repository-relative paths that stay inside the repository and contain no symlink.", reasons: &[] },
-    CodeInfo { code: "CURSOR_INVALID", meaning: "`--cursor` is not one this listing issued, or the record it points after is gone", exit: 2, retryable: false, fix: "Restart the listing without --cursor and page with the cursor it returns.", reasons: &[] },
+    CodeInfo { code: "CURSOR_INVALID", meaning: "`--cursor` is not one this listing issued, was issued for other arguments, or points after a record that is gone; `reason` says which", exit: 2, retryable: false, fix: "Restart the listing without --cursor and page with the cursor it returns.", reasons: CURSOR_INVALID_REASONS },
     CodeInfo { code: "DASHBOARD_BAD_REQUEST", meaning: "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body", exit: 2, retryable: false, fix: "Send requests only through the briefs page the dashboard serves.", reasons: &[] },
     CodeInfo { code: "DASHBOARD_CONFIG_INVALID", meaning: "the dashboard's canon.yaml section is present but unusable", exit: 2, retryable: false, fix: "Fix the dashboard section of canon.yaml, then start the dashboard again.", reasons: &[] },
     CodeInfo { code: "DASHBOARD_FAILED", meaning: "the dashboard could not start for a reason that is not one of the other DASHBOARD_ codes (an I/O failure)", exit: 1, retryable: false, fix: "Read the I/O error in the message, fix its cause, then start the dashboard again.", reasons: &[] },

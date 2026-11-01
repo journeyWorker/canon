@@ -280,7 +280,8 @@ fn outputs_of(path: &str, batch: bool, schemas: &mut BTreeMap<String, Value>) ->
     let mut add = |name: &str, kind: OutputKind, media_type: Option<&str>, batch: bool, when: Option<&str>, schemas: &mut BTreeMap<String, Value>| -> Built<()> {
         let report = reports.iter().find(|report| report.name == name).ok_or_else(|| format!("`{path}` names the report `{name}`, which has no schema"))?;
         project::add_schema(schemas, name, report.schema.clone())?;
-        outputs.push(OutputDoc { kind, schema_ref: format!("#/schemas/{name}"), schema_version: report.schema_version.clone(), media_type: media_type.map(str::to_string), event_ref: None, batch, when: when.map(str::to_string) });
+        let fields = if batch { None } else { crate::fields::doc_for(path, name) };
+        outputs.push(OutputDoc { kind, schema_ref: format!("#/schemas/{name}"), schema_version: report.schema_version.clone(), media_type: media_type.map(str::to_string), event_ref: None, batch, when: when.map(str::to_string), fields });
         Ok(())
     };
     for output in facts.outputs {

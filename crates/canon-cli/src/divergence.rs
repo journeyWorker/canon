@@ -167,17 +167,6 @@ pub struct DivergenceListReport<'a> {
 
 impl crate::reports::Report for DivergenceListReport<'_> {}
 
-/// `canon divergence list --fields`: each scenario keeps only the requested members.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DivergenceListFieldsReport {
-    pub as_of: String,
-    pub summary: BurndownSummary,
-    pub scenarios: Vec<crate::json_out::Projected<ScenarioRow<'static>>>,
-}
-
-impl crate::reports::Report for DivergenceListFieldsReport {}
-
 /// `canon divergence add` (module doc): writes ONE unordered staging
 /// candidate — `run_seq` is assigned later, at `promote` time. With
 /// `--promote` or `write: { promote: auto }` (0.16 D2) the same run then
@@ -530,14 +519,9 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
 /// with `mart_review_burndown`'s per-day TREND). `as_of` defaults to
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
-/// The fields of one `divergence list` scenario row, which `--fields` may name.
-const ROW_FIELDS: [&str; 6] = ["projectId", "scenarioId", "state", "reason", "expiry", "tracking"];
-
-pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> u8 {
-    if let Some(requested) = fields {
-        if let Err(e) = crate::paging::check_known("canon divergence list", requested, &ROW_FIELDS) {
-            return e.emit("canon divergence list", json);
-        }
+pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&str>) -> u8 {
+    if let Err(e) = crate::fields::select("divergence list", fields, None) {
+        return e.emit("canon divergence list", json);
     }
     let repo = resolve_repo_root(repo);
     let gate_ctx = match GateCtx::from_repo(&repo) {
@@ -584,15 +568,7 @@ pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &cr
         let mut page = serde_json::Map::new();
         meta.insert_into(&mut page);
         let page = serde_json::Value::Object(page);
-        match fields {
-            Some(requested) => {
-                let scenarios = scenarios
-                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a scenario row serializes"), requested)))
-                    .collect();
-                crate::json_out::data_with_meta("divergence list", &DivergenceListFieldsReport { as_of, summary, scenarios }, page);
-            }
-            None => crate::json_out::data_with_meta("divergence list", &DivergenceListReport { as_of, summary, scenarios: scenarios.collect() }, page),
-        }
+        crate::json_out::data_with_meta("divergence list", &DivergenceListReport { as_of, summary, scenarios: scenarios.collect() }, page);
         return 0;
     }
 
