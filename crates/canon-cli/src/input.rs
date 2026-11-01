@@ -1,7 +1,7 @@
 //! `--input <JSON|FILE|->` (0.28 D7): a leaf's arguments as a JSON document.
 //!
 //! The document is turned into an ordinary command line before clap sees it,
-//! so every rule of the flags (required, `requiredOneOf`, value sets, error
+//! so every rule of the flags (required, exactly-one-of sets, value sets, error
 //! codes) applies unchanged; [`expand`] is that step and `main` runs it first.
 //!
 //! - **Source:** inline JSON when the value starts with `{` or `[` after

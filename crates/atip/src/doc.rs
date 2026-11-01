@@ -358,6 +358,10 @@ pub struct TreeDoc {
     /// The conformance level the tool claims: `L1` or `L2`.
     pub level: String,
     pub commands: Vec<TreeEntry>,
+    /// Tool extensions (`x-<tool>`, spec 10.12): a tool that filters its tree (10.2.2) says so here.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, Value>,
 }
 
 /// `schema <GROUP> --json` (spec 10.4).

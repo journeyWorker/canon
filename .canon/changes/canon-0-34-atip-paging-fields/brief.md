@@ -4,6 +4,12 @@ waive:
     section: "brief"
     reason: "cursor 묶기, 투영 규칙, 경로 문법, 보고서 스키마 조정을 한 변경에서 정해야 해서 줄이면 결정이 빠진다"
   - rule: "prose.length"
+    section: "detail"
+    reason: "다섯 단계가 각자 규칙과 목록을 가져야 해서 줄이면 사실이 빠진다"
+  - rule: "prose.length"
+    section: "questions"
+    reason: "계약 저자의 결정과 가정이 서로 다른 결정이라 함께 적어야 한다"
+  - rule: "prose.length"
     section: "acceptance"
     reason: "다섯 단계마다 실패 경로를 요구하는 규칙 때문에 줄일 수 없다"
   - rule: "prose.code-citation"
@@ -25,7 +31,7 @@ waive:
 
 # 쪽 나누기 cursor를 인수에 묶고 --fields를 atip/1 투영으로 낸다
 
-Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 6.9, 6.10, 7.2.3, 10.9, 10.13 규칙 11과 15, approaches/migration.md §3.1 2번과 5번
+Source: https://github.com/journeyWorker/atip tag v1.1.1, spec 6.9, 6.10, 7.2.3, 10.9, 10.13 규칙 11과 15, approaches/migration.md §3.1 2번과 5번
 
 ## Intent
 
@@ -70,8 +76,9 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 6.9, 6.10, 7.2.3,
 - `--fields`를 받는 명령의 출력은 `fields`를 가진다: `records`(데이터 안에서 기록 배열을 가리키는 포인터), `paths`(고를 수 있는 경로), `keep`(항상 남는 경로. 고를 수 없다), `default`(`--fields` 없이 오는 선택, `paths`의 부분집합).
 - 경로는 기록의 멤버를 점으로 이은 것이다. 배열은 `name[]`로만 지난다. 이름이 식별자(`[A-Za-z_][A-Za-z0-9_]*`)가 아닌 멤버는 따옴표 대괄호(`attributes["http.status-code"]`)로 쓴다. 식별자인 이름은 대괄호로 쓰지 않는다. 선언한 map의 키도 한 단계 선택할 수 있다.
 - 경로의 대소문자는 기록의 키 그대로다. 임베드된 기록은 snake_case다. 0.33이 받던 camelCase 별칭은 없어진다.
-- 투영되는 출력의 보고서 스키마는 계약의 투영 가능 조건을 지킨다. 기록, 기록 위 조상, 선언한 경로의 조상이 `oneOf`, `allOf`, `const`, `enum`이나 `uniqueItems`를 쓰지 않는다. 지키지 못하는 보고서(`export`의 세 변형처럼 합집합인 것)는 모양을 바꾸고 그 보고서의 `schemaVersion`을 올린다.
-- 대상 출력은 `finding list`, `divergence list`, `query`, `export`, `status`, `context`다.
+- 투영되는 출력의 보고서 스키마는 계약의 투영 가능 조건을 지킨다. 기록, 기록 위 조상, 선언한 경로의 조상이 `oneOf`, `allOf`, `const`, `enum`이나 `uniqueItems`를 쓰지 않는다.
+- `fields`는 출력마다 선언한다. 답이 두 모양 중 하나인 명령(`export`의 세 변형)은 두 방식 중 하나를 고른다. 보고서 출력을 모양마다 두고 각자 `fields`와 `when`을 주거나, 합집합 모양 하나를 그대로 두고 `fields`를 선언하지 않고 `--fields`를 받지 않는다.
+- `--fields`는 그 호출이 고르는 출력에 대해 읽는다. 모양을 바꾸는 보고서는 `schemaVersion`을 올린다. 대상 출력은 `finding list`, `divergence list`, `query`, `status`, `context`와, 나눈 경우의 `export`다.
 
 ### F4 투영
 
@@ -98,7 +105,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 6.9, 6.10, 7.2.3,
   - `--limit`과 `--fields`만 바꾼 호출은 거절되지 않고 같은 쪽 위치에서 이어진다.
   - 실패 경로: 거절은 아무것도 쓰지 않고, 모든 `CURSOR_INVALID`가 reason을 가지고 레지스트리에 등록되어 있다.
 - F3:
-  - `canon schema query --json`, `finding list`, `divergence list`, `export`, `status`, `context`의 출력에 `fields`가 있고 `default`가 `paths`의 부분집합, `keep`과 `paths`가 서로소다.
+  - `canon schema query --json`, `finding list`, `divergence list`, `status`, `context`의 출력에 `fields`가 있고 `default`가 `paths`의 부분집합, `keep`과 `paths`가 서로소다. `export`를 모양마다 나눴다면 출력마다 `fields`와 `when`이 있고, 나누지 않았다면 `fields`가 없고 `--fields`는 `USAGE`다.
   - 선언된 모든 경로가 기록 스키마의 멤버이고 배열은 `[]`로만 지난다. 식별자가 아닌 이름이 선언에 있으면 대괄호로 쓴다.
   - 실패 경로: 투영 가능 조건을 어기는 스키마나 기록 스키마에 없는 경로를 선언하면 테스트가 실패한다.
 - F4:
@@ -115,7 +122,7 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 6.9, 6.10, 7.2.3,
 
 - 계약 저자가 정했다. 쪽 나누기(6.9)와 `--fields`(6.10)는 L0 규칙이고, 그 기능을 제공하는 도구에는 MUST다. 이 변경이 0.34 범위다.
 - 계약 저자가 정했다. cursor는 `--limit`, `--cursor`, `--fields`를 뺀 모든 인수에 묶는다. camelCase 필드 이름 별칭은 없앤다. 멤버마다 철자는 하나이고(6.10) 별칭은 두지 않는다(9.10). 이 별칭에 의존하는 호출이 깨지므로 CHANGELOG의 대체 표에 싣는다.
-- 가정: 투영 가능 조건을 지키려고 모양이 바뀌는 보고서(합집합 변형을 가진 `export` 등)는 그 출력의 `schemaVersion` 주 버전을 올린다. 데이터가 같고 모양만 달라지는 경우 구현자가 minor와 major를 계약 15.3으로 정한다.
+- 가정: 투영 가능 조건을 지키려고 모양이 바뀌는 보고서(합집합 변형을 가진 `export` 등)는 그 출력의 `schemaVersion` 주 버전을 올린다. 데이터가 같고 모양만 달라지는 경우 구현자가 minor와 major를 계약 15.3으로 정한다. `export`를 모양마다 출력으로 나눌지, 합집합 하나로 두고 `fields`를 선언하지 않을지는 구현자가 정하고 변경 기록에 남긴다. 계약 1.1.1은 두 방식을 모두 허용한다.
 - 가정: canon에는 크기로 잘리는 답이 없다. 구현자가 확인하고, 있으면 `meta.truncated`를 이 변경에서 낸다.
 - 가정: canon의 어떤 `--fields` 출력도 식별자가 아닌 이름의 멤버나 선언할 map을 갖지 않는다. 경로 문법의 대괄호와 map 키는 `crates/atip`에 구현하고 단위 테스트로 증명한다. 구현자가 canon 출력에서 해당하는 곳을 찾으면 선언에 쓴다.
 - 가정: `CURSOR_INVALID`의 reason은 위 세 개만 등록한다. 계약의 예약 이름이다.

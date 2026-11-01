@@ -201,6 +201,7 @@ fn schema_listing(env: &[(&str, &str)], args: &[&str]) -> (Output, Vec<Value>) {
 fn as_reviewer_lists_the_reviewers_commands_only_and_canon_role_never_filters() {
     let (out, commands) = schema_listing(&[], &["--as", "reviewer"]);
     assert_eq!(json_of(&out)["data"]["kind"], "tree");
+    assert_eq!(json_of(&out)["data"]["x-canon"], json!({ "as": "reviewer" }), "a filtered tree says whose commands it lists");
     let listed = names(&commands);
     assert!(listed.contains(&"review scenario") && listed.contains(&"finding add") && listed.contains(&"brief check"), "{listed:?}");
     assert!(!listed.contains(&"evidence add") && !listed.contains(&"scenario new") && !listed.contains(&"gate promote"), "{listed:?}");
@@ -211,12 +212,13 @@ fn as_reviewer_lists_the_reviewers_commands_only_and_canon_role_never_filters() 
     assert!(everyone.len() > commands.len(), "no declared role lists every command");
     let (_, via_env) = schema_listing(&[("CANON_ROLE", "reviewer")], &[]);
     assert_eq!(names(&via_env), names(&everyone), "CANON_ROLE never filters schema");
+    assert!(json_of(&canon_with(tempfile::tempdir().unwrap().path(), &["schema", "--json"], &[("CANON_ROLE", "reviewer")]))["data"].get("x-canon").is_none(), "an unfiltered tree names no role");
 }
 
 #[test]
 fn the_as_flag_filters_schema_regardless_of_canon_role() {
     let (out, commands) = schema_listing(&[("CANON_ROLE", "reviewer")], &["--as", "implementer"]);
-    assert_eq!(json_of(&out)["data"]["kind"], "tree");
+    assert_eq!(json_of(&out)["data"]["x-canon"], json!({ "as": "implementer" }));
     assert!(names(&commands).contains(&"evidence add") && !names(&commands).contains(&"review scenario"));
 }
 

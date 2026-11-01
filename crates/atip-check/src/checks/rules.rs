@@ -100,6 +100,30 @@ pub fn contract_version_findings(document: &Value, claim: Claim) -> Vec<Finding>
     findings
 }
 
+/// Whether `document` is the first line of a stream (spec 13.5): `{"type":"start", ...}` with no `ok`.
+pub fn is_stream_start(document: &Value) -> bool {
+    document.get("type").and_then(Value::as_str) == Some("start") && document.get("ok").is_none()
+}
+
+/// `L0.contract-version`, for the start line of a stream: its `contract` and `contractVersion` are the markers of an
+/// envelope's `meta`, so the same conditions apply to them (a tool emits only envelopes or stream lines).
+pub fn stream_start_findings(line: &Value, claim: Claim) -> Vec<Finding> {
+    let mut meta = line.clone();
+    if let Some(object) = meta.as_object_mut() {
+        object.remove("type");
+    }
+    contract_version_findings(&serde_json::json!({"ok": true, "meta": meta}), claim)
+        .into_iter()
+        // A start line is no `schema` answer, whatever its command is called.
+        .filter(|(id, _)| *id != "schema-version-is-claim")
+        .collect()
+}
+
+/// `L0.envelope`, for one line of a stream: the stream-line schema's problems.
+pub fn stream_line_problems(line: &Value) -> Vec<String> {
+    schemas().stream_line_problems(line)
+}
+
 /// `L0.hint-form`: the hints of an error (and of its `details`) that start with the tool name and a space, and are
 /// not one command line.
 pub fn hint_problems(document: &Value, tool: &str) -> Vec<String> {

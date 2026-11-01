@@ -27,5 +27,5 @@ pub const SITES: &[Site] = &[
     site("run/top.rs:run_retrieve:USAGE#3", Kind::Rule { command: "retrieve", rule: "requires", arguments: &["subject", "domain"] }),
     site("run/top.rs:run_retrieve:USAGE#4", Kind::Validator { command: "retrieve", arguments: &["for-role", "regime"] }),
     site("search/mod.rs:run_search:SEARCH_QUERY_EMPTY#1", Kind::Domain { command: "search", argument: "text" }),
-    site("search/mod.rs:run_trace:TRACE_OPERAND_INVALID#1", Kind::Precondition("the operand's shape is checked after `open_index` has built or refreshed the index, so a refusal has written the index; a pure-syntax grammar of three alternatives (26 characters of a review id, 7 to 40 hex digits, `<change>_<round>_<seq>`) that the order of the checks keeps from being a validator")),
+    site("search/mod.rs:run_trace:TRACE_OPERAND_INVALID#1", Kind::Domain { command: "trace", argument: "id" }),
 ];

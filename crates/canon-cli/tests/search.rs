@@ -967,3 +967,78 @@ fn search_graph_03_the_placeholder_ids_are_the_distinct_ids_canon_query_reports_
     let placeholders: std::collections::BTreeSet<String> = doc["neighbors"].as_array().unwrap().iter().filter(|n| n["placeholder"] == true).map(|n| n["id"].as_str().unwrap().split_once(':').unwrap().1.to_string()).collect();
     assert_eq!(placeholders, reported);
 }
+
+// ── atip.contract11.14: a refusal changes nothing (atip/1 8.2) ───────────────────────────────────
+
+/// A trace or search that refuses leaves every file of the repository as it was: the index directory and
+/// file are derived state, written only by a run that answers.
+fn assert_refusal_changes_nothing(r: &Path, args: &[&str], code: &str) {
+    let before = tree(r);
+    let out = canon(args, r);
+    assert_eq!(out.status.code(), Some(2), "{args:?}: {}", text(&out));
+    if args.contains(&"--json") {
+        assert_eq!(json_of(&out)["error"]["code"], code, "{args:?}");
+    } else {
+        assert!(text(&out).contains(code), "{args:?}: {}", text(&out));
+    }
+    let after = tree(r);
+    let changed: Vec<&PathBuf> = after.keys().filter(|path| before.get(*path) != after.get(*path)).chain(before.keys().filter(|path| !after.contains_key(*path))).collect();
+    assert!(changed.is_empty(), "{args:?} refused and changed {changed:?}");
+    assert!(!r.join(".canon/index").exists(), "{args:?} refused and left an index");
+}
+
+#[test]
+fn atip_contract11_14_a_trace_of_an_id_no_record_says_is_refused_and_writes_no_index() {
+    let dir = repo();
+    let r = dir.path();
+    finding(r, "1", "1", "Token is logged", &[]);
+    assert!(!r.join(".canon/index").exists());
+    for operand in ["loop-change_9_9", "deadbeefdead", "abcdef0", "01ARZ3NDEKTSV4RRFFQ69G5FAV"] {
+        assert_refusal_changes_nothing(r, &["trace", operand, "--json"], "TRACE_NOT_FOUND");
+    }
+    assert_refusal_changes_nothing(r, &["trace", "loop-change_9_9"], "TRACE_NOT_FOUND");
+}
+
+#[test]
+fn atip_contract11_14_a_trace_of_an_operand_with_no_shape_is_refused_and_writes_no_index() {
+    let dir = repo();
+    let r = dir.path();
+    finding(r, "1", "1", "Token is logged", &[]);
+    for operand in ["not a shape!", "abc", ""] {
+        assert_refusal_changes_nothing(r, &["trace", operand, "--json"], "TRACE_OPERAND_INVALID");
+    }
+}
+
+#[test]
+fn atip_contract11_14_a_search_of_an_empty_text_is_refused_and_writes_no_index() {
+    let dir = repo();
+    let r = dir.path();
+    finding(r, "1", "1", "Token is logged", &[]);
+    for text in ["", "   "] {
+        assert_refusal_changes_nothing(r, &["search", text, "--json"], "SEARCH_QUERY_EMPTY");
+    }
+}
+
+#[test]
+fn atip_contract11_14_a_refused_trace_leaves_a_fresh_index_as_it_was_and_a_trace_that_answers_still_writes_it() {
+    let dir = repo();
+    let r = dir.path();
+    finding(r, "1", "1", "Token is logged", &[]);
+    let answered = trace_in(r, "loop-change_1_1");
+    assert_eq!(answered.status.code(), Some(0), "{}", text(&answered));
+    assert_eq!(data(&answered)["index"]["rebuilt"], true);
+    assert!(r.join(".canon/index/search.db").is_file(), "the index is written by a run that answers");
+    assert_eq!(std::fs::read_to_string(r.join(".canon/index/.gitignore")).unwrap(), "*\n");
+    let before = tree(r);
+    let refused = trace_in(r, "loop-change_9_9");
+    assert_eq!(json_of(&refused)["error"]["code"], "TRACE_NOT_FOUND");
+    assert_eq!(tree(r), before, "a fresh index stays byte for byte");
+    // A stale index: the refusal leaves the old file, and the next answer rebuilds it.
+    finding(r, "1", "2", "A second one", &[]);
+    let stale = tree(r);
+    let refused = trace_in(r, "loop-change_9_9");
+    assert_eq!(json_of(&refused)["error"]["code"], "TRACE_NOT_FOUND");
+    assert_eq!(tree(r), stale, "a stale index is not rebuilt by a refusal");
+    let again = trace_in(r, "loop-change_1_2");
+    assert_eq!(data(&again)["index"]["rebuilt"], true);
+}

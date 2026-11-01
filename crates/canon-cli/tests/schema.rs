@@ -142,18 +142,20 @@ fn errors_error_and_an_operand_conflict() {
 }
 
 #[test]
-fn a_bogus_canon_role_warns_and_never_fails_the_schema() {
-    for args in [&["schema", "--json"][..], &["schema", "--errors", "--json"][..]] {
+fn schema_does_not_read_canon_role_so_a_bogus_one_is_neither_a_warning_nor_a_failure() {
+    for args in [&["schema", "--json"][..], &["schema", "--errors", "--json"][..], &["schema", "finding", "--json"][..]] {
         let out = canon_env(args, "bogus");
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
         assert_eq!(v["ok"], true, "{v}");
-        assert!(!v["meta"]["warnings"].as_array().expect("a warning in meta.warnings").is_empty(), "{v}");
+        assert!(v["meta"].get("warnings").is_none(), "schema reads no CANON_ROLE, so it has nothing to warn about: {v}");
+        assert_eq!(out.stdout, canon(args).stdout, "{args:?}: the answer is the same with and without the variable");
     }
 }
 
 #[test]
 fn canon_role_never_filters_the_listing_but_as_does() {
+    assert_eq!(canon_env(&["schema", "--json"], "reviewer").stdout, canon(&["schema", "--json"]).stdout);
     let all = listing_len(&canon(&["schema", "--json"]));
     assert_eq!(listing_len(&canon_env(&["schema", "--json"], "implementer")), all);
     let filtered = listing_len(&canon(&["schema", "--as", "implementer", "--json"]));

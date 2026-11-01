@@ -1,0 +1,59 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T10:10:19.490776Z",
+  "attachments": [
+    {
+      "case": "claim::tests::atip_check_58_a_hint_that_starts_with_the_tool_is_one_command_line_or_it_is_not",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "claim::tests::atip_check_58_the_schemas_mark_exactly_what_this_module_knows_as_later_than_1_0",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "claim::tests::atip_check_58_a_one_zero_claim_finds_each_member_of_a_later_minor",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "claim::tests::atip_check_58_nulls_inside_meta_and_error_are_found_and_dropped_for_the_schema",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "atip_check_58_a_tool_that_claims_1_0_is_held_to_no_member_of_1_1_and_to_no_hint_form",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    }
+  ],
+  "code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r4-junit.xml"
+  },
+  "evidence_sha": "e328721b1ac7c1ff1a8710a59a3b84b2c4860a4c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 481,
+  "scenario_id": "atip.check.58",
+  "schema": 1,
+  "staging_id": "52ec38da",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

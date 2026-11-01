@@ -29,6 +29,11 @@ const REGIME_SEGMENT: &str = concat!("^[", white_space!(), "/]*[^", white_space!
 const REGIME_HASH: &str = concat!("^[", white_space!(), "]*[0-9A-Fa-f]{6,64}[", white_space!(), "]*$");
 
 /// Every kind but the ones a filter of `query` applies to.
+/// What `canon trace` reads an operand as, after trimming (`search/trace.rs`): a review id (26 characters of Crockford base32),
+/// a commit sha (7 to 40 hex digits) or a finding key `<change>_<round>_<seq>` with a non-empty change. It is judged from the text
+/// alone, before any read; a pattern is a necessary condition: it admits some text (` _1_2`) that the parser then calls unrecognised.
+const TRACE_OPERAND: &str = concat!("^[", white_space!(), "]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|", any_char!(), "+_[0-9]+_[0-9]+)[", white_space!(), "]*$");
+
 const NOT_CHANGE_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding"];
 const NOT_STATUS_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
 const NOT_DOMAIN_KINDS: &[&str] = &["change", "task", "scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
@@ -84,6 +89,7 @@ pub(super) static TABLES: Tables = Tables {
         ),
     ],
     domains: &[
+        DomainRow::new(Scope::Arguments(&["trace"], "id"), Domain::matching(TRACE_OPERAND), "TRACE_OPERAND_INVALID").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "abcdef0", "loop-change_9_9", " a_1_2 "]).outside(&["abc", "not a shape!", "abcdef", "a_1", "a__2", "a_1_x", "a_1_2_"]),
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_EMPTY").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_INVALID_ARGUMENT").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
