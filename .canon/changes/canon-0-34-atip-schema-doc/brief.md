@@ -162,3 +162,5 @@ Source: https://github.com/journeyWorker/atip tag v1.1.0, spec 4.7, 9, 10.1-10.7
 - 검사기의 L1 검사(`canon-0-34-atip-check-l1`).
 - `schema --search`(알려진 SHOULD 공백, backlog).
 - L2(0.35): `--input` 처리 순서와 조각 병합, 배치 포인터, 계획 digest 형식, `--operation`, stream 선언(`dashboard`), `skills show`의 data 모양.
+
+Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:cfa5f36c309494f7d5b055314cef3809eaf058f6b8f2b31ede1b4f2e30a029df)

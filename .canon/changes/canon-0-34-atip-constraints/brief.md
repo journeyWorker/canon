@@ -157,3 +157,5 @@ canon은 인수 사이의 관계와 값의 범위를 파서와 핸들러에서 �
 - 검사기의 제약, 도메인, 검증자, 숫자 검사(`canon-0-34-atip-check-l1`).
 - 지금 제한이 없는 인수에 새 제한을 만드는 일, 상태를 읽는 검사의 선언.
 - `--input` 문서의 숫자 처리와 입력 오류의 포인터(0.35).
+
+Approved: Journey Hwang 2026-11-01T06:36:14Z — "승인 (6개 모두 0.34, 깨는 변경 괜찮아)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:e57141e2340a81e9739d02464c36788661ac9db8450e4a876b67b19fdf87649a)
