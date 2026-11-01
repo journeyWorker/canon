@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T08:37:48.769275Z",
+  "change_id": "canon-0-34-atip-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/removed.rs:53-70",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "99e3ea117de8f4e6fdbce0b55c0d74d61ffc2136",
+  "reviewer": "rev-atip-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.contract11.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[spec fidelity + standards] Two hints that start with `canon ` are prose, which brief F4 and Acceptance F4 forbid (7.1.2): `canon brief --json` and `canon report --json` (COMMAND_REQUIRED, exit 2) print hint `canon brief without a subcommand was removed in 0.28.0; use `canon brief show` (a group is never runnable; ...)` and the same for `report`. Removed::hint() (removed.rs:68) builds them with format!(\"{} was removed ...\", self.used) where `used` is `canon <group> without a subcommand` (removed.rs:304). The test atip_contract11_10 cannot see them: source_hints() reads only the first string literal of a `.hint(...)` call and `*HINT*` consts, so a hint built from a runtime value is never scanned, and the frozen corpus has no bare-group case. I found them by running every leaf with --bogus, --input '{', '[1]', extra operands, and each group bare, then splitting every hint that starts with `canon`: 4 hints did, 2 are prose (these), 2 are `canon schema --errors|--warnings --json`. Proposed fix: make the bare-group hint start with something that is not `canon` (e.g. `a group is never runnable: use `canon brief show`...`) or just `canon brief show`; and add a test that runs each group bare (and each removed row) through the binary and applies problem() to the printed hint. Blast radius: every Removed row whose `used` starts with `canon` (only the bare-group rows today) and any future computed hint, none of which the scan exercises.",
+  "worktree_dirty": false
+}
