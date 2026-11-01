@@ -31,21 +31,21 @@ Commands without a group word.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon completion` | `<shell>` | none | 읽기: Write the shell completion script for canon (bash, zsh or fish) | `canon completion zsh` |
-| `canon context` | none | none | 읽기: Show what you can author here: record kinds, fields, enums, policies | `canon context` |
-| `canon dashboard` | none | none | 쓰기: Serve the local status dashboard | `canon dashboard` |
-| `canon export` | none | `--kind <KIND>` | 쓰기: Export a redacted retention manifest without deleting records | `canon export --kind evidence --output evidence.json` |
-| `canon format` | `<dir>` (optional) | none | 읽기: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs` |
-| `canon init` | none | none | 쓰기: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init` |
-| `canon migrate` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate` |
-| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z` |
-| `canon query` | none | `--kind <KIND>` | 읽기: Read stored records across every storage tier | `canon query --kind evidence` |
-| `canon retrieve` | none | `--for-role <ROLE>` | 읽기: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20` |
-| `canon schema` | `<path>` (optional) (repeatable) | none | 읽기: Describe canon's own commands | `canon schema evidence add` |
-| `canon search` | `<text>` | none | 읽기: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding` |
-| `canon selftest` | none | none | 읽기: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate` |
-| `canon status` | none | none | 읽기: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status` |
-| `canon trace` | `<id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1` |
+| `canon completion` | `<shell>` | none | 읽기: Write the shell completion script for canon (bash, zsh or fish) | `canon completion zsh --json` |
+| `canon context` | none | none | 읽기: Show what you can author here: record kinds, fields, enums, policies | `canon context --json` |
+| `canon dashboard` | none | none | 쓰기: Serve the local status dashboard | `canon dashboard --json` |
+| `canon export` | none | `--kind <KIND>` | 쓰기: Export a redacted retention manifest without deleting records | `canon export --kind evidence --output evidence.json --json` |
+| `canon format` | `<dir>` (optional) | none | 읽기: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs --json` |
+| `canon init` | none | none | 쓰기: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init --json` |
+| `canon migrate` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate --json` |
+| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z --json` |
+| `canon query` | none | `--kind <KIND>` | 읽기: Read stored records across every storage tier | `canon query --kind evidence --json` |
+| `canon retrieve` | none | `--for-role <ROLE>`, one of `--regime` or `--domain` | 읽기: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20 --json` |
+| `canon schema` | `<path>` (optional) (repeatable) | none | 읽기: Describe canon's own commands | `canon schema evidence add --json` |
+| `canon search` | `<text>` | none | 읽기: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding --json` |
+| `canon selftest` | none | none | 읽기: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate --json` |
+| `canon status` | none | none | 읽기: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status --json` |
+| `canon trace` | `<id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -55,8 +55,8 @@ Validate a provider-neutral adapter response without executing a provider.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon adapter authorize` | none | `--response <FILE>` | 읽기: Authorize declared capabilities against repository policy (preflight only) | `canon adapter authorize --response adapter-response.json --repo .` |
-| `canon adapter validate` | none | `--response <FILE>` | 읽기: Read and validate one provider-neutral response envelope | `canon adapter validate --response adapter-response.json` |
+| `canon adapter authorize` | none | `--response <FILE>` | 읽기: Authorize declared capabilities against repository policy (preflight only) | `canon adapter authorize --response adapter-response.json --repo . --json` |
+| `canon adapter validate` | none | `--response <FILE>` | 읽기: Read and validate one provider-neutral response envelope | `canon adapter validate --response adapter-response.json --json` |
 {/* canon:generated cli-adapter end */}
 
 ### `canon artifacts`
@@ -66,9 +66,9 @@ Check or move the evidence artifact store (local, or an object-store tier).
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon artifacts move` | none | `--tier <TIER>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold` |
-| `canon artifacts store` | none | none | 쓰기: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store` |
-| `canon artifacts verify` | none | none | 읽기: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify` |
+| `canon artifacts move` | none | `--tier <TIER>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold --json` |
+| `canon artifacts store` | none | none | 쓰기: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store --json` |
+| `canon artifacts verify` | none | none | 읽기: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify --json` |
 {/* canon:generated cli-artifacts end */}
 
 ### `canon brief`
@@ -78,9 +78,9 @@ Check a change's brief (PRD format) and see the next steps; never edits.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon brief approve` | `<change-id>` (optional) (repeatable) | `--approver <NAME>`, `--note <TEXT>` | 쓰기: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written"` |
-| `canon brief check` | `<change-id>` (optional) | none | 읽기: Read the brief against the rules | `canon brief check` |
-| `canon brief show` | `<change-id>` (optional) | none | 읽기: Show where the change stands and the next one to three steps; never edits | `canon brief show` |
+| `canon brief approve` | `<change-id>` (optional) (repeatable) | `--approver <NAME>`, `--note <TEXT>` | 쓰기: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written" --json` |
+| `canon brief check` | `<change-id>` (optional) | none | 읽기: Read the brief against the rules | `canon brief check --json` |
+| `canon brief show` | `<change-id>` (optional) | none | 읽기: Show where the change stands and the next one to three steps; never edits | `canon brief show --json` |
 {/* canon:generated cli-brief end */}
 
 ### `canon change`
@@ -90,7 +90,7 @@ Write a plan change (.canon/changes/&lt;slug&gt;/brief.md) and adopt it into a s
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon change new` | `<change-id>` | `--subject <SUBJECT_ID>`, `--title <TEXT>` | 쓰기: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject demo --title "Add search"` |
+| `canon change new` | `<change-id>` | `--subject <SUBJECT_ID>`, `--title <TEXT>` | 쓰기: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject demo --title "Add search" --json` |
 {/* canon:generated cli-change end */}
 
 ### `canon context-pack`
@@ -100,9 +100,9 @@ Create, inspect, and verify reproducible context packs.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon context-pack add` | none | `--manifest <FILE>` | 쓰기: Create an immutable context pack from a repository-local JSON manifest | `canon context-pack add --manifest .canon/context-manifest.json` |
-| `canon context-pack show` | `<pack-id>` | none | 읽기: Show a context pack after verifying its manifest and content objects | `canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000` |
-| `canon context-pack verify` | `<pack-id>` | none | 읽기: Verify a context pack's manifest and immutable content objects | `canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000` |
+| `canon context-pack add` | none | `--manifest <FILE>` | 쓰기: Create an immutable context pack from a repository-local JSON manifest | `canon context-pack add --manifest .canon/context-manifest.json --json` |
+| `canon context-pack show` | `<pack-id>` | none | 읽기: Show a context pack after verifying its manifest and content objects | `canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000 --json` |
+| `canon context-pack verify` | `<pack-id>` | none | 읽기: Verify a context pack's manifest and immutable content objects | `canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000 --json` |
 {/* canon:generated cli-context-pack end */}
 
 ### `canon demo`
@@ -112,8 +112,8 @@ Try the evidence loop end-to-end in a throwaway demo repo.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon demo init` | none | none | 쓰기: Scaffold the demo repo (gate starts RED) | `canon demo init --repo canon-demo` |
-| `canon demo review` | none | none | 쓰기: Record the missing reviewer evidence (gate turns GREEN) | `canon demo review` |
+| `canon demo init` | none | none | 쓰기: Scaffold the demo repo (gate starts RED) | `canon demo init --repo canon-demo --json` |
+| `canon demo review` | none | none | 쓰기: Record the missing reviewer evidence (gate turns GREEN) | `canon demo review --json` |
 {/* canon:generated cli-demo end */}
 
 ### `canon dispatch`
@@ -123,9 +123,9 @@ Begin an agent run with retrieved guidance recorded.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon dispatch begin` | none | `--regime <KEY>` | 쓰기: Mint a Run manifest with retrieved guidance and context/policy lineage | `canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer` |
-| `canon dispatch diff` | none | none | 읽기: Diff the declared plan DAG against the observed execution graph | `canon dispatch diff` |
-| `canon dispatch end` | `<run-id>` | `--run-outcome <RUN_OUTCOME>` | 쓰기: Close a dispatched run with a terminal status and an ended_at | `canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded` |
+| `canon dispatch begin` | none | `--regime <KEY>` | 쓰기: Mint a Run manifest with retrieved guidance and context/policy lineage | `canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer --json` |
+| `canon dispatch diff` | none | none | 읽기: Diff the declared plan DAG against the observed execution graph | `canon dispatch diff --json` |
+| `canon dispatch end` | `<run-id>` | `--run-outcome <RUN_OUTCOME>` | 쓰기: Close a dispatched run with a terminal status and an ended_at | `canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded --json` |
 {/* canon:generated cli-dispatch end */}
 
 ### `canon divergence`
@@ -135,11 +135,11 @@ Stage, promote, resolve, and inspect spec divergences.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <TEXT>`, `--tracking <TEXT>`, `--actor <ACTOR_ID>` | 쓰기: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer` |
-| `canon divergence add` | `<scenario-id>` | `--actor <ACTOR_ID>` | 쓰기: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --actor alice --role reviewer` |
-| `canon divergence defer` | `<scenario-id>` | `--actor <ACTOR_ID>`, `--reason <TEXT>`, `--expiry <TIMESTAMP>` | 쓰기: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer` |
-| `canon divergence list` | none | none | 읽기: List the current divergence burn-down state | `canon divergence list --as-of 2030-01-01` |
-| `canon divergence resolve` | `<scenario-id>` | `--actor <ACTOR_ID>` | 쓰기: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --actor alice --role reviewer` |
+| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <TEXT>`, `--tracking <TEXT>`, `--actor <ACTOR_ID>` | 쓰기: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer --json` |
+| `canon divergence add` | `<scenario-id>` | `--actor <ACTOR_ID>` | 쓰기: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --actor alice --role reviewer --json` |
+| `canon divergence defer` | `<scenario-id>` | `--actor <ACTOR_ID>`, `--reason <TEXT>`, `--expiry <TIMESTAMP>` | 쓰기: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer --json` |
+| `canon divergence list` | none | none | 읽기: List the current divergence burn-down state | `canon divergence list --as-of 2030-01-01 --json` |
+| `canon divergence resolve` | `<scenario-id>` | `--actor <ACTOR_ID>` | 쓰기: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --actor alice --role reviewer --json` |
 {/* canon:generated cli-divergence end */}
 
 ### `canon evidence`
@@ -149,9 +149,9 @@ Author a staged, attributed evidence attestation for a plan task.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon evidence add` | none | none | 쓰기: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer` |
-| `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | 읽기: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z` |
-| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | 쓰기: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer` |
+| `canon evidence add` | none | none | 쓰기: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer --json` |
+| `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | 읽기: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | 쓰기: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
 {/* canon:generated cli-evidence end */}
 
 ### `canon feature`
@@ -161,7 +161,7 @@ Scaffold a new .feature spec file.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon feature new` | `<surface>` | `--title <TEXT>` | 쓰기: Create a fresh .feature file for a new area.surface | `canon feature new billing.invoice --title Invoices` |
+| `canon feature new` | `<surface>` | `--title <TEXT>` | 쓰기: Create a fresh .feature file for a new area.surface | `canon feature new billing.invoice --title Invoices --json` |
 {/* canon:generated cli-feature end */}
 
 ### `canon finding`
@@ -171,9 +171,9 @@ Record one code-review finding as a durable record.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon finding add` | none | `--change <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor <ACTOR_ID>`, `--summary <TEXT>` | 쓰기: Record one code-review finding (promoted in the same run under `write | `canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged"` |
-| `canon finding close` | `<change-id>` | `--round <N>`, `--seq <N>`, `--disposition <DISPOSITION>` | 쓰기: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"` |
-| `canon finding list` | none | `--change <CHANGE_ID>` | 읽기: List a change's committed findings at their latest version | `canon finding list --change add-login` |
+| `canon finding add` | none | `--change <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor <ACTOR_ID>`, `--summary <TEXT>` | 쓰기: Record one code-review finding (promoted in the same run under `write | `canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged" --json` |
+| `canon finding close` | `<change-id>` | `--round <N>`, `--seq <N>`, `--disposition <DISPOSITION>` | 쓰기: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed" --json` |
+| `canon finding list` | none | `--change <CHANGE_ID>` | 읽기: List a change's committed findings at their latest version | `canon finding list --change add-login --json` |
 {/* canon:generated cli-finding end */}
 
 ### `canon gate`
@@ -183,9 +183,9 @@ Run evidence gates, promote staged records, install hooks.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon gate check` | none | none | 읽기: Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage) | `canon gate check` |
-| `canon gate install-hooks` | none | none | 쓰기: Install the gate hook into .claude/settings.json / .codex/hooks.json | `canon gate install-hooks` |
-| `canon gate promote` | none | none | 쓰기: Promote staged records (evidence, findings, divergences) to the committed ledger | `canon gate promote --kind evidence` |
+| `canon gate check` | none | none | 읽기: Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage) | `canon gate check --json` |
+| `canon gate install-hooks` | none | none | 쓰기: Install the gate hook into .claude/settings.json / .codex/hooks.json | `canon gate install-hooks --json` |
+| `canon gate promote` | none | none | 쓰기: Promote staged records (evidence, findings, divergences) to the committed ledger | `canon gate promote --kind evidence --json` |
 {/* canon:generated cli-gate end */}
 
 ### `canon ingest`
@@ -195,9 +195,9 @@ Import agent sessions, records, and plans into canon's store.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon ingest plans` | none | none | 쓰기: Import plans as Change/Task records | `canon ingest plans` |
-| `canon ingest records` | none | none | 쓰기: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records` |
-| `canon ingest sessions` | none | none | 쓰기: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions` |
+| `canon ingest plans` | none | none | 쓰기: Import plans as Change/Task records | `canon ingest plans --json` |
+| `canon ingest records` | none | none | 쓰기: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records --json` |
+| `canon ingest sessions` | none | none | 쓰기: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions --json` |
 {/* canon:generated cli-ingest end */}
 
 ### `canon inventory`
@@ -207,7 +207,7 @@ Index a validated .feature corpus into the scenario ledger.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon inventory sync` | none | none | 쓰기: Validate each spec root, then materialize scenario index records | `canon inventory sync` |
+| `canon inventory sync` | none | none | 쓰기: Validate each spec root, then materialize scenario index records | `canon inventory sync --json` |
 {/* canon:generated cli-inventory end */}
 
 ### `canon ledger`
@@ -217,7 +217,7 @@ Keep the ledger to the current version of each record.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon ledger compact` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Move superseded versions of every record out of the ledger into the archive | `canon ledger compact` |
+| `canon ledger compact` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Move superseded versions of every record out of the ledger into the archive | `canon ledger compact --json` |
 {/* canon:generated cli-ledger end */}
 
 ### `canon plugin`
@@ -227,7 +227,7 @@ Sync plugin overlay records onto the ledger.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon plugin sync` | `<plugin-id>` | none | 쓰기: Validate and write a plugin's overlay records | `canon plugin sync my-plugin` |
+| `canon plugin sync` | `<plugin-id>` | none | 쓰기: Validate and write a plugin's overlay records | `canon plugin sync my-plugin --json` |
 {/* canon:generated cli-plugin end */}
 
 ### `canon policy`
@@ -237,8 +237,8 @@ Record who approved the gate's policy (.canon/policy.yaml) and which bytes.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon policy approve` | none | `--approver <NAME>` | 쓰기: Approve the current .canon/policy.yaml (written directly; nothing to promote) | `canon policy approve --approver alice --note "reviewed the starter policy"` |
-| `canon policy show` | none | none | 읽기: Show the policy's digest and its approval (who, when, which bytes) | `canon policy show` |
+| `canon policy approve` | none | `--approver <NAME>` | 쓰기: Approve the current .canon/policy.yaml (written directly; nothing to promote) | `canon policy approve --approver alice --note "reviewed the starter policy" --json` |
+| `canon policy show` | none | none | 읽기: Show the policy's digest and its approval (who, when, which bytes) | `canon policy show --json` |
 {/* canon:generated cli-policy end */}
 
 ### `canon prompt`
@@ -248,8 +248,8 @@ Register and select versioned prompt bundles.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon prompt add` | `<name@version>` | `--manifest <FILE>` | 쓰기: Add a prompt bundle from a repository-local JSON manifest | `canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json` |
-| `canon prompt show` | `<name@version>` | none | 읽기: Select a registered prompt bundle version | `canon prompt show reviewer@v1` |
+| `canon prompt add` | `<name@version>` | `--manifest <FILE>` | 쓰기: Add a prompt bundle from a repository-local JSON manifest | `canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json --json` |
+| `canon prompt show` | `<name@version>` | none | 읽기: Select a registered prompt bundle version | `canon prompt show reviewer@v1 --json` |
 {/* canon:generated cli-prompt end */}
 
 ### `canon regime`
@@ -259,7 +259,7 @@ Build a canonical regime key for hook scripts.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon regime show` | none | `--role-segment <NAME>`, `--repo-name <NAME>`, `--area <NAME>`, `--hash <HASH>` | 읽기: Build a canonical regime key for hook scripts | `canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345` |
+| `canon regime show` | none | `--role-segment <NAME>`, `--repo-name <NAME>`, `--area <NAME>`, `--hash <HASH>` | 읽기: Build a canonical regime key for hook scripts | `canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345 --json` |
 {/* canon:generated cli-regime end */}
 
 ### `canon report`
@@ -269,9 +269,9 @@ Build, check, or snapshot the status report.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon report build` | none | none | 쓰기: Write the status report (.canon/REPORT.md) | `canon report build` |
-| `canon report check` | none | none | 읽기: Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing | `canon report check` |
-| `canon report snapshot` | `<dir>` | none | 쓰기: Export the panel marts to &lt;DIR&gt;/*.parquet plus manifest.json | `canon report snapshot snapshot-out` |
+| `canon report build` | none | none | 쓰기: Write the status report (.canon/REPORT.md) | `canon report build --json` |
+| `canon report check` | none | none | 읽기: Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing | `canon report check --json` |
+| `canon report snapshot` | `<dir>` | none | 쓰기: Export the panel marts to &lt;DIR&gt;/*.parquet plus manifest.json | `canon report snapshot snapshot-out --json` |
 {/* canon:generated cli-report end */}
 
 ### `canon review`
@@ -281,8 +281,8 @@ Record an attributed review verdict.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon review change` | `<change-id>` | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | 쓰기: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md` |
-| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | 쓰기: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md` |
+| `canon review change` | `<change-id>` | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | 쓰기: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md --json` |
+| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | 쓰기: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md --json` |
 {/* canon:generated cli-review end */}
 
 ### `canon scenario`
@@ -292,7 +292,7 @@ Add a tagged scenario to a .feature spec file.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon scenario new` | `<scenario-id>` | `--title <TEXT>` | 쓰기: Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input` | `canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature` |
+| `canon scenario new` | `<scenario-id>` | `--title <TEXT>` | 쓰기: Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input` | `canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature --json` |
 {/* canon:generated cli-scenario end */}
 
 ### `canon skills`
@@ -302,10 +302,10 @@ Install canon's agent guides into a repo.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon skills check` | none | none | 읽기: Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote | `canon skills check` |
-| `canon skills doctor` | none | none | 읽기: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor` |
-| `canon skills install` | none | none | 쓰기: Install the canonical `canon` bundle or legacy developer skills | `canon skills install` |
-| `canon skills show` | `<name>` | none | 읽기: Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here | `canon skills show canon --full` |
+| `canon skills check` | none | none | 읽기: Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote | `canon skills check --json` |
+| `canon skills doctor` | none | none | 읽기: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor --json` |
+| `canon skills install` | none | none | 쓰기: Install the canonical `canon` bundle or legacy developer skills | `canon skills install --json` |
+| `canon skills show` | `<name>` | none | 읽기: Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here | `canon skills show canon --full --json` |
 {/* canon:generated cli-skills end */}
 
 ### `canon strategy`
@@ -315,9 +315,9 @@ Promote a proven strategy into the git-tracked tier.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon strategy approval-payload` | `<strategy-id>` | `--evaluation <FILE>`, `--approver <NAME>`, `--approval-at <TIMESTAMP>` | 읽기: The unsigned approval payload bytes an external signer signs (a read | `canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z` |
-| `canon strategy promote` | `<strategy-id>` | none | 쓰기: Promote a strategy after paired evaluation and signed approval | `canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV` |
-| `canon strategy rollback` | `<strategy-id>` | `--reason <TEXT>`, `--actor <ACTOR_ID>`, `--signature-file <FILE>`, `--approval-at <TIMESTAMP>` | 쓰기: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z` |
+| `canon strategy approval-payload` | `<strategy-id>` | `--evaluation <FILE>`, `--approver <NAME>`, `--approval-at <TIMESTAMP>` | 읽기: The unsigned approval payload bytes an external signer signs (a read | `canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
+| `canon strategy promote` | `<strategy-id>` | none | 쓰기: Promote a strategy after paired evaluation and signed approval | `canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json` |
+| `canon strategy rollback` | `<strategy-id>` | `--reason <TEXT>`, `--actor <ACTOR_ID>`, `--signature-file <FILE>`, `--approval-at <TIMESTAMP>` | 쓰기: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json` |
 {/* canon:generated cli-strategy end */}
 
 ### `canon subject`
@@ -327,11 +327,11 @@ Create and manage subjects (durable product units).
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon subject adopt` | `<subject-id>` | `--change <CHANGE_ID>` | 쓰기: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change add-login` |
-| `canon subject move` | `<subject-id>` | `--to <STATE>` | 쓰기: Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason) | `canon subject move demo --to specced` |
-| `canon subject new` | `<subject-id>` | `--domain <NAME>`, `--title <TEXT>` | 쓰기: Author a new subject at status `proposed` | `canon subject new payments --domain dev --title Payments` |
-| `canon subject show` | `<subject-id>` | none | 읽기: Show a subject (read-only) | `canon subject show demo` |
-| `canon subject unadopt` | `<subject-id>` | `--change <CHANGE_ID>` | 쓰기: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change add-login` |
+| `canon subject adopt` | `<subject-id>` | `--change <CHANGE_ID>` | 쓰기: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change add-login --json` |
+| `canon subject move` | `<subject-id>` | `--to <STATE>` | 쓰기: Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason) | `canon subject move demo --to specced --json` |
+| `canon subject new` | `<subject-id>` | `--domain <NAME>`, `--title <TEXT>` | 쓰기: Author a new subject at status `proposed` | `canon subject new payments --domain dev --title Payments --json` |
+| `canon subject show` | `<subject-id>` | none | 읽기: Show a subject (read-only) | `canon subject show demo --json` |
+| `canon subject unadopt` | `<subject-id>` | `--change <CHANGE_ID>` | 쓰기: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change add-login --json` |
 {/* canon:generated cli-subject end */}
 
 ### `canon task`
@@ -341,7 +341,7 @@ Flip a plan task's checkbox once committed evidence supports it.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon task done` | `<task-id>` | none | 쓰기: Flip one task checkbox, gated on real evidence (fails closed) | `canon task done add-login#1` |
+| `canon task done` | `<task-id>` | none | 쓰기: Flip one task checkbox, gated on real evidence (fails closed) | `canon task done add-login#1 --json` |
 {/* canon:generated cli-task end */}
 
 ### `canon tier`
@@ -351,7 +351,7 @@ Age records between storage tiers.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon tier age` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Apply canon.yaml aging rules, moving old records to their destination tier | `canon tier age` |
+| `canon tier age` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Apply canon.yaml aging rules, moving old records to their destination tier | `canon tier age --json` |
 {/* canon:generated cli-tier end */}
 
 ## 에이전트로 canon 구동하기
@@ -359,28 +359,49 @@ Age records between storage tiers.
 모든 명령은 하나의 머신 계약을 공유하므로, 에이전트가 `--help`나 사람용
 텍스트를 긁어 읽을 필요가 없습니다.
 
-**`canon schema`로 파악합니다.** 한 번의 호출로 명령 하나를 설명합니다. 옵션 이름을 추측하지 말고 여기서 확인하세요:
+**`canon schema`로 파악합니다.** 모든 `--help`의 첫 줄이 이 명령을 가리킵니다. 한 번의 호출로 CLI 전체, 그룹 하나, 명령 하나를 설명합니다. 옵션 이름을 추측하지 말고 여기서 확인하세요:
 
 ```bash
-canon schema                      # 모든 명령과 effect, 한 줄씩
-canon schema purge --json         # {ok, data, meta}: arguments, options, exits, errorCodes, input 스키마와 예시
-canon schema --errors --json      # 고정된 모든 오류 코드와 의미
+canon schema --json               # 트리: 모든 그룹과 명령, effect, canon이 주장하는 level
+canon schema finding --json       # 그룹 하나: 그 그룹의 명령
+canon schema purge --json         # 명령 하나 전체
+canon schema evidence add --json  # ... --input 스키마와 완전한 예시 포함
+canon schema --as reviewer --json # 한 역할의 명령만 담은 트리(`x-canon.as`가 그 역할)
+canon schema --errors --json      # 고정된 모든 오류 코드, 의미, reason
+canon schema --warnings --json    # 모든 경고 코드(meta.warnings)와 의미
 ```
 
-`data`에는 `command`, `effect`(`read`, `write`, `destructive`),
-`supportsJson`, `arguments`, `options`(`name`, `kind`, `valueName`,
-`required`, `repeatable`, `possibleValues`, `default`), `exits`(`code`,
-`meaning`), `errorCodes`가 담깁니다.
+`data.kind`가 어떤 문서가 왔는지 알려 줍니다. `tree`에는 `level`(`L1`)과
+`commands`가 있습니다. 모든 그룹과 명령이 한 번씩, 그룹이 자기 명령 앞에 오고,
+각 항목에 `command`, `path`, `kind`(`group` 또는 `command`), `summary`, 명령이면
+`effect`와 `x-canon.roles`가 있습니다. `group`에는 `command`, `path`, `summary`와
+직접 자식 `commands`가 있습니다. `command`에는 `effect`(`read`, `write`,
+`destructive`), `idempotency`(읽기는 없음), `operands`와 `options`(`name`,
+`valueName`, `valueType`, `required`, `repeatable`, 타입이 있는 `default`,
+`possibleValues`, 해당하면 `defaultNote`, `env`, `flagOnly`, `short`), `errors`(낼 수
+있는 모든 코드, 명령이 제공하는 기능의 예약 코드 포함), `outputs`, `input`,
+`examples`, `schemas`가 담깁니다. `valueType`은 `switch`, `count`, `string`,
+`integer`, `number`, `path`, `enum`, `json` 중 하나이고, `--input` 문서에 쓸 수
+없는 옵션은 `flagOnly: true`입니다. 출력마다 JSON Schema 이름(`schemaRef`,
+`#/schemas/<Name>`)과 `schemaVersion`이 있고, 배열이나 NDJSON `--input`의
+보고서는 `batch: true`입니다. `schemas`가 그 스키마들을 담으므로 모든 보고서의
+모양이 답 안에 있습니다. `input`은 `--input` 문서 하나의 스키마(`schemaRef`: 받는 키,
+`required` 없음)와 병합 뒤 인수의 스키마(`argumentsRef`), 완전한 `example` 하나를
+알려 줍니다. `examples`는 `--json`으로 끝나고 그대로 실행되는 완전한 호출입니다.
 
 **`--json` 봉투(envelope).** `--json`이면 stdout에 JSON 문서가 정확히 하나만 나오고
 (안내 문구는 stderr), 성공과 실패 모두 같은 모양입니다: `{ok, data, meta}`.
 exit 1의 부분 보고서는 실패 봉투에 `data`도 함께 담습니다. 봉투는 atip/1을
 따릅니다. `meta`에는 `schemaVersion`, `tool`(`canon`), `toolVersion`,
-`contract`(`atip/1`), 해석된 `command`가 들어 있고, 해당할 때 `output`(명령이
+`contract`(`atip/1`), `contractVersion`(`1.1`, 모든 봉투에), 해석된 `command`가 들어 있고, 해당할 때 `output`(명령이
 보고서를 여럿 선언하면 그 이름), `context`(`{repo}`), `next`, `warnings`,
 `coverage`, `page`, `x-canon`(canon 전용 추가 정보)이 더해집니다. 값이 없는
 멤버는 `null`도 `[]`도 아니라 아예 빠집니다. `--json`은 `--` 앞이면 어디에든 올 수
 있어 루트와 그룹에도 붙습니다(`canon --json`, `canon finding --json`).
+`--repo`와 `--as`도 그룹 뒤에 받으며 그룹에서는 아무 일도 하지 않습니다
+(그 옵션만 붙은 그룹은 `USAGE`가 아니라 `COMMAND_REQUIRED`로 답합니다).
+읽는 쪽은 아는 멤버만 읽고 나머지는 무시합니다. 이후 canon이 멤버를 더하고,
+닫힌 집합의 값이 처음 보는 것이면 그 항목 하나만 건너뛰며 문서를 거절하지 않습니다.
 텍스트가 곧 산출물인 몇 개 명령(`skills show`의 가이드, `export`와
 `approval-payload`의 바이트, 셸 완성 스크립트)은 텍스트 모드에서만 봉투로
 감싸지 않습니다.
@@ -392,8 +413,9 @@ exit 1의 부분 보고서는 실패 봉투에 `data`도 함께 담습니다. �
   "meta": {
     "schemaVersion": "1.0",
     "tool": "canon",
-    "toolVersion": "0.33.0",
+    "toolVersion": "0.34.0",
     "contract": "atip/1",
+    "contractVersion": "1.1",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [
@@ -411,9 +433,13 @@ exit 1의 부분 보고서는 실패 봉투에 `data`도 함께 담습니다. �
 **오류.** 실패하면 stderr 첫 줄에 `canon: CODE: message`를 내고, 이어서 들여쓴
 `field:`, `expected:`, `hint:` 줄을 냅니다. 텍스트 모드에서 stdout은 비어 있습니다.
 `--json`이면 봉투의 `error`가 `{"code", "message", "retryable"}`를 담고, canon이
-지목할 수 있으면 `hint`, `field`(문제의 옵션), `expected`(유효한 값), `received`,
-`suggestions`가 더해집니다. `retryable`은 항상 있고 나머지는 값이 없으면
-빠집니다. 코드는 고정된 문자열입니다. 커맨드라인 파싱 오류는 `USAGE`, 모르는
+지목할 수 있으면 `reason`(코드 아래에 등록된 상황 중 어느 것인지), `hint`(`canon`으로 시작하는
+실행할 한 줄, `<PLACEHOLDER>`가 든 틀, 또는 한 문장), `field`(문제의 옵션),
+`expected`(유효한 값), `received`(받은 값, 빈 값이면 `""`), `suggestions`가
+더해집니다. 어떤 인수 때문인지 못 가리는 `USAGE`는 `field`가 없고 `hint`가
+`canon schema <명령> --json`입니다. `retryable`은 항상 있고 나머지는 값이 없으면
+빠집니다. 코드는 고정된 문자열이고, `canon schema --error <CODE>`가 reason과 함께
+설명하며, 경고로만 나오는 코드는 `canon schema --warning <CODE>`가 설명합니다. 커맨드라인 파싱 오류는 `USAGE`, 모르는
 명령은 `UNKNOWN_COMMAND`(`expected`가 그 단계의 유효한 단어를 나열), 명령이 아예
 없는 호출(`canon --json`, `canon finding --json`)은 `COMMAND_REQUIRED`,
 JSON 모드의 패닉은 `INTERNAL`입니다. 종료 코드는 `0`, `1`, `2`뿐이며 각 코드의
@@ -429,8 +455,11 @@ finding, `unverifiable`)입니다. 검사가 아무것도 살펴보지 못했다
 옵션 이름의 camelCase(`scenario`, `project`, …)이고 피연산자는 `operands`
 배열에 둡니다. 모르는 키, 잘못된 타입, 읽을 수 없는 파일, 터미널에서의 `-`처럼
 쓸 수 없는 입력은 조용히 버려지지 않고 `INPUT_INVALID`로 거부되며 구분은
-`message`와 `field`에 남습니다(`-`를 다른 stdin 입력과 함께 쓰면 `field`가
-`--input`인 `USAGE`입니다). 객체는 호출 한 번이고, 배열(또는 파일/stdin의 NDJSON)은 **배치**입니다:
+`reason`에 남습니다: `UNREADABLE`(읽을 수 없는 파일), `STDIN_TTY`(터미널에서의 `-`),
+`EMPTY`, `NOT_JSON`, `NOT_OBJECT`, `BATCH_UNSUPPORTED`(배치를 받지 않는 명령),
+문서가 스키마를 어기면(`field`가 포인터) `UNKNOWN_KEY`, `FLAG_ONLY_KEY`, `INVALID_VALUE`입니다.
+한도를 넘으면 `INPUT_TOO_LARGE`이고 `reason`은 `TOO_MANY_BYTES`나 `TOO_MANY_ITEMS`입니다
+(`-`를 다른 stdin 입력과 함께 쓰면 `field`가 `--input`인 `USAGE`입니다). 객체는 호출 한 번이고, 배열(또는 파일/stdin의 NDJSON)은 **배치**입니다:
 모든 원소를 첫 쓰기 전에 검증하므로 검증이 실패하면 아무것도 쓰지 않고 `error.field`가
 `/items/<i>/<key>`로 지목합니다. 원소 일부가 실패한 배치는 `BATCH_INCOMPLETE`(exit 1)입니다.
 같은 배치를 다시 실행해도 안전합니다(이미 있는
@@ -454,10 +483,16 @@ canon scenario new --input '[{"operands":["auth.login.02"],"title":"Sign out"},{
 반환합니다. `--all`은 전부, `--cursor <nextCursor>`는 이어서 가져옵니다.
 `--json`은 `meta.page`(`{returned, total, nextCursor}`)를 더합니다. `nextCursor`가
 있으면 더 있다는 뜻이고 `meta.next`가 같은 호출에
-`--cursor <nextCursor>`를 붙여 알려 줍니다. 잘못된 커서는 `CURSOR_INVALID`입니다.
-`canon query`와 `canon finding list`는 `--fields a,b,c`로 레코드를 투영할 수
-있으며, 모르는 필드는 `field`가 `--fields`인 `USAGE`이고 `expected`가 고를 수 있는
-필드를 나열합니다.
+`--cursor <nextCursor>`를 붙여 알려 줍니다. 커서는 그것을 발급한 호출에서만 유효합니다:
+`--limit`, `--all`, `--fields`만 바꿀 수 있고, 다른 인수가 바뀌면 `CURSOR_INVALID`이며
+`error.reason`이 `ARGUMENTS_CHANGED`입니다(`FOREIGN`: 이 명령이 발급한 커서가 아님,
+`EXPIRED`: 커서가 가리키던 레코드가 없어짐). `canon query`, `canon finding list`,
+`canon divergence list`, `canon export`, `canon status`, `canon context`는
+`--fields a,b,c`로 투영할 수 있습니다. 고를 수 있는 경로는
+`canon schema <command> --json`의 `outputs[].fields`에 있고, 답이 쓰는 철자 그대로 씁니다
+(목록 안은 `name[]`, 식별자가 아닌 키는 `["the-key"]`). 답의 `meta.fields`가 남긴 경로를
+나열하며, 없는 경로는 `field`가 `--fields`인 `USAGE`이고 `expected`가 고를 수 있는
+경로를 나열합니다.
 
 **검색과 추적.** `canon search "<텍스트>"`는 레코드, brief 섹션과 flow 단계, 시나리오
 본문에서 텍스트를 찾고 걸린 노드마다 레코드 그래프의 이웃을 함께 냅니다

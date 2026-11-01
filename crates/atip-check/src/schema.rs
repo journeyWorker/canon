@@ -1,6 +1,6 @@
 //! The contract schemas, as the checker reads them.
 //!
-//! The three schemas are the originals the `atip` crate embeds (`atip::schema`):
+//! The schemas are the originals the `atip` crate embeds (`atip::schema`):
 //! this module parses them and builds the validators, it never rewrites a
 //! schema. They are JSON Schema 2020-12; `format` is an annotation, never an
 //! assertion (the checker's authors decided it so, because a format a tool
@@ -12,10 +12,14 @@ use jsonschema::{Draft, Registry, ValidationOptions, Validator};
 use serde_json::Value;
 
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
+/// `schema/guide.schema.json` of the contract at tag v1.1.1, byte for byte (`atip` does not vendor it: no L1 document of canon refers to it).
+pub const GUIDE_SCHEMA: &str = include_str!("../schema/guide.schema.json");
+const SCHEMA_DOC_ID: &str = "https://atip.dev/1/schema-doc.schema.json";
 const REGISTRY_ENTRY_ID: &str = "https://atip.dev/1/registry-entry.schema.json";
 const ENVELOPE_ID: &str = "https://atip.dev/1/envelope.schema.json";
+const WARNING_ENTRY_ID: &str = "https://atip.dev/1/warning-entry.schema.json";
 
-/// The validators of the three contract schemas.
+/// The validators of the contract schemas.
 #[derive(Debug)]
 pub struct Schemas {
     registry: Registry<'static>,
@@ -24,6 +28,9 @@ pub struct Schemas {
     success: Validator,
     failure: Validator,
     registry_entry: Validator,
+    warning_entry: Validator,
+    schema_doc: Validator,
+    stream_line: Validator,
 }
 
 /// One thing wrong with a document: where (a JSON pointer, `/` for the root) and what.
@@ -31,6 +38,8 @@ pub struct Schemas {
 pub struct Problem {
     pub path: String,
     pub message: String,
+    /// The JSON Schema keyword that was violated (`pattern`, `required`, ...).
+    pub keyword: String,
 }
 
 impl Problem {
@@ -71,12 +80,37 @@ impl Schemas {
             "registry-entry.schema.json",
             atip::schema::REGISTRY_ENTRY_SCHEMA,
         )?;
-        let registry = Registry::new()
-            .add(ERROR_ID, error)
-            .and_then(|builder| builder.add(ENVELOPE_ID, envelope.clone()))
-            .and_then(|builder| builder.add(REGISTRY_ENTRY_ID, registry_entry.clone()))
-            .and_then(jsonschema::RegistryBuilder::prepare)
-            .map_err(|error| error.to_string())?;
+        let warning_entry = parse(
+            "warning-entry.schema.json",
+            atip::schema::WARNING_ENTRY_SCHEMA,
+        )?;
+        let schema_doc = parse("schema-doc.schema.json", atip::schema::SCHEMA_DOC_SCHEMA)?;
+        let stream_line = parse(
+            "stream-line.schema.json",
+            atip::schema::STREAM_LINE_SCHEMA,
+        )?;
+        let registry = [
+            (ERROR_ID, error),
+            (ENVELOPE_ID, envelope.clone()),
+            (REGISTRY_ENTRY_ID, registry_entry.clone()),
+            (WARNING_ENTRY_ID, warning_entry.clone()),
+            (
+                "https://atip.dev/1/input-document.schema.json",
+                parse("input-document.schema.json", atip::schema::INPUT_DOCUMENT_SCHEMA)?,
+            ),
+            (
+                "https://atip.dev/1/batch-report.schema.json",
+                parse("batch-report.schema.json", atip::schema::BATCH_REPORT_SCHEMA)?,
+            ),
+            ("https://atip.dev/1/stream-line.schema.json", stream_line.clone()),
+            (SCHEMA_DOC_ID, schema_doc.clone()),
+            // L2's guide schema: a command document's `schemas` may `$ref` it (the contract's `skills show` example does).
+            ("https://atip.dev/1/guide.schema.json", parse("guide.schema.json", GUIDE_SCHEMA)?),
+        ]
+        .into_iter()
+        .try_fold(Registry::new(), |builder, (id, schema)| builder.add(id, schema))
+        .and_then(jsonschema::RegistryBuilder::prepare)
+        .map_err(|error| error.to_string())?;
         let build = |schema: &Value| {
             options(&registry)
                 .build(schema)
@@ -90,6 +124,9 @@ impl Schemas {
             success: branch("success")?,
             failure: branch("failure")?,
             registry_entry: build(&registry_entry)?,
+            warning_entry: build(&warning_entry)?,
+            schema_doc: build(&schema_doc)?,
+            stream_line: build(&stream_line)?,
             registry,
         })
     }
@@ -99,6 +136,11 @@ impl Schemas {
         options(&self.registry)
             .build(schema)
             .map_err(|error| error.to_string())
+    }
+
+    /// The problems of the whole `schema --json` answer `document` against the self-description schema, each with its place and keyword.
+    pub fn schema_doc_problem_list(&self, document: &Value) -> Vec<Problem> {
+        problem_list(&self.schema_doc, document)
     }
 
     /// The problems of `document` against the envelope schema, empty when it validates.
@@ -127,6 +169,22 @@ impl Schemas {
             .map(ToString::to_string)
             .collect()
     }
+
+    /// The problems of one NDJSON line of a stream against the stream-line schema, empty when it validates.
+    pub fn stream_line_problems(&self, line: &Value) -> Vec<String> {
+        problem_list(&self.stream_line, line)
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    /// The problems of `row` against the warning-entry schema, empty when it validates.
+    pub fn warning_entry_problems(&self, row: &Value) -> Vec<String> {
+        problem_list(&self.warning_entry, row)
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
 }
 
 fn options<'r>(registry: &'r Registry<'r>) -> ValidationOptions<'r> {
@@ -142,6 +200,7 @@ fn problem_list(validator: &Validator, document: &Value) -> Vec<Problem> {
         .map(|error| Problem {
             path: pointer(&error.instance_path().to_string()).to_string(),
             message: error.to_string(),
+            keyword: error.kind().keyword().to_string(),
         })
         .collect()
 }

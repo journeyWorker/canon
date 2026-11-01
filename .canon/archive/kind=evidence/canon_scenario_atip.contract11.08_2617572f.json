@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T08:57:10.578191Z",
+  "attachments": [
+    {
+      "case": "run::entry::tests::atip_contract11_08_an_option_with_no_value_is_not_an_empty_value_the_caller_sent",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-r1-junit.xml",
+      "sha256": "47e6a8d222cdfa5efefbfa97f359c72357e0e55942e9b8894e3c8021ceb87dbc"
+    },
+    {
+      "case": "atip_contract11_08_an_empty_value_the_caller_sent_is_received_empty_and_a_value_never_sent_has_no_received",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-r1-junit.xml",
+      "sha256": "47e6a8d222cdfa5efefbfa97f359c72357e0e55942e9b8894e3c8021ceb87dbc"
+    }
+  ],
+  "code_tree": "7b922d4ecb8731dc64185a47646a3df53e18cf5b",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-r1-junit.xml"
+  },
+  "evidence_sha": "6d2efc765778b47c8a7604adcc3d112f4cb95f75",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "atip.contract11.08",
+  "schema": 1,
+  "staging_id": "e6d575da",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

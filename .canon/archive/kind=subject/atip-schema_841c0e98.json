@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-10-31T17:28:53.309824Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "atip-schema",
+  "summary": "schema tree, group and command documents with value types, typed defaults, constraints, domains, validators and output schemas",
+  "title": "ATIP: canon's atip/1 L1 self-description (schema)"
+}

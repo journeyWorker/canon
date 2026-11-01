@@ -202,11 +202,15 @@ jobs:
 
   # 0.33: canon claims atip/1 L0, and the shared checker is what holds it to that
   # (approaches/checker.md in https://github.com/journeyWorker/atip). `atip check`
-  # runs the built binary from outside (argv, stdout, stderr, exit status, files)
-  # and reports the 16 L0 checks; the MUST ones failing, or missing a fixture
-  # entry, fail the job. The fixture is `crates/canon-cli/tests/atip/canon.fixture.json`;
-  # its registry is generated from `canon schema --errors --json` and a test
-  # compares the two. The checker also runs on itself: it follows the contract it checks.
+  # runs the built binary from outside (argv, stdout, stderr, exit status, files,
+  # a terminal) and reports the 28 L0 checks of contract 1.1; the MUST ones failing,
+  # or missing a fixture entry, fail the job. 0.34: the fixture claims 1.1
+  # (`contractVersion`), so canon is judged on the 26 checks that apply to it (`L0.contract` is a 1.0 rule and `L0.usage-hint` observes no USAGE without a field), and
+  # the job is green only with the 1.1 output of `canon-0-34-atip-1-1` in the binary.
+  # The fixture is `crates/canon-cli/tests/atip/canon.fixture.json`; its registry
+  # and warning list are generated from `canon schema --errors --json` and
+  # `--warnings --json` and a test compares them. The checker also runs on itself:
+  # it follows the contract it checks.
   atip-l0:
     name: atip check L0 (canon and the checker itself)
     runs-on: ubuntu-latest
@@ -237,6 +241,39 @@ jobs:
 
       - name: atip check, the checker at L0
         run: target/debug/atip check --bin target/debug/atip --level L0 --fixture crates/atip-check/atip.fixture.json
+
+  # 0.34: canon claims atip/1 L1 (the self-description, the arguments and the data), and the shared checker holds it to that: `atip check --level L1`
+  # runs the 28 L0 and the 31 L1 checks of contract 1.1.2 against the built binary (25 + 21 MUST, the rest advisories). The same fixture as `atip-l0`, with
+  # `prepare` (a git repository with one commit, which findings and divergences need), more `setup`, and the `paged`, `fields` and `domainRejects`
+  # entries the L1 checks read. The job is green only with `canon-0-34-atip-constraints` and `-paging-fields` in the binary. The tree's `level` is `L1`
+  # from the schema-doc change; this job is what proves the claim.
+  atip-l1:
+    name: atip check L1 (canon)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-atip-l1-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo fetch --locked
+        run: cargo fetch --locked
+
+      - name: build the canon and atip binaries
+        run: cargo build --locked --offline -p canon-cli -p atip-check
+
+      - name: atip check, canon at L1
+        run: target/debug/atip check --bin target/debug/canon --level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
   # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
   # it builds a copy of the workspace, which would double the time of the job above.

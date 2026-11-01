@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:33:01.416443Z",
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "kind": "review",
+  "pin": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_69_l0_registry_fails_when_the_tools_registries_or_what_it_emitted_disagree_with_the_contract_and_the_fixture"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "578c9ac3f5647dd31ac319494b5a9707dfc81e6afeae2086aa9d3706997c79ef",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B791K8KHGMPHG9ETBKMDQW",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.69",
+  "schema": 2,
+  "worktree_dirty": false
+}

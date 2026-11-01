@@ -136,10 +136,10 @@ class TraceCheckTests(unittest.TestCase):
             '{"error":{"code":"USAGE","hint":"--agent-id was removed in 0.28.0; use `--actor`"}}'), "naming")
 
 
-def failure(command, code="USAGE", message="unexpected argument '--x' found", hint=""):
-    """An atip/1 JSON failure envelope as `canon <command> --json` prints it."""
-    return json.dumps({"ok": False, "error": {"code": code, "message": message, "hint": hint, "retryable": False},
-                       "meta": {"schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.33.0", "contract": "atip/1", "command": command}}, separators=(",", ":"))
+def failure(command, code="USAGE", message="unexpected argument '--x' found", hint="", **error):
+    """An atip/1 JSON failure envelope as `canon <command> --json` prints it (contract 1.1); `error` adds members of the error."""
+    return json.dumps({"ok": False, "error": {"code": code, "message": message, "hint": hint, "retryable": False, **error},
+                       "meta": {"schemaVersion": "1.1", "tool": "canon", "toolVersion": "0.34.0", "contract": "atip/1", "contractVersion": "1.1", "command": command}}, separators=(",", ":"))
 
 
 class SyntheticTranscriptTests(unittest.TestCase):
@@ -168,6 +168,20 @@ class SyntheticTranscriptTests(unittest.TestCase):
         out = failure("subject new") + "\n# README"
         report = self.run_calls(("canon subject new demo --domain dev --title T --session s --json; cat README.md", out))
         self.assertEqual(self.wrong(report), [("canon subject new demo", "USAGE", "other")])
+
+    def test_an_envelope_with_members_it_does_not_know_is_still_read(self):
+        # atip/1 15.6: `reason`, `received`, `meta.contractVersion` and members of a later minor are ignored, not refused.
+        out = failure("scenario new", code="INPUT_INVALID", message="`/nosuch` is not an option", hint="use another key", reason="UNKNOWN_KEY", field="/nosuch", received="nosuch",
+                      **{"x-future": {"a": 1}, "aMemberOfALaterMinor": [1, 2]})
+        found = trace_check.failure_envelopes(out)
+        self.assertEqual([(e["code"], e["field"], e["command"]) for e in found], [("INPUT_INVALID", "/nosuch", "scenario new")])
+        report = self.run_calls(("canon scenario new --input '{\"nosuch\":1}' --json", out))
+        self.assertEqual(self.wrong(report), [("canon scenario new", "INPUT_INVALID", "other")])
+
+    def test_a_code_it_does_not_know_is_not_a_wrong_shape_and_does_not_stop_the_reading(self):
+        out = failure("status", code="A_CODE_FROM_A_LATER_CANON", reason="A_REASON") + "\n" + failure("subject new")
+        report = self.run_calls(("canon status --json; canon subject new demo --json", out))
+        self.assertEqual([code for _, code, _ in self.wrong(report)], ["USAGE"], "the unknown code is no wrong shape; the USAGE envelope after it is still read")
 
     def test_removed_spelling_in_the_envelope_is_naming(self):
         out = failure("brief check", message="--change-id was removed in 0.28.0", hint="use `canon brief check pause-menu`")

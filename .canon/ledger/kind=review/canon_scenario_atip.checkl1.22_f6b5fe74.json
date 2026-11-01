@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-l1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-l1-rev"
+  },
+  "at": "2026-11-01T15:49:46.533846Z",
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "kind": "review",
+  "pin": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl1_22_a_fixture_with_a_malformed_l1_entry_is_fixture_invalid_wrong_shape_and_no_binary_runs"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0457047e1d342eb6366f80e62c86134668df5ec43e5585ed72e422a59e3ae53d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-l1/brief.md"
+  },
+  "review_id": "01M6BWTWX56PSWDFDH0GX8CA51",
+  "reviewer": "rev-check-l1",
+  "scenario_id": "atip.checkl1.22",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T08:02:04.126664Z",
+  "attachments": [
+    {
+      "case": "schema::tests::atip_l0_07_the_vendored_schemas_are_the_published_bytes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    },
+    {
+      "case": "schema::tests::atip_l0_07_one_changed_character_fails_the_pin",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    },
+    {
+      "case": "schema::tests::atip_l0_07_a_null_meta_a_null_member_and_an_undefined_meta_key_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    },
+    {
+      "case": "schema::tests::atip_l0_07_an_error_with_a_null_hint_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-junit.xml",
+      "sha256": "1d6a26bb3ac1b19e3abbc63ff86b3d5f14f42e230e9ccb6347a3884625617a01"
+    }
+  ],
+  "code_tree": "7d832b72fdf933bc7ed4db78f06a3f3faf1fc1aa",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-junit.xml"
+  },
+  "evidence_sha": "b424782a812aad0b7a06b48ea6d0c4f557e54905",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 72,
+  "scenario_id": "atip.l0.07",
+  "schema": 1,
+  "staging_id": "92f9513b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

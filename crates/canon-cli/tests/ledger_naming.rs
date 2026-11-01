@@ -573,8 +573,9 @@ fn ledger_naming_10_query_shows_the_id_before_escaping() {
     assert_eq!(first["data"]["records"][0]["session_id"], "Sess/One_A");
     let cursor = first["meta"]["page"]["nextCursor"].as_str().expect("a second page");
     let key = hex_decode(cursor);
-    let (scope, key) = key.split_once('\u{1f}').unwrap();
-    assert_eq!(scope, "query:session");
+    let mut cursor_parts = key.splitn(3, '\u{1f}');
+    let (scope, _binding, key) = (cursor_parts.next().unwrap(), cursor_parts.next().unwrap(), cursor_parts.next().unwrap());
+    assert_eq!(scope, "query");
     let parts: Vec<&str> = key.split('|').collect();
     assert_eq!(parts[1], "Sess/One_A", "the cursor key holds the value, not `+53ess+2f…`: {key}");
     assert!(parts[2].trim_end_matches("#1").len() == 8 && parts[2].trim_end_matches("#1").bytes().all(|b| b.is_ascii_hexdigit()), "digest8: {key}");
@@ -1027,7 +1028,7 @@ fn hex_encode(text: &str) -> String {
 }
 
 /// ledger.naming.19: a cursor `canon query` issued in 0.29 names a record by its 0.29 id and 12-hex
-/// digest; it is refused CURSOR_INVALID, and the hint says to drop `--cursor` and start from the first page.
+/// digest; it is refused CURSOR_INVALID (`FOREIGN`, since 0.34 binds a cursor to its call's arguments), and the hint says to drop `--cursor` and start from the first page.
 #[test]
 fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     let dir = repo30(1);
@@ -1042,8 +1043,7 @@ fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let doc = json_of(&out);
     assert_eq!(doc["error"]["code"], "CURSOR_INVALID", "{doc}");
-    let message = doc["error"]["message"].as_str().unwrap();
-    assert!(message.contains("0.29") && message.contains("names"), "the message says the cursor names records by 0.29 names: {message}");
+    assert_eq!(doc["error"]["reason"], "FOREIGN", "a cursor of an older release carries no binding to the arguments, so it is not one this canon issued: {doc}");
     let hint = doc["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("drop --cursor") && hint.contains("first page"), "{hint}");
     // Starting over works, and the cursor 0.30 issues is accepted.

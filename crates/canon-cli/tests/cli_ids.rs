@@ -802,7 +802,7 @@ fn context_capability_57_the_schema_shows_no_option_ending_in_id_and_the_docs_sp
         for option in harness::options(leaf) {
             let name = option["name"].as_str().unwrap();
             assert!(!name.ends_with("-id"), "{} has --{name}", harness::path_of(leaf));
-            assert!(option["aliases"].as_array().is_none_or(Vec::is_empty), "{}: {option}", harness::path_of(leaf));
+            assert!(option.get("aliases").is_none(), "{}: {option}", harness::path_of(leaf));
         }
     }
     let root = harness::repo_root();

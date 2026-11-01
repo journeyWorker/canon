@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-l1"
+  },
+  "at": "2026-11-01T15:26:57.944676Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_18_paging_is_decided_by_the_command_documents_a_paged_entry_is_used_first_and_a_paging_command_without_either_is_unprovided",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "b2bfe15cff94db14a3a73f3d5b367dd40d5989b98f7fc68679a6fb409700322f"
+    }
+  ],
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "6d5c24d1f55c8a67d4ae34b751cf36e72a9e6099",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "atip.checkl1.18",
+  "schema": 1,
+  "staging_id": "8ac631b1",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

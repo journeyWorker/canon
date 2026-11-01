@@ -164,7 +164,7 @@ fn write_leaves() -> Vec<&'static Value> {
 }
 
 fn error_codes(node: &Value) -> Vec<String> {
-    strings(&node["errorCodes"])
+    strings(&node["errors"])
 }
 
 fn has_option(node: &Value, name: &str) -> bool {
@@ -218,10 +218,33 @@ struct Snap {
     repo: std::collections::BTreeMap<PathBuf, Option<Vec<u8>>>,
     scratch: std::collections::BTreeMap<PathBuf, Option<Vec<u8>>>,
     status: String,
+    /// Every file under `.git` but its `index` (which git refreshes by itself) and its logs: a refusal that
+    /// runs git plumbing must not leave an object, a ref or a pack behind (atip/1 8.2).
+    git: std::collections::BTreeSet<String>,
+}
+
+/// The files under `repo/.git`, relative, without the index (refreshed by any `git status`) and `logs/`.
+fn git_files(repo: &Path) -> std::collections::BTreeSet<String> {
+    fn walk(root: &Path, dir: &Path, out: &mut std::collections::BTreeSet<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap().to_string_lossy().into_owned();
+            if entry.file_type().unwrap().is_dir() {
+                walk(root, &path, out);
+            } else if relative != "index" && !relative.starts_with("logs/") && !relative.ends_with(".lock") {
+                out.insert(relative);
+            }
+        }
+    }
+    let mut out = std::collections::BTreeSet::new();
+    let git_dir = repo.join(".git");
+    walk(&git_dir, &git_dir, &mut out);
+    out
 }
 
 fn snap(t: &Trial) -> Snap {
-    Snap { repo: tree(&t.repo), scratch: tree(t.scratch.path()), status: git(&t.repo, &["status", "--porcelain"]) }
+    Snap { repo: tree(&t.repo), scratch: tree(t.scratch.path()), status: git(&t.repo, &["status", "--porcelain"]), git: git_files(&t.repo) }
 }
 
 /// What differs between two snapshots, as readable lines.
@@ -231,6 +254,8 @@ fn differences(before: &Snap, after: &Snap) -> Vec<String> {
     if before.status != after.status {
         out.push(format!("git status: `{}` became `{}`", before.status.trim(), after.status.trim()));
     }
+    out.extend(after.git.difference(&before.git).map(|f| format!(".git/{f} appeared")));
+    out.extend(before.git.difference(&after.git).map(|f| format!(".git/{f} vanished")));
     out
 }
 
@@ -343,6 +368,75 @@ fn a_refused_write_leaves_the_tree_and_git_status_unchanged() {
         }
     }
     settle("refusal", found);
+}
+
+/// A read leaf's refusal: the leaf, its command line (no `canon`, no `--json`), and the code it refuses with.
+const READ_REFUSALS: &[(&str, &[&str], &str)] = &[
+    ("evidence approval-payload", &["evidence", "approval-payload", "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], "EVIDENCE_REFUSED"),
+    ("evidence approval-payload", &["evidence", "approval-payload", "--scenario", "nosuch.scenario.01", "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], "EVIDENCE_SCENARIO_NOT_INDEXED"),
+    ("evidence approval-payload", &["evidence", "approval-payload", "--scenario", "auth.login.01", "--approver", "alice", "--approval-at", "yesterday"], "USAGE"),
+    ("brief show", &["brief", "show", "no-such-change"], "BRIEF_NOT_FOUND"),
+    ("brief check", &["brief", "check", "no-such-change"], "BRIEF_NOT_FOUND"),
+    ("context-pack show", &["context-pack", "show", "sha256:0000000000000000000000000000000000000000000000000000000000000000"], "CONTEXT_PACK_NOT_FOUND"),
+    ("context-pack verify", &["context-pack", "verify", "sha256:0000000000000000000000000000000000000000000000000000000000000000"], "CONTEXT_PACK_NOT_FOUND"),
+    ("subject show", &["subject", "show", "no-such"], "SUBJECT_NOT_FOUND"),
+    ("trace", &["trace", "no-such_9_9"], "TRACE_NOT_FOUND"),
+    ("search", &["search", ""], "SEARCH_QUERY_EMPTY"),
+    ("query", &["query", "--kind", "evidence", "--cursor", "zz"], "CURSOR_INVALID"),
+    ("retrieve", &["retrieve", "--for-role", "reviewer"], "USAGE"),
+    ("status", &["status", "--fields", "nosuch"], "USAGE"),
+    ("gate check", &["gate", "check", "--repo", "@missing"], "CONFIG_MISSING"),
+    ("adapter validate", &["adapter", "validate", "--response", "missing.json"], "ADAPTER_REFUSED"),
+];
+
+/// A refusal of a leaf that only reads leaves the repository as it was, `.git` included: the code tree of the
+/// working tree is computed in a scratch object directory, never in `.git/objects` (atip/1 8.2).
+#[test]
+fn atip_contract11_15_a_refused_read_leaves_the_tree_and_dot_git_as_they_were() {
+    let home = TempDir::new().unwrap();
+    let base = synced_fixture(home.path());
+    let mut problems = Vec::new();
+    for (leaf_path, argv, code) in READ_REFUSALS {
+        let t = trial(base.path(), &[]);
+        let before = snap(&t);
+        let out = run(&t, home.path(), &strs(argv), &[]);
+        let after = snap(&t);
+        let document = parse(&out);
+        let got = document.as_ref().map(error_code).unwrap_or_default();
+        if out.status.code() != Some(2) || got != *code {
+            problems.push(format!("{leaf_path} {argv:?}: exit {:?} `{got}`, expected 2 `{code}`: {}", out.status.code(), String::from_utf8_lossy(&out.stdout)));
+            continue;
+        }
+        let diff = differences(&before, &after);
+        if !diff.is_empty() {
+            problems.push(format!("{leaf_path} {argv:?} refused with {code} but changed: {diff:?}"));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// The code tree is an id: the same working tree gives the same id with and without objects in `.git`, and
+/// computing it adds nothing to `.git` (so `gate check`, which reads, does not grow `.git/objects`).
+#[test]
+fn atip_contract11_15_computing_the_code_tree_adds_nothing_to_dot_git_and_gives_the_same_id() {
+    let home = TempDir::new().unwrap();
+    let base = synced_fixture(home.path());
+    let t = trial(base.path(), &[]);
+    std::fs::write(t.repo.join("untracked-code.rs"), "fn main() {}\n").unwrap();
+    let before = git_files(&t.repo);
+    let first = canon_cli::git_rev::code_tree(&t.repo, None).expect("a code tree");
+    let again = canon_cli::git_rev::code_tree(&t.repo, None).expect("a code tree");
+    assert_eq!(first, again);
+    assert!(first.dirty, "an untracked code file makes the tree dirty");
+    assert_eq!(git_files(&t.repo), before, "the code tree wrote into .git");
+    // Git itself names the same tree for the same files: stage them in a copy and ask.
+    let want = {
+        git(&t.repo, &["add", "-A", "--", "untracked-code.rs"]);
+        git(&t.repo, &["write-tree"]).trim().to_string()
+    };
+    assert_ne!(want, first.tree, "the whole repo tree (docs, .canon) is not the code tree: a filter applies");
+    let at_head = canon_cli::git_rev::code_tree(&t.repo, Some("HEAD")).expect("a code tree");
+    assert!(!at_head.dirty && at_head.tree != first.tree);
 }
 
 /// A leaf may refresh the scenario index before it refuses, only when its `effectNote` says so.

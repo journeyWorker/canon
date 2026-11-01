@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-paging-fields",
+    "role": "reviewer",
+    "session_id": "s-0-34-paging-fields-rev"
+  },
+  "at": "2026-11-01T14:10:04.028520Z",
+  "change_id": "canon-0-34-atip-paging-fields",
+  "code_tree": "85d3f2121351444d5a0ad8272b73f661db6e001d",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/retention.rs:446-449",
+  "introduced_by": "67ea7ee00f6c6800f4d14a0b3dec9fceefd6fe07",
+  "kind": "finding",
+  "reason": "verified at 90d27a5d: --fields is flagOnly; a fields key is INPUT_INVALID FLAG_ONLY_KEY at plan time (/items/1/fields, /fields), --fields on a batch argv is USAGE field --fields, nothing written (repo checksum identical, no file, no audit line)",
+  "resolution_code_tree": "01c22c3ff6f286b3485b64eba07f3be53fbde8aa",
+  "resolution_sha": "90d27a5d36241b7c56e1011856a261312e4191c5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "637392a78a5c591c4e2cf7a6a2585367a735bcf0",
+  "reviewer": "rev-paging-fields",
+  "round": 1,
+  "scenario_ids": [
+    "atip.paging.13"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] ATIP ruling: an output that declares no fields makes --fields USAGE. A batch export with --fields is not refused up front. `canon export --input '[{\"kind\":\"subject\",\"output\":\"b1.json\"},{\"kind\":\"subject\",\"fields\":\"recordCount\"}]'` passes the plan pass (it reads the item against ExportPreviewReport, whose paths hold recordCount) and fails at element 1 in the run pass (read against ExportReport): BATCH_INCOMPLETE with element 0's file already written (seen). \"fields\":\"id\" (or argv --fields id with an --input array) is refused in the plan pass with expected [dryRun,kind,output,recordCount], the preview's paths, so no fields value can succeed in a batch. BatchExportReport declares no fields, so --fields on a batch should be USAGE field --fields (or /items/N/fields) before any write. Blast radius: only export has a batch output; no test binds the batch path (atip.paging.13 never reads --input). The brief puts --input-supplied --fields in 0.35; the up-front refusal and no partial write are due now.",
+  "worktree_dirty": false
+}

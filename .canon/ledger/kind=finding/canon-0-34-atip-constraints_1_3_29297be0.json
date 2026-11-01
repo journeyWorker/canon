@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T17:43:00.444840Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "01aa559313c2a5b88a2a4d834a6417f4969a3b90",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "resolution_sha": "575a91b668cbc59a0cf3aa5281bb48afd90cdfa1",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "c518cecd523d9dd4e9245880d0f6aa2c27e527e6",
+  "reviewer": "rev-constraints",
+  "round": 1,
+  "scenario_ids": [
+    "atip.constraints.03",
+    "atip.constraints.05",
+    "atip.constraints.07"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] a rule or domain whose code is the command's own is still enforced in the handler after the repository, plan sources and files are read, so spec 11.7 (steps 1-6 give the same answer whatever the state) and 10.8.3 (validators come after domains and constraints) do not hold for it: in an empty directory `finding close --disposition rejected` (no --reason), `finding close --round 0`, `divergence add --state deferred`, `evidence add --command-result x`, `evidence audit --report-case x`, `evidence approval-payload` without --task/--scenario answer CONFIG_MISSING; with a repository `evidence add --command-result x --signature-file nosuch` answers the missing file and `--task T --report-case x` answers PLAN_SOURCES_MISSING instead of the declared rule; and `evidence add --all-scenarios --scenario S --artifact bare.png` answers the `--artifact` validator before the declared `forbids`; exit code is always 2 and nothing is written, so the harm is the wrong code/field for a call with two faults; blast radius: the sweeps run each rule on a story repo with every file present, so they never see this order",
+  "worktree_dirty": false
+}

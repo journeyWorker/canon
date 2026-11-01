@@ -89,16 +89,13 @@ fn nodes(doc: &Value) -> std::collections::BTreeMap<String, Value> {
 
 // ── D2: the spec ────────────────────────────────────────────────────────────────────────
 
-/// context.capability.27: `canon schema <command>` shows the node of the checked-in spec.
+/// context.capability.27: `canon schema <command>` shows the document of the checked-in spec.
 #[test]
 fn context_capability_27_schema_nodes_are_the_nodes_of_the_checked_in_spec() {
     let doc: Value = serde_json::from_str(&spec_on_disk()).expect("the spec is JSON");
     let dir = tempfile::tempdir().expect("tempdir");
     let mut leaves = BTreeSet::new();
     for (command, node) in nodes(&doc) {
-        if node["nodeKind"] != "leaf" {
-            continue;
-        }
         let mut args = vec!["schema"];
         args.extend(command.split(' '));
         args.push("--json");
@@ -110,8 +107,8 @@ fn context_capability_27_schema_nodes_are_the_nodes_of_the_checked_in_spec() {
     assert!(leaves.len() > 60, "{} leaves", leaves.len());
 
     let listing = json_of(&canon(dir.path(), &["schema", "--json"]));
-    let listed: BTreeSet<String> = listing["data"]["commands"].as_array().expect("commands").iter().map(|c| c["command"].as_str().expect("command").to_string()).collect();
-    assert_eq!(listed, leaves, "the bare listing is every leaf of the spec and nothing else");
+    let listed: BTreeSet<String> = listing["data"]["commands"].as_array().expect("commands").iter().filter(|c| c["kind"] == "command").map(|c| c["command"].as_str().expect("command").to_string()).collect();
+    assert_eq!(listed, leaves, "the bare listing holds every command of the spec and nothing else");
 }
 
 /// context.capability.28: the drift check is the byte comparison of the checked-in spec with the one the
@@ -227,7 +224,7 @@ fn context_capability_31_json_mode_carries_warnings_in_meta_and_leaves_stderr_em
     let warnings = body["meta"]["warnings"].as_array().expect("meta.warnings");
     let warning = warnings.iter().find(|w| w["message"].as_str().is_some_and(|m| m.contains("reviwer"))).unwrap_or_else(|| panic!("a warning names `reviwer`: {body}"));
     let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning has a code: {body}"));
-    assert!(canon_cli::cli_error::code_info(code).is_some(), "the warning code {code} is registered: {body}");
+    assert!(canon_cli::cli_error::warning_info(code).is_some(), "the warning code {code} is in the warning registry: {body}");
 
     let human = finding("2", false);
     assert_eq!(human.status.code(), Some(0), "{}", stderr(&human));

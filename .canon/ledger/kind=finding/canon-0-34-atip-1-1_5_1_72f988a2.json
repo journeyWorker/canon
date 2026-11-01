@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T19:59:36.044045Z",
+  "change_id": "canon-0-34-atip-1-1",
+  "code_tree": "060591b674a4925def52a0d25845914d372aede9",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/main.rs:55",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "a095ef815cfdde1bd45354772e2cfa2a161c65f9",
+  "reviewer": "rev-atip-1-1",
+  "round": 5,
+  "scenario_ids": [
+    "atip.contract11.16"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec fidelity] A tool-wide option with no value followed by --json and then the command is read as taking the command as its value: `canon finding --repo --json list --change x` is USAGE field --change (unexpected argument), not field --repo. relocate_json moves --json to the end before the hoist sees the argv, so `--repo --json list` and `--repo list --json` are the same words by then; only `--repo --json` at the end of the group (the case scenario 16 names) is caught. Same as typing `--repo list`, so no change asked; the error still names an option, exit 2, nothing written. Also `finding --repo --json` reports received `--repo` (clap's unknown-argument form, as for `--bogus`) while `finding --as --json` has no received; both are accepted by the test and consistent with 0.33's convention for an unknown option. Blast radius: argv shapes with a valueless tool-wide option before a group's command.",
+  "worktree_dirty": false
+}

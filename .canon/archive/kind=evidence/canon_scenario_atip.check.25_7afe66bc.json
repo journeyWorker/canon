@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T08:22:28.897918Z",
+  "attachments": [
+    {
+      "case": "report::tests::atip_check_25_a_level_is_met_unless_a_must_check_fails_or_is_unprovided",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r2-junit.xml",
+      "sha256": "d4427505e1182e2529a650c14fe1db13c1ce2986150d1b410d9b20e61a10de8e"
+    },
+    {
+      "case": "atip_check_25_a_fixture_without_a_probe_a_registry_or_commands_leaves_the_checks_that_need_them_unprovided_and_fails_the_level",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r2-junit.xml",
+      "sha256": "d4427505e1182e2529a650c14fe1db13c1ce2986150d1b410d9b20e61a10de8e"
+    }
+  ],
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r2-junit.xml"
+  },
+  "evidence_sha": "6c66123948d7420ff149962cc2bd0acd7ba82649",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 298,
+  "scenario_id": "atip.check.25",
+  "schema": 1,
+  "staging_id": "3111774c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

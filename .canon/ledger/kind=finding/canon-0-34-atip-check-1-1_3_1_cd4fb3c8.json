@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T10:28:01.601681Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/mod.rs:1363-1380",
+  "introduced_by": "e328721b1ac7c1ff1a8710a59a3b84b2c4860a4c",
+  "kind": "finding",
+  "reviewed_sha": "93f0bd4b37bf0b627bff92103b70cfaf4d712603",
+  "reviewer": "rev-check-1-1",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.65"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[standards] Scenario 65 says L0.contract-version judges a stream's start line and the envelope of its end line, but only the start line is seeded: removing the end-line half (mod.rs:1366-1380, the .chain of the end result) leaves the whole atip-check suite green. Behaviour is right: a fake stream whose end result lacks meta.contractVersion fails L0.contract-version alone ('(a stream): meta has no contractVersion'), checked by hand with a wrapper. Fix: add a fake-tool setting that strips the marker from the end line and a seeded case. Blast radius: streaming commands' end envelope. Not blocking.",
+  "worktree_dirty": false
+}

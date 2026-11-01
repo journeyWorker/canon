@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:08:17.642921Z",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "kind": "review",
+  "pin": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_74_a_refusal_that_changes_what_the_probe_reports_fails_refusal_effects"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "786e3f9fdd580032b643226a626c7d680ac515e9ddc9a1e1dd74426ec8d82233",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B5VRKAT7K2QCWEPCR65QNG",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.74",
+  "schema": 2,
+  "worktree_dirty": false
+}

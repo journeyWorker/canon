@@ -467,7 +467,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
     ok(repo, home.path(), &["inventory", "sync"]);
     let mut seen = BTreeSet::new();
     let mut out = Vec::new();
-    for leaf in spec["commands"].as_array().expect("commands").iter().filter(|n| n["nodeKind"] == "leaf") {
+    for leaf in spec["commands"].as_array().expect("commands") {
         let command = leaf["command"].as_str().expect("command");
         if matches!(command, "dashboard" | "init") {
             continue;
@@ -475,9 +475,9 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
         let scratch = TempDir::new().unwrap();
         let cwd = scratch.path().join("repo");
         copy_dir(base.path(), &cwd);
+        // The example already ends with `--json`, after the path.
         let mut argv: Vec<String> = atip::split_argv(leaf["examples"][0].as_str().expect("example"));
         argv.remove(0);
-        argv.push("--json".into());
         let output = run(&cwd, home.path(), &argv);
         let Ok(doc) = serde_json::from_slice::<Value>(&output.stdout) else { continue };
         for step in doc["meta"]["next"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {

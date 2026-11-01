@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:08:17.642921Z",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "kind": "review",
+  "pin": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon_binary_with_the_same_command"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e1672e81b94339a91690bbad696da8841a78346a5e6a7b707fbb23e5e32b112f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B5VRKAT7K2QCWEPCR65QNG",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.43",
+  "schema": 2,
+  "worktree_dirty": false
+}

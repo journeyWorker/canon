@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T10:10:19.490776Z",
+  "attachments": [
+    {
+      "case": "snapshot::tests::atip_check_30_a_snapshot_names_what_was_created_changed_and_removed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "exec::tests::atip_check_30_a_refusal_that_changes_the_directory_or_home_names_the_paths",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "atip_check_30_l0_refusal_effects_fails_when_a_refusal_writes_in_the_working_directory_home_or_a_remote_the_probe_reports",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    }
+  ],
+  "code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r4-junit.xml"
+  },
+  "evidence_sha": "e328721b1ac7c1ff1a8710a59a3b84b2c4860a4c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 453,
+  "scenario_id": "atip.check.30",
+  "schema": 1,
+  "staging_id": "1c1884da",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

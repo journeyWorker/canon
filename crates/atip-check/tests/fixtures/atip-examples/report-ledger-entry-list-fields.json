@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "data": {
+    "ledger": "main",
+    "entries": [
+      {
+        "id": 1,
+        "attributes": {
+          "kind": "debit"
+        }
+      },
+      {
+        "id": 2,
+        "attributes": {
+          "kind": "credit",
+          "note": "refund"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "command": "entry list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "ledger",
+    "toolVersion": "2.3.0",
+    "fields": [
+      "id",
+      "attributes"
+    ],
+    "warnings": [
+      {
+        "code": "ENTRY_STALE",
+        "message": "Entries come from a cache older than a day"
+      }
+    ]
+  }
+}

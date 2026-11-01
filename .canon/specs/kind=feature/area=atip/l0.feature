@@ -296,10 +296,10 @@ Feature: ATIP L0 output contract
   @case:edge
   @flow:canon-0-33-atip-l0.F6
   @atip.l0.30
-  Scenario: The five faults of the value of --input are INPUT_INVALID with field --input and x-canon.reason, and a fault in the document has a pointer field and no reason
+  Scenario: The faults of the value of --input are INPUT_INVALID with field --input and the contract's reserved reason, and a fault in the document has a pointer field and its own reason
     Given a repo
     When --input names a file that cannot be read, `-` on a terminal, an empty value, text that is not JSON, and an array given to a command that takes one object
-    Then each is INPUT_INVALID with exit 2 and field --input, and x-canon.reason is unreadable, tty, empty, syntax and batch-unsupported in that order; a document that breaks its fragment schema is INPUT_INVALID with a pointer field and no reason
+    Then each is INPUT_INVALID with exit 2 and field --input, and error.reason is UNREADABLE, STDIN_TTY, EMPTY, NOT_JSON and BATCH_UNSUPPORTED in that order; a document that breaks its fragment schema is INPUT_INVALID with a pointer field and the reason UNKNOWN_KEY, FLAG_ONLY_KEY or INVALID_VALUE
 
   # canon: {"schema":1,"at":"2026-10-31T15:01:17Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract

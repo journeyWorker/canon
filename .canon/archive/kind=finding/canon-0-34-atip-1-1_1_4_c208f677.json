@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T08:37:50.552428Z",
+  "change_id": "canon-0-34-atip-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_names.rs:84-91",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "99e3ea117de8f4e6fdbce0b55c0d74d61ffc2136",
+  "reviewer": "rev-atip-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.contract11.13"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] The `reviving one of the old names fails the check` half of atip.contract11.13 calls old_name() on strings; it never puts a name back into a scanned file and runs the scan, so a surface that drops out of surfaces() (a renamed directory, a new extension) would not fail it. The first test guards that with `scanned > 200` and a non-empty file list per surface, which is enough today. I re-ran the scan by hand with grep over the same surfaces plus docs/ and found no old name outside the CHANGELOG, briefs of 0.33 and artifacts. Not blocking.",
+  "worktree_dirty": false
+}

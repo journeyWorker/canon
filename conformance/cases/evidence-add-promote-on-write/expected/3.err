@@ -1,4 +1,3 @@
 canon: USAGE: the argument '--promote' cannot be used with '--no-promote'
   field: --promote
-  expected: true, false
-  hint: a working call: canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer; `canon schema evidence add` lists every argument
+  hint: a working call: canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer; `canon schema evidence add --json` lists every argument

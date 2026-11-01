@@ -14,7 +14,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 /// The members `meta` may hold: the contract's, and canon's `x-canon` (spec 6.6).
-const META_MEMBERS: &[&str] = &["schemaVersion", "tool", "toolVersion", "command", "contract", "output", "context", "next", "warnings", "coverage", "page", "fields", "truncated", "x-canon"];
+const META_MEMBERS: &[&str] = &["schemaVersion", "tool", "toolVersion", "command", "contract", "contractVersion", "output", "context", "next", "warnings", "coverage", "page", "fields", "truncated", "x-canon"];
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
@@ -84,6 +84,7 @@ fn atip_l0_01_status_json_names_the_tool_its_version_and_the_contract() {
     let meta = &document["meta"];
     assert_eq!(meta["tool"], "canon");
     assert_eq!(meta["contract"], "atip/1");
+    assert_eq!(meta["contractVersion"], "1.1", "every envelope declares the contract minor it follows");
     assert_eq!(version.trim(), format!("canon {}", meta["toolVersion"].as_str().unwrap()), "toolVersion is the version `canon --version` prints");
     assert!(meta.get("canonVersion").is_none(), "canonVersion is gone");
     assert_eq!(meta["command"], "status");
@@ -300,7 +301,7 @@ fn atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code() {
     let document = json(&out);
     let warnings = document["meta"]["warnings"].as_array().expect("a warning in meta.warnings");
     assert!(!warnings.is_empty());
-    let registered: BTreeSet<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
+    let registered: BTreeSet<&str> = canon_cli::cli_error::all_warnings().iter().map(|info| info.code).collect();
     for warning in warnings {
         assert!(warning["code"].as_str().is_some_and(|code| registered.contains(code)), "{warning}");
         assert!(warning["message"].as_str().is_some_and(|m| !m.is_empty()));
@@ -541,7 +542,8 @@ fn atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_
     assert_eq!(out.status.code(), Some(2));
     let document = json(&out);
     assert_eq!(document["error"]["code"], "USAGE", "{document}");
-    assert_eq!(document["error"]["field"], "--input");
+    // One stdin, two readers: the violation names the one given later (spec 5.5), here `--report`.
+    assert_eq!(document["error"]["field"], "--report");
     // On a terminal `--input -` has nothing to read.
     // A terminal stdin needs a pty: `script` makes one. Without it the case cannot run, and that is said, not passed over.
     let Some(text) = canon_on_a_terminal(repo.path(), &["scenario", "new", "--input", "-", "--json"]) else {
@@ -552,7 +554,8 @@ fn atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_
     let document: Value = serde_json::from_str(text[at..].lines().next().unwrap().trim()).unwrap();
     assert_eq!(document["error"]["code"], "INPUT_INVALID", "{document}");
     assert_eq!(document["error"]["field"], "--input");
-    assert_eq!(document["error"]["x-canon"]["reason"], "tty", "{document}");
+    assert_eq!(document["error"]["reason"], "STDIN_TTY", "{document}");
+    assert!(document["error"].get("x-canon").is_none(), "{document}");
     assert!(atip::envelope_problems(&document).is_empty());
 }
 
@@ -593,6 +596,7 @@ fn atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract() {
         let meta = &document["meta"];
         assert_eq!(meta["tool"], "canon", "{args:?}");
         assert_eq!(meta["contract"], "atip/1");
+        assert_eq!(meta["contractVersion"], "1.1", "{args:?}");
         assert_eq!(format!("canon {}", meta["toolVersion"].as_str().unwrap()), version.trim());
         assert!(meta["schemaVersion"].is_string());
         assert!(document["error"]["retryable"].is_boolean());
@@ -611,7 +615,7 @@ fn atip_l0_29_input_twice_or_without_a_value_is_usage_on_input() {
         let document = json(out);
         assert_eq!(document["error"]["code"], "USAGE", "{document}");
         assert_eq!(document["error"]["field"], "--input");
-        assert!(document["error"].get("x-canon").is_none(), "a shape fault has no reason: {document}");
+        assert!(document["error"].get("reason").is_none() && document["error"].get("x-canon").is_none(), "a shape fault has no reason: {document}");
         assert!(atip::envelope_problems(&document).is_empty());
     }
     assert_eq!(before, std::fs::read_to_string(repo.path().join(".canon/specs/kind=feature/area=auth/login.feature")).unwrap(), "nothing was written");
@@ -621,10 +625,13 @@ fn atip_l0_29_input_twice_or_without_a_value_is_usage_on_input() {
 fn atip_l0_30_the_framing_faults_of_input_carry_a_reason_and_a_document_fault_a_pointer() {
     let repo = scratch_repo();
     let missing = repo.path().join("no-such-file.json");
+    let scalar = repo.path().join("scalar.json");
+    std::fs::write(&scalar, "42").unwrap();
     let cases: Vec<(Vec<String>, &str)> = vec![
-        (vec!["--input".into(), missing.display().to_string()], "unreadable"),
-        (vec!["--input".into(), String::new()], "empty"),
-        (vec!["--input".into(), "{ not json".into()], "syntax"),
+        (vec!["--input".into(), missing.display().to_string()], "UNREADABLE"),
+        (vec!["--input".into(), String::new()], "EMPTY"),
+        (vec!["--input".into(), "{ not json".into()], "NOT_JSON"),
+        (vec!["--input".into(), scalar.display().to_string()], "NOT_OBJECT"),
     ];
     for (input, reason) in cases {
         let mut args: Vec<String> = vec!["scenario".to_string(), "new".to_string()];
@@ -637,18 +644,163 @@ fn atip_l0_30_the_framing_faults_of_input_carry_a_reason_and_a_document_fault_a_
         let error = &document["error"];
         assert_eq!(error["code"], "INPUT_INVALID", "{args:?}: {document}");
         assert_eq!(error["field"], "--input", "{args:?}");
-        assert_eq!(error["x-canon"]["reason"], reason, "{args:?}: {document}");
+        assert_eq!(error["reason"], reason, "{args:?}: {document}");
+        assert!(error.get("x-canon").is_none(), "the reason is a member of the error, not an extension: {document}");
         assert!(atip::error_problems(error).is_empty(), "{args:?}: {:?}", atip::error_problems(error));
     }
     // An array to a command that takes one object.
     let array = json(&canon(repo.path(), &["purge", "--input", r#"[{"repo":"."}]"#, "--json"]));
     assert_eq!(array["error"]["code"], "INPUT_INVALID", "{array}");
-    assert_eq!(array["error"]["x-canon"]["reason"], "batch-unsupported", "{array}");
-    // A document that breaks its fragment schema: a pointer, and no reason.
-    let fragment = json(&canon(repo.path(), &["scenario", "new", "--input", r#"{"operands":["auth.login.51"],"title":"t","nosuch":1}"#, "--json"]));
-    assert_eq!(fragment["error"]["code"], "INPUT_INVALID", "{fragment}");
-    assert_eq!(fragment["error"]["field"], "/nosuch", "{fragment}");
-    assert!(fragment["error"].get("x-canon").is_none(), "{fragment}");
+    assert_eq!(array["error"]["reason"], "BATCH_UNSUPPORTED", "{array}");
+    assert!(array["error"].get("x-canon").is_none(), "{array}");
+    // A document that breaks its fragment schema: a pointer, and the reason of the fault.
+    let fragment = |document: &str| json(&canon(repo.path(), &["scenario", "new", "--input", document, "--json"]));
+    let unknown = fragment(r#"{"operands":["auth.login.51"],"title":"t","nosuch":1}"#);
+    assert_eq!((unknown["error"]["code"].as_str(), unknown["error"]["field"].as_str(), unknown["error"]["reason"].as_str()), (Some("INPUT_INVALID"), Some("/nosuch"), Some("UNKNOWN_KEY")), "{unknown}");
+    let wrong_type = fragment(r#"{"operands":["auth.login.51"],"title":7,"case":["happy"]}"#);
+    assert_eq!((wrong_type["error"]["code"].as_str(), wrong_type["error"]["reason"].as_str()), (Some("INPUT_INVALID"), Some("INVALID_VALUE")), "{wrong_type}");
+    let null = fragment(r#"{"operands":["auth.login.51"],"title":null}"#);
+    assert_eq!(null["error"]["reason"], "INVALID_VALUE", "{null}");
+    let flag_only = fragment(r#"{"operands":["auth.login.51"],"title":"t","json":true}"#);
+    assert_eq!((flag_only["error"]["field"].as_str(), flag_only["error"]["reason"].as_str()), (Some("/json"), Some("FLAG_ONLY_KEY")), "{flag_only}");
+    // A batch item that is not an object.
+    let item = json(&canon(repo.path(), &["scenario", "new", "--input", r#"[{"operands":["auth.login.51"],"title":"t"}, 3]"#, "--json"]));
+    assert_eq!((item["error"]["code"].as_str(), item["error"]["reason"].as_str()), (Some("INPUT_INVALID"), Some("NOT_OBJECT")), "{item}");
+    for document in [&unknown, &wrong_type, &null, &flag_only, &item] {
+        assert!(document["error"].get("x-canon").is_none(), "{document}");
+        assert!(atip::envelope_problems(document).is_empty(), "{document}");
+    }
+}
+
+#[test]
+fn atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reason() {
+    let repo = scratch_repo();
+    let big = repo.path().join("big.json");
+    std::fs::write(&big, vec![b' '; 8 * 1024 * 1024 + 1]).unwrap();
+    let bytes = json(&canon(repo.path(), &["scenario", "new", "--input", big.to_str().unwrap(), "--json"]));
+    assert_eq!((bytes["error"]["code"].as_str(), bytes["error"]["reason"].as_str()), (Some("INPUT_TOO_LARGE"), Some("TOO_MANY_BYTES")), "{bytes}");
+    let items = format!("[{}]", vec!["{}"; 10_001].join(","));
+    let many = json(&canon(repo.path(), &["scenario", "new", "--input", &items, "--json"]));
+    assert_eq!((many["error"]["code"].as_str(), many["error"]["reason"].as_str()), (Some("INPUT_TOO_LARGE"), Some("TOO_MANY_ITEMS")), "{many}");
+    for document in [&bytes, &many] {
+        assert_eq!(document["meta"]["contractVersion"], "1.1");
+        assert!(document["error"].get("x-canon").is_none(), "{document}");
+        assert!(atip::envelope_problems(document).is_empty(), "{document}");
+    }
+}
+
+#[test]
+fn atip_contract11_04_every_reason_canon_emits_is_registered_under_its_code_and_a_missing_one_fails() {
+    // The registry the answer prints is the one the check reads: reasons are unique within their code and
+    // every row validates against the vendored registry-entry schema.
+    let table = canon_cli::cli_error::all_codes();
+    for info in table {
+        let mut names: Vec<&str> = info.reasons.iter().map(|reason| reason.reason).collect();
+        let count = names.len();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), count, "{}: a reason appears once", info.code);
+        let row = serde_json::to_value(canon_cli::spec::error_rows().into_iter().find(|row| row.code == info.code).unwrap()).unwrap();
+        assert_eq!(atip::registry_entry_problems(&row), Vec::<String>::new(), "{}", info.code);
+    }
+    let reserved = |code: &str| -> Vec<&'static str> { canon_cli::cli_error::code_info(code).unwrap().reasons.iter().map(|reason| reason.reason).collect() };
+    assert_eq!(reserved("INPUT_INVALID"), ["BATCH_UNSUPPORTED", "EMPTY", "FLAG_ONLY_KEY", "INVALID_VALUE", "NOT_JSON", "NOT_OBJECT", "STDIN_TTY", "UNKNOWN_KEY", "UNREADABLE"]);
+    assert_eq!(reserved("INPUT_TOO_LARGE"), ["TOO_MANY_BYTES", "TOO_MANY_ITEMS"]);
+    // An unregistered reason is refused where the error is rendered (a debug build asserts it); a registered one is not.
+    let registered = CliError::refused("INPUT_INVALID", "m").reason("NOT_JSON");
+    assert_eq!(registered.body().reason.as_deref(), Some("NOT_JSON"));
+    let unregistered = CliError::refused("INPUT_INVALID", "m").reason("MADE_UP");
+    assert!(canon_cli::cli_error::code_info(unregistered.code).unwrap().find_reason(unregistered.reason_name().unwrap()).is_none(), "the registry has no such reason");
+    let caught = std::panic::catch_unwind(|| unregistered.emit("canon scenario new", true));
+    assert!(caught.is_err(), "emitting a reason the registry does not hold fails in a debug build");
+}
+
+/// The `.rs` sources of the crate, outside `#[cfg(test)]`, as `(file, text)`.
+fn live_sources() -> Vec<(String, String)> {
+    fn walk(dir: &Path, out: &mut Vec<(String, String)>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let text = std::fs::read_to_string(&path).unwrap();
+                out.push((path.display().to_string(), text.split("#[cfg(test)]").next().unwrap().to_string()));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut out);
+    out
+}
+
+#[test]
+fn atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a_registered_reason() {
+    // Every construction of the two codes names its reason in the same statement, and each name is registered under its code.
+    let mut sites = 0;
+    let mut missing = Vec::new();
+    let mut emitted: BTreeSet<String> = BTreeSet::new();
+    for (file, text) in live_sources() {
+        // The tables of `arg_rules/` DECLARE the code of a validator; they construct no error.
+        if file.ends_with("cli_error.rs") || file.ends_with("schema_codes.rs") || file.contains("/arg_rules/") {
+            continue;
+        }
+        for code in ["INPUT_INVALID", "INPUT_TOO_LARGE"] {
+            for (at, _) in text.match_indices(&format!("\"{code}\"")) {
+                sites += 1;
+                let statement = &text[at..text[at..].find(";\n").map_or(text.len(), |n| at + n)];
+                let statement = &statement[..statement.len().min(900)];
+                if !statement.contains(".reason(") {
+                    missing.push(format!("{file}: {code} without .reason(…): {}", statement.lines().next().unwrap_or_default()));
+                }
+            }
+        }
+        for (at, _) in text.match_indices(".reason(\"") {
+            let rest = &text[at + ".reason(\"".len()..];
+            emitted.insert(rest[..rest.find('"').unwrap()].to_string());
+        }
+        for helper in ["framing(\"", "too_large(\""] {
+            for (at, _) in text.match_indices(helper) {
+                let rest = &text[at + helper.len()..];
+                emitted.insert(rest[..rest.find('"').unwrap()].to_string());
+            }
+        }
+    }
+    assert!(sites >= 5, "the scan saw {sites} sites");
+    assert!(missing.is_empty(), "{}", missing.join("\n"));
+    let registered: BTreeSet<String> = ["INPUT_INVALID", "INPUT_TOO_LARGE"].iter().flat_map(|code| canon_cli::cli_error::code_info(code).unwrap().reasons.iter().map(|r| r.reason.to_string())).collect();
+    // The reasons of other codes are emitted by their own sites (`EVIDENCE_APPROVAL_INVALID`: `MALFORMED`, `SIGNATURE_MISMATCH`).
+    let others: BTreeSet<String> = canon_cli::cli_error::code_info("EVIDENCE_APPROVAL_INVALID").unwrap().reasons.iter().map(|r| r.reason.to_string()).collect();
+    for reason in &emitted {
+        if reason.chars().all(|c| c.is_ascii_uppercase() || c == '_') && !others.contains(reason) {
+            assert!(registered.contains(reason), "{reason} is emitted and not registered under INPUT_INVALID or INPUT_TOO_LARGE");
+        }
+    }
+    // The `if forbidden { "FLAG_ONLY_KEY" } else { "UNKNOWN_KEY" }` and the batch item reasons are on the list too.
+    for reason in registered {
+        assert!(live_sources().iter().any(|(file, text)| !file.ends_with("cli_error.rs") && text.contains(&format!("\"{reason}\""))), "{reason} is registered and emitted nowhere");
+    }
+}
+
+#[test]
+fn atip_contract11_04_every_input_error_the_corpus_froze_has_a_registered_reason() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut files = Vec::new();
+    collect(&root.join("conformance/cases"), "out", &mut files);
+    let mut seen = 0;
+    for file in files {
+        for line in std::fs::read_to_string(&file).unwrap().lines().filter(|line| line.starts_with("{\"ok\":false")) {
+            let document: Value = serde_json::from_str(line).unwrap();
+            let error = &document["error"];
+            let code = error["code"].as_str().unwrap_or_default();
+            if code == "INPUT_INVALID" || code == "INPUT_TOO_LARGE" {
+                seen += 1;
+                let reason = error["reason"].as_str().unwrap_or_else(|| panic!("{} freezes {code} without a reason: {line}", file.display()));
+                assert!(canon_cli::cli_error::code_info(code).unwrap().find_reason(reason).is_some(), "{reason} is not registered under {code}");
+                assert!(error.get("x-canon").is_none());
+            }
+        }
+    }
+    assert!(seen >= 2, "the corpus freezes {seen} input errors");
 }
 
 #[test]
@@ -681,5 +833,6 @@ fn atip_l0_31_every_error_object_passes_the_contract_error_schema() {
     // The in-process error value, with the fields a tool sets.
     let error = CliError::refused("USAGE", "m").hint("").field("").received("");
     let body = serde_json::to_value(error.body_with(None, Vec::new())).unwrap();
-    assert!(atip::error_problems(&body).is_empty(), "empty members are left out: {body}");
+    assert!(atip::error_problems(&body).is_empty(), "an empty hint and field are left out: {body}");
+    assert_eq!(body["received"], "", "an empty value the caller sent is reported as it was: {body}");
 }

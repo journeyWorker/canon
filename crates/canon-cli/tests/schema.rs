@@ -28,7 +28,7 @@ fn json(args: &[&str]) -> serde_json::Value {
 }
 
 #[test]
-fn bare_schema_lists_every_leaf_with_an_effect_in_a_stable_order() {
+fn bare_schema_lists_every_group_and_command_with_an_effect_in_a_stable_order() {
     let first = json(&["schema", "--json"]);
     assert_eq!(first, json(&["schema", "--json"]));
     let commands = first["commands"].as_array().unwrap();
@@ -36,9 +36,11 @@ fn bare_schema_lists_every_leaf_with_an_effect_in_a_stable_order() {
     let mut sorted = names.clone();
     sorted.sort();
     assert_eq!(names, sorted);
-    assert!(names.contains(&"evidence add") && names.contains(&"schema"));
+    assert!(names.contains(&"evidence add") && names.contains(&"schema") && names.contains(&"evidence"));
     let purge = commands.iter().find(|c| c["command"] == "purge").unwrap();
     assert_eq!(purge["effect"], "destructive");
+    let group = commands.iter().find(|c| c["command"] == "evidence").unwrap();
+    assert_eq!((group["kind"].clone(), group.get("effect")), (serde_json::json!("group"), None));
 }
 
 #[test]
@@ -46,37 +48,35 @@ fn one_command_shows_options_with_their_shape() {
     let v = json(&["schema", "evidence", "add", "--json"]);
     assert_eq!(v["command"], "evidence add");
     let opt = |name: &str| v["options"].as_array().unwrap().iter().find(|o| o["name"] == name).unwrap_or_else(|| panic!("no --{name}")).clone();
-    assert_eq!(opt("all-scenarios")["kind"], "flag");
+    assert_eq!(opt("all-scenarios")["valueType"], "switch");
     assert_eq!(opt("report")["repeatable"], true);
+    assert_eq!(opt("report")["valueType"], "string");
     assert_eq!(v["effect"], "write");
-    assert_eq!(v["supportsJson"], v["options"].as_array().unwrap().iter().any(|o| o["name"] == "json"));
-    let codes: Vec<&str> = v["errorCodes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
-    for code in ["EVIDENCE_FABRICATED", "BRIEF_UNAPPROVED", "BRIEF_CHANGED_SINCE_APPROVAL", "EVIDENCE_INVALID_ARGUMENT", "USAGE"] {
+    assert!(opt("json")["flagOnly"] == true);
+    let codes: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+    for code in ["EVIDENCE_FABRICATED", "BRIEF_UNAPPROVED", "BRIEF_CHANGED_SINCE_APPROVAL", "EVIDENCE_INVALID_ARGUMENT", "USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE"] {
         assert!(codes.contains(&code), "{code} missing from {codes:?}");
     }
     assert!(!codes.contains(&"ARTIFACTS_STORE_FAILED"), "a sibling command's code leaked in: {codes:?}");
-    let exits: Vec<u64> = v["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
-    assert_eq!(exits, [0, 1, 2]);
+    assert!(v.get("exits").is_none() && v.get("errorCodes").is_none());
 }
 
 #[test]
-fn exits_follow_each_commands_own_contract() {
-    let exits = |cmd: &[&str]| {
+fn a_command_lists_the_codes_it_can_emit_and_a_read_lists_no_writes_codes() {
+    let errors = |cmd: &[&str]| {
         let mut args = vec!["schema"];
         args.extend_from_slice(cmd);
         args.push("--json");
-        json(&args)["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect::<Vec<_>>()
+        json(&args)["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect::<Vec<_>>()
     };
-    // Every leaf can end with `INTERNAL` (a bug in canon), which is exit 1: the three read leaves below declare it and nothing else.
-    assert_eq!(exits(&["context"]), [0, 1, 2]);
-    assert_eq!(exits(&["dispatch", "diff"]), [0, 1, 2]);
-    assert_eq!(exits(&["finding", "list"]), [0, 1, 2]);
-    // A batch whose element fails exits 1 (BATCH_INCOMPLETE, D7).
-    assert_eq!(exits(&["artifacts", "store"]), [0, 1, 2]);
-    assert_eq!(exits(&["gate", "check"]), [0, 1, 2]);
-    assert_eq!(exits(&["brief", "check"]), [0, 1, 2]);
-    // `PROMOTE_FAILED` (exit 1) is a code `finding add` lists, so its exit 1 is declared too.
-    assert_eq!(exits(&["finding", "add"]), [0, 1, 2]);
+    let context = errors(&["context"]);
+    let finding_list = errors(&["finding", "list"]);
+    assert!(context.contains(&"USAGE".to_string()) && finding_list.contains(&"USAGE".to_string()));
+    assert!(finding_list.contains(&"CURSOR_INVALID".to_string()), "a command that pages lists the cursor refusal");
+    assert!(!context.contains(&"CURSOR_INVALID".to_string()) && !context.contains(&"INPUT_INVALID".to_string()), "{context:?}");
+    // `PROMOTE_FAILED` (exit 1) is a code `finding add` lists.
+    assert!(errors(&["finding", "add"]).contains(&"PROMOTE_FAILED".to_string()));
+    assert!(errors(&["purge"]).contains(&"PLAN_STALE".to_string()));
 }
 
 #[test]
@@ -98,10 +98,11 @@ fn enum_options_list_their_values_and_defaults() {
     assert!(policy["possibleValues"].as_array().unwrap().iter().any(|p| p == "strict"));
     // `init` sets up the directory as given (default `.`); every other leaf has no `--repo` default: absent means discovery.
     let repo = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
-    assert_eq!(repo["default"][0], ".");
+    assert_eq!(repo["default"], ".");
     let gate = json(&["schema", "gate", "check", "--json"]);
     let repo = gate["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
-    assert!(repo["default"].as_array().unwrap().is_empty(), "{repo}");
+    assert!(repo["default"].is_null(), "{repo}");
+    assert!(repo["defaultNote"].as_str().unwrap().contains("canon.yaml"), "{repo}");
 }
 
 /// Dogfood eval 8: an agent quoted the path as one word.
@@ -115,7 +116,8 @@ fn an_unknown_path_is_a_refusal_naming_the_nearest_matches() {
     let out = canon(&["schema", "evidence", "ad"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(out.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&out.stderr).contains("evidence add"));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("UNKNOWN_COMMAND") && stderr.contains("suggestions: add") && stderr.contains("expected: add"), "{stderr}");
 }
 
 #[test]
@@ -127,29 +129,33 @@ fn error_returns_that_codes_row_and_an_unknown_code_exits_2() {
     assert_eq!(out.status.code(), Some(2));
     let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
     assert_eq!(body["ok"], false);
-    assert_eq!(body["error"]["code"], "UNKNOWN_ERROR_CODE", "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("--error")), "{body}");
 }
 
 #[test]
 fn errors_error_and_an_operand_conflict() {
     assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_MISSING"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--warnings", "--warning", "OLD_LAYOUT_FOUND"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--warning", "OLD_LAYOUT_FOUND", "evidence", "add"]).status.code(), Some(2));
     assert_eq!(canon(&["schema", "--error", "CONFIG_MISSING", "evidence", "add"]).status.code(), Some(2));
     assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_MISSING", "evidence", "add"]).status.code(), Some(2));
 }
 
 #[test]
-fn a_bogus_canon_role_warns_and_never_fails_the_schema() {
-    for args in [&["schema", "--json"][..], &["schema", "--errors", "--json"][..]] {
+fn schema_does_not_read_canon_role_so_a_bogus_one_is_neither_a_warning_nor_a_failure() {
+    for args in [&["schema", "--json"][..], &["schema", "--errors", "--json"][..], &["schema", "finding", "--json"][..]] {
         let out = canon_env(args, "bogus");
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
         assert_eq!(v["ok"], true, "{v}");
-        assert!(!v["meta"]["warnings"].as_array().expect("a warning in meta.warnings").is_empty(), "{v}");
+        assert!(v["meta"].get("warnings").is_none(), "schema reads no CANON_ROLE, so it has nothing to warn about: {v}");
+        assert_eq!(out.stdout, canon(args).stdout, "{args:?}: the answer is the same with and without the variable");
     }
 }
 
 #[test]
 fn canon_role_never_filters_the_listing_but_as_does() {
+    assert_eq!(canon_env(&["schema", "--json"], "reviewer").stdout, canon(&["schema", "--json"]).stdout);
     let all = listing_len(&canon(&["schema", "--json"]));
     assert_eq!(listing_len(&canon_env(&["schema", "--json"], "implementer")), all);
     let filtered = listing_len(&canon(&["schema", "--as", "implementer", "--json"]));

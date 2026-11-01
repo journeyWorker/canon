@@ -1,0 +1,160 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "page label",
+    "path": [
+      "page",
+      "label"
+    ],
+    "summary": "Add labels to a wiki page, recording each change in the page's label history",
+    "effect": "write",
+    "idempotency": "replay-safe",
+    "effectNote": "appends one entry to the page's label history, none when every label is there already; never rewrites an entry",
+    "operands": [
+      {
+        "name": "page",
+        "valueName": "PAGE",
+        "valueType": "string",
+        "required": true,
+        "variadic": false,
+        "default": null,
+        "help": "The page, by its slug (getting-started)"
+      }
+    ],
+    "options": [
+      {
+        "name": "label",
+        "valueName": "LABEL",
+        "valueType": "string",
+        "required": true,
+        "repeatable": true,
+        "default": null,
+        "help": "A label, lowercase group:value (topic:setup, status:draft); repeat the option for several labels"
+      },
+      {
+        "name": "reason",
+        "valueName": "TEXT",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Why, one sentence (kept in the history)"
+      },
+      {
+        "name": "input",
+        "valueName": "JSON|FILE|-",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "flagOnly": true,
+        "help": "The arguments as one JSON document (inline when it starts with {, - for stdin, else a file); keys are option names in camelCase"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "INPUT_CONFLICT",
+      "INPUT_INVALID",
+      "INPUT_TOO_LARGE",
+      "INTERNAL",
+      "PAGE_NOT_FOUND",
+      "STORE_UNAVAILABLE",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/PageLabels",
+        "schemaVersion": "1.0"
+      }
+    ],
+    "input": {
+      "option": "--input",
+      "schemaRef": "#/schemas/PageLabelInput",
+      "batch": false,
+      "maxBytes": 1048576,
+      "example": {
+        "operands": [
+          "getting-started"
+        ],
+        "label": [
+          "status:draft"
+        ]
+      }
+    },
+    "examples": [
+      "acme page label getting-started --label topic:setup --label status:draft --reason \"First draft of the setup guide\" --json",
+      "acme page label getting-started --label status:draft --json"
+    ],
+    "x-acme": {
+      "needsLogin": false
+    },
+    "schemas": {
+      "PageLabels": {
+        "type": "object",
+        "required": [
+          "page",
+          "labels",
+          "changed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "page": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed": {
+            "type": "boolean",
+            "description": "false when every label was there already and nothing was written"
+          }
+        }
+      },
+      "PageLabelInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "label": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

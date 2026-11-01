@@ -292,6 +292,14 @@ pub enum PolicyApprovalError {
     },
 }
 
+/// `canon policy approve --approver` is not blank: refused before any state is read, `POLICY_APPROVAL_REFUSED`.
+pub(crate) fn check_approver(by: &str) -> Result<(), CliError> {
+    if by.trim().is_empty() {
+        return Err(CliError::refused("POLICY_APPROVAL_REFUSED", PolicyApprovalError::BlankApprover.to_string()).hint("pass the human's name: `canon policy approve --approver <name>`").field("--approver"));
+    }
+    Ok(())
+}
+
 /// Writes the policy approval record for `by` under an already-resolved
 /// repo root. `Err` carries the refusal (no policy to approve, an
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`
@@ -368,7 +376,9 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&App
         Err(e) => {
             // A missing or unreadable policy and a blank approver are refused before anything is written; a failed write of the approval is a failure during the work.
             let code = if matches!(e, PolicyApprovalError::WriteApproval { .. }) { "POLICY_APPROVAL_FAILED" } else { "POLICY_APPROVAL_REFUSED" };
-            CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
+            let refusal = CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again");
+            let refusal = if matches!(e, PolicyApprovalError::BlankApprover) { refusal.field("--approver") } else { refusal };
+            refusal.emit("canon policy approve", json)
         }
     }
 }

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-paging-fields",
+    "role": "implementer",
+    "session_id": "s-0-34-paging-fields"
+  },
+  "at": "2026-11-01T12:36:09.725328Z",
+  "attachments": [
+    {
+      "case": "atip_paging_01_a_paged_listing_reports_its_page_and_the_next_call_reads_the_next_page",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-paging-fields.xml",
+      "sha256": "48a43e40bf0e962904f8cd556c68803d8fcb29dfc567429e0f34bd412de6e714"
+    }
+  ],
+  "code_tree": "85d3f2121351444d5a0ad8272b73f661db6e001d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-paging-fields.xml"
+  },
+  "evidence_sha": "67ea7ee00f6c6800f4d14a0b3dec9fceefd6fe07",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "atip.paging.01",
+  "schema": 1,
+  "staging_id": "876a6efd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

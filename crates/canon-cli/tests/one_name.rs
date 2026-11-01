@@ -122,6 +122,7 @@ fn command_tree() -> Vec<Surface> {
         .as_array()
         .unwrap()
         .iter()
+        .filter(|entry| entry["kind"] == "command")
         .map(|entry| {
             let path = entry["command"].as_str().unwrap().to_string();
             let mut args = vec!["schema"];
@@ -132,12 +133,11 @@ fn command_tree() -> Vec<Surface> {
             let mut flags: Vec<String> = Vec::new();
             for option in options {
                 flags.push(option["name"].as_str().unwrap().to_string());
-                flags.extend(option["aliases"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().trim_start_matches('-').to_string()));
             }
             let kind_values = options
                 .iter()
                 .filter(|o| o["name"] == "kind")
-                .flat_map(|o| o["possibleValues"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()))
+                .flat_map(|o| o["possibleValues"].as_array().into_iter().flatten().map(|v| v.as_str().unwrap().to_string()))
                 .collect();
             Surface { path, flags, kind_values }
         })
@@ -315,7 +315,7 @@ fn context_capability_18_help_and_schema_show_only_the_one_name() {
         let schema = schema_json(&args);
         for option in schema["options"].as_array().unwrap() {
             assert!(option.get("deprecatedAliases").is_none() && option.get("deprecatedValues").is_none(), "{command:?}: {option}");
-            assert!(option["aliases"].as_array().unwrap().is_empty(), "{command:?}: no alias keeps an old spelling: {option}");
+            assert!(option.get("aliases").is_none(), "{command:?}: no alias keeps an old spelling: {option}");
             assert!(!option["name"].as_str().unwrap().ends_with("-id"), "{command:?}: {option}");
         }
     }

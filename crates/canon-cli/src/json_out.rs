@@ -1,4 +1,4 @@
-//! The `--json` output contract: atip/1 L0 (0.33).
+//! The `--json` output contract: atip/1 L0, contract version 1.1 (0.34).
 //!
 //! In JSON mode stdout carries exactly one document and stderr nothing:
 //!
@@ -9,6 +9,7 @@
 //!
 //! `meta` holds only the members the contract defines and canon's own
 //! `x-canon` ([`Meta`]): `schemaVersion`, `tool`, `toolVersion`, `contract`,
+//! `contractVersion` (`"1.1"`, on every envelope),
 //! `command` (the resolved command id; absent when not even the first word
 //! resolved), `output` (the report's name, when the command declares several),
 //! `context` (the context options a command took: `repo`), `next` (runnable
@@ -69,7 +70,10 @@ pub const DEFAULT_SCHEMA_VERSION: &str = "1.0";
 pub const TOOL: &str = "canon";
 
 /// `meta.contract`: the contract the output follows.
-pub const CONTRACT: &str = "atip/1";
+pub const CONTRACT: &str = atip::CONTRACT;
+
+/// `meta.contractVersion`: the minor of the contract the output follows, on every envelope (spec 15.7).
+pub const CONTRACT_VERSION: &str = atip::CONTRACT_VERSION;
 
 /// `meta.context`: the context options a command took, with the value it used.
 /// canon's only context option is `--repo`.
@@ -81,7 +85,8 @@ pub struct Context {
 }
 
 /// One entry of `meta.warnings`: a condition that makes the result weaker than
-/// it looks. The code is registered like an error code ([`crate::cli_error::all_codes`]).
+/// it looks. The code is registered in the warning registry ([`crate::cli_error::all_warnings`]),
+/// or in the error registry when it is also an error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, JsonSchema)]
 pub struct Warning {
     pub code: String,
@@ -123,6 +128,8 @@ pub struct Meta {
     pub tool: &'static str,
     pub tool_version: String,
     pub contract: &'static str,
+    /// The contract version, `"<major>.<minor>"`.
+    pub contract_version: &'static str,
     /// The name of the output `data` follows, when the command declares more than one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
@@ -138,6 +145,9 @@ pub struct Meta {
     pub coverage: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<PageInfo>,
+    /// The field paths `data` was projected to with `--fields`, the always-kept ones included (spec 6.10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<String>>,
     /// canon's own metadata: what `data` cannot hold.
     #[serde(rename = "x-canon", skip_serializing_if = "Option::is_none")]
     pub x_canon: Option<Map<String, Value>>,
@@ -212,38 +222,6 @@ impl Report for NoData {
     const STATE_IN_DATA: bool = false;
 }
 
-/// A `--fields` projection of a typed report: some of its top-level members. It
-/// serializes as the projected value and validates against the report's schema
-/// without `required`.
-#[derive(Debug, Clone, Serialize)]
-#[serde(transparent)]
-pub struct Projected<R>(pub Value, #[serde(skip)] std::marker::PhantomData<R>);
-
-impl<R> Projected<R> {
-    pub fn new(value: Value) -> Self {
-        Self(value, std::marker::PhantomData)
-    }
-}
-
-impl<R: JsonSchema> JsonSchema for Projected<R> {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        format!("Projected{}", R::schema_name()).into()
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        let mut schema = R::json_schema(generator);
-        if let Some(object) = schema.as_object_mut() {
-            object.remove("required");
-            object.insert("description".to_string(), json!("A `--fields` projection: the requested top-level members of the full report"));
-        }
-        schema
-    }
-}
-
-impl<R: Report> Report for Projected<R> {
-    const SCHEMA_VERSION: &'static str = R::SCHEMA_VERSION;
-}
-
 /// `Some(Some(dir))`: the leaf took `--repo dir`; `Some(None)`: it takes `--repo` and was not given one;
 /// `None` (never set, or [`set_repo_unused`]): the command names no repo, so `meta.context` is absent.
 static REPO: OnceLock<Option<Option<PathBuf>>> = OnceLock::new();
@@ -253,7 +231,7 @@ static INVOCATION: OnceLock<Vec<String>> = OnceLock::new();
 
 /// Says a warning: on stderr in human mode; in JSON mode it waits for the
 /// document and travels in `meta.warnings`. `code` is registered in
-/// [`crate::cli_error::all_codes`]; one situation is one code, and the same
+/// [`crate::cli_error::all_warnings`]; one situation is one code, and the same
 /// code with the same message is said once.
 pub fn warn(code: &'static str, message: String) {
     warn_at(code, None, message);
@@ -261,7 +239,7 @@ pub fn warn(code: &'static str, message: String) {
 
 /// [`warn`] naming the argument or field the warning is about.
 pub fn warn_at(code: &'static str, field: Option<&str>, message: String) {
-    debug_assert!(crate::cli_error::code_info(code).is_some(), "warning code {code} is not in cli_error::all_codes()");
+    debug_assert!(crate::cli_error::warning_info(code).is_some(), "warning code {code} is not in cli_error::all_warnings()");
     if atip::json_mode() {
         let warning = Warning { code: code.to_string(), message, field: field.map(str::to_string) };
         let mut warnings = WARNINGS.lock().expect("the warnings list is not poisoned");
@@ -524,12 +502,14 @@ fn build_meta(command: &str, schema_version: String, output: Option<String>, aft
         tool: TOOL,
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
         contract: CONTRACT,
+        contract_version: CONTRACT_VERSION,
         output,
         context: context(),
         next: (!next.is_empty()).then_some(next),
         warnings: (!warnings.is_empty()).then_some(warnings),
         coverage,
         page,
+        fields: None,
         x_canon: (!x_canon.is_empty()).then_some(x_canon),
     };
     (meta, pushed_out)
@@ -542,14 +522,30 @@ fn success_text<R: Report>(command: &str, data: &R, after: Option<&After>, extra
     let (mut meta, pushed_out) = build_meta(command, schema_version_of::<R>(&id), output, after, extra);
     state.next_omitted += pushed_out;
     let in_data = R::STATE_IN_DATA && carries_state(&id);
-    let text = if in_data && !state.is_empty() {
-        let wrapped = WithState { report: data, unchanged: state.unchanged.then_some(true), waiting_on: state.waiting_on.as_ref(), next_omitted: (state.next_omitted > 0).then_some(state.next_omitted) };
-        atip::line(&Success { ok: true, data: &wrapped, meta })
+    let wrapped = if in_data && !state.is_empty() {
+        Some(WithState { report: data, unchanged: state.unchanged.then_some(true), waiting_on: state.waiting_on.as_ref(), next_omitted: (state.next_omitted > 0).then_some(state.next_omitted) })
     } else {
         if !state.is_empty() {
             state.into_x_canon(meta.x_canon.get_or_insert_with(Map::new));
         }
-        atip::line(&Success { ok: true, data, meta })
+        None
+    };
+    let text = match crate::fields::active() {
+        // `--fields`: the records of `data` are cut to the kept paths after the whole report, its state included, is serialized.
+        Some(active) => {
+            let mut projected = match &wrapped {
+                Some(wrapped) => serde_json::to_value(wrapped),
+                None => serde_json::to_value(data),
+            }
+            .expect("a report serializes");
+            active.projection.apply(&mut projected);
+            meta.fields = Some(active.projection.meta_fields());
+            atip::line(&Success { ok: true, data: &projected, meta })
+        }
+        None => match &wrapped {
+            Some(wrapped) => atip::line(&Success { ok: true, data: wrapped, meta }),
+            None => atip::line(&Success { ok: true, data, meta }),
+        },
     };
     #[cfg(debug_assertions)]
     validate::<R>(&id, &text);
@@ -603,7 +599,7 @@ fn failure_text<R: Report>(command: &str, error: &CliError, data: Option<&R>, ex
         Some(_) => (schema_version_of::<R>(&id), output_of::<R>(&id)),
         None => (crate::reports::declared_version(&id, BATCH_INPUT.load(std::sync::atomic::Ordering::Relaxed)).unwrap_or_else(|| DEFAULT_SCHEMA_VERSION.to_string()), None),
     };
-    let document = Failure { ok: false, error: error.body(), data, meta: build_meta(command, schema_version, output, None, extra_meta).0 };
+    let document = Failure { ok: false, error: crate::cli_error::with_usage_hint(error, command).body(), data, meta: build_meta(command, schema_version, output, None, extra_meta).0 };
     let text = atip::line(&document);
     #[cfg(debug_assertions)]
     validate::<R>(&id, &text);
@@ -662,16 +658,29 @@ fn validate<R: Report>(command: &str, text: &str) {
     let ok = document["ok"].as_bool().unwrap_or(false);
     let problems = atip::envelope_problems(&document);
     assert!(problems.is_empty(), "JSON document breaks the atip/1 envelope schema: {problems:?}\n{text}");
-    let registered = |code: &str| crate::cli_error::code_info(code).is_some();
     if !ok {
         let code = document["error"]["code"].as_str().unwrap_or_default();
-        assert!(registered(code), "error code {code} is not in cli_error::all_codes()");
+        let info = crate::cli_error::code_info(code);
+        assert!(info.is_some(), "error code {code} is not in cli_error::all_codes()");
+        if let Some(reason) = document["error"]["reason"].as_str() {
+            assert!(info.is_some_and(|info| info.find_reason(reason).is_some()), "reason {reason} is not registered under {code} in cli_error::all_codes()");
+        }
+        for detail in document["error"]["details"].as_array().into_iter().flatten() {
+            let (code, reason) = (detail["code"].as_str().unwrap_or_default(), detail["reason"].as_str());
+            assert!(crate::cli_error::code_info(code).is_some_and(|info| reason.is_none_or(|reason| info.find_reason(reason).is_some())), "details item {code}/{reason:?} is not registered");
+        }
     }
     for warning in document["meta"]["warnings"].as_array().into_iter().flatten() {
         let code = warning["code"].as_str().unwrap_or_default();
-        assert!(registered(code), "warning code {code} is not in cli_error::all_codes()");
+        assert!(crate::cli_error::warning_info(code).is_some(), "warning code {code} is not in cli_error::all_warnings()");
     }
     let Some(data) = document.get("data") else { return };
+    if let (Some(active), true) = (crate::fields::active(), document["meta"].get("fields").is_some()) {
+        // A projected answer is held to the schema with `required` reduced to the members that are present (spec 6.10).
+        let problems = atip::fields::projected_problems(&active.doc, &active.root, &active.projection.records, &active.projection.kept, data);
+        assert!(problems.is_empty(), "the projected `data` breaks the schema of {} with `required` reduced: {problems:?}\n{text}", std::any::type_name::<R>());
+        return;
+    }
     let validator = REPORTS
         .lock()
         .expect("the validator cache is not poisoned")

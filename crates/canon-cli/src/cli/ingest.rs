@@ -20,7 +20,7 @@ pub struct IngestSessionsArgs {
     #[arg(long)]
     pub watch: bool,
     /// Seconds between polls
-    #[arg(long, default_value_t = 30, value_name = "N")]
+    #[arg(long, default_value_t = 30, value_name = "N", value_parser = crate::cli::safe_min0)]
     pub interval_secs: u64,
     /// The scan root's home directory (defaults to $HOME)
     #[arg(long, value_name = "DIR")]
@@ -48,7 +48,7 @@ pub struct IngestRecordsArgs {
     #[arg(long)]
     pub watch: bool,
     /// Seconds between polls
-    #[arg(long, default_value_t = 30, value_name = "N")]
+    #[arg(long, default_value_t = 30, value_name = "N", value_parser = crate::cli::safe_min0)]
     pub interval_secs: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

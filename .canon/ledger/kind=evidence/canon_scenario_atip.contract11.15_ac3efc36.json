@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T13:44:28.491237Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_15_computing_the_code_tree_adds_nothing_to_dot_git_and_gives_the_same_id",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-82-junit.xml",
+      "sha256": "5baa903d42e563f262ba72d6e8c9ae8c20095779eee155d6432ba5a8ea2c1ecd"
+    },
+    {
+      "case": "atip_contract11_15_a_refused_read_leaves_the_tree_and_dot_git_as_they_were",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-82-junit.xml",
+      "sha256": "5baa903d42e563f262ba72d6e8c9ae8c20095779eee155d6432ba5a8ea2c1ecd"
+    }
+  ],
+  "code_tree": "670dff37efebda29b10c4f5152d42e1986bd9780",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-82-junit.xml"
+  },
+  "evidence_sha": "7fa6bb652753ff6b6dd6b5bf37f821bc47af019e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 45,
+  "scenario_id": "atip.contract11.15",
+  "schema": 1,
+  "staging_id": "95f68518",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

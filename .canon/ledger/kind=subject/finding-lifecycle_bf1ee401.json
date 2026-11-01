@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-01T19:29:21.138840Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-record-links",
+    "canon-0-30-ledger-naming",
+    "canon-0-31-cli-ids",
+    "canon-0-34-atip-paging-fields"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "reason": "0.34 ATIP 1.1.2 + L1: all changes reviewed, gate clean"
+  },
+  "subject_id": "finding-lifecycle",
+  "summary": "canon finding add/close and the promote-time transition exemption",
+  "title": "Finding lifecycle: a finding is raised open and closed later"
+}

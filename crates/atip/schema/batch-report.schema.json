@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/batch-report.schema.json",
+  "title": "ATIP batch report",
+  "description": "The shape every batch output's data shares (spec 11.11). A command's batch schema is `allOf` this schema and a constraint on `items[].data` (its single-invocation report). Ordering rules (written/unchanged, then at most one failed, then skipped) are checked by scripts/check.ts.",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": ["index", "status"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "status": { "enum": ["written", "unchanged", "failed", "skipped"] },
+        "data": {},
+        "error": { "$ref": "error.schema.json" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["written", "unchanged"] } } },
+          "then": { "required": ["data"], "not": { "required": ["error"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } } },
+          "then": { "required": ["error"], "not": { "required": ["data"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "skipped" } } },
+          "then": { "not": { "anyOf": [{ "required": ["data"] }, { "required": ["error"] }] } }
+        }
+      ]
+    }
+  }
+}

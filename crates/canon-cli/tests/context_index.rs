@@ -53,16 +53,15 @@ fn every_kind_option_value_is_a_context_kind() {
     let mut root = canon_cli::cli::command();
     root.build();
     let mut checked = BTreeSet::new();
-    for node in canon_cli::spec::nodes(&root) {
-        let Some(leaf) = node.leaf else { continue };
-        for option in leaf.options.iter().filter(|o| o.name == "kind" && !o.possible_values.is_empty()) {
-            checked.insert(node.command.clone());
-            for value in &option.possible_values {
+    for doc in canon_cli::spec::commands(&root).expect("the command documents are built") {
+        for option in doc.options.iter().filter(|o| o.name == "kind" && o.possible_values.is_some()) {
+            checked.insert(doc.command.clone());
+            for value in option.possible_values.iter().flatten() {
                 // A node of `canon search` is a record of any kind or a brief section: `brief` is no record kind.
-                if node.command == "search" && value == "brief" {
+                if doc.command == "search" && value == "brief" {
                     continue;
                 }
-                assert!(kinds.contains(value), "`{} --kind {value}` is not in context.kinds", node.command);
+                assert!(kinds.contains(value), "`{} --kind {value}` is not in context.kinds", doc.command);
             }
         }
     }
@@ -75,16 +74,16 @@ fn every_kind_option_value_is_a_context_kind() {
 fn commands_are_the_spec_leaves_each_role_uses() {
     let mut root = canon_cli::cli::command();
     root.build();
-    let leaves: Vec<_> = canon_cli::spec::nodes(&root).into_iter().filter(|n| n.leaf.is_some()).collect();
+    let leaves = canon_cli::spec::commands(&root).expect("the command documents are built");
     let command_set = |doc: &Value| -> BTreeSet<String> { doc["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect() };
 
     let all = data(&context(&[], &[]));
     assert_eq!(command_set(&all), leaves.iter().map(|n| n.command.clone()).collect::<BTreeSet<_>>());
     for c in all["commands"].as_array().unwrap() {
         let name = c["command"].as_str().unwrap();
-        let leaf = leaves.iter().find(|n| n.command == name).and_then(|n| n.leaf.as_ref()).unwrap_or_else(|| panic!("no leaf `{name}`"));
+        let leaf = leaves.iter().find(|n| n.command == name).unwrap_or_else(|| panic!("no leaf `{name}`"));
         assert_eq!(c["effect"], leaf.effect.as_str(), "`{name}` effect");
-        let roles: Vec<&str> = leaf.roles.iter().map(|r| r.as_str()).collect();
+        let roles: Vec<&str> = canon_cli::schema::meta_for(name).expect("a metadata row").roles.iter().map(|r| r.as_str()).collect();
         assert_eq!(c["roles"].as_array().unwrap().iter().map(|r| r.as_str().unwrap()).collect::<Vec<_>>(), roles, "`{name}` roles");
     }
     let with_roles = all["commands"].as_array().unwrap().iter().filter(|c| !c["roles"].as_array().unwrap().is_empty()).count();

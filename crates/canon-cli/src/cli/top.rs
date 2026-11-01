@@ -17,7 +17,7 @@ pub struct InitArgs {
     /// Do not write or refresh the canon block in AGENTS.md
     #[arg(long)]
     pub no_agents_md: bool,
-    /// Level of the starter .canon/policy.yaml [default: strict]
+    /// Level of the starter .canon/policy.yaml
     #[arg(long, value_enum, value_name = "LEVEL", default_value = "strict", conflicts_with = "no_policy")]
     pub policy: Option<crate::policy_level::PolicyLevel>,
     /// Do not write the starter .canon/policy.yaml
@@ -76,9 +76,9 @@ pub struct StatusArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// With --json, keep only these top-level report fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of the report (comma-separated field paths; `canon schema status --json` lists them under outputs[].fields.paths)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -88,9 +88,9 @@ pub struct ContextArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these sections of the surface (comma-separated field paths; `canon schema context --json` lists them under outputs[].fields.paths)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -119,8 +119,8 @@ pub struct RetrieveArgs {
     /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
     #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
-    /// Cap on the guidance items returned (default: 5)
-    #[arg(long, value_name = "N", default_value = "5")]
+    /// Cap on the guidance items returned
+    #[arg(long, value_name = "N", default_value = "5", value_parser = crate::cli::safe_min0_usize)]
     pub limit: Option<usize>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -135,7 +135,7 @@ pub struct QueryArgs {
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
     /// Only records with at >= <since> (RFC3339/ISO-8601)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub since: Option<DateTime<Utc>>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -163,9 +163,9 @@ pub struct QueryArgs {
     /// Return at most this many records per page, `--cursor` to continue, `--all` for every record
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of each record (comma-separated field paths; `canon schema query --json` lists them under outputs[].fields.paths)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -207,10 +207,10 @@ pub struct ExportArgs {
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
     /// Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: Option<DateTime<Utc>>,
     /// Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub after: Option<DateTime<Utc>>,
     /// Write the manifest to this file (mode 0600) instead of stdout
     #[arg(short = 'o', long = "output", value_name = "FILE")]
@@ -225,9 +225,9 @@ pub struct ExportArgs {
     pub include_sensitive: bool,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// Keep only these members of the answer this call prints (comma-separated field paths): of each exported record in the manifest, of the written answer with --json and --output, of the preview with --dry-run; `canon schema export --json` lists the paths per output
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,
     #[command(flatten)]
@@ -240,7 +240,7 @@ pub struct PurgeArgs {
     #[arg(long, value_parser = crate::query::purgeable_kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
     /// Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: DateTime<Utc>,
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,
@@ -287,12 +287,18 @@ pub struct SchemaArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// Print every error code any command can emit, with its meaning, instead of a command
-    #[arg(long, conflicts_with_all = ["path", "error"])]
+    /// Print every error code any command can emit, with its meaning and reasons, instead of a command
+    #[arg(long, conflicts_with_all = ["path", "error", "warnings", "warning"])]
     pub errors: bool,
-    /// Show one error code: its meaning, exit, retryable and fix (an unknown code exits 2)
-    #[arg(long, value_name = "CODE", conflicts_with = "path")]
+    /// Show one error code: its meaning, exit, retryable, fix and reasons (an unknown code, or a code that is only a warning, exits 2)
+    #[arg(long, value_name = "CODE", conflicts_with_all = ["path", "warnings", "warning"])]
     pub error: Option<String>,
+    /// Print every warning code, with its meaning, instead of a command
+    #[arg(long, conflicts_with_all = ["path", "warning"])]
+    pub warnings: bool,
+    /// Show one warning code: its meaning and fix (an unknown code exits 2)
+    #[arg(long, value_name = "CODE", conflicts_with = "path")]
+    pub warning: Option<String>,
 }
 
 /// The shells `canon completion` writes a script for.

@@ -99,7 +99,7 @@ fn every_batch_leaf_answers_a_one_element_batch_with_its_batch_report() {
     let base = fixture(home.path());
     let mut batches = 0;
     for node in leaves() {
-        let Some(input) = node["inputs"].as_array().unwrap().iter().find(|i| i["batch"] == true) else { continue };
+        let Some(input) = node["input"].as_object().filter(|i| i["batch"] == true) else { continue };
         let path = path_of(node);
         let (_scratch, mut repo) = copy_of(base.path());
         let _fresh;

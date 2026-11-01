@@ -106,7 +106,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Retrieve(RetrieveArgs { for_role, regime, domain, subject_id, limit, repo, json }) => run_retrieve(&repo, &for_role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), limit, json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json, .. }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::Selftest(SelftestArgs { suite, json }) => crate::selftest::run_selftest(suite.as_deref(), json),
-        Command::Schema(SchemaArgs { path, json, errors, error }) => ExitCode::from(crate::schema::run(&crate::cli::command(), &path, json, errors, error.as_deref(), declared)),
+        Command::Schema(SchemaArgs { path, json, errors, error, warnings, warning }) => ExitCode::from(crate::schema::run(&crate::cli::command(), &path, json, crate::schema::Registry { errors, error: error.as_deref(), warnings, warning: warning.as_deref() }, declared)),
         Command::Completion(CompletionArgs { shell, json }) => run_completion(shell, json),
     }
 }
@@ -123,6 +123,7 @@ fn record_role(flag: Option<RoleId>, repo: &std::path::Path, command: &str, json
         Some(role) => Ok(RoleId::parse(role.as_str()).expect("a role name is a valid role id")),
         None => Err(ExitCode::from(
             CliError::refused("USAGE", "the following required argument was not provided: --role <ROLE>")
+                .field("--role")
                 .hint("pass --role <planner|implementer|reviewer|orchestrator>, or declare the role you act as with --as <role> (or CANON_ROLE)")
                 .emit(command, json),
         )),

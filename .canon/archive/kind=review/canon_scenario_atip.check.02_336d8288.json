@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:33:01.416443Z",
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "kind": "review",
+  "pin": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_02_a_tool_that_breaks_one_rule_exits_1_with_level_not_met_and_the_failing_check_in_data"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "1e6c2e30cea24eef80c123fb9a0a74b6de4a789dc0d7f685d4424386803f45f0",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B791K8KHGMPHG9ETBKMDQW",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -3,6 +3,8 @@
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::claim::Claim;
+
 /// Whether a failure of the check fails the level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -45,6 +47,12 @@ pub struct Check {
     /// Things seen that the contract only recommends against (stderr output that carries no error or result). They never change the result.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub advisories: Vec<String>,
+    /// Facts the check found that do not change its result: the rules an `entailed` check rests on, a verified Unicode-version difference between the two regular-expression engines.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
+    /// The write and destructive commands of the tool's documents that no fixture entry covers, named by `L1.constraints`, `L1.domains` and `L1.validators`: the checker never runs them, so they are outside what those checks probe (contract 1.1.2). Information only: it never changes the result.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unlisted: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -54,21 +62,41 @@ pub struct Check {
 #[derive(Debug, Clone, Serialize)]
 pub struct Report {
     pub level: &'static str,
+    /// The contract minor the tool claimed and the checks judged.
+    #[serde(rename = "contractVersion")]
+    pub contract_version: &'static str,
     pub passed: bool,
+    /// The programs the fixture's `prepare` ran before `setup`, each as its argv: what was made outside the tool, for whoever reviews the claim.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub prepare: Vec<Vec<String>>,
     pub checks: Vec<Check>,
 }
 
 impl Report {
-    pub fn new(level: &'static str, checks: Vec<Check>) -> Self {
+    pub fn new(level: &'static str, claim: Claim, checks: Vec<Check>) -> Self {
         let passed = !checks.iter().any(|check| {
             check.strength == Strength::Must
                 && matches!(check.result, CheckResult::Fail | CheckResult::Unprovided)
         });
         Self {
             level,
+            contract_version: claim.as_str(),
             passed,
+            prepare: Vec::new(),
             checks,
         }
+    }
+
+    /// The same report naming the `prepare` steps that built the state it ran against.
+    #[must_use]
+    pub fn with_prepare(mut self, prepare: Vec<Vec<String>>) -> Self {
+        self.prepare = prepare;
+        self
+    }
+
+    /// How many SHOULD checks failed.
+    pub fn advisories(&self) -> usize {
+        self.count(Strength::Should, CheckResult::Fail)
     }
 
     pub fn find(&self, id: &str) -> Option<&Check> {
@@ -84,7 +112,8 @@ impl Report {
 
     /// The text of the report: one line per check, then one summary line. The text is not part of the contract.
     pub fn text(&self) -> String {
-        let mut lines: Vec<String> = self.checks.iter().map(Check::line).collect();
+        let mut lines: Vec<String> = self.prepare.iter().map(|step| format!("prepare: {}", step.join(" "))).collect();
+        lines.extend(self.checks.iter().map(Check::line));
         lines.push(self.summary());
         lines.join("\n")
     }
@@ -123,6 +152,16 @@ impl Check {
             self.id,
             self.rules.join(", ")
         );
+        let base = if self.notes.is_empty() {
+            base
+        } else {
+            format!("{base} [{}]", self.notes.join("; "))
+        };
+        let base = if self.unlisted.is_empty() {
+            base
+        } else {
+            format!("{base} (unlisted writes, not probed: {})", self.unlisted.join(", "))
+        };
         match &self.reason {
             Some(reason) => format!("{base}: {reason}"),
             None => base,
@@ -139,6 +178,7 @@ impl Check {
 #[cfg(test)]
 mod tests {
     use super::{Check, CheckResult, Report, Strength};
+    use crate::claim::Claim;
 
     fn check(id: &'static str, strength: Strength, result: CheckResult) -> Check {
         Check {
@@ -148,6 +188,8 @@ mod tests {
             rules: vec!["1"],
             reason: None,
             advisories: Vec::new(),
+            notes: Vec::new(),
+            unlisted: Vec::new(),
             observed: Vec::new(),
         }
     }
@@ -157,6 +199,7 @@ mod tests {
         let all = |result| {
             Report::new(
                 "L0",
+                Claim::V1_1,
                 vec![
                     check("L0.a", Strength::Must, CheckResult::Pass),
                     check("L0.b", Strength::Must, result),
@@ -173,6 +216,7 @@ mod tests {
         );
         let advisory = Report::new(
             "L0",
+            Claim::V1_1,
             vec![check("L0.a", Strength::Should, CheckResult::Fail)],
         );
         assert!(advisory.passed, "a SHOULD failure never fails the level");
@@ -184,6 +228,7 @@ mod tests {
         failing.reason = Some("it broke".to_string());
         let report = Report::new(
             "L0",
+            Claim::V1_1,
             vec![check("L0.a", Strength::Should, CheckResult::Pass), failing],
         );
         let text = report.text();

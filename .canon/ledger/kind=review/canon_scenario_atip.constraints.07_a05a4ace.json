@@ -1,0 +1,43 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T19:27:34.103996Z",
+  "code_tree": "37c6159ab44015669dc5eb99b20fc56310bc0a0d",
+  "kind": "review",
+  "pin": "a349f58a876cb2ce11db69f6c7f7ec13e06afc15",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_constraints_07_brief_approve_a_relayed_approval_without_its_digest_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_brief_approve_one_change_with_two_digests_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date",
+          "junit:atip_constraints_07_every_validator_refuses_every_call_it_rejects",
+          "junit:atip_constraints_07_evidence_add_an_artifact_scope_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_evidence_add_class_audit_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_evidence_audit_an_artifact_scope_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_export_an_empty_window_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_finding_add_a_defect_without_its_origin_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before_any_state_is_read",
+          "junit:atip_constraints_07_query_a_status_foreign_to_the_kind_is_refused_before_any_state_is_read"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "9c91d2fa82c8ecd5946dd569a6c59eafd97b03a6209a1a7ddb3387745aa8c8c2",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-constraints/brief.md"
+  },
+  "review_id": "01M6C99P6QQ93QZCXMT3MZHRDE",
+  "reviewer": "rev-constraints",
+  "scenario_id": "atip.constraints.07",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -5,7 +5,8 @@
 //! of the framework the tool is built with. Its own output follows the
 //! contract at L0, so it is checked by itself.
 //!
-//! - [`checks`]: the 16 L0 checks (approaches/checker.md 6).
+//! - [`checks`]: the 28 L0 checks of the contract's minor (approaches/checker.md 6).
+//! - [`claim`]: the contract minor a tool claims and what a document of that minor may carry.
 //! - [`exec`]: running the binary in a fresh copy of the fixture state.
 //! - [`fixture`]: the fixture file's L0 keys.
 //! - [`schema`]: the contract schemas, as validators.
@@ -21,9 +22,11 @@ compile_error!("atip check runs on macOS and Linux: it needs a pseudo-terminal a
 
 pub mod app;
 pub mod checks;
+pub mod claim;
 pub mod cli;
 pub mod exec;
 pub mod fixture;
+pub mod l1;
 pub mod output;
 pub mod report;
 pub mod schema;

@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-paging-fields",
+    "role": "reviewer",
+    "session_id": "s-0-34-paging-fields-rev"
+  },
+  "at": "2026-11-01T14:10:31.988355Z",
+  "change_id": "canon-0-34-atip-paging-fields",
+  "code_tree": "85d3f2121351444d5a0ad8272b73f661db6e001d",
+  "disposition": "rejected",
+  "file_ref": "crates/canon-cli/tests/atip_paging_fields.rs:632",
+  "introduced_by": "67ea7ee00f6c6800f4d14a0b3dec9fceefd6fe07",
+  "kind": "finding",
+  "reason": "accepted: count and recordCount are documented as report content (doc comments, changelog row, scenario 14 text); meta.page stays the paging",
+  "reviewed_sha": "637392a78a5c591c4e2cf7a6a2585367a735bcf0",
+  "reviewer": "rev-paging-fields",
+  "round": 1,
+  "scenario_ids": [
+    "atip.paging.14"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[spec fidelity] Brief F1 and scenario 14 say canon's reports keep no paging member of their own, but query's data.count (the page's record count: 2 for --limit 2 of 3) and export's data.recordCount (the page's) equal meta.page.returned and sit in data (published in QueryReport and ExportManifest). Spec 6.9 allows it (meta.page is authoritative) and the changelog does not claim otherwise; the test's list (page, nextCursor, returned, hasMore, total, meta) does not name them. Either say so in the brief/changelog or accept it. Blast radius: consumers that read count/recordCount as the total.",
+  "worktree_dirty": false
+}

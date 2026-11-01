@@ -44,8 +44,8 @@ pub struct FindingAddArgs {
     /// The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff
     #[arg(long, value_name = "REV")]
     pub resolution_rev: Option<String>,
-    /// The SOURCED introducing commit, any git revision (resolved to the full sha). No default: leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff
-    #[arg(long, value_name = "REV", value_parser = crate::finding::parse_introduced_rev)]
+    /// The SOURCED introducing commit, any git revision (resolved to the full sha). Leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff
+    #[arg(long, value_name = "REV", value_parser = crate::finding::accept_introduced_rev)]
     pub introduced_rev: Option<String>,
     /// Say the introducing commit is not known, instead of --introduced-rev. A new blocker or should-fix needs one of the two; a note needs neither. Stored in its own field, never in the commit slot
     #[arg(long)]
@@ -131,7 +131,7 @@ pub struct FindingListArgs {
     pub repo: crate::cli::RepoArgs,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref; camelCase and snake_case both match
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of each finding (comma-separated field paths: severity, disposition, reviewer, summary, resolutionSha, fileRef, reason; round and seq are always kept)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }

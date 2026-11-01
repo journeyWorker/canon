@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T09:23:38.505159Z",
+  "attachments": [
+    {
+      "case": "checks::tests::atip_check_01_the_table_is_twenty_eight_checks_twenty_one_must_and_seven_should",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r3-junit.xml",
+      "sha256": "9731d7f6c2b378d91a0b08f6e071bf0710510d872e6fd198667d4fd3978f0044"
+    },
+    {
+      "case": "atip_check_01_a_conforming_1_1_tool_passes_the_27_applicable_of_the_28_l0_checks_with_exit_0",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r3-junit.xml",
+      "sha256": "9731d7f6c2b378d91a0b08f6e071bf0710510d872e6fd198667d4fd3978f0044"
+    }
+  ],
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r3-junit.xml"
+  },
+  "evidence_sha": "10cdac9e3c8006fea7835e3e812562f1370ab9ff",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 349,
+  "scenario_id": "atip.check.01",
+  "schema": 1,
+  "staging_id": "db53187c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

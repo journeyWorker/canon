@@ -1,42 +1,48 @@
-//! The generated command spec (0.28 D2): everything an agent, a doc linter or
+//! The generated command spec (0.28 D2, 0.34 L1): everything an agent, a doc linter or
 //! a completion script needs to know about `canon`, in one document, built
 //! from the clap tree ([`crate::cli::command`]) and the tables beside it.
 //!
-//! - clap says each node's name, about, operands and options (help, value
-//!   name, default, `possibleValues`, `env`, conflicts, requirements) and the
-//!   argument groups of which one is required;
-//! - [`crate::schema::META`] says what a leaf does (`effect`, `effectNote`,
-//!   `roles`, `exits`) and [`crate::spec_facts::FACTS`] how a repeat behaves
-//!   (`idempotency`) and what it prints (`outputs`);
+//! The documents are the contract's (atip/1 spec 10): [`tree`] (the groups and commands with `level`), [`group`]
+//! and [`command`] (one command with its options, outputs, input, examples and the JSON Schemas its refs name).
+//! `canon schema` prints them and the checked-in `docs/cli/canon.cli.json` holds them, from the same functions, so
+//! what the file says of a command and what `canon schema <COMMAND>` answers are one value.
+//!
+//! - clap says each node's name, summary, operands and options (help, value name, typed default,
+//!   `possibleValues`, `env`); [`atip::project`] reads them and holds the parts every clap tool shares;
+//! - [`crate::schema::META`] says what a leaf does (`effect`, `effectNote`, `roles`) and
+//!   [`crate::spec_facts::FACTS`] how a repeat behaves (`idempotency`) and what it prints (`outputs`);
 //! - [`crate::schema_codes`] says which error codes a leaf can emit, and
 //!   [`crate::cli_error::all_codes`] what each means;
-//! - [`crate::reports`] holds the report and envelope JSON Schemas.
+//! - [`crate::reports`] holds the report and envelope JSON Schemas, and [`crate::input`] the `--input` documents.
 //!
-//! [`generate`] is the whole document and [`render`] its checked-in text,
-//! `docs/cli/canon.cli.json`; `tests/cli_spec.rs` regenerates it and
-//! byte-diffs (`CANON_BLESS_CLI_SPEC=1` rewrites it). `canon schema`
-//! renders its command nodes from [`nodes`], so what it prints and what the
-//! spec says cannot differ.
+//! [`generate`] is the whole file and [`render`] its checked-in text; `tests/cli_spec.rs` regenerates it and
+//! byte-diffs it (`CANON_BLESS_CLI_SPEC=1` rewrites it).
 //!
-//! The output is deterministic: nodes sort by command, options keep their
-//! declaration order, every other list is sorted or in a fixed order, and
-//! object keys sort (the workspace's `serde_json` has no `preserve_order`).
+//! The output is deterministic: the tree is in command order, options keep their declaration order, every
+//! other list is sorted or in a fixed order, and the file's object keys sort (the workspace's `serde_json` has
+//! no `preserve_order`).
 
-use clap::{Arg, ArgAction, Command};
+use std::collections::{BTreeMap, BTreeSet};
+
+use atip::doc::{CommandDoc, EntryKind, GroupDoc, InputDoc, OperandDoc, OptionDoc, OutputDoc, OutputKind, TreeDoc, TreeEntry, ValidatorDoc, ValueType};
+use atip::domain::Domain;
+use atip::project::{self, Node};
+use clap::Command;
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::cli_error::feature_codes;
 use crate::role::Role;
-use crate::schema::{error_codes, example_for, meta_for, Effect, ExitMeta, STANDARD_EXITS};
-use crate::spec_facts::{facts_for, Idempotency, OutputKind};
+use crate::schema::{error_codes, example_for, meta_for};
+use crate::spec_facts::facts_for;
 
-/// The version of this document's own layout.
-pub const SPEC_VERSION: &str = "1";
+/// The version of this document's own layout: `2` is the L1 shape (a tree and command documents in the contract's names).
+pub const SPEC_VERSION: &str = "2";
 
 /// The repo-relative path of the checked-in spec.
 pub const SPEC_PATH: &str = "docs/cli/canon.cli.json";
 
-/// The exit table every leaf's own `exits` refines (0.28 D4).
+/// What exit 0, 1 and 2 mean for every command (spec 8); the exit of a code is in the registry.
 const EXIT_TABLE: &[(u8, &str)] = &[
     (0, "ok"),
     (1, "the command ran and its answer is negative or incomplete: a finding, a failed check, an unverifiable result, a failure after the work began, an internal error"),
@@ -57,7 +63,7 @@ const ENV_VARS: &[EnvVar] = &[
     EnvVar { name: "CANON_INGEST_CLAUDE_SESSIONS_DIR", about: "An extra directory `ingest sessions` scans for Claude Code sessions, besides `~/.claude/projects`" },
     EnvVar { name: "CANON_INGEST_OMP_SESSIONS_DIR", about: "An extra directory `ingest sessions` scans for omp sessions, besides the default roots" },
     EnvVar { name: "CANON_PG_DSN", about: "Connection string of the Postgres tier (falls back to `DATABASE_URL`)" },
-    EnvVar { name: "CANON_ROLE", about: "The role you act as: planner, implementer, reviewer or orchestrator; `--as` overrides it. Never filters or fails `schema`, `context` or `skills show`" },
+    EnvVar { name: "CANON_ROLE", about: "The role you act as: planner, implementer, reviewer or orchestrator; `--as` overrides it. Never filters or fails `context` or `skills show`; `schema` does not read it" },
     EnvVar { name: "CANON_S3_ACCESS_KEY", about: "Access key of an s3 tier's object store (required in a release build)" },
     EnvVar { name: "CANON_S3_ENDPOINT", about: "Endpoint of an s3 tier's object store (required in a release build)" },
     EnvVar { name: "CANON_S3_REGION", about: "Region of an s3 tier's object store (default `us-east-1`)" },
@@ -86,406 +92,340 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
     ENV_VARS.iter().map(|v| v.name)
 }
 
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum NodeKind {
-    Leaf,
-    Group,
-}
 
-/// One operand of a leaf.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Operand {
-    /// The clap id.
-    pub name: String,
-    /// The placeholder the operand is written as (`CHANGE_ID`).
-    pub kind: String,
-    pub arity: Arity,
-    pub required: bool,
-    pub repeatable: bool,
-    pub possible_values: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub default: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-}
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it once `atip check --level L1` passes on the
+/// build: the check runs in CI beside the tests that build these documents.
+pub const LEVEL: &str = "L1";
 
-/// How many values an operand takes; `max` is absent when unbounded.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct Arity {
-    pub min: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max: Option<usize>,
-}
+/// The first line of every `--help` (spec 4.7): it points at the self-description, so an agent that read nothing else knows it exists.
+pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every command as JSON.";
 
-/// One option of a leaf (or a global one).
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct OptionSpec {
-    /// The long name, without `--`.
-    pub name: String,
-    /// `flag` (no value), `count`, or `value`.
-    pub kind: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub short: Option<char>,
-    pub aliases: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value_name: Option<String>,
-    pub required: bool,
-    pub repeatable: bool,
-    pub possible_values: Vec<String>,
-    pub default: Vec<String>,
-    pub help: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub env: Option<String>,
-    /// Options that cannot be given with this one, as `--name`.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub conflicts_with: Vec<String>,
-    /// Options that must be given with this one, as `--name`.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub requires: Vec<String>,
-}
+/// The value type of every parser canon wrote itself, by the value name of the argument that uses it (approaches/rust.md
+/// 4.1). clap cannot read a type out of a function, and a guessed `string` is how canon once published none: an argument
+/// with a parser of its own and a value name that is not here fails the generation (`tests/schema_doc.rs`
+/// `atip.schemadoc.06`). Every one of canon's today is text that the parser checks the form of, so `string`.
+pub const CUSTOM_PARSERS: &[(&str, ValueType)] = &[
+    ("CHANGE_ID", ValueType::String),
+    ("FORMAT:PATH", ValueType::String),
+    ("KEY", ValueType::String),
+    ("NAME", ValueType::String),
+    ("NAME@VERSION", ValueType::String),
+    ("PATH_OR_EFFECT", ValueType::String),
+    ("PROJECT_ID", ValueType::String),
+    ("REV", ValueType::String),
+    ("REVIEW_ID", ValueType::String),
+    ("ROLE", ValueType::String),
+    ("RUN_ID", ValueType::String),
+    ("SCENARIO_ID", ValueType::String),
+    ("SESSION_ID", ValueType::String),
+    ("STRATEGY_ID", ValueType::String),
+    ("SUBJECT_ID", ValueType::String),
+    ("SURFACE", ValueType::String),
+    ("TASK_ID", ValueType::String),
+    ("TIMESTAMP", ValueType::String),
+];
 
-/// One output of a leaf: what it prints and the schema of that.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Output {
-    pub kind: OutputKind,
-    /// The report's name; for an artifact the report that envelopes it under `--json`.
-    pub report: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub media_type: Option<&'static str>,
-    /// `#/schemas/<report>`; absent while the report has no schema.
-    pub schema_ref: Option<String>,
-    pub schema_version: Option<String>,
-    /// The report of a leaf run with an array or NDJSON as `--input` (`Batch<Name>Report`, D7).
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub batch: bool,
-}
+/// How a default that clap does not hold is found, for the options whose help promises one: `(command or "*", argument name, note)`.
+/// Used only where the typed default is `null`; a command's own row wins over `*`. `tests/schema_doc.rs` fails on a help text that
+/// promises a default and has neither a typed default nor a note here.
+const DEFAULT_NOTES: &[(&str, &str, &str)] = &[
+    ("*", "repo", "the nearest ancestor directory holding a canon.yaml"),
+    ("*", "actor", "the CANON_ACTOR environment variable, with --relayed-via"),
+    ("*", "role", "the role declared with --as or CANON_ROLE"),
+    ("*", "promote", "on under canon.yaml `write: { promote: auto }`"),
+    ("*", "kind", "every kind"),
+    ("*", "change", "the repo's only live change"),
+    ("*", "dir", "every configured specs.roots[] entry"),
+    ("*", "home", "$HOME"),
+    ("*", "suite", "every suite"),
+    ("*", "as-of", "now"),
+    ("dashboard", "snapshot", "regenerated fresh each run"),
+    ("migrate", "backup", "the newest under .canon/migrate-backup/"),
+    ("scenario new", "change", "the --subject's newest adopted change"),
+    ("scenario new", "feature", "derived from the scenario tag"),
+    ("finding add", "resolution-rev", "HEAD when --disposition is fixed"),
+    ("finding close", "resolution-rev", "HEAD when --disposition is fixed"),
+    ("evidence add", "class", "test-run when a --report is given"),
+    ("evidence add", "ref", "the --report paths, comma-separated, when one is given"),
+    ("evidence add", "verdict", "derived from the bound cases when a --report is given, else faithful"),
+    ("skills check", "skills-source", "CANON_SKILLS_SOURCE, else canon/skills"),
+    ("skills doctor", "skills-source", "CANON_SKILLS_SOURCE, else canon/skills"),
+    ("skills install", "skills-source", "CANON_SKILLS_SOURCE, else the text built into the binary"),
+    ("skills install", "providers", "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories"),
+    ("skills check", "providers", "the providers `skills install` would use"),
+    ("skills doctor", "providers", "the providers `skills install` would use"),
+];
 
-/// One exit code of a leaf with its meaning: the leaf's own rows ([`crate::schema::META`]),
-/// then one row per exit a listed error code carries that the leaf did not declare.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ExitRow {
-    pub code: u8,
-    pub meaning: String,
-}
-
-/// The exits of a leaf: its declared rows, and for each of exit 1 and 2 that a code it
-/// lists carries but it does not declare, a row naming those codes, so no listed code
-/// exits with a status the leaf says it never returns.
-fn exits_of(declared: &[ExitMeta], codes: &[&'static str]) -> Vec<ExitRow> {
-    let mut rows: Vec<ExitRow> = declared.iter().map(|e| ExitRow { code: e.code, meaning: e.meaning.to_string() }).collect();
-    for (exit, what) in [(1u8, "failed"), (2u8, "refused")] {
-        if rows.iter().any(|r| r.code == exit) {
-            continue;
-        }
-        let named: Vec<&str> = codes.iter().copied().filter(|c| crate::cli_error::code_info(c).is_some_and(|i| i.exit == exit)).collect();
-        if !named.is_empty() {
-            rows.push(ExitRow { code: exit, meaning: format!("{what}: {}", named.join(", ")) });
-        }
-    }
-    rows.sort_by_key(|r| r.code);
-    rows
-}
-
-/// The part of a node only a leaf has.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Leaf {
-    pub effect: Effect,
-    /// What the command does when invoked with fewer effects than `effect` says.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub effect_note: Option<&'static str>,
-    /// Absent for a read.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub idempotency: Option<Idempotency>,
-    /// The roles whose steps use the command; empty means humans only.
-    pub roles: Vec<Role>,
-    pub supports_json: bool,
-    pub operands: Vec<Operand>,
-    pub options: Vec<OptionSpec>,
-    /// Option sets of which exactly one is required.
-    pub required_one_of: Vec<Vec<String>>,
-    pub exits: Vec<ExitRow>,
-    pub error_codes: Vec<&'static str>,
-    pub outputs: Vec<Output>,
-    /// JSON input documents of the leaf (`--input`).
-    pub inputs: Vec<crate::input::InputDoc>,
-    pub examples: Vec<&'static str>,
-}
-
-/// One node of the command tree: a leaf, or a group that only holds children.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Node {
-    /// The canonical space-separated path, e.g. `evidence add`.
-    pub command: String,
-    pub path: Vec<String>,
-    pub name: String,
-    pub node_kind: NodeKind,
-    pub aliases: Vec<String>,
-    pub about: Option<String>,
-    /// A group's children, as commands.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub children: Vec<String>,
-    #[serde(flatten)]
-    pub leaf: Option<Leaf>,
-}
-
-/// What an option holds when it is not given. `--repo` (the shared `RepoArgs`)
-/// has none: absent, it means the nearest ancestor directory holding a
-/// `canon.yaml` (D5); `init` and `demo init` default to `.`, used as given.
-fn default_values(arg: &Arg) -> Vec<String> {
-    arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect()
-}
-
-/// Clap's own `--help` / `--version`: noise in a spec. A command's own
-/// argument that happens to be called `version` is not.
-fn is_builtin(arg: &Arg) -> bool {
-    matches!(arg.get_action(), ArgAction::Help | ArgAction::HelpShort | ArgAction::HelpLong | ArgAction::Version)
-}
-
-fn display_name(arg: &Arg) -> String {
-    arg.get_long().map_or_else(|| arg.get_id().to_string(), |l| format!("--{l}"))
-}
-
-fn value_name(arg: &Arg) -> String {
-    arg.get_value_names().and_then(|v| v.first()).map_or_else(|| arg.get_id().as_str().to_uppercase(), std::string::ToString::to_string)
-}
-
-fn is_repeatable(arg: &Arg) -> bool {
-    matches!(arg.get_action(), ArgAction::Append | ArgAction::Count) || arg.get_num_args().is_some_and(|r| r.max_values() > 1)
-}
-
-fn kind_of(arg: &Arg) -> &'static str {
-    match arg.get_action() {
-        ArgAction::SetTrue | ArgAction::SetFalse => "flag",
-        ArgAction::Count => "count",
-        _ => "value",
+/// The environment variable a command reads to fill an option that clap does not give an `env` (spec 16.3: a variable may
+/// fill only an option that declares it, and a tool declares it per command). `canon schema` reads none: its `--as` is the flag alone.
+fn declared_env(command: &str, option: &str) -> Option<&'static str> {
+    match (command, option) {
+        ("schema", _) => None,
+        (_, "as" | "role") => Some(crate::role::ENV),
+        ("skills install" | "skills check" | "skills doctor", "skills-source") => Some(crate::skills::CANONICAL_SOURCE_ENV),
+        // The relayed human acts (`--relayed-via`) take the agent's actor id from the variable when `--actor` is not given.
+        ("brief approve" | "migrate" | "policy approve", "actor") => Some(crate::relay::ACTOR_ENV),
+        _ => None,
     }
 }
 
-/// The ids `arg` requires. clap keeps them private (`Arg::requires` has no
-/// getter), but its `Debug` prints them: `requires: [(IsPresent, "flow")]`.
-/// `tests/cli_spec.rs` pins one known requirement, so a clap that changes the
-/// print fails the suite instead of emptying the spec.
-fn required_ids(arg: &Arg) -> Vec<String> {
-    let text = format!("{arg:?}");
-    let Some(start) = text.find("requires: [") else { return Vec::new() };
-    let rest = &text[start + "requires: [".len()..];
-    let mut depth = 1usize;
-    let mut end = rest.len();
-    let mut in_str = false;
-    for (i, c) in rest.char_indices() {
-        match c {
-            '"' => in_str = !in_str,
-            '[' if !in_str => depth += 1,
-            ']' if !in_str => {
-                depth -= 1;
-                if depth == 0 {
-                    end = i;
-                    break;
-                }
-            }
-            _ => {}
+fn default_note(command: &str, name: &str) -> Option<&'static str> {
+    DEFAULT_NOTES.iter().find(|(scope, known, _)| *scope == command && *known == name).or_else(|| DEFAULT_NOTES.iter().find(|(scope, known, _)| *scope == "*" && *known == name)).map(|(_, _, note)| *note)
+}
+
+/// What a failed projection says: a defect of a table or a declaration, found when a document is built.
+pub type Built<T> = Result<T, String>;
+
+fn built<T>(result: Result<T, atip::project::Problem>) -> Built<T> {
+    result.map_err(|problem| problem.to_string())
+}
+
+/// `x-canon` of a command: the roles whose steps use it (empty: humans only).
+fn x_canon(path: &str) -> BTreeMap<String, Value> {
+    let roles: Vec<&str> = meta_for(path).map_or_else(Vec::new, |meta| meta.roles.iter().map(|role| role.as_str()).collect());
+    BTreeMap::from([("x-canon".to_string(), json!({ "roles": roles }))])
+}
+
+fn entry(node: &Node<'_>) -> Built<TreeEntry> {
+    let summary = built(project::summary(node))?;
+    Ok(if node.is_group {
+        TreeEntry { command: node.command.clone(), path: node.path.clone(), kind: EntryKind::Group, summary, effect: None, extensions: BTreeMap::new() }
+    } else {
+        let effect = meta_for(&node.command).ok_or_else(|| format!("`{}` has no row in the metadata table", node.command))?.effect;
+        TreeEntry { command: node.command.clone(), path: node.path.clone(), kind: EntryKind::Command, summary, effect: Some(effect), extensions: x_canon(&node.command) }
+    })
+}
+
+/// Whether the tree of `role` lists `node`: a command of that role, or a group that holds one (`None`: everything).
+fn listed_for(nodes: &[Node<'_>], node: &Node<'_>, role: Option<Role>) -> bool {
+    match role {
+        None => true,
+        Some(role) if node.is_group => nodes.iter().any(|other| !other.is_group && other.command.starts_with(&format!("{} ", node.command)) && meta_for(&other.command).is_some_and(|meta| meta.roles.contains(&role))),
+        Some(role) => meta_for(&node.command).is_some_and(|meta| meta.roles.contains(&role)),
+    }
+}
+
+/// `canon schema --json`: every group and command, a group before its commands. `role` (`--as`) keeps the commands
+/// of that role and the groups that hold one, and the tree names the role in `x-canon.as`; nothing else, the environment
+/// included, filters it (spec 10.2.2).
+pub fn tree(root: &Command, role: Option<Role>) -> Built<TreeDoc> {
+    let nodes = project::nodes(root);
+    let mut entries = Vec::with_capacity(nodes.len());
+    for node in &nodes {
+        if listed_for(&nodes, node, role) {
+            entries.push(entry(node)?);
         }
     }
-    // Each entry is `(<predicate>, "<id>")`; the id is the last quoted string.
-    rest[..end]
-        .split("), (")
-        .filter_map(|entry| {
-            let close = entry.rfind('"')?;
-            let open = entry[..close].rfind('"')?;
-            Some(entry[open + 1..close].to_string())
-        })
-        .collect()
+    // A filtered tree says so (spec 10.2.2, 10.12): the role is `x-canon.as`, and an unfiltered tree has no `x-canon`.
+    let extensions = role.map(|role| ("x-canon".to_string(), json!({ "as": role.as_str() }))).into_iter().collect();
+    Ok(TreeDoc { kind: TreeDoc::KIND, level: LEVEL.to_string(), commands: entries, extensions })
 }
 
-/// The names a `requires` / conflict id stands for: an argument's own name, or
-/// every member of the group it names.
-fn names_of(cmd: &Command, id: &str) -> Vec<String> {
-    if let Some(arg) = cmd.get_arguments().find(|a| a.get_id() == id) {
-        return vec![display_name(arg)];
-    }
-    cmd.get_groups()
-        .find(|g| g.get_id() == id)
-        .map(|g| g.get_args().filter_map(|member| cmd.get_arguments().find(|a| a.get_id() == member)).map(display_name).collect())
-        .unwrap_or_default()
+/// Whether the tree of `role` lists the group or command `path`.
+pub fn is_listed(root: &Command, path: &[String], role: Role) -> bool {
+    let nodes = project::nodes(root);
+    let wanted = path.join(" ");
+    nodes.iter().find(|node| node.command == wanted).is_some_and(|node| listed_for(&nodes, node, Some(role)))
 }
 
-fn option_spec(cmd: &Command, arg: &Arg, conflicts: &[(String, String)]) -> OptionSpec {
-    let kind = kind_of(arg);
-    let name = display_name(arg);
-    let mut conflicts_with: Vec<String> = conflicts.iter().filter(|(a, _)| *a == name).map(|(_, b)| b.clone()).collect();
-    conflicts_with.sort();
-    conflicts_with.dedup();
-    let mut requires: Vec<String> = required_ids(arg).iter().flat_map(|id| names_of(cmd, id)).collect();
-    requires.sort();
-    requires.dedup();
-    OptionSpec {
-        name: arg.get_long().map_or_else(|| arg.get_id().to_string(), str::to_string),
-        kind,
-        short: arg.get_short(),
-        aliases: arg.get_all_aliases().map(|a| a.iter().map(std::string::ToString::to_string).collect()).unwrap_or_default(),
-        value_name: (kind == "value").then(|| value_name(arg)),
-        required: arg.is_required_set(),
-        repeatable: is_repeatable(arg),
-        possible_values: arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
-        // A flag is off unless given; clap's `false` is not a default worth listing.
-        default: if kind == "value" { default_values(arg) } else { Vec::new() },
-        help: arg.get_help().map(std::string::ToString::to_string),
-        env: arg.get_env().map(|e| e.to_string_lossy().into_owned()),
-        conflicts_with,
-        requires,
-    }
+/// The words that follow `path` in the tree of `role`: the valid next words of a path the role's tree does not list.
+pub fn listed_children(root: &Command, path: &[String], role: Role) -> Vec<String> {
+    let nodes = project::nodes(root);
+    nodes.iter().filter(|node| node.path.len() == path.len() + 1 && node.path.starts_with(path) && listed_for(&nodes, node, Some(role))).filter_map(|node| node.path.last().cloned()).collect()
 }
 
-fn operand_spec(arg: &Arg, note: Option<&str>) -> Operand {
-    let range = arg.get_num_args();
-    let required = arg.is_required_set();
-    let (min, max) = range.map_or((1, 1), |r| (r.min_values(), r.max_values()));
-    Operand {
-        name: arg.get_id().to_string(),
-        kind: value_name(arg),
-        arity: Arity { min: if required { min.max(1) } else { 0 }, max: (max < usize::MAX / 2).then_some(max) },
-        required,
-        repeatable: is_repeatable(arg),
-        possible_values: arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
-        default: default_values(arg),
-        description: note.map(str::to_string).or_else(|| arg.get_help().map(std::string::ToString::to_string)),
-    }
-}
-
-/// Every pair `(a, b)` of options of `cmd` that cannot be given together, in
-/// both directions: clap enforces a conflict whichever side declared it, and
-/// the members of a group that allows one are in conflict with each other.
-fn conflict_pairs(cmd: &Command) -> Vec<(String, String)> {
-    let mut pairs = Vec::new();
-    for arg in cmd.get_arguments().filter(|a| !is_builtin(a)) {
-        for other in cmd.get_arg_conflicts_with(arg) {
-            pairs.push((display_name(arg), display_name(other)));
-            pairs.push((display_name(other), display_name(arg)));
+/// `canon schema <GROUP> --json`. With `role` (`--as`) the group lists only the children the role's tree lists, so the
+/// group and the tree agree; a group the role's tree omits has none (the caller refuses it).
+pub fn group(root: &Command, path: &[String], role: Option<Role>) -> Built<GroupDoc> {
+    let nodes = project::nodes(root);
+    let command = path.join(" ");
+    let node = nodes.iter().find(|node| node.is_group && node.command == command).ok_or_else(|| format!("`{command}` is not a group"))?;
+    let mut children = Vec::new();
+    for child in &node.children {
+        let child = nodes.iter().find(|other| other.command == *child).ok_or_else(|| format!("`{child}` is not in the tree"))?;
+        if listed_for(&nodes, child, role) {
+            children.push(entry(child)?);
         }
     }
-    for group in cmd.get_groups() {
-        if (*group).clone().is_multiple() {
-            continue;
-        }
-        let members: Vec<String> = group.get_args().filter_map(|id| cmd.get_arguments().find(|a| a.get_id() == id)).map(display_name).collect();
-        for a in &members {
-            for b in members.iter().filter(|b| *b != a) {
-                pairs.push((a.clone(), b.clone()));
-            }
-        }
-    }
-    pairs
+    Ok(GroupDoc { kind: GroupDoc::KIND, command, path: node.path.clone(), summary: built(project::summary(node))?, commands: children, extensions: role.map(|role| ("x-canon".to_string(), json!({ "as": role.as_str() }))).into_iter().collect() })
 }
 
-fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) -> Leaf {
-    let meta = meta_for(path);
-    let facts = facts_for(path);
-    let effect = meta.map_or(Effect::Write, |m| m.effect);
-    let conflicts = conflict_pairs(cmd);
-    let operands: Vec<Operand> = cmd
-        .get_positionals()
-        .filter(|a| !is_builtin(a))
-        .map(|a| operand_spec(a, facts.and_then(|f| f.operands.iter().find(|o| o.name == a.get_id().as_str())).map(|o| o.about)))
-        .collect();
-    let options: Vec<OptionSpec> = cmd.get_arguments().filter(|a| !a.is_positional() && !a.is_global_set() && !is_builtin(a)).map(|a| option_spec(cmd, a, &conflicts)).collect();
-    let supports_json = options.iter().any(|o| o.name == "json");
-    let error_codes = error_codes(path);
-    let batch_supported = crate::input::batch_supported(path);
-    let mut outputs: Vec<Output> = facts
-        .map(|f| f.outputs)
-        .unwrap_or_default()
-        .iter()
-        .map(|o| {
-            let schema = reports.iter().find(|r| r.name == o.report);
-            Output {
-                kind: o.kind,
-                report: o.report.to_string(),
-                media_type: o.media_type,
-                schema_ref: schema.map(|r| format!("#/schemas/{}", r.name)),
-                schema_version: schema.map(|r| r.schema_version.clone()),
-                batch: false,
-            }
-        })
-        .collect();
-    if batch_supported {
-        let batch: Vec<Output> = outputs
-            .iter()
-            .filter_map(|o| {
-                let name = format!("Batch{}", o.report);
-                let schema = reports.iter().find(|r| r.name == name)?;
-                Some(Output { kind: OutputKind::Report, schema_ref: Some(format!("#/schemas/{name}")), schema_version: Some(schema.schema_version.clone()), report: name, media_type: None, batch: true })
-            })
-            .collect();
-        outputs.extend(batch);
+/// The reserved codes of the features a command has (spec 7.2.1, 10.13 rule 4), with the codes it emits.
+fn errors_of(path: &str, options: &[OptionDoc], operands: &[OperandDoc], batch: bool) -> Vec<String> {
+    let mut codes: BTreeSet<String> = error_codes(path).into_iter().map(str::to_string).collect();
+    codes.insert("USAGE".to_string());
+    let has = |name: &str| options.iter().any(|option| option.name == name);
+    if has("input") {
+        codes.extend(feature_codes::INPUT.map(str::to_string));
     }
-    Leaf {
-        effect,
-        effect_note: meta.and_then(|m| m.effect_note),
-        idempotency: facts.and_then(|f| f.idempotency),
-        roles: meta.map_or_else(Vec::new, |m| m.roles.to_vec()),
-        supports_json,
+    if batch {
+        codes.insert(feature_codes::BATCH.to_string());
+    }
+    if has("commit") {
+        codes.insert(feature_codes::COMMIT.to_string());
+    }
+    if has("cursor") {
+        codes.insert(feature_codes::CURSOR.to_string());
+    }
+    let arguments: Vec<(String, Option<String>)> = options.iter().map(|option| (option.name.clone(), option.value_name.clone())).chain(operands.iter().map(|operand| (operand.name.clone(), Some(operand.value_name.clone())))).collect();
+    codes.extend(crate::arg_rules::codes_for(path, &arguments).into_iter().map(str::to_string));
+    codes.into_iter().collect()
+}
+
+/// The outputs of a command and the schemas they name.
+fn outputs_of(path: &str, batch: bool, schemas: &mut BTreeMap<String, Value>) -> Built<Vec<OutputDoc>> {
+    let facts = facts_for(path).ok_or_else(|| format!("`{path}` has no row in the facts table"))?;
+    let reports = crate::reports::schemas_of(path);
+    let mut outputs = Vec::new();
+    let mut add = |name: &str, kind: OutputKind, media_type: Option<&str>, batch: bool, when: Option<&str>, schemas: &mut BTreeMap<String, Value>| -> Built<()> {
+        let report = reports.iter().find(|report| report.name == name).ok_or_else(|| format!("`{path}` names the report `{name}`, which has no schema"))?;
+        project::add_schema(schemas, name, report.schema.clone())?;
+        let fields = if batch { None } else { crate::fields::doc_for(path, name) };
+        outputs.push(OutputDoc { kind, schema_ref: format!("#/schemas/{name}"), schema_version: report.schema_version.clone(), media_type: media_type.map(str::to_string), event_ref: None, batch, when: when.map(str::to_string), fields });
+        Ok(())
+    };
+    for output in facts.outputs {
+        add(output.report, output.kind, output.media_type, false, output.when, schemas)?;
+    }
+    if batch {
+        let name = crate::reports::batch_output_name(path).ok_or_else(|| format!("`{path}` takes a batch and has no batch report"))?;
+        add(&name, OutputKind::Report, None, true, Some("--input is an array or NDJSON"), schemas)?;
+    }
+    Ok(outputs)
+}
+
+/// The `--input` declaration of a command and the two schemas it names.
+fn input_of(path: &str, cmd: &Command, operands: &[OperandDoc], options: &[OptionDoc], schemas: &mut BTreeMap<String, Value>) -> Option<InputDoc> {
+    if !options.iter().any(|option| option.name == "input") {
+        return None;
+    }
+    let words: Vec<String> = path.split(' ').map(str::to_string).collect();
+    let leaf = crate::input::Leaf::of(cmd, &words);
+    let name = crate::input::schema_name(path);
+    let arguments = name.replacen("Input", "Arguments", 1);
+    let (title, arguments_title) = (format!("`canon {path}` --input document"), format!("`canon {path}` arguments after the --input document is merged with the command line"));
+    schemas.insert(name.clone(), project::fragment_schema(&title, operands, options));
+    schemas.insert(arguments.clone(), project::arguments_schema(&arguments_title, operands, options, &leaf.required_one_of()));
+    let batch = crate::input::batch_supported(path);
+    Some(InputDoc {
+        option: "--input",
+        schema_ref: format!("#/schemas/{name}"),
+        arguments_ref: Some(format!("#/schemas/{arguments}")),
+        batch,
+        max_bytes: crate::input::MAX_BYTES,
+        max_items: batch.then_some(crate::input::MAX_ELEMENTS as u64),
+        example: crate::input::example_document(cmd, &leaf).unwrap_or_else(|| json!({})),
+    })
+}
+
+/// The examples of a command: the one table row, with `--json` after the path as the contract asks (spec 10.5).
+fn examples_of(path: &str) -> Built<Vec<String>> {
+    let example = example_for(path).ok_or_else(|| format!("`{path}` has no example"))?;
+    Ok(vec![format!("{example} --json")])
+}
+
+/// The `domain` of the argument `name` of `path`: what its Rust integer type carries (`implicit`), merged with the row of
+/// the tool's table, when there is one. A row for an `enum` or a `switch` argument is left out: those have no domain.
+fn domain_of(path: &str, name: &str, value_name: Option<&str>, value_type: ValueType, implicit: Option<Value>) -> Built<Option<Value>> {
+    let Some(row) = crate::arg_rules::domain_for(path, name, value_name) else { return Ok(implicit) };
+    let fits = match (&row.domain, value_type) {
+        (_, ValueType::Enum | ValueType::Switch) => return Ok(implicit),
+        (Domain::Integer { .. }, ValueType::Integer | ValueType::Count) | (Domain::Text { .. }, ValueType::String | ValueType::Path) => true,
+        _ => false,
+    };
+    if !fits {
+        return Err(format!("`{path}`: the domain of `{name}` is {:?} and the argument is a {}", row.domain, value_type.as_str()));
+    }
+    atip::domain::merge(implicit, Some(row.domain.to_value())).map_err(|problem| format!("`{path}`: the domain of `{name}`: {problem}"))
+}
+
+fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
+    let path = node.command.as_str();
+    let meta = meta_for(path).ok_or_else(|| format!("`{path}` has no row in the metadata table"))?;
+    let facts = facts_for(path).ok_or_else(|| format!("`{path}` has no row in the facts table"))?;
+    let mut operands = Vec::new();
+    for arg in node.cmd.get_positionals().filter(|arg| !project::is_builtin_arg(arg)) {
+        let mut operand = built(project::operand_doc(path, arg, CUSTOM_PARSERS))?;
+        if let Some(about) = facts.operands.iter().find(|about| about.name == arg.get_id().as_str()) {
+            operand.help = about.about.to_string();
+        }
+        if operand.default.is_null() && !operand.required {
+            operand.default_note = default_note(path, &operand.name).map(str::to_string);
+        }
+        operand.domain = domain_of(path, &operand.name, Some(&operand.value_name), operand.value_type, operand.domain.take())?;
+        operands.push(operand);
+    }
+    let mut options = Vec::new();
+    for arg in node.cmd.get_arguments().filter(|arg| !arg.is_positional() && !project::is_builtin_arg(arg)) {
+        let mut option = built(project::option_doc(path, arg, CUSTOM_PARSERS, crate::input::FLAGS_ONLY))?;
+        option.env = option.env.or_else(|| declared_env(path, &option.name).map(str::to_string));
+        if (option.default.is_null() && !option.required) || option.name == "promote" {
+            option.default_note = default_note(path, &option.name).map(str::to_string);
+        }
+        option.domain = domain_of(path, &option.name, option.value_name.as_deref(), option.value_type, option.domain.take())?;
+        options.push(option);
+    }
+    let mut schemas = BTreeMap::new();
+    let input = input_of(path, node.cmd, &operands, &options, &mut schemas);
+    let batch = input.as_ref().is_some_and(|input| input.batch);
+    let outputs = outputs_of(path, batch, &mut schemas)?;
+    let mut constraints = atip::constraint::clap_rules(node.cmd);
+    constraints.extend(crate::arg_rules::rules_for(path).iter().map(atip::constraint::Rule::doc));
+    let validators: Vec<ValidatorDoc> = crate::arg_rules::validators_for(path).iter().map(atip::constraint::Validator::doc).collect();
+    let examples = examples_of(path)?;
+    let errors = errors_of(path, &options, &operands, batch);
+    let problems = atip::constraint::document_problems(&options, &operands, &constraints, &validators, &errors, &examples);
+    if !problems.is_empty() {
+        return Err(format!("`{path}`: {}", problems.join("; ")));
+    }
+    Ok(CommandDoc {
+        kind: CommandDoc::KIND,
+        command: node.command.clone(),
+        path: node.path.clone(),
+        summary: built(project::summary(node))?,
+        effect: meta.effect,
+        idempotency: facts.idempotency,
+        effect_note: meta.effect_note.map(str::to_string),
+        errors,
         operands,
         options,
-        required_one_of: cmd
-            .get_groups()
-            .filter(|g| g.is_required_set() && !(*g).clone().is_multiple())
-            .map(|g| g.get_args().filter_map(|id| cmd.get_arguments().find(|a| a.get_id() == id)).map(display_name).collect())
-            .collect(),
-        exits: exits_of(meta.map_or(STANDARD_EXITS, |m| m.exits), &error_codes),
-        error_codes,
+        constraints,
+        validators,
         outputs,
-        inputs: crate::input::inputs(path, cmd),
-        examples: example_for(path).into_iter().collect(),
-    }
+        input,
+        examples,
+        schemas,
+        extensions: x_canon(path),
+    })
 }
 
-/// The subcommands of `cmd` a user can run: everything but clap's own `help`.
-fn subcommands(cmd: &Command) -> impl Iterator<Item = &Command> {
-    cmd.get_subcommands().filter(|c| c.get_name() != "help")
+/// `canon schema <COMMAND> --json`.
+pub fn command(root: &Command, path: &[String]) -> Built<CommandDoc> {
+    let nodes = project::nodes(root);
+    let wanted = path.join(" ");
+    let node = nodes.iter().find(|node| !node.is_group && node.command == wanted).ok_or_else(|| format!("`{wanted}` is not a command"))?;
+    command_of(node)
 }
 
-/// Every node of the tree under `root` (leaves and groups, not the root),
-/// sorted by command. `root` must be built (`Command::build`) so a parent's
-/// global flags have reached its leaves.
-pub fn nodes(root: &Command) -> Vec<Node> {
-    fn walk(cmd: &Command, prefix: &mut Vec<String>, reports: &[crate::reports::ReportSchema], out: &mut Vec<Node>) {
-        for sub in subcommands(cmd) {
-            prefix.push(sub.get_name().to_string());
-            let command = prefix.join(" ");
-            let is_group = subcommands(sub).next().is_some();
-            out.push(Node {
-                path: prefix.clone(),
-                name: sub.get_name().to_string(),
-                node_kind: if is_group { NodeKind::Group } else { NodeKind::Leaf },
-                aliases: sub.get_all_aliases().map(str::to_string).collect(),
-                about: sub.get_about().map(std::string::ToString::to_string),
-                children: subcommands(sub).map(|c| format!("{command} {}", c.get_name())).collect(),
-                leaf: (!is_group).then(|| leaf_of(&command, sub, reports)),
-                command,
-            });
-            walk(sub, prefix, reports, out);
-            prefix.pop();
-        }
-    }
-    let reports = crate::reports::report_schemas();
-    let mut out = Vec::new();
-    walk(root, &mut Vec::new(), &reports, &mut out);
-    out.sort_by(|a, b| a.command.cmp(&b.command));
-    for node in &mut out {
-        node.children.sort();
-    }
-    out
+/// Every command document, in tree order: what the checked-in spec holds and what `canon schema <COMMAND>` answers.
+pub fn commands(root: &Command) -> Built<Vec<CommandDoc>> {
+    project::nodes(root).iter().filter(|node| !node.is_group).map(command_of).collect()
 }
 
-fn global_options(root: &Command) -> Vec<OptionSpec> {
-    let no_conflicts = [];
-    root.get_arguments().filter(|a| a.is_global_set() && !is_builtin(a)).map(|a| option_spec(root, a, &no_conflicts)).collect()
+/// The clap tree of the whole CLI, built: the root every document is read from.
+pub fn built_root() -> Command {
+    let mut root = crate::cli::command();
+    root.build();
+    root
+}
+
+/// One reason registered under an error code (spec 7.6).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ReasonRow {
+    pub reason: &'static str,
+    pub meaning: &'static str,
+    /// What the caller does next in this situation.
+    pub fix: &'static str,
 }
 
 /// One error code of the registry.
@@ -499,11 +439,38 @@ pub struct ErrorRow {
     pub retryable: bool,
     /// One sentence telling the caller what to do about the code.
     pub fix: &'static str,
+    /// The situations under the code that need another next action; absent when the code has none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub reasons: Vec<ReasonRow>,
 }
 
 /// Every registered error code, sorted by code.
 pub fn error_rows() -> Vec<ErrorRow> {
-    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: i32::from(info.exit), retryable: info.retryable, fix: info.fix }).collect()
+    crate::cli_error::all_codes()
+        .iter()
+        .map(|info| ErrorRow {
+            code: info.code,
+            meaning: info.meaning,
+            exit: i32::from(info.exit),
+            retryable: info.retryable,
+            fix: info.fix,
+            reasons: info.reasons.iter().map(|reason| ReasonRow { reason: reason.reason, meaning: reason.meaning, fix: reason.fix }).collect(),
+        })
+        .collect()
+}
+
+/// One warning code of the warning registry (spec 7.5.2): no exit and no retryability.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct WarningRow {
+    pub code: &'static str,
+    pub meaning: &'static str,
+    /// One sentence telling the caller what to do about the warning.
+    pub fix: &'static str,
+}
+
+/// Every registered warning code, sorted by code.
+pub fn warning_rows() -> Vec<WarningRow> {
+    crate::cli_error::all_warnings().iter().map(|info| WarningRow { code: info.code, meaning: info.meaning, fix: info.fix }).collect()
 }
 
 /// Every removed spelling with its replacement (the CHANGELOG's Upgrading tables
@@ -529,35 +496,15 @@ fn records() -> Value {
     json!({ "kinds": kinds, "families": families })
 }
 
-/// Gives an embedded JSON Schema its own base URI, so that its `#/$defs/…`
-/// references resolve inside it and not against the spec document.
-fn with_id(mut schema: Value, id: String) -> Value {
-    if let Some(object) = schema.as_object_mut() {
-        object.insert("$id".to_string(), Value::String(id));
-    }
-    schema
-}
-
-/// The JSON Schema of every report and every `--input` document, keyed by name.
-fn schemas(nodes: &[Node]) -> Value {
-    let mut map = serde_json::Map::new();
-    for input in nodes.iter().filter_map(|n| n.leaf.as_ref()).flat_map(|l| &l.inputs) {
-        let name = input.schema_ref.trim_start_matches("#/schemas/").to_string();
-        let id = format!("urn:canon:input:{name}");
-        map.insert(name, with_id(input.schema.clone(), id));
-    }
-    for report in crate::reports::report_schemas() {
-        let id = format!("urn:canon:report:{}", report.name);
-        map.insert(report.name, with_id(report.schema, id));
-    }
-    Value::Object(map)
-}
-
 /// The whole spec.
+///
+/// # Panics
+/// When a table or a declaration the documents are built from is incomplete (an unlisted custom parser, a default
+/// that does not parse, an option without help): that is a defect of this build, which `tests/schema_doc.rs` finds.
 pub fn generate() -> Value {
-    let mut root = crate::cli::command();
-    root.build();
-    let nodes = nodes(&root);
+    let root = built_root();
+    let tree = tree(&root, None).expect("the tree is built from tables the tests keep whole");
+    let commands = commands(&root).expect("the command documents are built from tables the tests keep whole");
     json!({
         "_doNotEdit": "GENERATED from the clap tree and the tables beside it: do not edit. Regenerate with `CANON_BLESS_CLI_SPEC=1 cargo test -p canon-cli --test cli_spec`.",
         "specVersion": SPEC_VERSION,
@@ -566,14 +513,15 @@ pub fn generate() -> Value {
             "version": env!("CARGO_PKG_VERSION"),
             "about": root.get_about().map(std::string::ToString::to_string),
         },
-        "globalOptions": global_options(&root),
         "envVars": ENV_VARS.iter().map(|v| json!({ "name": v.name, "about": v.about })).collect::<Vec<_>>(),
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
-        "contract": crate::json_out::CONTRACT,
+        "contract": atip::CONTRACT,
+        "contractVersion": atip::CONTRACT_VERSION,
         "errors": error_rows(),
+        "warnings": warning_rows(),
         "removed": removed_rows(),
-        "commands": nodes,
-        "schemas": schemas(&nodes),
+        "tree": tree,
+        "commands": commands,
         "records": records(),
     })
 }

@@ -11,33 +11,8 @@
 //! of its 0.28 row.
 
 use clap::Command;
-use serde::Serialize;
 
-/// What running a writing leaf a second time with the same arguments does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Idempotency {
-    /// A repeat is a no-op, reported `unchanged`.
-    ReplaySafe,
-    /// Identical content is a no-op; different content under the same key is refused.
-    ContentKeyed,
-    /// Every call adds a record.
-    Appends,
-    /// A repeat is refused with exit 2 and changes nothing.
-    Once,
-}
-
-/// The form a leaf's output takes on stdout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum OutputKind {
-    /// An enveloped report.
-    Report,
-    /// Raw bytes on stdout without `--json`; `--json` envelopes them.
-    Artifact,
-    /// A long-running stdout.
-    Stream,
-}
+pub use atip::doc::{Idempotency, OutputKind};
 
 /// One output of a leaf.
 #[derive(Debug, Clone, Copy)]
@@ -48,6 +23,8 @@ pub struct OutputMeta {
     pub report: &'static str,
     /// The media type of an artifact's bytes.
     pub media_type: Option<&'static str>,
+    /// What selects this output when the leaf has several: the invocation that prints it (spec 10.9.1 `when`).
+    pub when: Option<&'static str>,
 }
 
 /// A description of one operand, where the doc comment on its clap argument
@@ -91,15 +68,16 @@ impl LeafFacts {
 }
 
 const fn report(report: &'static str) -> OutputMeta {
-    OutputMeta { kind: OutputKind::Report, report, media_type: None }
+    OutputMeta { kind: OutputKind::Report, report, media_type: None, when: None }
 }
 
 const fn artifact(media_type: &'static str, report: &'static str) -> OutputMeta {
-    OutputMeta { kind: OutputKind::Artifact, report, media_type: Some(media_type) }
+    OutputMeta { kind: OutputKind::Artifact, report, media_type: Some(media_type), when: None }
 }
 
-const fn stream(report: &'static str) -> OutputMeta {
-    OutputMeta { kind: OutputKind::Stream, report, media_type: None }
+const fn when(mut output: OutputMeta, when: &'static str) -> OutputMeta {
+    output.when = Some(when);
+    output
 }
 
 const fn operand(name: &'static str, about: &'static str) -> OperandMeta {
@@ -114,7 +92,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("adapter validate").out(&[report("AdapterValidateReport")]),
     leaf("artifacts move").idem(ReplaySafe).out(&[report("ArtifactsMoveReport")]),
     leaf("artifacts verify").out(&[report("ArtifactsVerifyReport")]),
-    leaf("brief approve").idem(ReplaySafe).out(&[report("BriefApproveReport"), report("BriefApproveManyReport")]),
+    leaf("brief approve").idem(ReplaySafe).out(&[when(report("BriefApproveReport"), "one change is approved"), when(report("BriefApproveManyReport"), "several changes are approved in one answer")]),
     leaf("brief check").out(&[report("BriefCheckReport")]),
     leaf("brief show").out(&[report("BriefShowReport")]),
     leaf("change new").idem(Once).out(&[report("ChangeNewReport")]),
@@ -123,7 +101,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("context-pack add").idem(ContentKeyed).out(&[report("ContextPackAddReport")]),
     leaf("context-pack show").out(&[report("ContextPackShowReport")]),
     leaf("context-pack verify").out(&[report("ContextPackVerifyReport")]),
-    leaf("dashboard").idem(ReplaySafe).out(&[stream("DashboardReport")]),
+    leaf("dashboard").idem(ReplaySafe).out(&[report("DashboardReport")]),
     leaf("demo review").idem(Appends).out(&[report("DemoReviewReport")]),
     leaf("demo init").idem(Once).out(&[report("DemoInitReport")]),
     leaf("dispatch begin").idem(Appends).out(&[report("DispatchBeginReport")]),
@@ -136,9 +114,13 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("divergence list").out(&[report("DivergenceListReport")]),
     leaf("evidence add").idem(ContentKeyed).out(&[report("EvidenceAddReport")]),
     leaf("evidence audit").idem(ContentKeyed).out(&[report("EvidenceAuditReport")]),
-    leaf("evidence approval-payload").idem(ReplaySafe).out(&[artifact("application/octet-stream", "EvidenceApprovalPayloadReport")]),
+    leaf("evidence approval-payload").out(&[artifact("application/octet-stream", "EvidenceApprovalPayloadReport")]),
     leaf("artifacts store").idem(ReplaySafe).out(&[report("ArtifactsStoreReport")]),
-    leaf("export").idem(ReplaySafe).out(&[artifact("application/json", "ExportReport")]),
+    leaf("export").idem(ReplaySafe).out(&[
+        when(artifact("application/json", "ExportReport"), "--dry-run is not given, and --output is not given or --json is not (in text mode the manifest goes to stdout or to the --output file)"),
+        when(report("ExportWrittenReport"), "--json and --output are given and --dry-run is not"),
+        when(report("ExportPreviewReport"), "--dry-run is given"),
+    ]),
     leaf("feature new").idem(Once).out(&[report("FeatureNewReport")]),
     leaf("finding add").idem(ContentKeyed).out(&[report("FindingAddReport")]),
     leaf("finding close").idem(ReplaySafe).out(&[report("FindingCloseReport")]),
@@ -151,9 +133,9 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("ingest records").idem(ReplaySafe).out(&[report("IngestRecordsReport")]),
     leaf("ingest plans").idem(ReplaySafe).out(&[report("IngestPlansReport")]),
     leaf("ingest sessions").idem(ReplaySafe).out(&[report("IngestSessionsReport")]),
-    leaf("init").idem(ReplaySafe).out(&[report("InitReport"), report("InitCheckReport")]),
+    leaf("init").idem(ReplaySafe).out(&[when(report("InitReport"), "--check is not given"), when(report("InitCheckReport"), "--check is given")]),
     leaf("inventory sync").idem(ReplaySafe).out(&[report("InventorySyncReport")]),
-    leaf("strategy approval-payload").idem(ReplaySafe).out(&[artifact("application/octet-stream", "StrategyApprovalPayloadReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) whose approval payload is printed")]),
+    leaf("strategy approval-payload").out(&[artifact("application/octet-stream", "StrategyApprovalPayloadReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) whose approval payload is printed")]),
     leaf("strategy promote").idem(ReplaySafe).out(&[report("StrategyPromoteReport")]),
     leaf("strategy rollback").idem(ReplaySafe).out(&[report("StrategyRollbackReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) to roll back")]),
     leaf("ledger compact").idem(ReplaySafe).out(&[report("LedgerCompactReport")]),

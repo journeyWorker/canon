@@ -20,7 +20,7 @@ in your ids. Use only the options on a line; never guess one. Ask `canon schema
 <command> --json` only for a leaf this block does not list, or after a `USAGE` refusal.
 
 <!-- canon:generated commands-planner begin -->
-Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `schema`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list; camelCase and snake_case both match.
+Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `schema`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list of the paths `canon schema <COMMAND> --json` declares under `outputs[].fields.paths`; a path is the record's own key, spelled as the answer spells it.
 In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
 
 ```text
@@ -28,147 +28,147 @@ In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` e
 canon brief check [<CHANGE_ID>]
 ```
 ```bash
-canon brief check
+canon brief check --json
 ```
 ```text
 # Show where the change stands and the next one to three steps; never edits
 canon brief show [<CHANGE_ID>] [--body]
 ```
 ```bash
-canon brief show
+canon brief show --json
 ```
 ```text
 # Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
 canon change new <CHANGE_ID> --subject <SUBJECT_ID> --title <TEXT> [--change-kind <feature|chore>] [--input]
 ```
 ```bash
-canon change new add-search --subject demo --title "Add search"
+canon change new add-search --subject demo --title "Add search" --json
 ```
 ```text
 # Write the shell completion script for canon (bash, zsh or fish)
 canon completion <SHELL>
 ```
 ```bash
-canon completion zsh
+canon completion zsh --json
 ```
 ```text
 # Show what you can author here: record kinds, fields, enums, policies
 canon context [--fields <FIELDS>]
 ```
 ```bash
-canon context
+canon context --json
 ```
 ```text
 # List the current divergence burn-down state
 canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon divergence list --as-of 2030-01-01
+canon divergence list --as-of 2030-01-01 --json
 ```
 ```text
 # Create a fresh .feature file for a new area.surface
 canon feature new <SURFACE> --title <TEXT> [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--project <PROJECT_ID>] [--input]
 ```
 ```bash
-canon feature new billing.invoice --title Invoices
+canon feature new billing.invoice --title Invoices --json
 ```
 ```text
 # List a change's committed findings at their latest version
 canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon finding list --change add-login
+canon finding list --change add-login --json
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
 canon format [<DIR>]
 ```
 ```bash
-canon format .canon/specs
+canon format .canon/specs --json
 ```
 ```text
 # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
 canon gate check [--release]
 ```
 ```bash
-canon gate check
+canon gate check --json
 ```
 ```text
 # Read stored records across every storage tier
 canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon query --kind evidence
+canon query --kind evidence --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
 ```
 ```bash
-canon retrieve --for-role reviewer --domain dev --limit 20
+canon retrieve --for-role reviewer --domain dev --limit 20 --json
 ```
 ```text
 # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
 canon scenario new <SCENARIO_ID> --title <TEXT> [--subject <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change <CHANGE_ID> (with --flow)] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--feature <FILE>] [--project <PROJECT_ID>] [--input]
 ```
 ```bash
-canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature
+canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature --json
 ```
 ```text
 # Describe canon's own commands
-canon schema [<PATH>]* [--errors | --error <CODE>]
+canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
 ```
 ```bash
-canon schema evidence add
+canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
 canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
-canon search timeout --kind finding
+canon search timeout --kind finding --json
 ```
 ```text
 # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
 canon skills show <NAME> [--full]
 ```
 ```bash
-canon skills show canon --full
+canon skills show canon --full --json
 ```
 ```text
 # Show where this repo stands: subjects by status, their gaps, and the next commands
 canon status [--fields <FIELDS>]
 ```
 ```bash
-canon status
+canon status --json
 ```
 ```text
 # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
 canon subject adopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
-canon subject adopt demo --change add-login
+canon subject adopt demo --change add-login --json
 ```
 ```text
 # Author a new subject at status `proposed`
 canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
 ```
 ```bash
-canon subject new payments --domain dev --title Payments
+canon subject new payments --domain dev --title Payments --json
 ```
 ```text
 # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
 canon subject unadopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
-canon subject unadopt demo --change add-login
+canon subject unadopt demo --change add-login --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
 canon trace <ID>
 ```
 ```bash
-canon trace add-login_1_1
+canon trace add-login_1_1 --json
 ```
 <!-- canon:generated commands-planner end -->
 

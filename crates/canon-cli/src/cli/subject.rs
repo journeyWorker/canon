@@ -34,7 +34,7 @@ pub struct SubjectNewArgs {
     /// The subject's summary (optional)
     #[arg(long, value_name = "TEXT")]
     pub summary: Option<String>,
-    /// The accountable owning role (default: implementer)
+    /// The accountable owning role
     #[arg(long, value_parser = crate::retrieve::parse_role, default_value = "implementer", value_name = "ROLE")]
     pub owner_role: RoleId,
     /// The invoking actor's id

@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:33:01.416443Z",
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "kind": "review",
+  "pin": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:exec::tests::atip_check_28_a_pseudo_terminal_run_has_a_terminal_on_stdout_and_a_pipe_run_does_not",
+          "junit:exec::tests::atip_check_28_everything_a_process_writes_to_a_terminal_is_read_however_fast_it_exits",
+          "junit:exec::tests::atip_check_28_stdin_is_closed_and_a_reader_sees_the_end_at_once",
+          "junit:exec::tests::atip_check_28_the_environment_is_only_path_home_lang_and_the_declared_variables"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "6c082cc7f43536c4929935055d952cf028c823c9f8019fd99c1d746279a91f05",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B791K8KHGMPHG9ETBKMDQW",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.28",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -36,13 +36,13 @@ pub struct EvidenceApprovalPayloadArgs {
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
     /// The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
+    #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// Who approved (the human whose detached signature the payload is for)
     #[arg(long, value_name = "NAME")]
     pub approver: String,
     /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
     pub approval_at: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -81,7 +81,7 @@ pub struct EvidenceAddArgs {
     #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
+    #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
     #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
@@ -102,7 +102,7 @@ pub struct EvidenceAddArgs {
     #[arg(long, value_name = "FILE")]
     pub signature_file: Option<PathBuf>,
     /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
     pub approval_at: Option<String>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -119,7 +119,7 @@ pub struct EvidenceAddArgs {
     #[arg(long)]
     pub all_scenarios: bool,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
-    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = crate::cli::safe_min1)]
     pub max_artifact_mib: u64,
     /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)
     #[arg(long, value_name = "TEXT")]
@@ -178,7 +178,7 @@ pub struct EvidenceAuditArgs {
     #[arg(long = "report-case", value_name = "NAME")]
     pub report_cases: Vec<String>,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
-    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = crate::cli::safe_min1)]
     pub max_artifact_mib: u64,
     /// The external evaluator that re-audited the scenario (canon never runs it)
     #[arg(long = "evaluator", value_name = "ID")]

@@ -711,7 +711,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
+            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).field("--language").hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
         }
     };
     let agents = if options.agents_md {

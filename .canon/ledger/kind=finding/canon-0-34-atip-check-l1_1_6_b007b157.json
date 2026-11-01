@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-check-l1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-l1-rev"
+  },
+  "at": "2026-11-01T16:41:25.035999Z",
+  "change_id": "canon-0-34-atip-check-l1",
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "disposition": "fixed",
+  "file_ref": "crates/atip-check/src/checks/l1_plan.rs:320",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "7f111ed603c2b3d23938b021e7ca77d54e223bc5",
+  "resolution_sha": "d8102a7985adb6f61d761a586442671bfb37282d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "reviewer": "rev-check-l1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl1.01"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[standards] Code hygiene: (1) l1_plan.rs:320-325 is a loop over read commands whose body only `continue`s, under a comment that says validators run for read commands; dead code. (2) l1.rs:1 and :173 say 'the 30 L1 checks'; the table has 31. (3) `atip check --help` (cli.rs:64) lists the fixture keys without `prepare` and `paged`. (4) plan_nexts caps the followed `meta.next` entries at MAX_NEXT_RUNS = 300 with `.take`, and reports nothing when it drops entries, where L1.next says every observed entry. (5) ECMASCRIPT_UNICODE '17.0' and RUST_UNICODE '16.0.0' (regex.rs:12-14) are literals; only U+11DB0 ties them to the crates, so a regress or regex-syntax bump makes the notes of L1.patterns wrong silently. Blast radius: documentation and the wording of one note; no check result changes.",
+  "worktree_dirty": false
+}

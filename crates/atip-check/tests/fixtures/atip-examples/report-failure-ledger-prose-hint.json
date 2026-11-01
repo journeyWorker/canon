@@ -1,0 +1,21 @@
+{
+  "ok": false,
+  "error": {
+    "code": "LEDGER_NOT_FOUND",
+    "message": "No ledger is named mian",
+    "retryable": false,
+    "field": "--ledger",
+    "received": "mian",
+    "suggestions": [
+      "main"
+    ],
+    "hint": "ledger can't find this ledger; check the name against ledger list."
+  },
+  "meta": {
+    "command": "entry list",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "ledger",
+    "toolVersion": "2.3.0"
+  }
+}

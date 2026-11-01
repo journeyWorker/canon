@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-schema-doc",
+    "role": "implementer",
+    "session_id": "s-0-34-schema-doc"
+  },
+  "at": "2026-11-01T11:13:24.270087Z",
+  "attachments": [
+    {
+      "case": "atip_schemadoc_03_a_group_lists_its_children_and_a_path_in_words_or_one_string_is_one_answer",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7f1deaded5cccd9d4b98c0dacdacc03513bf9f5ebf72bd7ca827a8c1e0ef38ad"
+    },
+    {
+      "case": "atip_schemadoc_03_a_group_under_as_lists_what_the_roles_tree_lists",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7f1deaded5cccd9d4b98c0dacdacc03513bf9f5ebf72bd7ca827a8c1e0ef38ad"
+    }
+  ],
+  "code_tree": "828fccdf11b595bbb2e22b49f159e701fddb072e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "bb6eaa92164411a458658933b8a0a1045e423535",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "atip.schemadoc.03",
+  "schema": 1,
+  "staging_id": "f00cfb02",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

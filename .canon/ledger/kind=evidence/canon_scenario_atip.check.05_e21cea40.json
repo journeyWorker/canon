@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T10:10:19.490776Z",
+  "attachments": [
+    {
+      "case": "output::tests::atip_check_05_the_text_form_is_code_message_then_the_members_that_exist",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "report::tests::atip_check_05_the_text_has_a_line_per_check_and_one_summary",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    },
+    {
+      "case": "atip_check_05_text_mode_prints_a_line_per_check_and_a_summary_and_a_failed_level_prints_on_stderr_with_stdout_empty",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r4-junit.xml",
+      "sha256": "fde7ec621232c7a4240e1c8b1e26d0c3f7c2a48c8e0c908dc0e603bf2e367fc4"
+    }
+  ],
+  "code_tree": "f6d881e64a3b62128f5fee3b06d75f9d371ef128",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r4-junit.xml"
+  },
+  "evidence_sha": "e328721b1ac7c1ff1a8710a59a3b84b2c4860a4c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 428,
+  "scenario_id": "atip.check.05",
+  "schema": 1,
+  "staging_id": "143069ad",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-constraints",
+    "role": "implementer",
+    "session_id": "s-0-34-constraints-r4"
+  },
+  "at": "2026-11-01T18:33:48.657463Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and_the_constraints",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "e7cb8dd0ff6040b1055ccc28711c31303b03fbf00f6bd1f6d64393ed0fc85e59"
+    }
+  ],
+  "code_tree": "e0f1eaf7589003cf343776fd9cc0cab93360375d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-constraints.xml"
+  },
+  "evidence_sha": "5b8255b30ced31876d054bf815bd0207f1843f74",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 89,
+  "scenario_id": "atip.constraints.24",
+  "schema": 1,
+  "staging_id": "f3fb4fad",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -6,9 +6,10 @@
 
 use std::ffi::OsString;
 
+use crate::claim::MINORS;
 use crate::output::{Code, Failure};
 
-/// The levels the contract defines; only `L0` has checks in this release.
+/// The levels the contract defines; `L0` and `L1` have checks in this release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
     L0,
@@ -22,6 +23,8 @@ pub struct CheckArgs {
     pub bin: OsString,
     pub level: Level,
     pub fixture: OsString,
+    /// The claimed minor from `--contract`; the fixture's `contractVersion` when absent.
+    pub contract: Option<String>,
 }
 
 /// What the command line asks for.
@@ -35,12 +38,12 @@ pub enum Command {
 
 const COMMANDS: [&str; 1] = ["check"];
 const ROOT_OPTIONS: [&str; 3] = ["--json", "--version", "--help"];
-const CHECK_OPTIONS: [&str; 5] = ["--bin", "--level", "--fixture", "--json", "--help"];
+const CHECK_OPTIONS: [&str; 6] = ["--bin", "--level", "--fixture", "--contract", "--json", "--help"];
 const LEVELS: [&str; 3] = ["L0", "L1", "L2"];
 
 pub const ROOT_HELP: &str = "atip: run a built binary and check the atip/1 contract from outside
 
-Usage: atip check --bin <BINARY> --level <LEVEL> --fixture <FILE> [--json]
+Usage: atip check --bin <BINARY> --level <LEVEL> --fixture <FILE> [--contract <MAJOR.MINOR>] [--json]
 
 Commands:
   check    Run the checks of a level against a binary
@@ -53,12 +56,14 @@ Run atip check --help for the options of check.";
 
 pub const CHECK_HELP: &str = "atip check: run the checks of a level against a built binary
 
-Usage: atip check --bin <BINARY> --level <LEVEL> --fixture <FILE> [--json]
+Usage: atip check --bin <BINARY> --level <LEVEL> --fixture <FILE> [--contract <MAJOR.MINOR>] [--json]
 
 Options:
       --bin <BINARY>     The binary to check: a path, or a name found on PATH
-      --level <LEVEL>    The level the tool claims: L0 (L1 and L2 are not supported yet)
-      --fixture <FILE>   The tool's fixture file: JSON with setup, env, timeoutSeconds, probe and registry
+      --level <LEVEL>    The level the tool claims: L0 or L1 (L2 is not supported yet)
+      --fixture <FILE>   The tool's fixture file: JSON with contractVersion, prepare, setup, env, timeoutSeconds, probe, globalOptions, registry, warnings and commands (and, in commands, ok, refused, paged, missingValue, fields and domainRejects)
+      --contract <MAJOR.MINOR>
+                         The contract minor the tool claims: 1.0 or 1.1. Defaults to the fixture's contractVersion, and to 1.0
       --json             Print one JSON envelope on stdout instead of text
   -h, --help             Print help
 
@@ -123,6 +128,7 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
     let mut bin = None;
     let mut level = None;
     let mut fixture = None;
+    let mut contract = None;
     let mut help = false;
     let mut position = 0;
     while let Some(arg) = args.get(position) {
@@ -142,7 +148,7 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
         match name {
             "--json" if inline.is_none() => {}
             "--help" | "-h" if inline.is_none() => help = true,
-            "--bin" | "--level" | "--fixture" => {
+            "--bin" | "--level" | "--fixture" | "--contract" => {
                 let value: OsString = match inline {
                     Some(value) => value.into(),
                     None => match args.get(position + 1) {
@@ -160,6 +166,7 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
                 let slot = match name {
                     "--bin" => &mut bin,
                     "--level" => &mut level,
+                    "--contract" => &mut contract,
                     _ => &mut fixture,
                 };
                 if slot.replace(value).is_some() {
@@ -195,10 +202,24 @@ fn parse_check(args: &[OsString]) -> Result<Command, Failure> {
                 .suggestions(close(&given.to_ascii_uppercase(), &LEVELS)));
         }
     };
+    let contract = match contract {
+        None => None,
+        Some(given) => {
+            let given = given.to_string_lossy().into_owned();
+            if !MINORS.contains(&given.as_str()) {
+                return Err(usage(format!("{given} is not a contract minor this checker knows"))
+                    .field("--contract")
+                    .expected(MINORS)
+                    .received(given.as_str()));
+            }
+            Some(given)
+        }
+    };
     Ok(Command::Check(CheckArgs {
         bin,
         level,
         fixture,
+        contract,
     }))
 }
 
@@ -283,6 +304,7 @@ mod tests {
             bin: "target/x".into(),
             level: Level::L0,
             fixture: "f.json".into(),
+            contract: None,
         });
         assert_eq!(
             parse(&args(&[

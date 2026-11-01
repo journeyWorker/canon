@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-schema-doc",
+    "role": "reviewer",
+    "session_id": "s-0-34-schema-doc-rev"
+  },
+  "at": "2026-11-01T11:32:49.659130Z",
+  "change_id": "canon-0-34-atip-schema-doc",
+  "code_tree": "5054cd1f165b16ecd65498d8c29a9d0e3caa935b",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/spec.rs:130-153",
+  "introduced_by": "59cf7ee286190548e499d431a0432e5775dcf3e8",
+  "kind": "finding",
+  "reason": "verified at c819893f",
+  "resolution_code_tree": "de6ff7e4ee7514331ad59d042003ca9728b5610f",
+  "resolution_sha": "c819893fbcd09f0c444f3aece370d22dc9d00367",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "9655dc4cf7a280f3031fe6cccc94a13a14f8a317",
+  "reviewer": "rev-schema-doc",
+  "round": 1,
+  "scenario_ids": [
+    "atip.schemadoc.05"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity + standards] A default the help promises in prose is not in the document for three options: `skills install --providers` (help: \"Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected .claude/.codex/.omp/.pi directories\"), and `skills check --providers` and `skills doctor --providers` (\"Omitted: as for install\"). Each has default null and no defaultNote, but spec 10.7.3 (\"A default the help text promises MUST appear here\") and the brief (F3/F6: every default --help promises is carried; a computed one is null + defaultNote) require a defaultNote. Cause: the detector in atip_schemadoc_05_help_defaults... (crates/canon-cli/tests/schema_doc.rs:490) looks only for \"(default\", \"defaults to\", \"default is\", \"default:\", \"[default\", so the word \"Omitted\" slips past it, and DEFAULT_NOTES (spec.rs:130) has rows for skills-source but none for providers. Fix: add `(\"skills install\"|\"skills check\"|\"skills doctor\", \"providers\", note)` rows and widen the detector (or state the rule on a closed list of phrasings the test checks against the help text). Blast radius: my scan of all 608 option helps found no other prose default without a note; the guides generated from the spec are unaffected.",
+  "worktree_dirty": false
+}

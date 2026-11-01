@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:32:49.752636Z",
+  "change_id": "canon-0-34-atip-check-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=atip/check.feature:atip.check.73",
+  "introduced_by": "6c66123948d7420ff149962cc2bd0acd7ba82649",
+  "kind": "finding",
+  "resolution_code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "resolution_sha": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "ab0485c55e75ef9618f73094c5fabdc9842589ff",
+  "reviewer": "rev-check-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.73"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] Scenario atip.check.73 Then-line contradicts its own Given list, the test and the ATIP author's rule. 6c661239 inserted `one whose paging command is listed without an ok invocation` as the second Given but left the Then as `unprovided for the first and the third and unsupported for the second`. The test (atip_check_73) and the author's rule are: first = unprovided, second (paging command listed without ok) = unprovided, third (refuses --cursor on every command) = unsupported, fourth (no commands) = unprovided. As written the scenario asks for unsupported on the paging tool, which is the defect that commit fixed. Fix: rewrite the Then to `unprovided for the first, the second and the fourth, unsupported for the third`. Blast radius: the scenario digest changes, so evidence and reviews of atip.check.73 must be re-bound.",
+  "worktree_dirty": false
+}

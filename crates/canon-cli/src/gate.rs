@@ -501,7 +501,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
         Err(e) => {
-            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).hint("`canon schema task done` lists the accepted arguments and their forms").emit("canon task done", json);
+            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).hint("`canon schema task done` lists the accepted arguments and their forms").field("TASK_ID").emit("canon task done", json);
         }
     };
 

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T18:59:03.420671Z",
+  "code_tree": "e0f1eaf7589003cf343776fd9cc0cab93360375d",
+  "kind": "review",
+  "pin": "f86c34401b799acbb8c576fe65f5bf573af1fb0e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_constraints_09_a_validator_whose_rejects_is_not_refused_is_found"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "a3c6ed5f3786f517c8bced35e6a7bccd3217bec2eb45c190701c43beb67a4be5",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-constraints/brief.md"
+  },
+  "review_id": "01M6C7NFKWC11NE1SSXT1PPD5X",
+  "reviewer": "rev-constraints",
+  "scenario_id": "atip.constraints.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

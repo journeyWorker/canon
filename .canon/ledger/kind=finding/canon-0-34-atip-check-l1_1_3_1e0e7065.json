@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-check-l1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-l1-rev"
+  },
+  "at": "2026-11-01T16:41:24.505495Z",
+  "change_id": "canon-0-34-atip-check-l1",
+  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "disposition": "fixed",
+  "file_ref": "crates/atip-check/tests/support/l1.rs:617",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "7f111ed603c2b3d23938b021e7ca77d54e223bc5",
+  "resolution_sha": "d8102a7985adb6f61d761a586442671bfb37282d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "reviewer": "rev-check-l1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl1.14"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] l1_cases() plants three validator conditions (refused, declared-code, field-is-an-argument). Scenario 14 and brief F3/F6 name a fake that answers a precondition code without setup / reads its state first; no case plants it, and nothing can: the judge (l1.rs l1_validators) cannot tell a precondition code from any code other than the validator's, so that variant is the declared-code condition. Verified by a wrapper over the fake that answers another code when state.txt is absent: only L1.validators fails. 'Nothing was written' is owned by L0.refusal-effects (it measures every exit-2 call, validators' included), so it has no L1.validators case; say so in the test or scenario. Blast radius: none beyond naming.",
+  "worktree_dirty": false
+}

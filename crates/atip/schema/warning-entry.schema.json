@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/warning-entry.schema.json",
+  "title": "atip/1 warning registry entry",
+  "description": "One row of a tool's warning registry (spec 7.5.2), printed by `schema --warnings` and `schema --warning <CODE>`. A warning has no exit and no retryability. Since 1.1. Closed for tools of the current minor; callers read it open (spec 15.8).",
+  "x-atip-since": "1.1",
+  "type": "object",
+  "required": ["code", "meaning", "fix"],
+  "properties": {
+    "code": { "$ref": "error.schema.json#/$defs/code" },
+    "meaning": { "type": "string", "minLength": 1 },
+    "fix": {
+      "description": "What the caller does about the warning, in one or two sentences; a runnable command when there is one.",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "patternProperties": {
+    "^x-[a-z][a-z0-9-]*$": true
+  },
+  "additionalProperties": false
+}

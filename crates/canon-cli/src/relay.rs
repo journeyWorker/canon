@@ -102,6 +102,78 @@ pub struct Call<'a> {
     pub note: Option<&'a str>,
 }
 
+/// The tool a relayed approval names (`--relayed-via`) is one word.
+fn check_via(tool: &str) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::{CliError, CliErrorExt as _};
+    if !is_token(tool) {
+        return Err(CliError::refused("USAGE", format!("{FLAG} names the tool the human was asked with as one word, got `{tool}`"))
+            .field(FLAG)
+            .hint("pass the question tool's name without spaces, parentheses or quotes: `ask` (omp), `AskUserQuestion` (Claude Code) or `chat`"));
+    }
+    Ok(())
+}
+
+/// The actor that records a relayed approval (`--actor`, trimmed) is one word.
+fn check_actor(actor: &str) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::{CliError, CliErrorExt as _};
+    if actor.is_empty() {
+        return Err(CliError::refused("USAGE", format!("a relayed approval names the agent that recorded it: pass --actor <your actor id> (or set {ACTOR_ENV})"))
+            .field("--actor")
+            .hint("give the actor id of your unit, as on every record you write"));
+    }
+    if !is_token(actor) {
+        return Err(CliError::refused("USAGE", format!("--actor must be one word for a relayed approval, got `{actor}`")).field("--actor").hint("use your unit's actor id, without spaces, parentheses or quotes"));
+    }
+    Ok(())
+}
+
+/// The arguments of a relayed approval that need no state, in the order [`authorize`] holds them: an agent role is declared
+/// (`--as` or `CANON_ROLE`), the tool is one word, the actor (`--actor`, else `CANON_ACTOR`) is named and one word, and the
+/// human's name and answer are not blank. The environment is a stateless input (spec 11.7), so these are validators:
+/// `canon brief approve`, `canon policy approve`, `canon divergence accept` and `canon migrate` are refused with them before
+/// any state is read (`validators::check`), and [`authorize`] holds every relayed act to the same checks.
+pub(crate) fn check_arguments(command: &str, call: &Call<'_>) -> Result<(), crate::cli_error::CliError> {
+    let Some(tool) = call.via else { return Ok(()) };
+    check_role(command)?;
+    check_via(tool)?;
+    check_actor_of(call)?;
+    check_answer(call)
+}
+
+/// A relayed approval is an agent's: a role is declared for it.
+fn check_role(command: &str) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::{CliError, CliErrorExt as _};
+    if crate::role::Role::current(None).is_none() {
+        return Err(CliError::refused("USAGE", format!("{FLAG} records a human's answer on behalf of an agent, and no agent role is declared for `{command}`"))
+            .field(FLAG)
+            .hint("declare the role you act as (`--as <role>` or CANON_ROLE) to relay a human's answer; in the human's own shell, run the call without the relay option"));
+    }
+    Ok(())
+}
+
+/// The actor that records the relayed approval: `--actor`, else the environment's.
+fn check_actor_of(call: &Call<'_>) -> Result<(), crate::cli_error::CliError> {
+    let actor = call.actor.map(str::to_string).or_else(|| std::env::var(ACTOR_ENV).ok()).unwrap_or_default();
+    check_actor(actor.trim())
+}
+
+/// A relayed approval carries the human's own name and answer: with `--relayed-via`, neither
+/// `--approver` nor `--note` is blank.
+pub(crate) fn check_answer(call: &Call<'_>) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::{CliError, CliErrorExt as _};
+    if call.via.is_none() {
+        return Ok(());
+    }
+    for (flag, value) in [("--approver", call.approver), ("--note", call.note)] {
+        if value.is_none_or(|v| v.trim().is_empty()) {
+            return Err(CliError::refused("USAGE", format!("a relayed approval carries the human's own {}: pass {flag}", if flag == "--approver" { "name" } else { "answer, word for word" }))
+                .field(flag)
+                .hint("the name and the answer the human gave in the conversation"));
+        }
+    }
+    Ok(())
+}
+
 /// Decides how a human-only act runs (0.32): `Ok(None)` in the human's own
 /// shell (no role declared, no relay option), `Ok(Some(relay))` for an agent
 /// recording the human's answer, `Err` for every refusal. `human_call` is the
@@ -112,11 +184,7 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
     let role = Role::current(None);
     let (role, tool) = match (role, call.via) {
         (None, None) => return Ok(None),
-        (None, Some(_)) => {
-            return Err(CliError::refused("USAGE", format!("{FLAG} records a human's answer on behalf of an agent, and no agent role is declared for `{command}`"))
-                .field(FLAG)
-                .hint("declare the role you act as (`--as <role>` or CANON_ROLE) to relay a human's answer; in the human's own shell, run the call without the relay option"));
-        }
+        (None, Some(_)) => return check_role(command).map(|()| None),
         (Some(role), None) => {
             return Err(CliError::refused("HUMAN_ONLY", format!("`{command}` records a human's decision and is not available to the {role} role without the relay option"))
                 .field("--as")
@@ -126,11 +194,7 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
         }
         (Some(role), Some(tool)) => (role, tool),
     };
-    if !is_token(tool) {
-        return Err(CliError::refused("USAGE", format!("{FLAG} names the tool the human was asked with as one word, got `{tool}`"))
-            .field(FLAG)
-            .hint("pass the question tool's name without spaces, parentheses or quotes: `ask` (omp), `AskUserQuestion` (Claude Code) or `chat`"));
-    }
+    check_via(tool)?;
     match relay_allowed(repo) {
         Ok(true) => {}
         Ok(false) => {
@@ -142,24 +206,10 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
             return Err(CliError::refused("CONFIG_UNREADABLE", e).hint("fix the `approval:` section of canon.yaml (`canon init --check` names the problem), then run the call again"));
         }
     }
-    let env_actor = std::env::var(ACTOR_ENV).ok();
-    let actor = call.actor.map(str::to_string).or(env_actor).unwrap_or_default();
+    check_actor_of(&call)?;
+    check_answer(&call)?;
+    let actor = call.actor.map(str::to_string).or_else(|| std::env::var(ACTOR_ENV).ok()).unwrap_or_default();
     let actor = actor.trim();
-    if actor.is_empty() {
-        return Err(CliError::refused("USAGE", format!("a relayed approval names the agent that recorded it: pass --actor <your actor id> (or set {ACTOR_ENV})"))
-            .field("--actor")
-            .hint("give the actor id of your unit, as on every record you write"));
-    }
-    if !is_token(actor) {
-        return Err(CliError::refused("USAGE", format!("--actor must be one word for a relayed approval, got `{actor}`")).field("--actor").hint("use your unit's actor id, without spaces, parentheses or quotes"));
-    }
-    for (flag, value) in [("--approver", call.approver), ("--note", call.note)] {
-        if value.is_none_or(|v| v.trim().is_empty()) {
-            return Err(CliError::refused("USAGE", format!("a relayed approval carries the human's own {}: pass {flag}", if flag == "--approver" { "name" } else { "answer, word for word" }))
-                .field(flag)
-                .hint("the name and the answer the human gave in the conversation"));
-        }
-    }
     Ok(Some(ApprovalRelay { role: role.as_str().to_string(), actor: actor.to_string(), tool: tool.to_string(), approver: None, answer: None }))
 }
 

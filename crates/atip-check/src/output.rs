@@ -6,7 +6,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use atip::CodeInfo;
+use atip::{CodeInfo, ReasonInfo, WarningInfo};
 
 /// The tool name every envelope and every text error carries.
 pub const TOOL: &str = "atip";
@@ -15,15 +15,31 @@ pub const SCHEMA_VERSION: &str = "1.0";
 
 /// `atip`'s error registry (spec 7.3), sorted by code: the four reserved codes it can produce (`USAGE`, `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INTERNAL`) and four of its own.
 pub const REGISTRY: [CodeInfo; 8] = [
-    CodeInfo { code: "BINARY_UNUSABLE", meaning: "the binary named by --bin does not exist, is not a file, is not executable, or cannot be started", exit: 2, retryable: false, fix: "Pass the path of a built, executable binary with --bin <BINARY>." },
-    CodeInfo { code: "COMMAND_REQUIRED", meaning: "atip was run without a command", exit: 2, retryable: false, fix: "Run atip check --bin <BINARY> --level L0 --fixture <FILE>." },
-    CodeInfo { code: "FIXTURE_INVALID", meaning: "the fixture file cannot be read, is not JSON, has a member of the wrong shape, or its setup command failed", exit: 2, retryable: false, fix: "Fix the member the message names, or the setup command, then run atip check again." },
-    CodeInfo { code: "INTERNAL", meaning: "a bug in atip, or its scratch space could not be used", exit: 1, retryable: false, fix: "Report it at https://github.com/journeyWorker/atip/issues with the command line; if the message names a scratch directory, point TMPDIR at a writable one." },
-    CodeInfo { code: "LEVEL_NOT_MET", meaning: "a MUST check of the level failed or is unprovided", exit: 1, retryable: false, fix: "Read data.checks, fix every check whose result is fail or unprovided, then run atip check again." },
-    CodeInfo { code: "LEVEL_UNSUPPORTED", meaning: "the level is known but this release of atip has no checks for it", exit: 2, retryable: false, fix: "Run atip check with --level L0." },
-    CodeInfo { code: "UNKNOWN_COMMAND", meaning: "the command word is not a command of atip", exit: 2, retryable: false, fix: "Run atip check; it is the only command." },
-    CodeInfo { code: "USAGE", meaning: "the command line does not parse or does not satisfy the command's requirements", exit: 2, retryable: false, fix: "Run atip check --help for the options." },
+    CodeInfo { code: "BINARY_UNUSABLE", meaning: "the binary named by --bin does not exist, is not a file, is not executable, or cannot be started", exit: 2, retryable: false, fix: "Pass the path of a built, executable binary with --bin <BINARY>.", reasons: &[] },
+    CodeInfo { code: "COMMAND_REQUIRED", meaning: "atip was run without a command", exit: 2, retryable: false, fix: "Run atip check --bin <BINARY> --level L0 --fixture <FILE>.", reasons: &[] },
+    CodeInfo { code: "FIXTURE_INVALID", meaning: "the fixture file cannot be read, is not JSON, has a member of the wrong shape, or its prepare or setup command failed", exit: 2, retryable: false, fix: "Fix the member the message names, or the setup command, then run atip check again.", reasons: &FIXTURE_INVALID_REASONS },
+    CodeInfo { code: "INTERNAL", meaning: "a bug in atip, or its scratch space could not be used", exit: 1, retryable: false, fix: "Report it at https://github.com/journeyWorker/atip/issues with the command line; if the message names a scratch directory, point TMPDIR at a writable one.", reasons: &[] },
+    CodeInfo { code: "LEVEL_NOT_MET", meaning: "a MUST check of the level failed or is unprovided", exit: 1, retryable: false, fix: "Read data.checks, fix every check whose result is fail or unprovided, then run atip check again.", reasons: &[] },
+    CodeInfo { code: "LEVEL_UNSUPPORTED", meaning: "the level is known but this release of atip has no checks for it", exit: 2, retryable: false, fix: "Run atip check with --level L0.", reasons: &[] },
+    CodeInfo { code: "UNKNOWN_COMMAND", meaning: "the command word is not a command of atip", exit: 2, retryable: false, fix: "Run atip check; it is the only command.", reasons: &[] },
+    CodeInfo { code: "USAGE", meaning: "the command line does not parse or does not satisfy the command's requirements", exit: 2, retryable: false, fix: "Run atip check --help for the options.", reasons: &[] },
 ];
+
+/// The reasons under `FIXTURE_INVALID` (spec 7.6), sorted by name.
+pub const FIXTURE_INVALID_REASONS: [ReasonInfo; 5] = [
+    ReasonInfo { reason: "NOT_JSON", meaning: "the fixture file is not JSON", fix: "Write the fixture as one JSON object." },
+    ReasonInfo { reason: "PREPARE_FAILED", meaning: "a prepare command of the fixture did not exit 0", fix: "Run the prepare command named in the message by hand and fix what it reports." },
+    ReasonInfo { reason: "SETUP_FAILED", meaning: "a setup command of the fixture did not exit 0", fix: "Run the setup command named in the message by hand and fix what it reports." },
+    ReasonInfo { reason: "UNREADABLE", meaning: "the fixture file cannot be read", fix: "Pass the path of a readable file with --fixture." },
+    ReasonInfo { reason: "WRONG_SHAPE", meaning: "a member of the fixture has the wrong shape or an unknown value", fix: "Fix the member the message names." },
+];
+
+/// `atip`'s warning registry (spec 7.5.2), sorted by code.
+pub const WARNINGS: [WarningInfo; 1] = [WarningInfo {
+    code: "SHOULD_FAILED",
+    meaning: "a SHOULD check failed: an advisory, which never fails the level",
+    fix: "Read data.checks for the checks whose strength is SHOULD and whose result is fail.",
+}];
 
 /// The codes `atip` emits, in the order of [`REGISTRY`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +91,8 @@ pub struct FailureBody {
     pub received: Option<String>,
     pub suggestions: Vec<String>,
     pub hint: Option<String>,
+    /// Which of the situations registered under the code this is (spec 7.6).
+    pub reason: Option<&'static str>,
     /// The partial output of a command that ran (exit 1 only).
     pub data: Option<Value>,
     /// More lines for the text form on stderr, such as the check list; never in the envelope.
@@ -91,6 +109,7 @@ impl Failure {
             expected: Vec::new(),
             received: None,
             suggestions: Vec::new(),
+            reason: None,
             hint: None,
             data: None,
             detail: None,
@@ -100,6 +119,12 @@ impl Failure {
     #[must_use]
     pub fn in_command(mut self, command: &'static str) -> Self {
         self.command = Some(command);
+        self
+    }
+
+    #[must_use]
+    pub fn reason(mut self, reason: &'static str) -> Self {
+        self.reason = Some(reason);
         self
     }
 
@@ -165,14 +190,25 @@ struct Meta {
     #[serde(skip_serializing_if = "Option::is_none")]
     command: Option<&'static str>,
     contract: &'static str,
+    contract_version: &'static str,
     schema_version: &'static str,
     tool: &'static str,
     tool_version: &'static str,
+    #[serde(skip_serializing_if = "<[MetaWarning]>::is_empty")]
+    warnings: Vec<MetaWarning>,
+}
+
+#[derive(Serialize)]
+struct MetaWarning {
+    code: &'static str,
+    message: String,
 }
 
 #[derive(Serialize)]
 struct ErrorBody<'a> {
     code: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'static str>,
     message: &'a str,
     retryable: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -197,29 +233,41 @@ struct Envelope<'a> {
     meta: Meta,
 }
 
-fn meta(command: Option<&'static str>) -> Meta {
+fn meta(command: Option<&'static str>, warnings: Vec<MetaWarning>) -> Meta {
     Meta {
         command,
-        contract: "atip/1",
+        contract: atip::schema::CONTRACT,
+        contract_version: atip::schema::CONTRACT_VERSION,
         schema_version: SCHEMA_VERSION,
         tool: TOOL,
         tool_version: env!("CARGO_PKG_VERSION"),
+        warnings,
     }
 }
 
-/// The success envelope of `atip check`: one compact line.
-pub fn success_line(data: &Value) -> String {
+/// The success envelope of `atip check`: one compact line. `advisories` is how many SHOULD checks failed: more than
+/// none is the warning `SHOULD_FAILED`, which does not change the exit.
+pub fn success_line(data: &Value, advisories: usize) -> String {
+    let warnings = if advisories == 0 {
+        Vec::new()
+    } else {
+        vec![MetaWarning {
+            code: WARNINGS[0].code,
+            message: format!("{advisories} SHOULD checks failed; the level is still met"),
+        }]
+    };
     atip::line(&Envelope {
         ok: true,
         data: Some(data),
         error: None,
-        meta: meta(Some("check")),
+        meta: meta(Some("check"), warnings),
     })
 }
 
 /// The failure envelope: one compact line.
 pub fn failure_line(failure: &Failure) -> String {
     let error = ErrorBody {
+        reason: failure.reason,
         code: failure.code.info().code,
         message: &failure.message,
         retryable: failure.code.info().retryable,
@@ -233,7 +281,7 @@ pub fn failure_line(failure: &Failure) -> String {
         ok: false,
         data: failure.data.as_ref(),
         error: Some(error),
-        meta: meta(failure.command),
+        meta: meta(failure.command, Vec::new()),
     })
 }
 
@@ -244,6 +292,9 @@ pub fn failure_text(failure: &Failure) -> String {
         failure.code.info().code,
         failure.message
     )];
+    if let Some(reason) = failure.reason {
+        lines.push(format!("  reason: {reason}"));
+    }
     if let Some(field) = &failure.field {
         lines.push(format!("  field: {field}"));
     }
@@ -291,7 +342,7 @@ mod tests {
     #[test]
     fn atip_check_03_a_failure_omits_what_it_does_not_have() {
         let line = failure_line(&Failure::new(Code::UnknownCommand, "no such command"));
-        assert_eq!(line, r#"{"ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"no such command","retryable":false},"meta":{"contract":"atip/1","schemaVersion":"1.0","tool":"atip","toolVersion":""#.to_string() + env!("CARGO_PKG_VERSION") + r#""}}"#);
+        assert_eq!(line, r#"{"ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"no such command","retryable":false},"meta":{"contract":"atip/1","contractVersion":"1.1","schemaVersion":"1.0","tool":"atip","toolVersion":""#.to_string() + env!("CARGO_PKG_VERSION") + r#""}}"#);
         let full = failure_line(
             &Failure::new(Code::Usage, "m")
                 .in_command("check")
@@ -323,6 +374,9 @@ mod tests {
             text,
             "atip: USAGE: bad\n  field: --bin\n  hint: pass it\n  line one\n  line two"
         );
-        assert!(success_line(&serde_json::json!({"level": "L0"})).contains(r#""command":"check""#));
+        assert!(success_line(&serde_json::json!({"level": "L0"}), 0).contains(r#""command":"check""#));
+        let warned = success_line(&serde_json::json!({"level": "L0"}), 2);
+        assert!(warned.contains(r#""warnings":[{"code":"SHOULD_FAILED""#), "{warned}");
+        assert!(warned.contains(r#""contractVersion":"1.1""#));
     }
 }

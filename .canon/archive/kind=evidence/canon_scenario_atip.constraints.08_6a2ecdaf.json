@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-constraints",
+    "role": "implementer",
+    "session_id": "s-0-34-constraints"
+  },
+  "at": "2026-11-01T14:07:15.987298Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_08_an_export_window_that_ends_before_it_starts_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "d566270745857f6bc0054b044ad85311dcb33ce700f12b180c80932e7a917439"
+    }
+  ],
+  "code_tree": "15887b748a2ba3c6847ff8bde2e6b5fda61e7f4a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-constraints.xml"
+  },
+  "evidence_sha": "8715cf266211dd2fa25b868ee6f2dc686a95a5a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "atip.constraints.08",
+  "schema": 1,
+  "staging_id": "f4f2b24f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

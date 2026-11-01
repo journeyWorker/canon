@@ -77,7 +77,7 @@ pub struct ReviewOptions {
     #[arg(long = "artifact", value_name = "PATH")]
     pub artifacts: Vec<PathBuf>,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused
-    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = crate::cli::safe_min1)]
     pub max_artifact_mib: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

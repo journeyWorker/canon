@@ -72,7 +72,15 @@ use clap::{CommandFactory, Parser, Subcommand};
 /// reaches the error that names the missing command instead of clap's
 /// "unexpected argument" (atip/1 spec 4.4, 4.5).
 pub fn command() -> clap::Command {
-    accept_json_on_groups(Cli::command())
+    // A negative number after an integer option is that option's value, so a refusal names the option, not the `-1`.
+    fn negative_integers(node: clap::Command) -> clap::Command {
+        node.mut_args(|arg| if atip::project::is_integer_arg(&arg) { arg.allow_negative_numbers(true) } else { arg }).mut_subcommands(negative_integers)
+    }
+    negative_integers(command_without_negatives())
+}
+
+fn command_without_negatives() -> clap::Command {
+    atip::project::point_help_at_schema(accept_json_on_groups(Cli::command()), crate::spec::HELP_POINTER)
 }
 
 fn accept_json_on_groups(node: clap::Command) -> clap::Command {
@@ -109,7 +117,7 @@ Learn more:
   target without deleting user files."
 )]
 pub struct Cli {
-    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it
+    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given
     #[arg(long = "as", global = true, value_enum, value_name = "ROLE")]
     pub declared_role: Option<crate::role::Role>,
     #[command(subcommand)]
@@ -308,11 +316,47 @@ pub enum Command {
     /// Run canon's built-in fixture self-tests
     Selftest(SelftestArgs),
     /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
-    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n  canon schema --as reviewer --json\n  canon schema --errors --json\n  canon schema --error CONFIG_MISSING\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An unknown path exits 2 and names the\nnearest matches.\n\nThe bare listing is unfiltered: every command. `--as <ROLE>` lists only that role's commands; the\nCANON_ROLE variable never filters or fails `schema` (an invalid value is a warning in meta.warnings).\nA command whose effect depends on its arguments carries `effectNote`.")]
+    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n  canon schema --as reviewer --json\n  canon schema --errors --json\n  canon schema --error CONFIG_MISSING\n  canon schema --warnings --json\n  canon schema --warning OLD_LAYOUT_FOUND\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An unknown path exits 2 and names the\nnearest matches.\n\nThe bare listing is unfiltered: every command. `--as <ROLE>` lists only that role's commands; the\nCANON_ROLE variable never filters or fails `schema` (an invalid value is a warning in meta.warnings).\nA command whose effect depends on its arguments carries `effectNote`.")]
     Schema(SchemaArgs),
     /// Write the shell completion script for canon (bash, zsh or fish)
     #[command(after_help = "Examples:\n  canon completion zsh > ~/.zfunc/_canon\n  canon completion bash > /etc/bash_completion.d/canon\n  canon completion fish > ~/.config/fish/completions/canon.fish\n\nThe script is generated from the command tree, so it completes exactly what the parser accepts. It needs no repo and no network.")]
     Completion(CompletionArgs),
+}
+
+/// The largest integer a JSON parser, JavaScript and a Rust `i64` all read the same: ±(2^53-1) (atip/1 spec 10.7.5). An
+/// integer option that parses into a 64-bit type is refused outside it, never rounded into it.
+pub const SAFE_INTEGER: u64 = atip::domain::SAFE_INTEGER as u64;
+
+/// Reads a non-negative integer option of 64 bits the way the contract's integer grammar does (spec 11.5): digits, with `-0` and
+/// `+0` the number 0, a negative value refused, and nothing above 2^53-1 rounded into range. The error names the bounds.
+fn safe_uint(text: &str, min: u64) -> Result<u64, String> {
+    let unsigned = text.strip_prefix('+').unwrap_or(text);
+    let (negative, digits) = unsigned.strip_prefix('-').map_or((false, unsigned), |digits| (true, digits));
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(format!("`{text}` is not an integer from {min} to {SAFE_INTEGER}"));
+    }
+    let value = digits.parse::<u128>().ok().filter(|value| *value <= u128::from(SAFE_INTEGER));
+    match value {
+        Some(value) if negative && value != 0 => Err(format!("`{text}` is negative: an integer from {min} to {SAFE_INTEGER}")),
+        Some(value) if value < u128::from(min) => Err(format!("`{text}` is below {min}: an integer from {min} to {SAFE_INTEGER}")),
+        Some(value) => Ok(u64::try_from(value).unwrap_or(SAFE_INTEGER)),
+        None => Err(format!("`{text}` is beyond 9007199254740991 (2^53-1): an integer from {min} to {SAFE_INTEGER}")),
+    }
+}
+
+/// An integer from 1 to 2^53-1 (`--limit`, `--max-artifact-mib`).
+pub fn safe_min1(text: &str) -> Result<u64, String> {
+    safe_uint(text, 1)
+}
+
+/// An integer from 0 to 2^53-1 (`--interval-secs`).
+pub fn safe_min0(text: &str) -> Result<u64, String> {
+    safe_uint(text, 0)
+}
+
+/// An integer from 0 to 2^53-1 that counts items (`retrieve --limit`).
+pub fn safe_min0_usize(text: &str) -> Result<usize, String> {
+    safe_uint(text, 0).map(|value| usize::try_from(value).unwrap_or(usize::MAX))
 }
 
 /// `--promote`/`--no-promote`, flattened into every staged write

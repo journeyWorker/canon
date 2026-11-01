@@ -1,7 +1,7 @@
 //! `--input <JSON|FILE|->` (0.28 D7): a leaf's arguments as a JSON document.
 //!
 //! The document is turned into an ordinary command line before clap sees it,
-//! so every rule of the flags (required, `requiredOneOf`, value sets, error
+//! so every rule of the flags (required, exactly-one-of sets, value sets, error
 //! codes) applies unchanged; [`expand`] is that step and `main` runs it first.
 //!
 //! - **Source:** inline JSON when the value starts with `{` or `[` after
@@ -21,8 +21,9 @@
 //!   run in order, each as one `canon … --json` child process; the first
 //!   failure stops the run (`failed`, the rest `skipped`, exit 1).
 //!
-//! The same [`Leaf`] description (keys, types, value sets, required) derives
-//! the JSON Schema the spec publishes ([`document_schema`]).
+//! The same [`Leaf`] description (keys, types, value sets) is what the example document of the spec
+//! is read with ([`example_document`]); the JSON Schemas the spec publishes for a document
+//! come from the command's document ([`atip::project::fragment_schema`]).
 
 use std::ffi::OsString;
 use std::io::{IsTerminal, Read};
@@ -43,18 +44,10 @@ pub const MAX_BYTES: u64 = 8 * 1024 * 1024;
 /// The most elements one batch may hold.
 pub const MAX_ELEMENTS: usize = 10_000;
 
-/// Options a document can never carry: the globals and the safety pair. A
-/// document is a command invocation, not a way past a preview.
-const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest"];
-
-/// Batch examples of the per-leaf table (D7), by leaf.
-const BATCH_EXAMPLES: &[(&str, &str)] = &[
-    ("scenario new", r#"[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Signs out","case":"happy"}]"#),
-    ("evidence add", r#"[{"scenario":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenario":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]"#),
-    ("finding add", r#"[{"change":"add-login","round":1,"seq":1,"severity":"note","actor":"reviewer-1","summary":"Token is logged"},{"change":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actor":"reviewer-1","summary":"No rate limit"}]"#),
-    ("divergence add", r#"[{"operands":["auth.login.01"],"actor":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"actor":"reviewer-1","role":"reviewer"}]"#),
-    ("subject new", r#"[{"operands":["payments"],"domain":"dev","title":"Payments"},{"operands":["billing"],"domain":"dev","title":"Billing"}]"#),
-];
+/// Options a document can never carry: the globals, the safety pair and `--fields`. A
+/// document is a command invocation, not a way past a preview; `--fields` is read against the output the
+/// invocation selects, and a batch output declares none (spec 6.10). The spec marks each `flagOnly`.
+pub const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest", "fields"];
 
 // ---------------------------------------------------------------- batch report
 
@@ -99,11 +92,9 @@ pub struct BatchReport<R> {
 impl<R: Serialize + JsonSchema> Report for BatchReport<R> {}
 
 /// Whether a leaf takes a batch: every writing leaf with an enveloped report.
-/// The destructive leaves bind one plan (O16) and `dashboard` is a stream.
+/// The destructive leaves bind one plan (O16) and `dashboard` serves until it is stopped.
 pub fn batch_supported(path: &str) -> bool {
-    let writes = crate::schema::meta_for(path).is_some_and(|m| m.effect == crate::schema::Effect::Write);
-    let streams = crate::spec_facts::facts_for(path).is_some_and(|f| f.outputs.iter().any(|o| o.kind == crate::spec_facts::OutputKind::Stream));
-    writes && !streams
+    crate::schema::meta_for(path).is_some_and(|m| m.effect == crate::schema::Effect::Write) && path != "dashboard"
 }
 
 // ---------------------------------------------------------------- the leaf
@@ -125,12 +116,8 @@ struct Key {
     kind: Kind,
     repeatable: bool,
     integer: bool,
-    possible: Vec<String>,
     /// `--no-<long>` exists.
     negatable: bool,
-    required: bool,
-    help: Option<String>,
-    default: Vec<String>,
 }
 
 /// What a leaf's document can say, read from its clap definition.
@@ -140,7 +127,6 @@ pub struct Leaf {
     keys: Vec<Key>,
     /// `(min, max)` of the operands, when the leaf has any.
     operands: Option<(usize, Option<usize>)>,
-    operand_help: Option<String>,
     operand_names: Vec<String>,
     /// Option groups of which exactly one is required, as document keys.
     one_of: Vec<Vec<String>>,
@@ -197,11 +183,7 @@ impl Leaf {
                     kind,
                     repeatable: matches!(a.get_action(), ArgAction::Append),
                     integer: kind == Kind::Value && is_integer(a),
-                    possible: a.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
                     negatable: args.iter().any(|o| o.get_long().is_some_and(|l| l.strip_prefix("no-") == Some(long))),
-                    required: a.is_required_set(),
-                    help: a.get_help().map(std::string::ToString::to_string),
-                    default: if kind == Kind::Value { a.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect() } else { Vec::new() },
                 })
             })
             .collect();
@@ -237,10 +219,14 @@ impl Leaf {
             has_dry_run: keys.iter().any(|k| k.long == "dry-run"),
             keys,
             operands,
-            operand_help: positionals.first().and_then(|a| a.get_help()).map(std::string::ToString::to_string),
             operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(std::string::ToString::to_string).unwrap_or_default()]).collect(),
             one_of,
         }
+    }
+
+    /// The sets of document keys (`operands` or a camelCase option name) of which exactly one is required.
+    pub fn required_one_of(&self) -> Vec<Vec<String>> {
+        self.one_of.clone()
     }
 
     fn command(&self) -> String {
@@ -411,12 +397,17 @@ fn refused(code: &'static str, message: impl Into<String>, hint: impl Into<Strin
 }
 
 /// An `INPUT_INVALID` for a fault in the value of `--input` itself (spec of the contract 11.7 steps 1-2):
-/// `field` is `--input`, and `x-canon.reason` says which of the five framing faults it is
-/// (`unreadable`, `tty`, `empty`, `syntax`, `batch-unsupported`), because the contract's one code
-/// cannot tell a caller to re-read a file from fixing JSON. A fault in the document against its fragment
-/// schema has a pointer `field` and no reason.
+/// `field` is `--input`, and `reason` is the contract's reserved name (7.2.3) of the framing fault
+/// (`UNREADABLE`, `STDIN_TTY`, `EMPTY`, `NOT_JSON`, `NOT_OBJECT`, `BATCH_UNSUPPORTED`), because the contract's
+/// one code cannot tell a caller to re-read a file from fixing JSON. A fault in the document against its
+/// fragment schema has a pointer `field` and the reason of [`invalid`].
 fn framing(reason: &'static str, message: impl Into<String>, hint: impl Into<String>) -> CliError {
-    refused("INPUT_INVALID", message, hint).field("--input").extension("x-canon", serde_json::json!({ "reason": reason }))
+    refused("INPUT_INVALID", message, hint).reason(reason).field("--input")
+}
+
+/// An `INPUT_INVALID` for a value of the document of the wrong type, or `null` (reason `INVALID_VALUE`).
+fn invalid(message: impl Into<String>, hint: impl Into<String>) -> CliError {
+    refused("INPUT_INVALID", message, hint).reason("INVALID_VALUE")
 }
 
 const SCHEMA_HINT: &str = "`canon schema <command> --json` shows the document keys under `inputs` with an example";
@@ -437,40 +428,41 @@ enum Document {
     Batch(Vec<Value>),
 }
 
-fn too_large(what: &str) -> CliError {
-    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit")
+/// `INPUT_TOO_LARGE`: `reason` is `TOO_MANY_BYTES` (the source) or `TOO_MANY_ITEMS` (a batch).
+fn too_large(reason: &'static str, what: &str) -> CliError {
+    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit").reason(reason)
 }
 
 /// Reads at most [`MAX_BYTES`] from `reader`; one byte more is `INPUT_TOO_LARGE`.
 #[expect(clippy::map_err_ignore, reason = "`refused` takes a message and a hint, no source; the message already says the input is not UTF-8")]
 fn read_capped(reader: impl Read, what: &str) -> Result<String, CliError> {
     let mut bytes = Vec::new();
-    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| framing("unreadable", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
+    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| framing("UNREADABLE", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
     if bytes.len() as u64 > MAX_BYTES {
-        return Err(too_large(what));
+        return Err(too_large("TOO_MANY_BYTES", what));
     }
-    String::from_utf8(bytes).map_err(|_| framing("unreadable", format!("{what} is not UTF-8 text"), "write the document as UTF-8 JSON"))
+    String::from_utf8(bytes).map_err(|_| framing("UNREADABLE", format!("{what} is not UTF-8 text"), "write the document as UTF-8 JSON"))
 }
 
 fn load(value: &str) -> Result<(String, Source), CliError> {
     if value.trim_start().starts_with(['{', '[']) {
         if value.len() as u64 > MAX_BYTES {
-            return Err(too_large("the inline document"));
+            return Err(too_large("TOO_MANY_BYTES", "the inline document"));
         }
         return Ok((value.to_string(), Source::Inline));
     }
     if value == "-" {
         if std::io::stdin().is_terminal() {
-            return Err(framing("tty", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file"));
+            return Err(framing("STDIN_TTY", "`--input -` reads stdin, and stdin is a terminal", "pipe the document in (`… | canon <command> --input -`), or pass it inline or as a file"));
         }
         return Ok((read_capped(std::io::stdin().lock(), "stdin")?, Source::Stdin));
     }
     if value.is_empty() {
-        return Err(framing("empty", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin"));
+        return Err(framing("EMPTY", "`--input` is empty", "pass inline JSON, a file path, or `-` for stdin"));
     }
-    let file = std::fs::File::open(value).map_err(|e| framing("unreadable", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin"))?;
+    let file = std::fs::File::open(value).map_err(|e| framing("UNREADABLE", format!("`--input {value}` could not be opened: {e}"), "give a readable file path, inline JSON starting with `{` or `[`, or `-` for stdin"))?;
     if file.metadata().is_ok_and(|m| m.len() > MAX_BYTES) {
-        return Err(too_large(&format!("`{value}`")));
+        return Err(too_large("TOO_MANY_BYTES", &format!("`{value}`")));
     }
     Ok((read_capped(file, &format!("`{value}`"))?, Source::File))
 }
@@ -479,10 +471,10 @@ fn load(value: &str) -> Result<(String, Source), CliError> {
 fn frame(text: &str, source: Source) -> Result<Document, CliError> {
     match serde_json::from_str::<Value>(text) {
         Ok(Value::Object(object)) => Ok(Document::One(object)),
-        Ok(Value::Array(items)) if items.len() > MAX_ELEMENTS => Err(too_large(&format!("the array ({} elements)", items.len()))),
+        Ok(Value::Array(items)) if items.len() > MAX_ELEMENTS => Err(too_large("TOO_MANY_ITEMS", &format!("the array ({} elements)", items.len()))),
         Ok(Value::Array(items)) => Ok(Document::Batch(items)),
-        Ok(_) => Err(framing("syntax", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
-        Err(error) if source == Source::Inline => Err(framing("syntax", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")),
+        Ok(_) => Err(framing("NOT_OBJECT", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
+        Err(error) if source == Source::Inline => Err(framing("NOT_JSON", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")),
         Err(_) => {
             let mut items = Vec::new();
             for (n, line) in text.lines().enumerate() {
@@ -491,15 +483,15 @@ fn frame(text: &str, source: Source) -> Result<Document, CliError> {
                     continue;
                 }
                 if items.len() == MAX_ELEMENTS {
-                    return Err(too_large(&format!("the NDJSON input (more than {MAX_ELEMENTS} lines)")));
+                    return Err(too_large("TOO_MANY_ITEMS", &format!("the NDJSON input (more than {MAX_ELEMENTS} lines)")));
                 }
                 match serde_json::from_str::<Value>(line) {
                     Ok(value) => items.push(value),
-                    Err(error) => return Err(framing("syntax", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array")),
+                    Err(error) => return Err(framing("NOT_JSON", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array")),
                 }
             }
             if items.is_empty() {
-                return Err(framing("empty", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT));
+                return Err(framing("EMPTY", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT));
             }
             Ok(Document::Batch(items))
         }
@@ -527,12 +519,12 @@ fn scalar(value: &Value, pointer: &str, expected: &str) -> Result<String, CliErr
         Value::String(s) => Ok(s.clone()),
         Value::Number(n) => Ok(n.to_string()),
         Value::Null => Err(null_refusal(pointer)),
-        other => Err(refused("INPUT_INVALID", format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+        other => Err(invalid(format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
     }
 }
 
 fn null_refusal(pointer: &str) -> CliError {
-    refused("INPUT_INVALID", format!("`{pointer}` is null: canon has no clear-to-default, so omit the key"), "drop the key to get the option's default").field(pointer)
+    invalid(format!("`{pointer}` is null: canon has no clear-to-default, so omit the key"), "drop the key to get the option's default").field(pointer)
 }
 
 fn type_name(value: &Value) -> &'static str {
@@ -577,7 +569,7 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
             let items = match value {
                 Value::Array(items) => items,
                 Value::Null => return Err(null_refusal(&pointer)),
-                other => return Err(refused("INPUT_INVALID", format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+                other => return Err(invalid(format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             };
             let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string")).collect::<Result<Vec<_>, _>>()?;
             out.push(Setting { key: name.clone(), long: None, values, flag: None, negatable: false, count: false });
@@ -596,19 +588,19 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
                 }
                 (false, None) => SCHEMA_HINT.to_string(),
             };
-            return Err(CliError::refused("INPUT_INVALID", message).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
+            return Err(CliError::refused("INPUT_INVALID", message).reason(if forbidden { "FLAG_ONLY_KEY" } else { "UNKNOWN_KEY" }).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
         };
         let setting = match (key.kind, value) {
             (_, Value::Null) => return Err(null_refusal(&pointer)),
             (Kind::Flag, Value::Bool(on)) => Setting { key: name.clone(), long: Some(key.long.clone()), values: Vec::new(), flag: Some(*on), negatable: key.negatable, count: false },
-            (Kind::Flag, other) => return Err(refused("INPUT_INVALID", format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Flag, other) => return Err(invalid(format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Count, Value::Number(n)) if n.as_u64().is_some() => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![n.to_string()], flag: None, negatable: false, count: true },
-            (Kind::Count, other) => return Err(refused("INPUT_INVALID", format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Count, other) => return Err(invalid(format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Value, Value::Array(items)) if key.repeatable => {
                 let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string or number")).collect::<Result<Vec<_>, _>>()?;
                 Setting { key: name.clone(), long: Some(key.long.clone()), values, flag: None, negatable: false, count: false }
             }
-            (Kind::Value, other) if key.repeatable => return Err(refused("INPUT_INVALID", format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+            (Kind::Value, other) if key.repeatable => return Err(invalid(format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
             (Kind::Value, other) => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![scalar(other, &pointer, if key.integer { "a number" } else { "a string or number" })?], flag: None, negatable: false, count: false },
         };
         out.push(setting);
@@ -752,7 +744,9 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     if value == "-" {
         if let Some(other) = lexed.opts.iter().find(|o| o.long.as_deref() != Some("input") && o.value.as_deref().is_some_and(|v| v == "-" || v.ends_with(":-"))) {
             let other_option = other.long.as_deref().map(|l| format!("--{l}")).unwrap_or_default();
-            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field("--input"));
+            // One stdin, two readers: the violation names the one given later on the command line (spec 5.5).
+            let field = if other.span.start > input.span.start { other_option.clone() } else { "--input".to_string() };
+            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field(field));
         }
     }
     let (text, source) = match load(value) {
@@ -765,7 +759,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     };
     drop(text);
     if matches!(document, Document::Batch(_)) && !batch_supported(&command_name["canon ".len()..]) {
-        return fail(framing("batch-unsupported", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan"));
+        return fail(framing("BATCH_UNSUPPORTED", format!("`{command_name}` takes one object as `--input`, not an array or NDJSON"), "pass one JSON object; run the command once per plan"));
     }
 
     // The command line without `--input`.
@@ -874,13 +868,18 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     };
     let wants_json = has_flag(lexed, "json");
     let dry_run_given = has_flag(lexed, "dry-run");
+    // `--fields` is read against the output the invocation selects, and the output of a batch declares no `fields` (spec 6.10):
+    // refused before any element is planned, so no element is run and nothing is written.
+    if has_flag(lexed, "fields") {
+        return exit_refused(refused("USAGE", format!("`{command_name}` takes no `--fields` with a batch: the output of a batch declares no fields"), "drop `--fields`, or run one element at a time with it").field("--fields"));
+    }
 
     // Validate every element before the first write.
     let mut argvs: Vec<Vec<String>> = Vec::with_capacity(items.len());
     for (i, item) in items.iter().enumerate() {
         let prefix = format!("/items/{i}");
         let Some(object) = item.as_object() else {
-            return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).field(prefix).received(item.to_string()));
+            return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).reason("NOT_OBJECT").field(prefix).received(item.to_string()));
         };
         let argv = match settings(leaf, object, &prefix).and_then(|s| assemble(base, &s, &prefix)) {
             Ok(argv) => argv,
@@ -888,12 +887,30 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         };
         let mut parse_argv = vec![root.get_name().to_string()];
         parse_argv.extend(argv.iter().cloned());
-        if let Err(error) = root.clone().try_get_matches_from(&parse_argv) {
-            let (_, usage) = crate::run::entry::usage_parts(&error, root);
-            return exit_refused(pointed(usage, map, &prefix));
+        let mut matches = match root.clone().try_get_matches_from(&parse_argv) {
+            Ok(matches) => matches,
+            Err(error) => {
+                let (_, usage) = crate::run::entry::usage_parts(&error, root);
+                return exit_refused(pointed(usage, map, &prefix));
+            }
+        };
+        // Preflight is the whole stateless stage (spec 11.11, 10.8.3): required, domains, constraints, validators, on every element,
+        // so a stateless fault anywhere refuses the batch with exit 2 before the first element writes.
+        let parsed = matches.clone();
+        if let Ok(cli) = <crate::cli::Cli as clap::FromArgMatches>::from_arg_matches_mut(&mut matches) {
+            if let Some((_, error)) = crate::validators::refusal(&cli, root, &parsed) {
+                return exit_refused(pointed(error, map, &prefix));
+            }
         }
-        if leaf.has_dry_run && !dry_run_given {
-            let child = spawn(&exe, &argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });
+        argvs.push(argv);
+    }
+
+    // Then each element's own dry run, which reads state (a missing repository is `CONFIG_MISSING`): after every element's stateless stage, so
+    // a stateless fault in a later element is the answer, not the first element's missing repository (spec 11.11).
+    if leaf.has_dry_run && !dry_run_given {
+        for (i, argv) in argvs.iter().enumerate() {
+            let prefix = format!("/items/{i}");
+            let child = spawn(&exe, argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });
             let ok = child.exit == 0 && child.envelope.as_ref().is_some_and(|e| e["ok"] == true);
             if !ok {
                 let error = match &child.envelope {
@@ -903,7 +920,6 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                 return exit_refused(error);
             }
         }
-        argvs.push(argv);
     }
 
     // Run in order; the first failure stops the run.
@@ -975,65 +991,6 @@ pub fn schema_name(path: &str) -> String {
     name + "Input"
 }
 
-fn schema_type(key: &Key) -> Value {
-    let item = match key.kind {
-        Kind::Flag => json!({ "type": "boolean" }),
-        Kind::Count => json!({ "type": "integer", "minimum": 0 }),
-        Kind::Value if key.integer => json!({ "type": ["integer", "string"] }),
-        Kind::Value if !key.possible.is_empty() => json!({ "enum": key.possible }),
-        Kind::Value => json!({ "type": ["string", "number"] }),
-    };
-    if key.repeatable {
-        json!({ "type": "array", "items": item })
-    } else {
-        item
-    }
-}
-
-/// The JSON Schema (2020-12) of one document object of the leaf, derived from its clap definition.
-pub fn document_schema(leaf: &Leaf) -> Value {
-    let mut properties = Map::new();
-    if let Some((min, max)) = leaf.operands {
-        let mut operands = json!({ "type": "array", "items": { "type": ["string", "number"] }, "minItems": min });
-        if let Some(max) = max {
-            operands["maxItems"] = json!(max);
-        }
-        if let Some(help) = &leaf.operand_help {
-            operands["description"] = json!(help);
-        }
-        properties.insert("operands".to_string(), operands);
-    }
-    for key in &leaf.keys {
-        let mut property = schema_type(key);
-        if let Some(help) = &key.help {
-            property["description"] = json!(help);
-        }
-        if !key.default.is_empty() && !key.repeatable {
-            property["default"] = if key.integer { key.default[0].parse::<u64>().map_or_else(|_| json!(key.default[0]), |n| json!(n)) } else { json!(key.default[0]) };
-        }
-        properties.insert(key.key.clone(), property);
-    }
-    let mut required: Vec<&str> = leaf.keys.iter().filter(|k| k.required).map(|k| k.key.as_str()).collect();
-    if leaf.operands.is_some_and(|(min, _)| min > 0) {
-        required.insert(0, "operands");
-    }
-    let mut schema = json!({
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": format!("`{}` --input document", leaf.command()),
-        "type": "object",
-        "properties": properties,
-        "additionalProperties": false,
-    });
-    if !required.is_empty() {
-        schema["required"] = json!(required);
-    }
-    let one_of: Vec<Value> = leaf.one_of.iter().filter(|g| !g.is_empty()).map(|group| json!({ "oneOf": group.iter().map(|k| json!({ "required": [k] })).collect::<Vec<_>>() })).collect();
-    if !one_of.is_empty() {
-        schema["allOf"] = Value::Array(one_of);
-    }
-    schema
-}
-
 /// Splits an example line like a shell would for the examples canon ships:
 /// whitespace separates, double quotes group.
 fn words(line: &str) -> Vec<String> {
@@ -1094,48 +1051,4 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
         }
     }
     Some(Value::Object(object))
-}
-
-/// One input of a leaf in the spec (`inputs[]`).
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct InputDoc {
-    /// The option that carries it.
-    pub option: &'static str,
-    /// `#/schemas/<Name>Input`: the JSON Schema of one document object.
-    pub schema_ref: String,
-    /// The most bytes one document may hold.
-    pub max_bytes: u64,
-    /// The most elements one batch may hold.
-    pub max_elements: usize,
-    /// An array or NDJSON runs the leaf once per element; false for a leaf that takes one object.
-    pub batch: bool,
-    /// A document that runs, equivalent to the leaf's example command line.
-    pub example: Value,
-    /// A batch document of the per-leaf table.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub batch_example: Option<Value>,
-    /// The JSON Schema itself, published once under `schemas`.
-    #[serde(skip)]
-    pub schema: Value,
-}
-
-/// The inputs of the leaf `path` whose (built) clap node is `cmd`: one for a
-/// leaf that takes `--input`, none otherwise.
-pub fn inputs(path: &str, cmd: &Command) -> Vec<InputDoc> {
-    if find_long(cmd, "input").is_none() {
-        return Vec::new();
-    }
-    let words: Vec<String> = path.split(' ').map(str::to_string).collect();
-    let leaf = Leaf::of(cmd, &words);
-    vec![InputDoc {
-        option: "--input",
-        schema_ref: format!("#/schemas/{}", schema_name(path)),
-        max_bytes: MAX_BYTES,
-        max_elements: MAX_ELEMENTS,
-        batch: batch_supported(path),
-        example: example_document(cmd, &leaf).unwrap_or_else(|| json!({})),
-        batch_example: BATCH_EXAMPLES.iter().find(|(p, _)| *p == path).map(|(_, text)| serde_json::from_str(text).expect("the batch example is JSON")),
-        schema: document_schema(&leaf),
-    }]
 }

@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T17:42:58.367468Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "575a91b668cbc59a0cf3aa5281bb48afd90cdfa1",
+  "reviewer": "rev-constraints",
+  "round": 2,
+  "scenario_ids": [
+    "atip.constraints.18"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec fidelity] the validators that clap's value parser enforces (the calendar of the 12 time options, `--introduced-rev self`, `--surface-ref`) answer before the declared constraints, so the one order the CHANGELOG states (required, domains, constraints in the document's order, validators) does not hold for them: `divergence add --state deferred --expiry 2026-02-30` (no --reason) is USAGE at --expiry, not DIVERGENCE_INVALID_ARGUMENT at --reason; `purge --before 2026-02-30 --commit` is USAGE at --before, not the requires of --plan-digest; `finding add --introduced-rev self --introduced-unknown` is USAGE at --introduced-rev, not the atMostOne; also a bad value of a parser-coded domain answers before a missing required argument (`finding close Bad_Id --round 1` is CHANGE_ID); 10.8.3 puts validators after domains and constraints, the required-versus-domain order is not fixed by the spec; exit 2 and nothing written either way, only the code and field of a multi-fault call differ; blast radius: the 12 time options, --introduced-rev, --surface-ref (evidence add, approval-payload)",
+  "worktree_dirty": false
+}

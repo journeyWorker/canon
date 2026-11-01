@@ -23,8 +23,10 @@ const PRINTS: &[(&str, &str, &str)] = &[
 
 /// Schemas that are deliberately opaque, as (definition name, why).
 const OPAQUE: &[(&str, &str)] = &[
-    ("InputDoc", "its `example` and `batchExample` are example `--input` documents: their keys are the leaf's option names, so their shape is that leaf's `<Name>Input` schema, published beside it"),
+    ("EmbeddedSchema", "an embedded JSON Schema of a command document: its shape is JSON Schema's own, published by the draft"),
+    ("InputExample", "an example `--input` document: its keys are the command's option names, so its shape is that command's `<Name>Input` schema, published beside it"),
     ("LedgerRecord", "a ledger record embedded verbatim keeps its own snake_case schema (crates/canon-model/schemas)"),
+    ("QueryRecord", "a ledger record of any kind: each kind keeps its own snake_case schema (crates/canon-model/schemas), and `--fields` selects the members they declare"),
 ];
 
 fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
@@ -163,12 +165,14 @@ fn untyped(schema: &Value, at: &str, def: Option<&str>, out: &mut Vec<String>) {
 #[test]
 fn no_report_schema_holds_an_untyped_value() {
     let mut problems = Vec::new();
-    for (name, schema) in spec()["schemas"].as_object().expect("schemas") {
-        untyped(schema, name, None, &mut problems);
+    for node in leaves() {
+        for (name, schema) in node["schemas"].as_object().expect("schemas") {
+            untyped(schema, &format!("{} {name}", path_of(node)), Some(name), &mut problems);
+        }
     }
     for (def, reason) in OPAQUE {
         assert!(!reason.is_empty());
-        let used = spec()["schemas"].as_object().unwrap().values().any(|s| s["$defs"].get(*def).is_some()) || spec()["schemas"].get(*def).is_some();
+        let used = leaves().iter().any(|node| node["schemas"].get(*def).is_some());
         assert!(used, "OPAQUE names {def}, which no schema defines: drop the entry");
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));

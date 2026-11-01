@@ -101,11 +101,16 @@ pub fn batch_output_name(command: &str) -> Option<String> {
 
 /// The `meta.schemaVersion` of a failure without `data` (spec 6.11): the version of the output the
 /// invocation would have produced: the batch output for a batch `--input`, otherwise the command's
-/// first output that is not a batch.
+/// first output that is not a batch, in the order its command document lists them.
 pub fn declared_version(command: &str, batch: bool) -> Option<String> {
     let rows = report_rows();
     let mut of_command = rows.iter().filter(|row| row.command == command && row.batch == batch);
-    of_command.next().map(|row| row.schema_version.clone())
+    let first_named = (!batch).then(|| crate::spec_facts::facts_for(command).and_then(|facts| facts.outputs.first())).flatten();
+    match first_named {
+        Some(first) => of_command.find(|row| row.name == first.report),
+        None => of_command.next(),
+    }
+    .map(|row| row.schema_version.clone())
 }
 
 /// The JSON Schema of `R` as a value.
@@ -115,15 +120,20 @@ pub fn schema_of<R: JsonSchema>() -> Value {
     serde_json::to_value(generator.into_root_schema_for::<R>()).expect("a JSON Schema serializes")
 }
 
+/// The typed reports of `command` (one entry per output, the batch output included), each with its schema: the
+/// schemas a command document carries. Only this command's schemas are built.
+pub fn schemas_of(command: &str) -> Vec<ReportSchema> {
+    report_rows().iter().filter(|row| row.command == command).map(row_schema).collect()
+}
+
+fn row_schema(row: &ReportRow) -> ReportSchema {
+    let schema = (row.schema)();
+    ReportSchema { command: row.command, name: row.name.clone(), schema_version: row.schema_version.clone(), type_name: row.type_name, schema: if row.state { crate::json_out::with_state_properties(schema) } else { schema } }
+}
+
 /// Every typed report, one entry per `(command, name)`, sorted by command, with its schema.
 pub fn report_schemas() -> Vec<ReportSchema> {
-    report_rows()
-        .iter()
-        .map(|row| {
-            let schema = (row.schema)();
-            ReportSchema { command: row.command, name: row.name.clone(), schema_version: row.schema_version.clone(), type_name: row.type_name, schema: if row.state { crate::json_out::with_state_properties(schema) } else { schema } }
-        })
-        .collect()
+    report_rows().iter().map(row_schema).collect()
 }
 
 /// Every typed report without its schema, sorted like [`report_schemas`]. Built once.
@@ -198,7 +208,9 @@ fn build_rows() -> Vec<ReportRow> {
         entry::<crate::dashboard::DashboardReport>("dashboard", "DashboardReport"),
         entry::<crate::dashboard::DashboardStatusReport<'static>>("dashboard", "DashboardStatusReport"),
         entry::<crate::dashboard_briefs::DashboardBriefsReport>("dashboard", "DashboardBriefsReport"),
-        entry::<crate::retention::ExportReport>("export", "ExportReport"),
+        entry::<crate::retention::ExportManifest>("export", "ExportReport"),
+        entry::<crate::retention::ExportWritten>("export", "ExportWrittenReport"),
+        entry::<crate::retention::ExportPreview>("export", "ExportPreviewReport"),
         entry::<crate::fmt::FormatReport<'static>>("format", "FormatReport"),
         entry::<crate::ingest::IngestSessionsReport<'static>>("ingest sessions", "IngestSessionsReport"),
         entry::<crate::init::InitReport>("init", "InitReport"),
@@ -212,7 +224,7 @@ fn build_rows() -> Vec<ReportRow> {
         entry::<crate::report::ReportBuildReport>("report build", "ReportBuildReport"),
         entry::<crate::report::ReportCheckReport>("report check", "ReportCheckReport"),
         entry::<crate::report::ReportSnapshotReport<'static>>("report snapshot", "ReportSnapshotReport"),
-        entry::<crate::schema::SchemaReport<'static>>("schema", "SchemaReport"),
+        entry::<crate::schema::SchemaReport>("schema", "SchemaReport"),
         entry::<crate::skills::SkillsCheckReport>("skills check", "SkillsCheckReport"),
         entry::<crate::skills::SkillsDoctorReport<'static>>("skills doctor", "SkillsDoctorReport"),
         entry::<crate::skills::SkillsInstallReport<'static>>("skills install", "SkillsInstallReport"),
@@ -250,7 +262,7 @@ fn build_rows() -> Vec<ReportRow> {
         batch_entry::<subject::SubjectReport<'static>>("subject new", "BatchSubjectNewReport"),
         batch_entry::<subject::SubjectReport<'static>>("subject move", "BatchSubjectMoveReport"),
         batch_entry::<subject::SubjectReport<'static>>("subject unadopt", "BatchSubjectUnadoptReport"),
-        batch_entry::<crate::retention::ExportReport>("export", "BatchExportReport"),
+        batch_entry::<crate::retention::ExportAnswer>("export", "BatchExportReport"),
         batch_entry::<crate::ingest::IngestSessionsReport<'static>>("ingest sessions", "BatchIngestSessionsReport"),
         batch_entry::<crate::init::InitReport>("init", "BatchInitReport"),
         batch_entry::<crate::inventory::InventorySyncReport<'static>>("inventory sync", "BatchInventorySyncReport"),

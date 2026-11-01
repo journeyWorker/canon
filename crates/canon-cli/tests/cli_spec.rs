@@ -46,7 +46,7 @@ fn two_generations_are_byte_identical() {
 #[test]
 fn every_node_of_the_clap_tree_is_in_the_spec_and_the_reverse() {
     let doc = spec::generate();
-    let mut spec_commands: Vec<&str> = doc["commands"].as_array().expect("commands").iter().map(|n| n["command"].as_str().expect("command")).collect();
+    let mut spec_commands: Vec<&str> = doc["tree"]["commands"].as_array().expect("the tree lists commands").iter().map(|n| n["command"].as_str().expect("command")).collect();
     let mut tree_commands = Vec::new();
     fn walk(cmd: &clap::Command, prefix: &mut Vec<String>, out: &mut Vec<String>) {
         for sub in cmd.get_subcommands().filter(|c| c.get_name() != "help") {
@@ -60,52 +60,40 @@ fn every_node_of_the_clap_tree_is_in_the_spec_and_the_reverse() {
     tree_commands.sort();
     spec_commands.sort_unstable();
     assert_eq!(spec_commands, tree_commands.iter().map(String::as_str).collect::<Vec<_>>());
+    // `commands` holds one document for each leaf of the tree and no group.
+    let leaves: BTreeSet<&str> = doc["tree"]["commands"].as_array().expect("tree").iter().filter(|n| n["kind"] == "command").map(|n| n["command"].as_str().expect("command")).collect();
+    let documented: BTreeSet<&str> = doc["commands"].as_array().expect("commands").iter().map(|n| n["command"].as_str().expect("command")).collect();
+    assert_eq!(leaves, documented);
 }
 
 #[test]
-fn a_node_is_a_leaf_xor_a_group_and_a_leaf_says_everything_an_agent_needs() {
+fn a_command_document_says_everything_an_agent_needs() {
     let doc = spec::generate();
-    let nodes = doc["commands"].as_array().expect("commands");
-    let (mut leaves, mut groups) = (0, 0);
-    for node in nodes {
+    let commands = doc["commands"].as_array().expect("commands");
+    for node in commands {
         let command = node["command"].as_str().expect("command");
-        match node["nodeKind"].as_str().expect("nodeKind") {
-            "group" => {
-                groups += 1;
-                assert!(!node["children"].as_array().expect("a group lists its children").is_empty(), "group `{command}` has no children");
-                assert!(node.get("effect").is_none(), "group `{command}` carries leaf fields");
-            }
-            "leaf" => {
-                leaves += 1;
-                for key in ["effect", "roles", "operands", "options", "requiredOneOf", "exits", "errorCodes", "outputs", "inputs", "examples"] {
-                    assert!(node.get(key).is_some(), "leaf `{command}` has no `{key}`");
-                }
-                assert!(!node["outputs"].as_array().expect("outputs").is_empty(), "leaf `{command}` declares no output");
-                assert!(!node["examples"].as_array().expect("examples").is_empty(), "leaf `{command}` has no example");
-                assert!(!node["exits"].as_array().expect("exits").is_empty(), "leaf `{command}` has no exits");
-                for operand in node["operands"].as_array().expect("operands") {
-                    assert!(operand["description"].as_str().is_some_and(|d| !d.is_empty()), "`{command}`: operand {} has no description", operand["name"]);
-                }
-                // A writing leaf declares how a repeat behaves; a read only where its table row does (the approval payloads).
-                let declaring_reads = ["evidence approval-payload", "strategy approval-payload"];
-                if node["effect"] == "read" {
-                    assert_eq!(node.get("idempotency").is_some(), declaring_reads.contains(&command), "read leaf `{command}`: unexpected idempotency declaration");
-                } else {
-                    assert!(node.get("idempotency").is_some(), "writing leaf `{command}` declares no idempotency");
-                }
-                if let Some(idempotency) = node.get("idempotency") {
-                    assert!(["replay-safe", "content-keyed", "appends", "once"].contains(&idempotency.as_str().expect("a word")), "`{command}`: {idempotency}");
-                }
-                for output in node["outputs"].as_array().expect("outputs") {
-                    let kind = output["kind"].as_str().expect("output kind");
-                    assert!(["report", "artifact", "stream"].contains(&kind), "`{command}`: output kind {kind}");
-                    assert_eq!(output.get("mediaType").is_some(), kind == "artifact", "`{command}`: only an artifact has a media type");
-                }
-            }
-            other => panic!("`{command}` has node kind {other}"),
+        assert_eq!(node["kind"], "command");
+        for key in ["summary", "effect", "operands", "options", "errors", "outputs", "examples", "schemas", "x-canon"] {
+            assert!(node.get(key).is_some(), "`{command}` has no `{key}`");
+        }
+        assert!(!node["outputs"].as_array().expect("outputs").is_empty(), "`{command}` declares no output");
+        assert!(!node["examples"].as_array().expect("examples").is_empty(), "`{command}` has no example");
+        for operand in node["operands"].as_array().expect("operands") {
+            assert!(operand["help"].as_str().is_some_and(|d| !d.is_empty()), "`{command}`: operand {} has no help", operand["name"]);
+        }
+        // A writing command declares how a repeat behaves; a read has no idempotency.
+        assert_eq!(node.get("idempotency").is_some(), node["effect"] != "read", "`{command}`");
+        if let Some(idempotency) = node.get("idempotency") {
+            assert!(["replay-safe", "content-keyed", "appends", "once"].contains(&idempotency.as_str().expect("a word")), "`{command}`: {idempotency}");
+        }
+        for output in node["outputs"].as_array().expect("outputs") {
+            let kind = output["kind"].as_str().expect("output kind");
+            assert!(["report", "artifact", "stream"].contains(&kind), "`{command}`: output kind {kind}");
+            assert_eq!(output.get("mediaType").is_some(), kind == "artifact", "`{command}`: only an artifact has a media type");
         }
     }
-    assert!(leaves > 60 && groups > 20, "{leaves} leaves, {groups} groups");
+    let groups = doc["tree"]["commands"].as_array().expect("tree").iter().filter(|n| n["kind"] == "group").count();
+    assert!(commands.len() > 60 && groups > 20, "{} commands, {groups} groups", commands.len());
 }
 
 #[test]
@@ -114,61 +102,42 @@ fn every_leaf_has_one_facts_row_and_every_row_a_leaf() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// The relations the guides' syntax lines are drawn from are the `constraints` of the command documents: clap's
+/// conflicts and groups, and the tables' `requires`.
 #[test]
-fn an_option_says_what_it_conflicts_with_and_requires() {
+fn the_relations_the_guides_draw_are_the_constraints_of_the_documents() {
     let doc = spec::generate();
-    let option = |command: &str, name: &str| -> Value {
-        let node = doc["commands"].as_array().expect("commands").iter().find(|n| n["command"] == command).unwrap_or_else(|| panic!("no `{command}`"));
-        node["options"].as_array().expect("options").iter().find(|o| o["name"] == name).unwrap_or_else(|| panic!("no --{name} on `{command}`")).clone()
+    let relations = |command: &str| {
+        let found = doc["commands"].as_array().expect("commands").iter().find(|leaf| leaf["command"] == command).unwrap_or_else(|| panic!("no `{command}`"));
+        atip::project::Relations::from_json(&found["constraints"])
     };
-    // `scenario new --change` requires `--flow` (a clap `requires`, which clap does not expose).
-    assert_eq!(option("scenario new", "change")["requires"], serde_json::json!(["--flow"]));
+    // `scenario new --change` requires `--flow`: the table says it, clap does not expose it.
+    assert_eq!(relations("scenario new").requires["change"], ["flow"]);
     // `--history` conflicts `--plugin` on `query`, whichever side declared it.
-    assert_eq!(option("query", "history")["conflictsWith"], serde_json::json!(["--plugin"]));
-    assert_eq!(option("query", "plugin")["conflictsWith"], serde_json::json!(["--history"]));
-    assert_eq!(option("query", "kind")["env"], Value::Null);
-    assert_eq!(option("feature new", "actor")["env"], "CANON_ACTOR");
+    let query = relations("query");
+    assert_eq!(query.conflicts_with["history"], ["plugin"]);
+    assert_eq!(query.conflicts_with["plugin"], ["history"]);
 }
 
-/// An embedded schema is a document of its own: it names its base URI and its
-/// internal references resolve against it, so a consumer can validate with it.
+/// An embedded schema does not carry its own base URI: the `#/schemas/..` references of a command document
+/// resolve against the document (approaches/rust.md section 5), and none of its members is a stray resource.
 #[test]
-fn every_embedded_schema_is_a_self_contained_json_schema() {
+fn no_embedded_schema_names_its_own_base_uri() {
     let doc = spec::generate();
     let mut checked = 0;
-    for group in ["schemas"] {
-        for (name, schema) in doc[group].as_object().unwrap_or_else(|| panic!("`{group}` is an object")) {
-            let id = schema["$id"].as_str().unwrap_or_else(|| panic!("{group}.{name} has no $id"));
-            assert!(id.starts_with("urn:canon:"), "{group}.{name}: {id}");
-            jsonschema::validator_for(schema).unwrap_or_else(|e| panic!("{group}.{name} is not a usable JSON Schema: {e}"));
+    for command in doc["commands"].as_array().expect("commands") {
+        for (name, schema) in command["schemas"].as_object().expect("schemas") {
+            assert!(schema.get("$id").is_none() && schema.get("$schema").is_none() && schema.get("$defs").is_none(), "`{}` {name}", command["command"]);
             checked += 1;
         }
     }
-    assert!(checked >= 2, "{checked} schemas");
-}
-
-#[test]
-fn an_output_that_names_a_schema_points_at_one() {
-    let doc = spec::generate();
-    for node in doc["commands"].as_array().expect("commands") {
-        for output in node["outputs"].as_array().into_iter().flatten() {
-            let report = output["report"].as_str().expect("report name");
-            match output["schemaRef"].as_str() {
-                Some(reference) => {
-                    assert_eq!(reference, format!("#/schemas/{report}"));
-                    assert!(doc["schemas"].get(report).is_some(), "`{}`: {reference} names no schema", node["command"]);
-                    assert!(output["schemaVersion"].is_string(), "`{}`: a schema without a version", node["command"]);
-                }
-                None => assert!(doc["schemas"].get(report).is_none(), "`{}`: the schema of {report} exists but the output does not point at it", node["command"]),
-            }
-        }
-    }
+    assert!(checked > 200, "{checked} schemas");
 }
 
 #[test]
 fn the_spec_carries_what_d2_promises() {
     let doc = spec::generate();
-    for key in ["_doNotEdit", "specVersion", "cli", "globalOptions", "envVars", "exitTable", "contract", "errors", "commands", "schemas", "records"] {
+    for key in ["_doNotEdit", "specVersion", "cli", "envVars", "exitTable", "contract", "contractVersion", "errors", "warnings", "removed", "tree", "commands", "records"] {
         assert!(doc.get(key).is_some(), "the spec has no `{key}`");
     }
     assert_eq!(doc["cli"]["version"], env!("CARGO_PKG_VERSION"));
@@ -178,7 +147,7 @@ fn the_spec_carries_what_d2_promises() {
     for name in ["CANON_ROLE", "CANON_ACTOR", "CANON_SKILLS_SOURCE"] {
         assert!(env_names.contains(&name), "{name} is not in the spec");
     }
-    assert!(doc["globalOptions"].as_array().expect("globalOptions").iter().any(|o| o["name"] == "as"));
+    assert!(doc["commands"].as_array().expect("commands").iter().all(|c| c["options"].as_array().expect("options").iter().any(|o| o["name"] == "as")), "every command lists the inherited --as");
     let codes: Vec<u64> = doc["exitTable"].as_array().expect("exitTable").iter().map(|e| e["code"].as_u64().expect("a code")).collect();
     assert_eq!(codes, [0, 1, 2]);
     let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
@@ -272,19 +241,4 @@ fn completion_refuses_a_shell_it_does_not_know_and_needs_no_repo() {
     assert_eq!(canon(&["completion"]).status.code(), Some(2));
     // `canon` is run from an empty temp directory above: no canon.yaml anywhere near it.
     assert!(canon(&["completion", "zsh", "--as", "reviewer"]).status.success());
-}
-
-#[test]
-fn schema_renders_the_node_of_the_spec() {
-    let doc = spec::generate();
-    for command in ["evidence add", "completion", "purge", "brief check"] {
-        let mut args = vec!["schema"];
-        args.extend(command.split(' '));
-        args.push("--json");
-        let out = canon(&args);
-        assert!(out.status.success(), "{command}: {}", String::from_utf8_lossy(&out.stderr));
-        let shown: Value = serde_json::from_slice(&out.stdout).expect("JSON");
-        let node = doc["commands"].as_array().expect("commands").iter().find(|n| n["command"] == command).expect("node");
-        assert_eq!(&shown["data"], node, "`canon schema {command}` and the spec disagree");
-    }
 }

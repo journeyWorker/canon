@@ -1,6 +1,8 @@
 //! atip.l0.13: every warning carries a registered code. A warning is an entry
-//! of `meta.warnings` (`{code, message, field?}`, spec 8.4); the code is
-//! registered in `cli_error::all_codes()` like an error code. One scan keeps
+//! of `meta.warnings` (`{code, message, field?}`, spec 8.4); since 1.1 the code
+//! is registered in the warning registry `cli_error::all_warnings()` (spec
+//! 7.5.2), and in the error registry too when the same situation is an error
+//! somewhere (7.5.3, `tests/schema_codes.rs` holds that half). One scan keeps
 //! the sources honest (no warning site names an unregistered code), and one
 //! status run shows the codes reaching the envelope.
 
@@ -53,11 +55,11 @@ fn warning_sites() -> Vec<(String, String)> {
 
 #[test]
 fn atip_l0_13_every_warning_site_names_a_registered_code() {
-    let registered: BTreeSet<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
+    let registered: BTreeSet<&str> = canon_cli::cli_error::all_warnings().iter().map(|info| info.code).collect();
     let sites = warning_sites();
     assert!(sites.len() >= 20, "the scan found only {} warning sites; it cannot be looking at the sources", sites.len());
     let unregistered: Vec<_> = sites.iter().filter(|(_, code)| !registered.contains(code.as_str())).collect();
-    assert!(unregistered.is_empty(), "warning codes used but not in cli_error::all_codes(): {unregistered:?}");
+    assert!(unregistered.is_empty(), "warning codes used but not in cli_error::all_warnings(): {unregistered:?}");
 }
 
 #[test]
@@ -78,12 +80,12 @@ fn atip_l0_13_no_warning_macro_call_lacks_a_code_literal() {
 }
 
 #[test]
-fn atip_l0_13_a_warning_code_has_the_registry_shape_of_an_error_code() {
+fn atip_l0_13_a_warning_code_has_the_registry_shape_of_a_warning_code() {
     for (_, code) in warning_sites() {
-        let info = canon_cli::cli_error::code_info(&code).unwrap_or_else(|| panic!("{code} is not registered"));
-        assert!(matches!(info.exit, 1 | 2), "{code} declares exit {}", info.exit);
-        assert!(!info.retryable, "{code} is a warning: a retry changes nothing");
+        let info = canon_cli::cli_error::warning_info(&code).unwrap_or_else(|| panic!("{code} is not registered"));
         assert!(info.fix.ends_with('.') && !info.fix.trim().is_empty(), "{code}: `fix` is one sentence: {}", info.fix);
+        let row = serde_json::json!({ "code": info.code, "meaning": info.meaning, "fix": info.fix });
+        assert_eq!(atip::warning_entry_problems(&row), Vec::<String>::new(), "{code}: a warning row is {{code, meaning, fix}} and nothing else");
     }
 }
 
@@ -95,7 +97,7 @@ fn atip_l0_13_every_warning_the_status_report_produces_has_a_registered_code() {
     let report = canon_cli::status::resolve(dir.path());
     assert!(!report.coded_warnings.is_empty(), "an empty directory must make `status` warn");
     for warning in &report.coded_warnings {
-        assert!(canon_cli::cli_error::code_info(&warning.code).is_some(), "status warning code {} is not registered: {}", warning.code, warning.message);
+        assert!(canon_cli::cli_error::warning_info(&warning.code).is_some(), "status warning code {} is not registered: {}", warning.code, warning.message);
     }
     // `data.warnings` keeps its shape (plain lines); the coded list carries the same text, in the same order.
     let lines: Vec<&str> = report.coded_warnings.iter().map(|w| w.message.as_str()).collect();
@@ -113,7 +115,7 @@ fn atip_l0_13_status_json_carries_coded_warnings_in_meta_and_plain_lines_in_data
     assert!(!warnings.is_empty(), "{document}");
     for warning in warnings {
         let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning without a code: {warning}"));
-        assert!(canon_cli::cli_error::code_info(code).is_some(), "meta.warnings code {code} is not registered: {warning}");
+        assert!(canon_cli::cli_error::warning_info(code).is_some(), "meta.warnings code {code} is not registered: {warning}");
         assert!(warning["message"].as_str().is_some_and(|m| !m.is_empty()), "{warning}");
     }
     if let Some(lines) = document.get("data").and_then(|data| data.get("warnings")).and_then(Value::as_array) {

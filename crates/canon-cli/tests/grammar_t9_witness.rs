@@ -30,7 +30,7 @@ fn declared() -> Vec<(String, String)> {
     for node in leaves() {
         let path = path_of(node);
         for output in node["outputs"].as_array().unwrap() {
-            out.push((path.clone(), output["report"].as_str().unwrap().to_string()));
+            out.push((path.clone(), report_of(output)));
         }
         out.push((path, "failure".to_string()));
     }

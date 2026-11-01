@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-01T06:36:35.149711Z",
+  "change_ids": [
+    "canon-0-30-plans-cutover",
+    "canon-0-30-rust-sweep",
+    "canon-0-33-atip-l0",
+    "canon-0-34-atip-1-1"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "change": "canon-0-34-atip-1-1",
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "subject_id": "ingest-pipelines",
+  "summary": "",
+  "title": "Ingest: sessions, artifacts, and foreign plan dialects"
+}

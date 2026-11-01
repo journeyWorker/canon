@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-constraints",
+    "role": "implementer",
+    "session_id": "s-0-34-constraints-r3"
+  },
+  "at": "2026-11-01T16:52:27.664698Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_22_the_retrieve_role_regime_refusal_names_for_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "5f0451c473a0f2ebd9d734f14f3b867d4bae6cdc04108adbed8bea45ec723069"
+    }
+  ],
+  "code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-constraints.xml"
+  },
+  "evidence_sha": "2843b7c309266dc4f75e256262a8f73ab029b218",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 65,
+  "scenario_id": "atip.constraints.22",
+  "schema": 1,
+  "staging_id": "b403741a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

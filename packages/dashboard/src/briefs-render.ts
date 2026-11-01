@@ -5,7 +5,8 @@ import { h, withOn, type Child, type VNode } from "./vnode";
 // check`'s own parser, so this file only lays the result out.
 
 export interface Finding {
-  severity: "blocker" | "advisory";
+  /** `blocker` or `advisory`; any other string a later canon names is read as the cautious one, a finding that is not an advisory (atip/1 15.6). */
+  severity: string;
   rule: string;
   line: number;
   message: string;
@@ -245,6 +246,13 @@ export function renderApproveError(failure: ApproveFailure, reload: VNode | null
     failure.hint ? h("p", { class: "finding-hint" }, failure.hint) : null,
     reload,
   );
+}
+
+/** The changes an approval answer recorded: an entry whose `outcome` is `written` or `unchanged`. An entry
+ * with an outcome this page does not know is left out and the others are read (atip/1 15.6): a newer
+ * canon may name a new outcome, and that one entry is not this page's to count as done. */
+export function approvedChanges(data: { approvals: { change: string; outcome: string }[] }): string[] {
+  return data.approvals.filter((a) => a.outcome === "written" || a.outcome === "unchanged").map((a) => a.change);
 }
 
 /** The change ids a refusal names, for marking their cards. */

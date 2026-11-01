@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-01T06:36:42.265164Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-record-links",
+    "canon-0-33-atip-l0",
+    "canon-0-34-atip-paging-fields"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "change": "canon-0-34-atip-paging-fields",
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "reason": "0.34 ATIP 1.1 / L1 changes approved"
+  },
+  "subject_id": "query-reads",
+  "summary": "",
+  "title": "Query: record reads, folds, and scope filters"
+}

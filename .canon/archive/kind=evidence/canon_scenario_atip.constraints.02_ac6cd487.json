@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-constraints",
+    "role": "implementer",
+    "session_id": "s-0-34-constraints"
+  },
+  "at": "2026-11-01T14:07:03.668612Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_its_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "d566270745857f6bc0054b044ad85311dcb33ce700f12b180c80932e7a917439"
+    }
+  ],
+  "code_tree": "15887b748a2ba3c6847ff8bde2e6b5fda61e7f4a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-constraints.xml"
+  },
+  "evidence_sha": "8715cf266211dd2fa25b868ee6f2dc686a95a5a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "atip.constraints.02",
+  "schema": 1,
+  "staging_id": "8546718e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

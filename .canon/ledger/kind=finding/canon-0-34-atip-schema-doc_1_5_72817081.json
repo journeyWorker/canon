@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-schema-doc",
+    "role": "reviewer",
+    "session_id": "s-0-34-schema-doc-rev"
+  },
+  "at": "2026-11-01T11:32:51.601713Z",
+  "change_id": "canon-0-34-atip-schema-doc",
+  "code_tree": "5054cd1f165b16ecd65498d8c29a9d0e3caa935b",
+  "disposition": "rejected",
+  "file_ref": "crates/canon-cli/tests/schema_doc.rs:760",
+  "introduced_by": "59cf7ee286190548e499d431a0432e5775dcf3e8",
+  "kind": "finding",
+  "reason": "judged: canon context's about/roles are the context report's own members, not names of the old schema spec; the brief does not rename them. The source scan (atip.schemadoc.13) now covers crates/*/src, so the comment at input.rs:4 is fixed and cannot return",
+  "reviewed_sha": "9655dc4cf7a280f3031fe6cccc94a13a14f8a317",
+  "reviewer": "rev-schema-doc",
+  "round": 1,
+  "scenario_ids": [
+    "atip.schemadoc.13",
+    "atip.schemadoc.14"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] The old-name scan (consumer_files, schema_doc.rs:760) covers canon/skills, the website, evals and docs/design only. Left outside it: `canon context --json` still names a command's summary `about` and its roles `roles` (CommandSurface in crates/canon-cli/src/context.rs; the brief's F7 lists `canon context` as a consumer to move), a comment at crates/canon-cli/src/input.rs:4 still says `requiredOneOf`, and docs/research/*.md keep the 0.33 names (history, probably fine). Mutation check: putting `nodeKind` back into canon/skills/SKILL.src.md fails atip_schemadoc_13 and the spec drift test as intended. Question for the planner: is `about`/`roles` in the `context` index a spec name that F7 means, or the context report's own member? Blast radius: an agent sees `about` in `context` and `summary` in `schema`.",
+  "worktree_dirty": false
+}

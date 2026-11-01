@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-check-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-check-1-1-rev"
+  },
+  "at": "2026-11-01T09:33:01.416443Z",
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "kind": "review",
+  "pin": "f667c3e9db15e2124c3474a65e3ba0e11baeca0b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:checks::rules::tests::atip_check_59_a_finding_belongs_to_one_rule_and_the_envelope_schema_leaves_the_others_theirs",
+          "junit:checks::rules::tests::atip_check_59_a_hint_that_starts_with_the_tool_name_is_judged_as_one_command_line",
+          "junit:checks::rules::tests::atip_check_59_every_code_reason_and_warning_a_document_emits_is_listed",
+          "junit:checks::rules::tests::atip_check_59_the_markers_and_the_version_are_the_claims"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "83da33b3859a336ea23d8a9425a0aadc43ab8e2a4599f77cecc1770999b291a5",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-check-1-1/brief.md"
+  },
+  "review_id": "01M6B791K8KHGMPHG9ETBKMDQW",
+  "reviewer": "rev-check-1-1",
+  "scenario_id": "atip.check.59",
+  "schema": 2,
+  "worktree_dirty": false
+}

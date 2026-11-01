@@ -19,20 +19,20 @@ SPEC_PATH = Path(__file__).resolve().parents[2] / "docs" / "cli" / "canon.cli.js
 
 
 def load_effects(path=SPEC_PATH):
-    """`{command path tuple: effect}` for every leaf of the generated spec (`read`, `write` or `destructive`)."""
+    """`{command path tuple: effect}` for every command of the generated spec (`read`, `write` or `destructive`)."""
     with open(path, encoding="utf-8") as stream:
         spec = json.load(stream)
-    return {tuple(node["path"]): node["effect"] for node in spec["commands"] if node["nodeKind"] == "leaf"}
+    return {tuple(node["path"]): node["effect"] for node in spec["commands"]}
 
 
 EFFECTS = load_effects()
 
 
 def load_options(path=SPEC_PATH):
-    """`{command path tuple: set of long option names (`--x`)}` for every leaf, `--as` included."""
+    """`{command path tuple: set of long option names (`--x`)}` for every command; `--as` is one of its options."""
     with open(path, encoding="utf-8") as stream:
         spec = json.load(stream)
-    return {tuple(node["path"]): {f"--{o['name']}" for o in node["options"]} | {"--as"} for node in spec["commands"] if node["nodeKind"] == "leaf"}
+    return {tuple(node["path"]): {f"--{o['name']}" for o in node["options"]} for node in spec["commands"]}
 
 
 OPTIONS = load_options()

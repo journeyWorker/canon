@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T08:21:48.246262Z",
+  "attachments": [
+    {
+      "case": "atip_l0_03_an_unresolved_command_leaves_command_out_and_a_half_resolved_one_names_the_path",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-junit.xml",
+      "sha256": "768715de67e5410b7a791b846025fe4b297c6dcb5251590f99436957167cbbab"
+    }
+  ],
+  "code_tree": "b12cb85d9282067369eed6fa51553491cd82a0ee",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-junit.xml"
+  },
+  "evidence_sha": "abd60f05214f66315925ac4a490822bd02a6ebec",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 124,
+  "scenario_id": "atip.l0.03",
+  "schema": 1,
+  "staging_id": "ab434a39",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

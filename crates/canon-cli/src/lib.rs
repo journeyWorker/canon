@@ -3,6 +3,7 @@
 //! subprocess. `src/main.rs` is a thin `clap` wrapper around this module.
 
 pub mod adapter;
+pub mod arg_rules;
 pub mod artifact_ingest;
 pub mod artifacts;
 pub mod brief;
@@ -26,6 +27,7 @@ pub mod dispatch;
 pub mod divergence;
 pub mod evidence;
 pub mod evidence_attach;
+pub mod fields;
 pub mod finding;
 pub mod fmt;
 pub mod gate;
@@ -81,5 +83,6 @@ pub mod status;
 pub mod suggest;
 pub mod tier;
 pub mod timestamp;
+pub mod validators;
 pub mod tiers;
 pub mod write_mode;

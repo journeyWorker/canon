@@ -28,21 +28,21 @@ Commands without a group word.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon completion` | `<shell>` | none | read: Write the shell completion script for canon (bash, zsh or fish) | `canon completion zsh` |
-| `canon context` | none | none | read: Show what you can author here: record kinds, fields, enums, policies | `canon context` |
-| `canon dashboard` | none | none | write: Serve the local status dashboard | `canon dashboard` |
-| `canon export` | none | `--kind <KIND>` | write: Export a redacted retention manifest without deleting records | `canon export --kind evidence --output evidence.json` |
-| `canon format` | `<dir>` (optional) | none | read: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs` |
-| `canon init` | none | none | write: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init` |
-| `canon migrate` | none | none | destructive (preview, then `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate` |
-| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | destructive (preview, then `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z` |
-| `canon query` | none | `--kind <KIND>` | read: Read stored records across every storage tier | `canon query --kind evidence` |
-| `canon retrieve` | none | `--for-role <ROLE>` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20` |
-| `canon schema` | `<path>` (optional) (repeatable) | none | read: Describe canon's own commands | `canon schema evidence add` |
-| `canon search` | `<text>` | none | read: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding` |
-| `canon selftest` | none | none | read: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate` |
-| `canon status` | none | none | read: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status` |
-| `canon trace` | `<id>` | none | read: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1` |
+| `canon completion` | `<shell>` | none | read: Write the shell completion script for canon (bash, zsh or fish) | `canon completion zsh --json` |
+| `canon context` | none | none | read: Show what you can author here: record kinds, fields, enums, policies | `canon context --json` |
+| `canon dashboard` | none | none | write: Serve the local status dashboard | `canon dashboard --json` |
+| `canon export` | none | `--kind <KIND>` | write: Export a redacted retention manifest without deleting records | `canon export --kind evidence --output evidence.json --json` |
+| `canon format` | `<dir>` (optional) | none | read: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs --json` |
+| `canon init` | none | none | write: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init --json` |
+| `canon migrate` | none | none | destructive (preview, then `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate --json` |
+| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | destructive (preview, then `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z --json` |
+| `canon query` | none | `--kind <KIND>` | read: Read stored records across every storage tier | `canon query --kind evidence --json` |
+| `canon retrieve` | none | `--for-role <ROLE>`, one of `--regime` or `--domain` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20 --json` |
+| `canon schema` | `<path>` (optional) (repeatable) | none | read: Describe canon's own commands | `canon schema evidence add --json` |
+| `canon search` | `<text>` | none | read: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding --json` |
+| `canon selftest` | none | none | read: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate --json` |
+| `canon status` | none | none | read: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status --json` |
+| `canon trace` | `<id>` | none | read: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -52,8 +52,8 @@ Validate a provider-neutral adapter response without executing a provider.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon adapter authorize` | none | `--response <FILE>` | read: Authorize declared capabilities against repository policy (preflight only) | `canon adapter authorize --response adapter-response.json --repo .` |
-| `canon adapter validate` | none | `--response <FILE>` | read: Read and validate one provider-neutral response envelope | `canon adapter validate --response adapter-response.json` |
+| `canon adapter authorize` | none | `--response <FILE>` | read: Authorize declared capabilities against repository policy (preflight only) | `canon adapter authorize --response adapter-response.json --repo . --json` |
+| `canon adapter validate` | none | `--response <FILE>` | read: Read and validate one provider-neutral response envelope | `canon adapter validate --response adapter-response.json --json` |
 {/* canon:generated cli-adapter end */}
 
 ### `canon artifacts`
@@ -63,9 +63,9 @@ Check or move the evidence artifact store (local, or an object-store tier).
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon artifacts move` | none | `--tier <TIER>` | destructive (preview, then `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold` |
-| `canon artifacts store` | none | none | write: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store` |
-| `canon artifacts verify` | none | none | read: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify` |
+| `canon artifacts move` | none | `--tier <TIER>` | destructive (preview, then `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold --json` |
+| `canon artifacts store` | none | none | write: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store --json` |
+| `canon artifacts verify` | none | none | read: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify --json` |
 {/* canon:generated cli-artifacts end */}
 
 ### `canon brief`
@@ -75,9 +75,9 @@ Check a change's brief (PRD format) and see the next steps; never edits.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon brief approve` | `<change-id>` (optional) (repeatable) | `--approver <NAME>`, `--note <TEXT>` | write: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written"` |
-| `canon brief check` | `<change-id>` (optional) | none | read: Read the brief against the rules | `canon brief check` |
-| `canon brief show` | `<change-id>` (optional) | none | read: Show where the change stands and the next one to three steps; never edits | `canon brief show` |
+| `canon brief approve` | `<change-id>` (optional) (repeatable) | `--approver <NAME>`, `--note <TEXT>` | write: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written" --json` |
+| `canon brief check` | `<change-id>` (optional) | none | read: Read the brief against the rules | `canon brief check --json` |
+| `canon brief show` | `<change-id>` (optional) | none | read: Show where the change stands and the next one to three steps; never edits | `canon brief show --json` |
 {/* canon:generated cli-brief end */}
 
 ### `canon change`
@@ -87,7 +87,7 @@ Write a plan change (.canon/changes/&lt;slug&gt;/brief.md) and adopt it into a s
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon change new` | `<change-id>` | `--subject <SUBJECT_ID>`, `--title <TEXT>` | write: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject demo --title "Add search"` |
+| `canon change new` | `<change-id>` | `--subject <SUBJECT_ID>`, `--title <TEXT>` | write: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject demo --title "Add search" --json` |
 {/* canon:generated cli-change end */}
 
 ### `canon context-pack`
@@ -97,9 +97,9 @@ Create, inspect, and verify reproducible context packs.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon context-pack add` | none | `--manifest <FILE>` | write: Create an immutable context pack from a repository-local JSON manifest | `canon context-pack add --manifest .canon/context-manifest.json` |
-| `canon context-pack show` | `<pack-id>` | none | read: Show a context pack after verifying its manifest and content objects | `canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000` |
-| `canon context-pack verify` | `<pack-id>` | none | read: Verify a context pack's manifest and immutable content objects | `canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000` |
+| `canon context-pack add` | none | `--manifest <FILE>` | write: Create an immutable context pack from a repository-local JSON manifest | `canon context-pack add --manifest .canon/context-manifest.json --json` |
+| `canon context-pack show` | `<pack-id>` | none | read: Show a context pack after verifying its manifest and content objects | `canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000 --json` |
+| `canon context-pack verify` | `<pack-id>` | none | read: Verify a context pack's manifest and immutable content objects | `canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000 --json` |
 {/* canon:generated cli-context-pack end */}
 
 ### `canon demo`
@@ -109,8 +109,8 @@ Try the evidence loop end-to-end in a throwaway demo repo.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon demo init` | none | none | write: Scaffold the demo repo (gate starts RED) | `canon demo init --repo canon-demo` |
-| `canon demo review` | none | none | write: Record the missing reviewer evidence (gate turns GREEN) | `canon demo review` |
+| `canon demo init` | none | none | write: Scaffold the demo repo (gate starts RED) | `canon demo init --repo canon-demo --json` |
+| `canon demo review` | none | none | write: Record the missing reviewer evidence (gate turns GREEN) | `canon demo review --json` |
 {/* canon:generated cli-demo end */}
 
 ### `canon dispatch`
@@ -120,9 +120,9 @@ Begin an agent run with retrieved guidance recorded.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon dispatch begin` | none | `--regime <KEY>` | write: Mint a Run manifest with retrieved guidance and context/policy lineage | `canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer` |
-| `canon dispatch diff` | none | none | read: Diff the declared plan DAG against the observed execution graph | `canon dispatch diff` |
-| `canon dispatch end` | `<run-id>` | `--run-outcome <RUN_OUTCOME>` | write: Close a dispatched run with a terminal status and an ended_at | `canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded` |
+| `canon dispatch begin` | none | `--regime <KEY>` | write: Mint a Run manifest with retrieved guidance and context/policy lineage | `canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer --json` |
+| `canon dispatch diff` | none | none | read: Diff the declared plan DAG against the observed execution graph | `canon dispatch diff --json` |
+| `canon dispatch end` | `<run-id>` | `--run-outcome <RUN_OUTCOME>` | write: Close a dispatched run with a terminal status and an ended_at | `canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded --json` |
 {/* canon:generated cli-dispatch end */}
 
 ### `canon divergence`
@@ -132,11 +132,11 @@ Stage, promote, resolve, and inspect spec divergences.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <TEXT>`, `--tracking <TEXT>`, `--actor <ACTOR_ID>` | write: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer` |
-| `canon divergence add` | `<scenario-id>` | `--actor <ACTOR_ID>` | write: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --actor alice --role reviewer` |
-| `canon divergence defer` | `<scenario-id>` | `--actor <ACTOR_ID>`, `--reason <TEXT>`, `--expiry <TIMESTAMP>` | write: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer` |
-| `canon divergence list` | none | none | read: List the current divergence burn-down state | `canon divergence list --as-of 2030-01-01` |
-| `canon divergence resolve` | `<scenario-id>` | `--actor <ACTOR_ID>` | write: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --actor alice --role reviewer` |
+| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <TEXT>`, `--tracking <TEXT>`, `--actor <ACTOR_ID>` | write: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer --json` |
+| `canon divergence add` | `<scenario-id>` | `--actor <ACTOR_ID>` | write: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --actor alice --role reviewer --json` |
+| `canon divergence defer` | `<scenario-id>` | `--actor <ACTOR_ID>`, `--reason <TEXT>`, `--expiry <TIMESTAMP>` | write: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer --json` |
+| `canon divergence list` | none | none | read: List the current divergence burn-down state | `canon divergence list --as-of 2030-01-01 --json` |
+| `canon divergence resolve` | `<scenario-id>` | `--actor <ACTOR_ID>` | write: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --actor alice --role reviewer --json` |
 {/* canon:generated cli-divergence end */}
 
 ### `canon evidence`
@@ -146,9 +146,9 @@ Author a staged, attributed evidence attestation for a plan task.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon evidence add` | none | none | write: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer` |
-| `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z` |
-| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer` |
+| `canon evidence add` | none | none | write: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer --json` |
+| `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
 {/* canon:generated cli-evidence end */}
 
 ### `canon feature`
@@ -158,7 +158,7 @@ Scaffold a new .feature spec file.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon feature new` | `<surface>` | `--title <TEXT>` | write: Create a fresh .feature file for a new area.surface | `canon feature new billing.invoice --title Invoices` |
+| `canon feature new` | `<surface>` | `--title <TEXT>` | write: Create a fresh .feature file for a new area.surface | `canon feature new billing.invoice --title Invoices --json` |
 {/* canon:generated cli-feature end */}
 
 ### `canon finding`
@@ -168,9 +168,9 @@ Record one code-review finding as a durable record.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon finding add` | none | `--change <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor <ACTOR_ID>`, `--summary <TEXT>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged"` |
-| `canon finding close` | `<change-id>` | `--round <N>`, `--seq <N>`, `--disposition <DISPOSITION>` | write: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"` |
-| `canon finding list` | none | `--change <CHANGE_ID>` | read: List a change's committed findings at their latest version | `canon finding list --change add-login` |
+| `canon finding add` | none | `--change <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor <ACTOR_ID>`, `--summary <TEXT>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged" --json` |
+| `canon finding close` | `<change-id>` | `--round <N>`, `--seq <N>`, `--disposition <DISPOSITION>` | write: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed" --json` |
+| `canon finding list` | none | `--change <CHANGE_ID>` | read: List a change's committed findings at their latest version | `canon finding list --change add-login --json` |
 {/* canon:generated cli-finding end */}
 
 ### `canon gate`
@@ -180,9 +180,9 @@ Run evidence gates, promote staged records, install hooks.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon gate check` | none | none | read: Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage) | `canon gate check` |
-| `canon gate install-hooks` | none | none | write: Install the gate hook into .claude/settings.json / .codex/hooks.json | `canon gate install-hooks` |
-| `canon gate promote` | none | none | write: Promote staged records (evidence, findings, divergences) to the committed ledger | `canon gate promote --kind evidence` |
+| `canon gate check` | none | none | read: Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage) | `canon gate check --json` |
+| `canon gate install-hooks` | none | none | write: Install the gate hook into .claude/settings.json / .codex/hooks.json | `canon gate install-hooks --json` |
+| `canon gate promote` | none | none | write: Promote staged records (evidence, findings, divergences) to the committed ledger | `canon gate promote --kind evidence --json` |
 {/* canon:generated cli-gate end */}
 
 ### `canon ingest`
@@ -192,9 +192,9 @@ Import agent sessions, records, and plans into canon's store.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon ingest plans` | none | none | write: Import plans as Change/Task records | `canon ingest plans` |
-| `canon ingest records` | none | none | write: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records` |
-| `canon ingest sessions` | none | none | write: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions` |
+| `canon ingest plans` | none | none | write: Import plans as Change/Task records | `canon ingest plans --json` |
+| `canon ingest records` | none | none | write: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records --json` |
+| `canon ingest sessions` | none | none | write: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions --json` |
 {/* canon:generated cli-ingest end */}
 
 ### `canon inventory`
@@ -204,7 +204,7 @@ Index a validated .feature corpus into the scenario ledger.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon inventory sync` | none | none | write: Validate each spec root, then materialize scenario index records | `canon inventory sync` |
+| `canon inventory sync` | none | none | write: Validate each spec root, then materialize scenario index records | `canon inventory sync --json` |
 {/* canon:generated cli-inventory end */}
 
 ### `canon ledger`
@@ -214,7 +214,7 @@ Keep the ledger to the current version of each record.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon ledger compact` | none | none | destructive (preview, then `--commit --plan-digest`): Move superseded versions of every record out of the ledger into the archive | `canon ledger compact` |
+| `canon ledger compact` | none | none | destructive (preview, then `--commit --plan-digest`): Move superseded versions of every record out of the ledger into the archive | `canon ledger compact --json` |
 {/* canon:generated cli-ledger end */}
 
 ### `canon plugin`
@@ -224,7 +224,7 @@ Sync plugin overlay records onto the ledger.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon plugin sync` | `<plugin-id>` | none | write: Validate and write a plugin's overlay records | `canon plugin sync my-plugin` |
+| `canon plugin sync` | `<plugin-id>` | none | write: Validate and write a plugin's overlay records | `canon plugin sync my-plugin --json` |
 {/* canon:generated cli-plugin end */}
 
 ### `canon policy`
@@ -234,8 +234,8 @@ Record who approved the gate's policy (.canon/policy.yaml) and which bytes.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon policy approve` | none | `--approver <NAME>` | write: Approve the current .canon/policy.yaml (written directly; nothing to promote) | `canon policy approve --approver alice --note "reviewed the starter policy"` |
-| `canon policy show` | none | none | read: Show the policy's digest and its approval (who, when, which bytes) | `canon policy show` |
+| `canon policy approve` | none | `--approver <NAME>` | write: Approve the current .canon/policy.yaml (written directly; nothing to promote) | `canon policy approve --approver alice --note "reviewed the starter policy" --json` |
+| `canon policy show` | none | none | read: Show the policy's digest and its approval (who, when, which bytes) | `canon policy show --json` |
 {/* canon:generated cli-policy end */}
 
 ### `canon prompt`
@@ -245,8 +245,8 @@ Register and select versioned prompt bundles.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon prompt add` | `<name@version>` | `--manifest <FILE>` | write: Add a prompt bundle from a repository-local JSON manifest | `canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json` |
-| `canon prompt show` | `<name@version>` | none | read: Select a registered prompt bundle version | `canon prompt show reviewer@v1` |
+| `canon prompt add` | `<name@version>` | `--manifest <FILE>` | write: Add a prompt bundle from a repository-local JSON manifest | `canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json --json` |
+| `canon prompt show` | `<name@version>` | none | read: Select a registered prompt bundle version | `canon prompt show reviewer@v1 --json` |
 {/* canon:generated cli-prompt end */}
 
 ### `canon regime`
@@ -256,7 +256,7 @@ Build a canonical regime key for hook scripts.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon regime show` | none | `--role-segment <NAME>`, `--repo-name <NAME>`, `--area <NAME>`, `--hash <HASH>` | read: Build a canonical regime key for hook scripts | `canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345` |
+| `canon regime show` | none | `--role-segment <NAME>`, `--repo-name <NAME>`, `--area <NAME>`, `--hash <HASH>` | read: Build a canonical regime key for hook scripts | `canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345 --json` |
 {/* canon:generated cli-regime end */}
 
 ### `canon report`
@@ -266,9 +266,9 @@ Build, check, or snapshot the status report.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon report build` | none | none | write: Write the status report (.canon/REPORT.md) | `canon report build` |
-| `canon report check` | none | none | read: Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing | `canon report check` |
-| `canon report snapshot` | `<dir>` | none | write: Export the panel marts to &lt;DIR&gt;/*.parquet plus manifest.json | `canon report snapshot snapshot-out` |
+| `canon report build` | none | none | write: Write the status report (.canon/REPORT.md) | `canon report build --json` |
+| `canon report check` | none | none | read: Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing | `canon report check --json` |
+| `canon report snapshot` | `<dir>` | none | write: Export the panel marts to &lt;DIR&gt;/*.parquet plus manifest.json | `canon report snapshot snapshot-out --json` |
 {/* canon:generated cli-report end */}
 
 ### `canon review`
@@ -278,8 +278,8 @@ Record an attributed review verdict.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon review change` | `<change-id>` | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md` |
-| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md` |
+| `canon review change` | `<change-id>` | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md --json` |
+| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md --json` |
 {/* canon:generated cli-review end */}
 
 ### `canon scenario`
@@ -289,7 +289,7 @@ Add a tagged scenario to a .feature spec file.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon scenario new` | `<scenario-id>` | `--title <TEXT>` | write: Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input` | `canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature` |
+| `canon scenario new` | `<scenario-id>` | `--title <TEXT>` | write: Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input` | `canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature --json` |
 {/* canon:generated cli-scenario end */}
 
 ### `canon skills`
@@ -299,10 +299,10 @@ Install canon's agent guides into a repo.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon skills check` | none | none | read: Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote | `canon skills check` |
-| `canon skills doctor` | none | none | read: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor` |
-| `canon skills install` | none | none | write: Install the canonical `canon` bundle or legacy developer skills | `canon skills install` |
-| `canon skills show` | `<name>` | none | read: Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here | `canon skills show canon --full` |
+| `canon skills check` | none | none | read: Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote | `canon skills check --json` |
+| `canon skills doctor` | none | none | read: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor --json` |
+| `canon skills install` | none | none | write: Install the canonical `canon` bundle or legacy developer skills | `canon skills install --json` |
+| `canon skills show` | `<name>` | none | read: Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here | `canon skills show canon --full --json` |
 {/* canon:generated cli-skills end */}
 
 ### `canon strategy`
@@ -312,9 +312,9 @@ Promote a proven strategy into the git-tracked tier.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon strategy approval-payload` | `<strategy-id>` | `--evaluation <FILE>`, `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: The unsigned approval payload bytes an external signer signs (a read | `canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z` |
-| `canon strategy promote` | `<strategy-id>` | none | write: Promote a strategy after paired evaluation and signed approval | `canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV` |
-| `canon strategy rollback` | `<strategy-id>` | `--reason <TEXT>`, `--actor <ACTOR_ID>`, `--signature-file <FILE>`, `--approval-at <TIMESTAMP>` | write: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z` |
+| `canon strategy approval-payload` | `<strategy-id>` | `--evaluation <FILE>`, `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: The unsigned approval payload bytes an external signer signs (a read | `canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
+| `canon strategy promote` | `<strategy-id>` | none | write: Promote a strategy after paired evaluation and signed approval | `canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json` |
+| `canon strategy rollback` | `<strategy-id>` | `--reason <TEXT>`, `--actor <ACTOR_ID>`, `--signature-file <FILE>`, `--approval-at <TIMESTAMP>` | write: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json` |
 {/* canon:generated cli-strategy end */}
 
 ### `canon subject`
@@ -324,11 +324,11 @@ Create and manage subjects (durable product units).
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon subject adopt` | `<subject-id>` | `--change <CHANGE_ID>` | write: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change add-login` |
-| `canon subject move` | `<subject-id>` | `--to <STATE>` | write: Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason) | `canon subject move demo --to specced` |
-| `canon subject new` | `<subject-id>` | `--domain <NAME>`, `--title <TEXT>` | write: Author a new subject at status `proposed` | `canon subject new payments --domain dev --title Payments` |
-| `canon subject show` | `<subject-id>` | none | read: Show a subject (read-only) | `canon subject show demo` |
-| `canon subject unadopt` | `<subject-id>` | `--change <CHANGE_ID>` | write: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change add-login` |
+| `canon subject adopt` | `<subject-id>` | `--change <CHANGE_ID>` | write: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change add-login --json` |
+| `canon subject move` | `<subject-id>` | `--to <STATE>` | write: Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason) | `canon subject move demo --to specced --json` |
+| `canon subject new` | `<subject-id>` | `--domain <NAME>`, `--title <TEXT>` | write: Author a new subject at status `proposed` | `canon subject new payments --domain dev --title Payments --json` |
+| `canon subject show` | `<subject-id>` | none | read: Show a subject (read-only) | `canon subject show demo --json` |
+| `canon subject unadopt` | `<subject-id>` | `--change <CHANGE_ID>` | write: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change add-login --json` |
 {/* canon:generated cli-subject end */}
 
 ### `canon task`
@@ -338,7 +338,7 @@ Flip a plan task's checkbox once committed evidence supports it.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon task done` | `<task-id>` | none | write: Flip one task checkbox, gated on real evidence (fails closed) | `canon task done add-login#1` |
+| `canon task done` | `<task-id>` | none | write: Flip one task checkbox, gated on real evidence (fails closed) | `canon task done add-login#1 --json` |
 {/* canon:generated cli-task end */}
 
 ### `canon tier`
@@ -348,7 +348,7 @@ Age records between storage tiers.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon tier age` | none | none | destructive (preview, then `--commit --plan-digest`): Apply canon.yaml aging rules, moving old records to their destination tier | `canon tier age` |
+| `canon tier age` | none | none | destructive (preview, then `--commit --plan-digest`): Apply canon.yaml aging rules, moving old records to their destination tier | `canon tier age --json` |
 {/* canon:generated cli-tier end */}
 
 ## Driving canon from an agent
@@ -358,19 +358,36 @@ Every command shares one machine contract, so an agent never has to scrape
 the parser, `canon schema`, the tables above and the guide are generated from
 it.
 
-**Discover with `canon schema`.** One call describes a command:
+**Discover with `canon schema`.** The first line of every `--help` points at it. One call describes the whole CLI, a group or one command:
 
 ```bash
-canon schema                      # every command, its effect, one line each
-canon schema purge --json         # arguments, options, exits, errorCodes
-canon schema evidence add --json  # the --input schema and an example
-canon schema --errors --json      # every stable error code and its meaning
+canon schema --json               # the tree: every group and command, its effect, and the level canon claims
+canon schema finding --json       # one group: its commands
+canon schema purge --json         # one command in full
+canon schema evidence add --json  # ... with the --input schema and a complete example
+canon schema --as reviewer --json # the tree of one role's commands (`x-canon.as` names the role)
+canon schema --errors --json      # every stable error code, its meaning and its reasons
+canon schema --warnings --json    # every warning code (meta.warnings) and its meaning
 ```
 
-`data` carries `command`, `effect` (`read`, `write` or `destructive`),
-`supportsJson`, `arguments`, `options` (`name`, `kind`, `valueName`,
-`required`, `repeatable`, `possibleValues`, `default`), `exits` (`code`,
-`meaning`) and `errorCodes`.
+`data.kind` says which document came back. The `tree` has `level` (`L1`) and
+`commands`: every group and command once, a group before its commands, each with
+`command`, `path`, `kind` (`group` or `command`), `summary` and, for a command,
+`effect` and `x-canon.roles`. A `group` has `command`, `path`, `summary` and its
+direct `commands`. A `command` has `effect` (`read`, `write` or `destructive`),
+`idempotency` (not for a read), `operands` and `options` (`name`, `valueName`,
+`valueType`, `required`, `repeatable`, a typed `default`, `possibleValues`, and
+where they apply `defaultNote`, `env`, `flagOnly` and `short`), `errors` (every
+code it can emit, the reserved ones of its features included), `outputs`, `input`,
+`examples` and `schemas`. The `valueType` is `switch`, `count`, `string`,
+`integer`, `number`, `path`, `enum` or `json`; an option that cannot be given in
+an `--input` document has `flagOnly: true`. Each output names its JSON Schema
+(`schemaRef`, `#/schemas/<Name>`) and `schemaVersion`, and says `batch: true` for
+the report of an array or NDJSON `--input`; `schemas` holds those schemas, so the
+shape of every report is in the answer. `input` names the schema of one
+`--input` document (`schemaRef`: the keys it accepts, no `required`), the schema of
+the arguments after the merge (`argumentsRef`), and one complete `example`.
+`examples` are complete calls that end with `--json` and run as written.
 
 **Read the guide from the binary.** `canon skills show canon` prints the
 core guide; `canon skills show canon --full` adds every reference;
@@ -383,12 +400,17 @@ always matches the installed binary.
 stderr: `{"ok": true, "data": …, "meta": …}` on success and
 `{"ok": false, "error": …, "meta": …}` on failure (an exit 1 partial report
 also carries `data`). The envelope follows atip/1. `meta` carries
-`schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`) and the
+`schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`),
+`contractVersion` (`1.1`, on every envelope) and the
 resolved `command`, plus `output` (the report name, for a command that
 declares several), `context` (`{repo}`), `next`, `warnings`, `coverage`, `page`
 and `x-canon` (canon-only extras) where they apply. A member with no value is
 absent, never `null` and never `[]`. `--json` is accepted anywhere before `--`,
-including at the root and on a group (`canon --json`, `canon finding --json`).
+including at the root and on a group (`canon --json`, `canon finding --json`);
+`--repo` and `--as` are accepted there too and do nothing on a group:
+a group with only those options answers `COMMAND_REQUIRED`, not `USAGE`.
+A reader keeps the members it knows and ignores the rest: a later canon adds
+members, and a value of a closed set it has not seen is one item to leave out.
 
 ```json
 {
@@ -397,8 +419,9 @@ including at the root and on a group (`canon --json`, `canon finding --json`).
   "meta": {
     "schemaVersion": "1.0",
     "tool": "canon",
-    "toolVersion": "0.33.0",
+    "toolVersion": "0.34.0",
     "contract": "atip/1",
+    "contractVersion": "1.1",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [
@@ -416,9 +439,15 @@ including at the root and on a group (`canon --json`, `canon finding --json`).
 **Errors.** Every failure prints `canon: CODE: message` as the first stderr
 line, then indented `field:`, `expected:` and `hint:` lines; in text mode
 stdout stays empty. With `--json`, `error` is `{code, message, retryable}`,
-plus `hint`, `field` (the option at fault), `expected` (its valid values),
-`received` and `suggestions` when canon can name them; `retryable` is always
-present, the rest are absent otherwise. Codes are stable strings. A
+plus `reason` (which of the situations registered under the code this is),
+`hint` (one command line that starts with `canon`, the same with
+`<PLACEHOLDER>`s, or one sentence), `field` (the option at fault), `expected` (its valid values),
+`received` (what was given, `""` for an empty value) and `suggestions` when
+canon can name them; `retryable` is always present, the rest are absent
+otherwise. A `USAGE` that cannot name an argument has no `field` and its `hint` is
+`canon schema <command> --json`. Codes are stable strings; `canon schema
+--error <CODE>` explains one with its reasons, and a code that is only a
+warning is explained by `canon schema --warning <CODE>`. A
 command-line parse error is `USAGE`, an unknown command is `UNKNOWN_COMMAND`
 (`expected` lists the valid words at that level), a call with no command at all
 (`canon --json`, `canon finding --json`) is `COMMAND_REQUIRED`, and a panic in
@@ -435,9 +464,12 @@ option names in camelCase, and `operands` is an array. A JSON array or NDJSON
 is a batch: it is validated whole before anything is written, and the report
 has one entry per element in `data.items[]` (`written`, `unchanged`, `failed`
 or `skipped`); a batch where an element failed is `BATCH_INCOMPLETE` (exit 1).
-An input canon cannot use (an unknown key, a wrong type, an unreadable file,
-`-` on a terminal, a batch the command does not take) is `INPUT_INVALID`, with
-the distinction in `message` and `field`; `-` together with another stdin
+An input canon cannot use is `INPUT_INVALID` with a `reason`:
+`UNREADABLE` (a file that cannot be read), `STDIN_TTY` (`-` on a terminal), `EMPTY`,
+`NOT_JSON`, `NOT_OBJECT`, `BATCH_UNSUPPORTED` (a batch the command does not
+take), and for a document that breaks its schema (`field` is a pointer) `UNKNOWN_KEY`,
+`FLAG_ONLY_KEY` or `INVALID_VALUE`; a source over the limits is `INPUT_TOO_LARGE`
+with `TOO_MANY_BYTES` or `TOO_MANY_ITEMS`; `-` together with another stdin
 reader is `USAGE` with `field` `--input`. `canon schema <command> --json` shows
 the input schema.
 
@@ -458,10 +490,17 @@ same. Outside git, or with no commit, the command refuses with `NO_COMMIT`.
 records (default 100). `--all` returns everything; `--cursor <nextCursor>`
 continues. `--json` adds `meta.page` = `{returned, total, nextCursor}`: a
 `nextCursor` means more records follow, and `meta.next`
-holds the same call plus `--cursor <nextCursor>`; a bad cursor is
-`CURSOR_INVALID`. `canon query` and `canon finding list` also take
-`--fields a,b,c` to project records; an unknown field is `USAGE` with `field`
-`--fields` and `expected` listing the selectable fields.
+holds the same call plus `--cursor <nextCursor>`. A cursor holds only for the
+call that issued it: change `--limit`, `--all` or `--fields` and nothing else,
+or the call is `CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED`
+(`FOREIGN`: not a cursor of this command; `EXPIRED`: the record it points after
+is gone). `canon query`, `canon finding list`, `canon divergence list`,
+`canon export`, `canon status` and `canon context` also take `--fields a,b,c`
+to project records: the paths `canon schema <command> --json` lists under
+`outputs[].fields`, each spelled as the answer spells it (a path into a list is
+`name[]`, a key that is not an identifier is `["the-key"]`). The answer's
+`meta.fields` lists what was kept; an unknown path is `USAGE` with `field`
+`--fields` and `expected` listing the selectable paths.
 
 **Search and trace.** `canon search "<text>"` finds records, brief sections and
 flow steps, and scenario text, and lists each hit with its neighbors in the

@@ -1,0 +1,25 @@
+description: "atip/1 1.1 (0.34): the warning registry answers `schema --warning <CODE>` (data.kind warning); a code that is only a warning is USAGE under `--error` with the hint `canon schema --warning <CODE> --json`, an unknown `--error` or `--warning` code is USAGE naming the option, two registry options together are USAGE; an empty value the caller sent is `received: \"\"`; a USAGE that cannot name its argument hints `canon schema <command> --json`; a tool-wide option after a group word is COMMAND_REQUIRED while an unknown one is USAGE; a retrieve with no scope hints a template"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [schema, --warning, OLD_LAYOUT_FOUND, --json]
+    exit: 0
+  - args: [schema, --error, OLD_LAYOUT_FOUND, --json]
+    exit: 2
+  - args: [schema, --error, NOSUCH, --json]
+    exit: 2
+  - args: [schema, --warning, NOSUCH, --json]
+    exit: 2
+  - args: [schema, --errors, --warnings, --json]
+    exit: 2
+  - args: [finding, add, --change, "", --round, "1", --seq, "1", --severity, note, --actor, a, --summary, s, --json]
+    exit: 2
+  - args: [finding, --repo, ., --json]
+    exit: 2
+  - args: [finding, --as, planner, --json]
+    exit: 2
+  - args: [finding, --bogus, --json]
+    exit: 2
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [retrieve, --for-role, reviewer, --json]
+    exit: 2

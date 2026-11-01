@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T18:58:55.568167Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "e0f1eaf7589003cf343776fd9cc0cab93360375d",
+  "resolution_sha": "f86c34401b799acbb8c576fe65f5bf573af1fb0e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "575a91b668cbc59a0cf3aa5281bb48afd90cdfa1",
+  "reviewer": "rev-constraints",
+  "round": 2,
+  "scenario_ids": [
+    "atip.constraints.18",
+    "atip.constraints.21"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] the messages generated from the declarations do not state what a caller needs to fix the value: an integer domain says only `--round is outside its domain` (no minimum), and a negative value is refused by clap with `-1 is not in 0..=4294967295` while the declared domain is minimum 1; the message is for a person (7.1.1) so this is wording only; blast radius: finding add/close --round/--seq and the other integer domains refused by the stateless stage",
+  "worktree_dirty": false
+}

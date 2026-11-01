@@ -364,6 +364,11 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, EvidenceArgError> {
 /// `effect:<kebab-slug>` form; all other refs are repository-relative paths.
 /// This validates shape only — the CLI still records an attestation, not
 /// proof that the caller's ref equals the changed paths.
+/// The clap parser of `--surface-ref`: it takes the text; [`parse_surface_ref`] judges it in the stateless stage (`arg_rules::semantic`).
+pub fn accept_surface_ref(s: &str) -> Result<String, std::convert::Infallible> {
+    Ok(s.to_string())
+}
+
 pub fn parse_surface_ref(s: &str) -> Result<String, EvidenceArgError> {
     if s.is_empty() || s.trim() != s || s.contains('\n') || s.contains('\r') || s.contains('\0') {
         return Err(EvidenceArgError::SurfaceRefMalformed);
@@ -553,13 +558,46 @@ pub fn audit_verdict(result: AuditResult) -> EvidenceVerdict {
     }
 }
 
+/// The refusal of an argument: what is wrong, and the argument at fault as the command line writes it (spec 7.1.1).
+#[derive(Debug, Clone)]
+struct ArgRefusal {
+    message: String,
+    field: Option<&'static str>,
+}
+
+impl ArgRefusal {
+    fn at(field: &'static str, message: impl Into<String>) -> Self {
+        Self { message: message.into(), field: Some(field) }
+    }
+
+    /// `error` naming the argument at fault, when this refusal knows it.
+    fn name(&self, error: CliError) -> CliError {
+        match self.field {
+            Some(field) => error.field(field),
+            None => error,
+        }
+    }
+}
+
+impl From<String> for ArgRefusal {
+    fn from(message: String) -> Self {
+        Self { message, field: None }
+    }
+}
+
+impl From<&str> for ArgRefusal {
+    fn from(message: &str) -> Self {
+        Self { message: message.to_string(), field: None }
+    }
+}
+
 /// The audit an `--kind audit` invocation records, or `None` for every
 /// other kind (0.15 D3). The four evaluator/result flags are required
 /// with `--kind audit` and refused elsewhere; the declared-record flags
 /// the gate reads only off declared evidence (`--task`, `--verdict`,
 /// `--surface-ref`, the approval set) are refused on an audit, so no
 /// value is recorded that nothing would ever read.
-fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
+fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, ArgRefusal> {
     let audit_flags = [
         ("--evaluator", args.evaluator_id.is_some()),
         ("--evaluator-version", args.evaluator_version.is_some()),
@@ -571,13 +609,16 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
         if given.is_empty() {
             return Ok(None);
         }
-        return Err(format!("{} belong(s) to `--class {AUDIT_KIND}` only; this record is `--class {}`", given.join(", "), args.kind));
+        return Err(ArgRefusal::at(given[0], format!("{} belong(s) to `--class {AUDIT_KIND}` only; this record is `--class {}`", given.join(", "), args.kind)));
     }
     let missing: Vec<&str> = audit_flags.iter().filter(|(_, set)| !*set).map(|(flag, _)| *flag).collect();
     if !missing.is_empty() {
-        return Err(format!(
-            "`--class {AUDIT_KIND}` records an external evaluator's re-audit and needs {}; canon never generates or runs the audit, it records the evaluator's result",
-            missing.join(", ")
+        return Err(ArgRefusal::at(
+            missing[0],
+            format!(
+                "`--class {AUDIT_KIND}` records an external evaluator's re-audit and needs {}; canon never generates or runs the audit, it records the evaluator's result",
+                missing.join(", ")
+            ),
         ));
     }
     let declared_only = [
@@ -591,13 +632,16 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
     ];
     let refused: Vec<&str> = declared_only.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
     if !refused.is_empty() {
-        return Err(format!(
-            "{} do(es) not apply to `--class {AUDIT_KIND}`: an audit re-checks one scenario (--scenario/--project), its verdict is its --audit-result, and it never flips a task or approves a risk",
-            refused.join(", ")
+        return Err(ArgRefusal::at(
+            refused[0],
+            format!(
+                "{} do(es) not apply to `--class {AUDIT_KIND}`: an audit re-checks one scenario (--scenario/--project), its verdict is its --audit-result, and it never flips a task or approves a risk",
+                refused.join(", ")
+            ),
         ));
     }
     if args.scenario_id.is_none() {
-        return Err(format!("`--class {AUDIT_KIND}` needs --scenario and --project: an audit re-checks one scenario's declared success"));
+        return Err(ArgRefusal::at("--scenario", format!("`--class {AUDIT_KIND}` needs --scenario and --project: an audit re-checks one scenario's declared success")));
     }
     let (Some(evaluator_id), Some(evaluator_version), Some(evaluator_digest), Some(result)) =
         (&args.evaluator_id, &args.evaluator_version, &args.evaluator_digest, &args.audit_result)
@@ -606,14 +650,14 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
     };
     for (flag, value) in [("--evaluator", evaluator_id), ("--evaluator-version", evaluator_version)] {
         if value.is_empty() || value.trim() != value || first_row_line_break(value).is_some() {
-            return Err(format!("{flag} must be a non-empty, trimmed, single-line value"));
+            return Err(ArgRefusal::at(flag, format!("{flag} must be a non-empty, trimmed, single-line value")));
         }
     }
     Ok(Some(EvidenceAudit {
         evaluator_id: evaluator_id.clone(),
         evaluator_version: evaluator_version.clone(),
-        evaluator_digest: parse_sha256(evaluator_digest)?,
-        result: parse_audit_result(result)?,
+        evaluator_digest: parse_sha256(evaluator_digest).map_err(|message| ArgRefusal::at("--evaluator-digest", message))?,
+        result: parse_audit_result(result).map_err(|message| ArgRefusal::at("--audit-result", message))?,
     }))
 }
 
@@ -634,20 +678,20 @@ pub struct ApprovalPayloadArgs {
 
 type ApprovalBinding = (Vec<u8>, Vec<String>, Vec<String>);
 
-fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, String> {
+fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, ArgRefusal> {
     let subject = args.task_id.as_ref().map(ToString::to_string)
         .or_else(|| args.scenario_id.as_ref().map(ToString::to_string))
-        .ok_or("give --task or --scenario")?;
+        .ok_or_else(|| ArgRefusal::at("--task", "give --task or --scenario"))?;
     if args.scenario_id.is_some() && args.project_id.is_none() {
-        return Err("--scenario requires --project".into());
+        return Err(ArgRefusal::at("--project", "--scenario requires --project"));
     }
     if args.approval_by.is_empty() || args.approval_by.trim() != args.approval_by
         || first_row_line_break(&args.approval_by).is_some() {
-        return Err("--approver must be a non-empty trimmed single-line identity".into());
+        return Err(ArgRefusal::at("--approver", "--approver must be a non-empty trimmed single-line identity"));
     }
     #[expect(clippy::map_err_ignore, reason = "the error is a fixed message string with no source slot; the chrono parse detail is not part of the pinned wording")]
     let at = args.approval_at.parse::<DateTime<Utc>>()
-        .map_err(|_| "--approval-at must be an RFC3339 timestamp")?;
+        .map_err(|_| ArgRefusal::at("--approval-at", "--approval-at must be an RFC3339 timestamp"))?;
     if let Some(task) = &args.task_id {
         crate::dispatch::validate_task_binding(repo, task).map_err(|error| error.to_string())?;
     }
@@ -771,7 +815,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
         },
         Err(ApprovalRefusal::NotIndexed(error)) => error.emit("canon evidence approval-payload", args.json),
         Err(ApprovalRefusal::Binding(error)) => {
-            CliError::refused("EVIDENCE_REFUSED", error.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence approval-payload", args.json)
+            error.name(CliError::refused("EVIDENCE_REFUSED", error.message.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)")).emit("canon evidence approval-payload", args.json)
         }
     }
 }
@@ -779,14 +823,14 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
 /// Why `approval-payload` printed no bytes.
 enum ApprovalRefusal {
     /// The binding itself was refused (`EVIDENCE_REFUSED`).
-    Binding(String),
+    Binding(ArgRefusal),
     /// The scenario is not in the scenario index (`EVIDENCE_SCENARIO_NOT_INDEXED`).
     NotIndexed(CliError),
 }
 
-impl From<String> for ApprovalRefusal {
-    fn from(message: String) -> Self {
-        Self::Binding(message)
+impl From<ArgRefusal> for ApprovalRefusal {
+    fn from(refusal: ArgRefusal) -> Self {
+        Self::Binding(refusal)
     }
 }
 
@@ -833,13 +877,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     };
 
     if args.kind.trim().is_empty() || args.evidence_ref.trim().is_empty() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing").field(if args.kind.trim().is_empty() { "--class" } else { "--ref" }).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if let Err(error) = check_all_scenarios_flags(args) {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
-    }
-    if let Err(error) = check_artifact_scopes(args) {
-        return error.emit(&args.full(), args.json);
+        return error.name(CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.message.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms")).emit(&args.full(), args.json);
     }
     // #104: an id no configured spec root carries is refused before
     // anything is staged, bound or written (`--all-scenarios` included).
@@ -851,7 +892,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     let audit = match audit_of(args) {
         Ok(audit) => audit,
         Err(error) => {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+            return error.name(CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.message.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms")).emit(&args.full(), args.json);
         }
     };
     // An audit's result is a claim; so is `--verdict`. With neither, a bound
@@ -862,12 +903,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     };
     if let Some(reason) = &args.override_reason {
         if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason").field("--override-reason").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     }
     for surface in &args.surface_ref {
         if let Err(error) = parse_surface_ref(surface) {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("--surface-ref `{surface}` is invalid: {error}")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("--surface-ref `{surface}` is invalid: {error}")).field("--surface-ref").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     }
     let approval_requested = args.approval_by.is_some()
@@ -875,30 +916,14 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         || args.approval_signature_file.is_some()
         || args.approval_at.is_some();
     if approval_requested {
-        if args.approval_by.is_none()
-            || args.approval_role.is_none()
-            || args.approval_signature_file.is_none()
-            || args.approval_at.is_none()
-        {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "authenticated approval requires --approver, --approval-role human, --signature-file and --approval-at").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
-        let approver = args.approval_by.as_deref().unwrap_or_default();
-        if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
-        if args.approval_role.as_ref().is_none_or(|role| role.as_str() != "human") {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
-        if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
-        }
+        // Its arguments were checked by `validators::check` (`check_approval`); what is left reads the signature file.
         let signature_path = args.approval_signature_file.as_ref().expect("approval_requested implies --signature-file");
         if !signature_path.is_file() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).field("--signature-file").reason("SIGNATURE_MISMATCH").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
     }
     if args.summary.is_none() && args.command_result.is_some() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--command-result requires --summary; `canon_gate::evidence_note_of` requires `summary`, so a summary-less note is unparseable to the gate rather than partially read").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--command-result requires --summary; `canon_gate::evidence_note_of` requires `summary`, so a summary-less note is unparseable to the gate rather than partially read").field("--summary").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // The document-bound fields, refused before anything is staged
@@ -911,7 +936,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // which inputs are safe.
     for (flag, value) in [("--summary", args.summary.as_deref()), ("--actor", Some(args.actor_id.as_str()))] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs")).field(flag).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if args.all_scenarios {
         return run_add_all(&repo, args, promote);
@@ -923,7 +948,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // `None`), so staging one would be writing an attestation nothing
     // can ever read back.
     if args.task_id.is_none() && args.scenario_id.is_none() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "give --task, --scenario, or both; a record with neither carries no coverage subject and no gate can read it back").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "give --task, --scenario, or both; a record with neither carries no coverage subject and no gate can read it back").field("--task").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // A scenario-keyed record needs the COMPOSITE key, because
@@ -931,7 +956,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // carry the same scenario id. Refused rather than defaulted: there
     // is no safe guess when `specs.roots[]` holds more than one entry.
     if args.scenario_id.is_some() && args.project_id.is_none() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--scenario needs --project; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--scenario needs --project; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id").field("--project").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // The SAME plan-corpus admission `canon dispatch begin --task` makes
@@ -1003,7 +1028,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // Experimental binding: read (never run) the files the caller names,
     // before anything is staged, so a refused binding leaves no record.
     if !args.report_cases.is_empty() && args.reports.is_empty() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--report-case names a case in a --report; none was given").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--report-case names a case in a --report; none was given").field("--report").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     let bound = match crate::evidence_attach::bind(&crate::evidence_attach::BindRequest {
         repo: &repo,
@@ -1073,7 +1098,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         }) {
             Ok(binding) => binding,
             Err(error) => {
-                return CliError::refused("EVIDENCE_REFUSED", error.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_REFUSED", error.message.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit(&args.full(), args.json);
             }
         };
         record = record.with_surface_ref(surface.clone());
@@ -1081,23 +1106,23 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         let signature = match std::fs::read(signature_path) {
             Ok(signature) => signature,
             Err(error) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("read detached signature: {error}")).hint("pass --signature-file <path> pointing at a readable armored SSH signature over the bytes `canon evidence approval-payload` prints").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("read detached signature: {error}")).reason("SIGNATURE_MISMATCH").hint("pass --signature-file <path> pointing at a readable armored SSH signature over the bytes `canon evidence approval-payload` prints").emit(&args.full(), args.json);
             }
         };
         let allowed_signers = match canon_gate::policy::allowed_signers_path(&repo) {
             Ok(Some(path)) => path,
             Ok(None) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "no policy-pinned allowed_signers verifier is configured").hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and approve the change with `canon policy approve --approver <name>`, then record the approval again").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "no policy-pinned allowed_signers verifier is configured").reason("SIGNATURE_MISMATCH").hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and approve the change with `canon policy approve --approver <name>`, then record the approval again").emit(&args.full(), args.json);
             }
             Err(error) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("approval policy is malformed: {error}")).hint("fix the approval settings in .canon/policy.yaml, then run `canon policy approve --approver <name>`").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("approval policy is malformed: {error}")).reason("SIGNATURE_MISMATCH").hint("fix the approval settings in .canon/policy.yaml, then run `canon policy approve --approver <name>`").emit(&args.full(), args.json);
             }
         };
         if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
-            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
+            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).reason("SIGNATURE_MISMATCH").hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
         }
         let Ok(signature) = String::from_utf8(signature) else {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").reason("SIGNATURE_MISMATCH").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
         };
         record = record.with_approval(EvidenceApproval {
             approver: approver.clone(),
@@ -1291,7 +1316,7 @@ fn brief_override_of(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Option<B
 /// whose indexed scenarios own the cases, and refuses every flag that
 /// names one subject (`--scenario`, `--task`, `--report-case`, an
 /// audit, an approval).
-fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
+fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), ArgRefusal> {
     if !args.all_scenarios {
         return Ok(());
     }
@@ -1307,36 +1332,83 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
     ];
     let refused: Vec<&str> = one_subject.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
     if !refused.is_empty() {
-        return Err(format!(
-            "{} name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario and without --all-scenarios",
-            refused.join(", ")
+        return Err(ArgRefusal::at(
+            refused[0].split(' ').next().unwrap_or("--scenario"),
+            format!(
+                "{} name(s) one subject and do(es) not combine with --all-scenarios, which writes one record per scenario the --report owns; attest one scenario on its own with --scenario and without --all-scenarios",
+                refused.join(", ")
+            ),
         ));
     }
     if args.reports.is_empty() {
-        return Err("--all-scenarios splits a --report <format>:<path> by the scenario each case belongs to; none was given".to_string());
+        return Err(ArgRefusal::at("--report", "--all-scenarios splits a --report <format>:<path> by the scenario each case belongs to; none was given"));
     }
     if args.project_id.is_none() {
-        return Err("--all-scenarios needs --project: the cases are matched against that spec root's indexed scenarios".to_string());
+        return Err(ArgRefusal::at("--project", "--all-scenarios needs --project: the cases are matched against that spec root's indexed scenarios"));
     }
     Ok(())
 }
 
-/// `--artifact` binds to ONE record (0.24 D4, #83): `--all-scenarios`
-/// refuses a bare `--artifact <path>` (it would bind to every record of
-/// the batch) and takes `--artifact <scenario-id>=<path>`; a single
-/// record accepts the bare form and the form naming its own scenario.
-fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
-    let refuse = |message: String, hint: &str| CliError::refused("EVIDENCE_INVALID_ARGUMENT", message).hint(hint.to_string());
-    for value in &args.artifacts {
+/// `canon evidence add`: `--class audit` is `canon evidence audit`'s; `--artifact` binds to one record.
+pub(crate) fn check_add(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<(), CliError> {
+    if args.class.as_deref() == Some(AUDIT_KIND) {
+        return Err(CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--class audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
+            .field("--class")
+            .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`"));
+    }
+    check_artifact_scopes(&args.artifacts, args.all_scenarios, args.scenario_id.as_ref())?;
+    check_approval(args)
+}
+
+const APPROVAL_HINT: &str = "pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign";
+
+/// The authenticated approval's arguments alone (spec 10.8.3, the validator of `EVIDENCE_APPROVAL_INVALID`, reason `MALFORMED`): the four
+/// go together, the approver is one trimmed line, the role is `human`, the time is RFC 3339. That the signature file exists and verifies
+/// reads state and is the precondition's, reason `SIGNATURE_MISMATCH`.
+pub(crate) fn check_approval(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<(), CliError> {
+    let refuse = |message: &str, field: &str| Err(CliError::refused("EVIDENCE_APPROVAL_INVALID", message).reason("MALFORMED").field(field).hint(APPROVAL_HINT));
+    let given = [args.approver.is_some(), args.approval_role.is_some(), args.signature_file.is_some(), args.approval_at.is_some()];
+    // `--all-scenarios` forbids the approval options: that rule (a constraint, which precedes a validator, spec 11.7) refuses first.
+    if !given.iter().any(|one| *one) || args.all_scenarios {
+        return Ok(());
+    }
+    if let Some(at) = given.iter().position(|one| !*one) {
+        return refuse("authenticated approval requires --approver, --approval-role human, --signature-file and --approval-at", ["--approver", "--approval-role", "--signature-file", "--approval-at"][at]);
+    }
+    let approver = args.approver.as_deref().unwrap_or_default();
+    if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
+        return refuse("approval identity must be a non-empty trimmed single-line value", "--approver");
+    }
+    if args.approval_role.as_ref().is_none_or(|role| role.as_str() != "human") {
+        return refuse("only the human approval role can satisfy risk approval", "--approval-role");
+    }
+    if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
+        return refuse("--approval-at must be an RFC3339 timestamp", "--approval-at");
+    }
+    Ok(())
+}
+
+/// `canon evidence audit`: `--artifact` binds to the audited scenario's record.
+pub(crate) fn check_audit(args: &crate::cli::evidence::EvidenceAuditArgs) -> Result<(), CliError> {
+    check_artifact_scopes(&args.artifacts, false, Some(&args.scenario_id))
+}
+
+/// `--artifact` binds to ONE record (0.24 D4, #83): `--all-scenarios` refuses a bare
+/// `--artifact <path>` (it would bind to every record of the batch) and takes
+/// `--artifact <scenario-id>=<path>`; a single record accepts the bare form and the form naming
+/// its own scenario.
+fn check_artifact_scopes(artifacts: &[std::path::PathBuf], all_scenarios: bool, scenario: Option<&ScenarioId>) -> Result<(), CliError> {
+    let refuse = |message: String, hint: &str| CliError::refused("EVIDENCE_INVALID_ARGUMENT", message).field("--artifact").hint(hint.to_string());
+    for value in artifacts {
         match crate::evidence_attach::parse_artifact(value) {
-            (None, path) if args.all_scenarios => {
+            (None, path) if all_scenarios => {
                 return Err(refuse(
                     format!("--artifact `{}` would be bound to every scenario's record of the batch; no record is written", path.display()),
                     "let the report carry per-test attachments (Playwright's JUnit reporter writes `[[ATTACHMENT|<path>]]` per test; Cucumber JSON embeddings do the same), or bind a file to one scenario with `--artifact <scenario-id>=<path>`",
                 ));
             }
-            (Some(scope), path) if !args.all_scenarios && args.scenario_id.as_ref().map(ScenarioId::as_str) != Some(scope.as_str()) => {
-                let own = args.scenario_id.as_ref().map_or("this record names no scenario".to_string(), |id| format!("this record is for `{}`", id.as_str()));
+            (Some(scope), path) if !all_scenarios && scenario.map(ScenarioId::as_str) != Some(scope.as_str()) => {
+                let own = scenario.map_or("this record names no scenario".to_string(), |id| format!("this record is for `{}`", id.as_str()));
                 return Err(refuse(
                     format!("--artifact `{scope}={}` is scoped to scenario `{scope}`, but {own}", path.display()),
                     "pass the plain path (`--artifact <path>`) to bind the file to this record, or `--artifact <this-scenario-id>=<path>`; a path that really contains `=` is written `./<path>`",

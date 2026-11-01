@@ -75,7 +75,7 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
     let children: Vec<String> = node.get_subcommands().filter(|c| !c.is_hide_set() && c.get_name() != "help").map(|c| c.get_name().to_string()).collect();
     let joined = path.join(" ");
     let at = if joined.is_empty() { "canon".to_string() } else { format!("canon {joined}") };
-    let mut usage = CliError::refused("USAGE", message);
+    let mut usage = CliError::refused("USAGE", message.clone());
     let mut suggested: Vec<String> = Vec::new();
     // For an unknown option: what the leaf does take, and why an attribution flag cannot apply to a read leaf.
     let mut unknown_option: Option<String> = None;
@@ -99,16 +99,35 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
         }
         _ => {
             if let Some(arg) = string(ContextKind::InvalidArg).map(first_word) {
-                usage = usage.field(arg);
+                usage = usage.field(crate::arg_rules::argument_name(&arg));
+            }
+            if error.kind() == ErrorKind::ArgumentConflict {
+                // The violation names the first argument of the rule at fault, in the rule's own order, not the one clap met last (spec 10.8.1).
+                if let Some(field) = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &[]) {
+                    usage = usage.field(field);
+                }
             }
             if error.kind() == ErrorKind::MissingRequiredArgument {
                 if let Some(ContextValue::Strings(names)) = error.get(ContextKind::InvalidArg) {
-                    let names: Vec<&str> = names.iter().map(|name| name.split_whitespace().next().unwrap_or_default()).collect();
-                    usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(names.first().copied().unwrap_or_default());
+                    let names: Vec<String> = names.iter().flat_map(|name| crate::arg_rules::missing_names(name)).collect();
+                    let field = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &names).or_else(|| names.first().cloned()).unwrap_or_default();
+                    usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(field);
+                }
+            }
+            // clap's range sentence for an integer (`-1 is not in 0..=4294967295`) must not contradict a declared minimum: the declared domain speaks.
+            if message.contains(" is not in ") {
+                if let (Some(field), Some(value)) = (usage.field_name().map(str::to_string), string(ContextKind::InvalidValue)) {
+                    if let Some(says) = crate::arg_rules::enforce::declared_integer_says(node, &joined, &field) {
+                        usage.message = format!("invalid value '{value}' for '{field}': {says}");
+                    }
                 }
             }
             if let Some(value) = string(ContextKind::InvalidValue) {
-                usage = usage.received(value);
+                // clap reports an option with no value (`--change --json`) as an empty value too: only a value the
+                // caller sent, empty or not, is `received` (spec 7.1.1); a value never sent leaves it out.
+                if !value.is_empty() || usage.field_name().is_none_or(|field| sent_empty_value(field, &std::env::args().collect::<Vec<_>>())) {
+                    usage = usage.received(value);
+                }
             }
             let valid: Vec<String> = match error.get(ContextKind::ValidValue) {
                 Some(ContextValue::Strings(values)) => values.clone(),
@@ -126,8 +145,8 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
     }
     let example = |path: &str| crate::schema::example_for(path);
     let mut hint = match (suggested.first().and_then(|s| s.strip_prefix("canon ")).and_then(example), example(&joined), first_leaf_example(root, &path)) {
-        (Some(example), _, _) | (None, Some(example), _) | (None, None, Some(example)) => format!("a working call: {example}; `{}` lists every argument", format!("canon schema {joined}").trim_end()),
-        _ => "run `canon schema` to list the commands".to_string(),
+        (Some(example), _, _) | (None, Some(example), _) | (None, None, Some(example)) => format!("a working call: {example}; `{}` lists every argument", format!("canon schema {joined} --json").replace("schema  --json", "schema --json")),
+        _ => "run `canon schema --json` to list the commands".to_string(),
     };
     if let (Some(arg), true) = (&unknown_option, node.get_subcommands().next().is_none()) {
         let takes = crate::suggest::long_options(node).join(" ");
@@ -140,10 +159,89 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
     (joined, usage.hint(hint))
 }
 
+/// Tool-wide options a group (or the bare tool) takes without using them (spec 9.13): `--repo` and `--as`, with their
+/// value. `--json` is moved by `relocate_json`.
+fn is_tool_wide(arg: &str) -> Option<bool> {
+    match arg {
+        "--repo" | "--as" => Some(true),
+        _ if arg.starts_with("--repo=") || arg.starts_with("--as=") => Some(false),
+        _ => None,
+    }
+}
+
+/// `--repo` and `--as` given after a group word (`canon finding --repo . list`) or before the command (`canon --as
+/// planner status`) are accepted wherever `--json` is (spec 9.13.1): they are moved to the end of the words before
+/// the first `--`, where the leaf that takes them sees them. Where no leaf follows (`canon finding --repo . --json`)
+/// they do nothing and are dropped, so the answer is `COMMAND_REQUIRED`, not `USAGE` for an option the group "does
+/// not take". An option a group does not know is left where it is.
+pub fn hoist_tool_wide_options(root: &clap::Command, args: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
+    let end = args.iter().skip(1).position(|arg| arg == "--").map_or(args.len(), |at| at + 1);
+    let mut node = root;
+    let mut kept: Vec<std::ffi::OsString> = vec![args[0].clone()];
+    let mut hoisted: Vec<std::ffi::OsString> = Vec::new();
+    let mut at = 1;
+    while at < end {
+        let word = args[at].to_string_lossy().into_owned();
+        let is_group = node.get_subcommands().any(|sub| sub.get_name() != "help");
+        // An option with no value (`canon finding --repo --json`) is not hoisted: the next word is another option,
+        // not its value, and the option stays where it was so the parser refuses it (`USAGE`, `field` the option).
+        let valueless = is_tool_wide(&word) == Some(true) && args.get(at + 1).is_some_and(|next| at + 1 < end && next.to_string_lossy().starts_with('-') && next != "-");
+        if let (true, Some(takes_value), false) = (is_group, is_tool_wide(&word), valueless) {
+            hoisted.push(args[at].clone());
+            if takes_value && at + 1 < end {
+                hoisted.push(args[at + 1].clone());
+                at += 1;
+            }
+            at += 1;
+            continue;
+        }
+        if word.starts_with('-') {
+            // `--json` stays where `relocate_json` put it; any other option belongs to the leaf from here on.
+            if word == "--json" {
+                kept.push(args[at].clone());
+                at += 1;
+                continue;
+            }
+            break;
+        }
+        match node.get_subcommands().find(|sub| sub.get_name() == word || sub.get_all_aliases().any(|alias| alias == word)) {
+            Some(sub) => {
+                kept.push(args[at].clone());
+                node = sub;
+                at += 1;
+            }
+            None => break,
+        }
+    }
+    if hoisted.is_empty() {
+        return args;
+    }
+    let leaf_follows = !node.get_subcommands().any(|sub| sub.get_name() != "help");
+    let mut out = kept;
+    out.extend(args[at..end].iter().cloned());
+    if leaf_follows {
+        out.extend(hoisted);
+    }
+    out.extend(args[end..].iter().cloned());
+    out
+}
+
+/// Whether `args` give the option `field` an empty value (`--change ""`, `--change=`). An operand (`field` not
+/// starting with `--`) has no value to leave out: clap reports its absence as a missing argument, not an empty value.
+fn sent_empty_value(field: &str, args: &[String]) -> bool {
+    if !field.starts_with("--") {
+        return true;
+    }
+    let end = args.iter().position(|arg| arg == "--").unwrap_or(args.len());
+    let words = &args[..end];
+    words.iter().enumerate().any(|(at, word)| (word == field && words.get(at + 1).is_some_and(String::is_empty)) || *word == format!("{field}="))
+}
+
 /// The accepted values of the option `--name` of `node`, when it takes a closed set.
 fn possible_values(node: &clap::Command, field: &str) -> Vec<String> {
     let name = field.trim_start_matches('-');
-    node.get_arguments().find(|arg| arg.get_long() == Some(name)).map(|arg| arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect()).unwrap_or_default()
+    // A switch has the values `true` and `false` only to clap: they are not a set the caller chooses from.
+    node.get_arguments().find(|arg| arg.get_long() == Some(name) && arg.get_action().takes_values()).map(|arg| arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect()).unwrap_or_default()
 }
 
 /// The example of the first leaf at or below the group at `path`.
@@ -255,7 +353,37 @@ pub fn refuse_without_config(command_tree: &clap::Command, parsed: &clap::ArgMat
 
 #[cfg(test)]
 mod tests {
-    use super::leaf_takes_repo;
+    use std::ffi::OsString;
+
+    use super::{hoist_tool_wide_options, leaf_takes_repo, sent_empty_value};
+
+    #[test]
+    fn atip_contract11_08_an_option_with_no_value_is_not_an_empty_value_the_caller_sent() {
+        let args = |words: &[&str]| words.iter().map(|w| (*w).to_string()).collect::<Vec<_>>();
+        assert!(sent_empty_value("--change", &args(&["canon", "finding", "add", "--change", "", "--json"])));
+        assert!(sent_empty_value("--change", &args(&["canon", "finding", "add", "--change=", "--json"])));
+        assert!(!sent_empty_value("--change", &args(&["canon", "finding", "add", "--change", "--json"])));
+        assert!(!sent_empty_value("--change", &args(&["canon", "finding", "add", "--json", "--change"])));
+        assert!(!sent_empty_value("--change", &args(&["canon", "finding", "add", "--", "--change", ""])));
+    }
+
+    fn hoisted(args: &[&str]) -> Vec<String> {
+        let tree = crate::cli::command();
+        hoist_tool_wide_options(&tree, args.iter().map(OsString::from).collect()).into_iter().map(|arg| arg.to_string_lossy().into_owned()).collect()
+    }
+
+    #[test]
+    fn atip_contract11_11_tool_wide_options_after_a_group_word_move_to_the_leaf_or_are_dropped() {
+        assert_eq!(hoisted(&["canon", "finding", "--repo", ".", "--json"]), ["canon", "finding", "--json"]);
+        assert_eq!(hoisted(&["canon", "finding", "--as", "planner", "--json"]), ["canon", "finding", "--json"]);
+        assert_eq!(hoisted(&["canon", "finding", "--repo=.", "list", "--change", "c"]), ["canon", "finding", "list", "--change", "c", "--repo=."]);
+        assert_eq!(hoisted(&["canon", "--as", "planner", "finding", "list"]), ["canon", "finding", "list", "--as", "planner"]);
+        assert_eq!(hoisted(&["canon", "finding", "--repo", "--json"]), ["canon", "finding", "--repo", "--json"], "an option with no value stays for the parser to refuse");
+        assert_eq!(hoisted(&["canon", "finding", "--repo", "-", "list"]), ["canon", "finding", "list", "--repo", "-"], "`-` is a value");
+        assert_eq!(hoisted(&["canon", "finding", "--bogus", "--json"]), ["canon", "finding", "--bogus", "--json"], "an option the group does not know stays a USAGE");
+        assert_eq!(hoisted(&["canon", "status", "--repo", "x"]), ["canon", "status", "--repo", "x"], "after a leaf nothing moves");
+        assert_eq!(hoisted(&["canon", "finding", "list", "--repo", "x", "--", "--repo"]), ["canon", "finding", "list", "--repo", "x", "--", "--repo"]);
+    }
 
     /// The context check reads `--repo` from the command tree: a leaf that declares none (`schema`) is never
     /// judged against a `canon.yaml`, in debug and release builds alike.

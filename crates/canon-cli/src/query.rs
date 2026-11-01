@@ -32,7 +32,7 @@ use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use crate::json_out::{LedgerRecord, Report};
+use crate::json_out::Report;
 
 use crate::context::resolve_canon_yaml;
 use crate::paging::{self, Page, PageMeta};
@@ -61,8 +61,6 @@ pub struct QueryOutcome {
     /// Set by [`page_outcome`]: what the page says about the rest of the
     /// result. `None` leaves `records` and the output unbounded.
     pub page: Option<PageMeta>,
-    /// `--fields`: the top-level record fields JSON output keeps.
-    pub fields: Option<Vec<String>>,
     /// 0.30 `record-links`: the references of the records this query returned that no committed source
     /// holds ([`crate::references`]); `None` for a kind whose references are not checked.
     pub references: Option<ReferenceCheck>,
@@ -514,26 +512,37 @@ pub fn run(
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
     let references = check_references(repo, kind, &records);
-    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None, references })
+    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, references })
 }
 
-/// The top-level record fields `--fields` may name for `kind`: what the
-/// kind's schema declares (`canon context --json`'s `kinds.<kind>`), plus
-/// the fields `--json` adds on top (a change's `subject_ids`, a
-/// `--plugin` overlay's `overlay`).
-pub fn known_fields(kind: RecordKind, plugin: bool) -> BTreeSet<String> {
+/// The top-level members of every kind's record (`--kind` aside), each with the kinds that carry it: what `QueryRecord`
+/// declares and `--fields` may name. A kind's own members come from its record schema (`canon context --json`'s
+/// `kinds.<kind>`); a change's `--json` record adds `subject_ids` and a `--plugin` run adds `overlay`.
+pub fn all_record_members() -> BTreeMap<String, Vec<&'static str>> {
+    let mut members: BTreeMap<String, Vec<&'static str>> = BTreeMap::new();
+    for kind in RecordKind::ALL {
+        for member in kind_members(kind, false) {
+            members.entry(member).or_default().push(kind.as_str());
+        }
+    }
+    members.entry("overlay".to_string()).or_default();
+    members
+}
+
+/// The top-level members a record of `kind` can carry.
+fn kind_members(kind: RecordKind, plugin: bool) -> BTreeSet<String> {
     let registry = canon_policy::SchemaRegistry::load();
-    let mut fields: BTreeSet<String> = registry
+    let mut members: BTreeSet<String> = registry
         .get(kind)
         .and_then(|schema| schema.as_value().get("properties").and_then(Value::as_object).map(|props| props.keys().cloned().collect()))
         .unwrap_or_default();
     if kind == RecordKind::Change {
-        fields.insert("subject_ids".to_string());
+        members.insert("subject_ids".to_string());
     }
     if plugin {
-        fields.insert("overlay".to_string());
+        members.insert("overlay".to_string());
     }
-    fields
+    members
 }
 
 /// The key a cursor names a record by: `at`, id and content digest, the
@@ -543,28 +552,18 @@ fn record_key(kind: RecordKind, raw: &RawRecord) -> String {
     format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest(&raw.0))
 }
 
-/// Whether a cursor's record key (`<at>|<id>|<digest>#<n>`) ends in a 0.29 12-hex digest; 0.30 digests are 8 hex.
-fn names_a_029_record(key: &str) -> bool {
-    let digest = key.rsplit('|').next().and_then(|tail| tail.split('#').next()).unwrap_or("");
-    digest.len() == 12 && digest.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-}
-
 /// Applies `--limit`/`--cursor`/`--all` and `--fields` to a finished query:
 /// `outcome.records` becomes the requested page, in the order the query
 /// returned them, and `page` records what remains. `--fields` is checked
 /// before anything is cut, so a typo fails on the first call, not the last.
-pub fn page_outcome(mut outcome: QueryOutcome, page: &Page, fields: Option<Vec<String>>, plugin: bool) -> Result<QueryOutcome, CliError> {
-    if let Some(requested) = &fields {
-        paging::check_fields("canon query", requested, &known_fields(outcome.kind, plugin))?;
-    }
+/// A path the declaration holds but this `--kind` has no member for selects nothing: the records simply lack it.
+pub fn page_outcome(mut outcome: QueryOutcome, page: &Page, fields: Option<&str>, plugin: bool) -> Result<QueryOutcome, CliError> {
     let kind = outcome.kind;
-    if page.cursor.as_deref().and_then(paging::cursor_key).is_some_and(|key| names_a_029_record(&key)) {
-        return Err(CliError::refused("CURSOR_INVALID", "the cursor names records by 0.29 names (an id with `__` parts and a 12-hex digest), which canon 0.30 no longer uses").hint("drop --cursor and start from the first page"));
-    }
-    let (records, meta) = paging::paginate(&format!("query:{}", kind.as_str()), std::mem::take(&mut outcome.records), |raw| record_key(kind, raw), page)?;
+    let own: Vec<String> = kind_members(kind, plugin).into_iter().collect();
+    crate::fields::select("query", fields, Some(&format!("`--kind {}` records carry: {}", kind.as_str(), own.join(", "))))?;
+    let (records, meta) = paging::paginate("query", std::mem::take(&mut outcome.records), |raw| record_key(kind, raw), page)?;
     outcome.records = records;
     outcome.page = Some(meta);
-    outcome.fields = fields;
     Ok(outcome)
 }
 
@@ -714,6 +713,7 @@ fn change_record(raw: &RawRecord) -> Value {
 pub struct QueryReport {
     pub kind: &'static str,
     pub since: Option<String>,
+    /// The records in this answer: report content, not paging state (`meta.page` is the paging).
     pub count: usize,
     /// Records the tiers reported as violations and the query left out.
     pub violations: usize,
@@ -723,7 +723,7 @@ pub struct QueryReport {
     /// The overlay identities actually projected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<String>>,
-    pub records: Vec<LedgerRecord>,
+    pub records: Vec<QueryRecord>,
     /// `--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dangling: Option<QueryDangling>,
@@ -789,11 +789,11 @@ pub struct QueryRollup {
 /// only when the caller has already passed `--include-sensitive` through policy
 /// validation.
 pub fn report(outcome: &QueryOutcome, include_sensitive: bool) -> QueryReport {
-    let records = outcome.records.iter().map(|r| LedgerRecord(shape_record(outcome, query_record(outcome.kind, r, include_sensitive)))).collect();
+    let records = outcome.records.iter().map(|r| QueryRecord(query_record(outcome.kind, r, include_sensitive))).collect();
     base_report(outcome, records)
 }
 
-fn base_report(outcome: &QueryOutcome, records: Vec<LedgerRecord>) -> QueryReport {
+fn base_report(outcome: &QueryOutcome, records: Vec<QueryRecord>) -> QueryReport {
     QueryReport {
         kind: outcome.kind.as_str(),
         since: outcome.since.map(|s| s.to_rfc3339()),
@@ -807,11 +807,31 @@ fn base_report(outcome: &QueryOutcome, records: Vec<LedgerRecord>) -> QueryRepor
     }
 }
 
-/// `--fields`' projection of one JSON record, a no-op without `--fields`.
-fn shape_record(outcome: &QueryOutcome, record: Value) -> Value {
-    match &outcome.fields {
-        Some(fields) => paging::project(&record, fields),
-        None => record,
+/// One record of `--json`, as the ledger holds it (an event's body redacted unless sensitive output was allowed, a
+/// change's `subject_ids`, a `--plugin` overlay): its members are its kind's own, in the kind's own snake_case. The
+/// schema lists every member any kind's record schema declares, so `--fields` can name them.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(transparent)]
+pub struct QueryRecord(pub Value);
+
+impl schemars::JsonSchema for QueryRecord {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "QueryRecord".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let members: BTreeMap<String, Value> = all_record_members()
+            .into_iter()
+            .map(|(name, kinds)| {
+                let description = if name == "overlay" { "with --plugin, the plugin's projected members of the record".to_string() } else { format!("a member of the records of: {}", kinds.join(", ")) };
+                (name, serde_json::json!({ "description": description }))
+            })
+            .collect();
+        schemars::json_schema!({
+            "type": "object",
+            "description": "A ledger record of the kind `--kind` names, verbatim: it keeps its own snake_case members (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted. `properties` lists the members of every kind; a record has the ones its kind declares",
+            "properties": members
+        })
     }
 }
 
@@ -991,7 +1011,7 @@ pub fn run_with_plugin(
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
     let references = check_references(repo, kind, &records);
-    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None, references };
+    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, references };
 
     let git = git_root.map(GitTier::new);
     let plugin_outcome = resolve_and_project(&project_dir, git.as_ref(), kind, plugin_id, &outcome.records);
@@ -1010,7 +1030,7 @@ pub fn run_with_plugin(
 /// by `main.rs::run_query` unless `projections` is non-empty — the
 /// empty case calls [`report`] verbatim instead.
 pub fn report_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], include_sensitive: bool) -> QueryReport {
-    let records = outcome.records.iter().map(|raw| LedgerRecord(shape_record(outcome, merge_overlay_fields(outcome.kind, raw, projections, include_sensitive)))).collect();
+    let records = outcome.records.iter().map(|raw| QueryRecord(merge_overlay_fields(outcome.kind, raw, projections, include_sensitive))).collect();
     let mut report = base_report(outcome, records);
     report.plugin = Some(plugin_id.to_string());
     report.overlays = Some(projections.iter().map(|p| p.identity.clone()).collect());
@@ -1117,7 +1137,6 @@ mod tests {
             violation_count: 0,
             rollup: None,
             page: None,
-            fields: None,
             references: None,
         }
     }

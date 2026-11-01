@@ -20,17 +20,7 @@ fn spec_leaves() -> BTreeSet<String> {
     let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     let spec: serde_json::Value = serde_json::from_str(&text).expect("command spec is JSON");
     let commands = spec["commands"].as_array().expect("spec has a commands array");
-    commands
-        .iter()
-        .filter(|node| {
-            node["nodeKind"] == "leaf"
-                && node
-                    .get("children")
-                    .and_then(|c| c.as_array())
-                    .is_none_or(Vec::is_empty)
-        })
-        .map(|node| node["command"].as_str().expect("leaf has a command id").to_string())
-        .collect()
+    commands.iter().map(|node| node["command"].as_str().expect("a command document names its command").to_string()).collect()
 }
 
 struct Row {

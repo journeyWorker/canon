@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "warning",
+    "warning": {
+      "code": "MEMBER_ARCHIVED",
+      "meaning": "The member was archived; the report shows it as it was when archived",
+      "fix": "acme member restore <MEMBER> --json brings it back, if it should be active"
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

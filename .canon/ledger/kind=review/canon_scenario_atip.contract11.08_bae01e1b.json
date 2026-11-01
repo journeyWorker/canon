@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T09:02:47.904340Z",
+  "code_tree": "7b922d4ecb8731dc64185a47646a3df53e18cf5b",
+  "kind": "review",
+  "pin": "338f7751ec7422b07a97a87e3b68da8aec8b2a6e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_contract11_08_an_empty_value_the_caller_sent_is_received_empty_and_a_value_never_sent_has_no_received",
+          "junit:run::entry::tests::atip_contract11_08_an_option_with_no_value_is_not_an_empty_value_the_caller_sent"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "5cec3b77a490cb02de8daced58ece228801ae8aa1d7a74eb3ef0967446ad9aef",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-1-1/brief.md"
+  },
+  "review_id": "01M6B5HPK0B4CMF3F7SMATZXXM",
+  "reviewer": "rev-atip-1-1",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.contract11.08",
+  "schema": 2,
+  "worktree_dirty": false
+}

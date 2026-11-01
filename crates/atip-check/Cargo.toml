@@ -37,6 +37,9 @@ atip = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+# The two regular-expression engines of spec 10.7.4: the ECMAScript `u` reading (`regress`) and the Rust one (`regex`, default limits).
+regress = "0.12"
+regex = "1"
 tempfile = "3"
 # Schemas are validated with JSON Schema 2020-12; `format` is an annotation only (no format assertions).
 jsonschema = { version = "0.47.0", default-features = false }

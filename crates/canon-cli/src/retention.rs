@@ -360,38 +360,11 @@ impl ExportRecord {
         let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
         Self { kind: kind.as_str(), at, id, digest }
     }
-
-    /// The members `--fields` asked for.
-    fn project(self, fields: &[String]) -> ProjectedExportRecord {
-        let has = |name: &str| crate::paging::wants(fields, name);
-        ProjectedExportRecord { kind: has("kind").then_some(self.kind), at: has("at").then_some(self.at), id: has("id").then_some(self.id), digest: has("digest").then_some(self.digest) }
-    }
-}
-
-/// An exported record cut to the `--fields` asked for.
-#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectedExportRecord {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<&'static str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub digest: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
-#[serde(untagged)]
-pub enum ExportRecordView {
-    Full(ExportRecord),
-    Projected(ProjectedExportRecord),
 }
 
 /// The `canon.retention.export` manifest: what `export` writes to stdout or
-/// `--output`, and what `--json` envelopes (without `meta`, which then travels
-/// in the envelope's `meta`).
+/// `--output`, and what `--json` envelopes (`ExportReport`). The page state is `meta.page` of the envelope; the file and
+/// the stdout document hold it beside the manifest ([`ExportDocument`]).
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportManifest {
@@ -401,16 +374,28 @@ pub struct ExportManifest {
     pub source_scope: &'static str,
     pub before: Option<String>,
     pub after: Option<String>,
+    /// The records this answer covers: report content, not paging state (`meta.page` is the paging).
     pub record_count: usize,
     pub content_digests: Vec<String>,
-    pub records: Vec<ExportRecordView>,
+    pub records: Vec<ExportRecord>,
     pub sensitive: bool,
     /// Present only with `--include-sensitive`: the full records, verbatim.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sensitive_records: Option<Vec<crate::json_out::LedgerRecord>>,
-    /// The page state; only in the manifest file or stdout document.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<crate::paging::PageMeta>,
+}
+
+impl crate::json_out::Report for ExportManifest {
+    /// 2.0: the three answers of `export` are three outputs, so this one is the manifest alone, with no page state of
+    /// its own, and its records are one shape that `--fields` cuts.
+    const SCHEMA_VERSION: &'static str = "2.0";
+}
+
+/// What `export` writes to a file or to stdout in text mode: the manifest and the page it holds.
+#[derive(Debug, serde::Serialize)]
+struct ExportDocument<'a> {
+    #[serde(flatten)]
+    manifest: &'a ExportManifest,
+    meta: &'a crate::paging::PageMeta,
 }
 
 /// What `--json --output` returns: the file holds the manifest, this names it.
@@ -421,6 +406,8 @@ pub struct ExportWritten {
     pub kind: &'static str,
     pub record_count: usize,
 }
+
+impl crate::json_out::Report for ExportWritten {}
 
 /// What `--json --dry-run` returns: what the run would write, nothing written.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
@@ -434,20 +421,30 @@ pub struct ExportPreview {
     pub record_count: usize,
 }
 
-/// `canon export --json` (`ExportReport`): the manifest, or with `--output` the
-/// file it was written to; with `--dry-run` the preview.
+impl crate::json_out::Report for ExportPreview {}
+
+/// One answer of `export`, as a batch item carries it: the manifest, the name of the file it was written to, or the preview.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
-pub enum ExportReport {
+pub enum ExportAnswer {
     Manifest(ExportManifest),
     Written(ExportWritten),
     Preview(ExportPreview),
 }
 
-impl crate::json_out::Report for ExportReport {}
+impl crate::json_out::Report for ExportAnswer {}
 
-/// The fields of one exported record, which `--fields` may name.
-const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
+/// `canon export`: the window must not be empty.
+pub(crate) fn check_window(args: &crate::cli::top::ExportArgs) -> Result<(), CliError> {
+    if let (Some(after), Some(before)) = (args.after, args.before) {
+        if after > before {
+            return Err(CliError::refused("USAGE", format!("`--after {}` is later than `--before {}`; the window would be empty", after.to_rfc3339(), before.to_rfc3339()))
+                .field("--after")
+                .hint("give `--after` an earlier time than `--before` (`--after` is inclusive, `--before` exclusive)"));
+        }
+    }
+    Ok(())
+}
 
 pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
     let crate::cli::top::ExportArgs { kind, before, after, output, repo, json: json_output, include_sensitive, page, fields, dry_run, .. } = args;
@@ -459,9 +456,10 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
     let mut next_cursor_line = None;
     let mut writing = false;
     let result = (|| -> Result<(), ExportFailure> {
-        if let Some(requested) = fields {
-            crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Refused)?;
-        }
+        // `--fields` is read against the output this call selects (spec 6.10): the preview; with `--json` and `--output`, the answer that
+        // names the file; otherwise the manifest, which is what a text-mode run prints or writes to the file.
+        let answer = if dry_run { "ExportPreviewReport" } else if json_output && out.is_some() { "ExportWrittenReport" } else { "ExportReport" };
+        let chosen = crate::fields::choose_output("export", Some(answer), fields, None).map_err(ExportFailure::Refused)?;
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind, true)?;
         let mut query = TierQuery::kind(kind);
@@ -469,7 +467,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         let rows = registry.query(&query)?.records;
         let rows: Vec<_> = rows.into_iter().filter(|raw| before.is_none_or(|cutoff| raw_record_at(raw) < cutoff)).collect();
         let (rows, meta) = crate::paging::paginate(
-            &format!("export:{}", kind.as_str()),
+            "export",
             rows,
             |raw| {
                 let record = ExportRecord::of(kind, raw);
@@ -480,11 +478,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         .map_err(ExportFailure::Refused)?;
         let records: Vec<ExportRecord> = rows.iter().map(|raw| ExportRecord::of(kind, raw)).collect();
         let content_digests = records.iter().map(|m| m.digest.clone()).collect();
-        let records = match fields {
-            Some(requested) => records.into_iter().map(|r| ExportRecordView::Projected(r.project(requested))).collect(),
-            None => records.into_iter().map(ExportRecordView::Full).collect(),
-        };
-        let mut manifest = ExportManifest {
+        let manifest = ExportManifest {
             schema: "canon.retention.export",
             version: 1,
             kind: kind.as_str(),
@@ -496,9 +490,17 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
             records,
             sensitive: include_sensitive,
             sensitive_records: include_sensitive.then(|| rows.iter().map(|r| crate::json_out::LedgerRecord(r.0.clone())).collect()),
-            meta: Some(meta.clone()),
         };
-        let encoded = serde_json::to_vec_pretty(&manifest)?;
+        let document = ExportDocument { manifest: &manifest, meta: &meta };
+        // The bytes of the manifest (the file, or stdout in text mode) are cut only when the manifest is the output this call selects.
+        let encoded = match &chosen {
+            Some(chosen) if answer == "ExportReport" => {
+                let mut value = serde_json::to_value(&document)?;
+                chosen.apply(&mut value);
+                serde_json::to_vec_pretty(&value)?
+            }
+            _ => serde_json::to_vec_pretty(&document)?,
+        };
         // The destination is checked before anything is written, for a preview as for a run: an output that cannot be created refuses with nothing written and no audit line.
         if let Some(path) = out.filter(|path| !fs::read(path).is_ok_and(|held| held == encoded)) {
             crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(path, &e)))?;
@@ -509,7 +511,10 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         }
         if dry_run {
             if json_output {
-                let data = ExportReport::Preview(ExportPreview { dry_run: true, output: out.map(|p| p.display().to_string()), kind: kind.as_str(), record_count: rows.len() });
+                let data = ExportPreview { dry_run: true, output: out.map(|p| p.display().to_string()), kind: kind.as_str(), record_count: rows.len() };
+                if let Some(chosen) = &chosen {
+                    chosen.activate();
+                }
                 crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
             } else {
                 crate::human_err!("canon export: would write {} record(s){}", rows.len(), out.map(|p| format!(" to {}", p.display())).unwrap_or_default());
@@ -537,13 +542,14 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         }
         append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if json_output {
-            // The manifest is the result; with `--out` it went to the file, and the result names it.
-            manifest.meta = None;
-            let data = match out {
-                Some(path) => ExportReport::Written(ExportWritten { output: path.display().to_string(), kind: kind.as_str(), record_count: rows.len() }),
-                None => ExportReport::Manifest(manifest),
-            };
-            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
+            // The manifest is the result; with `--output` it went to the file, and the result names it.
+            if let Some(chosen) = &chosen {
+                chosen.activate();
+            }
+            match out {
+                Some(path) => crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &ExportWritten { output: path.display().to_string(), kind: kind.as_str(), record_count: rows.len() }, meta.to_json()),
+                None => crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &manifest, meta.to_json()),
+            }
         }
         if out.is_some() && !json_output { crate::human_err!("canon export: wrote {} record(s)", rows.len()); }
         // The manifest itself is JSON on stdout, so the human cursor line

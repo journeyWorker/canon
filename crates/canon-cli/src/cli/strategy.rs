@@ -51,7 +51,7 @@ pub struct StrategyApprovalPayloadArgs {
     #[arg(long, value_name = "NAME")]
     pub approver: String,
     /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::parse)]
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only)]
     pub approval_at: chrono::DateTime<chrono::Utc>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -75,7 +75,7 @@ pub struct StrategyRollbackArgs {
     #[arg(long, value_name = "FILE")]
     pub signature_file: PathBuf,
     /// When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
     pub approval_at: String,
     /// A trajectory that contradicts the strategy (must exist in the trajectory store)
     #[arg(long = "contradicting-trajectory", value_name = "ID")]

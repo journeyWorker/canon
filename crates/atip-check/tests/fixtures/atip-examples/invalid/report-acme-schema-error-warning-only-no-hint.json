@@ -1,0 +1,19 @@
+{
+  "ok": false,
+  "error": {
+    "code": "USAGE",
+    "message": "MEMBER_ARCHIVED is a warning code, not an error code",
+    "retryable": false,
+    "field": "--error",
+    "received": "MEMBER_ARCHIVED",
+    "hint": "acme schema --errors --json"
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

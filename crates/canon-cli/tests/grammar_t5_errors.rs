@@ -29,6 +29,12 @@ fn the_specs_error_list_is_the_registry() {
         assert_eq!(row["meaning"], info.meaning);
         assert_eq!(row["fix"], info.fix);
     }
+    let warnings = spec()["warnings"].as_array().expect("warnings");
+    assert_eq!(warnings.len(), canon_cli::cli_error::all_warnings().len());
+    for (row, info) in warnings.iter().zip(canon_cli::cli_error::all_warnings()) {
+        assert_eq!((row["code"].as_str(), row["meaning"].as_str(), row["fix"].as_str()), (Some(info.code), Some(info.meaning), Some(info.fix)));
+        assert!(row.get("exit").is_none() && row.get("retryable").is_none(), "a warning row has no exit and no retryability");
+    }
     let mut sorted: Vec<&str> = all_codes().iter().map(|i| i.code).collect();
     let before = sorted.len();
     sorted.sort_unstable();
@@ -93,17 +99,14 @@ fn a_leaf_lists_only_registered_codes_and_the_exits_of_the_table() {
     let table: BTreeSet<u64> = spec()["exitTable"].as_array().unwrap().iter().map(|r| r["code"].as_u64().unwrap()).collect();
     for node in leaves() {
         let path = path_of(node);
-        for code in strings(&node["errorCodes"]) {
+        // A command's exits are 0 and the exit of each code it lists (spec 8): the document says no more.
+        let mut exits: BTreeSet<u64> = BTreeSet::from([0]);
+        for code in strings(&node["errors"]) {
             assert!(registry.contains(code.as_str()), "`{path}` lists {code}, which is not registered");
+            exits.insert(u64::from(all_codes().iter().find(|i| i.code == code).unwrap().exit));
         }
-        let exits: Vec<u64> = node["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
-        assert!(!exits.is_empty() && exits.iter().all(|e| table.contains(e)), "`{path}` exits {exits:?}");
-        assert!(exits.contains(&0), "`{path}` has no success exit");
-        // A leaf that lists a code of exit 2 declares exit 2; one that lists a code of exit 1 declares exit 1.
-        for code in strings(&node["errorCodes"]) {
-            let exit = u64::from(all_codes().iter().find(|i| i.code == code).unwrap().exit);
-            assert!(exits.contains(&exit), "`{path}` lists {code} (exit {exit}) but declares only {exits:?}");
-        }
+        assert!(exits.iter().all(|e| table.contains(e)), "`{path}` exits {exits:?}");
+        assert!(node.get("exits").is_none(), "`{path}` has no `exits` member: the registry says what a code exits");
     }
 }
 
@@ -124,5 +127,59 @@ fn schema_explains_every_code_and_lists_them_all() {
     }
     let unknown = canon_in(dir.path(), home.path(), &strs(&["schema", "--error", "NO_SUCH_CODE", "--json"]), &[]);
     assert_eq!(unknown.status.code(), Some(2));
-    assert_eq!(document(&unknown)["error"]["code"], "UNKNOWN_ERROR_CODE");
+    let refused = document(&unknown);
+    assert_eq!((refused["error"]["code"].as_str(), refused["error"]["field"].as_str()), (Some("USAGE"), Some("--error")), "an unknown code is a usage error naming `--error`: {refused}");
+    assert_eq!(refused["error"]["hint"], "canon schema --errors --json");
+}
+
+/// The warning registry answers like the error registry: the same entries from the list and from `--warning <CODE>`.
+#[test]
+fn atip_contract11_05_schema_lists_every_warning_and_explains_each() {
+    let home = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let listing = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--warnings", "--json"]), &[]));
+    assert_eq!(listing["data"]["kind"], "warnings");
+    assert_eq!(listing["meta"]["schemaVersion"], "1.1");
+    let listed = listing["data"]["warnings"].as_array().expect("--warnings lists the codes").clone();
+    assert_eq!(listed.iter().map(|e| e["code"].as_str().unwrap().to_string()).collect::<Vec<_>>(), canon_cli::cli_error::all_warnings().iter().map(|i| i.code.to_string()).collect::<Vec<_>>());
+    for entry in &listed {
+        assert_eq!(atip::warning_entry_problems(entry), Vec::<String>::new(), "{entry}");
+        let one = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--warning", entry["code"].as_str().unwrap(), "--json"]), &[]));
+        assert_eq!(one["data"]["kind"], "warning");
+        assert_eq!(&one["data"]["warning"], entry, "the list and the single answer hold the same entry");
+        assert!(atip::envelope_problems(&one).is_empty());
+    }
+    let errors = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--errors", "--json"]), &[]));
+    assert_eq!((errors["data"]["kind"].as_str(), errors["meta"]["schemaVersion"].as_str()), (Some("errors"), Some("1.1")));
+    let error_codes: Vec<&str> = errors["data"]["errors"].as_array().unwrap().iter().map(|e| e["code"].as_str().unwrap()).collect();
+    let warning_codes: Vec<&str> = listed.iter().map(|e| e["code"].as_str().unwrap()).collect();
+    assert!(warning_codes.contains(&"OLD_LAYOUT_FOUND") && !error_codes.contains(&"OLD_LAYOUT_FOUND"), "a code that is only a warning left the error registry");
+    assert!(warning_codes.contains(&"CONFIG_MISSING") && error_codes.contains(&"CONFIG_MISSING"), "a code that is both is in both");
+    let one = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--error", "INPUT_INVALID", "--json"]), &[]));
+    assert_eq!(one["data"]["kind"], "error");
+    assert_eq!(one["data"]["error"]["reasons"].as_array().unwrap().len(), 9);
+}
+
+#[test]
+fn atip_contract11_06_a_registry_option_the_other_registry_owns_or_does_not_know_is_usage() {
+    let home = tempfile::tempdir().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let run = |args: &[&str]| {
+        let out = canon_in(dir.path(), home.path(), &strs(args), &[]);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        document(&out)
+    };
+    let unknown = run(&["schema", "--warning", "NOSUCH", "--json"]);
+    assert_eq!((unknown["error"]["code"].as_str(), unknown["error"]["field"].as_str(), unknown["error"]["received"].as_str()), (Some("USAGE"), Some("--warning"), Some("NOSUCH")), "{unknown}");
+    let warning_only = run(&["schema", "--error", "OLD_LAYOUT_FOUND", "--json"]);
+    assert_eq!((warning_only["error"]["code"].as_str(), warning_only["error"]["field"].as_str()), (Some("USAGE"), Some("--error")), "{warning_only}");
+    assert_eq!(warning_only["error"]["hint"], "canon schema --warning OLD_LAYOUT_FOUND --json");
+    let nothing = run(&["schema", "--error", "NOSUCH", "--json"]);
+    assert_eq!((nothing["error"]["code"].as_str(), nothing["error"]["field"].as_str()), (Some("USAGE"), Some("--error")), "{nothing}");
+    for exclusive in [vec!["schema", "--errors", "--warnings"], vec!["schema", "--error", "USAGE", "--warning", "OLD_LAYOUT_FOUND"], vec!["schema", "--warnings", "--warning", "OLD_LAYOUT_FOUND"], vec!["schema", "status", "--warnings"], vec!["schema", "status", "--warning", "OLD_LAYOUT_FOUND"], vec!["schema", "--errors", "--warning", "OLD_LAYOUT_FOUND"]] {
+        let mut args = exclusive.clone();
+        args.push("--json");
+        let document = run(&args);
+        assert_eq!(document["error"]["code"], "USAGE", "{args:?}: {document}");
+    }
 }

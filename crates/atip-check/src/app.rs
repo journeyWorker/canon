@@ -4,7 +4,8 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use crate::checks::{run_l0, Judged, Mutation};
+use crate::checks::{run_checks, Judged, Mutation};
+use crate::claim::Claim;
 use crate::cli::{self, CheckArgs, Command, Level, CHECK_HELP, ROOT_HELP};
 use crate::exec::{RunError, Runner};
 use crate::fixture;
@@ -72,7 +73,10 @@ fn execute(args: &[OsString]) -> Result<String, Failure> {
                 return Err(level_not_met(&report).unwrap_or_else(|failure| failure));
             }
             Ok(if json {
-                success_line(&serde_json::to_value(&report).map_err(internal_error)?)
+                success_line(
+                    &serde_json::to_value(&report).map_err(internal_error)?,
+                    report.advisories(),
+                )
             } else {
                 report.text()
             })
@@ -131,13 +135,34 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         Failure::new(code, message).in_command("check").field(field)
     };
     match args.level {
-        Level::L0 => {}
-        Level::L1 => return Err(unsupported("L1", "0.34")),
+        Level::L0 | Level::L1 => {}
         Level::L2 => return Err(unsupported("L2", "0.35")),
     }
     let fixture_path = Path::new(&args.fixture);
-    let fixture = fixture::load(fixture_path)
-        .map_err(|reason| refuse(Code::FixtureInvalid, reason, "--fixture"))?;
+    let fixture = fixture::load(fixture_path).map_err(|error| {
+        refuse(Code::FixtureInvalid, error.message, "--fixture").reason(error.reason)
+    })?;
+    let claim = match (
+        args.contract.as_deref().and_then(Claim::parse),
+        fixture.contract_version,
+    ) {
+        (Some(given), Some(declared)) if given != declared => {
+            return Err(refuse(
+                Code::Usage,
+                format!(
+                    "--contract {} differs from the fixture's contractVersion {}",
+                    given.as_str(),
+                    declared.as_str()
+                ),
+                "--contract",
+            )
+            .expected([declared.as_str()])
+            .received(given.as_str())
+            .hint("Claim one minor: pass the same value in both, or drop one of them."))
+        }
+        (Some(claim), _) | (None, Some(claim)) => claim,
+        (None, None) => Claim::V1_0,
+    };
     let bin = resolve_binary(&args.bin)
         .map_err(|reason| refuse(Code::BinaryUnusable, reason, "--bin"))?;
     let scratch_failure = |reason: String| {
@@ -154,7 +179,12 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
             format!("the binary cannot be started: {reason}"),
             "--bin",
         ),
-        RunError::Setup(reason) => refuse(Code::FixtureInvalid, reason, "--fixture"),
+        RunError::Setup(reason) => {
+            refuse(Code::FixtureInvalid, reason, "--fixture").reason("SETUP_FAILED")
+        }
+        RunError::Prepare(reason) => {
+            refuse(Code::FixtureInvalid, reason, "--fixture").reason("PREPARE_FAILED")
+        }
         RunError::Scratch(reason) => scratch_failure(reason),
     };
     let runner = Runner::new(&bin, &fixture).map_err(from_run)?;
@@ -162,20 +192,20 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    run_l0(runner, &fixture, &name, mutation).map_err(from_run)
+    run_checks(runner, &fixture, claim, &name, mutation, args.level).map_err(from_run)
 }
 
 fn unsupported(level: &str, release: &str) -> Failure {
     Failure::new(
         Code::LevelUnsupported,
-        format!("{level} is not supported yet: this release of atip has the L0 checks only"),
+        format!("{level} is not supported yet: this release of atip has the L0 and L1 checks only"),
     )
     .in_command("check")
     .field("--level")
-    .expected(["L0"])
+    .expected(["L0", "L1"])
     .received(level)
     .hint(format!(
-        "{level} checks arrive in {release}; run atip check --level L0 until then."
+        "{level} checks arrive in {release}; run atip check --level L1 until then."
     ))
 }
 

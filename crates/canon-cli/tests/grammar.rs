@@ -200,22 +200,25 @@ fn schema_listing(env: &[(&str, &str)], args: &[&str]) -> (Output, Vec<Value>) {
 #[test]
 fn as_reviewer_lists_the_reviewers_commands_only_and_canon_role_never_filters() {
     let (out, commands) = schema_listing(&[], &["--as", "reviewer"]);
-    assert_eq!(json_of(&out)["data"]["role"], "reviewer");
+    assert_eq!(json_of(&out)["data"]["kind"], "tree");
+    assert_eq!(json_of(&out)["data"]["x-canon"], json!({ "as": "reviewer" }), "a filtered tree says whose commands it lists");
     let listed = names(&commands);
     assert!(listed.contains(&"review scenario") && listed.contains(&"finding add") && listed.contains(&"brief check"), "{listed:?}");
     assert!(!listed.contains(&"evidence add") && !listed.contains(&"scenario new") && !listed.contains(&"gate promote"), "{listed:?}");
-    assert!(commands.iter().all(|c| c["roles"].as_array().unwrap().contains(&json!("reviewer"))), "every listed command carries the role");
+    assert!(commands.iter().filter(|c| c["kind"] == "command").all(|c| c["x-canon"]["roles"].as_array().unwrap().contains(&json!("reviewer"))), "every listed command carries the role");
+    assert!(commands.iter().filter(|c| c["kind"] == "group").all(|g| commands.iter().any(|c| c["kind"] == "command" && c["command"].as_str().unwrap().starts_with(&format!("{} ", g["command"].as_str().unwrap())))), "a group is listed only for a command it holds");
 
     let (_, everyone) = schema_listing(&[], &[]);
     assert!(everyone.len() > commands.len(), "no declared role lists every command");
     let (_, via_env) = schema_listing(&[("CANON_ROLE", "reviewer")], &[]);
     assert_eq!(names(&via_env), names(&everyone), "CANON_ROLE never filters schema");
+    assert!(json_of(&canon_with(tempfile::tempdir().unwrap().path(), &["schema", "--json"], &[("CANON_ROLE", "reviewer")]))["data"].get("x-canon").is_none(), "an unfiltered tree names no role");
 }
 
 #[test]
 fn the_as_flag_filters_schema_regardless_of_canon_role() {
     let (out, commands) = schema_listing(&[("CANON_ROLE", "reviewer")], &["--as", "implementer"]);
-    assert_eq!(json_of(&out)["data"]["role"], "implementer");
+    assert_eq!(json_of(&out)["data"]["x-canon"], json!({ "as": "implementer" }));
     assert!(names(&commands).contains(&"evidence add") && !names(&commands).contains(&"review scenario"));
 }
 
@@ -223,10 +226,11 @@ fn the_as_flag_filters_schema_regardless_of_canon_role() {
 fn every_command_declares_its_roles_and_humans_only_commands_declare_none() {
     let (_, all) = schema_listing(&[], &[]);
     let by_name = |name: &str| all.iter().find(|c| c["command"] == name).unwrap_or_else(|| panic!("no `{name}`"));
-    assert_eq!(by_name("evidence add")["roles"], json!(["implementer"]));
-    assert_eq!(by_name("review scenario")["roles"], json!(["reviewer"]));
-    assert_eq!(by_name("brief approve")["roles"], json!([]));
-    assert!(all.iter().all(|c| c["roles"].is_array()));
+    assert_eq!(by_name("evidence add")["x-canon"]["roles"], json!(["implementer"]));
+    assert_eq!(by_name("review scenario")["x-canon"]["roles"], json!(["reviewer"]));
+    assert_eq!(by_name("brief approve")["x-canon"]["roles"], json!([]));
+    assert!(all.iter().filter(|c| c["kind"] == "command").all(|c| c["x-canon"]["roles"].is_array()));
+    assert!(all.iter().filter(|c| c["kind"] == "group").all(|c| c.get("x-canon").is_none()), "a group has no roles");
 }
 
 #[test]

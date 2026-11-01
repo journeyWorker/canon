@@ -358,9 +358,11 @@ dependencies = [
 
 [[package]]
 name = "atip"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
+ "clap",
  "jsonschema",
+ "regex",
  "schemars",
  "serde",
  "serde_json",
@@ -369,13 +371,15 @@ dependencies = [
 
 [[package]]
 name = "atip-check"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "atip",
  "atip-check",
  "jsonschema",
  "libc",
  "nix",
+ "regex",
+ "regress",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -533,7 +537,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "canon-cli"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "atip",
  "atip-check",
@@ -570,7 +574,7 @@ dependencies = [
 
 [[package]]
 name = "canon-fmt"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "canon-model",
  "chrono",
@@ -586,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "canon-gate"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "canon-fmt",
  "canon-model",
@@ -604,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "canon-ingest"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "canon-model",
  "canon-store",
@@ -625,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "canon-learn"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "arrow",
  "canon-gate",
@@ -644,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "canon-model"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "chrono",
  "schemars",
@@ -659,7 +663,7 @@ dependencies = [
 
 [[package]]
 name = "canon-plugin"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "canon-model",
  "canon-store",
@@ -673,7 +677,7 @@ dependencies = [
 
 [[package]]
 name = "canon-policy"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "canon-model",
  "cel",
@@ -687,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "canon-report"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "arrow",
  "canon-ingest",
@@ -706,7 +710,7 @@ dependencies = [
 
 [[package]]
 name = "canon-store"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "arrow",
  "async-trait",
@@ -730,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "canon-vocab"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
  "canon-gate",
  "canon-model",
@@ -2811,6 +2815,15 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "regress"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32eef8b209c3c1c15dbad02c1f30f9539f00dc7253e0cbcdaae442a50a09d7c1"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "reqwest"

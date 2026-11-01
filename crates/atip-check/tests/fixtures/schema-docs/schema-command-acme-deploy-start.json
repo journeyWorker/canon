@@ -1,0 +1,99 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "deploy start",
+    "path": [
+      "deploy",
+      "start"
+    ],
+    "summary": "Start deploying the project to an environment; the deployment runs on a worker and is followed with deploy status",
+    "effect": "write",
+    "idempotency": "replay-safe",
+    "async": true,
+    "effectNote": "queues one deployment on the deploy worker; a repeat with the same --operation and arguments returns the deployment it started",
+    "operands": [
+      {
+        "name": "environment",
+        "valueName": "ENVIRONMENT",
+        "valueType": "string",
+        "required": true,
+        "variadic": false,
+        "default": null,
+        "domain": {
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "help": "The environment to deploy to (staging, production)"
+      }
+    ],
+    "options": [
+      {
+        "name": "operation",
+        "valueName": "KEY",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "A key you choose that names this request; repeating it with the same arguments starts nothing new"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "errors": [
+      "ENVIRONMENT_NOT_FOUND",
+      "INTERNAL",
+      "OPERATION_REUSED",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/DeployAccepted",
+        "schemaVersion": "1.0"
+      }
+    ],
+    "examples": [
+      "acme deploy start staging --json",
+      "acme deploy start staging --operation release-42 --json"
+    ],
+    "schemas": {
+      "DeployAccepted": {
+        "type": "object",
+        "required": [
+          "deployment",
+          "environment",
+          "state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "deployment": {
+            "type": "string",
+            "description": "The identifier to follow with deploy status"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "state": {
+            "const": "accepted",
+            "description": "Accepted, not done (spec 13.2)"
+          }
+        }
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}

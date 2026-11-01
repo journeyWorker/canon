@@ -1,7 +1,7 @@
 //! `canon evidence` — the handlers of the group.
 
 use crate::cli::evidence::{EvidenceCommand, EvidenceApprovalPayloadArgs, EvidenceAddArgs, EvidenceAuditArgs};
-use crate::cli_error::{CliError, CliErrorExt as _};
+use crate::cli_error::CliErrorExt as _;
 use canon_model::ProjectId;
 use std::path::Path;
 use std::process::ExitCode;
@@ -71,14 +71,6 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
         }) => {
             let kind = class.unwrap_or_else(|| "test-run".to_string());
             let evidence_ref = evidence_ref.unwrap_or_else(|| reports.iter().map(|(_, path)| path.display().to_string()).collect::<Vec<_>>().join(","));
-            if kind == crate::evidence::AUDIT_KIND {
-                return ExitCode::from(
-                    CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--class audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
-                        .field("--class")
-                        .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`")
-                        .emit("canon evidence add", json),
-                );
-            }
             let project_id = if scenario_id.is_some() || all_scenarios {
                 match project_for(&repo, project_id, "canon evidence add", json) {
                     Ok(id) => Some(id),

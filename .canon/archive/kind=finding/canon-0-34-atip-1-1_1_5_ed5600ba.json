@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T08:37:51.093179Z",
+  "change_id": "canon-0-34-atip-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/entry.rs:143-210",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "99e3ea117de8f4e6fdbce0b55c0d74d61ffc2136",
+  "reviewer": "rev-atip-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.contract11.11"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[spec fidelity] 9.13.1 defines a tool-wide option as one every command accepts. canon's `--repo` is not: `schema`, `skills show` and `completion` do not take it, so `canon skills --repo . --json` is COMMAND_REQUIRED while `canon skills --repo . show canon --json` is USAGE field --repo. That is consistent with the brief (F5 lists --json, --repo, --as and says a group drops them) and the scenario, and atip check L0.global-on-group passes at 1.1 (21 MUST + all applicable SHOULD), so I record it only as ATIP feedback. No change asked.",
+  "worktree_dirty": false
+}

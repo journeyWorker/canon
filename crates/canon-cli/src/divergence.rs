@@ -36,17 +36,10 @@ use serde::Serialize;
 pub use crate::review::{parse_project_id, parse_scenario_id};
 use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
-use crate::timestamp::TimestampError;
 
 /// `--sha`'s `clap` value parser.
 pub fn parse_sha(s: &str) -> Result<Sha, JoinKeyError> {
     Sha::parse(s)
-}
-
-/// `--expiry`'s and `--as-of`'s `clap` value parser: the shared `<TIMESTAMP>`
-/// grammar (RFC3339 or `YYYY-MM-DD`).
-pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, TimestampError> {
-    crate::timestamp::parse(s)
 }
 
 /// `canon divergence add --state <state>` refused.
@@ -166,17 +159,6 @@ pub struct DivergenceListReport<'a> {
 }
 
 impl crate::reports::Report for DivergenceListReport<'_> {}
-
-/// `canon divergence list --fields`: each scenario keeps only the requested members.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DivergenceListFieldsReport {
-    pub as_of: String,
-    pub summary: BurndownSummary,
-    pub scenarios: Vec<crate::json_out::Projected<ScenarioRow<'static>>>,
-}
-
-impl crate::reports::Report for DivergenceListFieldsReport {}
 
 /// `canon divergence add` (module doc): writes ONE unordered staging
 /// candidate — `run_seq` is assigned later, at `promote` time. With
@@ -530,14 +512,9 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
 /// with `mart_review_burndown`'s per-day TREND). `as_of` defaults to
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
-/// The fields of one `divergence list` scenario row, which `--fields` may name.
-const ROW_FIELDS: [&str; 6] = ["projectId", "scenarioId", "state", "reason", "expiry", "tracking"];
-
-pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> u8 {
-    if let Some(requested) = fields {
-        if let Err(e) = crate::paging::check_known("canon divergence list", requested, &ROW_FIELDS) {
-            return e.emit("canon divergence list", json);
-        }
+pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&str>) -> u8 {
+    if let Err(e) = crate::fields::select("divergence list", fields, None) {
+        return e.emit("canon divergence list", json);
     }
     let repo = resolve_repo_root(repo);
     let gate_ctx = match GateCtx::from_repo(&repo) {
@@ -584,15 +561,7 @@ pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &cr
         let mut page = serde_json::Map::new();
         meta.insert_into(&mut page);
         let page = serde_json::Value::Object(page);
-        match fields {
-            Some(requested) => {
-                let scenarios = scenarios
-                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a scenario row serializes"), requested)))
-                    .collect();
-                crate::json_out::data_with_meta("divergence list", &DivergenceListFieldsReport { as_of, summary, scenarios }, page);
-            }
-            None => crate::json_out::data_with_meta("divergence list", &DivergenceListReport { as_of, summary, scenarios: scenarios.collect() }, page),
-        }
+        crate::json_out::data_with_meta("divergence list", &DivergenceListReport { as_of, summary, scenarios: scenarios.collect() }, page);
         return 0;
     }
 
@@ -644,7 +613,6 @@ mod tests {
         assert_eq!(parse_status("bogus", None, None).unwrap_err().to_string(), "unknown --state `bogus` (expected one of: open, still-divergent, resolved, deferred)");
         assert_eq!(parse_status("deferred", None, None).unwrap_err().to_string(), "`--state deferred` requires `--reason`");
         assert_eq!(parse_status("deferred", Some("why"), None).unwrap_err().to_string(), "`--state deferred` requires `--expiry`");
-        assert_eq!(parse_timestamp("tomorrow").unwrap_err().to_string(), "invalid timestamp `tomorrow`: want RFC3339 or YYYY-MM-DD");
         assert!(parse_sha("nope").unwrap_err().to_string().starts_with("invalid Sha: \"nope\" does not match grammar"));
     }
 

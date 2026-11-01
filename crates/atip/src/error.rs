@@ -17,11 +17,12 @@
 //!   then indented `field:`, `expected:`, `suggestions:` and `hint:` lines
 //!   for the members the error has (spec 7.4);
 //! - JSON mode: [`CliError::body_with`], the failure envelope's `error` member
-//!   ([`ErrorBody`]): `code`, `message`, `retryable`, then `field` (the argument
-//!   or JSON pointer refused), `expected` (the valid set when there is one),
-//!   `received` (the refused value, secrets redacted), `suggestions` and
-//!   `hint`. A member with no value is absent, never `null` and never `[]`
-//!   (spec 6.5).
+//!   ([`ErrorBody`]): `code`, `reason` (one of the reasons registered under the
+//!   code, since 1.1), `message`, `retryable`, then `field` (the argument or
+//!   JSON pointer refused), `expected` (the valid set when there is one),
+//!   `received` (the refused value, secrets redacted; `""` when the caller
+//!   sent an empty value), `suggestions` and `hint`. A member with no value is
+//!   absent, never `null` and never `[]` (spec 6.5).
 //!
 //! Exit codes: `0` ok; `1` the command ran and its answer is negative or
 //! incomplete ([`EXIT_FAILED`]); `2` the command refused to run
@@ -39,6 +40,17 @@ pub const EXIT_FAILED: u8 = 1;
 /// A refusal or a usage error.
 pub const EXIT_REFUSED: u8 = 2;
 
+/// One reason registered under an error code (spec 7.6): a situation under the
+/// code that needs another next action. It shares its code's exit and retryability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReasonInfo {
+    /// UPPER_SNAKE_CASE, unique within its code.
+    pub reason: &'static str,
+    pub meaning: &'static str,
+    /// What the caller does next in this situation.
+    pub fix: &'static str,
+}
+
 /// One row of a tool's error-code table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeInfo {
@@ -50,11 +62,34 @@ pub struct CodeInfo {
     pub retryable: bool,
     /// One imperative sentence telling the caller what to do about the code.
     pub fix: &'static str,
+    /// The reasons registered under the code, sorted by name (empty: the code has none).
+    pub reasons: &'static [ReasonInfo],
+}
+
+/// One row of a tool's warning-code table (spec 7.5.2): no exit and no retryability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WarningInfo {
+    pub code: &'static str,
+    pub meaning: &'static str,
+    /// One sentence telling the caller what to do about the warning.
+    pub fix: &'static str,
 }
 
 /// The row of `code` in `table`, which MUST be sorted by code.
 pub fn find_code(table: &'static [CodeInfo], code: &str) -> Option<&'static CodeInfo> {
     table.binary_search_by(|info| info.code.cmp(code)).ok().map(|index| &table[index])
+}
+
+/// The row of `code` in the warning `table`, which MUST be sorted by code.
+pub fn find_warning(table: &'static [WarningInfo], code: &str) -> Option<&'static WarningInfo> {
+    table.binary_search_by(|info| info.code.cmp(code)).ok().map(|index| &table[index])
+}
+
+impl CodeInfo {
+    /// The reason named `reason` registered under this code.
+    pub fn find_reason(&self, reason: &str) -> Option<&'static ReasonInfo> {
+        self.reasons.iter().find(|info| info.reason == reason)
+    }
 }
 
 /// One refusal or operational failure.
@@ -78,12 +113,14 @@ pub struct CliError {
 /// through its builder methods.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct CliErrorDetail {
+    /// Which of the situations registered under the code this is (spec 7.6).
+    reason: Option<&'static str>,
     hint: Option<String>,
     /// The argument or record field that was refused (`--to`, `--kind`).
     field: Option<String>,
     /// The values `field` accepts, when the refusal is about a closed set.
     expected: Option<Vec<String>>,
-    /// The refused value as given; redacted when it is rendered ([`redact`]).
+    /// The refused value as given, `""` included (a value the caller did not send is `None`); redacted when it is rendered ([`redact`]).
     received: Option<String>,
     /// The nearest valid words, closest first.
     suggestions: Vec<String>,
@@ -99,6 +136,9 @@ struct CliErrorDetail {
 pub struct ErrorBody {
     /// Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.
     pub code: String,
+    /// Which of the situations registered under `code` this is (since 1.1); registered in the code's row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
     pub message: String,
     /// True only where running the same command again can succeed; equal to the registry row's.
     pub retryable: bool,
@@ -108,7 +148,7 @@ pub struct ErrorBody {
     /// The valid values of `field`, when it takes a closed set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expected: Option<Vec<String>>,
-    /// The value that was refused, with secrets redacted.
+    /// The value that was refused, with secrets redacted; `""` for an empty value the caller sent (1.1).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub received: Option<String>,
     /// The nearest valid commands, options or values.
@@ -135,6 +175,11 @@ impl CliError {
         self.detail.get_or_insert_with(Box::default)
     }
 
+    /// The reason, if the error has one.
+    pub fn reason_name(&self) -> Option<&'static str> {
+        self.detail.as_deref()?.reason
+    }
+
     /// The hint, if the error has one.
     pub fn hint_text(&self) -> Option<&str> {
         self.detail.as_deref()?.hint.as_deref()
@@ -158,6 +203,13 @@ impl CliError {
     /// The nearest-word suggestions set on the error, closest first.
     pub fn suggested(&self) -> &[String] {
         self.detail.as_deref().map_or(&[], |detail| detail.suggestions.as_slice())
+    }
+
+    /// Which of the situations registered under the error's code this is (spec 7.6). The reason
+    /// MUST be registered in the code's row: a tool checks that where it renders the error.
+    pub fn reason(mut self, reason: &'static str) -> Self {
+        self.detail_mut().reason = Some(reason);
+        self
     }
 
     /// The next step the caller can take.
@@ -237,11 +289,12 @@ impl CliError {
     pub fn body_with(&self, field: Option<String>, suggestions: Vec<String>) -> ErrorBody {
         ErrorBody {
             code: self.code.to_string(),
+            reason: self.reason_name().map(str::to_string),
             message: self.message.clone(),
             retryable: self.retryable,
             field: field.filter(|field| !field.is_empty()),
             expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
-            received: self.received_value().filter(|received| !received.is_empty()).map(|received| redact(self.field_name(), received)),
+            received: self.received_value().map(|received| redact(self.field_name(), received)),
             suggestions,
             hint: self.hint_text().filter(|hint| !hint.is_empty()).map(str::to_string),
             extensions: self.extensions().cloned().unwrap_or_default(),
@@ -297,12 +350,12 @@ pub fn redact(field: Option<&str>, received: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_code, redact, CliError, CodeInfo, EXIT_FAILED, EXIT_REFUSED};
+    use super::{find_code, redact, CliError, CodeInfo, ReasonInfo, EXIT_FAILED, EXIT_REFUSED};
 
     const TABLE: &[CodeInfo] = &[
-        CodeInfo { code: "GATE_VIOLATIONS", meaning: "m", exit: EXIT_FAILED, retryable: false, fix: "f" },
-        CodeInfo { code: "LOCKED", meaning: "m", exit: EXIT_REFUSED, retryable: true, fix: "f" },
-        CodeInfo { code: "USAGE", meaning: "m", exit: EXIT_REFUSED, retryable: false, fix: "f" },
+        CodeInfo { code: "GATE_VIOLATIONS", meaning: "m", exit: EXIT_FAILED, retryable: false, fix: "f", reasons: &[] },
+        CodeInfo { code: "LOCKED", meaning: "m", exit: EXIT_REFUSED, retryable: true, fix: "f", reasons: &[] },
+        CodeInfo { code: "USAGE", meaning: "m", exit: EXIT_REFUSED, retryable: false, fix: "f", reasons: &[ReasonInfo { reason: "SHAPE", meaning: "m", fix: "f" }] },
     ];
 
     #[test]
@@ -337,6 +390,17 @@ mod tests {
         let bare = CliError::from_row("USAGE", "bad", None).body_with(None, Vec::new());
         assert_eq!(serde_json::to_string(&bare).expect("a body serializes"), r#"{"code":"USAGE","message":"bad","retryable":false}"#, "a member with no value is absent, never null or empty");
         assert!(CliError::from_row("USAGE", "bad", None).suggested().is_empty());
+    }
+
+    #[test]
+    fn a_reason_follows_the_code_and_an_empty_received_is_kept() {
+        let row = find_code(TABLE, "USAGE").expect("a row");
+        assert_eq!(row.find_reason("SHAPE").map(|reason| reason.meaning), Some("m"));
+        assert!(row.find_reason("OTHER").is_none());
+        let error = CliError::from_row("USAGE", "bad", Some(row)).reason("SHAPE").field("--x").received("");
+        assert_eq!(error.reason_name(), Some("SHAPE"));
+        let body = error.body_with(None, Vec::new());
+        assert_eq!(serde_json::to_string(&body).expect("a body serializes"), r#"{"code":"USAGE","reason":"SHAPE","message":"bad","retryable":false,"received":""}"#, "`received` keeps an empty value the caller sent; a value never sent is absent");
     }
 
     #[test]
