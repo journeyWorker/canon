@@ -26,6 +26,7 @@ pub struct Schemas {
     failure: Validator,
     registry_entry: Validator,
     warning_entry: Validator,
+    stream_line: Validator,
 }
 
 /// One thing wrong with a document: where (a JSON pointer, `/` for the root) and what.
@@ -77,6 +78,10 @@ impl Schemas {
             "warning-entry.schema.json",
             atip::schema::WARNING_ENTRY_SCHEMA,
         )?;
+        let stream_line = parse(
+            "stream-line.schema.json",
+            atip::schema::STREAM_LINE_SCHEMA,
+        )?;
         let registry = Registry::new()
             .add(ERROR_ID, error)
             .and_then(|builder| builder.add(ENVELOPE_ID, envelope.clone()))
@@ -98,6 +103,7 @@ impl Schemas {
             failure: branch("failure")?,
             registry_entry: build(&registry_entry)?,
             warning_entry: build(&warning_entry)?,
+            stream_line: build(&stream_line)?,
             registry,
         })
     }
@@ -131,6 +137,14 @@ impl Schemas {
     /// The problems of `row` against the registry-entry schema, empty when it validates.
     pub fn registry_entry_problems(&self, row: &Value) -> Vec<String> {
         problem_list(&self.registry_entry, row)
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    /// The problems of one NDJSON line of a stream against the stream-line schema, empty when it validates.
+    pub fn stream_line_problems(&self, line: &Value) -> Vec<String> {
+        problem_list(&self.stream_line, line)
             .iter()
             .map(ToString::to_string)
             .collect()

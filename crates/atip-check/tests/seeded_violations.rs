@@ -243,6 +243,27 @@ fn atip_check_64_l0_envelope_fails_when_a_document_breaks_the_envelope_schema_an
 #[test]
 fn atip_check_65_l0_contract_version_fails_on_a_missing_or_wrong_marker_or_a_member_of_a_later_minor() {
     proves("L0.contract-version");
+    // A tool emits envelopes or stream lines: the start line of a stream carries the markers too, and a stream is judged line by line
+    // by the stream-line schema (L0.envelope), not as a second document (L0.one-document).
+    let harness = Harness::new();
+    let good = harness.check_config(&json!({"teamAddStream": true}));
+    assert_eq!(good.code, Some(0), "{}", good.stdout);
+    assert_eq!(good.check("L0.contract-version")["result"], "pass");
+    assert_eq!(good.check("L0.envelope")["result"], "pass");
+    assert_eq!(good.check("L0.one-document")["result"], "pass");
+    let bad = harness.check_config(&json!({"teamAddStream": true, "streamStartContractVersion": "none"}));
+    let document = bad.envelope();
+    let failing: Vec<&str> = document["data"]["checks"]
+        .as_array()
+        .expect("checks")
+        .iter()
+        .filter(|check| check["result"] == "fail")
+        .map(|check| check["id"].as_str().unwrap_or_default())
+        .collect();
+    assert_eq!(failing, ["L0.contract-version"], "{}", bad.stdout);
+    assert!(bad.check("L0.contract-version")["reason"].as_str().unwrap_or_default().contains("a stream"), "{}", bad.stdout);
+    let wrong = harness.check_config(&json!({"teamAddStream": true, "streamStartContractVersion": "1.0"}));
+    assert_eq!(wrong.check("L0.contract-version")["result"], "fail", "{}", wrong.stdout);
 }
 
 #[test]
@@ -300,6 +321,21 @@ fn atip_check_71_l0_hint_form_fails_when_a_hint_that_starts_with_the_tool_name_i
 fn atip_check_72_l0_global_on_group_reports_an_advisory_when_a_tool_wide_option_after_a_group_is_an_error(
 ) {
     proves("L0.global-on-group");
+    // Without a group the fixture can run (no command id of two words) the check is unprovided, and it is unsupported only when the
+    // tool's own schema lists no group at all.
+    let harness = Harness::new();
+    let single = |config: Value| {
+        let mut fixture = harness.fixture(&config);
+        fixture["commands"].as_object_mut().expect("commands").remove("team add");
+        harness.check(&fixture, true)
+    };
+    let unknown = single(json!({}));
+    assert_eq!((unknown.code, unknown.check("L0.global-on-group")["result"].as_str()), (Some(0), Some("unprovided")), "{}", unknown.stdout);
+    let with_groups = single(json!({"schemaTree": "groups"}));
+    assert_eq!(with_groups.check("L0.global-on-group")["result"], "unprovided", "{}", with_groups.stdout);
+    assert!(with_groups.check("L0.global-on-group")["reason"].as_str().unwrap_or_default().contains("lists groups"));
+    let none = single(json!({"schemaTree": "nogroups"}));
+    assert_eq!((none.code, none.check("L0.global-on-group")["result"].as_str()), (Some(0), Some("unsupported")), "{}", none.stdout);
 }
 
 /// The check's id, the verdict on the planted violation and the verdict with the check forced to pass.
