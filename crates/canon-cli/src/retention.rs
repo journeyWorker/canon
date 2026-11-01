@@ -462,6 +462,15 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         if let Some(requested) = fields {
             crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Refused)?;
         }
+        if let (Some(after), Some(before)) = (after, before) {
+            if after > before {
+                return Err(ExportFailure::Refused(
+                    CliError::refused("USAGE", format!("`--after {}` is later than `--before {}`; the window would be empty", after.to_rfc3339(), before.to_rfc3339()))
+                        .field("--after")
+                        .hint("give `--after` an earlier time than `--before` (`--after` is inclusive, `--before` exclusive)"),
+                ));
+            }
+        }
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind, true)?;
         let mut query = TierQuery::kind(kind);
