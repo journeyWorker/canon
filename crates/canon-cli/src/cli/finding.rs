@@ -45,7 +45,7 @@ pub struct FindingAddArgs {
     #[arg(long, value_name = "REV")]
     pub resolution_rev: Option<String>,
     /// The SOURCED introducing commit, any git revision (resolved to the full sha). Leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff
-    #[arg(long, value_name = "REV", value_parser = crate::finding::parse_introduced_rev)]
+    #[arg(long, value_name = "REV", value_parser = crate::finding::accept_introduced_rev)]
     pub introduced_rev: Option<String>,
     /// Say the introducing commit is not known, instead of --introduced-rev. A new blocker or should-fix needs one of the two; a note needs neither. Stored in its own field, never in the commit slot
     #[arg(long)]

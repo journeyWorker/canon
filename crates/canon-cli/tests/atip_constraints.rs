@@ -685,3 +685,90 @@ fn atip_constraints_22_the_retrieve_role_regime_refusal_names_for_role() {
     let message = outcome.message.unwrap_or_default();
     assert!(message.contains("--for-role") && !message.contains("--role "), "{message}");
 }
+
+// ------------------------------------------------------------------------------------------------ round 4 (review of 575a91b6)
+
+/// A call in a copy of the story repo: the exit, the envelope and what the call changed.
+fn run_in_copy(args: &[&str]) -> (Run, Vec<std::path::PathBuf>) {
+    let dir = copy_of_story();
+    let before = harness::tree(dir.path());
+    let mut argv: Vec<String> = args.iter().map(ToString::to_string).collect();
+    argv.push("--json".to_string());
+    let output = canon_in(dir.path(), &STORY.home.path().to_path_buf(), &argv, &[("CANON_ROLE", "implementer")]);
+    let changed = harness::changed(&before, &harness::tree(dir.path()));
+    (Run { exit: output.status.code().unwrap_or(-1), body: serde_json::from_slice(&output.stdout).unwrap_or(Value::Null) }, changed)
+}
+
+/// atip.constraints.23: the stateless stage is part of batch preflight: any element with a stateless fault (a domain, a constraint or a
+/// validator) refuses the batch with exit 2 before any element writes, `field` pointed at the element.
+#[test]
+fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_before_it_writes() {
+    let good = r#"{"change":"add-login","round":1,"seq":5,"severity":"note","actor":"alice","summary":"fine"}"#;
+    for (bad, code, field) in [
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"blocker","actor":"alice","summary":"no origin"}"#, "FINDING_INTRODUCED_REQUIRED", "/items/1"),
+        (r#"{"change":"add-login","round":0,"seq":6,"severity":"note","actor":"alice","summary":"round zero"}"#, "FINDING_INVALID_ARGUMENT", "/items/1/round"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"both","introducedRev":"HEAD","introducedUnknown":true}"#, "FINDING_INVALID_ARGUMENT", "/items/1"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"two\nrows"}"#, "FINDING_INVALID_ARGUMENT", "/items/1/summary"),
+    ] {
+        for batch in [format!("[{good},{bad}]"), format!("[{bad},{good}]")] {
+            let (outcome, changed) = run_in_copy(&["finding", "add", "--input", &batch]);
+            let index = if batch.starts_with(&format!("[{good}")) { 1 } else { 0 };
+            assert_eq!(outcome.exit, 2, "{batch}: {}", outcome.body);
+            assert_eq!(outcome.body["error"]["code"], code, "{batch}: {}", outcome.body);
+            let at = outcome.body["error"]["field"].as_str().unwrap_or_default();
+            assert!(at.starts_with(&field.replace("/items/1", &format!("/items/{index}"))), "{batch}: field {at}");
+            assert!(changed.is_empty(), "{batch}: a refused batch wrote {changed:?}");
+        }
+    }
+    // The same elements, one at a time, are refused the same way; a batch of good elements still writes.
+    let (single, _) = run_in_copy(&["finding", "add", "--change", "add-login", "--round", "0", "--seq", "6", "--severity", "note", "--actor", "alice", "--summary", "x"]);
+    assert_eq!(single.body["error"]["code"], "FINDING_INVALID_ARGUMENT");
+    let two = format!("[{good},{}]", good.replace("\"seq\":5", "\"seq\":6"));
+    let (written, changed) = run_in_copy(&["finding", "add", "--input", &two]);
+    assert_eq!(written.exit, 0, "{}", written.body);
+    assert!(!changed.is_empty());
+}
+
+/// atip.constraints.24: the calendar of a time option, the forms of `--surface-ref` and `--introduced-rev` are validators of the stage, not
+/// clap's: they answer after the domains and the constraints, whatever the order of the call.
+#[test]
+fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and_the_constraints() {
+    let implementer = Some("implementer");
+    // A broken constraint (the four approval options go together) and an impossible date: the constraint answers.
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30", implementer), "EVIDENCE_APPROVAL_INVALID", "--approval-role");
+    // A broken domain (the shape of a time) before the calendar, a calendar when nothing else is broken.
+    assert_refused(&empty("canon query --kind change --since tomorrow", None), "USAGE", "--since");
+    let shape = empty("canon query --kind change --since tomorrow", None);
+    assert!(shape.message.unwrap_or_default().contains("pattern"), "the shape is the declared domain's");
+    let calendar = empty("canon query --kind change --since 2026-02-30", None);
+    assert_refused(&calendar, "USAGE", "--since");
+    assert!(calendar.message.unwrap_or_default().contains("2026-02-30"));
+    // The same for `--introduced-rev self` beside a broken exclusivity, and a lone `self`.
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self", implementer), "USAGE", "--introduced-rev");
+    // `--surface-ref` on `evidence add` beside `--all-scenarios --scenario`: the constraint first; alone, the form.
+    assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --class test-run --ref r --surface-ref /etc/passwd", implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --surface-ref /etc/passwd", implementer), "USAGE", "--surface-ref");
+    // A batch refuses them in preflight too.
+    let (outcome, changed) = run_in_copy(&["finding", "add", "--input", r#"[{"change":"add-login","round":1,"seq":5,"severity":"note","actor":"a","summary":"ok"},{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"a","summary":"x","introducedRev":"self"}]"#]);
+    assert_eq!(outcome.exit, 2, "{}", outcome.body);
+    assert_eq!(outcome.body["error"]["code"], "USAGE");
+    assert!(changed.is_empty());
+}
+
+/// atip.constraints.25: an integer refusal says the declared bound, and clap's own range sentence never contradicts a declared minimum.
+#[test]
+fn atip_constraints_25_an_integer_refusal_names_the_declared_bound() {
+    let zero = empty("canon finding close add-login --round 0 --seq 1 --disposition fixed", Some("implementer"));
+    assert_refused(&zero, "FINDING_INVALID_ARGUMENT", "--round");
+    assert!(zero.message.unwrap_or_default().contains("at least 1"));
+    let negative = empty("canon finding close add-login --round -1 --seq 1 --disposition fixed", Some("implementer"));
+    assert_refused(&negative, "USAGE", "--round");
+    let message = negative.message.unwrap_or_default();
+    assert!(message.contains("from 1 to 4294967295") && !message.contains("0..="), "{message}");
+    let limit = empty("canon query --kind change --limit 0", None);
+    assert!(limit.message.unwrap_or_default().contains("from 1 to 9007199254740991"));
+    let seq = empty("canon finding close add-login --round 1 --seq 4294967296 --disposition fixed", Some("implementer"));
+    assert_refused(&seq, "USAGE", "--seq");
+    assert!(seq.message.unwrap_or_default().contains("from 1 to 4294967295"));
+}

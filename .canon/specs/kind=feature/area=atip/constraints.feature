@@ -220,3 +220,33 @@ Feature: atip constraints: the relations, domains and validators of the command 
     Given an empty directory
     When canon retrieve --for-role reviewer --regime dev/canon/join-spine/9c93d024b1a2 runs
     Then the refusal is USAGE naming --regime and its message names --for-role, not --role
+
+  # canon: {"schema":1,"at":"2026-11-01T17:50:33Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r4"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F4
+  @atip.constraints.23
+  Scenario: The stateless stage is part of batch preflight: a domain, constraint or validator fault in any element refuses the batch with exit 2 before it writes
+    Given the story repo
+    When finding add runs with --input an array of two elements, one good and one with a blocker and no origin, a round of 0, both origins, or a line separator, in either order
+    Then each is exit 2 with the code of the fault (FINDING_INTRODUCED_REQUIRED, FINDING_INVALID_ARGUMENT) and a field pointed at the faulty element, and nothing is written, not even the good element; the same elements one at a time are refused the same way, and an array of good elements writes
+
+  # canon: {"schema":1,"at":"2026-11-01T17:50:38Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r4"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.24
+  Scenario: The calendar of a time option, the form of --surface-ref and --introduced-rev are validators of the stage and answer after the domains and constraints
+    Given an empty directory
+    When a call breaks a constraint and carries an impossible date, a finding add breaks exclusivity and carries --introduced-rev self, an evidence add breaks all-scenarios and carries --surface-ref /etc/passwd, and each of them alone
+    Then the constraint answers first; alone, the shape of a time is the declared domain's refusal, the calendar, the surface-ref form and `self` are USAGE naming the option; a batch with such an element is refused in preflight
+
+  # canon: {"schema":1,"at":"2026-11-01T17:50:42Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r4"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F5
+  @atip.constraints.25
+  Scenario: An integer refusal names the declared bound and clap's range sentence never contradicts a declared minimum
+    Given an empty directory
+    When finding close runs with --round 0, --round -1 and --seq 4294967296, and query --limit 0
+    Then the refusal says the declared bound (at least 1; from 1 to 4294967295; from 1 to 9007199254740991) and clap's `0..=4294967295` never appears

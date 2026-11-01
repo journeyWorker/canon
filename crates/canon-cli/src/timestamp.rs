@@ -14,6 +14,18 @@ pub enum TimestampError {
     },
 }
 
+/// The clap value parser of a `<TIMESTAMP>` option that is read as a `DateTime<Utc>`: it takes the text and leaves every judgement to the
+/// stateless stage (the declared domain says the shape, `arg_rules::semantic` the calendar, in that order, ATIP 11.7 step 6). A text
+/// [`parse`] refuses reads as the earliest instant here, and is never seen: the stage refuses the call first.
+pub fn shape_only(s: &str) -> Result<DateTime<Utc>, std::convert::Infallible> {
+    Ok(parse(s).unwrap_or(DateTime::<Utc>::MIN_UTC))
+}
+
+/// [`shape_only`] for an option kept as its normalised text.
+pub fn shape_only_string(s: &str) -> Result<String, std::convert::Infallible> {
+    Ok(normalize(s).unwrap_or_else(|_| s.to_string()))
+}
+
 /// `DateTime<Utc>` value parser of a `<TIMESTAMP>` option.
 pub fn parse(s: &str) -> Result<DateTime<Utc>, TimestampError> {
     if let Ok(date) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {

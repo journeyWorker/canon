@@ -36,13 +36,13 @@ pub struct EvidenceApprovalPayloadArgs {
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
     /// The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
+    #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// Who approved (the human whose detached signature the payload is for)
     #[arg(long, value_name = "NAME")]
     pub approver: String,
     /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
     pub approval_at: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -81,7 +81,7 @@ pub struct EvidenceAddArgs {
     #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
+    #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
     #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
@@ -102,7 +102,7 @@ pub struct EvidenceAddArgs {
     #[arg(long, value_name = "FILE")]
     pub signature_file: Option<PathBuf>,
     /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
     pub approval_at: Option<String>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,

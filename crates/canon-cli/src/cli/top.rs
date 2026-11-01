@@ -135,7 +135,7 @@ pub struct QueryArgs {
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
     /// Only records with at >= <since> (RFC3339/ISO-8601)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub since: Option<DateTime<Utc>>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -207,10 +207,10 @@ pub struct ExportArgs {
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
     /// Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: Option<DateTime<Utc>>,
     /// Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub after: Option<DateTime<Utc>>,
     /// Write the manifest to this file (mode 0600) instead of stdout
     #[arg(short = 'o', long = "output", value_name = "FILE")]
@@ -240,7 +240,7 @@ pub struct PurgeArgs {
     #[arg(long, value_parser = crate::query::purgeable_kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
     /// Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::timestamp::parse, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: DateTime<Utc>,
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,

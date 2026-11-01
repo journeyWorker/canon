@@ -80,6 +80,9 @@ pub fn check(root: &Command, matches: &ArgMatches) -> Option<(String, CliError)>
 
 /// What a value outside a domain is, in words: from the pattern's shape (a slug, a non-blank text, one line), else the pattern.
 fn says_for(domain: &Domain) -> String {
+    if let Domain::Integer { minimum, maximum } = domain {
+        return integer_says(*minimum, *maximum);
+    }
     let Domain::Text { pattern: Some(pattern), .. } = domain else { return "is outside its domain".to_string() };
     let breaks = pattern.contains("[^\\n\\r");
     let blank = pattern.contains("[^ \\t");
@@ -157,4 +160,30 @@ fn message_of(args: &[&Arg], rule: &ConstraintDoc, given: &Given) -> String {
         RuleKind::Requires => format!("{}, which needs {}", when.unwrap_or_default(), list(&then)),
         RuleKind::Forbids => format!("{}, which cannot be given with {}", when.unwrap_or_default(), list(&then)),
     }
+}
+
+/// What an integer bound says: `must be an integer of at least 1`.
+pub(super) fn integer_says(minimum: Option<i64>, maximum: Option<i64>) -> String {
+    match (minimum, maximum) {
+        (Some(minimum), Some(maximum)) => format!("must be an integer from {minimum} to {maximum}"),
+        (Some(minimum), None) => format!("must be an integer of at least {minimum}"),
+        (None, Some(maximum)) => format!("must be an integer of at most {maximum}"),
+        (None, None) => "must be an integer".to_string(),
+    }
+}
+
+/// The sentence the declared domain of the integer option `field` of `node` (command `path`) gives, in place of clap's own range sentence
+/// (`-1 is not in 0..=4294967295`, which reads as if 0 were declared valid): the tighter of the Rust type's bounds and the table's.
+pub fn declared_integer_says(node: &Command, path: &str, field: &str) -> Option<String> {
+    let name = field.strip_prefix("--")?;
+    let arg = node.get_arguments().find(|arg| arg.get_long() == Some(name))?;
+    let (mut minimum, mut maximum) = atip::project::implicit_bounds(arg)?;
+    if let Some(Domain::Integer { minimum: lower, maximum: upper }) = domain_for(path, name, Some(&atip::project::value_name(arg))).map(|row| row.domain) {
+        minimum = minimum.max(lower).or(minimum).or(lower);
+        maximum = match (maximum, upper) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+    }
+    Some(integer_says(minimum, maximum))
 }

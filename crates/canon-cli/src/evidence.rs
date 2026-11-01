@@ -364,6 +364,11 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, EvidenceArgError> {
 /// `effect:<kebab-slug>` form; all other refs are repository-relative paths.
 /// This validates shape only — the CLI still records an attestation, not
 /// proof that the caller's ref equals the changed paths.
+/// The clap parser of `--surface-ref`: it takes the text; [`parse_surface_ref`] judges it in the stateless stage (`arg_rules::semantic`).
+pub fn accept_surface_ref(s: &str) -> Result<String, std::convert::Infallible> {
+    Ok(s.to_string())
+}
+
 pub fn parse_surface_ref(s: &str) -> Result<String, EvidenceArgError> {
     if s.is_empty() || s.trim() != s || s.contains('\n') || s.contains('\r') || s.contains('\0') {
         return Err(EvidenceArgError::SurfaceRefMalformed);

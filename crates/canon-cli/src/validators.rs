@@ -17,28 +17,37 @@ use crate::cli::finding::FindingCommand;
 use crate::cli::policy::PolicyCommand;
 use crate::cli_error::{CliError, CliErrorExt as _};
 
-/// Refuses the invocation when one of its validators does: the exit code to end with, or `None`.
-pub fn check(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> Option<ExitCode> {
-    // Domains, then constraints (step 6 of 11.7): enforced from the declarations, before the validators.
-    if let Some((label, error)) = crate::arg_rules::enforce::check(root, matches) {
-        return Some(ExitCode::from(error.emit(&label, atip::argv_wants_json())));
+/// The refusal of the first stateless fault of an invocation, with the label of its command, in the order of step 6 of 11.7: domains,
+/// then constraints (`arg_rules::enforce`), then validators; `None` when there is none. It reads nothing but the parsed arguments
+/// (and the role the environment declares), so a batch runs it on every element in preflight before it writes any.
+pub fn refusal(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> Option<(String, CliError)> {
+    if let Some(found) = crate::arg_rules::enforce::check(root, matches) {
+        return Some(found);
     }
-    let (label, json, result): (&str, bool, Result<(), CliError>) = match &cli.command {
-        Command::Brief { action: BriefCommand::Approve(args) } => ("canon brief approve", args.json, crate::brief_approve::check_approve(args)),
-        Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", args.json, crate::relay::check_arguments("canon policy approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() }).and_then(|()| crate::policy_approval::check_approver(&args.approver))),
-        Command::Divergence { action: DivergenceCliCommand::Accept(args) } => ("canon divergence accept", args.json, crate::relay::check_arguments("canon divergence accept", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: Some(&args.actor_id), approver: args.approver.as_deref(), note: args.note.as_deref() })),
-        Command::Migrate(args) => ("canon migrate", args.json, crate::relay::check_arguments("canon migrate", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: args.approver.as_deref(), note: args.note.as_deref() })),
+    if let Some(found) = crate::arg_rules::semantic::check(root, matches) {
+        return Some(found);
+    }
+    let (label, result): (&str, Result<(), CliError>) = match &cli.command {
+        Command::Brief { action: BriefCommand::Approve(args) } => ("canon brief approve", crate::brief_approve::check_approve(args)),
+        Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", crate::relay::check_arguments("canon policy approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() }).and_then(|()| crate::policy_approval::check_approver(&args.approver))),
+        Command::Divergence { action: DivergenceCliCommand::Accept(args) } => ("canon divergence accept", crate::relay::check_arguments("canon divergence accept", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: Some(&args.actor_id), approver: args.approver.as_deref(), note: args.note.as_deref() })),
+        Command::Migrate(args) => ("canon migrate", crate::relay::check_arguments("canon migrate", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: args.approver.as_deref(), note: args.note.as_deref() })),
         Command::Evidence { action } => match &**action {
-            EvidenceCommand::Add(args) => ("canon evidence add", args.json, crate::evidence::check_add(args)),
-            EvidenceCommand::Audit(args) => ("canon evidence audit", args.json, crate::evidence::check_audit(args)),
+            EvidenceCommand::Add(args) => ("canon evidence add", crate::evidence::check_add(args)),
+            EvidenceCommand::Audit(args) => ("canon evidence audit", crate::evidence::check_audit(args)),
             _ => return None,
         },
-        Command::Finding { action: FindingCommand::Add(args) } => return crate::finding::check_add(args).map(ExitCode::from),
-        Command::Query(args) => ("canon query", args.json, crate::query::validate_scope(args.kind, args.change_id.as_ref(), args.status.as_deref(), args.domain.as_deref()).map_err(|error| error.to_cli_error())),
-        Command::Export(args) => ("canon export", args.json, crate::retention::check_window(args)),
+        Command::Finding { action: FindingCommand::Add(args) } => ("canon finding add", crate::finding::check_add(args)),
+        Command::Query(args) => ("canon query", crate::query::validate_scope(args.kind, args.change_id.as_ref(), args.status.as_deref(), args.domain.as_deref()).map_err(|error| error.to_cli_error())),
+        Command::Export(args) => ("canon export", crate::retention::check_window(args)),
         _ => return None,
     };
-    result.err().map(|error| ExitCode::from(error.emit(label, json)))
+    result.err().map(|error| (label.to_string(), error))
+}
+
+/// Refuses the invocation when it has a stateless fault: the exit code to end with, or `None`.
+pub fn check(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> Option<ExitCode> {
+    refusal(cli, root, matches).map(|(label, error)| ExitCode::from(error.emit(&label, atip::argv_wants_json())))
 }
 
 #[cfg(test)]
@@ -62,7 +71,7 @@ mod tests {
         let mut matches = command.clone().try_get_matches_from(argv).expect("the call parses");
         let cli = Cli::from_arg_matches_mut(&mut matches).expect("the call reads back");
         let Command::Finding { action: FindingCommand::Add(args) } = cli.command else { panic!("not `finding add`") };
-        crate::finding::check_add(&args)
+        crate::finding::check_add(&args).err().map(|_| 2)
     }
 
     /// The call is refused (exit 2); the codes of the refusals are held by `tests/finding.rs` and `tests/validators_first.rs`.

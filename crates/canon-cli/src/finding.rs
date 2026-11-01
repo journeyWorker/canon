@@ -369,6 +369,11 @@ pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyErr
 /// `--introduced-rev`'s value parser: any revision, except that `self` (the
 /// spelling an author reaches for when recording its own defect) is refused
 /// with a pointer to the option that records who found it.
+/// The clap parser of `--introduced-rev`: it takes the text; [`parse_introduced_rev`] judges it in the stateless stage.
+pub fn accept_introduced_rev(s: &str) -> Result<String, std::convert::Infallible> {
+    Ok(s.to_string())
+}
+
 pub fn parse_introduced_rev(s: &str) -> Result<String, FindingArgError> {
     if s == "self" {
         return Err(FindingArgError::IntroducedRevIsSelf);
@@ -541,15 +546,15 @@ pub struct FindingListReport<'a> {
 impl crate::reports::Report for FindingListReport<'_> {}
 
 /// `canon finding add`: the checks of the arguments alone, in the order the handler ran them.
-pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Option<u8> {
+pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Result<(), CliError> {
     if args.round == 0 || args.seq == 0 {
-        return Some(CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
+        return Err(CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
             args.round, args.seq
-        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding add", args.json));
+        )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }));
     }
     for (flag, value) in [("--actor", args.actor_id.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
-            return Some(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag).emit("canon finding add", args.json));
+            return Err(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag));
         }
     }
     // The free-text fields: a line separator would append a second row to the one the finding is rendered as. Checked through the row grammar's OWN separator set.
@@ -559,28 +564,28 @@ pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Option<u8
         ("--file-ref", args.file_ref.as_deref()),
     ] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return Some(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag).emit("canon finding add", args.json));
+        return Err(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag));
     }
     // The coherence pair: `fixed` takes `--resolution-rev` or its default `HEAD`, so only the other direction can be wrong.
     if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
         if disposition != FindingDisposition::Fixed {
-            return Some(CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
+            return Err(CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
                 disposition.as_str()
-            )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev").emit("canon finding add", args.json));
+            )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev"));
         }
     }
     // The 0.30 rule: a commit or an explicit "not known", never both, and a defect finding owes one of them.
     if args.introduced_rev.is_some() && args.introduced_unknown {
-        return Some(CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
+        return Err(CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
             .hint("drop --introduced-rev, or drop --introduced-unknown")
-            .field("--introduced-rev").emit("canon finding add", args.json));
+            .field("--introduced-rev"));
     }
     if args.introduced_rev.is_none() && !args.introduced_unknown && matches!(args.severity, FindingSeverity::Blocker | FindingSeverity::ShouldFix) {
-        return Some(CliError::refused("FINDING_INTRODUCED_REQUIRED", format!("a new {} finding needs --introduced-rev <rev> (the commit that introduced the defect) or --introduced-unknown (it is not known); a note needs neither", severity_slug(args.severity)))
+        return Err(CliError::refused("FINDING_INTRODUCED_REQUIRED", format!("a new {} finding needs --introduced-rev <rev> (the commit that introduced the defect) or --introduced-unknown (it is not known); a note needs neither", severity_slug(args.severity)))
             .hint("pass --introduced-rev <rev> when the introducing commit was established, else --introduced-unknown; never guess a commit")
-            .field("--introduced-rev").emit("canon finding add", args.json));
+            .field("--introduced-rev"));
     }
-    None
+    Ok(())
 }
 
 /// `canon finding add` (module doc). Returns the process exit code.

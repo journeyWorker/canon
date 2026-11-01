@@ -75,7 +75,7 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
     let children: Vec<String> = node.get_subcommands().filter(|c| !c.is_hide_set() && c.get_name() != "help").map(|c| c.get_name().to_string()).collect();
     let joined = path.join(" ");
     let at = if joined.is_empty() { "canon".to_string() } else { format!("canon {joined}") };
-    let mut usage = CliError::refused("USAGE", message);
+    let mut usage = CliError::refused("USAGE", message.clone());
     let mut suggested: Vec<String> = Vec::new();
     // For an unknown option: what the leaf does take, and why an attribution flag cannot apply to a read leaf.
     let mut unknown_option: Option<String> = None;
@@ -112,6 +112,14 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
                     let names: Vec<String> = names.iter().flat_map(|name| crate::arg_rules::missing_names(name)).collect();
                     let field = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &names).or_else(|| names.first().cloned()).unwrap_or_default();
                     usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(field);
+                }
+            }
+            // clap's range sentence for an integer (`-1 is not in 0..=4294967295`) must not contradict a declared minimum: the declared domain speaks.
+            if message.contains(" is not in ") {
+                if let (Some(field), Some(value)) = (usage.field_name().map(str::to_string), string(ContextKind::InvalidValue)) {
+                    if let Some(says) = crate::arg_rules::enforce::declared_integer_says(node, &joined, &field) {
+                        usage.message = format!("invalid value '{value}' for '{field}': {says}");
+                    }
                 }
             }
             if let Some(value) = string(ContextKind::InvalidValue) {

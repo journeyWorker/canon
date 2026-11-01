@@ -887,9 +887,20 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         };
         let mut parse_argv = vec![root.get_name().to_string()];
         parse_argv.extend(argv.iter().cloned());
-        if let Err(error) = root.clone().try_get_matches_from(&parse_argv) {
-            let (_, usage) = crate::run::entry::usage_parts(&error, root);
-            return exit_refused(pointed(usage, map, &prefix));
+        let mut matches = match root.clone().try_get_matches_from(&parse_argv) {
+            Ok(matches) => matches,
+            Err(error) => {
+                let (_, usage) = crate::run::entry::usage_parts(&error, root);
+                return exit_refused(pointed(usage, map, &prefix));
+            }
+        };
+        // Preflight is the whole stateless stage (spec 11.11, 10.8.3): required, domains, constraints, validators, on every element,
+        // so a stateless fault anywhere refuses the batch with exit 2 before the first element writes.
+        let parsed = matches.clone();
+        if let Ok(cli) = <crate::cli::Cli as clap::FromArgMatches>::from_arg_matches_mut(&mut matches) {
+            if let Some((_, error)) = crate::validators::refusal(&cli, root, &parsed) {
+                return exit_refused(pointed(error, map, &prefix));
+            }
         }
         if leaf.has_dry_run && !dry_run_given {
             let child = spawn(&exe, &argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });

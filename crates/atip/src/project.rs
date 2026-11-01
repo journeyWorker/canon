@@ -241,6 +241,16 @@ pub fn is_integer_arg(arg: &Arg) -> bool {
     integer_width(arg).is_some()
 }
 
+/// The bounds the Rust integer type of `arg` carries (`u32` is `(Some(0), Some(4294967295))`), within ±(2^53-1); `None` for an argument that is
+/// not an integer.
+pub fn implicit_bounds(arg: &Arg) -> Option<(Option<i64>, Option<i64>)> {
+    let (bits, signed) = integer_width(arg)?;
+    Some(match crate::domain::implicit(bits, signed) {
+        Some(crate::domain::Domain::Integer { minimum, maximum }) => (minimum, maximum),
+        _ => (None, None),
+    })
+}
+
 /// The restriction the Rust type of an integer argument carries (spec 10.7.4): an unsigned parser refuses a negative
 /// value, a narrow one its overflow. clap erases the bounds of `value_parser!(u64).range(1..)`, so a tool's own table
 /// says those and the two are merged ([`crate::domain::merge`]); a test holds the table and the parser to one answer.

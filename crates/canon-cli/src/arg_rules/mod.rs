@@ -157,6 +157,7 @@ macro_rules! any_char {
 }
 
 pub mod enforce;
+pub mod semantic;
 mod authoring;
 mod evidence;
 mod reads;
