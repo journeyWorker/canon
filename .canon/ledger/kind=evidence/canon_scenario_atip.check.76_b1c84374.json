@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T19:42:21.861397Z",
+  "attachments": [
+    {
+      "case": "atip_check_76_a_violation_of_a_1_1_check_is_read_in_the_result_as_its_owner_with_the_rule_and_the_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-f2-junit.xml",
+      "sha256": "5d397832258124739813f7654f16e6aaf1e051656217636fa2d817a496a606b6"
+    }
+  ],
+  "code_tree": "122299681d9294f217e6a71cf611cd981d995326",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-f2-junit.xml"
+  },
+  "evidence_sha": "a423c0553a97a7b70af797ef279ddfadf1dca748",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 499,
+  "scenario_id": "atip.check.76",
+  "schema": 1,
+  "staging_id": "9ad4b436",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
