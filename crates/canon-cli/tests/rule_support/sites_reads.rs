@@ -12,7 +12,7 @@ pub const SITES: &[Site] = &[
     site("paging.rs:check_fields:USAGE#1", Kind::Other("the paging change's (`--fields` names of query/export/status/context): not declared here")),
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#1", Kind::Rule { command: "query", rule: "forbids", arguments: &["kind", "change"] }),
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#2", Kind::Validator { command: "query", arguments: &["kind", "status"] }),
-    site("retention.rs:run_export:USAGE#1", Kind::Validator { command: "export", arguments: &["after", "before"] }),
+    site("retention.rs:check_window:USAGE#1", Kind::Validator { command: "export", arguments: &["after", "before"] }),
     site("run/entry.rs:usage_error:USAGE#1", Kind::Other("the refusal of a removed spelling of an option: it maps a fault, it does not check an argument of a command")),
     site("run/entry.rs:usage_parts:USAGE#1", Kind::Other("the mapping of clap's own parse error to the USAGE refusal")),
     site("run/entry.rs:usage_parts:USAGE#2", Kind::Other("the mapping of clap's own parse error (a bare group of commands) to the USAGE refusal")),

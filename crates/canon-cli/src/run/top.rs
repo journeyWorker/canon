@@ -17,14 +17,6 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
     let QueryArgs { kind, since, repo, json, plugin_id: plugin, history, change_id, status, domain, include_sensitive, page, fields } = args;
     let repo = repo.as_path();
     let page = page.page();
-    // s19 `query-scope-filters` design D5: kind-gating + status-domain
-    // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
-    // fault here is a clean, nothing-read `2`, never a store error.
-    if let Err(e) = crate::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
-        e.to_cli_error().emit("canon query", json);
-        return ExitCode::from(2);
-    }
-
     if let Err(err) = crate::retention::validate_sensitive(repo, include_sensitive) {
         CliError::refused("QUERY_INVALID_ARGUMENT", err.to_string()).hint("`canon schema query` lists the accepted arguments and their forms").emit("canon query", json);
         return ExitCode::from(2);

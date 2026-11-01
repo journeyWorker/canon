@@ -877,9 +877,6 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     if let Err(error) = check_all_scenarios_flags(args) {
         return error.name(CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.message.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms")).emit(&args.full(), args.json);
     }
-    if let Err(error) = check_artifact_scopes(args) {
-        return error.emit(&args.full(), args.json);
-    }
     // #104: an id no configured spec root carries is refused before
     // anything is staged, bound or written (`--all-scenarios` included).
     if let Some(project_id) = &args.project_id {
@@ -1377,22 +1374,37 @@ fn first_missing_approval_option(args: &EvidenceArgs) -> &'static str {
     }
 }
 
-/// `--artifact` binds to ONE record (0.24 D4, #83): `--all-scenarios`
-/// refuses a bare `--artifact <path>` (it would bind to every record of
-/// the batch) and takes `--artifact <scenario-id>=<path>`; a single
-/// record accepts the bare form and the form naming its own scenario.
-fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
+/// `canon evidence add`: `--class audit` is `canon evidence audit`'s; `--artifact` binds to one record.
+pub(crate) fn check_add(args: &crate::cli::evidence::EvidenceAddArgs) -> Result<(), CliError> {
+    if args.class.as_deref() == Some(AUDIT_KIND) {
+        return Err(CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--class audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
+            .field("--class")
+            .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`"));
+    }
+    check_artifact_scopes(&args.artifacts, args.all_scenarios, args.scenario_id.as_ref())
+}
+
+/// `canon evidence audit`: `--artifact` binds to the audited scenario's record.
+pub(crate) fn check_audit(args: &crate::cli::evidence::EvidenceAuditArgs) -> Result<(), CliError> {
+    check_artifact_scopes(&args.artifacts, false, Some(&args.scenario_id))
+}
+
+/// `--artifact` binds to ONE record (0.24 D4, #83): `--all-scenarios` refuses a bare
+/// `--artifact <path>` (it would bind to every record of the batch) and takes
+/// `--artifact <scenario-id>=<path>`; a single record accepts the bare form and the form naming
+/// its own scenario.
+fn check_artifact_scopes(artifacts: &[std::path::PathBuf], all_scenarios: bool, scenario: Option<&ScenarioId>) -> Result<(), CliError> {
     let refuse = |message: String, hint: &str| CliError::refused("EVIDENCE_INVALID_ARGUMENT", message).field("--artifact").hint(hint.to_string());
-    for value in &args.artifacts {
+    for value in artifacts {
         match crate::evidence_attach::parse_artifact(value) {
-            (None, path) if args.all_scenarios => {
+            (None, path) if all_scenarios => {
                 return Err(refuse(
                     format!("--artifact `{}` would be bound to every scenario's record of the batch; no record is written", path.display()),
                     "let the report carry per-test attachments (Playwright's JUnit reporter writes `[[ATTACHMENT|<path>]]` per test; Cucumber JSON embeddings do the same), or bind a file to one scenario with `--artifact <scenario-id>=<path>`",
                 ));
             }
-            (Some(scope), path) if !args.all_scenarios && args.scenario_id.as_ref().map(ScenarioId::as_str) != Some(scope.as_str()) => {
-                let own = args.scenario_id.as_ref().map_or("this record names no scenario".to_string(), |id| format!("this record is for `{}`", id.as_str()));
+            (Some(scope), path) if !all_scenarios && scenario.map(ScenarioId::as_str) != Some(scope.as_str()) => {
+                let own = scenario.map_or("this record names no scenario".to_string(), |id| format!("this record is for `{}`", id.as_str()));
                 return Err(refuse(
                     format!("--artifact `{scope}={}` is scoped to scenario `{scope}`, but {own}", path.display()),
                     "pass the plain path (`--artifact <path>`) to bind the file to this record, or `--artifact <this-scenario-id>=<path>`; a path that really contains `=` is written `./<path>`",

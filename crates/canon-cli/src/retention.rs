@@ -449,6 +449,18 @@ impl crate::json_out::Report for ExportReport {}
 /// The fields of one exported record, which `--fields` may name.
 const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
 
+/// `canon export`: the window must not be empty.
+pub(crate) fn check_window(args: &crate::cli::top::ExportArgs) -> Result<(), CliError> {
+    if let (Some(after), Some(before)) = (args.after, args.before) {
+        if after > before {
+            return Err(CliError::refused("USAGE", format!("`--after {}` is later than `--before {}`; the window would be empty", after.to_rfc3339(), before.to_rfc3339()))
+                .field("--after")
+                .hint("give `--after` an earlier time than `--before` (`--after` is inclusive, `--before` exclusive)"));
+        }
+    }
+    Ok(())
+}
+
 pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
     let crate::cli::top::ExportArgs { kind, before, after, output, repo, json: json_output, include_sensitive, page, fields, dry_run, .. } = args;
     let repo = repo.as_path();
@@ -461,15 +473,6 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
     let result = (|| -> Result<(), ExportFailure> {
         if let Some(requested) = fields {
             crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Refused)?;
-        }
-        if let (Some(after), Some(before)) = (after, before) {
-            if after > before {
-                return Err(ExportFailure::Refused(
-                    CliError::refused("USAGE", format!("`--after {}` is later than `--before {}`; the window would be empty", after.to_rfc3339(), before.to_rfc3339()))
-                        .field("--after")
-                        .hint("give `--after` an earlier time than `--before` (`--after` is inclusive, `--before` exclusive)"),
-                ));
-            }
         }
         ensure_sensitive(repo, include_sensitive)?;
         let (_, registry) = loaded_registry(repo, kind, true)?;

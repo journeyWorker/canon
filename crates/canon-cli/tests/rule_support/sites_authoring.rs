@@ -7,7 +7,7 @@ pub const SITES: &[Site] = &[
     site("brief_approve.rs:answer:APPROVAL_INCOMPLETE#1", Kind::Domain { command: "brief approve", argument: "approver" }),
     site("brief_approve.rs:answer:APPROVAL_INCOMPLETE#2", Kind::Domain { command: "brief approve", argument: "note" }),
     site("brief_approve.rs:hint_for:APPROVAL_INCOMPLETE#1", Kind::Other("the next step the hint names for the code; not a check")),
-    site("brief_approve.rs:run_approve:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["digest", "change"] }),
+    site("brief_approve.rs:check_approve:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["digest", "change"] }),
     site("brief_approve.rs:verify_shown:USAGE#1", Kind::Precondition("a relayed approval of the repo's only live change (no operand names it) needs the digest the human was shown: the change is read from the repo first")),
     // change new
     site("change.rs:run_new:CHANGE_INVALID_ARGUMENT#1", Kind::Unreachable("the staged brief is canon's own template and no --title (blank, several lines, a markdown heading, a colon, a tab) was found to make the plan adapter reject it; what is left is a failure of the staging directory, not an argument")),
@@ -23,13 +23,13 @@ pub const SITES: &[Site] = &[
     site("policy_approval.rs:run_approve:POLICY_APPROVAL_REFUSED#1", Kind::Domain { command: "policy approve", argument: "approver" }),
     // relayed approvals
     site("relay.rs:authorize:USAGE#1", Kind::Undeclared("--relayed-via is refused unless an agent role is declared (--as or CANON_ROLE): the ambient role is the environment, not an argument of the call")),
-    site("relay.rs:authorize:USAGE#2", Kind::Domain { command: "brief approve", argument: "relayed-via" }),
-    site("relay.rs:authorize:USAGE#3", Kind::Domain { command: "brief approve", argument: "actor" }),
-    site("relay.rs:authorize:USAGE#4", Kind::Domain { command: "brief approve", argument: "actor" }),
-    site("relay.rs:authorize:USAGE#5", Kind::Validator { command: "policy approve", arguments: &["relayed-via", "note"] }),
+    site("relay.rs:check_via:USAGE#1", Kind::Domain { command: "brief approve", argument: "relayed-via" }),
+    site("relay.rs:check_actor:USAGE#1", Kind::Domain { command: "brief approve", argument: "actor" }),
+    site("relay.rs:check_actor:USAGE#2", Kind::Domain { command: "brief approve", argument: "actor" }),
+    site("relay.rs:check_answer:USAGE#1", Kind::Validator { command: "policy approve", arguments: &["relayed-via", "note"] }),
     // brief approve --digest
-    site("run/brief.rs:run:USAGE#1", Kind::Domain { command: "brief approve", argument: "digest" }),
-    site("run/brief.rs:run:USAGE#2", Kind::Validator { command: "brief approve", arguments: &["digest"] }),
+    site("brief_approve.rs:shown_digests:USAGE#1", Kind::Domain { command: "brief approve", argument: "digest" }),
+    site("brief_approve.rs:shown_digests:USAGE#2", Kind::Validator { command: "brief approve", arguments: &["digest"] }),
     // scenario new
     site("scaffold.rs:plan:SCAFFOLD_INVALID_ARGUMENT#1", Kind::Precondition("--flow is resolved against the brief of the change: reads the repo")),
     site("scaffold.rs:plan:SCAFFOLD_INVALID_ARGUMENT#2", Kind::Precondition("--lane and --case are members of the vocabulary the repo activates: reads the repo's vocabulary")),

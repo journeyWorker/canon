@@ -82,5 +82,6 @@ pub mod status;
 pub mod suggest;
 pub mod tier;
 pub mod timestamp;
+pub mod validators;
 pub mod tiers;
 pub mod write_mode;
