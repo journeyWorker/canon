@@ -43,7 +43,7 @@ These codes are in both registries, with the same meaning, because the same situ
 | Call | 0.33 | 0.34 |
 |---|---|---|
 | an empty value (`canon finding add --change ""`) | `USAGE` without `received` | `USAGE` with `received: ""`; a value that was never sent still has no `received` |
-| `canon finding --repo . --json`, `canon finding --as planner --json` (a tool-wide option after a group word) | `USAGE` | `COMMAND_REQUIRED`, `expected` the commands of the group; `--repo` and `--as` do nothing on a group and are not an error there (`canon finding --repo . list …` runs `list` with `--repo .`). `canon finding --bogus` is still `USAGE` |
+| `canon finding --repo . --json`, `canon finding --as planner --json` (a tool-wide option after a group word) | `USAGE` | `COMMAND_REQUIRED`, `expected` the commands of the group; `--repo` and `--as` do nothing on a group and are not an error there (`canon finding --repo . list …` runs `list` with `--repo .`). `canon finding --bogus` and `canon finding --repo --json` (no value) are still `USAGE` |
 | a `USAGE` that cannot name its argument | any hint | no `field`, and `hint` is `canon schema <command> --json` (`canon schema --json` when no command resolved) |
 | `canon retrieve` with no scope | hint prose that started with `canon retrieve …` and went on in a sentence | hint `canon retrieve --for-role <ROLE> --domain <DOMAIN>` |
 | `canon subject move <S> --to verifying` without `--reason` | hint with a lowercase placeholder | hint `canon subject move <S> --to verifying --reason <REASON> --as <ROLE>` |

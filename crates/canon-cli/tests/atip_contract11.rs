@@ -130,3 +130,28 @@ fn atip_contract11_11_a_tool_wide_option_after_a_group_word_is_command_required_
     let refused = json(&canon(dir.path(), &["skills", "--repo", ".", "show", "canon", "--json"]));
     assert_eq!((refused["error"]["code"].as_str(), refused["error"]["field"].as_str()), (Some("USAGE"), Some("--repo")), "{refused}");
 }
+
+#[test]
+fn atip_contract11_16_a_group_option_that_is_not_tool_wide_or_has_no_value_is_still_usage_naming_the_option() {
+    let dir = repo();
+    // An option no command of the group has stays a USAGE, naming it: the hoist only moves `--repo` and `--as`.
+    for args in [vec!["finding", "--bogus", "--json"], vec!["finding", "--repo", ".", "--bogus", "--json"], vec!["--bogus", "--json"]] {
+        let out = canon(dir.path(), &args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        let document = json(&out);
+        assert_eq!((document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some("USAGE"), Some("--bogus")), "{args:?}: {document}");
+        assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
+    }
+    // A tool-wide option given with no value (the next word is another option) is not hoisted: USAGE naming it.
+    for (args, field) in [(vec!["finding", "--repo", "--json"], "--repo"), (vec!["finding", "--as", "--json"], "--as")] {
+        let out = canon(dir.path(), &args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        let document = json(&out);
+        assert_eq!((document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some("USAGE"), Some(field)), "{args:?}: {document}");
+        assert_eq!(document["error"]["received"], field, "the refused word is the option itself: {document}");
+        assert_ne!(document["error"]["code"], "COMMAND_REQUIRED", "{args:?}");
+    }
+    // After a leaf nothing is hoisted: a leaf that does not take the option refuses it as USAGE, naming it.
+    let refused = json(&canon(dir.path(), &["skills", "--repo", ".", "show", "canon", "--json"]));
+    assert_eq!((refused["error"]["code"].as_str(), refused["error"]["field"].as_str()), (Some("USAGE"), Some("--repo")), "{refused}");
+}

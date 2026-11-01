@@ -150,3 +150,13 @@ Feature: ATIP 1.1 contract
     Given a git repo whose work tree has an untracked code file, and the commands that read or refuse run in it
     When the code tree is computed, and each read leaf is given an id or a value it refuses
     Then every refusal exits 2 with its code and no file in the work tree or under .git is added, removed or changed (the index file and logs aside), and the code tree is the same id twice
+
+  # canon: {"schema":1,"at":"2026-11-01T19:32:28Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-34-atip-1-1.F5
+  @atip.contract11.16
+  Scenario: A group option that is not tool-wide, or a tool-wide option with no value, is still USAGE naming the option
+    Given a repo
+    When canon finding --bogus --json, canon finding --repo --json, canon finding --as --json and canon skills --repo . show canon --json run
+    Then each exits 2 with USAGE and the field is --bogus, --repo, --as and --repo, and none is COMMAND_REQUIRED

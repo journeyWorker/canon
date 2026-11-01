@@ -183,7 +183,10 @@ pub fn hoist_tool_wide_options(root: &clap::Command, args: Vec<std::ffi::OsStrin
     while at < end {
         let word = args[at].to_string_lossy().into_owned();
         let is_group = node.get_subcommands().any(|sub| sub.get_name() != "help");
-        if let (true, Some(takes_value)) = (is_group, is_tool_wide(&word)) {
+        // An option with no value (`canon finding --repo --json`) is not hoisted: the next word is another option,
+        // not its value, and the option stays where it was so the parser refuses it (`USAGE`, `field` the option).
+        let valueless = is_tool_wide(&word) == Some(true) && args.get(at + 1).is_some_and(|next| at + 1 < end && next.to_string_lossy().starts_with('-') && next != "-");
+        if let (true, Some(takes_value), false) = (is_group, is_tool_wide(&word), valueless) {
             hoisted.push(args[at].clone());
             if takes_value && at + 1 < end {
                 hoisted.push(args[at + 1].clone());
@@ -375,6 +378,8 @@ mod tests {
         assert_eq!(hoisted(&["canon", "finding", "--as", "planner", "--json"]), ["canon", "finding", "--json"]);
         assert_eq!(hoisted(&["canon", "finding", "--repo=.", "list", "--change", "c"]), ["canon", "finding", "list", "--change", "c", "--repo=."]);
         assert_eq!(hoisted(&["canon", "--as", "planner", "finding", "list"]), ["canon", "finding", "list", "--as", "planner"]);
+        assert_eq!(hoisted(&["canon", "finding", "--repo", "--json"]), ["canon", "finding", "--repo", "--json"], "an option with no value stays for the parser to refuse");
+        assert_eq!(hoisted(&["canon", "finding", "--repo", "-", "list"]), ["canon", "finding", "list", "--repo", "-"], "`-` is a value");
         assert_eq!(hoisted(&["canon", "finding", "--bogus", "--json"]), ["canon", "finding", "--bogus", "--json"], "an option the group does not know stays a USAGE");
         assert_eq!(hoisted(&["canon", "status", "--repo", "x"]), ["canon", "status", "--repo", "x"], "after a leaf nothing moves");
         assert_eq!(hoisted(&["canon", "finding", "list", "--repo", "x", "--", "--repo"]), ["canon", "finding", "list", "--repo", "x", "--", "--repo"]);
