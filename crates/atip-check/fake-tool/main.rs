@@ -615,8 +615,8 @@ impl Tool {
             .map(|(code, exit, reasons)| ((*code).to_string(), *exit, *reasons, "m".to_string(), "f".to_string()))
             .collect();
         if self.flag("l1Registry") {
-            table.extend(l1::EXTRA_ERRORS.iter().map(|(code, meaning, fix)| {
-                ((*code).to_string(), 2, &[][..], (*meaning).to_string(), fix.replace("{tool}", &tool))
+            table.extend(l1::EXTRA_ERRORS.iter().map(|(code, exit, meaning, fix)| {
+                ((*code).to_string(), *exit, &[][..], (*meaning).to_string(), fix.replace("{tool}", &tool))
             }));
         }
         table.sort_by(|left, right| left.0.cmp(&right.0));
@@ -996,9 +996,10 @@ fn team_verbs(tool: &Tool) -> Vec<&'static str> {
     verbs
 }
 
-/// `touch --name <NAME>` or `touch --input '{"name": <NAME>}'`; an `--input` that is no JSON object is refused with
-/// a reason, one with another key refuses with `UNKNOWN_KEY`, a larger one with `INPUT_TOO_LARGE`, and a name that
-/// differs from `--name` with `INPUT_CONFLICT`.
+/// `touch --name <NAME>` or `touch --input '{"name": <NAME>}'`, or a batch: `--input '[{"name": ...}, ...]'` (spec
+/// 11.11; at most `MAX_BATCH_ITEMS` documents, each merged with the argv arguments). An `--input` that is no JSON is
+/// refused with a reason, a document with another key with `UNKNOWN_KEY`, a larger one with `INPUT_TOO_LARGE`, and a
+/// name that differs from `--name` with `INPUT_CONFLICT`; a batch is refused whole, before its first item runs.
 fn touch(tool: &Tool, name: &Option<String>, input: &Option<String>) -> ExitCode {
     let mut name = name.clone();
     if let Some(text) = input {
@@ -1021,28 +1022,66 @@ fn touch(tool: &Tool, name: &Option<String>, input: &Option<String>) -> ExitCode
         if text.len() > l1::MAX_INPUT_BYTES {
             return refuse_input("INPUT_TOO_LARGE", None, "--input is larger than the command accepts", "--input");
         }
-        let Some(document) = serde_json::from_str::<Value>(text).ok().and_then(|value| value.as_object().cloned()) else {
+        let Ok(parsed) = serde_json::from_str::<Value>(text) else {
             return refuse_input("INPUT_INVALID", Some("NOT_JSON"), "--input is not JSON", "--input");
         };
-        if let Some(key) = document.keys().find(|key| key.as_str() != "name") {
-            return refuse_input("INPUT_INVALID", Some("UNKNOWN_KEY"), "the document has a key the command does not take", &format!("/{key}"));
+        let batch = parsed.is_array();
+        let documents = match parsed {
+            Value::Array(items) => items,
+            other => vec![other],
+        };
+        if batch && documents.is_empty() {
+            return refuse_input("INPUT_INVALID", None, "a batch holds at least one document", "--input");
         }
-        match document.get("name") {
-            Some(Value::String(from_document)) => {
-                if name.as_ref().is_some_and(|from_argv| from_argv != from_document) {
-                    return refuse_input("INPUT_CONFLICT", None, "--name and the document differ", "/name");
-                }
-                name = Some(from_document.clone());
+        if documents.len() > l1::MAX_BATCH_ITEMS {
+            return refuse_input("INPUT_TOO_LARGE", None, "the batch holds more documents than the command accepts", "--input");
+        }
+        let mut names: Vec<Option<String>> = Vec::new();
+        for (index, item) in documents.iter().enumerate() {
+            let prefix = if batch { format!("/{index}") } else { String::new() };
+            let Some(document) = item.as_object() else {
+                let field = if batch { prefix.clone() } else { "--input".to_string() };
+                return refuse_input("INPUT_INVALID", Some("NOT_JSON"), "--input is not a JSON object", &field);
+            };
+            if let Some(key) = document.keys().find(|key| key.as_str() != "name") {
+                return refuse_input("INPUT_INVALID", Some("UNKNOWN_KEY"), "the document has a key the command does not take", &format!("{prefix}/{key}"));
             }
-            Some(_) => return refuse_input("INPUT_INVALID", None, "name is not a string", "/name"),
-            None => {}
+            let mut item_name = name.clone();
+            match document.get("name") {
+                Some(Value::String(from_document)) => {
+                    if name.as_ref().is_some_and(|from_argv| from_argv != from_document) {
+                        return refuse_input("INPUT_CONFLICT", None, "--name and the document differ", &format!("{prefix}/name"));
+                    }
+                    item_name = Some(from_document.clone());
+                }
+                Some(_) => return refuse_input("INPUT_INVALID", None, "name is not a string", &format!("{prefix}/name")),
+                None => {}
+            }
+            names.push(item_name);
         }
+        if batch {
+            if let Some(index) = names.iter().position(Option::is_none) {
+                return tool.refuse("USAGE", "--name is required", "touch", &[("field", json!(format!("/{index}/name")))]);
+            }
+            let mut items = Vec::new();
+            for index in 0..names.len() {
+                let status = if std::fs::read_to_string("touched.txt").is_ok_and(|text| text == "x") { "unchanged" } else { "written" };
+                std::fs::write("touched.txt", "x").unwrap_or_default();
+                items.push(json!({"index": index, "status": status, "data": {"touched": true}}));
+            }
+            let mut meta = Map::new();
+            meta.insert("output".into(), json!("TouchBatchReport"));
+            return tool.success_with("touch", json!({"items": items}), meta);
+        }
+        name = names.pop().flatten();
     }
     if name.is_none() {
         return tool.name_missing();
     }
     std::fs::write("touched.txt", "x").unwrap_or_default();
-    tool.success("touch", json!({"touched": true}))
+    let mut meta = Map::new();
+    meta.insert("output".into(), json!("TouchReport"));
+    tool.success_with("touch", json!({"touched": true}), meta)
 }
 
 fn version(tool: &Tool) -> ExitCode {

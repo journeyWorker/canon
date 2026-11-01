@@ -217,6 +217,9 @@ pub fn command_doc(tool_name: &str, command: &Command) -> Value {
                     if let Some(when) = output.when {
                         entry["when"] = json!(when);
                     }
+                    if output.batch {
+                        entry["batch"] = json!(true);
+                    }
                     if let Some(fields) = &output.fields {
                         entry["fields"] = fields.clone();
                     }

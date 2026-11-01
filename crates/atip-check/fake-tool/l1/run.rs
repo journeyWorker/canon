@@ -127,9 +127,13 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
             &[("field", json!("--repo"))],
         );
     }
-    if tool.flag("schemaWrites") || alias.contains("writes") {
-        std::fs::write("schema-cache.txt", "written by schema").unwrap_or_default();
-    }
+    // The seeded violation of `writes-nothing`: a cache file, written when the answer is given and not by a refusal.
+    let writes = tool.flag("schemaWrites") || alias.contains("writes");
+    let cache = || {
+        if writes {
+            std::fs::write("schema-cache.txt", "written by schema").unwrap_or_default();
+        }
+    };
     let mut parsed = parse(tool, command, args, false);
     if let Err(Failure::Refuse {
         source: "constraint",
@@ -140,7 +144,14 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
         // The seeded violations: two of the registry forms, or a path and a registry form, are answered. The
         // argument at fault is the first one given, in the order of the rule: the path comes first.
         let skip = if field.as_deref() == Some("PATH") {
+            // Only `schema <group> --errors` is answered: `schema --errors x` keeps its refusal.
             tool.flag("schemaGroupErrorsAnswers")
+                && parse(tool, command, args, true).is_ok_and(|lenient| {
+                    lenient
+                        .text("path")
+                        .and_then(|word| word.split_whitespace().next().map(ToString::to_string))
+                        .is_some_and(|word| model.group(&word).is_some())
+                })
         } else {
             tool.flag("schemaOverlapAnswers")
         };
@@ -169,16 +180,19 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
             )
         })
         .collect();
+    if !registry.is_empty() {
+        if registry.iter().all(|(name, _)| name == "--errors" || name == "--warnings") {
+            cache();
+        }
+        return tool.schema(&registry);
+    }
     if !words.is_empty() {
         let quoted = parsed
             .values("path")
             .iter()
             .filter_map(Value::as_str)
             .any(|word| word.contains(char::is_whitespace));
-        return schema_path(tool, &model, &words, quoted);
-    }
-    if !registry.is_empty() {
-        return tool.schema(&registry);
+        return schema_path(tool, &model, &words, quoted, &cache);
     }
     if tool.config.get("treeAnswer").and_then(Value::as_str) == Some("usage") {
         return tool.refuse(
@@ -189,10 +203,11 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
         );
     }
     let tree = patched(tool, "<tree>", tree_doc(&model, tool.flag("treeGroupsLast")));
+    cache();
     tool.success("schema", tree)
 }
 
-fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool) -> ExitCode {
+fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool, cache: &dyn Fn()) -> ExitCode {
     let mut current = String::new();
     for (index, word) in words.iter().enumerate() {
         let candidate = if current.is_empty() {
@@ -238,6 +253,7 @@ fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool) -> Ex
     if quoted && tool.flag("quotedPathDiffers") {
         doc["summary"] = json!("another summary");
     }
+    cache();
     tool.success("schema", patched(tool, &current, doc))
 }
 
@@ -313,7 +329,7 @@ const MEMBERS: [Member; 5] = [
         name: "Ada",
         team: "core",
         age: 29,
-        nickname: None,
+        nickname: Some("ace"),
         profile: None,
         tags: &[],
         owners: &[],
@@ -622,9 +638,10 @@ fn search(tool: &Tool, parsed: &Parsed) -> ExitCode {
         .and_then(|filter| filter.get("team"))
         .and_then(Value::as_str);
     if filter_team == Some("ghost") {
-        if let Some(code) = tool.config.get("ghostFilterCode").and_then(Value::as_str) {
-            // The seeded violation: a refusal whose code no registry has.
-            return tool.refuse(code, "there is no such team", "member search", &[("field", json!("--filter"))]);
+        if tool.flag("ghostFilterCrash") {
+            // The seeded violation: the run ends with exit 1 and prints no envelope at all.
+            eprintln!("fake: the team ghost crashed the search");
+            return ExitCode::from(1);
         }
     }
     let min_score = parsed.int("min-score").unwrap_or(0);
@@ -673,11 +690,17 @@ fn search(tool: &Tool, parsed: &Parsed) -> ExitCode {
 fn tag(tool: &Tool, parsed: &Parsed) -> ExitCode {
     let id = parsed.int("member").unwrap_or_default();
     if !MEMBERS.iter().any(|member| member.id == id) {
+        // The hint is a runnable command line; the seeded violation names a command the tool does not have.
+        let listing = if tool.flag("hintNoCommand") { "member lst" } else { "member list" };
         return tool.refuse(
             "MEMBER_NOT_FOUND",
             &format!("there is no member {id}"),
             "member tag",
-            &[("field", json!("MEMBER")), ("received", json!(id.to_string()))],
+            &[
+                ("field", json!("MEMBER")),
+                ("received", json!(id.to_string())),
+                ("hint", json!(format!("{} {listing} --json", tool.name()))),
+            ],
         );
     }
     let path = std::path::Path::new("tags").join(format!("{id}.json"));

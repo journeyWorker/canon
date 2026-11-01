@@ -12,33 +12,44 @@ mod spec;
 
 pub use doc::patched;
 pub use run::handle;
-pub use spec::MAX_INPUT_BYTES;
+pub use spec::{MAX_BATCH_ITEMS, MAX_INPUT_BYTES};
 
-/// The registry rows an L1 fake adds to the L0 ones: code, meaning and fix (every one of them exits 2 and is not
-/// retryable). `{tool}` stands for the tool name in the fix.
-pub const EXTRA_ERRORS: [(&str, &str, &str); 5] = [
+/// The registry rows an L1 fake adds to the L0 ones: code, exit, meaning and fix (none is retryable). `{tool}`
+/// stands for the tool name in the fix.
+pub const EXTRA_ERRORS: [(&str, i64, &str, &str); 6] = [
+    (
+        "BATCH_INCOMPLETE",
+        1,
+        "A batch stopped during execution.",
+        "Read the items of the report: the failed one says why, the skipped ones were not run.",
+    ),
     (
         "DATE_INVALID",
+        2,
         "A date argument names a day that is not on the calendar.",
         "Give an existing calendar date as YYYY-MM-DD.",
     ),
     (
         "INPUT_CONFLICT",
+        2,
         "A value of the --input document and the same argument on the command line differ.",
         "Give the argument once, or give the same value both ways.",
     ),
     (
         "INPUT_TOO_LARGE",
+        2,
         "The --input document is larger than the command accepts.",
         "Shorten the document.",
     ),
     (
         "MEMBER_NOT_FOUND",
+        2,
         "The member does not exist.",
         "List the members with: {tool} member list --json",
     ),
     (
         "SORT_CONFLICT",
+        2,
         "The sort order cannot be combined with another option.",
         "Drop the option or choose another sort order.",
     ),
