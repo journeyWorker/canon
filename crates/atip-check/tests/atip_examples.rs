@@ -297,12 +297,13 @@ fn atip_check_35_a_failure_envelope_that_breaks_the_registry_is_rejected_by_the_
 #[test]
 fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_keyword_is_an_annotation(
 ) {
-    // The schemas the checker validates against are byte for byte the pinned originals (sha256 of `schema/*.schema.json` at v1.1.0).
+    // The schemas the checker validates against are byte for byte the pinned originals (sha256 of `schema/*.schema.json`:
+    // the envelope at v1.1.1, the others at v1.1.0, which 1.1.1 did not change).
     for (name, text, digest) in [
         (
             "envelope.schema.json",
             atip::schema::ENVELOPE_SCHEMA,
-            "d8b42e992a7750f857b7b9286925645ee4401ead264e3d27ff62db382a902a37",
+            "81a05fac5a09dd8f16543590d061bf94ac1f16136d3c129e0696e996c868503b",
         ),
         (
             "error.schema.json",
@@ -331,7 +332,7 @@ fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_ke
             .collect();
         assert_eq!(
             actual, digest,
-            "{name} is not the original of {PINNED}"
+            "{name} is not the original of {PINNED} (the envelope: v1.1.1)"
         );
     }
     // A null where the contract forbids one is rejected by the schema; `L0.no-null` names it, and `L0.envelope` leaves it.

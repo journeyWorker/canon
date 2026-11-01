@@ -43,10 +43,10 @@
           "const": "atip/1"
         },
         "contractVersion": {
-          "description": "The contract version the tool implements, <major>.<minor>; absent means 1.0 (spec 15.7). Set with `contract` by every tool that implements 1.1 or later.",
+          "description": "The contract version the tool implements, <major>.<minor>, 1.1 or later; absent means 1.0 and \"1.0\" is never written (spec 6.6, 15.7). Set with `contract` by every tool that implements 1.1 or later.",
           "x-atip-since": "1.1",
           "type": "string",
-          "pattern": "^1\\.(0|[1-9][0-9]*)$"
+          "pattern": "^1\\.[1-9][0-9]*$"
         },
         "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
         "tool": {

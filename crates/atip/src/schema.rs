@@ -78,15 +78,10 @@ fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
 }
 
 /// What breaks the envelope schema in `document`: one line per violation,
-/// empty when the document is a conforming envelope. The schema alone cannot say that
-/// `meta.contractVersion` is never `"1.0"` written out (spec 10.13 rule 16: an absent value means 1.0), so that
-/// rule is checked here beside it.
+/// empty when the document is a conforming envelope. The schema alone judges it, `meta.contractVersion` never
+/// `"1.0"` written out included (its pattern starts at minor 1, since 1.1.1).
 pub fn envelope_problems(document: &Value) -> Vec<String> {
-    let mut problems = problems_of(&ENVELOPE, document);
-    if document.pointer("/meta/contractVersion").and_then(Value::as_str) == Some("1.0") {
-        problems.push("\"1.0\" is never written out as meta.contractVersion: absent means 1.0 (spec 10.13 rule 16) at /meta/contractVersion".to_string());
-    }
-    problems
+    problems_of(&ENVELOPE, document)
 }
 
 /// What breaks the error-object schema in `error` (the `error` member of a failure envelope), empty when it conforms.
@@ -122,10 +117,10 @@ mod tests {
         Sha256::digest(text.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
     }
 
-    /// The digests of the files as the atip repository published them. A
+    /// The digests of the files as the atip repository published them (tag v1.1.1 for the envelope, v1.1.0 for the rest, which did not change). A
     /// changed copy fails here; re-vendoring updates the file and its digest
     /// together.
-    const ENVELOPE_DIGEST: &str = "d8b42e992a7750f857b7b9286925645ee4401ead264e3d27ff62db382a902a37";
+    const ENVELOPE_DIGEST: &str = "81a05fac5a09dd8f16543590d061bf94ac1f16136d3c129e0696e996c868503b";
     const ERROR_DIGEST: &str = "b89419efd8731950ac458a59e3631b50cf29f0168c141e087a2dfa18a15d4903";
     const REGISTRY_ENTRY_DIGEST: &str = "18e73eec11f662d6c19e18574a1c1d3424f037f0ad5d232f24ab0a56fab28622";
     const WARNING_ENTRY_DIGEST: &str = "66d2eaaea38eaf723343c262dea4b710bcd1b22dc547124f68f0abc2ee0fcfde";
@@ -176,7 +171,8 @@ mod tests {
         assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": lone })).is_empty(), "another major is refused");
         let mut written = meta();
         written["contractVersion"] = json!("1.0");
-        assert!(!envelope_problems(&json!({ "ok": true, "data": {}, "meta": written })).is_empty(), "1.0 is never written out");
+        assert!(!problems_of(&ENVELOPE, &json!({ "ok": true, "data": {}, "meta": written })).is_empty(), "1.0 is never written out: the vendored schema refuses it, with no check beside it");
+        assert!(ENVELOPE_SCHEMA.contains(r#""pattern": "^1\\.[1-9][0-9]*$""#), "the pattern of contractVersion starts at minor 1 (atip 1.1.1)");
         assert_eq!(envelope_problems(&json!({ "ok": true, "data": {}, "meta": meta() })), Vec::<String>::new(), "contract atip/1 with contractVersion 1.1 passes");
     }
 

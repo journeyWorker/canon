@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T12:14:46.376377Z",
+  "attachments": [
+    {
+      "case": "schema::tests::atip_contract11_03_a_reason_and_a_warning_row_validate",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    },
+    {
+      "case": "atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-111-junit.xml",
+      "sha256": "d923f5cc21cf736b964a7be509ad9f5821a134fc01362fb1fd49d0bec3026902"
+    }
+  ],
+  "code_tree": "937b6ab3bc1c56d75b8369014d4dcdee7b1336ac",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-111-junit.xml"
+  },
+  "evidence_sha": "1c7c6ec3b1b17be04ff7354f070d8fc8e179b750",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 33,
+  "scenario_id": "atip.contract11.03",
+  "schema": 1,
+  "staging_id": "9d2877e3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -368,7 +368,7 @@ pub fn cases() -> Vec<Case> {
         ),
         case(
             "contract-version/version-is-claim",
-            json!({"contractVersionSays": "1.0"}),
+            json!({"contractVersionSays": "1.2"}),
         ),
         case(
             "contract-version/no-contract-version",
