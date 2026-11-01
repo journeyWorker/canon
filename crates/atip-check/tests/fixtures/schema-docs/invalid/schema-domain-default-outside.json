@@ -1,0 +1,248 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "finding list",
+    "path": [
+      "finding",
+      "list"
+    ],
+    "summary": "List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary",
+    "effect": "read",
+    "operands": [],
+    "options": [
+      {
+        "name": "change",
+        "valueName": "CHANGE_ID",
+        "valueType": "string",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "help": "The change whose findings to list"
+      },
+      {
+        "name": "open",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Only findings whose current disposition is open"
+      },
+      {
+        "name": "limit",
+        "valueName": "N",
+        "valueType": "integer",
+        "required": false,
+        "repeatable": false,
+        "default": 100,
+        "help": "Return at most this many records",
+        "domain": {
+          "minimum": 500
+        }
+      },
+      {
+        "name": "cursor",
+        "valueName": "CURSOR",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Resume after the last record of the previous page (meta.page.nextCursor)"
+      },
+      {
+        "name": "all",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Return every record from the cursor on, not one page"
+      },
+      {
+        "name": "fields",
+        "valueName": "FIELDS",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Keep only these finding fields (comma-separated); see outputs[0].fields"
+      },
+      {
+        "name": "repo",
+        "valueName": "DIR",
+        "valueType": "path",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "defaultNote": "the nearest ancestor directory holding a canon.yaml",
+        "flagOnly": true,
+        "help": "The repo to act on"
+      },
+      {
+        "name": "as",
+        "valueName": "ROLE",
+        "valueType": "enum",
+        "possibleValues": [
+          "planner",
+          "implementer",
+          "reviewer",
+          "orchestrator"
+        ],
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "env": "CANON_ROLE",
+        "flagOnly": true,
+        "help": "The role you act as; overrides CANON_ROLE"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "constraints": [
+      {
+        "rule": "atMostOne",
+        "names": [
+          "limit",
+          "all"
+        ]
+      }
+    ],
+    "errors": [
+      "CONFIG_MISSING",
+      "CONFIG_UNREADABLE",
+      "CURSOR_INVALID",
+      "INTERNAL",
+      "REPO_UNREADABLE",
+      "UNKNOWN_ROLE",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/FindingListReport",
+        "schemaVersion": "1.0",
+        "fields": {
+          "records": "/findings",
+          "paths": [
+            "severity",
+            "disposition",
+            "reviewer",
+            "summary",
+            "resolutionSha",
+            "fileRef",
+            "reason"
+          ],
+          "keep": [
+            "round",
+            "seq"
+          ]
+        }
+      }
+    ],
+    "examples": [
+      "canon finding list --change add-login --open --json"
+    ],
+    "schemas": {
+      "FindingListReport": {
+        "type": "object",
+        "description": "`canon finding list`: a change's findings; paging is in `meta`.",
+        "required": [
+          "changeId",
+          "findings"
+        ],
+        "properties": {
+          "changeId": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/schemas/FindingRow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "FindingRow": {
+        "type": "object",
+        "description": "One finding of `canon finding list`.",
+        "required": [
+          "round",
+          "seq",
+          "severity",
+          "disposition",
+          "reviewer",
+          "summary",
+          "resolutionSha",
+          "fileRef",
+          "reason"
+        ],
+        "properties": {
+          "round": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "severity": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string"
+          },
+          "reviewer": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "resolutionSha": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "x-canon": {
+      "roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "orchestrator"
+      ]
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "schemaVersion": "1.0",
+    "tool": "canon",
+    "toolVersion": "0.31.0",
+    "context": {
+      "repo": "."
+    }
+  }
+}

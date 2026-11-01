@@ -1,0 +1,269 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "member list",
+    "path": [
+      "member",
+      "list"
+    ],
+    "summary": "List the members of a team, a page at a time",
+    "effect": "read",
+    "operands": [],
+    "options": [
+      {
+        "name": "team",
+        "valueName": "TEAM",
+        "valueType": "string",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "short": "t",
+        "help": "The team whose members to list"
+      },
+      {
+        "name": "limit",
+        "valueName": "N",
+        "valueType": "integer",
+        "required": false,
+        "repeatable": false,
+        "default": 50,
+        "help": "Return at most this many members",
+        "domain": {
+          "minimum": 1
+        }
+      },
+      {
+        "name": "cursor",
+        "valueName": "CURSOR",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Resume after the last member of the previous page (meta.page.nextCursor)"
+      },
+      {
+        "name": "all",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Return every member from the cursor on"
+      },
+      {
+        "name": "fields",
+        "valueName": "FIELDS",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Keep only these member fields (comma-separated dot paths); see outputs[0].fields"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "constraints": [
+      {
+        "rule": "atMostOne",
+        "names": [
+          "limit",
+          "all"
+        ]
+      }
+    ],
+    "errors": [
+      "CURSOR_INVALID",
+      "INTERNAL",
+      "TEAM_NOT_FOUND",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/MemberListReport",
+        "schemaVersion": "1.0",
+        "fields": {
+          "records": "/members",
+          "keep": [
+            "id"
+          ],
+          "paths": [
+            "name",
+            "profile",
+            "profile.name",
+            "profile.email",
+            "profile.timezone",
+            "tags",
+            "owners",
+            "owners[].name",
+            "owners[].email",
+            "badge",
+            "note",
+            "[\"display-name\"]",
+            "attributes",
+            "[\"name\"]"
+          ],
+          "default": [
+            "name",
+            "profile.name"
+          ]
+        }
+      }
+    ],
+    "examples": [
+      "acme member list -t core --fields profile.name,owners[].email --limit 2 --json",
+      "acme member list --team=core --all --json"
+    ],
+    "schemas": {
+      "MemberListReport": {
+        "type": "object",
+        "required": [
+          "team",
+          "members"
+        ],
+        "properties": {
+          "team": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/schemas/MemberRow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemberRow": {
+        "type": "object",
+        "description": "One member.",
+        "required": [
+          "id",
+          "name",
+          "profile",
+          "tags",
+          "owners"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/schemas/Profile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/schemas/Owner"
+            }
+          },
+          "badge": {
+            "description": "A structural enum on a member kept whole: allowed, since it is not a cut node (spec 6.10).",
+            "enum": [
+              {
+                "kind": "gold"
+              },
+              {
+                "kind": "silver",
+                "since": 2024
+              }
+            ]
+          },
+          "note": {
+            "description": "Free-form note; never a whole Profile. Not a cut node, so projection leaves its schema, and the shared Profile it names, unchanged (spec 6.10).",
+            "not": {
+              "$ref": "#/schemas/Profile"
+            }
+          },
+          "display-name": {
+            "type": "string",
+            "description": "The name shown in the directory; its key is not an identifier, so its field path is [\"display-name\"]."
+          },
+          "attributes": {
+            "description": "Free-form directory attributes: a map, so each key is selectable (spec 6.10).",
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Profile": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "timezone"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "timezone": {
+            "enum": [
+              "UTC",
+              "Asia/Seoul",
+              "Europe/Berlin"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Owner": {
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "acme",
+    "toolVersion": "1.0.0"
+  }
+}
