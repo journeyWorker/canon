@@ -423,7 +423,10 @@ impl Tool {
             if self.flag("nextCommandMismatch") {
                 next[0] = json!({"command": format!("{tool} {command} --json"), "argv": [command, "--quiet", "--json"]});
             }
-            if !self.flag("pageNoCursorEntry") {
+            // The L1 tool pages in `member list` only: its probe has no `--cursor` (and no `--limit`, which a page
+            // needs to be bound to anything), so its answers carry no page and no next-page entry.
+            let pages = !self.flag("l1Registry");
+            if pages && !self.flag("pageNoCursorEntry") {
                 next.push(json!({"command": format!("{tool} {command} --json --cursor c1"), "argv": [command, "--json", "--cursor", "c1"], "reason": "the next page"}));
             }
             if self.flag("nextBogusCommand") {
@@ -438,7 +441,9 @@ impl Tool {
             } else {
                 json!({"returned": 1, "nextCursor": "c1"})
             };
-            meta.insert("page".into(), page);
+            if pages {
+                meta.insert("page".into(), page);
+            }
         }
         if !self.flag("noWarning") {
             let code = if self.flag("unregisteredWarning") {
@@ -833,7 +838,7 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
                     .map(command_options)
                     .unwrap_or_default()
                     .iter()
-                    .find(|(name, _)| *name == option && !(*name == "--cursor" && tool.flag("noPaging")));
+                    .find(|(name, _)| *name == option && !(*name == "--cursor" && (tool.flag("noPaging") || tool.flag("l1Registry"))));
                 match takes {
                     Some((_, true)) => options.push((option.to_string(), rest.next().cloned())),
                     Some((_, false)) => options.push((option.to_string(), None)),

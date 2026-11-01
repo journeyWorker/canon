@@ -995,7 +995,7 @@ fn atip_checkl1_fake_every_seeded_case_changes_the_output_it_claims_to() {
             // Two runs of the seeded tool differ (`deterministic`), or the seeded one differs from the conforming one.
             assert!(standard != other, "{} on {probe:?}: the seeded tool answers as the conforming one", case.condition);
             // The answer of a seeded document is still an envelope (the help is text; the crash prints nothing).
-            if case.condition == "example-runs/exit-or-registered-code" {
+            if case.condition == "example-runs/exit-or-registered-code" && probe.first().map(String::as_str) != Some("schema") {
                 assert_eq!((other.0, other.1.as_str()), (1, ""), "the seeded run ends with exit 1 and no output");
             } else if !probe.iter().any(|word| word == "--help") {
                 let document: Value = serde_json::from_str(&other.1).unwrap_or_else(|error| panic!("{}: {error}: {}", case.condition, other.1));

@@ -89,8 +89,8 @@ fn l1_commands(is_1_1: bool) -> Value {
         fields.push(json!(["attributes[\"http.status-code\"]", "profile.email"]));
     }
     json!({
-        "items": {"ok": [["items", "--json"]], "paged": [["items", "--json"]]},
-        "status": {"ok": [["status", "--json"]], "paged": [["status", "--json"]]},
+        "items": {"ok": [["items", "--json"]]},
+        "status": {"ok": [["status", "--json"]]},
         "touch": {
             "missingValue": [["touch", "--json"]],
             "refused": [["touch", "--input", "nope", "--json"]],
@@ -298,7 +298,7 @@ pub fn l1_cases() -> Vec<Case> {
         case("walk/rule-1", patch(&[("init", vec![set("/command", json!("ini"))])])),
         case(
             "walk/rule-2-refs",
-            patch(&[("member list", vec![set("/outputs/0/schemaRef", json!("#/schemas/Missing"))])]),
+            patch(&[("init", vec![set("/outputs/0/schemaRef", json!("#/schemas/Missing"))])]),
         ),
         case(
             "walk/rule-2-compile",
@@ -321,10 +321,8 @@ pub fn l1_cases() -> Vec<Case> {
         ),
         case(
             "walk/rule-3-domain-profile",
-            patch(&[(
-                "member tag",
-                vec![set("/options/name=note/domain", json!({"maxLength": 80, "minimum": 1}))],
-            )]),
+            // A domain on a switch: a switch has two values and no domain (spec 10.7.4).
+            patch(&[("member search", vec![add("/options/name=quiet/domain", json!({"minimum": 1}))])]),
         ),
         case(
             "walk/rule-3-domain-compile",

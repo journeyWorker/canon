@@ -433,16 +433,12 @@ fn state_report(name: &'static str) -> (&'static str, Value) {
     )
 }
 
-fn paged_read(id: &'static str, summary: &'static str, report: &'static str) -> Command {
+/// A read command that reports the state: no argument but the tool-wide ones, and no page (only `member list` pages).
+fn state_read(id: &'static str, summary: &'static str, report: &'static str) -> Command {
     let (name, schema) = state_report(report);
     Command::new(id, summary)
-        .options(vec![Arg::option(
-            "cursor",
-            "string",
-            "Resume after the last item of the previous page (meta.page.nextCursor)",
-        )
-        .value("CURSOR")])
-        .errors(&["CURSOR_INVALID", "STATE_ODD", "USAGE"])
+        .options(Vec::new())
+        .errors(&["STATE_ODD", "USAGE"])
         .output(name, schema)
 }
 
@@ -826,7 +822,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
                 }),
             )
             .examples(&["{tool} init --json"]),
-        paged_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
+        state_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
         member_list(shape.is_1_1),
         member_search(),
         member_tag(),
@@ -839,7 +835,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
                 json!({"type": "object", "additionalProperties": false}),
             )
             .examples(&["{tool} reject --json"]),
-        paged_read("status", "Report the state of the tool", "StatusReport")
+        state_read("status", "Report the state of the tool", "StatusReport")
             .examples(&["{tool} status --json"]),
         Command::new("team add", "Add a team; writes team.txt")
             .writes("replay-safe")
