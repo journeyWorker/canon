@@ -1433,3 +1433,41 @@ fn atip_check_58_a_tool_that_claims_1_0_is_held_to_no_member_of_1_1_and_to_no_hi
     let text = check_of(&reason.envelope()["data"], "L0.contract-version")["reason"].as_str().unwrap_or_default().to_string();
     assert!(text.contains("error.reason"), "{text}");
 }
+
+#[test]
+fn atip_check_76_a_violation_of_a_1_1_check_is_read_in_the_result_as_its_owner_with_the_rule_and_the_reason() {
+    let harness = Harness::new();
+    // One planted violation for each of four checks that 1.1 added: the report says which check owns it, which rule broke and why,
+    // and every other check passes or does not apply.
+    for (config, owner, rule, reason_has) in [
+        (json!({"omitContractVersion": true}), "L0.contract-version", "15.7", "contractVersion"),
+        (json!({"mirrorStderrFor": ["unknown-command"]}), "L0.stderr-result", "5.2", "stderr"),
+        (json!({"metaUnknownMember": true}), "L0.envelope", "6.1-6.6", "unchanged"),
+        (json!({"unregisteredReason": true}), "L0.registry", "7.6.2", "NOT_A_REASON"),
+    ] {
+        let output = harness.check_config(&config);
+        assert_eq!(output.code, Some(1), "{config}: {}", output.stdout);
+        let document = output.envelope();
+        assert_eq!(document["error"]["code"], "LEVEL_NOT_MET", "{config}");
+        assert!(
+            document["error"]["message"].as_str().unwrap_or_default().contains(owner),
+            "the error names the failing check: {}",
+            document["error"]["message"]
+        );
+        let check = check_of(&document["data"], owner);
+        assert_eq!(check["result"], "fail", "{config}");
+        let rules = check["rules"].as_array().expect("rules");
+        assert!(rules.iter().any(|item| item == rule), "{owner} names the rule {rule}: {rules:?}");
+        let reason = check["reason"].as_str().unwrap_or_default();
+        assert!(reason.contains(reason_has), "{owner}: the reason says what broke ({reason_has}): {reason}");
+        assert!(check["observed"].as_array().is_some_and(|calls| !calls.is_empty()), "{owner} shows the invocation that decided it");
+        support::case_verdict(&document["data"], owner).unwrap_or_else(|why| panic!("{config}: {why}"));
+        // The text form reads the same: the failing check's line carries its rules and reason.
+        let text = harness.check(&harness.fixture(&config), false);
+        assert!(
+            text.stderr.lines().any(|line| line.trim_start().starts_with("fail") && line.contains(owner) && line.contains(rule)),
+            "{owner}: {}",
+            text.stderr
+        );
+    }
+}
