@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T08:18:50.991207Z",
+  "attachments": [
+    {
+      "case": "atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-junit.xml",
+      "sha256": "d4f6ca53d67f3ae4cf200afe3e93c086c002ff3dee5b31ea373a3260039de28a"
+    }
+  ],
+  "code_tree": "b12cb85d9282067369eed6fa51553491cd82a0ee",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-junit.xml"
+  },
+  "evidence_sha": "254cd6f4b0785b890131cd0a8f44857a6aab0b16",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 240,
+  "scenario_id": "atip.check.42",
+  "schema": 1,
+  "staging_id": "6973e7a2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

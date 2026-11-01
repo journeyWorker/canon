@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T08:18:50.991207Z",
+  "attachments": [
+    {
+      "case": "checks::rules::tests::atip_check_59_every_code_reason_and_warning_a_document_emits_is_listed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-junit.xml",
+      "sha256": "d4f6ca53d67f3ae4cf200afe3e93c086c002ff3dee5b31ea373a3260039de28a"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_a_hint_that_starts_with_the_tool_name_is_judged_as_one_command_line",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-junit.xml",
+      "sha256": "d4f6ca53d67f3ae4cf200afe3e93c086c002ff3dee5b31ea373a3260039de28a"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_the_markers_and_the_version_are_the_claims",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-junit.xml",
+      "sha256": "d4f6ca53d67f3ae4cf200afe3e93c086c002ff3dee5b31ea373a3260039de28a"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_a_finding_belongs_to_one_rule_and_the_envelope_schema_leaves_the_others_theirs",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-junit.xml",
+      "sha256": "d4f6ca53d67f3ae4cf200afe3e93c086c002ff3dee5b31ea373a3260039de28a"
+    }
+  ],
+  "code_tree": "b12cb85d9282067369eed6fa51553491cd82a0ee",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-junit.xml"
+  },
+  "evidence_sha": "254cd6f4b0785b890131cd0a8f44857a6aab0b16",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 257,
+  "scenario_id": "atip.check.59",
+  "schema": 1,
+  "staging_id": "61b6e2a3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
