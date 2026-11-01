@@ -374,6 +374,7 @@ pub struct ExportManifest {
     pub source_scope: &'static str,
     pub before: Option<String>,
     pub after: Option<String>,
+    /// The records this answer covers: report content, not paging state (`meta.page` is the paging).
     pub record_count: usize,
     pub content_digests: Vec<String>,
     pub records: Vec<ExportRecord>,

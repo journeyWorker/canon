@@ -217,7 +217,7 @@ const INPUT_TOO_LARGE_REASONS: &[ReasonInfo] = &[
 ];
 
 const CURSOR_INVALID_REASONS: &[ReasonInfo] = &[
-    ReasonInfo { reason: "ARGUMENTS_CHANGED", meaning: "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor and --fields", fix: "Repeat the call with the arguments that issued the cursor, or restart without --cursor." },
+    ReasonInfo { reason: "ARGUMENTS_CHANGED", meaning: "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor, --fields and --json", fix: "Repeat the call with the arguments that issued the cursor, or restart without --cursor." },
     ReasonInfo { reason: "EXPIRED", meaning: "this command issued the cursor for these arguments but the record it points after is gone", fix: "Restart the listing without --cursor." },
     ReasonInfo { reason: "FOREIGN", meaning: "the cursor is not one this command issued, or is not a cursor", fix: "Pass the `nextCursor` this same command returned, or restart without --cursor." },
 ];

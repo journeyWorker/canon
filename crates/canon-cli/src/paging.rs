@@ -10,7 +10,7 @@
 //!
 //! A cursor is opaque to the caller. It names the command (`scope`), a digest
 //! of every argument of the call that issued it except `--limit`, `--all`,
-//! `--cursor` and `--fields` (the binding, [`bind_arguments`]) and the key of
+//! `--cursor`, `--fields` and `--json` (the binding, [`bind_arguments`]) and the key of
 //! the last record it returned. A call with another cursor is refused
 //! (`CURSOR_INVALID`, exit 2, nothing written) with the reason that says why:
 //! `FOREIGN` (not a cursor this command issued), `ARGUMENTS_CHANGED` (issued for
@@ -33,8 +33,9 @@ pub const DEFAULT_LIMIT: usize = 100;
 
 const SEPARATOR: char = '\u{1f}';
 
-/// The options that change how much of a listing one call returns, never which records it lists: a cursor is not bound to them.
-const PAGING_ARGS: [&str; 4] = ["limit", "all", "cursor", "fields"];
+/// The options that change how much of a listing one call returns, or how it is shown, never which records it lists: a
+/// cursor is not bound to them. An argument equal to its default is not among them: `--repo .` and no `--repo` are two calls.
+const PAGING_ARGS: [&str; 5] = ["limit", "all", "cursor", "fields", "json"];
 
 /// The paging flags shared by every bounded listing.
 #[derive(Args, Debug, Clone, Default)]
@@ -188,8 +189,8 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
             if binding != page.binding {
                 return Err(invalid_cursor(
                     "ARGUMENTS_CHANGED",
-                    "the cursor was issued for a call with other arguments: a cursor is bound to every argument except --limit, --all, --cursor and --fields",
-                    "repeat the call that issued the cursor and change only --limit, --all or --fields, or drop --cursor to start from the first page",
+                    "the cursor was issued for a call with other arguments: a cursor is bound to every argument except --limit, --all, --cursor, --fields and --json",
+                    "repeat the call that issued the cursor and change only --limit, --all, --fields or --json, or drop --cursor to start from the first page",
                 ));
             }
             let mut found = None;
@@ -310,6 +311,8 @@ mod tests {
                     .arg(clap::Arg::new("kind").long("kind").value_name("K"))
                     .arg(clap::Arg::new("since").long("since").value_name("T"))
                     .arg(clap::Arg::new("json").long("json").action(clap::ArgAction::SetTrue))
+                    .arg(clap::Arg::new("history").long("history").action(clap::ArgAction::SetTrue))
+                    .arg(clap::Arg::new("repo").long("repo").value_name("D").default_value("."))
                     .arg(clap::Arg::new("limit").long("limit").value_name("N"))
                     .arg(clap::Arg::new("all").long("all").action(clap::ArgAction::SetTrue))
                     .arg(clap::Arg::new("cursor").long("cursor").value_name("C"))
@@ -328,6 +331,8 @@ mod tests {
         assert_eq!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--all"]), "--all is the unbounded --limit");
         assert_ne!(base, bind(&["--kind", "handoff", "--since", "2030-01-01"]), "--kind");
         assert_ne!(base, bind(&["--kind", "subject"]), "a dropped filter");
-        assert_ne!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--json"]), "a flag");
+        assert_eq!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--json"]), "the output mode does not change the result set");
+        assert_ne!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--repo", "."]), "an explicit argument equal to its default is a change");
+        assert_ne!(base, bind(&["--kind", "subject", "--since", "2030-01-01", "--history"]), "a flag");
     }
 }

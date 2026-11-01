@@ -1,8 +1,8 @@
 {
-  "policy_digest": "sha256:106b851bac352289019fca88f8095ee042f23efb41a15dd2dbb688fe4240474b",
+  "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-01T12:03:12Z",
-  "note": "휴가 중 승인 위임(2026-11-01 대화): fixture prepare 반영분",
+  "approved_at": "2026-11-01T13:30:18Z",
+  "note": "staleness.max_commits_behind 50→300 (사용자 요청, 2026-11-01 대화)",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",

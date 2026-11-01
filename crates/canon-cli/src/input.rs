@@ -44,9 +44,10 @@ pub const MAX_BYTES: u64 = 8 * 1024 * 1024;
 /// The most elements one batch may hold.
 pub const MAX_ELEMENTS: usize = 10_000;
 
-/// Options a document can never carry: the globals and the safety pair. A
-/// document is a command invocation, not a way past a preview. The spec marks each `flagOnly`.
-pub const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest"];
+/// Options a document can never carry: the globals, the safety pair and `--fields`. A
+/// document is a command invocation, not a way past a preview; `--fields` is read against the output the
+/// invocation selects, and a batch output declares none (spec 6.10). The spec marks each `flagOnly`.
+pub const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest", "fields"];
 
 // ---------------------------------------------------------------- batch report
 
@@ -865,6 +866,11 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     };
     let wants_json = has_flag(lexed, "json");
     let dry_run_given = has_flag(lexed, "dry-run");
+    // `--fields` is read against the output the invocation selects, and the output of a batch declares no `fields` (spec 6.10):
+    // refused before any element is planned, so no element is run and nothing is written.
+    if has_flag(lexed, "fields") {
+        return exit_refused(refused("USAGE", format!("`{command_name}` takes no `--fields` with a batch: the output of a batch declares no fields"), "drop `--fields`, or run one element at a time with it").field("--fields"));
+    }
 
     // Validate every element before the first write.
     let mut argvs: Vec<Vec<String>> = Vec::with_capacity(items.len());

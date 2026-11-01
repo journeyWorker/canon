@@ -3224,6 +3224,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "With --json, keep only these sections of the surface (comma-separated field paths; `canon schema context --json` lists them under outputs[].fields.paths)",
           "name": "fields",
           "repeatable": false,
@@ -9782,6 +9783,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "With --json, keep only these members of each scenario (comma-separated field paths: state, reason, expiry, tracking; projectId and scenarioId are always kept)",
           "name": "fields",
           "repeatable": false,
@@ -13202,7 +13204,8 @@
         },
         {
           "default": null,
-          "help": "With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)",
+          "flagOnly": true,
+          "help": "Keep only these members of the answer this call prints (comma-separated field paths): of each exported record in the manifest, of the written answer with --json and --output, of the preview with --dry-run; `canon schema export --json` lists the paths per output",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -13260,7 +13263,7 @@
           "mediaType": "application/json",
           "schemaRef": "#/schemas/ExportReport",
           "schemaVersion": "2.1",
-          "when": "neither --output nor --dry-run is given"
+          "when": "--dry-run is not given, and --output is not given or --json is not (in text mode the manifest goes to stdout or to the --output file)"
         },
         {
           "fields": {
@@ -13279,7 +13282,7 @@
           "kind": "report",
           "schemaRef": "#/schemas/ExportWrittenReport",
           "schemaVersion": "1.1",
-          "when": "--output is given and --dry-run is not"
+          "when": "--json and --output are given and --dry-run is not"
         },
         {
           "fields": {
@@ -13491,10 +13494,6 @@
               "description": "Validate fully and report what would be written, without writing anything",
               "type": "boolean"
             },
-            "fields": {
-              "description": "With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)",
-              "type": "string"
-            },
             "includeSensitive": {
               "description": "Include records marked sensitive (only when policy explicitly allows it)",
               "type": "boolean"
@@ -13560,10 +13559,6 @@
               "description": "Validate fully and report what would be written, without writing anything",
               "type": "boolean"
             },
-            "fields": {
-              "description": "With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)",
-              "type": "string"
-            },
             "includeSensitive": {
               "description": "Include records marked sensitive (only when policy explicitly allows it)",
               "type": "boolean"
@@ -13628,6 +13623,7 @@
               "type": "string"
             },
             "recordCount": {
+              "description": "The records this answer covers: report content, not paging state (`meta.page` is the paging).",
               "format": "uint",
               "minimum": 0,
               "type": "integer"
@@ -13814,6 +13810,7 @@
               "type": "integer"
             },
             "recordCount": {
+              "description": "The records this answer covers: report content, not paging state (`meta.page` is the paging).",
               "format": "uint",
               "minimum": 0,
               "type": "integer"
@@ -16186,6 +16183,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "With --json, keep only these members of each finding (comma-separated field paths: severity, disposition, reviewer, summary, resolutionSha, fileRef, reason; round and seq are always kept)",
           "name": "fields",
           "repeatable": false,
@@ -24470,6 +24468,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "With --json, keep only these members of each record (comma-separated field paths; `canon schema query --json` lists them under outputs[].fields.paths)",
           "name": "fields",
           "repeatable": false,
@@ -24981,6 +24980,7 @@
           "description": "`canon query --json`'s report (`QueryReport`): the page state travels in\n`meta` ([`QueryOutcome::page`]), not here.",
           "properties": {
             "count": {
+              "description": "The records in this answer: report content, not paging state (`meta.page` is the paging).",
               "format": "uint",
               "minimum": 0,
               "type": "integer"
@@ -31067,6 +31067,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "With --json, keep only these members of the report (comma-separated field paths; `canon schema status --json` lists them under outputs[].fields.paths)",
           "name": "fields",
           "repeatable": false,
@@ -37594,7 +37595,7 @@
       "reasons": [
         {
           "fix": "Repeat the call with the arguments that issued the cursor, or restart without --cursor.",
-          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor and --fields",
+          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor, --fields and --json",
           "reason": "ARGUMENTS_CHANGED"
         },
         {

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-paging-fields",
+    "role": "implementer",
+    "session_id": "s-0-34-paging-fields"
+  },
+  "at": "2026-11-01T13:13:27.040269Z",
+  "attachments": [
+    {
+      "case": "atip_paging_13_export_is_three_outputs_and_fields_cuts_the_manifest_and_the_file",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-paging-fields.xml",
+      "sha256": "d736014bc5658cef095c519c6bfe78171005512b3cd8f332e7403982e1cbf016"
+    }
+  ],
+  "code_tree": "01c22c3ff6f286b3485b64eba07f3be53fbde8aa",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-paging-fields.xml"
+  },
+  "evidence_sha": "3fe9f54cf5db8d52e81fa40dda834baa35434def",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "atip.paging.13",
+  "schema": 1,
+  "staging_id": "0325a74a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
