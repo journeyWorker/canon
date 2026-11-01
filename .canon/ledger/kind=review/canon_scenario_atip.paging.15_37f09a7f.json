@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-paging-fields",
+    "role": "reviewer",
+    "session_id": "s-0-34-paging-fields-rev"
+  },
+  "at": "2026-11-01T14:10:09.118545Z",
+  "code_tree": "01c22c3ff6f286b3485b64eba07f3be53fbde8aa",
+  "kind": "review",
+  "pin": "90d27a5d36241b7c56e1011856a261312e4191c5",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_paging_15_the_camel_case_alias_of_a_snake_case_key_and_the_snake_case_alias_of_a_report_member_are_gone"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "96719d7e9d2668187d5e0c75e9e3e746baf68eac790e1adc30b6376fff47923e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-paging-fields/brief.md"
+  },
+  "review_id": "01M6BQ4FJYS4HK6FGCRKC6SDXN",
+  "reviewer": "rev-paging-fields",
+  "scenario_id": "atip.paging.15",
+  "schema": 2,
+  "worktree_dirty": false
+}
