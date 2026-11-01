@@ -189,7 +189,7 @@ pub struct DivergenceListArgs {
     pub json: bool,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry, tracking; an unknown field is refused (camelCase and snake_case both match)
-    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
-    pub fields: Option<Vec<String>>,
+    /// With --json, keep only these members of each scenario (comma-separated field paths: state, reason, expiry, tracking; projectId and scenarioId are always kept)
+    #[arg(long, value_name = "FIELDS")]
+    pub fields: Option<String>,
 }

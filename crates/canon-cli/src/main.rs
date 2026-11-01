@@ -86,6 +86,7 @@ fn run() -> ExitCode {
     };
     let parsed = matches.clone();
     record_context(&command, &parsed);
+    canon_cli::paging::bind_arguments(&command, &parsed);
     let cli = match Cli::from_arg_matches_mut(&mut matches) {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),

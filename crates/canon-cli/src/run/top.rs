@@ -32,7 +32,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
     let Some(plugin_id) = plugin else {
         return match crate::query::run(repo, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref(), history) {
             Ok(outcome) => {
-                let outcome = match crate::query::page_outcome(outcome, &page, fields, false) {
+                let outcome = match crate::query::page_outcome(outcome, &page, fields.as_deref(), false) {
                     Ok(outcome) => outcome,
                     Err(err) => return ExitCode::from(err.emit("canon query", json)),
                 };
@@ -52,7 +52,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
 
     match crate::query::run_with_plugin(repo, kind, since, &plugin_id, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         Ok((outcome, plugin_outcome)) => {
-            let outcome = match crate::query::page_outcome(outcome, &page, fields, true) {
+            let outcome = match crate::query::page_outcome(outcome, &page, fields.as_deref(), true) {
                 Ok(outcome) => outcome,
                 Err(err) => return ExitCode::from(err.emit("canon query", json)),
             };
@@ -177,12 +177,11 @@ pub(crate) fn run_init(repo: &std::path::Path, check_config: bool, options: crat
 /// via [`crate::context::resolve_repo_root`] (design D7, task 1.4) —
 /// the `--repo`-omitted/`--repo .` nearest-`canon.yaml` ancestor walk —
 /// before [`crate::context::resolve_surface`] ever reads it.
-pub(crate) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>, role: Option<crate::role::Role>) -> ExitCode {
-    if let Some(requested) = &fields {
-        if let Err(e) = crate::paging::check_known("canon context", requested, &crate::context::SURFACE_FIELDS) {
-            return ExitCode::from(e.emit("canon context", json));
-        }
-    }
+pub(crate) fn run_context(repo: &std::path::Path, json: bool, fields: Option<String>, role: Option<crate::role::Role>) -> ExitCode {
+    let chosen = match crate::fields::choose("context", fields.as_deref(), None) {
+        Ok(chosen) => chosen,
+        Err(e) => return ExitCode::from(e.emit("canon context", json)),
+    };
     let repo = crate::context::resolve_repo_root(repo);
     // `context` needs no canon.yaml: only a repo that has one can hold 0.27-era state.
     if repo.join("canon.yaml").is_file() {
@@ -190,15 +189,13 @@ pub(crate) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec
     }
     let surface = crate::context::resolve_surface(&repo, crate::context::ContextOptions { role });
     if json {
-        match &fields {
-            Some(requested) => {
-                let projected = crate::paging::project(&serde_json::to_value(&surface).expect("the surface serializes"), requested);
-                crate::json_out::data("context", &crate::json_out::Projected::<crate::context::ContextReport>::new(projected));
-            }
-            None => crate::json_out::data("context", &surface),
+        if let Some(chosen) = &chosen {
+            chosen.activate();
         }
+        crate::json_out::data("context", &surface);
     } else {
-        print!("{}", crate::context::render_outline(&surface, fields.as_deref()));
+        let sections = chosen.as_ref().map(crate::fields::Chosen::paths);
+        print!("{}", crate::context::render_outline(&surface, sections.as_deref()));
     }
     ExitCode::SUCCESS
 }

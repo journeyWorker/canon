@@ -217,6 +217,24 @@ pub struct OutputDoc {
     /// The invocation that selects this output when there are several.
     #[serde(rename = "when", skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
+    /// The field paths `--fields` may select from this output (spec 6.10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<FieldsDoc>,
+}
+
+/// The field selection an output declares (spec 10.9.1): where the records are and which paths a caller may select.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct FieldsDoc {
+    /// RFC 6901 pointer of the record array in `data`, or `""` when `data` is the record.
+    pub records: String,
+    /// The selectable paths, each in its one spelling (spec 6.10).
+    pub paths: Vec<String>,
+    /// The paths always kept; they are not selectable.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub keep: Vec<String>,
+    /// The selection without `--fields`, a subset of `paths`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<Vec<String>>,
 }
 
 /// The `--input` declaration of a command (spec 10.10).

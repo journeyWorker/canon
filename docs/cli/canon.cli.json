@@ -3126,7 +3126,7 @@
         },
         {
           "default": null,
-          "help": "With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused (camelCase and snake_case both match)",
+          "help": "With --json, keep only these sections of the surface (comma-separated field paths; `canon schema context --json` lists them under outputs[].fields.paths)",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -3153,6 +3153,21 @@
       ],
       "outputs": [
         {
+          "fields": {
+            "paths": [
+              "capabilityVersion",
+              "cel",
+              "commands",
+              "enums",
+              "families",
+              "joinKeys",
+              "kinds",
+              "policy",
+              "review",
+              "vocab"
+            ],
+            "records": ""
+          },
           "kind": "report",
           "schemaRef": "#/schemas/ContextReport",
           "schemaVersion": "1.0"
@@ -9461,7 +9476,7 @@
         },
         {
           "default": null,
-          "help": "With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry, tracking; an unknown field is refused (camelCase and snake_case both match)",
+          "help": "With --json, keep only these members of each scenario (comma-separated field paths: state, reason, expiry, tracking; projectId and scenarioId are always kept)",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -9488,6 +9503,19 @@
       ],
       "outputs": [
         {
+          "fields": {
+            "keep": [
+              "projectId",
+              "scenarioId"
+            ],
+            "paths": [
+              "expiry",
+              "reason",
+              "state",
+              "tracking"
+            ],
+            "records": "/scenarios"
+          },
           "kind": "report",
           "schemaRef": "#/schemas/DivergenceListReport",
           "schemaVersion": "1.0"
@@ -12450,7 +12478,7 @@
         },
         {
           "default": null,
-          "help": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)",
+          "help": "With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -12495,10 +12523,59 @@
       ],
       "outputs": [
         {
+          "fields": {
+            "paths": [
+              "at",
+              "digest",
+              "id",
+              "kind"
+            ],
+            "records": "/records"
+          },
           "kind": "artifact",
           "mediaType": "application/json",
           "schemaRef": "#/schemas/ExportReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "2.1",
+          "when": "neither --output nor --dry-run is given"
+        },
+        {
+          "fields": {
+            "keep": [
+              "unchanged",
+              "waitingOn",
+              "nextOmitted"
+            ],
+            "paths": [
+              "kind",
+              "output",
+              "recordCount"
+            ],
+            "records": ""
+          },
+          "kind": "report",
+          "schemaRef": "#/schemas/ExportWrittenReport",
+          "schemaVersion": "1.1",
+          "when": "--output is given and --dry-run is not"
+        },
+        {
+          "fields": {
+            "keep": [
+              "unchanged",
+              "waitingOn",
+              "nextOmitted"
+            ],
+            "paths": [
+              "dryRun",
+              "kind",
+              "output",
+              "recordCount"
+            ],
+            "records": ""
+          },
+          "kind": "report",
+          "schemaRef": "#/schemas/ExportPreviewReport",
+          "schemaVersion": "1.1",
+          "when": "--dry-run is given"
         },
         {
           "batch": true,
@@ -12545,27 +12622,13 @@
           "title": "BatchReport",
           "type": "object"
         },
-        "BatchExportReportExportReport": {
-          "anyOf": [
-            {
-              "$ref": "#/schemas/ExportManifest"
-            },
-            {
-              "$ref": "#/schemas/ExportWritten"
-            },
-            {
-              "$ref": "#/schemas/ExportPreview"
-            }
-          ],
-          "description": "`canon export --json` (`ExportReport`): the manifest, or with `--output` the\nfile it was written to; with `--dry-run` the preview."
-        },
         "BatchItem": {
           "description": "One element of a batch, in input order.",
           "properties": {
             "data": {
               "anyOf": [
                 {
-                  "$ref": "#/schemas/BatchExportReportExportReport"
+                  "$ref": "#/schemas/ExportAnswer"
                 },
                 {
                   "type": "null"
@@ -12667,6 +12730,20 @@
           ],
           "type": "object"
         },
+        "ExportAnswer": {
+          "anyOf": [
+            {
+              "$ref": "#/schemas/ExportManifest"
+            },
+            {
+              "$ref": "#/schemas/ExportWritten"
+            },
+            {
+              "$ref": "#/schemas/ExportPreview"
+            }
+          ],
+          "description": "One answer of `export`, as a batch item carries it: the manifest, the name of the file it was written to, or the preview."
+        },
         "ExportArguments": {
           "additionalProperties": false,
           "properties": {
@@ -12691,7 +12768,7 @@
               "type": "boolean"
             },
             "fields": {
-              "description": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)",
+              "description": "With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)",
               "type": "string"
             },
             "includeSensitive": {
@@ -12760,7 +12837,7 @@
               "type": "boolean"
             },
             "fields": {
-              "description": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)",
+              "description": "With --json, keep only these members of each exported record (comma-separated field paths: kind, at, id, digest)",
               "type": "string"
             },
             "includeSensitive": {
@@ -12803,7 +12880,7 @@
           "type": "object"
         },
         "ExportManifest": {
-          "description": "The `canon.retention.export` manifest: what `export` writes to stdout or\n`--output`, and what `--json` envelopes (without `meta`, which then travels\nin the envelope's `meta`).",
+          "description": "The `canon.retention.export` manifest: what `export` writes to stdout or\n`--output`, and what `--json` envelopes (`ExportReport`). The page state is `meta.page` of the envelope; the file and\nthe stdout document hold it beside the manifest ([`ExportDocument`]).",
           "properties": {
             "after": {
               "type": [
@@ -12826,17 +12903,6 @@
             "kind": {
               "type": "string"
             },
-            "meta": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/PageMeta"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The page state; only in the manifest file or stdout document."
-            },
             "recordCount": {
               "format": "uint",
               "minimum": 0,
@@ -12844,7 +12910,7 @@
             },
             "records": {
               "items": {
-                "$ref": "#/schemas/ExportRecordView"
+                "$ref": "#/schemas/ExportRecord"
               },
               "type": "array"
             },
@@ -12918,6 +12984,55 @@
           ],
           "type": "object"
         },
+        "ExportPreviewReport": {
+          "description": "What `--json --dry-run` returns: what the run would write, nothing written.",
+          "properties": {
+            "dryRun": {
+              "description": "Always true.",
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "output": {
+              "description": "The file `--output` names, when given.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "recordCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "dryRun",
+            "output",
+            "kind",
+            "recordCount"
+          ],
+          "title": "ExportPreview",
+          "type": "object"
+        },
         "ExportRecord": {
           "description": "One exported record: identity and digest, never the content.",
           "properties": {
@@ -12945,30 +13060,97 @@
           ],
           "type": "object"
         },
-        "ExportRecordView": {
-          "anyOf": [
-            {
-              "$ref": "#/schemas/ExportRecord"
-            },
-            {
-              "$ref": "#/schemas/ProjectedExportRecord"
-            }
-          ]
-        },
         "ExportReport": {
-          "anyOf": [
-            {
-              "$ref": "#/schemas/ExportManifest"
+          "description": "The `canon.retention.export` manifest: what `export` writes to stdout or\n`--output`, and what `--json` envelopes (`ExportReport`). The page state is `meta.page` of the envelope; the file and\nthe stdout document hold it beside the manifest ([`ExportDocument`]).",
+          "properties": {
+            "after": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
-            {
-              "$ref": "#/schemas/ExportWritten"
+            "before": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
-            {
-              "$ref": "#/schemas/ExportPreview"
+            "contentDigests": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "recordCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "records": {
+              "items": {
+                "$ref": "#/schemas/ExportRecord"
+              },
+              "type": "array"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "sensitive": {
+              "type": "boolean"
+            },
+            "sensitiveRecords": {
+              "description": "Present only with `--include-sensitive`: the full records, verbatim.",
+              "items": {
+                "$ref": "#/schemas/LedgerRecord"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "sourceScope": {
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
             }
+          },
+          "required": [
+            "schema",
+            "version",
+            "kind",
+            "sourceScope",
+            "before",
+            "after",
+            "recordCount",
+            "contentDigests",
+            "records",
+            "sensitive"
           ],
-          "description": "`canon export --json` (`ExportReport`): the manifest, or with `--output` the\nfile it was written to; with `--dry-run` the preview.",
-          "title": "ExportReport"
+          "title": "ExportManifest",
+          "type": "object"
         },
         "ExportWritten": {
           "description": "What `--json --output` returns: the file holds the manifest, this names it.",
@@ -12990,6 +13172,46 @@
             "kind",
             "recordCount"
           ],
+          "type": "object"
+        },
+        "ExportWrittenReport": {
+          "description": "What `--json --output` returns: the file holds the manifest, this names it.",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "output": {
+              "type": "string"
+            },
+            "recordCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "output",
+            "kind",
+            "recordCount"
+          ],
+          "title": "ExportWritten",
           "type": "object"
         },
         "ItemStatus": {
@@ -13019,64 +13241,6 @@
         },
         "LedgerRecord": {
           "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`",
-          "type": "object"
-        },
-        "PageMeta": {
-          "description": "What a page says about the rest of the result.",
-          "properties": {
-            "nextCursor": {
-              "description": "Present exactly when more records follow.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "returned": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "total": {
-              "description": "Every record the command matched, across all pages.",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "returned",
-            "total"
-          ],
-          "type": "object"
-        },
-        "ProjectedExportRecord": {
-          "description": "An exported record cut to the `--fields` asked for.",
-          "properties": {
-            "at": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "digest": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "kind": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
           "type": "object"
         }
       },
@@ -15085,7 +15249,7 @@
         },
         {
           "default": null,
-          "help": "With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref; camelCase and snake_case both match",
+          "help": "With --json, keep only these members of each finding (comma-separated field paths: severity, disposition, reviewer, summary, resolutionSha, fileRef, reason; round and seq are always kept)",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -15112,6 +15276,22 @@
       ],
       "outputs": [
         {
+          "fields": {
+            "keep": [
+              "round",
+              "seq"
+            ],
+            "paths": [
+              "disposition",
+              "fileRef",
+              "reason",
+              "resolutionSha",
+              "reviewer",
+              "severity",
+              "summary"
+            ],
+            "records": "/findings"
+          },
           "kind": "report",
           "schemaRef": "#/schemas/FindingListReport",
           "schemaVersion": "1.0"
@@ -23004,7 +23184,7 @@
         },
         {
           "default": null,
-          "help": "With --json, keep only these top-level record fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)",
+          "help": "With --json, keep only these members of each record (comma-separated field paths; `canon schema query --json` lists them under outputs[].fields.paths)",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -23031,6 +23211,110 @@
       ],
       "outputs": [
         {
+          "fields": {
+            "paths": [
+              "abandoned_at",
+              "actor",
+              "approval",
+              "artifacts",
+              "at",
+              "attachments",
+              "audit",
+              "body",
+              "brief_override",
+              "case",
+              "chain_id",
+              "change_id",
+              "change_ids",
+              "claimed_at",
+              "claimed_by",
+              "client",
+              "code_tree",
+              "completed_at",
+              "content",
+              "depends_on",
+              "description",
+              "detail",
+              "disposition",
+              "domain",
+              "ended_at",
+              "evidence_note",
+              "evidence_sha",
+              "file_ref",
+              "flagged",
+              "from_role",
+              "id",
+              "injected_guidance",
+              "introduced_by",
+              "introduced_unknown",
+              "kind",
+              "label",
+              "lane",
+              "lifecycle",
+              "lineage",
+              "openspec_change_slug",
+              "outcome",
+              "overlay",
+              "owner_role",
+              "parent_handoff_id",
+              "parent_run_id",
+              "pin",
+              "pins",
+              "pr",
+              "project_id",
+              "project_key",
+              "provenance_ref",
+              "reason",
+              "regime_key",
+              "removed",
+              "reopen",
+              "research_vendor_slug",
+              "resolution_code_tree",
+              "resolution_sha",
+              "resolution_worktree_dirty",
+              "review_id",
+              "reviewed_sha",
+              "reviewer",
+              "reviewer_harness",
+              "reviewer_model",
+              "reviewer_provider",
+              "reward",
+              "role",
+              "round",
+              "run_id",
+              "run_seq",
+              "scenario_digest",
+              "scenario_id",
+              "scenario_ids",
+              "scenario_refs",
+              "schema",
+              "seq",
+              "session_id",
+              "severity",
+              "sha",
+              "source_digest",
+              "source_task_id",
+              "started_at",
+              "state",
+              "status",
+              "status_override",
+              "status_reason",
+              "steps",
+              "subject_id",
+              "subject_ids",
+              "summary",
+              "surface_ref",
+              "tags",
+              "task_id",
+              "title",
+              "to_role",
+              "verdict",
+              "workspace_key",
+              "workspace_label",
+              "worktree_dirty"
+            ],
+            "records": "/records"
+          },
           "kind": "report",
           "schemaRef": "#/schemas/QueryReport",
           "schemaVersion": "1.0"
@@ -23064,10 +23348,6 @@
             "target",
             "id"
           ],
-          "type": "object"
-        },
-        "LedgerRecord": {
-          "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`",
           "type": "object"
         },
         "QueryDangling": {
@@ -23106,6 +23386,309 @@
             "byReference",
             "references"
           ],
+          "type": "object"
+        },
+        "QueryRecord": {
+          "description": "A ledger record of the kind `--kind` names, verbatim: it keeps its own snake_case members (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted. `properties` lists the members of every kind; a record has the ones its kind declares",
+          "properties": {
+            "abandoned_at": {
+              "description": "a member of the records of: handoff"
+            },
+            "actor": {
+              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+            },
+            "approval": {
+              "description": "a member of the records of: evidence"
+            },
+            "artifacts": {
+              "description": "a member of the records of: review"
+            },
+            "at": {
+              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+            },
+            "attachments": {
+              "description": "a member of the records of: evidence"
+            },
+            "audit": {
+              "description": "a member of the records of: evidence"
+            },
+            "body": {
+              "description": "a member of the records of: handoff"
+            },
+            "brief_override": {
+              "description": "a member of the records of: evidence"
+            },
+            "case": {
+              "description": "a member of the records of: scenario"
+            },
+            "chain_id": {
+              "description": "a member of the records of: handoff"
+            },
+            "change_id": {
+              "description": "a member of the records of: change, review, finding"
+            },
+            "change_ids": {
+              "description": "a member of the records of: subject"
+            },
+            "claimed_at": {
+              "description": "a member of the records of: handoff"
+            },
+            "claimed_by": {
+              "description": "a member of the records of: handoff"
+            },
+            "client": {
+              "description": "a member of the records of: session"
+            },
+            "code_tree": {
+              "description": "a member of the records of: review, divergence, evidence, finding"
+            },
+            "completed_at": {
+              "description": "a member of the records of: handoff"
+            },
+            "content": {
+              "description": "a member of the records of: strategy_item"
+            },
+            "depends_on": {
+              "description": "a member of the records of: task"
+            },
+            "description": {
+              "description": "a member of the records of: scenario"
+            },
+            "detail": {
+              "description": "a member of the records of: event, divergence"
+            },
+            "disposition": {
+              "description": "a member of the records of: finding"
+            },
+            "domain": {
+              "description": "a member of the records of: subject"
+            },
+            "ended_at": {
+              "description": "a member of the records of: session, run"
+            },
+            "evidence_note": {
+              "description": "a member of the records of: task"
+            },
+            "evidence_sha": {
+              "description": "a member of the records of: evidence"
+            },
+            "file_ref": {
+              "description": "a member of the records of: finding"
+            },
+            "flagged": {
+              "description": "a member of the records of: evidence"
+            },
+            "from_role": {
+              "description": "a member of the records of: handoff"
+            },
+            "id": {
+              "description": "a member of the records of: handoff"
+            },
+            "injected_guidance": {
+              "description": "a member of the records of: run"
+            },
+            "introduced_by": {
+              "description": "a member of the records of: finding"
+            },
+            "introduced_unknown": {
+              "description": "a member of the records of: finding"
+            },
+            "kind": {
+              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+            },
+            "label": {
+              "description": "a member of the records of: event"
+            },
+            "lane": {
+              "description": "a member of the records of: scenario"
+            },
+            "lifecycle": {
+              "description": "a member of the records of: evidence"
+            },
+            "lineage": {
+              "description": "a member of the records of: run"
+            },
+            "openspec_change_slug": {
+              "description": "a member of the records of: handoff"
+            },
+            "outcome": {
+              "description": "a member of the records of: review"
+            },
+            "overlay": {
+              "description": "with --plugin, the plugin's projected members of the record"
+            },
+            "owner_role": {
+              "description": "a member of the records of: subject"
+            },
+            "parent_handoff_id": {
+              "description": "a member of the records of: handoff"
+            },
+            "parent_run_id": {
+              "description": "a member of the records of: run"
+            },
+            "pin": {
+              "description": "a member of the records of: review"
+            },
+            "pins": {
+              "description": "a member of the records of: review"
+            },
+            "pr": {
+              "description": "a member of the records of: trajectory"
+            },
+            "project_id": {
+              "description": "a member of the records of: scenario, review, divergence, evidence"
+            },
+            "project_key": {
+              "description": "a member of the records of: session"
+            },
+            "provenance_ref": {
+              "description": "a member of the records of: review"
+            },
+            "reason": {
+              "description": "a member of the records of: finding"
+            },
+            "regime_key": {
+              "description": "a member of the records of: strategy_item"
+            },
+            "removed": {
+              "description": "a member of the records of: scenario"
+            },
+            "reopen": {
+              "description": "a member of the records of: subject"
+            },
+            "research_vendor_slug": {
+              "description": "a member of the records of: handoff"
+            },
+            "resolution_code_tree": {
+              "description": "a member of the records of: finding"
+            },
+            "resolution_sha": {
+              "description": "a member of the records of: finding"
+            },
+            "resolution_worktree_dirty": {
+              "description": "a member of the records of: finding"
+            },
+            "review_id": {
+              "description": "a member of the records of: review, finding"
+            },
+            "reviewed_sha": {
+              "description": "a member of the records of: finding"
+            },
+            "reviewer": {
+              "description": "a member of the records of: review, divergence, finding"
+            },
+            "reviewer_harness": {
+              "description": "a member of the records of: review"
+            },
+            "reviewer_model": {
+              "description": "a member of the records of: review"
+            },
+            "reviewer_provider": {
+              "description": "a member of the records of: review"
+            },
+            "reward": {
+              "description": "a member of the records of: trajectory"
+            },
+            "role": {
+              "description": "a member of the records of: strategy_item"
+            },
+            "round": {
+              "description": "a member of the records of: divergence, finding"
+            },
+            "run_id": {
+              "description": "a member of the records of: run, event, trajectory, evidence"
+            },
+            "run_seq": {
+              "description": "a member of the records of: divergence, evidence"
+            },
+            "scenario_digest": {
+              "description": "a member of the records of: scenario"
+            },
+            "scenario_id": {
+              "description": "a member of the records of: scenario, review, divergence, evidence"
+            },
+            "scenario_ids": {
+              "description": "a member of the records of: finding"
+            },
+            "scenario_refs": {
+              "description": "a member of the records of: task"
+            },
+            "schema": {
+              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+            },
+            "seq": {
+              "description": "a member of the records of: event, handoff, finding"
+            },
+            "session_id": {
+              "description": "a member of the records of: session, run, trajectory"
+            },
+            "severity": {
+              "description": "a member of the records of: finding"
+            },
+            "sha": {
+              "description": "a member of the records of: divergence, trajectory"
+            },
+            "source_digest": {
+              "description": "a member of the records of: scenario"
+            },
+            "source_task_id": {
+              "description": "a member of the records of: strategy_item"
+            },
+            "started_at": {
+              "description": "a member of the records of: session, run"
+            },
+            "state": {
+              "description": "a member of the records of: handoff"
+            },
+            "status": {
+              "description": "a member of the records of: change, task, run, divergence, subject"
+            },
+            "status_override": {
+              "description": "a member of the records of: subject"
+            },
+            "status_reason": {
+              "description": "a member of the records of: subject"
+            },
+            "steps": {
+              "description": "a member of the records of: scenario"
+            },
+            "subject_id": {
+              "description": "a member of the records of: scenario, subject"
+            },
+            "subject_ids": {
+              "description": "a member of the records of: change"
+            },
+            "summary": {
+              "description": "a member of the records of: change, subject, finding"
+            },
+            "surface_ref": {
+              "description": "a member of the records of: evidence"
+            },
+            "tags": {
+              "description": "a member of the records of: handoff"
+            },
+            "task_id": {
+              "description": "a member of the records of: task, run, trajectory, evidence"
+            },
+            "title": {
+              "description": "a member of the records of: change, task, scenario, handoff, subject"
+            },
+            "to_role": {
+              "description": "a member of the records of: handoff"
+            },
+            "verdict": {
+              "description": "a member of the records of: evidence"
+            },
+            "workspace_key": {
+              "description": "a member of the records of: session"
+            },
+            "workspace_label": {
+              "description": "a member of the records of: session"
+            },
+            "worktree_dirty": {
+              "description": "a member of the records of: review, divergence, evidence, finding"
+            }
+          },
           "type": "object"
         },
         "QueryReport": {
@@ -23149,7 +23732,7 @@
             },
             "records": {
               "items": {
-                "$ref": "#/schemas/LedgerRecord"
+                "$ref": "#/schemas/QueryRecord"
               },
               "type": "array"
             },
@@ -26633,6 +27216,44 @@
           ],
           "type": "object"
         },
+        "FieldsDoc": {
+          "description": "The field selection an output declares (spec 10.9.1): where the records are and which paths a caller may select.",
+          "properties": {
+            "default": {
+              "description": "The selection without `--fields`, a subset of `paths`.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "keep": {
+              "description": "The paths always kept; they are not selectable.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "paths": {
+              "description": "The selectable paths, each in its one spelling (spec 6.10).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "records": {
+              "description": "RFC 6901 pointer of the record array in `data`, or `\"\"` when `data` is the record.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "records",
+            "paths"
+          ],
+          "type": "object"
+        },
         "GroupDoc": {
           "description": "`schema <GROUP> --json` (spec 10.4).",
           "properties": {
@@ -26889,6 +27510,17 @@
                 "string",
                 "null"
               ]
+            },
+            "fields": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/FieldsDoc"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The field paths `--fields` may select from this output (spec 6.10)."
             },
             "kind": {
               "$ref": "#/schemas/OutputKind"
@@ -28654,7 +29286,6 @@
       "errors": [
         "CONFIG_MISSING",
         "INTERNAL",
-        "SERIALIZE_FAILED",
         "UNKNOWN_ROLE",
         "UNVERIFIABLE",
         "USAGE"
@@ -28687,7 +29318,7 @@
         },
         {
           "default": null,
-          "help": "With --json, keep only these top-level report fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)",
+          "help": "With --json, keep only these members of the report (comma-separated field paths; `canon schema status --json` lists them under outputs[].fields.paths)",
           "name": "fields",
           "repeatable": false,
           "required": false,
@@ -28714,6 +29345,24 @@
       ],
       "outputs": [
         {
+          "fields": {
+            "keep": [
+              "unchanged",
+              "waitingOn",
+              "nextOmitted"
+            ],
+            "paths": [
+              "audits",
+              "canonVersion",
+              "danglingReferences",
+              "policy",
+              "statusVersion",
+              "subjects",
+              "unowned",
+              "warnings"
+            ],
+            "records": ""
+          },
           "kind": "report",
           "schemaRef": "#/schemas/StatusReport",
           "schemaVersion": "1.1"
@@ -35059,7 +35708,24 @@
       "code": "CURSOR_INVALID",
       "exit": 2,
       "fix": "Restart the listing without --cursor and page with the cursor it returns.",
-      "meaning": "`--cursor` is not one this listing issued, or the record it points after is gone",
+      "meaning": "`--cursor` is not one this listing issued, was issued for other arguments, or points after a record that is gone; `reason` says which",
+      "reasons": [
+        {
+          "fix": "Repeat the call with the arguments that issued the cursor, or restart without --cursor.",
+          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor and --fields",
+          "reason": "ARGUMENTS_CHANGED"
+        },
+        {
+          "fix": "Restart the listing without --cursor.",
+          "meaning": "this command issued the cursor for these arguments but the record it points after is gone",
+          "reason": "EXPIRED"
+        },
+        {
+          "fix": "Pass the `nextCursor` this same command returned, or restart without --cursor.",
+          "meaning": "the cursor is not one this command issued, or is not a cursor",
+          "reason": "FOREIGN"
+        }
+      ],
       "retryable": false
     },
     {

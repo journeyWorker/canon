@@ -288,6 +288,11 @@
     {
       "code": "CURSOR_INVALID",
       "exit": 2,
+      "reasons": [
+        "ARGUMENTS_CHANGED",
+        "EXPIRED",
+        "FOREIGN"
+      ],
       "retryable": false
     },
     {
