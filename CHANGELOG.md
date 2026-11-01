@@ -102,7 +102,6 @@ The shared part of the projection is in the `atip` crate (`atip::doc`: the typed
 | `data` of a run: `level`, `passed`, `checks` | also `data.contractVersion`, the minor the checks judged |
 | a fixture of a check that lacks an entry it needs: `unprovided` | unchanged, and a violation the run saw is `fail` whatever the fixture lacks |
 
-<<<<<<< HEAD
 **`atip check --level L1`.** `atip check` opens L1 (the self-description, the arguments and the data) of atip/1 1.1.1 (https://github.com/journeyWorker/atip, tag v1.1.1, `approaches/checker.md`); `L2` is still `LEVEL_UNSUPPORTED` and its hint says 0.35. A run at L1 is the 28 L0 checks and 31 L1 checks (25 MUST and 6 SHOULD for a 1.1 claim; the report's `data.level` is `L1`). The checks that judged what L1 now owns change as follows.
 
 | 0.33 and the L0 of 0.34 | 0.34 |
@@ -118,8 +117,6 @@ The shared part of the projection is in the `atip` crate (`atip::doc`: the typed
 
 The 31 L1 checks (`L1.tree`, `L1.no-state`, `L1.walk`, `L1.quoted-path`, `L1.schema-errors`, `L1.registry`, `L1.reasons`, `L1.reasons-reserved`, `L1.warnings`, `L1.reserved-applicable`, `L1.codes-known`, `L1.groups-not-runnable`, `L1.grammar`, `L1.depth`, `L1.one-meaning`, `L1.one-meaning-values`, `L1.examples`, `L1.example-runs`, `L1.constraints`, `L1.domains`, `L1.patterns`, `L1.numbers`, `L1.validators`, `L1.output-data`, `L1.next`, `L1.hint-command`, `L1.help-line`, `L1.defaults`, `L1.deterministic`, `L1.paging`, `L1.fields`) judge, for every command the tree names, the documents against `schema-doc.schema.json` and the rules of spec 10.13 that JSON Schema cannot say (the ones `scripts/check.ts` of the contract implements, ported to Rust), and probe what the documents declare with real invocations: one invocation per rule group of each `constraints` list, values at each bound of each `domain`, the two numbers beyond the safe integers, every validator's `rejects`, `--limit 1` and the next page, a reused cursor with a changed argument, `--fields` selections. A probe is made only for `read` commands and writes the fixture lists. A constraint that every violating invocation also breaks another declared rule for is `entailed`, with the rules named; equivalent rules are one test and fail when their codes differ. `L1.patterns` compares the ECMAScript (`u`, the `regress` crate) and Rust `regex` readings of every published pattern and passes a difference only as a verified Unicode-version difference (one code point, a pattern with a category, each engine's own tables giving it different categories), naming both Unicode versions and the code point; the contract's `scripts/regex-cases.json` (v1.1.1) is the evidence that `regress` answers as Bun does.
 
-||||||| 345e85f4
-=======
 **Paging and `--fields`** (spec 6.9, 6.10, 7.2.3, 10.9, 10.13 rules 11 and 15). A cursor is bound to the call that issued it, and `--fields` is the contract's field selection, declared in the command document and reported in `meta.fields`. The names below are deleted with no alias.
 
 | 0.33 | 0.34 |
@@ -146,7 +143,6 @@ The 31 L1 checks (`L1.tree`, `L1.no-state`, `L1.walk`, `L1.quoted-path`, `L1.sch
 
 `canon query --kind <k>` and the other five outputs are checked by `tests/atip_paging_fields.rs`: every declaration against spec 10.13 rule 11 (projectable cut nodes, every path a member of the record schema, arrays crossed only with `[]`), seeded violations of each rule, and a projected answer of each output against its published schema.
 
->>>>>>> main
 ### Added
 
 - Fixture keys (all optional; L1 and L2 keys such as `fields`, `domainRejects` and `search` are still ignored at L0): `contractVersion`, `globalOptions` (tool-wide options with a value, each an argv fragment such as `["--repo", "."]`), `warnings` (warning code names) and `commands`, an object keyed by command id whose entries hold `ok` (invocations that succeed, run in JSON mode; the checker reads their `meta.next` and `meta.page`), `refused` and `missingValue` (the invocation with one required value left out).
