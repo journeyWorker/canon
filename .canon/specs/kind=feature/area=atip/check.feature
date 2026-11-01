@@ -800,7 +800,7 @@ Feature: atip check: the atip/1 L0 conformance checker
   @flow:canon-0-34-atip-check-1-1.F3
   @atip.check.73
   Scenario: Whether a tool pages is decided by asking each command of the fixture for a cursor, not by the fixture
-    Given a fake tool that pages but whose fixture lists no paging call, one that refuses --cursor on every command, and a fixture without commands
+    Given a fake tool that pages but whose fixture lists no paging call, one whose paging command is listed without an ok invocation, one that refuses --cursor on every command, and a fixture without commands
     When atip check runs
     Then L0.page is unprovided for the first and the third and unsupported for the second
 

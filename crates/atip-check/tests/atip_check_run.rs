@@ -1034,6 +1034,15 @@ fn atip_check_73_whether_the_tool_pages_is_decided_by_asking_each_command_for_a_
         .as_str()
         .unwrap_or_default()
         .contains("`commands`"));
+    // The paging command is listed without an `ok` invocation that pages, next to one that does not page: asked for a cursor it says
+    // CURSOR_INVALID, so the tool pages and the missing paged call is unprovided, never unsupported.
+    let mut listed = harness.fixture(&json!({"noNextNoPage": true}));
+    listed["commands"] = json!({
+        "items": {"refused": [["items", "--bogus-xyz", "--json"]]},
+        "team add": {"ok": [["team", "add", "--json"]]}
+    });
+    let output = harness.check(&listed, true);
+    assert_eq!((output.code, result_of(&output, "L0.page")), (Some(1), "unprovided".to_string()), "{}", output.stdout);
     // A tool that refuses `--cursor` as an option it does not have, for every command the fixture lists, does not page.
     let never = harness.check_config(&json!({"noNextNoPage": true, "noPaging": true}));
     assert_eq!((never.code, result_of(&never, "L0.page")), (Some(0), "unsupported".to_string()));
