@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-01T13:30:18Z",
-  "note": "staleness.max_commits_behind 50→300 (사용자 요청, 2026-11-01 대화)",
+  "approved_at": "2026-11-01T15:52:06Z",
+  "note": "휴가 중 승인 위임(2026-11-01 대화): check-l1 리뷰 1라운드 반영분",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",
