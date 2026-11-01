@@ -571,7 +571,7 @@ pub fn pack_id_usage_error(id: &str) -> Option<CliError> {
     if well_formed {
         return None;
     }
-    Some(CliError::refused("USAGE", format!("invalid value `{id}` for <PACK_ID>: expected `sha256:` followed by 64 lower-case hex digits")).hint("pass the pack id `canon context-pack add` printed (sha256:<64 lower-case hex digits>)").field("<PACK_ID>"))
+    Some(CliError::refused("USAGE", format!("invalid value `{id}` for <PACK_ID>: expected `sha256:` followed by 64 lower-case hex digits")).hint("pass the pack id `canon context-pack add` printed (sha256:<64 lower-case hex digits>)").field("PACK_ID"))
 }
 
 fn pack_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("manifests").join(format!("{id}.json")) }

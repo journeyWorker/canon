@@ -385,7 +385,8 @@ pub fn default_strings(argument: &Value) -> Vec<String> {
     }
 }
 
-/// What clap declares about how the options of the command `path` go together (`atip::project::relations`).
+/// What clap declares about how the options of the command `path` go together: the rules `atip::constraint::clap_rules`
+/// reads from its public getters (the rules of the tables are in the command's document).
 pub fn relations_of(path: &str) -> atip::project::Relations {
     static ROOT: LazyLock<clap::Command> = LazyLock::new(|| {
         let mut root = canon_cli::cli::command();
@@ -396,7 +397,7 @@ pub fn relations_of(path: &str) -> atip::project::Relations {
     for word in path.split(' ') {
         node = node.find_subcommand(word).unwrap_or_else(|| panic!("`{path}` is not a command of the tree"));
     }
-    atip::project::relations(node)
+    atip::project::Relations::from_constraints(&atip::constraint::clap_rules(node))
 }
 
 /// What `canon --json` printed must be: an atip/1 envelope (`atip::envelope_problems`, the vendored contract

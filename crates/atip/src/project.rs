@@ -218,6 +218,35 @@ fn is_integer_type(id: &clap::builder::ValueParser) -> bool {
     [TypeId::of::<i8>(), TypeId::of::<i16>(), TypeId::of::<i32>(), TypeId::of::<i64>(), TypeId::of::<isize>(), TypeId::of::<u8>(), TypeId::of::<u16>(), TypeId::of::<u32>(), TypeId::of::<u64>(), TypeId::of::<usize>()].iter().any(|integer| id == *integer)
 }
 
+/// The width and signedness of the integer type `arg` parses into, when it is one.
+fn integer_width(arg: &Arg) -> Option<(u32, bool)> {
+    let id = arg.get_value_parser().type_id();
+    let widths: [(TypeId, u32, bool); 10] = [
+        (TypeId::of::<i8>(), 8, true),
+        (TypeId::of::<i16>(), 16, true),
+        (TypeId::of::<i32>(), 32, true),
+        (TypeId::of::<i64>(), 64, true),
+        (TypeId::of::<isize>(), 64, true),
+        (TypeId::of::<u8>(), 8, false),
+        (TypeId::of::<u16>(), 16, false),
+        (TypeId::of::<u32>(), 32, false),
+        (TypeId::of::<u64>(), 64, false),
+        (TypeId::of::<usize>(), 64, false),
+    ];
+    widths.iter().find(|(known, _, _)| id == *known).map(|(_, bits, signed)| (*bits, *signed))
+}
+
+/// The restriction the Rust type of an integer argument carries (spec 10.7.4): an unsigned parser refuses a negative
+/// value, a narrow one its overflow. clap erases the bounds of `value_parser!(u64).range(1..)`, so a tool's own table
+/// says those and the two are merged ([`crate::domain::merge`]); a test holds the table and the parser to one answer.
+fn implicit_domain(arg: &Arg, value_type: ValueType) -> Option<Value> {
+    if value_type != ValueType::Integer {
+        return None;
+    }
+    let (bits, signed) = integer_width(arg)?;
+    crate::domain::implicit(bits, signed).map(|domain| domain.to_value())
+}
+
 /// The `valueType` of `arg`, read from its action and its value parser (approaches/rust.md 4.1): a switch and a
 /// count by action, an enum by its possible values, an integer or a number by the parser's output type, a path
 /// and a string by the built-in parsers. A parser of the tool's own is looked up in `custom` by the argument's value name.
@@ -324,6 +353,7 @@ pub fn option_doc(command: &str, arg: &Arg, custom: CustomParsers<'_>, flag_only
         default_note: None,
         env: arg.get_env().map(|name| name.to_string_lossy().into_owned()),
         flag_only: flag_only.contains(&long),
+        domain: implicit_domain(arg, value_type),
         help: help_of(command, arg)?,
     })
 }
@@ -354,6 +384,7 @@ pub fn operand_doc(command: &str, arg: &Arg, custom: CustomParsers<'_>) -> Resul
         variadic,
         default: typed_default(command, arg, value_type, required, variadic)?,
         default_note: None,
+        domain: implicit_domain(arg, value_type),
         help: help_of(command, arg)?,
     })
 }
@@ -538,103 +569,61 @@ pub fn add_schema(schemas: &mut BTreeMap<String, Value>, name: &str, mut schema:
 
 // -------------------------------------------------------------- relations
 
-/// What clap declares about how arguments go together: the relations a tool's guide writes as `a | b` and
-/// `[--a --b <V>]`. A tool publishes them as constraints (spec 10.8) in the change that does so; the guide generators read them here.
+/// The relations of a command the way a tool's guide writes them (`a | b`, `[--a --b <V>]`), read from the rules the
+/// command document lists as `constraints` (spec 10.8): a guide and `canon schema` say one thing. Only a rule that holds
+/// whatever an argument's value is takes part; a rule that depends on a value is a document's alone.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Relations {
-    /// Per option (long name, no `--`): the options it cannot be given with, in both directions.
+    /// Per name: the names it cannot be given with, in both directions.
     pub conflicts_with: BTreeMap<String, Vec<String>>,
-    /// Per option: the options that must be given with it.
+    /// Per name: the names that must be given with it.
     pub requires: BTreeMap<String, Vec<String>>,
-    /// Sets of options (long names) of which exactly one is required.
+    /// Sets of names of which exactly one is required.
     pub required_one_of: Vec<Vec<String>>,
 }
 
-/// The ids `arg` requires. clap keeps them private (`Arg::requires` has no getter), but its `Debug` prints them:
-/// `requires: [(IsPresent, "flow")]`. A test of the tool pins one known requirement, so a clap that changes the print
-/// fails the suite instead of emptying the relations.
-fn required_ids(arg: &Arg) -> Vec<String> {
-    let text = format!("{arg:?}");
-    let Some(start) = text.find("requires: [") else { return Vec::new() };
-    let rest = &text[start + "requires: [".len()..];
-    let mut depth = 1usize;
-    let mut end = rest.len();
-    let mut in_str = false;
-    for (i, c) in rest.char_indices() {
-        match c {
-            '"' => in_str = !in_str,
-            '[' if !in_str => depth += 1,
-            ']' if !in_str => {
-                depth -= 1;
-                if depth == 0 {
-                    end = i;
-                    break;
-                }
-            }
-            _ => {}
-        }
+impl Relations {
+    /// The relations the rules state.
+    pub fn from_constraints(rules: &[crate::doc::ConstraintDoc]) -> Relations {
+        Relations::from_json(&serde_json::to_value(rules).unwrap_or(Value::Null))
     }
-    // Each entry is `(<predicate>, "<id>")`; the id is the last quoted string.
-    rest[..end]
-        .split("), (")
-        .filter_map(|entry| {
-            let close = entry.rfind('"')?;
-            let open = entry[..close].rfind('"')?;
-            Some(entry[open + 1..close].to_string())
-        })
-        .collect()
-}
 
-fn long_names_of(cmd: &Command, id: &str) -> Vec<String> {
-    if let Some(arg) = cmd.get_arguments().find(|arg| arg.get_id() == id) {
-        return arg.get_long().map(str::to_string).into_iter().collect();
-    }
-    cmd.get_groups()
-        .find(|group| group.get_id() == id)
-        .map(|group| group.get_args().filter_map(|member| cmd.get_arguments().find(|arg| arg.get_id() == member)).filter_map(|arg| arg.get_long().map(str::to_string)).collect())
-        .unwrap_or_default()
-}
-
-/// The relations clap declares among the options of `cmd`.
-pub fn relations(cmd: &Command) -> Relations {
-    let mut found = Relations::default();
-    let mut conflicts: Vec<(String, String)> = Vec::new();
-    for arg in cmd.get_arguments().filter(|arg| !is_builtin(arg)) {
-        let Some(long) = arg.get_long() else { continue };
-        for other in cmd.get_arg_conflicts_with(arg) {
-            if let Some(other_long) = other.get_long() {
-                conflicts.push((long.to_string(), other_long.to_string()));
-                conflicts.push((other_long.to_string(), long.to_string()));
-            }
-        }
-        let mut needs: Vec<String> = required_ids(arg).iter().flat_map(|id| long_names_of(cmd, id)).collect();
-        needs.sort();
-        needs.dedup();
-        if !needs.is_empty() {
-            found.requires.insert(long.to_string(), needs);
-        }
-    }
-    for group in cmd.get_groups() {
-        let members: Vec<String> = group.get_args().filter_map(|id| cmd.get_arguments().find(|arg| arg.get_id() == id)).filter_map(|arg| arg.get_long().map(str::to_string)).collect();
-        if group.is_required_set() && !(*group).clone().is_multiple() {
-            found.required_one_of.push(members.clone());
-        }
-        if !(*group).clone().is_multiple() {
-            for a in &members {
-                for b in members.iter().filter(|b| *b != a) {
-                    conflicts.push((a.clone(), b.clone()));
+    /// The relations the `constraints` array of a command document states.
+    pub fn from_json(rules: &Value) -> Relations {
+        let strings = |value: &Value| -> Vec<String> { value.as_array().map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect()).unwrap_or_default() };
+        let mut found = Relations::default();
+        for rule in rules.as_array().map(Vec::as_slice).unwrap_or_default() {
+            let names = strings(&rule["names"]);
+            let then = strings(&rule["then"]);
+            let unconditional = rule["if"].is_object() && rule["if"].get("in").is_none();
+            let when = rule["if"]["name"].as_str().unwrap_or_default().to_string();
+            match rule["rule"].as_str().unwrap_or_default() {
+                kind @ ("exactlyOne" | "atMostOne") => {
+                    if kind == "exactlyOne" {
+                        found.required_one_of.push(names.clone());
+                    }
+                    for a in &names {
+                        for b in names.iter().filter(|b| *b != a) {
+                            found.conflicts_with.entry(a.clone()).or_default().push(b.clone());
+                        }
+                    }
                 }
+                "requires" if unconditional => found.requires.entry(when).or_default().extend(then),
+                "forbids" if unconditional => {
+                    for b in &then {
+                        found.conflicts_with.entry(when.clone()).or_default().push(b.clone());
+                        found.conflicts_with.entry(b.clone()).or_default().push(when.clone());
+                    }
+                }
+                _ => {}
             }
         }
+        for names in found.conflicts_with.values_mut().chain(found.requires.values_mut()) {
+            names.sort();
+            names.dedup();
+        }
+        found
     }
-    for (a, b) in conflicts {
-        found.conflicts_with.entry(a).or_default().push(b);
-    }
-    for names in found.conflicts_with.values_mut() {
-        names.sort();
-        names.dedup();
-    }
-    found
 }
 
 #[cfg(test)]
@@ -810,7 +799,7 @@ mod tests {
     }
 
     #[test]
-    fn relations_read_conflicts_requires_and_required_groups() {
+    fn relations_are_read_from_the_rules() {
         let mut root = Command::new("tool").subcommand(
             Command::new("run")
                 .about("Runs")
@@ -821,7 +810,9 @@ mod tests {
                 .group(clap::ArgGroup::new("one").args(["flow", "change"]).required(true).multiple(false)),
         );
         root.build();
-        let found = relations(root.find_subcommand("run").expect("run"));
+        let mut rules = crate::constraint::clap_rules(root.find_subcommand("run").expect("run"));
+        rules.push(crate::constraint::Rule::requires("change", &["flow"]).doc());
+        let found = Relations::from_constraints(&rules);
         assert_eq!(found.conflicts_with["a"], ["b"]);
         assert_eq!(found.conflicts_with["b"], ["a"]);
         assert_eq!(found.requires["change"], ["flow"]);

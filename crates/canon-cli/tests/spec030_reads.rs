@@ -348,7 +348,7 @@ fn report_generation_14_snapshot_without_an_output_directory_is_refused_with_exi
     let out = canon(repo.path(), &["report", "snapshot", "--json"]);
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(error_code(&out), "USAGE");
-    assert_eq!(json(&out)["error"]["field"], "<DIR>");
+    assert_eq!(json(&out)["error"]["field"], "DIR");
     assert_eq!(tree(repo.path()), before, "a refused snapshot writes nothing");
 }
 

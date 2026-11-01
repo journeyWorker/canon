@@ -102,20 +102,16 @@ fn every_leaf_has_one_facts_row_and_every_row_a_leaf() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// The relations clap declares are read from the tree (the guides' syntax lines are drawn from them) and pinned here,
-/// because `Arg::requires` has no getter and its `Debug` print is what is read.
+/// The relations the guides' syntax lines are drawn from are the `constraints` of the command documents: clap's
+/// conflicts and groups, and the tables' `requires`.
 #[test]
-fn the_relations_clap_declares_are_read_from_the_tree() {
-    let mut root = cli::command();
-    root.build();
+fn the_relations_the_guides_draw_are_the_constraints_of_the_documents() {
+    let doc = spec::generate();
     let relations = |command: &str| {
-        let mut node = &root;
-        for word in command.split(' ') {
-            node = node.find_subcommand(word).unwrap_or_else(|| panic!("no `{command}`"));
-        }
-        atip::project::relations(node)
+        let found = doc["commands"].as_array().expect("commands").iter().find(|leaf| leaf["command"] == command).unwrap_or_else(|| panic!("no `{command}`"));
+        atip::project::Relations::from_json(&found["constraints"])
     };
-    // `scenario new --change` requires `--flow` (a clap `requires`, which clap does not expose).
+    // `scenario new --change` requires `--flow`: the table says it, clap does not expose it.
     assert_eq!(relations("scenario new").requires["change"], ["flow"]);
     // `--history` conflicts `--plugin` on `query`, whichever side declared it.
     let query = relations("query");

@@ -125,6 +125,94 @@ pub enum DefaultValue {
     None(()),
 }
 
+/// The `domain` of an argument: a JSON Schema in the profile of spec 10.7.4.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[schemars(schema_with = "domain_schema")]
+pub struct DomainSchema(pub Value);
+
+fn domain_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({ "type": "object", "minProperties": 1 })
+}
+
+/// The five rules of a constraint (spec 10.8.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum RuleKind {
+    /// At least one of `names` is given.
+    AtLeastOne,
+    /// Exactly one of `names` is given.
+    ExactlyOne,
+    /// At most one of `names` is given.
+    AtMostOne,
+    /// When `if` holds, every name in `then` is given.
+    Requires,
+    /// When `if` holds, no name in `then` is given.
+    Forbids,
+}
+
+impl RuleKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RuleKind::AtLeastOne => "atLeastOne",
+            RuleKind::ExactlyOne => "exactlyOne",
+            RuleKind::AtMostOne => "atMostOne",
+            RuleKind::Requires => "requires",
+            RuleKind::Forbids => "forbids",
+        }
+    }
+}
+
+/// The `if` of a `requires` or `forbids` rule: `{name}` holds when the argument is given, `{name, in}` when it is given and
+/// one of its values is in `in`.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ConditionDoc {
+    pub name: String,
+    #[serde(rename = "in", skip_serializing_if = "Option::is_none")]
+    pub values: Option<Vec<Value>>,
+}
+
+/// One rule of a command's `constraints` (spec 10.8).
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ConstraintDoc {
+    pub rule: RuleKind,
+    /// The operands and options of an `atLeastOne`, `exactlyOne` or `atMostOne`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub names: Option<Vec<String>>,
+    /// When a `requires` or `forbids` applies.
+    #[serde(rename = "if", skip_serializing_if = "Option::is_none")]
+    pub when: Option<ConditionDoc>,
+    /// What a `requires` demands and a `forbids` refuses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub then: Option<Vec<String>>,
+    /// The registered code a violation produces; absent: `USAGE`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// One sentence saying what the rule means in the command's own words.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub help: Option<String>,
+    /// Tool extensions (`x-<tool>`, spec 10.12), written beside the members above.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, Value>,
+}
+
+/// One stateless check a domain and the five rules cannot say (spec 10.8.3).
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ValidatorDoc {
+    /// The names of the operands and options it reads.
+    pub arguments: Vec<String>,
+    /// The registered code its failure produces, with exit 2.
+    pub code: String,
+    /// What it checks, in one or two plain sentences.
+    pub description: String,
+    /// Complete invocations that satisfy every requirement, constraint and domain and that this validator refuses.
+    pub rejects: Vec<String>,
+    /// Tool extensions (`x-<tool>`, spec 10.12), written beside the members above.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, Value>,
+}
+
 /// One embedded JSON Schema of a command document (`schemas`): an object, or a boolean.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[schemars(schema_with = "embedded_schema")]
@@ -173,6 +261,10 @@ pub struct OptionDoc {
     /// True when the option cannot be given in an `--input` document.
     #[serde(skip_serializing_if = "is_false")]
     pub flag_only: bool,
+    /// The restrictions of the option's own value beyond its `valueType` (spec 10.7.4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<DomainSchema>")]
+    pub domain: Option<Value>,
     pub help: String,
 }
 
@@ -194,6 +286,10 @@ pub struct OperandDoc {
     pub default: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_note: Option<String>,
+    /// The restrictions of each value of the operand beyond its `valueType` (spec 10.7.4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<DomainSchema>")]
+    pub domain: Option<Value>,
     pub help: String,
 }
 
@@ -298,6 +394,12 @@ pub struct CommandDoc {
     pub effect_note: Option<String>,
     pub operands: Vec<OperandDoc>,
     pub options: Vec<OptionDoc>,
+    /// Every relation between arguments the parser or the command enforces without reading state (spec 10.8.1); absent when there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub constraints: Vec<ConstraintDoc>,
+    /// The stateless checks neither a domain nor a constraint can say (spec 10.8.3); absent when there is none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub validators: Vec<ValidatorDoc>,
     /// Every error code the command can emit, reserved codes included.
     pub errors: Vec<String>,
     pub outputs: Vec<OutputDoc>,

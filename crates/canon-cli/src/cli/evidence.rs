@@ -119,7 +119,7 @@ pub struct EvidenceAddArgs {
     #[arg(long)]
     pub all_scenarios: bool,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
-    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..=crate::cli::SAFE_INTEGER))]
     pub max_artifact_mib: u64,
     /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)
     #[arg(long, value_name = "TEXT")]
@@ -178,7 +178,7 @@ pub struct EvidenceAuditArgs {
     #[arg(long = "report-case", value_name = "NAME")]
     pub report_cases: Vec<String>,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
-    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..=crate::cli::SAFE_INTEGER))]
     pub max_artifact_mib: u64,
     /// The external evaluator that re-audited the scenario (canon never runs it)
     #[arg(long = "evaluator", value_name = "ID")]
