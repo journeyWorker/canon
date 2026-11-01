@@ -743,6 +743,12 @@ fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and
     let calendar = empty("canon query --kind change --since 2026-02-30", None);
     assert_refused(&calendar, "USAGE", "--since");
     assert!(calendar.message.unwrap_or_default().contains("2026-02-30"));
+    // The divergence options too: `--expiry` and `--as-of` are judged by the stage (the constraint first, then the calendar).
+    assert_refused(&empty("canon divergence add auth.login.01 --state deferred --expiry 2026-02-30 --actor a", implementer), "DIVERGENCE_INVALID_ARGUMENT", "--reason");
+    assert_refused(&empty("canon divergence list --as-of 2026-02-30 --limit 1 --all", None), "USAGE", "--limit");
+    assert_refused(&empty("canon divergence add auth.login.01 --state deferred --reason why --expiry 2026-02-30 --actor a", implementer), "USAGE", "--expiry");
+    assert_refused(&empty("canon divergence list --as-of 2026-02-30", None), "USAGE", "--as-of");
+    assert_refused(&empty("canon divergence list --as-of tomorrow", None), "USAGE", "--as-of");
     // The same for `--introduced-rev self` beside a broken exclusivity, and a lone `self`.
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self", implementer), "USAGE", "--introduced-rev");
@@ -771,4 +777,22 @@ fn atip_constraints_25_an_integer_refusal_names_the_declared_bound() {
     let seq = empty("canon finding close add-login --round 1 --seq 4294967296 --disposition fixed", Some("implementer"));
     assert_refused(&seq, "USAGE", "--seq");
     assert!(seq.message.unwrap_or_default().contains("from 1 to 4294967295"));
+}
+
+/// atip.constraints.26: in a directory with no repository a batch answers the first stateless fault of any element, not the first valid
+/// element's `CONFIG_MISSING`: the stateless stage of every element runs before any element's dry run (spec 11.11).
+#[test]
+fn atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elements_missing_repository() {
+    for (command, items, code, field) in [
+        ("export", r#"[{"kind":"change"},{"kind":"change","after":"2026-02-01","before":"2026-01-02"}]"#, "USAGE", "/items/1/after"),
+        ("artifacts store", r#"[{},{"maxArtifactMib":0}]"#, "USAGE", "/items/1/maxArtifactMib"),
+        ("ingest records", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/items/1/intervalSecs"),
+        ("ingest sessions", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/items/1/intervalSecs"),
+    ] {
+        let outcome = empty(&format!("canon {command} --input '{items}'"), None);
+        assert_refused(&outcome, code, field);
+        // The same batch with every element valid still reaches the repository and answers its absence.
+        let valid = items.replace(r#"{"kind":"change","after":"2026-02-01","before":"2026-01-02"}"#, r#"{"kind":"change"}"#).replace(r#"{"maxArtifactMib":0}"#, "{}").replace(r#"{"intervalSecs":-1}"#, "{}");
+        assert_eq!(empty(&format!("canon {command} --input '{valid}'"), None).code.as_deref(), Some("CONFIG_MISSING"), "{command}");
+    }
 }

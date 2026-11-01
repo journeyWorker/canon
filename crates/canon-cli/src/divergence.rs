@@ -36,17 +36,10 @@ use serde::Serialize;
 pub use crate::review::{parse_project_id, parse_scenario_id};
 use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
-use crate::timestamp::TimestampError;
 
 /// `--sha`'s `clap` value parser.
 pub fn parse_sha(s: &str) -> Result<Sha, JoinKeyError> {
     Sha::parse(s)
-}
-
-/// `--expiry`'s and `--as-of`'s `clap` value parser: the shared `<TIMESTAMP>`
-/// grammar (RFC3339 or `YYYY-MM-DD`).
-pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, TimestampError> {
-    crate::timestamp::parse(s)
 }
 
 /// `canon divergence add --state <state>` refused.
@@ -620,7 +613,6 @@ mod tests {
         assert_eq!(parse_status("bogus", None, None).unwrap_err().to_string(), "unknown --state `bogus` (expected one of: open, still-divergent, resolved, deferred)");
         assert_eq!(parse_status("deferred", None, None).unwrap_err().to_string(), "`--state deferred` requires `--reason`");
         assert_eq!(parse_status("deferred", Some("why"), None).unwrap_err().to_string(), "`--state deferred` requires `--expiry`");
-        assert_eq!(parse_timestamp("tomorrow").unwrap_err().to_string(), "invalid timestamp `tomorrow`: want RFC3339 or YYYY-MM-DD");
         assert!(parse_sha("nope").unwrap_err().to_string().starts_with("invalid Sha: \"nope\" does not match grammar"));
     }
 

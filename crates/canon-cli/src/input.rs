@@ -902,8 +902,15 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                 return exit_refused(pointed(error, map, &prefix));
             }
         }
-        if leaf.has_dry_run && !dry_run_given {
-            let child = spawn(&exe, &argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });
+        argvs.push(argv);
+    }
+
+    // Then each element's own dry run, which reads state (a missing repository is `CONFIG_MISSING`): after every element's stateless stage, so
+    // a stateless fault in a later element is the answer, not the first element's missing repository (spec 11.11).
+    if leaf.has_dry_run && !dry_run_given {
+        for (i, argv) in argvs.iter().enumerate() {
+            let prefix = format!("/items/{i}");
+            let child = spawn(&exe, argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });
             let ok = child.exit == 0 && child.envelope.as_ref().is_some_and(|e| e["ok"] == true);
             if !ok {
                 let error = match &child.envelope {
@@ -913,7 +920,6 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                 return exit_refused(error);
             }
         }
-        argvs.push(argv);
     }
 
     // Run in order; the first failure stops the run.

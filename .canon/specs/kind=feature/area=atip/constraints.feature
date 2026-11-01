@@ -250,3 +250,13 @@ Feature: atip constraints: the relations, domains and validators of the command 
     Given an empty directory
     When finding close runs with --round 0, --round -1 and --seq 4294967296, and query --limit 0
     Then the refusal says the declared bound (at least 1; from 1 to 4294967295; from 1 to 9007199254740991) and clap's `0..=4294967295` never appears
+
+  # canon: {"schema":1,"at":"2026-11-01T19:04:04Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r5"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F4
+  @atip.constraints.26
+  Scenario: A stateless fault in a later batch element is the answer before the first valid element's missing repository
+    Given an empty directory with an empty HOME
+    When export, artifacts store, ingest records and ingest sessions run with --input an array whose first element is valid and whose second breaks a validator or a domain, and with every element valid
+    Then the first is exit 2 with the second element's code and a field pointed at it (/items/1/...), the second answers CONFIG_MISSING; every element's stateless stage runs before any element's dry run

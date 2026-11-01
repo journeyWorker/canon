@@ -23,7 +23,7 @@ pub struct DivergenceAddArgs {
     #[arg(long, value_name = "TEXT")]
     pub reason: Option<String>,
     /// When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`
-    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub expiry: Option<DateTime<Utc>>,
     /// The review round this version belongs to (1-based)
     #[arg(long, default_value_t = 1, value_name = "N")]
@@ -119,7 +119,7 @@ pub struct DivergenceDeferArgs {
     #[arg(long, value_name = "TEXT")]
     pub reason: String,
     /// When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)
-    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub expiry: DateTime<Utc>,
     /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
@@ -148,7 +148,7 @@ pub struct DivergenceAcceptArgs {
     #[arg(long, value_name = "TEXT")]
     pub tracking: String,
     /// The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence
-    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub expiry: Option<DateTime<Utc>>,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long = "actor", value_name = "ACTOR_ID")]
@@ -182,7 +182,7 @@ pub struct DivergenceListArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Governs Deferred expiry; defaults to now
-    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
+    #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub as_of: Option<DateTime<Utc>>,
     /// Print `{data, meta}` as JSON
     #[arg(long)]
