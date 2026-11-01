@@ -833,7 +833,7 @@ fn atip_check_31_a_refusal_that_writes_nothing_passes_and_a_successful_call_that
 }
 
 #[test]
-fn atip_check_32_level_l1_and_l2_exit_2_with_level_unsupported_naming_the_release_and_l9_is_usage()
+fn atip_check_32_level_l2_exits_2_with_level_unsupported_naming_the_release_and_l9_is_usage()
 {
     let harness = Harness::new();
     let fixture = harness.write("fixture.json", &harness.fixture(&json!({})));
@@ -855,7 +855,7 @@ fn atip_check_32_level_l1_and_l2_exit_2_with_level_unsupported_naming_the_releas
         }
         atip_in(&cwd, &tmp, &args)
     };
-    for (level, release) in [("L1", "0.34"), ("L2", "0.35")] {
+    for (level, release) in [("L2", "0.35")] {
         let output = run(level, true);
         assert_eq!(output.code, Some(2));
         let document = output.envelope();
@@ -875,7 +875,7 @@ fn atip_check_32_level_l1_and_l2_exit_2_with_level_unsupported_naming_the_releas
             ),
             (Some("--level"), Some(level))
         );
-        assert_eq!(document["error"]["expected"], json!(["L0"]));
+        assert_eq!(document["error"]["expected"], json!(["L0", "L1"]));
         let text = run(level, false);
         assert_eq!((text.code, text.stdout.is_empty()), (Some(2), true));
         assert!(
@@ -924,7 +924,7 @@ fn atip_check_33_a_refused_level_runs_no_binary_and_writes_nothing() {
     let (cwd, tmp) = (harness.path("cwd"), harness.path("tmp"));
     std::fs::create_dir_all(&cwd).expect("cwd");
     std::fs::create_dir_all(&tmp).expect("tmp");
-    for level in ["L1", "L2", "L9"] {
+    for level in ["L2", "L9"] {
         let output = atip_in(
             &cwd,
             &tmp,

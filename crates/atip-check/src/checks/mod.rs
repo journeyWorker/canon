@@ -26,6 +26,7 @@ use crate::fixture::{Fixture, RegistryRow};
 use crate::report::{Check, CheckResult, Report, Strength};
 use crate::schema::schemas;
 
+pub mod documents;
 pub mod rules;
 mod l1;
 mod l1_plan;

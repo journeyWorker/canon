@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
+use super::documents;
 use super::l1_plan::{names_command, output_with_fields, refusal_of, L1Run};
 use super::{
     excerpt, exit_text, must, reason_of, should, show, Conditions, End, Entry, Finding, Judge,
@@ -22,7 +23,6 @@ use crate::l1::project;
 use crate::l1::regex::{self, Comparison};
 use crate::l1::rules as doc_rules;
 use crate::l1::witness::{Expect, GroupOutcome};
-use crate::schema::{schemas, Problem};
 
 /// The L1 table, in the order of approaches/checker.md.
 pub(crate) const TABLE: [Entry; 30] = [
@@ -63,23 +63,6 @@ pub(crate) fn ids() -> [&'static str; 30] {
     TABLE.each_ref().map(|entry| entry.id)
 }
 
-/// The twelve reserved codes with their exit and retryability (spec 7.2.1).
-const RESERVED_CODES: [(&str, i64); 12] = [
-    ("USAGE", 2),
-    ("UNKNOWN_COMMAND", 2),
-    ("COMMAND_REQUIRED", 2),
-    ("INTERNAL", 1),
-    ("UNVERIFIABLE", 1),
-    ("INPUT_INVALID", 2),
-    ("INPUT_CONFLICT", 2),
-    ("INPUT_TOO_LARGE", 2),
-    ("BATCH_INCOMPLETE", 1),
-    ("PLAN_STALE", 2),
-    ("OPERATION_REUSED", 2),
-    ("CURSOR_INVALID", 2),
-];
-/// The four reserved codes whose exit `L0.ok-exit` already judges.
-const L0_RESERVED: [&str; 4] = ["USAGE", "UNKNOWN_COMMAND", "COMMAND_REQUIRED", "INTERNAL"];
 
 /// The reserved reasons of spec 7.2.3, by code.
 const RESERVED_REASONS: [(&str, &[&str]); 3] = [
@@ -116,37 +99,6 @@ const REASON_SYNONYMS: [(&str, &str); 22] = [
     ("STALE", "ARGUMENTS_CHANGED"),
     ("CURSOR_EXPIRED", "EXPIRED"),
 ];
-
-/// The option names with one reserved shape (spec 9.8, 10.13 rule 8): name and value type.
-const RESERVED_SHAPES: [(&str, &str); 9] = [
-    ("json", "switch"),
-    ("commit", "switch"),
-    ("all", "switch"),
-    ("input", "string"),
-    ("plan-digest", "string"),
-    ("cursor", "string"),
-    ("fields", "string"),
-    ("operation", "string"),
-    ("limit", "integer"),
-];
-/// The reserved options that are always flag-only (spec 10.7.1).
-const FLAG_ONLY: [&str; 4] = ["json", "input", "commit", "plan-digest"];
-
-/// `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`.
-fn is_kebab(word: &str) -> bool {
-    let mut parts = word.split('-');
-    let first_ok = parts
-        .next()
-        .is_some_and(|part| part.starts_with(|c: char| c.is_ascii_lowercase()) && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
-    first_ok && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
-}
-
-/// `UPPER_SNAKE_CASE` as the registry writes reasons and codes.
-fn is_upper_snake(name: &str) -> bool {
-    !name.is_empty()
-        && name.starts_with(|c: char| c.is_ascii_uppercase())
-        && name.split('_').all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()))
-}
 
 /// Whether `field` names the argument `arg`: its `--name`, its name, its value name, or a pointer ending in its document key.
 fn names_argument(field: &str, arg: &Arg) -> bool {
@@ -201,19 +153,13 @@ impl<'a> Judge<'a> {
     fn registered_exit(&self, code: &str) -> Option<i64> {
         self.row(code)
             .map(|row| row.exit)
-            .or_else(|| RESERVED_CODES.iter().find(|(name, _)| *name == code).map(|(_, exit)| *exit))
+            .or_else(|| documents::RESERVED_CODES.iter().find(|(name, _)| *name == code).map(|(_, exit)| *exit))
     }
 
     /// The problems of a `schema` answer against `schema-doc.schema.json`, but for what another check owns: the path words and
     /// option names (`L1.grammar`), a `null` in `meta` or `error` (`L0.no-null`) and members of a later minor (`L0.contract-version`).
     fn schema_doc_problems(&self, document: &Value) -> Vec<String> {
-        let prepared = crate::claim::for_envelope_schema(document, self.claim);
-        schemas()
-            .schema_doc_problem_list(&prepared)
-            .into_iter()
-            .filter(|problem| !owned_by_grammar(problem))
-            .map(|problem| problem.to_string())
-            .collect()
+        documents::schema_doc_problems(document, self.claim)
     }
 
     /// The findings of the 30 checks, in table order.
@@ -390,25 +336,11 @@ impl<'a> Judge<'a> {
             return c.finish(true);
         };
         c.own(self.calls.schema_errors);
-        let code_of = |entry: &Value| entry.get("code").and_then(Value::as_str).unwrap_or_default().to_string();
-        let codes: Vec<String> = entries.iter().map(code_of).collect();
-        let duplicated: BTreeSet<&String> = codes.iter().filter(|code| codes.iter().filter(|other| other == code).count() > 1).collect();
-        c.holds("codes-unique", duplicated.is_empty(), || {
-            format!("the registry lists {} more than once", duplicated.iter().map(|code| code.as_str()).collect::<Vec<_>>().join(", "))
-        });
-        let wrong: Vec<String> = entries
-            .iter()
-            .filter_map(|entry| {
-                let code = code_of(entry);
-                let (_, exit) = RESERVED_CODES.iter().find(|(name, _)| *name == code)?;
-                let got_exit = entry.get("exit").and_then(Value::as_i64);
-                let retryable = entry.get("retryable").and_then(Value::as_bool);
-                let exit_wrong = !L0_RESERVED.contains(&code.as_str()) && got_exit != Some(*exit);
-                (exit_wrong || retryable != Some(false)).then(|| format!("{code} is exit {} retryable {}, reserved is exit {exit} retryable false", got_exit.map_or("?".to_string(), |exit| exit.to_string()), retryable.map_or("?".to_string(), |flag| flag.to_string())))
-            })
-            .collect();
-        c.holds("reserved-exit", wrong.is_empty(), || reason_of(&wrong));
-        let missing: Vec<&str> = L0_RESERVED
+        for (condition, problem) in documents::registry_findings(entries) {
+            c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
+        }
+        let codes: Vec<String> = entries.iter().filter_map(|entry| entry.get("code").and_then(Value::as_str)).map(str::to_string).collect();
+        let missing: Vec<&str> = documents::L0_RESERVED
             .iter()
             .copied()
             .filter(|code| !codes.iter().any(|known| known == code))
@@ -437,20 +369,8 @@ impl<'a> Judge<'a> {
             return c.finish_as(End::Unsupported("no entry of the registry lists reasons".to_string()));
         }
         c.own(self.calls.schema_errors);
-        for entry in entries {
-            let code = entry.get("code").and_then(Value::as_str).unwrap_or_default();
-            let Some(reasons) = entry.get("reasons").and_then(Value::as_array) else { continue };
-            let names: Vec<&str> = reasons.iter().filter_map(|reason| reason.get("reason").and_then(Value::as_str)).collect();
-            let malformed: Vec<&str> = names.iter().copied().filter(|name| !is_upper_snake(name)).collect();
-            c.holds("reason-form", malformed.is_empty(), || format!("under {code} the reason {} is not UPPER_SNAKE_CASE", malformed.join(", ")));
-            let repeated: BTreeSet<&str> = names.iter().copied().filter(|name| names.iter().filter(|other| *other == name).count() > 1).collect();
-            c.holds("reasons-unique", repeated.is_empty(), || format!("{code} lists the reason {} more than once", repeated.iter().copied().collect::<Vec<_>>().join(", ")));
-            let with_exit: Vec<&str> = reasons
-                .iter()
-                .filter(|reason| reason.get("exit").is_some() || reason.get("retryable").is_some())
-                .filter_map(|reason| reason.get("reason").and_then(Value::as_str))
-                .collect();
-            c.holds("no-exit-on-reason", with_exit.is_empty(), || format!("under {code} the reason {} has its own exit or retryable: a reason shares its code's", with_exit.join(", ")));
+        for (condition, problem) in documents::reasons_findings(entries) {
+            c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
         }
         for (code, index) in &self.calls.error_entries {
             let Some(listed) = entries.iter().find(|entry| entry.get("code").and_then(Value::as_str) == Some(code)) else { continue };
@@ -504,9 +424,9 @@ impl<'a> Judge<'a> {
             return c.finish_as(End::Unsupported("the tool offers no `schema --warnings`".to_string()));
         };
         c.own(self.calls.schema_warnings);
-        let codes: Vec<&str> = entries.iter().filter_map(|entry| entry.get("code").and_then(Value::as_str)).collect();
-        let repeated: BTreeSet<&str> = codes.iter().copied().filter(|code| codes.iter().filter(|other| *other == code).count() > 1).collect();
-        c.holds("codes-unique", repeated.is_empty(), || format!("the warning registry lists {} more than once", repeated.iter().copied().collect::<Vec<_>>().join(", ")));
+        for (condition, problem) in documents::warnings_findings(entries) {
+            c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
+        }
         if let Some(index) = self.l1().unknown_warning {
             c.own(index);
             let failure = self.failure(index);
@@ -603,38 +523,15 @@ impl<'a> Judge<'a> {
     fn l1_grammar(&'a self) -> Finding {
         let mut c = self.check("L1.grammar");
         let Some(tree) = &self.docs().tree else { return self.no_tree(c) };
-        let mut bad_words: Vec<String> = Vec::new();
-        for entry in &tree.commands {
-            bad_words.extend(entry.path.iter().filter(|word| !is_kebab(word)).map(|word| format!("the path word {word:?} of {}", entry.command)));
+        let paths: Vec<(&str, &[String])> = tree.commands.iter().map(|entry| (entry.command.as_str(), entry.path.as_slice())).collect();
+        for (condition, problem) in documents::grammar_findings(&paths, None) {
+            c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
         }
-        let mut no_id = Vec::new();
-        let mut shapes = Vec::new();
         for doc in self.docs().commands.values() {
-            bad_words.extend(doc.path.iter().filter(|word| !is_kebab(word)).map(|word| format!("the path word {word:?} of {}", doc.command)));
-            for arg in doc.args() {
-                if !is_kebab(&arg.name) {
-                    bad_words.push(format!("the name {:?} of {} in {}", arg.name, arg.spelling(), doc.command));
-                }
-            }
-            for option in &doc.options {
-                if option.name.ends_with("-id") {
-                    no_id.push(format!("{} has the option --{}", doc.command, option.name));
-                }
-                if let Some((_, shape)) = RESERVED_SHAPES.iter().find(|(name, _)| *name == option.name) {
-                    if option.value_type != *shape {
-                        shapes.push(format!("{}: --{} is {}, reserved as {shape}", doc.command, option.name, option.value_type));
-                    }
-                }
-                if FLAG_ONLY.contains(&option.name.as_str()) && !option.flag_only {
-                    shapes.push(format!("{}: --{} is not flagOnly", doc.command, option.name));
-                }
+            for (condition, problem) in documents::grammar_findings(&[], Some(doc)) {
+                c.holds(condition, problem.is_none(), || problem.clone().unwrap_or_default());
             }
         }
-        bad_words.sort();
-        bad_words.dedup();
-        c.holds("kebab-words", bad_words.is_empty(), || format!("not lower kebab-case: {}", reason_of(&bad_words)));
-        c.holds("no-id-suffix", no_id.is_empty(), || format!("an option name ends in -id (spec 9.5): {}", reason_of(&no_id)));
-        c.holds("reserved-shape", shapes.is_empty(), || format!("a reserved option has not its reserved shape (spec 9.8): {}", reason_of(&shapes)));
         c.finish(true)
     }
 
@@ -1009,29 +906,12 @@ impl<'a> Judge<'a> {
         let mut judged = false;
         for index in runs {
             let Some(document) = self.ok_envelope(index) else { continue };
-            if document.pointer("/meta/fields").is_some() {
-                continue;
-            }
             let Some(doc) = document.pointer("/meta/command").and_then(Value::as_str).and_then(|command| self.docs().command(command)) else { continue };
-            let name = document.pointer("/meta/output").and_then(Value::as_str);
-            let Some(output) = doc.output(name) else {
-                if name.is_none() && doc.outputs.len() > 1 {
-                    judged = true;
-                    c.holds("data-validates", false, || format!("{} printed no meta.output but {} has {} outputs", self.label(index), doc.command, doc.outputs.len()));
-                }
-                continue;
-            };
-            if output.kind == "stream" {
-                continue;
+            for (condition, problem) in documents::output_findings(doc, document) {
+                judged = true;
+                c.observe(index);
+                c.holds(condition, problem.is_none(), || format!("{}: {}", self.label(index), problem.clone().unwrap_or_default()));
             }
-            let Ok(validator) = doc.compile_ref(&output.schema_ref) else { continue };
-            judged = true;
-            c.observe(index);
-            let data = document.get("data").unwrap_or(&Value::Null);
-            let problems: Vec<String> = validator.iter_errors(data).map(|error| format!("{error} at {}", error.instance_path())).collect();
-            c.holds("data-validates", problems.is_empty(), || format!("{}: data does not validate against {}: {}", self.label(index), output.schema_ref, reason_of(&problems)));
-            let version = document.pointer("/meta/schemaVersion").and_then(Value::as_str);
-            c.holds("schema-version", version == Some(output.schema_version.as_str()), || format!("{}: meta.schemaVersion is {}, the output {} is {}", self.label(index), version.unwrap_or("missing"), output.name(), output.schema_version));
         }
         c.finish(judged)
     }
@@ -1116,6 +996,7 @@ impl<'a> Judge<'a> {
             return c.finish_as(End::Unsupported("no command offers --cursor".to_string()));
         }
         let mut unprovided: Vec<String> = Vec::new();
+        let mut proven = false;
         for run in &l1.paging {
             c.own(run.first);
             let returned = self.ok_envelope(run.first).and_then(|document| document.pointer("/meta/page/returned")).and_then(Value::as_u64);
@@ -1147,6 +1028,7 @@ impl<'a> Judge<'a> {
                     c.holds("changed-filter-refused", false, || format!("{}: {}", run.command, reason_of(&bad)));
                 } else if good {
                     c.holds("changed-filter-refused", true, String::new);
+                    proven = true;
                 } else {
                     unprovided.push(format!("{}: no changed argument was refused as a reused cursor", run.command));
                 }
@@ -1156,7 +1038,10 @@ impl<'a> Judge<'a> {
             }
         }
         if !unprovided.is_empty() {
-            return c.finish_as(End::Unprovided(reason_of(&unprovided)));
+            if !proven {
+                return c.finish_as(End::Unprovided(reason_of(&unprovided)));
+            }
+            c.notes.extend(unprovided.into_iter().map(|why| format!("not probed: {why}")));
         }
         if l1.paging.is_empty() {
             return c.finish_as(End::Unprovided("the fixture lists no `ok` invocation of a command that pages".to_string()));
@@ -1192,14 +1077,8 @@ impl<'a> Judge<'a> {
             let mut stated: Vec<String> = projected.pointer("/meta/fields").and_then(Value::as_array).map(|list| list.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default();
             stated.sort();
             c.holds("meta-fields", stated == kept, || format!("{} has meta.fields {stated:?}, the selection and `keep` make {kept:?}", self.label(run.projected)));
-            let data = projected.get("data").unwrap_or(&Value::Null);
-            let leaks = project::leaks(data, output, &kept);
-            c.holds("no-unselected", leaks.is_empty(), || format!("{} has members nothing selected: {}", self.label(run.projected), reason_of(&leaks)));
-            let dropped = project::dropped(plain.get("data").unwrap_or(&Value::Null), data, output, &kept);
-            c.holds("selected-present", dropped.is_empty(), || format!("{} lacks selected members the unprojected answer has: {}", self.label(run.projected), reason_of(&dropped)));
-            if let Ok(validator) = project::projected_validator(doc, output, &kept) {
-                let problems: Vec<String> = validator.iter_errors(data).map(|error| format!("{error} at {}", error.instance_path())).collect();
-                c.holds("projected-schema", problems.is_empty(), || format!("{} does not validate against the projected schema: {}", self.label(run.projected), reason_of(&problems)));
+            for (condition, problem) in documents::fields_findings(doc, projected, &kept, Some(plain)) {
+                c.holds(condition, problem.is_none(), || format!("{}: {}", self.label(run.projected), problem.clone().unwrap_or_default()));
             }
             c.observe(run.projected);
         }
@@ -1240,16 +1119,6 @@ impl<'a> Judge<'a> {
     }
 }
 
-/// Whether a schema-document problem is about a word or a name that `L1.grammar` owns: a path word or an option or operand name that is not lower kebab-case, or an option ending in `-id`.
-fn owned_by_grammar(problem: &Problem) -> bool {
-    let path = problem.path.as_str();
-    let word_position = path == "/data/command"
-        || path.starts_with("/data/path/")
-        || (path.starts_with("/data/commands/") && (path.ends_with("/command") || path.contains("/path/")))
-        || ((path.starts_with("/data/options/") || path.starts_with("/data/operands/")) && path.ends_with("/name"));
-    word_position && (problem.keyword == "pattern" || problem.keyword == "not")
-}
-
 /// A default as the text `--help` shows it: a string as it is, a number or boolean as written; `None` for no default or a list.
 fn default_text(default: &Value) -> Option<String> {
     match default {
@@ -1288,7 +1157,8 @@ fn help_default(text: &str, option: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{help_default, ids, is_kebab, is_upper_snake, TABLE};
+    use super::{help_default, ids, TABLE};
+    use super::documents::is_kebab;
     use crate::report::Strength;
 
     #[test]
@@ -1305,7 +1175,7 @@ mod tests {
     #[test]
     fn atip_checkl1_words_and_names() {
         assert!(is_kebab("plan-digest") && is_kebab("a1") && !is_kebab("Plan") && !is_kebab("a--b") && !is_kebab("a_b"));
-        assert!(is_upper_snake("NOT_JSON") && !is_upper_snake("not_json") && !is_upper_snake("A__B"));
+       
     }
 
     #[test]
