@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-constraints",
+    "role": "implementer",
+    "session_id": "s-0-34-constraints"
+  },
+  "at": "2026-11-01T14:07:12.039652Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "d566270745857f6bc0054b044ad85311dcb33ce700f12b180c80932e7a917439"
+    },
+    {
+      "case": "atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "d566270745857f6bc0054b044ad85311dcb33ce700f12b180c80932e7a917439"
+    },
+    {
+      "case": "atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/junit-constraints.xml",
+      "sha256": "d566270745857f6bc0054b044ad85311dcb33ce700f12b180c80932e7a917439"
+    }
+  ],
+  "code_tree": "15887b748a2ba3c6847ff8bde2e6b5fda61e7f4a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/junit-constraints.xml"
+  },
+  "evidence_sha": "8715cf266211dd2fa25b868ee6f2dc686a95a5a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 19,
+  "scenario_id": "atip.constraints.06",
+  "schema": 1,
+  "staging_id": "301a74cd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
