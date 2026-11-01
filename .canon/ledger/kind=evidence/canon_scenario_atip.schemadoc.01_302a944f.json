@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-schema-doc",
+    "role": "implementer",
+    "session_id": "s-0-34-schema-doc"
+  },
+  "at": "2026-11-01T10:12:49.429983Z",
+  "attachments": [
+    {
+      "case": "atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l1",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c8f48865daa4758d2e9a965632905a19390a3e74fa030e4232d9c7829f73914d"
+    }
+  ],
+  "code_tree": "a127325a52b8b19042dcf4b32045155afe837cc1",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "c6715cdb2607d371417bb4c32a2e210874fac96f",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "atip.schemadoc.01",
+  "schema": 1,
+  "staging_id": "2e00d1bc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
