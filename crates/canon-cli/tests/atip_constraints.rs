@@ -79,13 +79,14 @@ fn atip_constraints_01_clap_relations_are_constraints_of_the_document() {
             assert!(seen.insert(key.to_string()), "`{}` states {rule} twice", doc["command"]);
         }
     }
-    // Failure path: `--commit` without `--plan-digest` is USAGE naming `--plan-digest`.
-    refused(&run(&["purge", "--kind", "change", "--before", "2020-01-01", "--commit"]), "USAGE", "--plan-digest");
 }
 
-/// atip.constraints.01: a declaration that states one relation twice is found by the document check.
+/// atip.constraints.02: a declaration that states one relation twice is found by the document check, and `--commit` without
+/// `--plan-digest` is `USAGE` naming `--plan-digest`.
 #[test]
-fn atip_constraints_01_a_relation_stated_twice_is_found() {
+fn atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_its_argument() {
+    refused(&run(&["purge", "--kind", "change", "--before", "2020-01-01", "--commit"]), "USAGE", "--plan-digest");
+    refused(&run(&["purge", "--kind", "change", "--before", "2020-01-01", "--plan-digest", "abc"]), "USAGE", "--commit");
     let flag = |name: &str| OptionDoc {
         name: name.to_string(),
         short: None,
@@ -107,9 +108,9 @@ fn atip_constraints_01_a_relation_stated_twice_is_found() {
     assert!(problems.iter().any(|problem| problem.contains("stated twice")), "{problems:?}");
 }
 
-/// atip.constraints.02: the relations the handlers enforce are in the documents with their codes.
+/// atip.constraints.03: the relations the handlers enforce are in the documents with their codes.
 #[test]
-fn atip_constraints_02_handler_relations_are_constraints_with_their_codes() {
+fn atip_constraints_03_handler_relations_are_constraints_with_their_codes() {
     let retrieve = leaf("retrieve");
     assert!(has_names(retrieve, "exactlyOne", &["regime", "domain"]), "{:?}", retrieve["constraints"]);
     assert!(rules(retrieve, "requires").iter().any(|rule| rule["if"]["name"] == "subject" && rule["then"] == json!(["domain"])), "{:?}", retrieve["constraints"]);
@@ -290,10 +291,10 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     assert!(problems.is_empty(), "{} problems, the first ten:\n{}", problems.len(), problems.iter().take(10).cloned().collect::<Vec<_>>().join("\n"));
 }
 
-/// atip.constraints.08: a date that is not on the calendar is refused by every option that reads a time, with `USAGE` and the option
+/// atip.constraints.07: a date that is not on the calendar is refused by every option that reads a time, with `USAGE` and the option
 /// as `field`; the validator of each command that has one names its options and refuses a call that is otherwise complete.
 #[test]
-fn atip_constraints_08_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date() {
+fn atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date() {
     let mut options = 0;
     for doc in leaves() {
         let time: Vec<&str> = harness::options(doc).iter().filter(|option| option["valueName"] == "TIMESTAMP").filter_map(|option| option["name"].as_str()).collect();
@@ -317,10 +318,10 @@ fn atip_constraints_08_every_time_option_declares_the_calendar_validator_and_ref
     refused(&run(&["query", "--kind", "change", "--since", "2026-02-30"]), "USAGE", "--since");
 }
 
-/// atip.constraints.09: `export --after` later than `--before` is refused with `USAGE` naming `--after` and writes nothing;
+/// atip.constraints.08: `export --after` later than `--before` is refused with `USAGE` naming `--after` and writes nothing;
 /// an equal pair, an earlier `--after` and an empty window stay as they were.
 #[test]
-fn atip_constraints_09_an_export_window_that_ends_before_it_starts_is_refused() {
+fn atip_constraints_08_an_export_window_that_ends_before_it_starts_is_refused() {
     let doc = leaf("export");
     let validator = doc["validators"].as_array().into_iter().flatten().find(|validator| validator["arguments"] == json!(["after", "before"]) || validator["arguments"] == json!(["before", "after"])).unwrap_or_else(|| panic!("no window validator: {:?}", doc["validators"]));
     assert_eq!(validator["code"], "USAGE");
@@ -345,33 +346,16 @@ fn atip_constraints_09_an_export_window_that_ends_before_it_starts_is_refused() 
     assert_eq!(run(&["export", "--kind", "change", "--after", "2026-02-01T10:00:00+02:00", "--before", "2026-02-01T09:00:00Z"]).exit, 0);
 }
 
-/// atip.constraints.10: an integer option outside ±(2^53-1) is refused, never rounded; the edge is accepted.
+/// atip.constraints.10: the edge of the safe range is accepted by every 64-bit integer option, and no declared domain bound is above it.
 #[test]
-fn atip_constraints_10_a_sixty_four_bit_integer_outside_the_safe_range_is_refused_and_never_rounded() {
-    let options = [
-        (vec!["artifacts", "store", "--dry-run"], "--max-artifact-mib"),
-        (vec!["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "x", "--dry-run"], "--max-artifact-mib"),
-        (vec!["query", "--kind", "change"], "--limit"),
-        (vec!["retrieve", "--for-role", "reviewer", "--domain", "dev"], "--limit"),
-        (vec!["ingest", "sessions", "--dry-run"], "--interval-secs"),
-    ];
-    for (base, option) in options {
-        for value in ["9007199254740992", "9007199254740993", "18446744073709551616", "-9007199254740992", "-1"] {
-            let mut args = base.clone();
-            args.push(option);
-            args.push(value);
-            let result = run(&args);
-            assert_eq!(result.exit, 2, "`{}` {option} {value}: {}", base.join(" "), result.body);
-            assert_eq!(result.body["error"]["code"], "USAGE", "`{}` {option} {value}: {}", base.join(" "), result.body);
-            assert_eq!(result.body["error"]["field"], option, "`{}` {option} {value}: {}", base.join(" "), result.body);
-        }
-        let mut edge = base.clone();
+fn atip_constraints_10_the_edge_of_the_safe_range_is_accepted_and_no_domain_goes_beyond_it() {
+    for (base, option) in INTEGER_OPTIONS {
+        let mut edge = base.to_vec();
         edge.push(option);
         edge.push("9007199254740991");
         let accepted = run(&edge);
         assert_ne!(accepted.body["error"]["code"], "USAGE", "`{}` {option} 9007199254740991 is the edge and is accepted: {}", base.join(" "), accepted.body);
     }
-    // The declared domain says it: every 64-bit integer carries its safe-range maximum, or none above it.
     for doc in leaves() {
         for option in options_of(doc) {
             if option["valueType"] != "integer" {
@@ -380,6 +364,30 @@ fn atip_constraints_10_a_sixty_four_bit_integer_outside_the_safe_range_is_refuse
             if let Some(maximum) = option["domain"]["maximum"].as_i64() {
                 assert!(maximum <= 9_007_199_254_740_991, "`{}` --{}: {maximum}", doc["command"], option["name"]);
             }
+        }
+    }
+}
+
+const INTEGER_OPTIONS: [(&[&str], &str); 5] = [
+    (&["artifacts", "store", "--dry-run"], "--max-artifact-mib"),
+    (&["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "x", "--dry-run"], "--max-artifact-mib"),
+    (&["query", "--kind", "change"], "--limit"),
+    (&["retrieve", "--for-role", "reviewer", "--domain", "dev"], "--limit"),
+    (&["ingest", "sessions", "--dry-run"], "--interval-secs"),
+];
+
+/// atip.constraints.11: an integer option outside ±(2^53-1) is refused, never rounded.
+#[test]
+fn atip_constraints_11_a_sixty_four_bit_integer_outside_the_safe_range_is_refused_and_never_rounded() {
+    for (base, option) in INTEGER_OPTIONS {
+        for value in ["9007199254740992", "9007199254740993", "18446744073709551616", "-9007199254740992", "-1"] {
+            let mut args = base.to_vec();
+            args.push(option);
+            args.push(value);
+            let result = run(&args);
+            assert_eq!(result.exit, 2, "`{}` {option} {value}: {}", base.join(" "), result.body);
+            assert_eq!(result.body["error"]["code"], "USAGE", "`{}` {option} {value}: {}", base.join(" "), result.body);
+            assert_eq!(result.body["error"]["field"], option, "`{}` {option} {value}: {}", base.join(" "), result.body);
         }
     }
     // Failure path: a domain bound above the safe range is found by the profile check.

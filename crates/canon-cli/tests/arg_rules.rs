@@ -352,9 +352,9 @@ pub fn example_problems(doc: &Value) -> Vec<String> {
     problems
 }
 
-/// atip.constraints.11: every example of every command document meets the constraints and the domains it declares.
+/// atip.constraints.12: every example of every command document meets the constraints and the domains it declares.
 #[test]
-fn atip_constraints_11_every_example_meets_the_declared_constraints_and_domains() {
+fn atip_constraints_12_every_example_meets_the_declared_constraints_and_domains() {
     let problems: Vec<String> = docs().into_iter().filter(|doc| selected(doc, &[])).flat_map(example_problems).collect();
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
 }
@@ -383,4 +383,50 @@ fn atip_constraints_04_a_new_handler_check_that_no_document_declares_is_found() 
     // The same text in a test module is not a site.
     let in_tests = "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn b() { let _ = \"EVIDENCE_INVALID_ARGUMENT\"; }\n}\n";
     assert!(!survey_problems(&[("evidence_seeded.rs", in_tests)]).iter().any(|problem| problem.contains("evidence_seeded.rs")), "a test module is not read");
+}
+
+// ------------------------------------------------------------------------------- the sweeps bite
+
+/// A copy of the real document of `path` with a rule or a validator added, which the binary does not enforce.
+fn seeded(path: &str, member: &str, extra: Value) -> Value {
+    let mut doc = harness::leaf(path).clone();
+    let list = doc.as_object_mut().expect("a document").entry(member).or_insert_with(|| Value::Array(Vec::new()));
+    list.as_array_mut().expect("a list").push(extra);
+    doc
+}
+
+/// atip.constraints.09: a validator whose `rejects` call the binary accepts, one refused with another code, and one that is also an
+/// example are each found by the sweep.
+#[test]
+fn atip_constraints_09_a_validator_whose_rejects_is_not_refused_is_found() {
+    let accepted = seeded("query", "validators", serde_json::json!({ "arguments": ["kind"], "code": "USAGE", "description": "Refuses nothing at all.", "rejects": ["canon query --kind change --json"] }));
+    let problems = drive_validator(&accepted, accepted["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
+    assert!(problems.iter().any(|problem| problem.contains("was not refused with USAGE")), "{problems:?}");
+    let other_code = seeded("query", "validators", serde_json::json!({ "arguments": ["limit"], "code": "QUERY_INVALID_ARGUMENT", "description": "Claims another code.", "rejects": ["canon query --kind change --limit 0 --json"] }));
+    let problems = drive_validator(&other_code, other_code["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
+    assert!(problems.iter().any(|problem| problem.contains("was not refused with QUERY_INVALID_ARGUMENT")), "{problems:?}");
+    let example = harness::leaf("query")["examples"][0].clone();
+    let also = seeded("query", "validators", serde_json::json!({ "arguments": ["kind"], "code": "USAGE", "description": "Is an example.", "rejects": [example] }));
+    let problems = drive_validator(&also, also["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
+    assert!(problems.iter().any(|problem| problem.contains("is also an example")), "{problems:?}");
+}
+
+/// atip.constraints.13: a constraint declared with no check behind it, a code the binary does not use and a domain that is wrong
+/// are each found by the sweeps (the handler's check removed makes its declaration's test fail).
+#[test]
+fn atip_constraints_13_a_declaration_with_no_check_behind_it_is_found() {
+    let doc = seeded("query", "constraints", serde_json::json!({ "rule": "atMostOne", "names": ["kind", "since"] }));
+    let at = doc["constraints"].as_array().map_or(0, Vec::len) - 1;
+    let problems = drive_rule(&doc, at);
+    assert!(problems.iter().any(|problem| problem.contains("was not refused for it")), "{problems:?}");
+    let wrong_code = seeded("finding close", "constraints", serde_json::json!({ "rule": "requires", "if": { "name": "disposition", "in": ["rejected"] }, "then": ["reason"], "code": "USAGE" }));
+    let at = wrong_code["constraints"].as_array().map_or(0, Vec::len) - 1;
+    let problems = drive_rule(&wrong_code, at);
+    assert!(!problems.is_empty(), "a rule whose code the binary does not give is found");
+    let mut domain = harness::leaf("query").clone();
+    let limit = domain["options"].as_array_mut().and_then(|options| options.iter_mut().find(|option| option["name"] == "limit")).expect("--limit");
+    limit["domain"] = serde_json::json!({ "minimum": 5 });
+    let argument = domain["options"].as_array().and_then(|options| options.iter().find(|option| option["name"] == "limit")).expect("--limit").clone();
+    let problems = drive_domain(&domain, &argument);
+    assert!(!problems.is_empty(), "a domain the parser does not hold is found: {problems:?}");
 }
