@@ -694,7 +694,7 @@ fn run_in_copy(args: &[&str]) -> (Run, Vec<std::path::PathBuf>) {
     let before = harness::tree(dir.path());
     let mut argv: Vec<String> = args.iter().map(ToString::to_string).collect();
     argv.push("--json".to_string());
-    let output = canon_in(dir.path(), &STORY.home.path().to_path_buf(), &argv, &[("CANON_ROLE", "implementer")]);
+    let output = canon_in(dir.path(), STORY.home.path(), &argv, &[("CANON_ROLE", "implementer")]);
     let changed = harness::changed(&before, &harness::tree(dir.path()));
     (Run { exit: output.status.code().unwrap_or(-1), body: serde_json::from_slice(&output.stdout).unwrap_or(Value::Null) }, changed)
 }

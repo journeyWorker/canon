@@ -217,7 +217,7 @@ static SHARED: Tables = Tables {
         DomainRow::new(Scope::ValueName("REVIEW_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAL"]),
         DomainRow::new(Scope::ValueName("STRATEGY_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAO"]),
         DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b"]).outside(&[" s", "s ", "a\tb"]),
-        DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE").inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-1-1", "2030-01-01 10:00:00+02:00"]).outside(&["tomorrow", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "01/02/2030"]),
+        DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE").says("is an invalid timestamp: an RFC 3339 time (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`) is expected").inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-1-1", "2030-01-01 10:00:00+02:00"]).outside(&["tomorrow", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "01/02/2030"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
         DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search"], "limit"), Domain::at_least(1), "USAGE"),
         DomainRow::new(Scope::Everywhere("max-artifact-mib"), Domain::at_least(1), "USAGE"),
