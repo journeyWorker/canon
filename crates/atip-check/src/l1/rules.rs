@@ -1256,16 +1256,11 @@ mod tests {
         judge_value(&load(relative), None)
     }
 
-    /// A problem that is only the registry of `schema.rs` lacking `guide.schema.json` (an L2 schema, not vendored): pending.
-    fn pending(problem: &str) -> bool {
-        problem.contains("is not present in a registry")
-    }
-
-    /// The conditions with a problem, without the pending ones.
+    /// The conditions with a problem.
     fn failing(findings: &Findings) -> Vec<&'static str> {
         findings
             .iter()
-            .filter(|(_, problem)| problem.as_deref().is_some_and(|p| !pending(p)))
+            .filter(|(_, problem)| problem.is_some())
             .map(|(condition, _)| *condition)
             .collect()
     }

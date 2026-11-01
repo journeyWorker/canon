@@ -12,6 +12,8 @@ use jsonschema::{Draft, Registry, ValidationOptions, Validator};
 use serde_json::Value;
 
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
+/// `schema/guide.schema.json` of the contract at tag v1.1.1, byte for byte (`atip` does not vendor it: no L1 document of canon refers to it).
+pub const GUIDE_SCHEMA: &str = include_str!("../schema/guide.schema.json");
 const SCHEMA_DOC_ID: &str = "https://atip.dev/1/schema-doc.schema.json";
 const REGISTRY_ENTRY_ID: &str = "https://atip.dev/1/registry-entry.schema.json";
 const ENVELOPE_ID: &str = "https://atip.dev/1/envelope.schema.json";
@@ -102,6 +104,8 @@ impl Schemas {
             ),
             ("https://atip.dev/1/stream-line.schema.json", stream_line.clone()),
             (SCHEMA_DOC_ID, schema_doc.clone()),
+            // L2's guide schema: a command document's `schemas` may `$ref` it (the contract's `skills show` example does).
+            ("https://atip.dev/1/guide.schema.json", parse("guide.schema.json", GUIDE_SCHEMA)?),
         ]
         .into_iter()
         .try_fold(Registry::new(), |builder, (id, schema)| builder.add(id, schema))

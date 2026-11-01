@@ -44,7 +44,17 @@
           "actor",
           "title"
         ]
-      ]
+      ],
+      "domainRejects": {
+        "since": [
+          "Core",
+          "-core"
+        ],
+        "change": [
+          "Core",
+          "-core"
+        ]
+      }
     },
     "status": {
       "ok": [
@@ -80,7 +90,13 @@
           "reviewer",
           "summary"
         ]
-      ]
+      ],
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      }
     },
     "divergence list": {
       "ok": [
@@ -103,7 +119,173 @@
         [
           "state"
         ]
-      ]
+      ],
+      "domainRejects": {
+        "as-of": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "brief check": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "brief show": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "context-pack show": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "context-pack verify": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "evidence approval-payload": {
+      "domainRejects": {
+        "task": [
+          "Core",
+          "-core"
+        ],
+        "project": [
+          "Core",
+          "-core"
+        ],
+        "scenario": [
+          "Core",
+          "-core"
+        ],
+        "run": [
+          "Core",
+          "-core"
+        ],
+        "surface-ref": [
+          "",
+          " "
+        ],
+        "approver": [
+          "",
+          " "
+        ],
+        "approval-at": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "prompt show": {
+      "domainRejects": {
+        "bundle": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "regime show": {
+      "domainRejects": {
+        "role-segment": [
+          "",
+          " "
+        ],
+        "repo-name": [
+          "",
+          " "
+        ],
+        "area": [
+          "",
+          " "
+        ],
+        "hash": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "retrieve": {
+      "domainRejects": {
+        "for-role": [
+          "Core",
+          "-core"
+        ],
+        "regime": [
+          "Core",
+          "-core"
+        ],
+        "subject": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "search": {
+      "domainRejects": {
+        "text": [
+          "",
+          " "
+        ]
+      }
+    },
+    "skills check": {
+      "domainRejects": {
+        "providers": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "skills doctor": {
+      "domainRejects": {
+        "providers": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "strategy approval-payload": {
+      "domainRejects": {
+        "strategy": [
+          "Core",
+          "-core"
+        ],
+        "approval-at": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "subject show": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "trace": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
     }
   },
   "contractVersion": "1.1",

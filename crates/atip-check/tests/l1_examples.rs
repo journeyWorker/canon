@@ -407,3 +407,10 @@ fn draft_the_table() {
         }
     }
 }
+
+#[test]
+fn atip_checkl1_26_the_embedded_guide_schema_is_the_original_of_the_contract_tag() {
+    use sha2::{Digest, Sha256};
+    let digest: String = Sha256::digest(atip_check::schema::GUIDE_SCHEMA.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect();
+    assert_eq!(digest, "43229f3cfbd518307b1e6071b9e12adad114c0da4f8fdba695c06d2e16c47d3f", "schema/guide.schema.json of v1.1.1 (16544ec22c022335eab4a0df17bf59e7508c67e8)");
+}

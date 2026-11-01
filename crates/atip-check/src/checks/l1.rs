@@ -828,12 +828,23 @@ impl<'a> Judge<'a> {
                         }
                     }
                 }
+                // The values of the documented examples are accepted values too.
+                for line in &doc.examples {
+                    if let Some(parsed) = invocation::split_line(line).ok().and_then(|words| invocation::parse(doc, words.get(1..)?).ok()) {
+                        if let Some(value) = super::l1_plan::given_value(doc, &parsed, arg) {
+                            values.push(value);
+                        }
+                    }
+                }
                 for pattern in patterns {
                     judged = true;
                     if regex::form_problem(&pattern).is_some() || regex::rust_problem(&pattern).is_some() {
                         continue;
                     }
-                    if values.is_empty() {
+                    // Values are needed where the checker probes the command: a `read` one, or a write the fixture lists with an `ok` invocation.
+                    let probed = doc.effect == "read"
+                        || self.fixture.commands.as_ref().and_then(|commands| commands.get(&doc.command)).is_some_and(|entry| !entry.ok.is_empty());
+                    if values.is_empty() && probed {
                         unprovided.push(format!("{}: no value of {} to compare the engines on for {pattern:?}", doc.command, arg.spelling()));
                     }
                     for value in &values {

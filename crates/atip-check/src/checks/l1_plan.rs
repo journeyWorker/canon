@@ -13,7 +13,7 @@ use serde_json::Value;
 use super::{first_document, in_json_mode, Run};
 use crate::claim::Claim;
 use crate::exec::{Call, RunError};
-use crate::l1::invocation::{self, Args, Invocation, Item};
+use crate::l1::invocation::{self, Invocation, Item};
 use crate::l1::model::{Arg, CommandDoc, GroupDoc, Output, ToolDocs, Tree};
 use crate::l1::witness::{self, DomainProbe, Expect, GroupOutcome, GroupPlan};
 
@@ -304,7 +304,7 @@ impl Run<'_> {
                 let Some(words) = invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| *word == tool)) else {
                     continue;
                 };
-                let call = self.invoke(Call::new(words[1..].iter().cloned()))?;
+                let call = self.invoke(Call::new(in_json_mode(&words[1..])))?;
                 run.examples.push(ExampleRun { command: doc.command.clone(), line: line.clone(), call });
             }
         }
@@ -377,13 +377,48 @@ impl Run<'_> {
         Ok(())
     }
 
-    /// The base to carry a changed argument: the first whose change leaves the requirements and constraints satisfied.
+    /// An invocation like one of `bases` with `arg` given as `word`, and the requirements and constraints of the command still satisfied, so that a refusal of the value is the value's: the
+    /// base as it is, else with the options that the broken rules name left out or given another value of their enum (at most two changes).
     fn carrying(doc: &CommandDoc, bases: &[Invocation], arg: &Arg, word: &str) -> Option<Invocation> {
+        let satisfied = |invocation: &Invocation| {
+            let args = invocation::args(doc, invocation);
+            invocation::requirement_problems(doc, &args).is_empty() && invocation::violated_constraints(doc, &args).is_empty()
+        };
+        let neighbours = |invocation: &Invocation| -> Vec<Invocation> {
+            let args = invocation::args(doc, invocation);
+            let mut names: Vec<&str> = Vec::new();
+            for index in invocation::violated_constraints(doc, &args) {
+                let Some(constraint) = doc.constraints.get(index) else { continue };
+                for name in constraint.names.iter().chain(constraint.if_name.iter()).chain(constraint.then.iter()) {
+                    if name != &arg.name && !names.contains(&name.as_str()) {
+                        names.push(name);
+                    }
+                }
+            }
+            let mut next: Vec<Invocation> = Vec::new();
+            for name in names {
+                let Some(other) = doc.option(name) else { continue };
+                let mut removed = invocation.clone();
+                invocation::remove_option(&mut removed, name);
+                next.push(removed);
+                for value in &other.possible_values {
+                    let mut given = invocation.clone();
+                    invocation::set_option(&mut given, name, Some(value.clone()));
+                    next.push(given);
+                }
+            }
+            next
+        };
         bases.iter().find_map(|base| {
             let changed = witness::with_argument(doc, base, arg, word)?;
-            let args: Args = invocation::args(doc, &changed);
-            (invocation::requirement_problems(doc, &args).is_empty() && invocation::violated_constraints(doc, &args).is_empty())
-                .then_some(changed)
+            if satisfied(&changed) {
+                return Some(changed);
+            }
+            let first = neighbours(&changed);
+            if let Some(found) = first.iter().find(|candidate| satisfied(candidate)) {
+                return Some(found.clone());
+            }
+            first.iter().flat_map(&neighbours).find(|candidate| satisfied(candidate))
         })
     }
 
@@ -452,7 +487,7 @@ impl Run<'_> {
                 let Some(words) = invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| word == tool)) else {
                     continue;
                 };
-                let call = self.invoke(Call::new(words[1..].iter().cloned()).without_setup())?;
+                let call = self.invoke(Call::new(in_json_mode(&words[1..])).without_setup())?;
                 run.validators.push(ValidatorRun { command: doc.command.clone(), validator: index, line: line.clone(), call });
             }
         }
