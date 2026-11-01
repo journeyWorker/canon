@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T08:37:49.785355Z",
+  "change_id": "canon-0-34-atip-1-1",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/entry.rs:110-111",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "99e3ea117de8f4e6fdbce0b55c0d74d61ffc2136",
+  "reviewer": "rev-atip-1-1",
+  "round": 1,
+  "scenario_ids": [
+    "atip.contract11.08"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] An option given with no value at all reports `received: \"\"`, as if the caller had sent an empty string. `canon finding add --change --json`, `canon status --repo --json`, `canon query --kind --json` all print `message: a value is required for '--change <CHANGE_ID>' but none was supplied` with `received: \"\"`; only `--change \"\"` or `--change=` is an empty value the caller sent (those are right). Brief F4: `received: \"\"` for an empty value the caller sent; no `received` for a value never sent (\"값 없이 부르면 received가 없다\"). Cause: usage_parts takes `string(ContextKind::InvalidValue)`, which clap sets to \"\" in the missing-value error; 0.33 dropped every empty `received`, which hid it. The scenario-08 test only covers the option left out entirely, so the gap is unproven. Proposed fix: keep `received` only when the argv held the value (e.g. ErrorKind::InvalidValue with a non-missing value, or check the raw args for `--change=` / an empty following word); add `finding add --change` (no value) to the test. Blast radius: every option in the tree, text and JSON.",
+  "worktree_dirty": false
+}

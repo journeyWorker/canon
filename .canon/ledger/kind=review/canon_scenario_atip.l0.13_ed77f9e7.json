@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "rev-atip-1-1",
+    "role": "reviewer",
+    "session_id": "s-0-34-atip-1-1-rev"
+  },
+  "at": "2026-11-01T08:38:15.267301Z",
+  "code_tree": "81184a90005a086af4843d254279265b69b69782",
+  "kind": "review",
+  "pin": "99e3ea117de8f4e6fdbce0b55c0d74d61ffc2136",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_l0_13_a_warning_code_has_the_registry_shape_of_a_warning_code",
+          "junit:atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code",
+          "junit:atip_l0_13_every_warning_site_names_a_registered_code",
+          "junit:atip_l0_13_every_warning_the_status_report_produces_has_a_registered_code",
+          "junit:atip_l0_13_no_warning_macro_call_lacks_a_code_literal",
+          "junit:atip_l0_13_status_json_carries_coded_warnings_in_meta_and_plain_lines_in_data"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "3d5c7c3d6679b1a5015ca61f5c63046e561ce59baa2b732e818173a8e52350e6",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-34-atip-1-1/brief.md"
+  },
+  "review_id": "01M6B44RF3EKW4BQCT7Z355AG5",
+  "reviewer": "rev-atip-1-1",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.l0.13",
+  "schema": 2,
+  "worktree_dirty": false
+}
