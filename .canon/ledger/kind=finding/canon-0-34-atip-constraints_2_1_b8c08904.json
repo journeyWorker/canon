@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T17:42:57.632336Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "575a91b668cbc59a0cf3aa5281bb48afd90cdfa1",
+  "reviewer": "rev-constraints",
+  "round": 2,
+  "scenario_ids": [
+    "atip.constraints.18"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] the stateless stage (domains, constraints, validators) is not part of batch preflight for the checks that carry the command's own code: `finding add --input '[{seq 21 note},{seq 22 blocker, no introduced-*}]'` writes item 0 and then fails item 1 with exit 1 BATCH_INCOMPLETE/FINDING_INTRODUCED_REQUIRED, and `[{good},{round 0}]` writes item 0 and fails with FINDING_INVALID_ARGUMENT, while the same faults with a parser-coded domain (`change` Bad_Id) are refused in preflight with exit 2 and nothing written; spec 10.8.3 says a validator reads no state so in a batch it is part of preflight, and 11.11 says preflight is steps 1-6 for every item and a preflight failure exits 2 before any item executes; the brief puts the validators before any state read for every call; blast radius: every batch command with command-coded rules, domains or validators (finding add/close, divergence add/defer, evidence add/audit, review scenario/change, dispatch begin): a later item's stateless fault is found only after earlier items wrote; the single-call sweeps of tests/arg_rules.rs and atip.constraints.18 never submit a batch",
+  "worktree_dirty": false
+}

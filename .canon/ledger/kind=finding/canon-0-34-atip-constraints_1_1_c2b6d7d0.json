@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T17:42:59.895277Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "01aa559313c2a5b88a2a4d834a6417f4969a3b90",
+  "disposition": "fixed",
+  "introduced_by": "cf0ec109e0458a607fbc2ca2118c1fe5e195ee48",
+  "kind": "finding",
+  "resolution_code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "resolution_sha": "575a91b668cbc59a0cf3aa5281bb48afd90cdfa1",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "c518cecd523d9dd4e9245880d0f6aa2c27e527e6",
+  "reviewer": "rev-constraints",
+  "round": 1,
+  "scenario_ids": [
+    "atip.constraints.03",
+    "atip.constraints.13"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] migrate declares `--backup` requires `--revert` and `--actor`/`--approver`/`--note` require `--relayed-via`, but clap does not enforce them when the call also carries the option that conflicts with the required one (clap skips a missing required arg that conflicts with a present arg): `migrate --commit --plan-digest D --relayed-via ask --backup f --actor a --approver b --note c` and `migrate --revert --commit --plan-digest D --actor x` pass the parser (answers PLAN_STALE / MIGRATE_REFUSED, not USAGE), so the document claims a refusal the binary does not give; the sweep of tests/arg_rules.rs builds one violating call per rule and never combines `--revert` with `--actor`; blast radius: the same quirk applies to any other `requires` whose target conflicts with another declared option (my exhaustive 2^n sampling of every command found only migrate)",
+  "worktree_dirty": false
+}

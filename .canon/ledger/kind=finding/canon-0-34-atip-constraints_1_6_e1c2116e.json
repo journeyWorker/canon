@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T17:43:01.241045Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "01aa559313c2a5b88a2a4d834a6417f4969a3b90",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "250d51f8d81a18bbe3498b0c5eb40f89b1d3f1ab",
+  "resolution_sha": "575a91b668cbc59a0cf3aa5281bb48afd90cdfa1",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "c518cecd523d9dd4e9245880d0f6aa2c27e527e6",
+  "reviewer": "rev-constraints",
+  "round": 1,
+  "scenario_ids": [
+    "atip.constraints.03"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[standards] the refusal of the role/regime validator of `retrieve` says `--role ... does not match --regime` while the option is `--for-role` (its `field` is `--regime`), so a caller reading the message looks for an option that does not exist; blast radius: message text of retrieve only",
+  "worktree_dirty": false
+}
