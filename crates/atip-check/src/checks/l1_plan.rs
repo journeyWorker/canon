@@ -18,17 +18,17 @@ use crate::l1::model::{Arg, CommandDoc, GroupDoc, Output, ToolDocs, Tree};
 use crate::l1::witness::{self, DomainProbe, Expect, GroupOutcome, GroupPlan};
 
 /// The word no tool has as a path word, for `schema nosuch-xyz`.
-pub(super) const NO_SUCH_PATH: &str = "nosuch-xyz";
+pub(crate) const NO_SUCH_PATH: &str = "nosuch-xyz";
 /// The code no registry has, for `schema --error` and `schema --warning`.
-pub(super) const NO_SUCH_CODE: &str = "NOSUCH_XYZ";
+pub(crate) const NO_SUCH_CODE: &str = "NOSUCH_XYZ";
 /// The path no field selection of a tool declares.
-pub(super) const NO_SUCH_FIELD: &str = "nosuch-xyz";
+pub(crate) const NO_SUCH_FIELD: &str = "nosuch-xyz";
 /// The most `next` entries one run follows.
 const MAX_NEXT_RUNS: usize = 300;
 
 /// One document the tree names, and the invocations that read it.
 #[derive(Debug, Clone)]
-pub(super) struct DocCall {
+pub(crate) struct DocCall {
     pub id: String,
     pub is_group: bool,
     /// `schema <words> --json`.
@@ -39,7 +39,7 @@ pub(super) struct DocCall {
 
 /// One example of a `read` command, run.
 #[derive(Debug, Clone)]
-pub(super) struct ExampleRun {
+pub(crate) struct ExampleRun {
     pub command: String,
     pub line: String,
     pub call: usize,
@@ -47,19 +47,17 @@ pub(super) struct ExampleRun {
 
 /// One rule group of a command and, when it has a witness, the invocation made for it.
 #[derive(Debug, Clone)]
-pub(super) struct ConstraintRun {
+pub(crate) struct ConstraintRun {
     pub command: String,
     pub group: GroupPlan,
     pub call: Option<usize>,
     /// The other groups of the command, so an entailed group can name the rules that break with it.
     pub labels: Vec<String>,
-    /// The result each group of the command got, filled in by the judge.
-    pub of_command: usize,
 }
 
 /// One value tried for one argument.
 #[derive(Debug, Clone)]
-pub(super) struct DomainRun {
+pub(crate) struct DomainRun {
     pub command: String,
     pub arg: String,
     pub probe: DomainProbe,
@@ -68,7 +66,7 @@ pub(super) struct DomainRun {
 
 /// What a domain needs and whether the run could probe it.
 #[derive(Debug, Clone)]
-pub(super) struct DomainNote {
+pub(crate) struct DomainNote {
     pub command: String,
     pub arg: String,
     /// The domain has a `pattern` or a structural keyword the checker cannot generate a value outside of.
@@ -81,7 +79,7 @@ pub(super) struct DomainNote {
 
 /// One integer argument given a number one beyond the safe range.
 #[derive(Debug, Clone)]
-pub(super) struct NumberRun {
+pub(crate) struct NumberRun {
     pub command: String,
     pub arg: String,
     pub word: String,
@@ -90,7 +88,7 @@ pub(super) struct NumberRun {
 
 /// One `rejects` invocation of a validator.
 #[derive(Debug, Clone)]
-pub(super) struct ValidatorRun {
+pub(crate) struct ValidatorRun {
     pub command: String,
     pub validator: usize,
     pub line: String,
@@ -99,7 +97,7 @@ pub(super) struct ValidatorRun {
 
 /// One `next` entry followed: the answer that carried it, and the run of it in the same sequence.
 #[derive(Debug, Clone)]
-pub(super) struct NextRun {
+pub(crate) struct NextRun {
     pub source: usize,
     pub argv: Vec<String>,
     pub call: usize,
@@ -107,7 +105,7 @@ pub(super) struct NextRun {
 
 /// A paged command called with `--limit 1`, the next page, and the cursor reused with another argument.
 #[derive(Debug, Clone)]
-pub(super) struct PagingRun {
+pub(crate) struct PagingRun {
     pub command: String,
     pub first: usize,
     pub next: Option<usize>,
@@ -118,7 +116,7 @@ pub(super) struct PagingRun {
 
 /// One `--fields` selection: the answer without it, with it, and with a path nothing declares.
 #[derive(Debug, Clone)]
-pub(super) struct FieldsRun {
+pub(crate) struct FieldsRun {
     pub command: String,
     pub selection: Vec<String>,
     pub plain: usize,
@@ -127,21 +125,14 @@ pub(super) struct FieldsRun {
 
 /// The refusal of a path no selection declares, once per command that offers `--fields`.
 #[derive(Debug, Clone)]
-pub(super) struct UnknownFieldRun {
+pub(crate) struct UnknownFieldRun {
     pub command: String,
     pub call: usize,
 }
 
-/// A command that offers `--fields` with a declared output and no selection in the fixture for it.
-#[derive(Debug, Clone)]
-pub(super) struct FieldsGap {
-    pub command: String,
-    pub why: String,
-}
-
 /// Everything the L1 judgments read besides the log.
 #[derive(Debug, Default)]
-pub(super) struct L1Run {
+pub(crate) struct L1Run {
     pub docs: ToolDocs,
     pub tree: usize,
     pub tree_again: usize,
@@ -169,7 +160,6 @@ pub(super) struct L1Run {
     pub paging: Vec<PagingRun>,
     pub fields: Vec<FieldsRun>,
     pub unknown_fields: Vec<UnknownFieldRun>,
-    pub fields_gaps: Vec<FieldsGap>,
 }
 
 /// `argv` as an envelope's `data` when it printed an ok envelope.
@@ -219,7 +209,7 @@ impl Run<'_> {
                 .is_some_and(|entry| !entry.ok.is_empty())
     }
 
-    pub(super) fn invoke_l1(&mut self, warnings_offered: bool, claim: Claim) -> Result<L1Run, RunError> {
+    pub(crate) fn invoke_l1(&mut self, warnings_offered: bool, claim: Claim) -> Result<L1Run, RunError> {
         let _ = claim;
         let mut run = L1Run {
             tree: self.invoke(Call::new(["schema", "--json"]).measured())?,
@@ -362,7 +352,6 @@ impl Run<'_> {
                     .join(" = ")
             })
             .collect();
-        let of_command = plans.len();
         for plan in plans {
             let call = match &plan.outcome {
                 GroupOutcome::Witness { words } => Some(self.invoke(Call::new(words.iter().cloned()))?),
@@ -373,7 +362,6 @@ impl Run<'_> {
                 group: plan,
                 call,
                 labels: labels.clone(),
-                of_command,
             });
         }
         Ok(())
@@ -574,12 +562,6 @@ impl Run<'_> {
             .unwrap_or_default();
         let mut unprojected = base.clone();
         invocation::remove_option(&mut unprojected, "fields");
-        if selections.is_empty() {
-            run.fields_gaps.push(FieldsGap {
-                command: doc.command.clone(),
-                why: "the fixture lists no `fields` selection for it".to_string(),
-            });
-        }
         for selection in selections {
             let plain = self.invoke(Call::new(invocation::render(&unprojected)))?;
             let sequence = self.log[plain].sequence;
@@ -633,7 +615,7 @@ impl Run<'_> {
     }
 
     /// Like [`Run::invoke`], in the sequence that `sequence` names.
-    pub(super) fn invoke_after(&mut self, sequence: usize, call: Call) -> Result<usize, RunError> {
+    pub(crate) fn invoke_after(&mut self, sequence: usize, call: Call) -> Result<usize, RunError> {
         let outcome = self.runner.run_after(sequence, &call)?;
         self.log.push(outcome);
         Ok(self.log.len() - 1)
@@ -641,7 +623,7 @@ impl Run<'_> {
 }
 
 /// The id of the command `argv` names: its words, after any leading tool-wide options, begin with the path of a command or group of the tree.
-pub(super) fn names_command(docs: &ToolDocs, argv: &[String]) -> Option<String> {
+pub(crate) fn names_command(docs: &ToolDocs, argv: &[String]) -> Option<String> {
     let tree = docs.tree.as_ref()?;
     (0..argv.len()).find_map(|start| {
         tree.commands
@@ -654,7 +636,7 @@ pub(super) fn names_command(docs: &ToolDocs, argv: &[String]) -> Option<String> 
 }
 
 /// Whether `outcome`'s envelope, when it is a failure, has `code` and `field`.
-pub(super) fn refusal_of(document: &Value) -> (Option<&str>, Option<&str>) {
+pub(crate) fn refusal_of(document: &Value) -> (Option<&str>, Option<&str>) {
     (
         document.pointer("/error/code").and_then(Value::as_str),
         document.pointer("/error/field").and_then(Value::as_str),
@@ -662,12 +644,12 @@ pub(super) fn refusal_of(document: &Value) -> (Option<&str>, Option<&str>) {
 }
 
 /// The `Output` of `doc` that carries `fields`, by the name `meta.output` gave or the only one.
-pub(super) fn output_with_fields<'a>(doc: &'a CommandDoc, name: Option<&str>) -> Option<&'a Output> {
+pub(crate) fn output_with_fields<'a>(doc: &'a CommandDoc, name: Option<&str>) -> Option<&'a Output> {
     doc.output(name).filter(|output| output.fields.is_some())
 }
 
 /// The value a fixture `ok` invocation gives `arg` of `doc`, for the accepted values of `L1.patterns`.
-pub(super) fn given_value(doc: &CommandDoc, invocation: &Invocation, arg: &Arg) -> Option<String> {
+pub(crate) fn given_value(doc: &CommandDoc, invocation: &Invocation, arg: &Arg) -> Option<String> {
     invocation.items.iter().find_map(|item| match item {
         Item::Option { name, value } if arg.is_option && *name == arg.name => value.clone(),
         _ => None,

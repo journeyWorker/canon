@@ -2056,29 +2056,3 @@ mod tests {
         assert!(results[0].1.contains("declares no input"));
     }
 }
-
-/// Whether argument `name` is given in `args` (an operand: `args.operands` has an element at its index; an option: `args.options` has it).
-pub fn arg_given(doc: &CommandDoc, args: &Args, name: &str) -> bool {
-    let _ = (doc, args, name);
-    false
-}
-
-/// Replaces every occurrence of option `name` by one occurrence with `value` (`None` for a flag); appends it when absent.
-pub fn set_option(invocation: &mut Invocation, name: &str, value: Option<String>) {
-    let _ = (invocation, name, value);
-}
-
-/// Removes every occurrence of option `name`.
-pub fn remove_option(invocation: &mut Invocation, name: &str) {
-    let _ = (invocation, name);
-}
-
-/// Replaces the `index`-th operand by `value`; appends it when `index` is the number of operands.
-pub fn set_operand(invocation: &mut Invocation, index: usize, value: String) {
-    let _ = (invocation, index, value);
-}
-
-/// Removes the `index`-th operand and every operand after it.
-pub fn remove_operand(invocation: &mut Invocation, index: usize) {
-    let _ = (invocation, index);
-}

@@ -47,6 +47,9 @@ pub struct Check {
     /// Things seen that the contract only recommends against (stderr output that carries no error or result). They never change the result.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub advisories: Vec<String>,
+    /// Facts the check found that do not change its result: the rules an `entailed` check rests on, a verified Unicode-version difference between the two regular-expression engines.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -134,6 +137,11 @@ impl Check {
             self.id,
             self.rules.join(", ")
         );
+        let base = if self.notes.is_empty() {
+            base
+        } else {
+            format!("{base} [{}]", self.notes.join("; "))
+        };
         match &self.reason {
             Some(reason) => format!("{base}: {reason}"),
             None => base,
@@ -160,6 +168,7 @@ mod tests {
             rules: vec!["1"],
             reason: None,
             advisories: Vec::new(),
+            notes: Vec::new(),
             observed: Vec::new(),
         }
     }

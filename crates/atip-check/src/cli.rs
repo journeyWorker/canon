@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use crate::claim::MINORS;
 use crate::output::{Code, Failure};
 
-/// The levels the contract defines; only `L0` has checks in this release.
+/// The levels the contract defines; `L0` and `L1` have checks in this release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
     L0,
@@ -60,8 +60,8 @@ Usage: atip check --bin <BINARY> --level <LEVEL> --fixture <FILE> [--contract <M
 
 Options:
       --bin <BINARY>     The binary to check: a path, or a name found on PATH
-      --level <LEVEL>    The level the tool claims: L0 (L1 and L2 are not supported yet)
-      --fixture <FILE>   The tool's fixture file: JSON with contractVersion, setup, env, timeoutSeconds, probe, globalOptions, registry, warnings and commands
+      --level <LEVEL>    The level the tool claims: L0 or L1 (L2 is not supported yet)
+      --fixture <FILE>   The tool's fixture file: JSON with contractVersion, setup, env, timeoutSeconds, probe, globalOptions, registry, warnings and commands (and, in commands, ok, refused, missingValue, fields and domainRejects)
       --contract <MAJOR.MINOR>
                          The contract minor the tool claims: 1.0 or 1.1. Defaults to the fixture's contractVersion, and to 1.0
       --json             Print one JSON envelope on stdout instead of text

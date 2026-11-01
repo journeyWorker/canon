@@ -20,12 +20,17 @@ use std::time::Duration;
 use serde_json::{json, Map, Value};
 
 use crate::claim::Claim;
+use crate::cli::Level;
 use crate::exec::{Call, Exit, Outcome, RunError, Runner};
 use crate::fixture::{Fixture, RegistryRow};
 use crate::report::{Check, CheckResult, Report, Strength};
 use crate::schema::schemas;
 
 pub mod rules;
+mod l1;
+mod l1_plan;
+
+use l1_plan::L1Run;
 
 /// A fixture entry a check needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,6 +120,11 @@ pub fn ids() -> [&'static str; 28] {
     TABLE.each_ref().map(|entry| entry.id)
 }
 
+/// The ids of the L1 checks, in table order.
+pub fn l1_ids() -> [&'static str; 30] {
+    l1::ids()
+}
+
 /// The fixture entries the check `id` needs.
 pub fn needs(id: &str) -> &'static [Need] {
     TABLE
@@ -151,6 +161,8 @@ struct Finding {
     reason: Option<String>,
     advisories: Vec<String>,
     observed: Vec<usize>,
+    /// Facts the check found that do not change its result.
+    notes: Vec<String>,
 }
 
 /// The most problems a reason lists, and the most characters of one.
@@ -478,13 +490,14 @@ pub(crate) struct Judged {
     pub(crate) conditions: BTreeSet<String>,
 }
 
-/// Runs every L0 check against the fixture's state and reports each.
-pub(crate) fn run_l0(
+/// Runs every check of `level` against the fixture's state and reports each.
+pub(crate) fn run_checks(
     runner: Runner,
     fixture: &Fixture,
     claim: Claim,
     bin_name: &str,
     mutation: Mutation<'_>,
+    level: Level,
 ) -> Result<Judged, RunError> {
     let mut run = Run {
         runner,
@@ -492,8 +505,16 @@ pub(crate) fn run_l0(
         log: Vec::new(),
     };
     let calls = run.invoke_all()?;
-    let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation);
-    let findings = vec![
+    let l1 = if level == Level::L1 {
+        let warnings_offered = claim.is_1_1()
+            && first_document(&run.log[calls.schema_warnings].stdout)
+                .is_some_and(|document| document.get("ok") == Some(&Value::Bool(true)) && document.pointer("/data/warnings").is_some_and(Value::is_array));
+        Some(run.invoke_l1(warnings_offered, claim)?)
+    } else {
+        None
+    };
+    let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation, l1.as_ref());
+    let mut findings = vec![
         judge.version(),
         judge.version_format(),
         judge.unknown_command(),
@@ -523,8 +544,13 @@ pub(crate) fn run_l0(
         judge.hint_form(),
         judge.global_on_group(),
     ];
-    let checks = TABLE
-        .iter()
+    let mut table: Vec<&Entry> = TABLE.iter().collect();
+    if l1.is_some() {
+        findings.extend(judge.l1_findings());
+        table.extend(l1::TABLE.iter());
+    }
+    let checks = table
+        .into_iter()
         .zip(findings)
         .map(|(entry, finding)| {
             let finding = if mutation.forced_pass.contains(&entry.id) {
@@ -543,6 +569,7 @@ pub(crate) fn run_l0(
                 rules: entry.rules.to_vec(),
                 reason: finding.reason,
                 advisories: finding.advisories,
+                notes: finding.notes,
                 observed: finding
                     .observed
                     .iter()
@@ -553,7 +580,7 @@ pub(crate) fn run_l0(
         .collect();
     let conditions = judge.seen.into_inner();
     Ok(Judged {
-        report: Report::new("L0", claim, checks),
+        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks),
         conditions,
     })
 }
@@ -568,6 +595,8 @@ enum End {
     Unsupported(String),
     /// The check observed its subject, so it needs no fixture entry to say so: nothing it judged failed.
     Observed,
+    /// Every rule the check judges is entailed by others that passed: the rules, and what each is entailed by.
+    Entailed(Vec<String>),
 }
 
 /// The conditions of one check being judged: what fails, what was looked at, what is only recommended.
@@ -578,6 +607,8 @@ struct Conditions<'j> {
     problems: Vec<String>,
     advisories: Vec<String>,
     observed: Vec<usize>,
+    /// Facts found that do not change the result.
+    notes: Vec<String>,
     /// The invocations this check made for itself: one that runs over the time limit is this check's failure.
     owned: Vec<usize>,
 }
@@ -633,6 +664,7 @@ impl<'j> Conditions<'j> {
                 reason: Some(reason),
                 advisories: self.advisories,
                 observed: self.observed,
+                notes: self.notes,
             };
         }
         if !self.problems.is_empty() {
@@ -641,22 +673,25 @@ impl<'j> Conditions<'j> {
                 reason: Some(reason_of(&self.problems)),
                 advisories: self.advisories,
                 observed: self.observed,
+                notes: self.notes,
             };
         }
-        let unprovided = |reason: String, advisories: Vec<String>| Finding {
+        let unprovided = |reason: String, advisories: Vec<String>, notes: Vec<String>| Finding {
             result: CheckResult::Unprovided,
             reason: Some(reason),
             advisories,
             observed: Vec::new(),
+            notes,
         };
         match end {
-            End::Unprovided(reason) => return unprovided(reason, self.advisories),
+            End::Unprovided(reason) => return unprovided(reason, self.advisories, self.notes),
             End::Unsupported(reason) => {
                 return Finding {
                     result: CheckResult::Unsupported,
                     reason: Some(reason),
                     advisories: self.advisories,
                     observed: self.observed,
+                    notes: self.notes,
                 }
             }
             End::Observed => {
@@ -665,7 +700,19 @@ impl<'j> Conditions<'j> {
                     reason: None,
                     advisories: self.advisories,
                     observed: self.observed,
+                    notes: self.notes,
                 }
+            }
+            End::Entailed(rules) => {
+                let mut notes = self.notes;
+                notes.extend(rules);
+                return Finding {
+                    result: CheckResult::Entailed,
+                    reason: None,
+                    advisories: self.advisories,
+                    observed: self.observed,
+                    notes,
+                };
             }
             End::Exercised(_) => {}
         }
@@ -685,7 +732,7 @@ impl<'j> Conditions<'j> {
             })
             .collect();
         if !missing.is_empty() {
-            return unprovided(format!("the fixture has no {}", missing.join(" and ")), self.advisories);
+            return unprovided(format!("the fixture has no {}", missing.join(" and ")), self.advisories, self.notes);
         }
         let exercised = matches!(end, End::Exercised(true));
         let reason = (!exercised)
@@ -699,6 +746,7 @@ impl<'j> Conditions<'j> {
             reason,
             advisories: self.advisories,
             observed: self.observed,
+            notes: self.notes,
         }
     }
 }
@@ -719,6 +767,8 @@ struct Judge<'a> {
     tool_warnings: Option<Vec<Value>>,
     /// The registry a code is looked up in: the tool's own when it prints one, else the fixture's.
     rows: Option<Vec<RegistryRow>>,
+    /// What the L1 invocations read, for an L1 run.
+    l1: Option<&'a L1Run>,
 }
 
 impl<'a> Judge<'a> {
@@ -729,6 +779,7 @@ impl<'a> Judge<'a> {
         calls: &'a Invocations,
         bin_name: &str,
         mutation: Mutation<'a>,
+        l1: Option<&'a L1Run>,
     ) -> Self {
         let documents: Vec<Option<Value>> = log
             .iter()
@@ -778,6 +829,7 @@ impl<'a> Judge<'a> {
             tool_errors,
             tool_warnings,
             rows,
+            l1,
         }
     }
 
@@ -803,8 +855,9 @@ impl<'a> Judge<'a> {
     fn check(&'a self, id: &'static str) -> Conditions<'a> {
         let entry = TABLE
             .iter()
+            .chain(l1::TABLE.iter())
             .find(|entry| entry.id == id)
-            .unwrap_or_else(|| panic!("{id} is not in the L0 table"));
+            .unwrap_or_else(|| panic!("{id} is not in a table"));
         Conditions {
             judge: self,
             entry,
@@ -813,6 +866,7 @@ impl<'a> Judge<'a> {
             advisories: Vec::new(),
             observed: Vec::new(),
             owned: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
