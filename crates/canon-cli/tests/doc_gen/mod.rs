@@ -70,7 +70,22 @@ fn group_of(leaf: &Value) -> String {
 }
 
 fn leaves(spec: &Value) -> impl Iterator<Item = &Value> {
-    spec["commands"].as_array().expect("commands").iter().filter(|n| n["nodeKind"] == "leaf")
+    spec["commands"].as_array().expect("commands").iter()
+}
+
+/// What clap declares about how the options of `leaf` go together: the guides write it as `a | b` and `[--a --b <V>]`.
+/// The spec file does not carry it (constraints are published in their own change); the clap tree does.
+fn relations(leaf: &Value) -> atip::project::Relations {
+    static ROOT: std::sync::LazyLock<clap::Command> = std::sync::LazyLock::new(|| {
+        let mut root = canon_cli::cli::command();
+        root.build();
+        root
+    });
+    let mut node = &*ROOT;
+    for word in leaf["path"].as_array().expect("path") {
+        node = node.find_subcommand(word.as_str().expect("word")).expect("a command of the tree");
+    }
+    atip::project::relations(node)
 }
 
 /// Every group name that has a table, sorted (`top` first).
@@ -125,12 +140,12 @@ fn operand_cell(leaf: &Value) -> String {
         .unwrap_or_default()
         .iter()
         .map(|o| {
-            let word = kind_word(o["kind"].as_str().unwrap_or("value"));
+            let word = kind_word(o["valueName"].as_str().unwrap_or("value"));
             let mut text = format!("`{word}`");
             if o["required"] != true {
                 text.push_str(" (optional)");
             }
-            if o["repeatable"] == true {
+            if o["variadic"] == true {
                 text.push_str(" (repeatable)");
             }
             text
@@ -141,16 +156,16 @@ fn operand_cell(leaf: &Value) -> String {
 
 fn option_syntax(o: &Value) -> String {
     let name = o["name"].as_str().expect("option name");
-    match (o["kind"].as_str(), o["valueName"].as_str()) {
-        (Some("value"), Some(v)) => format!("`--{name} <{v}>`"),
-        _ => format!("`--{name}`"),
+    match o["valueName"].as_str() {
+        Some(v) => format!("`--{name} <{v}>`"),
+        None => format!("`--{name}`"),
     }
 }
 
 fn required_cell(leaf: &Value) -> String {
     let mut parts: Vec<String> = leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter(|o| o["required"] == true).map(option_syntax).collect();
-    for group in leaf["requiredOneOf"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
-        let names: Vec<String> = group.as_array().expect("group").iter().map(|n| format!("`{}`", n.as_str().expect("name"))).collect();
+    for group in relations(leaf).required_one_of {
+        let names: Vec<String> = group.iter().map(|n| format!("`--{n}`")).collect();
         parts.push(format!("one of {}", names.join(" or ")));
     }
     if parts.is_empty() { "none".into() } else { parts.join(", ") }
@@ -175,24 +190,20 @@ fn effect_label(leaf: &Value, ko: bool) -> &'static str {
 /// One table of the command reference: a group's leaves.
 pub fn cli_table(spec: &Value, group: &str, ko: bool) -> String {
     let header = if ko { "| 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |" } else { "| Command | Operands | Required options | Effect | Example |" };
-    let about = spec["commands"].as_array().expect("commands").iter().find(|n| n["nodeKind"] == "group" && n["command"] == group).and_then(|n| n["about"].as_str()).unwrap_or("Commands without a group word");
+    let about = spec["tree"]["commands"].as_array().expect("the tree").iter().find(|n| n["kind"] == "group" && n["command"] == group).and_then(|n| n["summary"].as_str()).unwrap_or("Commands without a group word");
     let mut out = format!("{}.\n\n{header}\n|---|---|---|---|---|\n", mdx_safe(short(about)));
     for leaf in leaves(spec).filter(|l| group_of(l) == group) {
         let command = leaf["command"].as_str().expect("command");
-        let _ = writeln!(out, "| `canon {command}` | {} | {} | {}: {} | `{}` |", operand_cell(leaf), required_cell(leaf), effect_label(leaf, ko), cell(&mdx_safe(short(leaf["about"].as_str().expect("about")))), cell(&example(leaf)));
+        let _ = writeln!(out, "| `canon {command}` | {} | {} | {}: {} | `{}` |", operand_cell(leaf), required_cell(leaf), effect_label(leaf, ko), cell(&mdx_safe(short(leaf["summary"].as_str().expect("summary")))), cell(&example(leaf)));
     }
     out
 }
 
 /// Options every leaf lists (or most do) and the role block states once at its top.
-const SHARED: [&str; 3] = ["repo", "json", "input"];
+const SHARED: [&str; 4] = ["repo", "json", "input", "as"];
 
 fn options_of(leaf: &Value) -> &[Value] {
     leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default()
-}
-
-fn names_of<'a>(o: &'a Value, key: &str) -> Vec<&'a str> {
-    o[key].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).map(|n| n.trim_start_matches("--")).collect()
 }
 
 fn find_option<'a>(leaf: &'a Value, name: &str) -> Option<&'a Value> {
@@ -202,26 +213,29 @@ fn find_option<'a>(leaf: &'a Value, name: &str) -> Option<&'a Value> {
 /// `--name <VALUE>` (a closed set shows its members), or `--name` for a flag.
 fn atom(o: &Value) -> String {
     let name = o["name"].as_str().expect("option name");
-    if o["kind"] != "value" {
+    if matches!(o["valueType"].as_str(), Some("switch" | "count")) {
         return format!("--{name}");
     }
     let set: Vec<&str> = o["possibleValues"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
     if set.is_empty() { format!("--{name} <{}>", o["valueName"].as_str().unwrap_or("VALUE")) } else { format!("--{name} <{}>", set.join("|")) }
 }
 
-fn is_required(leaf: &Value, o: &Value) -> bool {
+fn is_required(relations: &atip::project::Relations, o: &Value) -> bool {
     let name = o["name"].as_str().unwrap_or_default();
-    o["required"] == true || leaf["requiredOneOf"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().any(|g| g.as_array().is_some_and(|g| g.iter().any(|n| n.as_str().is_some_and(|n| n.trim_start_matches("--") == name))))
+    o["required"] == true || relations.required_one_of.iter().any(|group| group.iter().any(|n| n == name))
 }
 
 /// The syntax line of a leaf: operands, required options, then the optional ones with
 /// their value names and closed sets; the shared `--repo/--json/--input` are left to the
 /// block's header (`--input` is flagged on the lines that take it).
 fn syntax_line(leaf: &Value) -> String {
+    let relations = relations(leaf);
+    let conflicts = |name: &str| -> Vec<&str> { relations.conflicts_with.get(name).map(|names| names.iter().map(String::as_str).collect()).unwrap_or_default() };
+    let needs = |name: &str| -> Vec<&str> { relations.requires.get(name).map(|names| names.iter().map(String::as_str).collect()).unwrap_or_default() };
     let mut parts: Vec<String> = vec![format!("canon {}", leaf["command"].as_str().expect("command"))];
     for o in leaf["operands"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
-        let word = format!("<{}>", o["kind"].as_str().unwrap_or("VALUE"));
-        let (required, repeatable) = (o["required"] == true, o["repeatable"] == true);
+        let word = format!("<{}>", o["valueName"].as_str().unwrap_or("VALUE"));
+        let (required, repeatable) = (o["required"] == true, o["variadic"] == true);
         parts.push(match (required, repeatable) {
             (true, false) => word,
             (true, true) => format!("{word}+"),
@@ -233,20 +247,20 @@ fn syntax_line(leaf: &Value) -> String {
     for o in opts.iter().filter(|o| o["required"] == true) {
         parts.push(atom(o));
     }
-    for group in leaf["requiredOneOf"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
-        let alts: Vec<String> = group.as_array().expect("group").iter().filter_map(|n| find_option(leaf, n.as_str().expect("name").trim_start_matches("--"))).map(atom).collect();
+    for group in &relations.required_one_of {
+        let alts: Vec<String> = group.iter().filter_map(|n| find_option(leaf, n)).map(atom).collect();
         parts.push(format!("({})", alts.join(" | ")));
     }
     let mut used: Vec<&str> = Vec::new();
-    for o in opts.iter().filter(|o| !is_required(leaf, o)) {
+    for o in opts.iter().filter(|o| !is_required(&relations, o)) {
         let name = o["name"].as_str().expect("option name");
         if used.contains(&name) {
             continue;
         }
-        let follows = |a: &str, b: &str| find_option(leaf, a).is_some_and(|x| names_of(x, "conflictsWith").contains(&b));
-        let rivals: Vec<&str> = names_of(o, "conflictsWith").into_iter().filter(|r| follows(r, name) && find_option(leaf, r).is_some_and(|x| !is_required(leaf, x))).collect();
+        let follows = |a: &str, b: &str| find_option(leaf, a).is_some() && conflicts(a).contains(&b);
+        let rivals: Vec<&str> = conflicts(name).into_iter().filter(|r| follows(r, name) && find_option(leaf, r).is_some_and(|x| !is_required(&relations, x))).collect();
         let clique = !rivals.is_empty() && rivals.iter().all(|a| rivals.iter().all(|b| a == b || follows(a, b)));
-        let partners: Vec<&str> = names_of(o, "requires").into_iter().filter(|r| find_option(leaf, r).is_some_and(|x| !is_required(leaf, x) && names_of(x, "requires").contains(&name))).collect();
+        let partners: Vec<&str> = needs(name).into_iter().filter(|r| find_option(leaf, r).is_some_and(|x| !is_required(&relations, x) && needs(r).contains(&name))).collect();
         let repeat = if o["repeatable"] == true { "*" } else { "" };
         if clique {
             let mut members = vec![atom(o)];
@@ -258,7 +272,7 @@ fn syntax_line(leaf: &Value) -> String {
             members.extend(partners.iter().filter_map(|r| find_option(leaf, r)).map(atom));
             used.extend(partners.iter().copied());
             parts.push(format!("[{}]{repeat}", members.join(" ")));
-        } else if let Some(needs) = names_of(o, "requires").first() {
+        } else if let Some(needs) = needs(name).first() {
             parts.push(format!("[{} (with --{needs})]{repeat}", atom(o)));
         } else {
             parts.push(format!("[{}]{repeat}", atom(o)));
@@ -280,7 +294,7 @@ fn gist(about: &str) -> &str {
 /// The **Commands** block of a role's reference: every leaf of the role with its full
 /// syntax (each option, value names, closed sets) and one runnable example.
 pub fn role_commands(spec: &Value, role: &str) -> String {
-    let mut mine: Vec<&Value> = leaves(spec).filter(|l| l["roles"].as_array().is_some_and(|r| r.iter().any(|x| x == role))).collect();
+    let mut mine: Vec<&Value> = leaves(spec).filter(|l| l["x-canon"]["roles"].as_array().is_some_and(|r| r.iter().any(|x| x == role))).collect();
     mine.sort_by_key(|l| l["command"].as_str().unwrap_or_default());
     let no_repo: Vec<String> = mine.iter().filter(|l| find_option(l, "repo").is_none()).map(|l| format!("`{}`", l["command"].as_str().unwrap_or_default())).collect();
     let mut out = String::from("Every leaf takes `--as <ROLE>` and `--json`");
@@ -292,7 +306,7 @@ pub fn role_commands(spec: &Value, role: &str) -> String {
     out.push_str(". `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list; camelCase and snake_case both match.\n");
     out.push_str("In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).\n\n");
     for leaf in mine {
-        let about = gist(leaf["about"].as_str().expect("about"));
+        let about = gist(leaf["summary"].as_str().expect("summary"));
         let _ = writeln!(out, "```text\n# {about}\n{}", syntax_line(leaf));
         if leaf["effect"] == "destructive" {
             out.push_str("# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts\n");

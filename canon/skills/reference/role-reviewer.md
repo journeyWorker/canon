@@ -27,154 +27,154 @@ In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` e
 canon brief check [<CHANGE_ID>]
 ```
 ```bash
-canon brief check
+canon brief check --json
 ```
 ```text
 # Show where the change stands and the next one to three steps; never edits
 canon brief show [<CHANGE_ID>] [--body]
 ```
 ```bash
-canon brief show
+canon brief show --json
 ```
 ```text
 # Write the shell completion script for canon (bash, zsh or fish)
 canon completion <SHELL>
 ```
 ```bash
-canon completion zsh
+canon completion zsh --json
 ```
 ```text
 # Show what you can author here: record kinds, fields, enums, policies
 canon context [--fields <FIELDS>]
 ```
 ```bash
-canon context
+canon context --json
 ```
 ```text
 # Add a divergence candidate, staged with no run_seq yet
 canon divergence add <SCENARIO_ID> --actor <ACTOR_ID> [--project <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon divergence add auth.login.01 --actor alice --role reviewer
+canon divergence add auth.login.01 --actor alice --role reviewer --json
 ```
 ```text
 # Directly record a deferred divergence (requires --reason/--expiry)
 canon divergence defer <SCENARIO_ID> --actor <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session <SESSION_ID>] [--role <ROLE>] [--input]
 ```
 ```bash
-canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
+canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer --json
 ```
 ```text
 # List the current divergence burn-down state
 canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon divergence list --as-of 2030-01-01
+canon divergence list --as-of 2030-01-01 --json
 ```
 ```text
 # Directly record a resolved divergence
 canon divergence resolve <SCENARIO_ID> --actor <ACTOR_ID> [--project <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
 ```
 ```bash
-canon divergence resolve auth.login.01 --actor alice --role reviewer
+canon divergence resolve auth.login.01 --actor alice --role reviewer --json
 ```
 ```text
 # Record one code-review finding
 canon finding add --change <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--introduced-unknown] [--review <REVIEW_ID>] [--file-ref <TEXT>] [--scenario <SCENARIO_ID>]* [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged"
+canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged" --json
 ```
 ```text
 # Move an already-committed finding's disposition
 canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <open|fixed|rejected|deferred> [--resolution-rev <REV>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"
+canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed" --json
 ```
 ```text
 # List a change's committed findings at their latest version
 canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon finding list --change add-login
+canon finding list --change add-login --json
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
 canon format [<DIR>]
 ```
 ```bash
-canon format .canon/specs
+canon format .canon/specs --json
 ```
 ```text
 # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
 canon gate check [--release]
 ```
 ```bash
-canon gate check
+canon gate check --json
 ```
 ```text
 # Read stored records across every storage tier
 canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon query --kind evidence
+canon query --kind evidence --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
 canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
 ```
 ```bash
-canon retrieve --for-role reviewer --domain dev --limit 20
+canon retrieve --for-role reviewer --domain dev --limit 20 --json
 ```
 ```text
 # Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required)
 canon review change <CHANGE_ID> --actor <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
 ```
 ```bash
-canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md
+canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md --json
 ```
 ```text
 # Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required)
 canon review scenario <SCENARIO_ID>+ --actor <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
 ```
 ```bash
-canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md
+canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md --json
 ```
 ```text
 # Describe canon's own commands
 canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
 ```
 ```bash
-canon schema evidence add
+canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
 canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
-canon search timeout --kind finding
+canon search timeout --kind finding --json
 ```
 ```text
 # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
 canon skills show <NAME> [--full]
 ```
 ```bash
-canon skills show canon --full
+canon skills show canon --full --json
 ```
 ```text
 # Show where this repo stands: subjects by status, their gaps, and the next commands
 canon status [--fields <FIELDS>]
 ```
 ```bash
-canon status
+canon status --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
 canon trace <ID>
 ```
 ```bash
-canon trace add-login_1_1
+canon trace add-login_1_1 --json
 ```
 <!-- canon:generated commands-reviewer end -->
 

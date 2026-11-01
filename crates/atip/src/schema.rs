@@ -23,6 +23,13 @@ pub const WARNING_ENTRY_SCHEMA: &str = include_str!("../schema/warning-entry.sch
 /// `schema/stream-line.schema.json`: one line of a stream (since 1.0; `canon` has no stream before 0.35).
 pub const STREAM_LINE_SCHEMA: &str = include_str!("../schema/stream-line.schema.json");
 
+/// `schema/schema-doc.schema.json`: a `schema --json` answer (since 1.0; spec 10).
+pub const SCHEMA_DOC_SCHEMA: &str = include_str!("../schema/schema-doc.schema.json");
+/// `schema/input-document.schema.json`: what every `--input` value parses to (spec 11.4-11.6).
+pub const INPUT_DOCUMENT_SCHEMA: &str = include_str!("../schema/input-document.schema.json");
+/// `schema/batch-report.schema.json`: the shape every batch output's `data` shares (spec 11.11).
+pub const BATCH_REPORT_SCHEMA: &str = include_str!("../schema/batch-report.schema.json");
+
 /// `meta.contract`: the contract every document follows.
 pub const CONTRACT: &str = "atip/1";
 /// `meta.contractVersion`: the minor of the contract the vendored schemas are (spec 15.7). The value is never `"1.0"` written out.
@@ -35,15 +42,36 @@ fn parse(text: &str) -> Value {
     serde_json::from_str(text).expect("a vendored contract schema is JSON")
 }
 
+/// Every vendored schema by its `$id`, so a `$ref` between them resolves (`error.schema.json` from the envelope,
+/// `envelope.schema.json` from the self-description's own schema).
+const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
+    (ERROR_ID, ERROR_SCHEMA),
+    ("https://atip.dev/1/envelope.schema.json", ENVELOPE_SCHEMA),
+    ("https://atip.dev/1/registry-entry.schema.json", REGISTRY_ENTRY_SCHEMA),
+    ("https://atip.dev/1/warning-entry.schema.json", WARNING_ENTRY_SCHEMA),
+    ("https://atip.dev/1/input-document.schema.json", INPUT_DOCUMENT_SCHEMA),
+    ("https://atip.dev/1/batch-report.schema.json", BATCH_REPORT_SCHEMA),
+    ("https://atip.dev/1/stream-line.schema.json", STREAM_LINE_SCHEMA),
+];
+
+/// The registry of the contract's schemas, for a validator of this crate or of a tool's own schemas that `$ref` them by `$id`.
+pub fn contract_registry() -> Registry<'static> {
+    CONTRACT_SCHEMAS
+        .iter()
+        .fold(Registry::new(), |registry, (id, text)| registry.add(*id, Resource::from_contents(parse(text))).expect("a vendored contract schema registers"))
+        .prepare()
+        .expect("the registry prepares")
+}
+
 fn compile(text: &str) -> Validator {
-    let registry = Registry::new().add(ERROR_ID, Resource::from_contents(parse(ERROR_SCHEMA))).expect("the error schema registers").prepare().expect("the registry prepares");
-    jsonschema::options().with_registry(&registry).build(&parse(text)).expect("a vendored contract schema compiles")
+    jsonschema::options().with_registry(&contract_registry()).build(&parse(text)).expect("a vendored contract schema compiles")
 }
 
 static ENVELOPE: LazyLock<Validator> = LazyLock::new(|| compile(ENVELOPE_SCHEMA));
 static ERROR: LazyLock<Validator> = LazyLock::new(|| compile(ERROR_SCHEMA));
 static REGISTRY_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(REGISTRY_ENTRY_SCHEMA));
 static WARNING_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(WARNING_ENTRY_SCHEMA));
+static SCHEMA_DOC: LazyLock<Validator> = LazyLock::new(|| compile(SCHEMA_DOC_SCHEMA));
 
 fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
     validator.iter_errors(document).map(|error| format!("{error} at {}", error.instance_path())).collect()
@@ -76,6 +104,13 @@ pub fn warning_entry_problems(row: &Value) -> Vec<String> {
     problems_of(&WARNING_ENTRY, row)
 }
 
+/// What breaks the contract's schema for a `schema --json` answer (`schema/schema-doc.schema.json`) in `document`, the
+/// whole envelope: one line per violation, empty when it conforms. The rules of spec 10.13 that JSON Schema cannot
+/// express are not checked here.
+pub fn schema_doc_problems(document: &Value) -> Vec<String> {
+    problems_of(&SCHEMA_DOC, document)
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -95,6 +130,9 @@ mod tests {
     const REGISTRY_ENTRY_DIGEST: &str = "18e73eec11f662d6c19e18574a1c1d3424f037f0ad5d232f24ab0a56fab28622";
     const WARNING_ENTRY_DIGEST: &str = "66d2eaaea38eaf723343c262dea4b710bcd1b22dc547124f68f0abc2ee0fcfde";
     const STREAM_LINE_DIGEST: &str = "cfa0647e4907a9447a992be8f9226b5873dc9b3cae89b5a9073c5fafef75c145";
+    const SCHEMA_DOC_DIGEST: &str = "1aaa4625f000df3221f355be2725e5d36f353b835b822cbce11498e11540484a";
+    const INPUT_DOCUMENT_DIGEST: &str = "a3e194a8f5b2d232bd46f84dc664a8a7d3bb38c2b7658a0edbfd4767d58c97a7";
+    const BATCH_REPORT_DIGEST: &str = "74ed7e2a5a0f234d447da186f313500756850313e752d500711401d41498944e";
 
     #[test]
     fn atip_l0_07_the_vendored_schemas_are_the_published_bytes() {
@@ -103,6 +141,9 @@ mod tests {
         assert_eq!(digest(REGISTRY_ENTRY_SCHEMA), REGISTRY_ENTRY_DIGEST);
         assert_eq!(digest(WARNING_ENTRY_SCHEMA), WARNING_ENTRY_DIGEST);
         assert_eq!(digest(STREAM_LINE_SCHEMA), STREAM_LINE_DIGEST);
+        assert_eq!(digest(SCHEMA_DOC_SCHEMA), SCHEMA_DOC_DIGEST);
+        assert_eq!(digest(INPUT_DOCUMENT_SCHEMA), INPUT_DOCUMENT_DIGEST);
+        assert_eq!(digest(BATCH_REPORT_SCHEMA), BATCH_REPORT_DIGEST);
     }
 
     /// A copy with one character changed no longer matches the pin: the pin test above would fail on it.

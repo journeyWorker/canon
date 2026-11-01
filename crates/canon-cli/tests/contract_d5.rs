@@ -440,24 +440,23 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
     assert!(body(&out)["data"]["counts"].is_object());
 }
 
-/// A leaf that never gates, and one that cannot exit 1 for a finding, say so in
-/// their schema: the exit rows are the leaf's own, not a shared default. Exit 1
-/// is declared for every leaf (a panic is `INTERNAL`, exit 1); on these two it is
-/// the only thing that can answer it.
+/// A leaf that never gates, and one that cannot exit 1 for a finding, list in their `errors` only the codes they can
+/// emit: the exits of a command are 0 and the exit of each code it lists. A command that cannot gate lists no
+/// exit-1 code but `INTERNAL` (a panic is `INTERNAL`, exit 1).
 #[test]
-fn the_exceptions_declare_only_the_exits_they_have() {
+fn the_exceptions_list_only_the_codes_they_have() {
     let dir = TempDir::new().unwrap();
-    for (command, exits) in [(vec!["context"], vec![0, 1, 2]), (vec!["dispatch", "diff"], vec![0, 1, 2]), (vec!["artifacts", "store"], vec![0, 1, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
+    let exit_of = |code: &str| canon_cli::cli_error::all_codes().iter().find(|info| info.code == code).unwrap_or_else(|| panic!("{code} is registered")).exit;
+    for command in [vec!["context"], vec!["dispatch", "diff"], vec!["artifacts", "store"], vec!["gate", "check"]] {
         let mut args = vec!["schema"];
         args.extend(&command);
         args.push("--json");
         let schema = body(&run(dir.path(), &args))["data"].clone();
-        let rows = schema["exits"].as_array().unwrap();
-        let declared: Vec<u64> = rows.iter().map(|e| e["code"].as_u64().unwrap()).collect();
-        assert_eq!(declared, exits, "{command:?}");
+        let errors: Vec<&str> = schema["errors"].as_array().unwrap().iter().map(|code| code.as_str().unwrap()).collect();
+        assert!(errors.contains(&"USAGE"), "{command:?}");
         if matches!(command[0], "context" | "dispatch") {
-            let one = rows.iter().find(|e| e["code"] == 1).unwrap()["meaning"].as_str().unwrap();
-            assert_eq!(one, "failed: INTERNAL", "{command:?} cannot gate: exit 1 is only a panic");
+            let gating: Vec<&&str> = errors.iter().filter(|code| exit_of(code) == 1 && **code != "INTERNAL").collect();
+            assert!(gating.is_empty(), "{command:?} cannot gate: exit 1 is only a panic, not {gating:?}");
         }
     }
 }

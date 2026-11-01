@@ -1,0 +1,13 @@
+description: "atip/1 1.1 (0.34 L1): `schema --json` is the tree (kind tree, level L1, every group and command once); a group word answers the group document with its direct commands; a command path answers the command document with typed options, errors, outputs, input and the schemas its refs name; an unknown path under a group is UNKNOWN_COMMAND with the valid words; every `--help` starts with the line that points at schema"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [schema, --json]
+    exit: 0
+  - args: [schema, finding, --json]
+    exit: 0
+  - args: [schema, finding, close, --json]
+    exit: 0
+  - args: [schema, finding, nosuch, --json]
+    exit: 2
+  - args: [finding, close, --help]
+    exit: 0

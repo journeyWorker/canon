@@ -148,6 +148,19 @@ where
     clap::builder::PossibleValuesParser::new(values).try_map(move |word: String| parse(&word))
 }
 
+/// The reserved codes (spec 7.2.1) a command has because of a feature it offers (spec 10.13 rule 4): `--input`,
+/// a batch `--input`, `--commit`, and `--cursor`. The command document lists them in its `errors`.
+pub mod feature_codes {
+    /// A command that takes `--input`.
+    pub const INPUT: [&str; 3] = ["INPUT_INVALID", "INPUT_CONFLICT", "INPUT_TOO_LARGE"];
+    /// A command whose `--input` takes an array or NDJSON.
+    pub const BATCH: &str = "BATCH_INCOMPLETE";
+    /// A command that takes `--commit`.
+    pub const COMMIT: &str = "PLAN_STALE";
+    /// A command that takes `--cursor`.
+    pub const CURSOR: &str = "CURSOR_INVALID";
+}
+
 /// A `USAGE` that cannot name the argument at fault has no `field`, and its hint is `canon schema
 /// <command> --json` for the command that was run, or `canon schema --json` when no command
 /// resolved (spec 7.1.3). Any other error is returned as it is.

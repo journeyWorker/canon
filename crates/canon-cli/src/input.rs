@@ -21,8 +21,9 @@
 //!   run in order, each as one `canon … --json` child process; the first
 //!   failure stops the run (`failed`, the rest `skipped`, exit 1).
 //!
-//! The same [`Leaf`] description (keys, types, value sets, required) derives
-//! the JSON Schema the spec publishes ([`document_schema`]).
+//! The same [`Leaf`] description (keys, types, value sets) is what the example document of the spec
+//! is read with ([`example_document`]); the JSON Schemas the spec publishes for a document
+//! come from the command's document ([`atip::project::fragment_schema`]).
 
 use std::ffi::OsString;
 use std::io::{IsTerminal, Read};
@@ -44,17 +45,8 @@ pub const MAX_BYTES: u64 = 8 * 1024 * 1024;
 pub const MAX_ELEMENTS: usize = 10_000;
 
 /// Options a document can never carry: the globals and the safety pair. A
-/// document is a command invocation, not a way past a preview.
-const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest"];
-
-/// Batch examples of the per-leaf table (D7), by leaf.
-const BATCH_EXAMPLES: &[(&str, &str)] = &[
-    ("scenario new", r#"[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Signs out","case":"happy"}]"#),
-    ("evidence add", r#"[{"scenario":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenario":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]"#),
-    ("finding add", r#"[{"change":"add-login","round":1,"seq":1,"severity":"note","actor":"reviewer-1","summary":"Token is logged"},{"change":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actor":"reviewer-1","summary":"No rate limit"}]"#),
-    ("divergence add", r#"[{"operands":["auth.login.01"],"actor":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"actor":"reviewer-1","role":"reviewer"}]"#),
-    ("subject new", r#"[{"operands":["payments"],"domain":"dev","title":"Payments"},{"operands":["billing"],"domain":"dev","title":"Billing"}]"#),
-];
+/// document is a command invocation, not a way past a preview. The spec marks each `flagOnly`.
+pub const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest"];
 
 // ---------------------------------------------------------------- batch report
 
@@ -99,11 +91,9 @@ pub struct BatchReport<R> {
 impl<R: Serialize + JsonSchema> Report for BatchReport<R> {}
 
 /// Whether a leaf takes a batch: every writing leaf with an enveloped report.
-/// The destructive leaves bind one plan (O16) and `dashboard` is a stream.
+/// The destructive leaves bind one plan (O16) and `dashboard` serves until it is stopped.
 pub fn batch_supported(path: &str) -> bool {
-    let writes = crate::schema::meta_for(path).is_some_and(|m| m.effect == crate::schema::Effect::Write);
-    let streams = crate::spec_facts::facts_for(path).is_some_and(|f| f.outputs.iter().any(|o| o.kind == crate::spec_facts::OutputKind::Stream));
-    writes && !streams
+    crate::schema::meta_for(path).is_some_and(|m| m.effect == crate::schema::Effect::Write) && path != "dashboard"
 }
 
 // ---------------------------------------------------------------- the leaf
@@ -125,12 +115,8 @@ struct Key {
     kind: Kind,
     repeatable: bool,
     integer: bool,
-    possible: Vec<String>,
     /// `--no-<long>` exists.
     negatable: bool,
-    required: bool,
-    help: Option<String>,
-    default: Vec<String>,
 }
 
 /// What a leaf's document can say, read from its clap definition.
@@ -140,7 +126,6 @@ pub struct Leaf {
     keys: Vec<Key>,
     /// `(min, max)` of the operands, when the leaf has any.
     operands: Option<(usize, Option<usize>)>,
-    operand_help: Option<String>,
     operand_names: Vec<String>,
     /// Option groups of which exactly one is required, as document keys.
     one_of: Vec<Vec<String>>,
@@ -197,11 +182,7 @@ impl Leaf {
                     kind,
                     repeatable: matches!(a.get_action(), ArgAction::Append),
                     integer: kind == Kind::Value && is_integer(a),
-                    possible: a.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
                     negatable: args.iter().any(|o| o.get_long().is_some_and(|l| l.strip_prefix("no-") == Some(long))),
-                    required: a.is_required_set(),
-                    help: a.get_help().map(std::string::ToString::to_string),
-                    default: if kind == Kind::Value { a.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect() } else { Vec::new() },
                 })
             })
             .collect();
@@ -237,10 +218,14 @@ impl Leaf {
             has_dry_run: keys.iter().any(|k| k.long == "dry-run"),
             keys,
             operands,
-            operand_help: positionals.first().and_then(|a| a.get_help()).map(std::string::ToString::to_string),
             operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(std::string::ToString::to_string).unwrap_or_default()]).collect(),
             one_of,
         }
+    }
+
+    /// The sets of document keys (`operands` or a camelCase option name) of which exactly one is required.
+    pub fn required_one_of(&self) -> Vec<Vec<String>> {
+        self.one_of.clone()
     }
 
     fn command(&self) -> String {
@@ -981,65 +966,6 @@ pub fn schema_name(path: &str) -> String {
     name + "Input"
 }
 
-fn schema_type(key: &Key) -> Value {
-    let item = match key.kind {
-        Kind::Flag => json!({ "type": "boolean" }),
-        Kind::Count => json!({ "type": "integer", "minimum": 0 }),
-        Kind::Value if key.integer => json!({ "type": ["integer", "string"] }),
-        Kind::Value if !key.possible.is_empty() => json!({ "enum": key.possible }),
-        Kind::Value => json!({ "type": ["string", "number"] }),
-    };
-    if key.repeatable {
-        json!({ "type": "array", "items": item })
-    } else {
-        item
-    }
-}
-
-/// The JSON Schema (2020-12) of one document object of the leaf, derived from its clap definition.
-pub fn document_schema(leaf: &Leaf) -> Value {
-    let mut properties = Map::new();
-    if let Some((min, max)) = leaf.operands {
-        let mut operands = json!({ "type": "array", "items": { "type": ["string", "number"] }, "minItems": min });
-        if let Some(max) = max {
-            operands["maxItems"] = json!(max);
-        }
-        if let Some(help) = &leaf.operand_help {
-            operands["description"] = json!(help);
-        }
-        properties.insert("operands".to_string(), operands);
-    }
-    for key in &leaf.keys {
-        let mut property = schema_type(key);
-        if let Some(help) = &key.help {
-            property["description"] = json!(help);
-        }
-        if !key.default.is_empty() && !key.repeatable {
-            property["default"] = if key.integer { key.default[0].parse::<u64>().map_or_else(|_| json!(key.default[0]), |n| json!(n)) } else { json!(key.default[0]) };
-        }
-        properties.insert(key.key.clone(), property);
-    }
-    let mut required: Vec<&str> = leaf.keys.iter().filter(|k| k.required).map(|k| k.key.as_str()).collect();
-    if leaf.operands.is_some_and(|(min, _)| min > 0) {
-        required.insert(0, "operands");
-    }
-    let mut schema = json!({
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": format!("`{}` --input document", leaf.command()),
-        "type": "object",
-        "properties": properties,
-        "additionalProperties": false,
-    });
-    if !required.is_empty() {
-        schema["required"] = json!(required);
-    }
-    let one_of: Vec<Value> = leaf.one_of.iter().filter(|g| !g.is_empty()).map(|group| json!({ "oneOf": group.iter().map(|k| json!({ "required": [k] })).collect::<Vec<_>>() })).collect();
-    if !one_of.is_empty() {
-        schema["allOf"] = Value::Array(one_of);
-    }
-    schema
-}
-
 /// Splits an example line like a shell would for the examples canon ships:
 /// whitespace separates, double quotes group.
 fn words(line: &str) -> Vec<String> {
@@ -1100,48 +1026,4 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
         }
     }
     Some(Value::Object(object))
-}
-
-/// One input of a leaf in the spec (`inputs[]`).
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct InputDoc {
-    /// The option that carries it.
-    pub option: &'static str,
-    /// `#/schemas/<Name>Input`: the JSON Schema of one document object.
-    pub schema_ref: String,
-    /// The most bytes one document may hold.
-    pub max_bytes: u64,
-    /// The most elements one batch may hold.
-    pub max_elements: usize,
-    /// An array or NDJSON runs the leaf once per element; false for a leaf that takes one object.
-    pub batch: bool,
-    /// A document that runs, equivalent to the leaf's example command line.
-    pub example: Value,
-    /// A batch document of the per-leaf table.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub batch_example: Option<Value>,
-    /// The JSON Schema itself, published once under `schemas`.
-    #[serde(skip)]
-    pub schema: Value,
-}
-
-/// The inputs of the leaf `path` whose (built) clap node is `cmd`: one for a
-/// leaf that takes `--input`, none otherwise.
-pub fn inputs(path: &str, cmd: &Command) -> Vec<InputDoc> {
-    if find_long(cmd, "input").is_none() {
-        return Vec::new();
-    }
-    let words: Vec<String> = path.split(' ').map(str::to_string).collect();
-    let leaf = Leaf::of(cmd, &words);
-    vec![InputDoc {
-        option: "--input",
-        schema_ref: format!("#/schemas/{}", schema_name(path)),
-        max_bytes: MAX_BYTES,
-        max_elements: MAX_ELEMENTS,
-        batch: batch_supported(path),
-        example: example_document(cmd, &leaf).unwrap_or_else(|| json!({})),
-        batch_example: BATCH_EXAMPLES.iter().find(|(p, _)| *p == path).map(|(_, text)| serde_json::from_str(text).expect("the batch example is JSON")),
-        schema: document_schema(&leaf),
-    }]
 }

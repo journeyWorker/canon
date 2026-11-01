@@ -210,7 +210,13 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - Your role guide's **Commands** block (`canon skills show role-<role>`) is
   your complete command set, every option of every leaf included. Run `canon schema <command> --json` only for a
   command it does not list, or after a `USAGE` refusal (read `error.field`
-  and `error.expected` first). `canon schema` alone lists every command.
+  and `error.expected` first). `canon schema --json` is the tree of every group and command
+  with its `effect` and `x-canon.roles`; `canon schema <group> --json` lists a group's
+  commands; `canon schema <command> --json` is one command in full: `options` (each with
+  `valueType`, a typed `default`, `possibleValues`, `env`, `flagOnly`), `errors`, `outputs`
+  with the JSON Schema of each report in `schemas`, `input` (the schema of one `--input`
+  document and a complete `example`) and `examples`. The first line of every `--help`
+  points at it.
 - Pass `--json` and read stdout as one document, nothing on stderr. Success is
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in
@@ -275,7 +281,7 @@ before anything is written: an invalid element writes nothing and exits 2,
 `error.field` pointing at `/items/<i>/<key>`; a write that fails stops there
 (exit 1, `BATCH_INCOMPLETE`) and re-running the same batch reports the finished elements
 `unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped.
-`canon schema <command> --json` shows the leaf's input schema and an example.
+`canon schema <command> --json` shows the leaf's `input`: the schema of one document and a complete `example`.
 
 ```text
 canon scenario new --input '[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Wrong password","case":"failure"}]'

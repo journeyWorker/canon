@@ -360,6 +360,7 @@ dependencies = [
 name = "atip"
 version = "0.33.0"
 dependencies = [
+ "clap",
  "jsonschema",
  "schemars",
  "serde",

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/input-document.schema.json",
+  "title": "atip/1 --input document (generic fragment shape)",
+  "description": "What every --input value parses to (spec 11.4-11.6): one document, or, where the command declares `input.batch`, a non-empty array of documents. This is the shape all fragment schemas share; each command publishes its exact fragment schema at input.schemaRef. Requirements are checked after the merge with argv (spec 11.7), not here.",
+  "oneOf": [
+    { "$ref": "#/$defs/document" },
+    { "$ref": "#/$defs/batch" }
+  ],
+  "$defs": {
+    "document": {
+      "type": "object",
+      "propertyNames": {
+        "description": "camelCase option names, plus `operands`. The four reserved flag-only options never appear.",
+        "allOf": [
+          { "pattern": "^[a-z][a-zA-Z0-9]*$" },
+          { "not": { "enum": ["json", "input", "commit", "planDigest"] } }
+        ]
+      },
+      "properties": {
+        "operands": {
+          "description": "The operands in order; omit the key when there are none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/argumentValue" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": {
+        "description": "A switch is a boolean, a count a non-negative integer, a valued option its value, a repeatable option an array of values, a json option any JSON value but null. This generic shape refuses a top-level null; the command's fragment schema refuses the rest (nulls inside a repeatable option's array, wrong types).",
+        "$ref": "#/$defs/argumentValue"
+      }
+    },
+    "argumentValue": {
+      "description": "One argument value: a string, a number, a boolean, an object or an array (spec 10.7.2, 11.5). Never null at this level; nulls nested inside a json value belong to that value.",
+      "type": ["string", "number", "boolean", "object", "array"]
+    },
+    "batch": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/document" },
+      "minItems": 1
+    }
+  }
+}

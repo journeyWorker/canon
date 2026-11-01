@@ -10,7 +10,7 @@
 //! - no valued option is named like a verb, no leaf like `update|get|delete`;
 //! - short aliases are `-h -V -o -q` only; `--json`, `--repo`, `--as` mean the
 //!   same thing everywhere;
-//! - every `conflictsWith` / `requires` the spec lists is enforced when the
+//! - every conflict and requirement clap declares ([`relations_of`]) is enforced when the
 //!   command line is parsed.
 
 mod harness;
@@ -65,7 +65,7 @@ fn name(option: &Value) -> &str {
 #[test]
 fn every_option_says_what_it_is() {
     let mut problems = Vec::new();
-    for (leaf, option) in all_options().into_iter().chain(spec()["globalOptions"].as_array().unwrap().iter().map(|o| ("(global)".to_string(), o))) {
+    for (leaf, option) in all_options() {
         if !option["help"].as_str().is_some_and(|h| !h.trim().is_empty()) {
             problems.push(format!("`{leaf}` --{}: no help", name(option)));
         }
@@ -77,20 +77,20 @@ fn every_option_says_what_it_is() {
 fn a_value_is_named_from_the_placeholder_list_and_a_flag_names_none() {
     let mut problems = Vec::new();
     for (leaf, option) in all_options() {
-        match (option["kind"].as_str().unwrap(), option["valueName"].as_str()) {
-            ("value", Some(value)) => {
+        match (is_flag(option), option["valueName"].as_str()) {
+            (false, Some(value)) => {
                 if !PLACEHOLDERS.contains(&value) && !value.ends_with("_ID") {
                     problems.push(format!("`{leaf}` --{}: value name {value} is not in the placeholder list", name(option)));
                 }
             }
-            ("value", None) => problems.push(format!("`{leaf}` --{}: a valued option without a value name", name(option))),
-            (_, Some(value)) => problems.push(format!("`{leaf}` --{}: a flag names the value {value}", name(option))),
+            (false, None) => problems.push(format!("`{leaf}` --{}: a valued option without a value name", name(option))),
+            (true, Some(value)) => problems.push(format!("`{leaf}` --{}: a flag names the value {value}", name(option))),
             _ => {}
         }
     }
     for node in leaves() {
         for operand in node["operands"].as_array().unwrap() {
-            let kind = operand["kind"].as_str().unwrap();
+            let kind = operand["valueName"].as_str().unwrap();
             // D1 r1 names `feature new <SURFACE>`.
             if !PLACEHOLDERS.contains(&kind) && !kind.ends_with("_ID") && kind != "SURFACE" {
                 problems.push(format!("`{}` operand {}: kind {kind} is not in the placeholder list", path_of(node), operand["name"]));
@@ -131,7 +131,7 @@ fn a_closed_set_lists_its_possible_values_and_a_default_is_a_real_one() {
         if closed.contains(n) && values.is_empty() {
             problems.push(format!("`{leaf}` --{n}: the table writes a closed set, the spec lists no possibleValues"));
         }
-        let default = strings(&option["default"]);
+        let default = default_strings(option);
         if default.iter().any(std::string::String::is_empty) {
             problems.push(format!("`{leaf}` --{n}: the default is the empty string, which is no default"));
         }
@@ -153,16 +153,12 @@ fn the_spec_carries_the_defaults_sets_and_arities_the_table_writes() {
             continue;
         };
         for row in rows {
-            // `--as` is declared once, globally.
-            if row.name == "as" {
-                continue;
-            }
             let Some(option) = option(node, &row.name) else {
                 problems.push(format!("`{leaf_path}` --{}: in the table, not in the spec", row.name));
                 continue;
             };
             compared += 1;
-            let default = strings(&option["default"]);
+            let default = default_strings(option);
             match &row.default {
                 Some(d) if default != [d.clone()] => problems.push(format!("`{leaf_path}` --{}: the table's default is {d:?}, the spec's {default:?}", row.name)),
                 None if !default.is_empty() => problems.push(format!("`{leaf_path}` --{}: the spec's default {default:?} is not in the table", row.name)),
@@ -198,7 +194,7 @@ fn one_name_has_one_value_name_arity_and_value_set_on_every_leaf() {
     }
     let mut problems = Vec::new();
     for (n, uses) in &by_name {
-        let shape = |option: &Value| (option["kind"].clone(), option["valueName"].clone(), if REPEATABLE_DIFFERS.contains(&n.as_str()) { Value::Null } else { option["repeatable"].clone() });
+        let shape = |option: &Value| (option["valueType"].clone(), option["valueName"].clone(), if REPEATABLE_DIFFERS.contains(&n.as_str()) { Value::Null } else { option["repeatable"].clone() });
         let first = shape(uses[0].1);
         for (leaf, option) in uses {
             if shape(option) != first {
@@ -240,9 +236,6 @@ fn the_vocabulary_and_the_spec_use_the_same_options_with_the_same_value_names() 
     for (leaf, option) in all_options() {
         used.entry(name(option).to_string()).or_insert((option["valueName"].as_str().map(str::to_string), leaf));
     }
-    for option in spec()["globalOptions"].as_array().unwrap() {
-        used.entry(name(option).to_string()).or_insert((option["valueName"].as_str().map(str::to_string), "(global)".into()));
-    }
     let mut problems = Vec::new();
     for (n, (value, leaf)) in &used {
         match vocabulary.iter().find(|r| &r.option == n) {
@@ -263,7 +256,7 @@ fn the_vocabulary_and_the_spec_use_the_same_options_with_the_same_value_names() 
 fn no_valued_option_is_a_verb_and_no_leaf_is_update_get_or_delete() {
     let mut problems = Vec::new();
     for (leaf, option) in all_options() {
-        if option["kind"] == "value" && VERBS.contains(&name(option)) {
+        if !is_flag(option) && VERBS.contains(&name(option)) {
             problems.push(format!("`{leaf}` --{}: a valued option named like a verb (a mode is a flag)", name(option)));
         }
     }
@@ -304,13 +297,10 @@ fn short_aliases_are_h_v_o_and_q_only() {
 #[test]
 fn json_repo_and_as_mean_the_same_everywhere() {
     let mut problems = Vec::new();
-    let global_as = spec()["globalOptions"].as_array().unwrap().iter().find(|o| o["name"] == "as").expect("--as is global");
-    assert_eq!(strings(&global_as["possibleValues"]), ["planner", "implementer", "reviewer", "orchestrator"]);
-    assert_eq!(global_as["valueName"], "ROLE");
     for node in leaves() {
         let path = path_of(node);
         match option(node, "json") {
-            Some(json) if json["kind"] == "flag" && json["short"].is_null() && strings(&json["aliases"]).is_empty() => {}
+            Some(json) if json["valueType"] == "switch" && json.get("short").is_none() => {}
             other => problems.push(format!("`{path}`: --json is {other:?}, the output-only flag")),
         }
         match (option(node, "repo"), NO_REPO.contains(&path.as_str())) {
@@ -323,8 +313,9 @@ fn json_repo_and_as_mean_the_same_everywhere() {
             (Some(_), true) => problems.push(format!("`{path}`: takes --repo, but needs no repo")),
             (None, true) => {}
         }
-        if option(node, "as").is_some() {
-            problems.push(format!("`{path}`: redefines --as, which is declared once globally"));
+        match option(node, "as") {
+            Some(role) if strings(&role["possibleValues"]) == ["planner", "implementer", "reviewer", "orchestrator"] && role["valueName"] == "ROLE" && role["flagOnly"] == true => {}
+            other => problems.push(format!("`{path}`: --as is {other:?}, the one closed set of roles")),
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
@@ -378,7 +369,7 @@ fn required_line(cmd: &clap::Command, path: &str, skip: &[&str]) -> Vec<String> 
 }
 
 #[test]
-fn every_conflict_and_requirement_the_spec_lists_is_enforced_when_parsing() {
+fn every_conflict_and_requirement_clap_declares_is_enforced_when_parsing() {
     let root = canon_cli::cli::command();
     let (mut conflicts, mut requires) = (0, 0);
     let mut problems = Vec::new();
@@ -390,40 +381,42 @@ fn every_conflict_and_requirement_the_spec_lists_is_enforced_when_parsing() {
             let bare = option.trim_start_matches("--");
             cmd.get_arguments().find(|a| a.get_long() == Some(bare) || (a.get_long().is_none() && a.get_id() == bare)).unwrap_or_else(|| panic!("`{path}` has no {option}"))
         };
-        for option in options(leaf) {
-            let own = arg_of(&format!("--{}", name(option)));
-            for other in strings(&option["conflictsWith"]) {
+        let relations = relations_of(&path);
+        let by_name: Vec<(&str, &Vec<String>)> = relations.conflicts_with.iter().map(|(option, others)| (option.as_str(), others)).collect();
+        for (option, others) in by_name {
+            let own = arg_of(&format!("--{option}"));
+            for other in others {
                 conflicts += 1;
-                let other_arg = arg_of(&other);
+                let other_arg = arg_of(other);
                 let mut line = required_line(cmd, &path, &[own.get_id().as_str(), other_arg.get_id().as_str()]);
                 line.extend(given(own));
                 line.extend(given(other_arg));
                 match root.clone().try_get_matches_from(std::iter::once("canon".to_string()).chain(line.iter().cloned())) {
                     Err(e) if e.kind() == ErrorKind::ArgumentConflict => {}
-                    Err(e) => problems.push(format!("`{path}`: --{} with {other} fails, but not as a conflict ({:?}): {}", name(option), e.kind(), e.to_string().lines().next().unwrap_or_default())),
-                    Ok(_) => problems.push(format!("`{path}`: --{} and {other} are declared to conflict and parse together: {line:?}", name(option))),
-                }
-            }
-            let needed = strings(&option["requires"]);
-            if !needed.is_empty() {
-                requires += 1;
-                let skip: Vec<&str> = std::iter::once(own.get_id().as_str()).chain(needed.iter().map(|n| arg_of(n).get_id().as_str())).collect();
-                let mut line = required_line(cmd, &path, &skip);
-                line.extend(given(own));
-                match root.clone().try_get_matches_from(std::iter::once("canon".to_string()).chain(line.iter().cloned())) {
-                    Err(e) if e.kind() == ErrorKind::MissingRequiredArgument => {
-                        let missing = e.get(ContextKind::InvalidArg).map(std::string::ToString::to_string).unwrap_or_default();
-                        if !needed.iter().any(|n| missing.contains(n.as_str())) {
-                            problems.push(format!("`{path}`: --{} without {needed:?} is refused for another reason: {missing}", name(option)));
-                        }
-                    }
-                    Err(e) => problems.push(format!("`{path}`: --{} without {needed:?} fails, but not as a missing argument ({:?}): {}", name(option), e.kind(), e.to_string().lines().next().unwrap_or_default())),
-                    Ok(_) => problems.push(format!("`{path}`: --{} requires {needed:?} and parses without: {line:?}", name(option))),
+                    Err(e) => problems.push(format!("`{path}`: --{option} with {other} fails, but not as a conflict ({:?}): {}", e.kind(), e.to_string().lines().next().unwrap_or_default())),
+                    Ok(_) => problems.push(format!("`{path}`: --{option} and {other} are declared to conflict and parse together: {line:?}")),
                 }
             }
         }
+        for (option, needed) in &relations.requires {
+            requires += 1;
+            let own = arg_of(&format!("--{option}"));
+            let skip: Vec<&str> = std::iter::once(own.get_id().as_str()).chain(needed.iter().map(|n| arg_of(n).get_id().as_str())).collect();
+            let mut line = required_line(cmd, &path, &skip);
+            line.extend(given(own));
+            match root.clone().try_get_matches_from(std::iter::once("canon".to_string()).chain(line.iter().cloned())) {
+                Err(e) if e.kind() == ErrorKind::MissingRequiredArgument => {
+                    let missing = e.get(ContextKind::InvalidArg).map(std::string::ToString::to_string).unwrap_or_default();
+                    if !needed.iter().any(|n| missing.contains(n.as_str())) {
+                        problems.push(format!("`{path}`: --{option} without {needed:?} is refused for another reason: {missing}"));
+                    }
+                }
+                Err(e) => problems.push(format!("`{path}`: --{option} without {needed:?} fails, but not as a missing argument ({:?}): {}", e.kind(), e.to_string().lines().next().unwrap_or_default())),
+                Ok(_) => problems.push(format!("`{path}`: --{option} requires {needed:?} and parses without: {line:?}")),
+            }
+        }
     }
-    assert!(conflicts > 20 && requires > 5, "the spec lists conflicts ({conflicts}) and requirements ({requires})");
+    assert!(conflicts > 20 && requires > 3, "clap declares conflicts ({conflicts}) and requirements ({requires})");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 

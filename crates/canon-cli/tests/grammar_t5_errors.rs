@@ -99,17 +99,14 @@ fn a_leaf_lists_only_registered_codes_and_the_exits_of_the_table() {
     let table: BTreeSet<u64> = spec()["exitTable"].as_array().unwrap().iter().map(|r| r["code"].as_u64().unwrap()).collect();
     for node in leaves() {
         let path = path_of(node);
-        for code in strings(&node["errorCodes"]) {
+        // A command's exits are 0 and the exit of each code it lists (spec 8): the document says no more.
+        let mut exits: BTreeSet<u64> = BTreeSet::from([0]);
+        for code in strings(&node["errors"]) {
             assert!(registry.contains(code.as_str()), "`{path}` lists {code}, which is not registered");
+            exits.insert(u64::from(all_codes().iter().find(|i| i.code == code).unwrap().exit));
         }
-        let exits: Vec<u64> = node["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
-        assert!(!exits.is_empty() && exits.iter().all(|e| table.contains(e)), "`{path}` exits {exits:?}");
-        assert!(exits.contains(&0), "`{path}` has no success exit");
-        // A leaf that lists a code of exit 2 declares exit 2; one that lists a code of exit 1 declares exit 1.
-        for code in strings(&node["errorCodes"]) {
-            let exit = u64::from(all_codes().iter().find(|i| i.code == code).unwrap().exit);
-            assert!(exits.contains(&exit), "`{path}` lists {code} (exit {exit}) but declares only {exits:?}");
-        }
+        assert!(exits.iter().all(|e| table.contains(e)), "`{path}` exits {exits:?}");
+        assert!(node.get("exits").is_none(), "`{path}` has no `exits` member: the registry says what a code exits");
     }
 }
 

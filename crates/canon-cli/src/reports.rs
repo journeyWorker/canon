@@ -115,15 +115,20 @@ pub fn schema_of<R: JsonSchema>() -> Value {
     serde_json::to_value(generator.into_root_schema_for::<R>()).expect("a JSON Schema serializes")
 }
 
+/// The typed reports of `command` (one entry per output, the batch output included), each with its schema: the
+/// schemas a command document carries. Only this command's schemas are built.
+pub fn schemas_of(command: &str) -> Vec<ReportSchema> {
+    report_rows().iter().filter(|row| row.command == command).map(row_schema).collect()
+}
+
+fn row_schema(row: &ReportRow) -> ReportSchema {
+    let schema = (row.schema)();
+    ReportSchema { command: row.command, name: row.name.clone(), schema_version: row.schema_version.clone(), type_name: row.type_name, schema: if row.state { crate::json_out::with_state_properties(schema) } else { schema } }
+}
+
 /// Every typed report, one entry per `(command, name)`, sorted by command, with its schema.
 pub fn report_schemas() -> Vec<ReportSchema> {
-    report_rows()
-        .iter()
-        .map(|row| {
-            let schema = (row.schema)();
-            ReportSchema { command: row.command, name: row.name.clone(), schema_version: row.schema_version.clone(), type_name: row.type_name, schema: if row.state { crate::json_out::with_state_properties(schema) } else { schema } }
-        })
-        .collect()
+    report_rows().iter().map(row_schema).collect()
 }
 
 /// Every typed report without its schema, sorted like [`report_schemas`]. Built once.
@@ -212,7 +217,7 @@ fn build_rows() -> Vec<ReportRow> {
         entry::<crate::report::ReportBuildReport>("report build", "ReportBuildReport"),
         entry::<crate::report::ReportCheckReport>("report check", "ReportCheckReport"),
         entry::<crate::report::ReportSnapshotReport<'static>>("report snapshot", "ReportSnapshotReport"),
-        entry::<crate::schema::SchemaReport<'static>>("schema", "SchemaReport"),
+        entry::<crate::schema::SchemaReport>("schema", "SchemaReport"),
         entry::<crate::skills::SkillsCheckReport>("skills check", "SkillsCheckReport"),
         entry::<crate::skills::SkillsDoctorReport<'static>>("skills doctor", "SkillsDoctorReport"),
         entry::<crate::skills::SkillsInstallReport<'static>>("skills install", "SkillsInstallReport"),

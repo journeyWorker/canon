@@ -56,8 +56,8 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("subject move", "id"), "demo"),
         (("subject move", "to"), "specced"),
         (("evidence audit", "audit-result"), "confirmed"),
-        (("subject adopt", "subject-id"), "demo"),
-        (("subject unadopt", "subject-id"), "demo"),
+        (("subject adopt", "subject"), "demo"),
+        (("subject unadopt", "subject"), "demo"),
         (("skills show", "name"), "canon"),
         (("context-pack show", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
         (("context-pack verify", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
@@ -68,21 +68,21 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
     match name {
         "repo" => ".",
         "response" => "response.json",
-        "approver" | "actor-id" => "alice",
+        "approver" | "actor" => "alice",
         "note" | "summary" | "reason" | "title" | "name" => "text",
-        "slug" | "change-id" | "change_id" => "add-login",
-        "subject-id" => "demo",
+        "slug" | "change" => "add-login",
+        "subject" => "demo",
         "domain" => "dev",
         "manifest" | "evaluation" | "signature-file" => "missing.json",
         "id" => "sha256:00",
         "role" => "reviewer",
         "regime" => regime,
-        "run-id" | "run_id" => ULID,
+        "run" | "strategy" => ULID,
         "bundle" => "demo@v1",
         "evaluator-digest" => SHA,
         "status" => "ok",
         "project-id" => "app-a",
-        "scenario-id" | "scenario_id" | "scenario_ids" => "auth.login.01",
+        "scenario" => "auth.login.01",
         "sha" | "artifact-sha" => SHA,
         "pin" => "abc123",
         "expiry" | "approved-at" | "approval-at" | "before" => "2030-01-01T00:00:00Z",
@@ -92,9 +92,8 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         "version" => "v1",
         "disposition" => "open",
         "root" => ".canon/specs",
-        "task_id" => "add-login#1",
-        "strategy_id" => ULID,
-        "plugin_id" => "no-such-plugin",
+        "task" => "add-login#1",
+        "plugin" => "no-such-plugin",
         "hash" => "abcdef012345",
         "area" => "area",
         "surface" => "auth.login",
@@ -122,12 +121,20 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
     }
 }
 
+/// The sets of options clap requires one of, for the command `path`.
+fn required_one_of(path: &str) -> Vec<Vec<String>> {
+    let mut root = canon_cli::cli::command();
+    root.build();
+    let node = path.split(' ').fold(&root, |cmd, word| cmd.find_subcommand(word).expect("a command of the tree"));
+    atip::project::relations(node).required_one_of
+}
+
 #[test]
 fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     let repo = scratch_repo();
     let listing = run(repo.path(), &["schema", "--json"]);
     let listing: Value = serde_json::from_slice(&listing.stdout).expect("schema lists the leaves");
-    let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command").map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
 
     let regime = String::from_utf8(run(repo.path(), &["regime", "show", "--role-segment", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
@@ -158,17 +165,16 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
         for option in schema["options"].as_array().unwrap().iter().filter(|o| o["required"] == true && o["name"] != "json") {
             let name = option["name"].as_str().unwrap();
             args.push(format!("--{name}"));
-            if option["kind"] != "flag" {
+            if !matches!(option["valueType"].as_str(), Some("switch" | "count")) {
                 args.push(value_for(leaf, name, &regime));
             }
         }
-        // One member of each required one-of group, the way an agent reading
-        // `requiredOneOf` would build the line.
-        for group in schema["requiredOneOf"].as_array().into_iter().flatten() {
-            let flag = group[0].as_str().unwrap();
-            if !args.iter().any(|a| a == flag) {
-                args.push(flag.to_string());
-                args.push(value_for(leaf, flag.trim_start_matches("--"), &regime));
+        // One member of each required one-of group clap declares.
+        for group in &required_one_of(leaf) {
+            let flag = format!("--{}", group[0]);
+            if !args.contains(&flag) {
+                args.push(flag);
+                args.push(value_for(leaf, &group[0], &regime));
             }
         }
         args.extend(extra_args(leaf, repo.path()));

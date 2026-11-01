@@ -1,0 +1,633 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atip.dev/1/schema-doc.schema.json",
+  "title": "atip/1 self-description (`<tool> schema ... --json`)",
+  "description": "A successful `schema` answer (spec section 10). `data.kind` selects one of seven documents (`warnings` and `warning` since 1.1). Closed for tools of the current minor; callers read it open (spec 15.8). Level-neutral: rules that apply only at L2 (spec 12.4) are checked by the L2 checker, not here (spec 3.2). Rules JSON Schema cannot express are listed in spec 10.13.",
+  "allOf": [
+    { "$ref": "envelope.schema.json#/$defs/success" },
+    {
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "required": ["command", "contract"],
+          "properties": {
+            "command": { "const": "schema" }
+          }
+        },
+        "data": {
+          "oneOf": [
+            { "$ref": "#/$defs/tree" },
+            { "$ref": "#/$defs/group" },
+            { "$ref": "#/$defs/command" },
+            { "$ref": "#/$defs/errors" },
+            { "$ref": "#/$defs/error" },
+            { "$ref": "#/$defs/warnings" },
+            { "$ref": "#/$defs/warning" }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "xKeys": {
+      "type": "string",
+      "pattern": "^x-[a-z][a-z0-9-]*$"
+    },
+    "word": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+    },
+    "commandId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*( [a-z][a-z0-9]*(-[a-z0-9]+)*)*$"
+    },
+    "path": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/word" },
+      "minItems": 1
+    },
+    "effect": { "enum": ["read", "write", "destructive"] },
+    "idempotency": { "enum": ["replay-safe", "content-keyed", "appends", "once"] },
+    "valueName": {
+      "description": "The placeholder shown in help: upper case, with the separators of composite placeholders (`JSON|FILE|-`, `GROUP:VALUE`, `PATH=TEXT`).",
+      "type": "string",
+      "pattern": "^[A-Z0-9_|:=@.-]*[A-Z][A-Z0-9_|:=@.-]*$"
+    },
+    "treeEntry": {
+      "type": "object",
+      "required": ["command", "path", "kind", "summary"],
+      "properties": {
+        "command": { "$ref": "#/$defs/commandId" },
+        "path": { "$ref": "#/$defs/path" },
+        "kind": { "enum": ["group", "command"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "effect": { "$ref": "#/$defs/effect" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "command" } } },
+          "then": { "required": ["effect"] },
+          "else": { "not": { "required": ["effect"] } }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "tree": {
+      "type": "object",
+      "required": ["kind", "level", "commands"],
+      "properties": {
+        "kind": { "const": "tree" },
+        "level": { "enum": ["L1", "L2"] },
+        "query": {
+          "description": "Present only on a `schema --search` answer; `commands` is then ranked best first and may be empty.",
+          "type": "string",
+          "minLength": 1
+        },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/treeEntry" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "not": { "required": ["query"] } },
+          "then": { "properties": { "commands": { "minItems": 1 } } }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "group": {
+      "type": "object",
+      "required": ["kind", "command", "path", "summary", "commands"],
+      "properties": {
+        "kind": { "const": "group" },
+        "command": { "$ref": "#/$defs/commandId" },
+        "path": { "$ref": "#/$defs/path" },
+        "summary": { "type": "string", "minLength": 1 },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/treeEntry" },
+          "minItems": 1
+        }
+      },
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "errors": {
+      "type": "object",
+      "required": ["kind", "errors"],
+      "properties": {
+        "kind": { "const": "errors" },
+        "errors": {
+          "type": "array",
+          "items": { "$ref": "registry-entry.schema.json" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["kind", "error"],
+      "properties": {
+        "kind": { "const": "error" },
+        "error": { "$ref": "registry-entry.schema.json" }
+      },
+      "additionalProperties": false
+    },
+    "warnings": {
+      "description": "The warning registry (spec 7.5.2).",
+      "x-atip-since": "1.1",
+      "type": "object",
+      "required": ["kind", "warnings"],
+      "properties": {
+        "kind": { "const": "warnings" },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "warning-entry.schema.json" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "warning": {
+      "description": "One warning registry entry (spec 7.5.2).",
+      "x-atip-since": "1.1",
+      "type": "object",
+      "required": ["kind", "warning"],
+      "properties": {
+        "kind": { "const": "warning" },
+        "warning": { "$ref": "warning-entry.schema.json" }
+      },
+      "additionalProperties": false
+    },
+    "command": {
+      "type": "object",
+      "required": ["kind", "command", "path", "summary", "effect", "operands", "options", "errors", "outputs", "examples", "schemas"],
+      "properties": {
+        "kind": { "const": "command" },
+        "command": { "$ref": "#/$defs/commandId" },
+        "path": { "$ref": "#/$defs/path" },
+        "summary": { "type": "string", "minLength": 1 },
+        "effect": { "$ref": "#/$defs/effect" },
+        "idempotency": { "$ref": "#/$defs/idempotency" },
+        "effectNote": {
+          "description": "Effects of a successful run the effect class does not say. Never permits a refusal or preview to write (spec 12.2).",
+          "type": "string",
+          "minLength": 1
+        },
+        "async": {
+          "description": "true: exit 0 means accepted, not done (spec 13.2).",
+          "type": "boolean"
+        },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/operand" }
+        },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/constraint" },
+          "minItems": 1
+        },
+        "validators": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/validator" },
+          "minItems": 1
+        },
+        "errors": {
+          "description": "Every error code the command can emit, reserved codes included. Exits are in the registry.",
+          "type": "array",
+          "items": { "$ref": "error.schema.json#/$defs/code" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/output" },
+          "minItems": 1
+        },
+        "input": { "$ref": "#/$defs/input" },
+        "examples": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "schemas": {
+          "description": "Every JSON Schema the command's refs name, keyed by name; `#/schemas/X` resolves against `data`.",
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+          "additionalProperties": { "type": ["object", "boolean"] },
+          "minProperties": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "effect": { "const": "read" } } },
+          "then": { "not": { "required": ["idempotency"] } },
+          "else": { "required": ["idempotency"] }
+        },
+        {
+          "if": {
+            "properties": {
+              "options": { "contains": { "type": "object", "properties": { "name": { "const": "input" } }, "required": ["name"] } }
+            }
+          },
+          "then": { "required": ["input"] },
+          "else": { "not": { "required": ["input"] } }
+        },
+        {
+          "if": {
+            "required": ["input"],
+            "properties": { "input": { "properties": { "batch": { "const": true } } } }
+          },
+          "then": {
+            "properties": {
+              "outputs": { "contains": { "type": "object", "properties": { "batch": { "const": true } }, "required": ["batch"] } }
+            }
+          },
+          "else": {
+            "properties": {
+              "outputs": { "not": { "contains": { "type": "object", "properties": { "batch": { "const": true } }, "required": ["batch"] } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "async": { "const": true } }, "required": ["async"] },
+          "then": { "properties": { "effect": { "enum": ["write", "destructive"] } } }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "operand": {
+      "type": "object",
+      "required": ["name", "valueName", "valueType", "required", "variadic", "default", "help"],
+      "properties": {
+        "name": { "$ref": "#/$defs/word" },
+        "valueName": { "$ref": "#/$defs/valueName" },
+        "valueType": { "enum": ["string", "integer", "number", "path", "enum", "json"] },
+        "possibleValues": { "$ref": "#/$defs/possibleValues" },
+        "required": { "type": "boolean" },
+        "variadic": { "type": "boolean" },
+        "default": {},
+        "defaultNote": { "type": "string", "minLength": 1 },
+        "domain": { "$ref": "#/$defs/domain" },
+        "help": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/enumNeedsValues" },
+        { "$ref": "#/$defs/requiredHasNoDefault" },
+        {
+          "$ref": "#/$defs/typedDefault",
+          "description": "operand defaults are typed like option defaults; variadic plays the role of repeatable"
+        },
+        {
+          "if": { "properties": { "variadic": { "const": true } } },
+          "then": { "properties": { "default": { "type": ["array", "null"] } } },
+          "else": {
+            "if": { "properties": { "valueType": { "not": { "const": "json" } } } },
+            "then": { "properties": { "default": { "not": { "type": "array" } } } }
+          }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "option": {
+      "type": "object",
+      "required": ["name", "valueType", "required", "repeatable", "default", "help"],
+      "properties": {
+        "name": {
+          "description": "The long name without `--`. Lower kebab case; an identifier option is the bare noun, never `<noun>-id`.",
+          "allOf": [
+            { "$ref": "#/$defs/word" },
+            { "not": { "pattern": "-id$" } }
+          ]
+        },
+        "short": { "type": "string", "pattern": "^[a-zA-Z]$" },
+        "valueName": { "$ref": "#/$defs/valueName" },
+        "valueType": { "enum": ["switch", "count", "string", "integer", "number", "path", "enum", "json"] },
+        "possibleValues": { "$ref": "#/$defs/possibleValues" },
+        "required": { "type": "boolean" },
+        "repeatable": { "type": "boolean" },
+        "default": {
+          "description": "The typed value used when the option is absent, or null when there is none (or it is computed: see defaultNote)."
+        },
+        "defaultNote": { "type": "string", "minLength": 1 },
+        "domain": { "$ref": "#/$defs/domain" },
+        "env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "flagOnly": {
+          "description": "true: the option cannot appear in an --input document (spec 11.6).",
+          "type": "boolean"
+        },
+        "help": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "valueType": { "enum": ["switch", "count"] } } },
+          "then": { "not": { "anyOf": [{ "required": ["valueName"] }, { "required": ["possibleValues"] }] } },
+          "else": { "required": ["valueName"] }
+        },
+        {
+          "if": { "properties": { "valueType": { "const": "switch" } } },
+          "then": {
+            "properties": {
+              "required": { "const": false },
+              "repeatable": { "const": false },
+              "default": { "const": false }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "valueType": { "const": "count" } } },
+          "then": {
+            "properties": {
+              "required": { "const": false },
+              "repeatable": { "const": true },
+              "default": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        { "$ref": "#/$defs/enumNeedsValues" },
+        { "$ref": "#/$defs/requiredHasNoDefault" },
+        { "$ref": "#/$defs/typedDefault" },
+        {
+          "if": {
+            "properties": {
+              "valueType": { "not": { "enum": ["switch", "count"] } },
+              "repeatable": { "const": true }
+            }
+          },
+          "then": { "properties": { "default": { "type": ["array", "null"] } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "valueType": { "enum": ["string", "integer", "number", "path", "enum"] },
+              "repeatable": { "const": false }
+            }
+          },
+          "then": { "properties": { "default": { "not": { "type": "array" } } } }
+        },
+        {
+          "if": { "properties": { "name": { "enum": ["json", "input", "commit", "plan-digest"] } } },
+          "then": { "required": ["flagOnly"], "properties": { "flagOnly": { "const": true } } }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "possibleValues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "domain": {
+      "description": "The interoperable domain profile (spec 10.7.4): which keywords fit which valueType, safe-integer bounds and the I-Regexp form of `pattern` are checked by scripts/check.ts (spec 10.13 rule 3).",
+      "$ref": "#/$defs/domainNode",
+      "minProperties": 1
+    },
+    "domainNode": {
+      "type": "object",
+      "properties": {
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "exclusiveMinimum": { "type": "number" },
+        "exclusiveMaximum": { "type": "number" },
+        "multipleOf": { "type": "number", "exclusiveMinimum": 0 },
+        "minLength": { "type": "integer", "minimum": 0 },
+        "maxLength": { "type": "integer", "minimum": 0 },
+        "pattern": {
+          "description": "`^`, an I-Regexp (RFC 9485) body with the restrictions of spec 10.7.4, and `$`.",
+          "type": "string",
+          "pattern": "^\\^.*\\$$"
+        },
+        "type": {
+          "anyOf": [
+            { "$ref": "#/$defs/jsonType" },
+            { "type": "array", "items": { "$ref": "#/$defs/jsonType" }, "minItems": 1, "uniqueItems": true }
+          ]
+        },
+        "enum": { "type": "array", "items": { "$ref": "#/$defs/scalar" }, "minItems": 1, "uniqueItems": true },
+        "const": { "$ref": "#/$defs/scalar" },
+        "properties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/domainNode" } },
+        "required": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "additionalProperties": { "anyOf": [{ "type": "boolean" }, { "$ref": "#/$defs/domainNode" }] },
+        "items": { "$ref": "#/$defs/domainNode" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "$comment": { "type": "string" },
+        "format": {
+          "description": "An annotation only: it asserts nothing (spec 10.7.4).",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "jsonType": { "enum": ["null", "boolean", "object", "array", "number", "string", "integer"] },
+    "scalar": { "type": ["null", "boolean", "number", "string"] },
+    "validator": {
+      "description": "A stateless check outside the domain profile and the constraint vocabulary (spec 10.8.3).",
+      "type": "object",
+      "required": ["arguments", "code", "description", "rejects"],
+      "properties": {
+        "arguments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/word" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "code": { "$ref": "error.schema.json#/$defs/code" },
+        "description": { "type": "string", "minLength": 1 },
+        "rejects": {
+          "description": "Complete invocations that satisfy every declared requirement, constraint and domain and that this validator refuses.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      },
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "enumNeedsValues": {
+      "if": { "properties": { "valueType": { "const": "enum" } } },
+      "then": { "required": ["possibleValues"] },
+      "else": { "not": { "required": ["possibleValues"] } }
+    },
+    "requiredHasNoDefault": {
+      "if": { "properties": { "required": { "const": true } } },
+      "then": { "properties": { "default": { "const": null } } }
+    },
+    "typedDefault": {
+      "allOf": [
+        {
+          "if": { "properties": { "valueType": { "const": "integer" } } },
+          "then": { "properties": { "default": { "$ref": "#/$defs/defaultInteger" } } }
+        },
+        {
+          "if": { "properties": { "valueType": { "const": "number" } } },
+          "then": { "properties": { "default": { "$ref": "#/$defs/defaultNumber" } } }
+        },
+        {
+          "if": { "properties": { "valueType": { "enum": ["string", "path", "enum"] } } },
+          "then": { "properties": { "default": { "$ref": "#/$defs/defaultString" } } }
+        }
+      ]
+    },
+    "defaultInteger": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "integer" },
+        { "type": "array", "items": { "type": "integer" } }
+      ]
+    },
+    "defaultNumber": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "number" },
+        { "type": "array", "items": { "type": "number" } }
+      ]
+    },
+    "defaultString": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["rule"],
+      "properties": {
+        "rule": { "enum": ["atLeastOne", "exactlyOne", "atMostOne", "requires", "forbids"] },
+        "names": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/word" },
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "if": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "$ref": "#/$defs/word" },
+            "in": {
+              "type": "array",
+              "items": { "type": ["string", "number"] },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "then": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/word" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "code": { "$ref": "error.schema.json#/$defs/code" },
+        "help": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "rule": { "enum": ["atLeastOne", "exactlyOne", "atMostOne"] } } },
+          "then": { "required": ["names"], "not": { "anyOf": [{ "required": ["if"] }, { "required": ["then"] }] } },
+          "else": { "required": ["if", "then"], "not": { "required": ["names"] } }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "schemaRef": {
+      "type": "string",
+      "pattern": "^#/schemas/[A-Za-z][A-Za-z0-9]*$"
+    },
+    "output": {
+      "type": "object",
+      "required": ["kind", "schemaRef", "schemaVersion"],
+      "properties": {
+        "kind": { "enum": ["report", "artifact", "stream"] },
+        "schemaRef": {
+          "description": "The JSON Schema of `data` in JSON mode (for a stream: of the end line's result data).",
+          "$ref": "#/$defs/schemaRef"
+        },
+        "schemaVersion": { "$ref": "envelope.schema.json#/$defs/schemaVersion" },
+        "mediaType": {
+          "description": "Text-mode bytes of an artifact; application/x-ndjson for a stream.",
+          "type": "string",
+          "pattern": "^[a-z]+/[a-zA-Z0-9.+-]+$"
+        },
+        "eventRef": {
+          "description": "A stream's event line data schema.",
+          "$ref": "#/$defs/schemaRef"
+        },
+        "batch": { "type": "boolean" },
+        "when": { "type": "string", "minLength": 1 },
+        "fields": {
+          "description": "Field selection (spec 6.10).",
+          "type": "object",
+          "required": ["records", "paths"],
+          "properties": {
+            "records": { "description": "RFC 6901 JSON pointer of the record array in data, or \"\" when data is the record.", "type": "string", "pattern": "^(/([^~]|~[01])*)*$" },
+            "paths": { "type": "array", "items": { "$ref": "envelope.schema.json#/$defs/fieldPath" }, "minItems": 1, "uniqueItems": true },
+            "keep": { "type": "array", "items": { "$ref": "envelope.schema.json#/$defs/fieldPath" }, "uniqueItems": true },
+            "default": { "type": "array", "items": { "$ref": "envelope.schema.json#/$defs/fieldPath" }, "minItems": 1, "uniqueItems": true }
+          },
+          "additionalProperties": false
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "artifact" } } },
+          "then": { "required": ["mediaType"], "not": { "required": ["eventRef"] } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "stream" } } },
+          "then": { "required": ["mediaType", "eventRef"], "properties": { "mediaType": { "const": "application/x-ndjson" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "report" } } },
+          "then": { "not": { "anyOf": [{ "required": ["mediaType"] }, { "required": ["eventRef"] }] } }
+        }
+      ],
+      "patternProperties": { "^x-[a-z][a-z0-9-]*$": true },
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "required": ["option", "schemaRef", "batch", "maxBytes", "example"],
+      "properties": {
+        "option": { "const": "--input" },
+        "schemaRef": {
+          "description": "The fragment schema of one document: no `required`, additionalProperties false (spec 10.10).",
+          "$ref": "#/$defs/schemaRef"
+        },
+        "argumentsRef": {
+          "description": "Informative schema of the complete merged arguments.",
+          "$ref": "#/$defs/schemaRef"
+        },
+        "batch": { "type": "boolean" },
+        "maxBytes": { "type": "integer", "minimum": 1 },
+        "maxItems": { "type": "integer", "minimum": 1 },
+        "example": { "$ref": "input-document.schema.json#/$defs/document" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "batch": { "const": true } } },
+          "then": { "required": ["maxItems"] },
+          "else": { "not": { "required": ["maxItems"] } }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

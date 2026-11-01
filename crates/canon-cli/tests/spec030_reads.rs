@@ -311,7 +311,7 @@ fn context_capability_46_schema_of_an_unknown_command_or_a_leaf_with_a_sub_path_
     let sub_path = canon(repo.path(), &["schema", "subject", "show", "nope", "extra", "--json"]);
     assert_eq!(sub_path.status.code(), Some(2));
     assert_eq!(error_code(&sub_path), "UNKNOWN_COMMAND");
-    assert!(json(&sub_path)["error"]["message"].as_str().unwrap().contains("is a leaf command"));
+    assert!(json(&sub_path)["error"]["message"].as_str().unwrap().contains("takes no sub-path"));
     assert_eq!(tree(repo.path()), before, "a refused schema writes nothing");
 }
 

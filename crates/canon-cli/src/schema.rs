@@ -1,27 +1,27 @@
 //! `canon schema [<command path>…] [--json]` — the CLI's own machine-readable
-//! contract (0.20 D1).
+//! contract (0.20 D1; atip/1 spec 10 since 0.34).
 //!
-//! The command tree (names, aliases, arguments, options, enum values,
-//! defaults) is read from clap, never restated, so it cannot drift from what
-//! the parser accepts. What clap does not know — whether a command reads,
-//! writes or destroys, and what its exit codes mean — lives in one table,
-//! [`META`], with one row per leaf command; [`crate::cli::meta::meta`] picks the
-//! row of a parsed command by an exhaustive `match`. [`check_metadata`] reports every
-//! leaf without a row and every row clap has no leaf for; the binary's test
-//! suite fails on either, so the table cannot drift from clap.
+//! The answers are the contract's documents ([`atip::doc`]): the tree of every group and
+//! command with the `level` canon claims, a group's children, and one command in full. The
+//! command tree (names, operands, options, value types, typed defaults, enum values) is read
+//! from clap by [`atip::project`], never restated, so it cannot drift from what the parser
+//! accepts. What clap does not know — whether a command reads, writes or destroys, and which
+//! roles use it — lives in one table, [`META`], with one row per leaf command;
+//! [`crate::cli::meta::meta`] picks the row of a parsed command by an exhaustive `match`.
+//! [`check_metadata`] reports every leaf without a row and every row clap has no leaf for;
+//! the binary's test suite fails on either, so the table cannot drift from clap.
 //!
-//! Each command's `error_codes` come from [`crate::schema_codes`], a table
-//! generated from the sources (`tests/schema_codes.rs` derives it and fails on
-//! any difference; `CANON_BLESS_SCHEMA_CODES=1` rewrites it). `canon schema
-//! --errors` prints the whole registry of [`crate::cli_error::all_codes`].
+//! Each command's `errors` come from [`crate::schema_codes`], a table generated from the
+//! sources (`tests/schema_codes.rs` derives it and fails on any difference;
+//! `CANON_BLESS_SCHEMA_CODES=1` rewrites it), with the reserved codes of the features the
+//! command has. `canon schema --errors` prints the whole registry of
+//! [`crate::cli_error::all_codes`].
 //!
-//! The command touches no repo and no network: it only walks the in-memory
-//! clap tree, so it works outside a canon repo. Since 0.28 a command's schema
-//! is its node of the generated spec ([`crate::spec`], checked in as
-//! `docs/cli/canon.cli.json`), so the two cannot disagree; this module keeps
-//! the tables the nodes are built from ([`META`]) and resolves a path to its
-//! node. Output order is deterministic: leaves sort by canonical path,
-//! operands and options keep their declaration order.
+//! The command touches no repo and no network: it only walks the in-memory clap tree, so it
+//! works outside a canon repo and from any environment (the documents are the one
+//! [`crate::spec`] builds; the checked-in `docs/cli/canon.cli.json` holds the same ones).
+//! Output order is deterministic: the tree is in command order, operands and options keep
+//! their declaration order.
 //!
 //! The registries (0.34, contract 1.1): `--errors` and `--error <CODE>` print the
 //! error registry with each code's reasons, `--warnings` and `--warning <CODE>`
@@ -30,10 +30,9 @@
 //! the four options exclude one another; an unknown code, or a code of the other
 //! registry, is `USAGE` with the option as `field`.
 //!
-//! 0.21 adds three things the table and clap cannot say alone. `roles` says
-//! which roles' steps use a command ([`CommandMeta::roles`]); bare `canon
-//! schema` lists every command, and `--as <ROLE>` lists only that role's
-//! (`CANON_ROLE` never filters it). A command whose effect depends on its
+//! `roles` says which roles' steps use a command ([`CommandMeta::roles`]); it travels in
+//! `x-canon.roles`. Bare `canon schema` lists every command, and `--as <ROLE>` lists only
+//! that role's (`CANON_ROLE` never filters it). A command whose effect depends on its
 //! arguments carries `effectNote`.
 
 use clap::Command;
@@ -41,47 +40,9 @@ use serde::Serialize;
 
 use crate::cli_error::CliErrorExt as _;
 use crate::role::Role;
-use crate::spec::{self, Node};
+use crate::spec;
 
-/// What running a command does to the repo and the machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Effect {
-    /// Writes nothing (stdout/stderr only).
-    Read,
-    /// Writes or stages files or records; nothing existing is destroyed.
-    Write,
-    /// Permanently removes data.
-    Destructive,
-}
-
-impl Effect {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Effect::Read => "read",
-            Effect::Write => "write",
-            Effect::Destructive => "destructive",
-        }
-    }
-}
-
-/// One exit code a command can return, with its meaning.
-#[derive(Debug, Clone, Copy, Serialize, schemars::JsonSchema)]
-pub struct ExitMeta {
-    pub code: u8,
-    pub meaning: &'static str,
-}
-
-const fn exit(code: u8, meaning: &'static str) -> ExitMeta {
-    ExitMeta { code, meaning }
-}
-
-/// The default exits, for a command whose module documents nothing narrower.
-pub const STANDARD_EXITS: &[ExitMeta] = &[
-    ExitMeta { code: 0, meaning: "success" },
-    ExitMeta { code: 1, meaning: "operational failure, or a blocking finding the command reports" },
-    ExitMeta { code: 2, meaning: "refused: the invocation or its inputs are wrong and fixable; nothing was written" },
-];
+pub use atip::doc::Effect;
 
 /// Metadata clap cannot supply, for one leaf command.
 #[derive(Debug)]
@@ -95,16 +56,15 @@ pub struct CommandMeta {
     pub effect: Effect,
     /// The arguments under which the command does less than `effect`.
     pub effect_note: Option<&'static str>,
-    pub exits: &'static [ExitMeta],
     /// The roles whose steps use the command (0.21 D3, the plan's step
     /// ownership). Empty: humans only (the command records a human's
     /// decision); the unfiltered `canon schema` lists it.
     pub roles: &'static [Role],
 }
 
-/// One row: every row names its own exits, taken from the leaf's table row.
-const fn row_exits(path: &'static str, effect: Effect, exits: &'static [ExitMeta], roles: &'static [Role]) -> CommandMeta {
-    CommandMeta { path, effect, effect_note: None, exits, roles }
+/// One row of [`META`].
+const fn row(path: &'static str, effect: Effect, roles: &'static [Role]) -> CommandMeta {
+    CommandMeta { path, effect, effect_note: None, roles }
 }
 
 impl CommandMeta {
@@ -114,14 +74,6 @@ impl CommandMeta {
     }
 }
 
-/// Success, and a refusal where the leaf needs canon state: every failure of
-/// the leaf is a refusal.
-const REFUSABLE: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written")];
-/// The same for a leaf that reads or writes no canon state.
-const REFUSABLE_NO_REPO: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused: an argument or input that is missing, unreadable or invalid; nothing is written")];
-/// A destructive leaf: the bare run previews, `--commit --plan-digest` acts.
-const DESTRUCTIVE_EXITS: &[ExitMeta] = &[exit(0, "previewed, or committed, or nothing to do"), exit(2, "refused: CONFIG_MISSING, an invalid input, or PLAN_STALE; nothing is removed")];
-
 use Effect::{Destructive, Read, Write};
 use Role::{Implementer as I, Orchestrator as O, Planner as P, Reviewer as R};
 
@@ -130,84 +82,84 @@ const HUMAN: &[Role] = &[];
 
 /// One row per leaf command, canonical path first.
 pub const META: &[CommandMeta] = &[
-    row_exits("adapter authorize", Read, &[exit(0, "authorized"), exit(1, "not authorized (ADAPTER_EXECUTION_NOT_AUTHORIZED): the report stays in data; the only exit 1"), exit(2, "refused (ADAPTER_REFUSED): the response file is missing or unreadable, its envelope breaks a rule, or the policy file is broken; fix the file and run again")], &[O]),
-    row_exits("adapter validate", Read, &[exit(0, "valid envelope"), exit(1, "invalid envelope (ADAPTER_RESPONSE_INVALID): the envelope breaks a rule"), exit(2, "refused (ADAPTER_REFUSED): the response file is missing or unreadable")], &[O]),
-    row_exits("artifacts move", Destructive, DESTRUCTIVE_EXITS, &[O]),
-    row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached")], &[O]),
-    row_exits("brief approve", Write, REFUSABLE, HUMAN),
-    row_exits("brief show", Read, REFUSABLE, &[P, R]),
-    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "blocker findings"), exit(2, "refused: no such change, no live change (NO_BRIEF), or CONFIG_MISSING")], &[P, R]),
-    row_exits("change new", Write, &[exit(0, "written and adopted"), exit(1, "WRITE_FAILED, or CHANGE_ADOPTION_INCOMPLETE: the subject record was written and the change record was not; the hint names the command that finishes the link"), exit(2, "refused: CONFIG_MISSING, or an input that is missing or invalid, or WRITE_UNAVAILABLE; nothing is written")], &[P]),
-    row_exits("context", Read, &[exit(0, "success: it describes what can be authored and never gates"), exit(2, "refused: USAGE (an unknown --fields name)")], EVERYONE),
-    row_exits("context-pack add", Write, REFUSABLE, &[O, I]),
-    row_exits("context-pack show", Read, &[exit(0, "shown"), exit(1, "the pack is tampered (CONTEXT_PACK_TAMPERED)"), exit(2, "refused: CONFIG_MISSING, a pack id that is not sha256: and 64 lower-case hex digits (USAGE), or no such pack")], &[O, I]),
-    row_exits("context-pack verify", Read, &[exit(0, "verified"), exit(1, "the pack is tampered"), exit(2, "refused: CONFIG_MISSING, a pack id that is not sha256: and 64 lower-case hex digits (USAGE), or no such pack")], &[O, I]),
-    row_exits("dashboard", Write, REFUSABLE, &[O]).note("regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief"),
-    row_exits("demo review", Write, REFUSABLE, &[O]),
-    row_exits("demo init", Write, REFUSABLE, &[O]),
-    row_exits("dispatch begin", Write, REFUSABLE, &[O]),
-    row_exits("dispatch diff", Read, REFUSABLE, &[O]),
-    row_exits("dispatch end", Write, REFUSABLE, &[O]),
-    row_exits("divergence accept", Write, REFUSABLE, HUMAN).note("refreshes stale scenario-index records first"),
-    row_exits("divergence add", Write, REFUSABLE, &[I, R]),
-    row_exits("divergence defer", Write, REFUSABLE, &[I, R]),
-    row_exits("divergence resolve", Write, REFUSABLE, &[I, R]),
-    row_exits("divergence list", Read, REFUSABLE, EVERYONE),
-    row_exits("evidence add", Write, &[exit(0, "staged, committed or unchanged"), exit(1, "refused by the gate: a fabrication marker, an invalid typed atom, a contradicting report, an unapproved brief, or EVIDENCE_BATCH_REFUSED; nothing is staged"), exit(2, "refused: CONFIG_MISSING, a malformed flag combination, an unknown task, or no plan corpus; nothing is staged")], &[I]).note("refreshes stale scenario-index records first"),
-    row_exits("evidence audit", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown scenario or spec root, a write failure; nothing is staged")], &[I]).note("refreshes stale scenario-index records first"),
-    row_exits("evidence approval-payload", Read, &[exit(0, "the bytes to sign"), exit(2, "refused: CONFIG_MISSING, a scenario the index does not hold (EVIDENCE_SCENARIO_NOT_INDEXED; run `canon inventory sync`), or an input that is missing, unreadable or invalid; no bytes are printed")], &[I, O]),
-    row_exits("artifacts store", Write, REFUSABLE, &[O]).note("refreshes stale scenario-index records first"),
-    row_exits("export", Write, REFUSABLE, &[O]).note("writes the --output file (mode 0600) and one audit line"),
-    row_exits("feature new", Write, REFUSABLE, &[P, I]),
-    row_exits("finding add", Write, REFUSABLE, &[R]),
-    row_exits("finding close", Write, REFUSABLE, &[R]),
-    row_exits("finding list", Read, REFUSABLE, EVERYONE),
-    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations, or has 0 files (unverifiable)"), exit(2, "refused: the corpus root is not a directory, or CONFIG_MISSING")], EVERYONE),
-    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations, or nothing was examined (unverifiable)"), exit(2, "refused: CONFIG_MISSING, or an unreadable ledger or config")], EVERYONE),
-    row_exits("gate install-hooks", Write, &[exit(0, "installed, unchanged, or previewed"), exit(2, "refused: --repo is not an existing directory, a hook file cannot be written, or an input that is invalid; nothing is written")], &[O]),
-    row_exits("gate promote", Write, &[exit(0, "promoted, recovered or nothing staged"), exit(1, "PROMOTE_REFUSED: the report stays in data"), exit(2, "refused: CONFIG_MISSING, or an unreadable ledger")], &[I]),
-    row_exits("task done", Write, &[exit(0, "the task row was flipped, or already was"), exit(1, "GATE_TASK_BLOCKED: the row is not ready to flip; nothing is written"), exit(2, "refused: CONFIG_MISSING, an unknown task, or an unreadable plan")], &[I]),
-    row_exits("ingest records", Write, REFUSABLE, &[O]),
-    row_exits("ingest plans", Write, &[exit(0, "ingested"), exit(1, "INGEST_SOURCE_UNUSABLE: every source is unusable"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[O]),
-    row_exits("ingest sessions", Write, REFUSABLE, &[O]),
-    row_exits("init", Write, &[exit(0, "initialized, or (--check) every section passes"), exit(1, "--check: a section failed"), exit(2, "refused: an invalid argument or an unusable directory; nothing is written")], &[O]).note("--check writes nothing"),
-    row_exits("inventory sync", Write, &[exit(0, "synced, or unchanged"), exit(1, "violations or duplicates in a root (INVENTORY_ABORTED); nothing is written for it"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[I, O]),
-    row_exits("strategy approval-payload", Read, REFUSABLE, &[O]),
-    row_exits("strategy promote", Write, &[exit(0, "promoted, or a dry run"), exit(1, "promotion blocked: the report names why"), exit(2, "refused: CONFIG_MISSING, or an argument error")], &[O]),
-    row_exits("strategy rollback", Write, &[exit(0, "rolled back"), exit(1, "LEARN_ROLLBACK_FAILED: the signature does not verify, or the rollback could not be recorded"), exit(2, "refused: CONFIG_MISSING, an unknown strategy id (LEARN_STRATEGY_NOT_FOUND, checked first), or an input that is missing, unreadable or invalid; nothing is written")], &[O]),
-    row_exits("ledger compact", Destructive, DESTRUCTIVE_EXITS, &[O]),
-    row_exits("migrate", Destructive, &[exit(0, "previewed, migrated, or nothing to do"), exit(1, "MIGRATE_STOPPED: it stopped partway and running it again finishes the rest, or it migrated and the index rebuild found the corpus unclean"), exit(2, "refused: an invalid input, PLAN_STALE, or uncommitted changes under a moved path; nothing is written")], &[O]),
-    row_exits("plugin sync", Write, &[exit(0, "synced, or deduped"), exit(1, "per-candidate write errors (PLUGIN_SYNC_ERRORS)"), exit(2, "refused: CONFIG_MISSING, or the plugin does not resolve")], &[O]),
-    row_exits("policy approve", Write, REFUSABLE, HUMAN),
-    row_exits("policy show", Read, REFUSABLE, &[O]),
-    row_exits("prompt add", Write, &[exit(0, "added, or unchanged"), exit(1, "CONTEXT_OBJECT_CONFLICT: different content under one name@version"), exit(2, "refused: CONFIG_MISSING, or an invalid manifest or label")], &[O]),
-    row_exits("prompt show", Read, REFUSABLE, &[O]),
-    row_exits("purge", Destructive, DESTRUCTIVE_EXITS, &[O]).note("a committed run writes one audit line; a preview writes nothing"),
-    row_exits("query", Read, REFUSABLE, EVERYONE).note("appends one line to .canon/audit/access.jsonl; a refused run writes none"),
-    row_exits("regime show", Read, REFUSABLE_NO_REPO, &[O]),
-    row_exits("search", Read, &[exit(0, "success: a text nothing matches is exit 0 with empty hits"), exit(1, "SEARCH_INDEX_FAILED: the records the index is built from cannot be read, or the index cannot be built"), exit(2, "refused: SEARCH_QUERY_EMPTY, CONFIG_MISSING, or CONFIG_UNREADABLE")], EVERYONE).note("first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written"),
-    row_exits("trace", Read, &[exit(0, "the chain, however short"), exit(1, "SEARCH_INDEX_FAILED: the records the index is built from cannot be read, or the index cannot be built"), exit(2, "refused: TRACE_OPERAND_INVALID, TRACE_NOT_FOUND (an id no record says, or an ambiguous sha prefix), CONFIG_MISSING, or CONFIG_UNREADABLE")], EVERYONE).note("first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written"),
-    row_exits("report build", Write, &[exit(0, "built"), exit(1, "REPORT_FAILED: the ledger could not be read or duckdb is missing"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[O]).note("scratch files go under the system temp dir"),
-    row_exits("report check", Read, &[exit(0, "fresh"), exit(1, "REPORT_STALE: the report is missing or has drifted, or REPORT_FAILED"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[O]).note("scratch files go under the system temp dir; writes no repo file"),
-    row_exits("report snapshot", Write, &[exit(0, "written"), exit(1, "the ledger could not be read"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[O]).note("scratch files go under the system temp dir"),
-    row_exits("retrieve", Read, REFUSABLE, EVERYONE),
-    row_exits("review change", Write, REFUSABLE, &[R]).note("refreshes stale scenario-index records first"),
-    row_exits("review scenario", Write, REFUSABLE, &[R]).note("refreshes stale scenario-index records first"),
-    row_exits("scenario new", Write, REFUSABLE, &[P, I]),
-    row_exits("completion", Read, &[exit(0, "the script was written"), exit(2, "refused: the shell is not one of bash, zsh, fish")], EVERYONE),
-    row_exits("schema", Read, REFUSABLE_NO_REPO, EVERYONE),
-    row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed"), exit(2, "refused: unknown suite")], &[O]).note("scratch directories in the system temp dir, removed on exit"),
-    row_exits("skills check", Read, &[exit(0, "clean"), exit(1, "drift (SKILLS_DRIFT)"), exit(2, "refused: an invalid argument")], &[O]),
-    row_exits("skills doctor", Read, &[exit(0, "every diagnosis, healthy or not: diagnostics only"), exit(2, "refused: an unknown provider or a malformed `skills:` section")], &[O]),
-    row_exits("skills install", Write, REFUSABLE, &[O]),
-    row_exits("skills show", Read, REFUSABLE_NO_REPO, EVERYONE),
-    row_exits("status", Read, &[exit(0, "success, whatever it finds"), exit(1, "unverifiable: nothing was examined"), exit(2, "refused: CONFIG_MISSING, or USAGE (an unknown --fields name)")], EVERYONE),
-    row_exits("subject adopt", Write, &[exit(0, "linked, or already linked"), exit(1, "CHANGE_ADOPTION_INCOMPLETE: the subject record was written and the change record was not; the hint names the command that finishes the link"), exit(2, "refused: CONFIG_MISSING, an input that is missing or invalid, or WRITE_UNAVAILABLE; nothing is written")], &[P, O]),
-    row_exits("subject new", Write, REFUSABLE, &[P, O]),
-    row_exits("subject show", Read, &[exit(0, "shown"), exit(2, "refused: an unknown subject (SUBJECT_NOT_FOUND), or CONFIG_MISSING")], &[O]).note("refreshes stale scenario-index records first"),
-    row_exits("subject move", Write, &[exit(0, "the transition was recorded"), exit(1, "SUBJECT_GATE_VIOLATION: an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"), exit(2, "refused: an invalid transition, a missing reason, an unknown subject, or CONFIG_MISSING")], &[O]).note("reads without --to: `subject move <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first"),
-    row_exits("subject unadopt", Write, &[exit(0, "unlinked, or already unlinked"), exit(1, "CHANGE_ADOPTION_INCOMPLETE: the subject record was rewritten and the change record was not; the hint names the command that finishes the unlink"), exit(2, "refused: CONFIG_MISSING, an input that is missing or invalid, WRITE_UNAVAILABLE, or an approved brief; nothing is written")], &[P, O]),
-    row_exits("tier age", Destructive, DESTRUCTIVE_EXITS, &[O]),
+    row("adapter authorize", Read, &[O]),
+    row("adapter validate", Read, &[O]),
+    row("artifacts move", Destructive, &[O]),
+    row("artifacts verify", Read, &[O]),
+    row("brief approve", Write, HUMAN),
+    row("brief show", Read, &[P, R]),
+    row("brief check", Read, &[P, R]),
+    row("change new", Write, &[P]),
+    row("context", Read, EVERYONE),
+    row("context-pack add", Write, &[O, I]),
+    row("context-pack show", Read, &[O, I]),
+    row("context-pack verify", Read, &[O, I]),
+    row("dashboard", Write, &[O]).note("regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief"),
+    row("demo review", Write, &[O]),
+    row("demo init", Write, &[O]),
+    row("dispatch begin", Write, &[O]),
+    row("dispatch diff", Read, &[O]),
+    row("dispatch end", Write, &[O]),
+    row("divergence accept", Write, HUMAN).note("refreshes stale scenario-index records first"),
+    row("divergence add", Write, &[I, R]),
+    row("divergence defer", Write, &[I, R]),
+    row("divergence resolve", Write, &[I, R]),
+    row("divergence list", Read, EVERYONE),
+    row("evidence add", Write, &[I]).note("refreshes stale scenario-index records first"),
+    row("evidence audit", Write, &[I]).note("refreshes stale scenario-index records first"),
+    row("evidence approval-payload", Read, &[I, O]),
+    row("artifacts store", Write, &[O]).note("refreshes stale scenario-index records first"),
+    row("export", Write, &[O]).note("writes the --output file (mode 0600) and one audit line"),
+    row("feature new", Write, &[P, I]),
+    row("finding add", Write, &[R]),
+    row("finding close", Write, &[R]),
+    row("finding list", Read, EVERYONE),
+    row("format", Read, EVERYONE),
+    row("gate check", Read, EVERYONE),
+    row("gate install-hooks", Write, &[O]),
+    row("gate promote", Write, &[I]),
+    row("task done", Write, &[I]),
+    row("ingest records", Write, &[O]),
+    row("ingest plans", Write, &[O]),
+    row("ingest sessions", Write, &[O]),
+    row("init", Write, &[O]).note("--check writes nothing"),
+    row("inventory sync", Write, &[I, O]),
+    row("strategy approval-payload", Read, &[O]),
+    row("strategy promote", Write, &[O]),
+    row("strategy rollback", Write, &[O]),
+    row("ledger compact", Destructive, &[O]),
+    row("migrate", Destructive, &[O]),
+    row("plugin sync", Write, &[O]),
+    row("policy approve", Write, HUMAN),
+    row("policy show", Read, &[O]),
+    row("prompt add", Write, &[O]),
+    row("prompt show", Read, &[O]),
+    row("purge", Destructive, &[O]).note("a committed run writes one audit line; a preview writes nothing"),
+    row("query", Read, EVERYONE).note("appends one line to .canon/audit/access.jsonl; a refused run writes none"),
+    row("regime show", Read, &[O]),
+    row("search", Read, EVERYONE).note("first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written"),
+    row("trace", Read, EVERYONE).note("first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written"),
+    row("report build", Write, &[O]).note("scratch files go under the system temp dir"),
+    row("report check", Read, &[O]).note("scratch files go under the system temp dir; writes no repo file"),
+    row("report snapshot", Write, &[O]).note("scratch files go under the system temp dir"),
+    row("retrieve", Read, EVERYONE),
+    row("review change", Write, &[R]).note("refreshes stale scenario-index records first"),
+    row("review scenario", Write, &[R]).note("refreshes stale scenario-index records first"),
+    row("scenario new", Write, &[P, I]),
+    row("completion", Read, EVERYONE),
+    row("schema", Read, EVERYONE),
+    row("selftest", Read, &[O]).note("scratch directories in the system temp dir, removed on exit"),
+    row("skills check", Read, &[O]),
+    row("skills doctor", Read, &[O]),
+    row("skills install", Write, &[O]),
+    row("skills show", Read, EVERYONE),
+    row("status", Read, EVERYONE),
+    row("subject adopt", Write, &[P, O]),
+    row("subject new", Write, &[P, O]),
+    row("subject show", Read, &[O]).note("refreshes stale scenario-index records first"),
+    row("subject move", Write, &[O]).note("reads without --to: `subject move <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first"),
+    row("subject unadopt", Write, &[P, O]),
+    row("tier age", Destructive, &[O]),
 ];
 
 /// Canonical paths of every leaf command under `cmd`, sorted.
@@ -256,24 +208,6 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
     problems
 }
 
-/// One command in `canon schema`'s listing.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ListEntry {
-    command: String,
-    effect: Effect,
-    roles: Vec<Role>,
-    about: Option<String>,
-}
-
-/// `canon schema` with no command: the commands, filtered to a role.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ListSchema {
-    /// The role the listing was filtered to; absent when it lists every command.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    role: Option<Role>,
-    commands: Vec<ListEntry>,
-}
-
 /// `canon schema --errors`: every error code.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorList {
@@ -290,13 +224,14 @@ pub struct WarningList {
     warnings: Vec<spec::WarningRow>,
 }
 
-/// `canon schema`'s report (`SchemaReport`): the command listing, one command's
-/// node of the generated spec, or the error registry.
+/// `canon schema`'s report (`SchemaReport`): the tree, a group, a command, or a registry
+/// (atip/1 spec 10.1.4: `data.kind` names which).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
-pub enum SchemaReport<'a> {
-    Commands(ListSchema),
-    Command(&'a spec::Node),
+pub enum SchemaReport {
+    Tree(atip::doc::TreeDoc),
+    Group(atip::doc::GroupDoc),
+    Command(Box<atip::doc::CommandDoc>),
     Errors(ErrorList),
     Error(ErrorEntry),
     Warnings(WarningList),
@@ -319,7 +254,7 @@ pub struct WarningEntry {
     pub warning: spec::WarningRow,
 }
 
-impl crate::json_out::Report for SchemaReport<'_> {
+impl crate::json_out::Report for SchemaReport {
     /// The version of the self-description format is the contract version canon implements (spec 10.1.4).
     const SCHEMA_VERSION: &'static str = crate::json_out::CONTRACT_VERSION;
 }
@@ -335,74 +270,6 @@ pub struct Registry<'a> {
     pub warnings: bool,
     /// `--warning <CODE>`
     pub warning: Option<&'a str>,
-}
-
-/// Why a command path did not resolve.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Refusal(pub String);
-
-enum Resolved {
-    /// A path naming a group (or the root): list the leaves beneath it.
-    Group(Vec<String>),
-    Leaf(Vec<String>),
-}
-
-fn find_sub<'a>(cmd: &'a Command, token: &str) -> Option<&'a Command> {
-    cmd.get_subcommands().filter(|c| c.get_name() != "help").find(|c| c.get_name() == token || c.get_all_aliases().any(|a| a == token))
-}
-
-fn distance(a: &str, b: &str) -> usize {
-    let b: Vec<char> = b.chars().collect();
-    let mut prev: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.chars().enumerate() {
-        let mut cur = vec![i + 1];
-        for (j, cb) in b.iter().enumerate() {
-            cur.push((prev[j] + usize::from(ca != *cb)).min(prev[j + 1] + 1).min(cur[j] + 1));
-        }
-        prev = cur;
-    }
-    prev[b.len()]
-}
-
-fn resolve(root: &Command, tokens: &[String]) -> Result<Resolved, Refusal> {
-    let mut cmd = root;
-    let mut canonical: Vec<String> = Vec::new();
-    for (i, token) in tokens.iter().enumerate() {
-        let is_group = cmd.get_subcommands().any(|c| c.get_name() != "help");
-        if !is_group {
-            return Err(Refusal(format!(
-                "`{}` is a leaf command and takes no sub-path `{}`",
-                canonical.join(" "),
-                tokens[i..].join(" ")
-            )));
-        }
-        match find_sub(cmd, token) {
-            Some(next) => {
-                canonical.push(next.get_name().to_string());
-                cmd = next;
-            }
-            None => {
-                let names: Vec<&str> = cmd.get_subcommands().filter(|c| c.get_name() != "help").flat_map(|c| std::iter::once(c.get_name()).chain(c.get_all_aliases())).collect();
-                let limit = (token.chars().count() / 3).max(2);
-                let mut near: Vec<(usize, &str)> = names.iter().map(|n| (distance(token, n), *n)).filter(|(d, _)| *d <= limit).collect();
-                near.sort();
-                let prefix = canonical.join(" ");
-                let at = |n: &str| if prefix.is_empty() { n.to_string() } else { format!("{prefix} {n}") };
-                let shown: Vec<String> = if near.is_empty() {
-                    cmd.get_subcommands().filter(|c| c.get_name() != "help").map(|c| at(c.get_name())).collect()
-                } else {
-                    near.iter().take(3).map(|(_, n)| at(n)).collect()
-                };
-                let label = if near.is_empty() { "available" } else { "nearest matches" };
-                return Err(Refusal(format!("unknown command `{}`; {label}: {}", at(token), shown.join(", "))));
-            }
-        }
-    }
-    if cmd.get_subcommands().any(|c| c.get_name() != "help") || canonical.is_empty() {
-        Ok(Resolved::Group(canonical))
-    } else {
-        Ok(Resolved::Leaf(canonical))
-    }
 }
 
 /// The stable error codes `path` can emit, sorted. The table is derived from
@@ -447,26 +314,13 @@ pub fn meta_for(path: &str) -> Option<&'static CommandMeta> {
     META.iter().find(|m| m.path == path)
 }
 
-/// The commands under `under`, hidden from the bare listing when they are
-/// outside `role`'s steps (`--as`); without a role every command is listed.
-fn list_entries(nodes: &[Node], under: &[String], role: Option<Role>) -> Vec<ListEntry> {
-    let prefix = under.join(" ");
-    nodes
-        .iter()
-        .filter_map(|n| n.leaf.as_ref().map(|leaf| (n, leaf)))
-        .filter(|(n, _)| prefix.is_empty() || n.command == prefix || n.command.starts_with(&format!("{prefix} ")))
-        .filter(|(_, leaf)| !role.is_some_and(|r| !leaf.roles.contains(&r)))
-        .map(|(n, leaf)| ListEntry { command: n.command.clone(), effect: leaf.effect, roles: leaf.roles.clone(), about: n.about.clone() })
-        .collect()
-}
-
 /// Run `canon schema`: print to stdout and return the exit code. A path that
-/// does not resolve is a refusal (exit 2) on stderr naming the nearest matches.
-/// The listing is unfiltered; `as_role` (the `--as` flag, never `CANON_ROLE`)
-/// keeps only that role's commands. `--errors` lists every error code and
-/// `--error <CODE>` shows one, `--warnings` and `--warning <CODE>` the same for
-/// the warning registry (an unknown code is `USAGE`, exit 2). A command's own
-/// schema is its node of the generated spec ([`crate::spec`]).
+/// does not resolve is a refusal (exit 2, `UNKNOWN_COMMAND`) whose `expected` is
+/// the valid words where it went wrong. The tree is unfiltered; `as_role` (the
+/// `--as` flag, never `CANON_ROLE`) keeps only that role's commands and the groups
+/// that hold one. `--errors` lists every error code and `--error <CODE>` shows one,
+/// `--warnings` and `--warning <CODE>` the same for the warning registry (an unknown
+/// code is `USAGE`, exit 2). A group or command document is the one [`crate::spec`] builds.
 pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>, as_role: Option<Role>) -> u8 {
     if registry.errors {
         print_errors(json);
@@ -482,41 +336,30 @@ pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>
     if let Some(code) = registry.warning {
         return print_warning(code, json);
     }
-    // Building the tree first copies a parent's `global = true` flags (`brief --json`) down to its leaves.
+    // Building the tree first copies a parent's `global = true` options (`--as`) down to its leaves.
     let mut built = root.clone();
     built.build();
     let root = &built;
     // `canon schema "evidence add"` (one quoted word, dogfood eval 8) names
-    // the same command as `canon schema evidence add`.
-    let tokens: Vec<String> = tokens.iter().flat_map(|t| t.split_whitespace()).map(str::to_string).collect();
-    let resolved = match resolve(root, &tokens) {
-        Ok(r) => r,
-        Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json),
+    // the same command as `canon schema evidence add` (spec 10.1.1).
+    let words: Vec<String> = tokens.iter().flat_map(|t| t.split_whitespace()).map(str::to_string).collect();
+    let resolved = match atip::project::resolve(root, &words) {
+        Ok(resolved) => resolved,
+        Err(unknown) => {
+            let hint = if unknown.resolved.is_empty() { "canon schema --json".to_string() } else { format!("canon schema {} --json", unknown.resolved.join(" ")) };
+            return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", unknown.message()).received(unknown.word.clone()).expected(unknown.expected.clone()).suggestions(unknown.suggestions.clone()).hint(hint).emit("canon schema", json);
+        }
     };
-    let nodes = spec::nodes(root);
-    match resolved {
-        Resolved::Group(under) => {
-            let role = as_role;
-            let commands = list_entries(&nodes, &under, role);
-            if json {
-                crate::json_out::data("schema", &SchemaReport::Commands(ListSchema { role, commands }));
-            } else {
-                let width = commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
-                for c in &commands {
-                    let about = c.about.as_deref().unwrap_or("");
-                    println!("{:<width$}  {:<11} {}", c.command, c.effect.as_str(), about);
-                }
-            }
-        }
-        Resolved::Leaf(path) => {
-            let key = path.join(" ");
-            let node = nodes.iter().find(|n| n.command == key).expect("a resolved leaf is a node of the tree it came from");
-            if json {
-                crate::json_out::data("schema", &SchemaReport::Command(node));
-            } else {
-                print_human(node);
-            }
-        }
+    let report = match &resolved {
+        atip::project::Resolved::Tree => spec::tree(root, as_role).map(SchemaReport::Tree),
+        atip::project::Resolved::Group(path) => spec::group(root, path).map(SchemaReport::Group),
+        atip::project::Resolved::Command(path) => spec::command(root, path).map(|doc| SchemaReport::Command(Box::new(doc))),
+    }
+    .expect("the command spec is built from the tables the tests keep whole");
+    if json {
+        crate::json_out::data("schema", &report);
+    } else {
+        print_human(&report);
     }
     0
 }
@@ -593,31 +436,48 @@ fn print_warning(code: &str, json: bool) -> u8 {
     0
 }
 
-fn print_human(node: &Node) {
-    println!("canon {}", node.command);
-    if let Some(about) = &node.about {
-        println!("  {about}");
+/// The roles of a document's `x-canon`, as a line.
+fn roles_line(extensions: &std::collections::BTreeMap<String, serde_json::Value>) -> Option<String> {
+    let roles = extensions.get("x-canon")?.get("roles")?.as_array()?;
+    Some(if roles.is_empty() { "humans only".to_string() } else { roles.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>().join(", ") })
+}
+
+fn print_entries(entries: &[atip::doc::TreeEntry]) {
+    let width = entries.iter().map(|entry| entry.command.len()).max().unwrap_or(0);
+    for entry in entries {
+        println!("{:<width$}  {:<11} {}", entry.command, entry.effect.map_or("group", atip::doc::Effect::as_str), entry.summary);
     }
-    let Some(leaf) = &node.leaf else {
-        println!("a group of commands: {}", node.children.join(", "));
-        return;
-    };
-    println!("effect: {}   supports --json: {}", leaf.effect.as_str(), if leaf.supports_json { "yes" } else { "no" });
-    if let Some(note) = leaf.effect_note {
+}
+
+fn print_human(report: &SchemaReport) {
+    match report {
+        SchemaReport::Tree(tree) => print_entries(&tree.commands),
+        SchemaReport::Group(group) => {
+            println!("canon {}", group.command);
+            println!("  {}", group.summary);
+            println!("a group of commands:");
+            print_entries(&group.commands);
+        }
+        SchemaReport::Command(doc) => print_command(doc),
+        SchemaReport::Errors(_) | SchemaReport::Error(_) | SchemaReport::Warnings(_) | SchemaReport::Warning(_) => {}
+    }
+}
+
+fn print_command(doc: &atip::doc::CommandDoc) {
+    use atip::doc::ValueType;
+    println!("canon {}", doc.command);
+    println!("  {}", doc.summary);
+    println!("effect: {}", doc.effect.as_str());
+    if let Some(note) = &doc.effect_note {
         println!("  {note}");
     }
-    if let Some(idempotency) = leaf.idempotency {
+    if let Some(idempotency) = doc.idempotency {
         println!("idempotency: {}", serde_json::to_value(idempotency).expect("idempotency serializes").as_str().unwrap_or_default());
     }
-    if leaf.roles.is_empty() {
-        println!("roles: humans only");
-    } else {
-        println!("roles: {}", leaf.roles.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", "));
+    if let Some(roles) = roles_line(&doc.extensions) {
+        println!("roles: {roles}");
     }
-    if !node.aliases.is_empty() {
-        println!("aliases: {}", node.aliases.join(", "));
-    }
-    let notes = |required: bool, repeatable: bool, values: &[String], default: &[String], aliases: &[String]| {
+    let notes = |required: bool, repeatable: bool, values: Option<&[String]>, default: &serde_json::Value, note: Option<&str>| {
         let mut notes = Vec::new();
         if required {
             notes.push("required".to_string());
@@ -625,14 +485,14 @@ fn print_human(node: &Node) {
         if repeatable {
             notes.push("repeatable".to_string());
         }
-        if !values.is_empty() {
+        if let Some(values) = values {
             notes.push(format!("one of: {}", values.join("|")));
         }
-        if !default.is_empty() {
-            notes.push(format!("default: {}", default.join(",")));
+        if !default.is_null() {
+            notes.push(format!("default: {default}"));
         }
-        if !aliases.is_empty() {
-            notes.push(format!("aliases: {}", aliases.join(",")));
+        if let Some(note) = note {
+            notes.push(format!("default: {note}"));
         }
         if notes.is_empty() {
             String::new()
@@ -640,31 +500,27 @@ fn print_human(node: &Node) {
             format!("  [{}]", notes.join("; "))
         }
     };
-    if !leaf.operands.is_empty() {
+    if !doc.operands.is_empty() {
         println!("operands:");
-        for o in &leaf.operands {
-            println!("  {} <{}>{}", o.name, o.kind, notes(o.required, o.repeatable, &o.possible_values, &o.default, &[]));
+        for o in &doc.operands {
+            println!("  {} <{}> {}{}", o.name, o.value_name, o.value_type.as_str(), notes(o.required, o.variadic, o.possible_values.as_deref(), &o.default, o.default_note.as_deref()));
         }
     }
-    if !leaf.options.is_empty() {
+    if !doc.options.is_empty() {
         println!("options:");
-        for o in &leaf.options {
+        for o in &doc.options {
             let value = o.value_name.as_ref().map(|v| format!(" <{v}>")).unwrap_or_default();
-            println!("  --{}{value}{}", o.name, notes(o.required, o.repeatable, &o.possible_values, &o.default, &o.aliases));
+            let flag_only = if o.flag_only { "; flag only" } else { "" };
+            let shown = notes(o.required, o.repeatable && o.value_type != ValueType::Count, o.possible_values.as_deref(), &o.default, o.default_note.as_deref());
+            println!("  --{}{value} {}{shown}{flag_only}", o.name, o.value_type.as_str());
         }
     }
-    if !leaf.required_one_of.is_empty() {
-        println!("one of each required: {}", leaf.required_one_of.iter().map(|set| set.join(" | ")).collect::<Vec<_>>().join("; "));
+    println!("errors: {}", doc.errors.join(", "));
+    for output in &doc.outputs {
+        println!("output: {}{}", output.schema_ref, output.when.as_ref().map(|when| format!(" (when {when})")).unwrap_or_default());
     }
-    println!("exits:");
-    for e in &leaf.exits {
-        println!("  {}  {}", e.code, e.meaning);
-    }
-    for example in &leaf.examples {
+    for example in &doc.examples {
         println!("example: {example}");
-    }
-    if !leaf.error_codes.is_empty() {
-        println!("error codes: {}", leaf.error_codes.join(", "));
     }
 }
 
@@ -675,42 +531,16 @@ mod tests {
 
     fn tree() -> Command {
         Command::new("canon")
-            .subcommand(Command::new("format").visible_alias("fmt").arg(Arg::new("root")).arg(Arg::new("json").long("json").action(ArgAction::SetTrue)))
-            .subcommand(Command::new("evidence").subcommand(Command::new("add").arg(Arg::new("scenario").long("scenario-id").action(ArgAction::Append).required(true))))
+            .subcommand(Command::new("format").arg(Arg::new("root")).arg(Arg::new("json").long("json").action(ArgAction::SetTrue)))
+            .subcommand(Command::new("evidence").subcommand(Command::new("add").arg(Arg::new("scenario").long("scenario").action(ArgAction::Append).required(true))))
     }
 
     #[test]
     fn drift_is_reported_both_ways() {
-        let meta = [row_exits("format", Read, REFUSABLE, EVERYONE), row_exits("ghost", Read, REFUSABLE, EVERYONE)];
+        let meta = [row("format", Read, EVERYONE), row("ghost", Read, EVERYONE)];
         let problems = check_metadata(&tree(), &meta);
         assert!(problems.iter().any(|p| p.contains("`evidence add`") && p.contains("no metadata row")));
         assert!(problems.iter().any(|p| p.contains("`ghost`")));
-        assert!(check_metadata(&tree(), &[row_exits("format", Read, REFUSABLE, EVERYONE), row_exits("evidence add", Write, REFUSABLE, &[I])]).is_empty());
-    }
-
-    #[test]
-    fn alias_resolves_to_canonical_path() {
-        match resolve(&tree(), &["fmt".into()]).unwrap() {
-            Resolved::Leaf(path) => assert_eq!(path, vec!["format".to_string()]),
-            _ => panic!("expected a leaf"),
-        }
-    }
-
-    #[test]
-    fn unknown_path_names_nearest_matches() {
-        let Err(Refusal(msg)) = resolve(&tree(), &["evidence".into(), "ad".into()]) else { panic!("expected refusal") };
-        assert!(msg.contains("evidence add"), "{msg}");
-        let Err(Refusal(msg)) = resolve(&tree(), &["evidence".into(), "add".into(), "x".into()]) else { panic!("expected refusal") };
-        assert!(msg.contains("leaf"), "{msg}");
-    }
-
-    #[test]
-    fn leaf_node_carries_options() {
-        let mut t = tree();
-        t.build();
-        let nodes = spec::nodes(&t);
-        let leaf = nodes.iter().find(|n| n.command == "evidence add").and_then(|n| n.leaf.as_ref()).expect("evidence add is a leaf");
-        let o = &leaf.options[0];
-        assert_eq!((o.name.as_str(), o.required, o.repeatable), ("scenario-id", true, true));
+        assert!(check_metadata(&tree(), &[row("format", Read, EVERYONE), row("evidence add", Write, &[I])]).is_empty());
     }
 }

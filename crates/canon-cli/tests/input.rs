@@ -166,13 +166,29 @@ fn scratch_copy(base: &Path) -> (TempDir, PathBuf) {
     (scratch, repo)
 }
 
-fn spec_schemas() -> Value {
-    canon_cli::spec::generate()["schemas"].clone()
+/// The command document of `command` from the in-memory spec.
+fn spec_command(command: &str) -> Value {
+    let root = canon_cli::spec::built_root();
+    let words: Vec<String> = command.split(' ').map(str::to_string).collect();
+    serde_json::to_value(canon_cli::spec::command(&root, &words).expect("a command document")).expect("serializes")
 }
 
-fn validates(schemas: &Value, name: &str, instance: &Value) {
-    let schema = schemas.get(name).unwrap_or_else(|| panic!("the spec has no schema `{name}`"));
-    let validator = jsonschema::validator_for(schema).unwrap_or_else(|e| panic!("`{name}` does not compile: {e}"));
+/// The report name an output of a command document refers to (`#/schemas/FindingCloseReport`).
+fn report_of(output: &Value) -> String {
+    output["schemaRef"].as_str().and_then(|reference| reference.strip_prefix("#/schemas/")).unwrap_or_else(|| panic!("an output names a #/schemas ref: {output}")).to_string()
+}
+
+/// A validator of the schema `name` of the command document `doc`: its `$ref`s resolve inside the document.
+fn schema_validator(doc: &Value, name: &str) -> jsonschema::Validator {
+    use jsonschema::{Registry, Resource};
+    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(doc.clone())).expect("the document registers").prepare().expect("the registry prepares");
+    jsonschema::options().with_registry(&registry).build(&serde_json::json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).unwrap_or_else(|e| panic!("`{name}` does not compile: {e}"))
+}
+
+/// `instance` against the schema `name` of the command document `doc`.
+fn validates(doc: &Value, name: &str, instance: &Value) {
+    assert!(doc["schemas"].get(name).is_some(), "`{}` has no schema `{name}`", doc["command"]);
+    let validator = schema_validator(doc, name);
     let problems: Vec<String> = validator.iter_errors(instance).map(|e| format!("{e} at {}", e.instance_path())).collect();
     assert!(problems.is_empty(), "{name}: {problems:?}\n{instance}");
 }
@@ -187,7 +203,7 @@ fn node(dir: &Path, home: &Path, leaf: &str) -> Value {
 
 fn write_leaves(dir: &Path, home: &Path) -> Vec<String> {
     let listing = json_of(&canon(dir, home, &["schema", "--json"], None));
-    listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["effect"] != "read").map(|c| c["command"].as_str().unwrap().to_string()).collect()
+    listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command" && c["effect"] != "read").map(|c| c["command"].as_str().unwrap().to_string()).collect()
 }
 
 // ---------------------------------------------------------------- the spec
@@ -198,60 +214,55 @@ fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
     let dir = TempDir::new().unwrap();
     let listing = json_of(&canon(dir.path(), home.path(), &["schema", "--json"], None));
     let mut writers = 0;
-    let schemas = spec_schemas();
-    for command in listing["data"]["commands"].as_array().unwrap() {
+    for command in listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command") {
         let leaf = command["command"].as_str().unwrap();
         let detail = node(dir.path(), home.path(), leaf);
         let has_input = detail["options"].as_array().unwrap().iter().any(|o| o["name"] == "input");
         let writes = detail["effect"] != "read";
         assert_eq!(has_input, writes, "`{leaf}`: --input belongs to exactly the writing leaves");
-        let inputs = detail["inputs"].as_array().unwrap();
-        assert_eq!(inputs.len(), usize::from(writes), "`{leaf}`: one input per writing leaf");
+        assert_eq!(detail["input"].is_object(), writes, "`{leaf}`: an input for each writing leaf");
         if !writes {
             continue;
         }
         writers += 1;
-        let input = &inputs[0];
+        let input = &detail["input"];
         assert_eq!(input["maxBytes"], 8 * 1024 * 1024, "{leaf}");
         let name = input["schemaRef"].as_str().unwrap().trim_start_matches("#/schemas/");
-        validates(&schemas, name, &input["example"]);
+        validates(&detail, name, &input["example"]);
         // The batch variant is declared exactly where a batch is accepted.
         let outputs = detail["outputs"].as_array().unwrap();
         let batch: Vec<&Value> = outputs.iter().filter(|o| o["batch"] == true).collect();
         let destructive = detail["effect"] == "destructive";
-        let stream = outputs.iter().any(|o| o["kind"] == "stream");
-        assert_eq!(input["batch"], !(destructive || stream), "{leaf}");
-        assert_eq!(batch.len(), usize::from(!(destructive || stream)), "{leaf}: {outputs:?}");
+        let serves = leaf == "dashboard";
+        assert_eq!(input["batch"], !(destructive || serves), "{leaf}");
+        assert_eq!(batch.len(), usize::from(!(destructive || serves)), "{leaf}: {outputs:?}");
         for variant in batch {
-            let report = variant["report"].as_str().unwrap();
+            let report = report_of(variant);
             assert!(report.starts_with("Batch") && report.ends_with("Report"), "{report}");
             assert_eq!(variant["schemaVersion"], "1.1");
-            assert!(schemas.get(report).is_some(), "{report} is published");
+            assert!(detail["schemas"].get(&report).is_some(), "{report} is published");
         }
     }
     assert_eq!(writers, 47, "every leaf whose effect is write or destructive");
     assert_eq!(write_leaves(dir.path(), home.path()).len(), writers);
 }
 
+/// The `input.example` of every writing command is one valid document of its schema, and an array of it is a valid batch.
 #[test]
-fn the_published_batch_examples_are_valid_documents() {
+fn the_published_input_examples_are_valid_documents() {
     let home = TempDir::new().unwrap();
     let dir = TempDir::new().unwrap();
-    let schemas = spec_schemas();
-    let mut seen = Vec::new();
+    let mut seen = 0;
     for leaf in write_leaves(dir.path(), home.path()) {
-        let input = node(dir.path(), home.path(), &leaf)["inputs"][0].clone();
+        let detail = node(dir.path(), home.path(), &leaf);
+        let input = &detail["input"];
         let name = input["schemaRef"].as_str().unwrap().trim_start_matches("#/schemas/").to_string();
-        validates(&schemas, &name, &input["example"]);
-        if let Some(batch) = input.get("batchExample") {
-            seen.push(leaf.clone());
-            for element in batch.as_array().expect("a batch example is an array") {
-                validates(&schemas, &name, element);
-            }
-        }
+        validates(&detail, &name, &input["example"]);
+        assert!(input["example"].is_object(), "`{leaf}`: the example is one document, not a batch");
+        assert!(input.get("batchExample").is_none(), "`{leaf}`");
+        seen += 1;
     }
-    seen.sort();
-    assert_eq!(seen, ["divergence add", "evidence add", "finding add", "scenario new", "subject new"]);
+    assert_eq!(seen, 47);
 }
 
 // ---------------------------------------------------------------- the example documents equal the flags
@@ -290,9 +301,9 @@ fn example_problems(leaf: &str, base: &Path, home: &Path) -> Vec<String> {
     let work = TempDir::new().unwrap();
     let detail = node(base, home, leaf);
     let example = detail["examples"][0].as_str().unwrap().to_string();
-    let document = detail["inputs"][0]["example"].to_string();
-    let mut flags: Vec<String> = split_words(&example).into_iter().skip(1).collect();
-    flags.push("--json".into());
+    let document = detail["input"]["example"].to_string();
+    let flags: Vec<String> = split_words(&example).into_iter().skip(1).collect();
+    assert_eq!(flags.last().map(String::as_str), Some("--json"), "an example ends with --json");
     let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
     // `--repo` and `--as` are flags only: they stay on the command line beside `--input`
     for pair in flags.windows(2) {
@@ -392,7 +403,6 @@ fn an_object_is_one_invocation_and_an_array_or_ndjson_is_a_batch() {
     let home = TempDir::new().unwrap();
     let dir = init_repo(home.path());
     let repo = dir.path();
-    let schemas = spec_schemas();
 
     // an object: the ordinary report
     let out = canon(repo, home.path(), &["subject", "new", "--input", r#"{"operands":["alpha"],"domain":"dev","title":"Alpha"}"#, "--json"], None);
@@ -409,7 +419,7 @@ fn an_object_is_one_invocation_and_an_array_or_ndjson_is_a_batch() {
     assert_eq!(body["data"]["items"].as_array().unwrap().len(), 1, "{body}");
     assert_eq!((body["data"]["items"][0]["index"].as_u64(), body["data"]["items"][0]["status"].as_str()), (Some(0), Some("written")));
     assert_eq!(body["meta"]["command"], "subject new", "the batch keeps the leaf id");
-    validates(&schemas, "BatchSubjectNewReport", &body["data"]);
+    validates(&spec_command("subject new"), "BatchSubjectNewReport", &body["data"]);
 
     // NDJSON in a file: comments and blank lines skipped
     std::fs::write(repo.join("batch.ndjson"), "# subjects\n\n{\"operands\":[\"gamma\"],\"domain\":\"dev\",\"title\":\"Gamma\"}\n\n# more\n{\"operands\":[\"delta\"],\"domain\":\"dev\",\"title\":\"Delta\"}\n").unwrap();
@@ -417,7 +427,7 @@ fn an_object_is_one_invocation_and_an_array_or_ndjson_is_a_batch() {
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
     let body = json_of(&out);
     assert_eq!(body["data"]["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect::<Vec<_>>(), ["written", "written"]);
-    validates(&schemas, "BatchSubjectNewReport", &body["data"]);
+    validates(&spec_command("subject new"), "BatchSubjectNewReport", &body["data"]);
 
     // NDJSON on stdin
     let out = canon(repo, home.path(), &["subject", "new", "--input", "-", "--json"], Some("{\"operands\":[\"epsilon\"],\"domain\":\"dev\",\"title\":\"E\"}\n{\"operands\":[\"zeta\"],\"domain\":\"dev\",\"title\":\"Z\"}\n"));
@@ -617,7 +627,6 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path(), true);
     let repo = base.path();
-    let schemas = spec_schemas();
     let element = |scenario: &str| json!({"scenario": scenario, "class": "test-run", "ref": "npm test", "role": "implementer"});
     // element 2 names a task no plan has: it passes clap and is refused when it runs
     let unknown_task = json!({"task": "no-such-change#1", "class": "test-run", "ref": "npm test", "role": "implementer"});
@@ -634,7 +643,7 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     assert_eq!(body["error"]["field"], "/items/2", "{body}");
     assert!(body["data"]["items"][0]["data"]["records"].is_array(), "{body}");
     assert_eq!(body["meta"]["command"], "evidence add");
-    validates(&schemas, "BatchEvidenceAddReport", &body["data"]);
+    validates(&spec_command("evidence add"), "BatchEvidenceAddReport", &body["data"]);
     let written = tree(repo);
 
     // the same batch again: the two that landed are unchanged, the third fails again
@@ -644,7 +653,7 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     let statuses: Vec<&str> = body["data"]["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect();
     assert_eq!(statuses, ["unchanged", "unchanged", "failed", "skipped"], "{body}");
     assert_eq!(tree(repo), written, "a repeat writes nothing");
-    validates(&schemas, "BatchEvidenceAddReport", &body["data"]);
+    validates(&spec_command("evidence add"), "BatchEvidenceAddReport", &body["data"]);
 
     // without the failing element every element is written or unchanged: exit 0
     let ok_doc = json!([element("auth.login.01"), element("auth.login.02")]).to_string();
@@ -652,7 +661,7 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(0), "{body}");
     assert!(body["data"]["items"].as_array().unwrap().iter().all(|i| i["status"] == "unchanged"));
-    validates(&schemas, "BatchEvidenceAddReport", &body["data"]);
+    validates(&spec_command("evidence add"), "BatchEvidenceAddReport", &body["data"]);
 }
 
 #[test]
@@ -661,14 +670,13 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     let base = fixture(home.path(), false);
     let (_batch_scratch, batch) = scratch_copy(base.path());
     let (_single_scratch, single) = scratch_copy(base.path());
-    let schemas = spec_schemas();
 
     let ndjson = "# the login scenarios\n\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
     let out = canon(&batch, home.path(), &["scenario", "new", "--input", "-", "--json"], Some(ndjson));
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(0), "{body}");
     assert_eq!(body["data"]["items"].as_array().unwrap().len(), 2);
-    validates(&schemas, "BatchScenarioNewReport", &body["data"]);
+    validates(&spec_command("scenario new"), "BatchScenarioNewReport", &body["data"]);
 
     ok(&single, home.path(), &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--lane", "behavior", "--case", "failure"]);
     ok(&single, home.path(), &["scenario", "new", "auth.session.01", "--title", "Session expires"]);

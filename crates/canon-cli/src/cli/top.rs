@@ -17,7 +17,7 @@ pub struct InitArgs {
     /// Do not write or refresh the canon block in AGENTS.md
     #[arg(long)]
     pub no_agents_md: bool,
-    /// Level of the starter .canon/policy.yaml [default: strict]
+    /// Level of the starter .canon/policy.yaml
     #[arg(long, value_enum, value_name = "LEVEL", default_value = "strict", conflicts_with = "no_policy")]
     pub policy: Option<crate::policy_level::PolicyLevel>,
     /// Do not write the starter .canon/policy.yaml
@@ -119,7 +119,7 @@ pub struct RetrieveArgs {
     /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
     #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
-    /// Cap on the guidance items returned (default: 5)
+    /// Cap on the guidance items returned
     #[arg(long, value_name = "N", default_value = "5")]
     pub limit: Option<usize>,
     #[command(flatten)]

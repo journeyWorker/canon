@@ -19,7 +19,8 @@ use serde_json::{json, Value};
 
 use crate::cli_error::{CliError, CliErrorExt as _};
 
-/// Records per page when neither `--limit` nor `--all` is given.
+/// Records per page when neither `--limit` nor `--all` is given. The `default_value` of `--limit` below says the same,
+/// so `--help` and `canon schema` print it; `the_clap_default_of_limit_is_the_default_limit` holds the two together.
 pub const DEFAULT_LIMIT: usize = 100;
 
 const SEPARATOR: char = '\u{1f}';
@@ -27,8 +28,8 @@ const SEPARATOR: char = '\u{1f}';
 /// The paging flags shared by every bounded listing.
 #[derive(Args, Debug, Clone, Default)]
 pub struct PageFlags {
-    /// Return at most this many records (default 100)
-    #[arg(long, value_parser = clap::value_parser!(u64).range(1..), conflicts_with = "all", value_name = "N")]
+    /// Return at most this many records per page
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..), conflicts_with = "all", value_name = "N", default_value = "100")]
     pub limit: Option<u64>,
     /// Resume after the last record of the previous page (the `nextCursor` it reported)
     #[arg(long, value_name = "CURSOR")]
@@ -224,6 +225,23 @@ mod tests {
 
     fn page(limit: Option<usize>, cursor: Option<String>) -> Page {
         Page { limit, cursor }
+    }
+
+    #[test]
+    fn the_clap_default_of_limit_is_the_default_limit() {
+        use clap::{CommandFactory as _, FromArgMatches as _};
+        #[derive(clap::Parser, Debug)]
+        struct Probe {
+            #[command(flatten)]
+            page: PageFlags,
+        }
+        let matches = Probe::command().try_get_matches_from(["probe"]).expect("no argument parses");
+        let probe = Probe::from_arg_matches(&matches).expect("the flags read");
+        assert_eq!(probe.page.page().limit, Some(DEFAULT_LIMIT));
+        assert_eq!(probe.page.limit, Some(DEFAULT_LIMIT as u64), "clap itself holds the default, so help and the schema print it");
+        let all = Probe::command().try_get_matches_from(["probe", "--all"]).expect("--all alone parses: a default does not conflict with it");
+        assert_eq!(Probe::from_arg_matches(&all).expect("the flags read").page.page().limit, None);
+        assert!(Probe::command().try_get_matches_from(["probe", "--all", "--limit", "5"]).is_err(), "--all with an explicit --limit still conflicts");
     }
 
     #[test]

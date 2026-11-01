@@ -199,7 +199,7 @@ fn skills_install_21_only_the_three_human_acts_name_no_agent_role() {
     let listing = json(&ok(dir.path(), &["schema", "--json"]));
     let commands = listing["data"]["commands"].as_array().unwrap();
     assert!(commands.len() > 50, "the listing is the whole tree: {}", commands.len());
-    let closed: Vec<&str> = commands.iter().filter(|c| c["roles"].as_array().is_some_and(Vec::is_empty)).map(|c| c["command"].as_str().unwrap()).collect();
+    let closed: Vec<&str> = commands.iter().filter(|c| c["x-canon"]["roles"].as_array().is_some_and(Vec::is_empty)).map(|c| c["command"].as_str().unwrap()).collect();
     assert_eq!(closed, ["brief approve", "divergence accept", "policy approve"], "every other leaf names an agent role");
 }
 

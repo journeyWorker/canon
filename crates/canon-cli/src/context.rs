@@ -678,20 +678,19 @@ fn collect_families() -> Vec<FamilySurface> {
         .collect()
 }
 
-/// `commands`: the leaves of the generated spec ([`crate::spec::nodes`]), so
+/// `commands`: the commands of the generated spec ([`crate::spec::tree`]), so
 /// the index can never name a command the parser lacks. `role` keeps only the
-/// leaves that role's steps use.
+/// commands that role's steps use.
 fn collect_commands(role: Option<crate::role::Role>) -> Vec<CommandSurface> {
-    let mut root = crate::cli::command();
-    root.build();
-    crate::spec::nodes(&root)
+    let root = crate::spec::built_root();
+    let tree = crate::spec::tree(&root, role).expect("the command spec is built from the tables the tests keep whole");
+    tree.commands
         .into_iter()
-        .filter_map(|node| {
-            let leaf = node.leaf?;
-            if role.is_some_and(|r| !leaf.roles.contains(&r)) {
-                return None;
-            }
-            Some(CommandSurface { command: node.command, effect: leaf.effect.as_str(), roles: leaf.roles, about: node.about, example: leaf.examples.first().copied() })
+        .filter_map(|entry| {
+            let effect = entry.effect?;
+            let roles = crate::schema::meta_for(&entry.command).map_or_else(Vec::new, |meta| meta.roles.to_vec());
+            let example = crate::schema::example_for(&entry.command);
+            Some(CommandSurface { command: entry.command, effect: effect.as_str(), roles, about: Some(entry.summary), example })
         })
         .collect()
 }

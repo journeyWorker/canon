@@ -13,7 +13,7 @@ canon adopts atip/1 **1.1** (https://github.com/journeyWorker/atip, tag v1.1.0: 
 | 0.33 | 0.34 |
 |---|---|
 | `meta.contract` alone | `meta.contract` (`atip/1`) and `meta.contractVersion` (`1.1`) on every envelope, success and failure alike; the value is never `1.0` |
-| `canon schema --errors` and `--error <CODE>` answers without `data.kind` | `data.kind` is `errors` or `error`; the answer's `meta.schemaVersion` is `1.1` (so is every `canon schema` answer's: the tree, group and command shapes follow with `canon-0-34-atip-schema-doc`, which ships in the same release) |
+| `canon schema --errors` and `--error <CODE>` answers without `data.kind` | `data.kind` is `errors` or `error`; the answer's `meta.schemaVersion` is `1.1` (so is every `canon schema` answer's: the tree, group and command shapes are in the next table) |
 | no warning registry | `canon schema --warnings --json` (`data.kind` `warnings`) and `canon schema --warning <CODE> --json` (`data.kind` `warning`): rows are `{code, meaning, fix}`, with no exit and no retryability. `canon schema <path>`, `--errors`, `--error`, `--warnings` and `--warning` exclude one another (`USAGE`) |
 | a warning-only code is an error registry row with `exit: 1` | it left the error registry: `canon schema --errors` no longer lists it and `canon schema --error <CODE>` on it is `USAGE` (`field` `--error`, `hint` `canon schema --warning <CODE> --json`). **A 1.0 caller that looked a warning code up with `--error` no longer finds it there: read `--warnings` first.** The codes that moved are listed below |
 | `UNKNOWN_ERROR_CODE` (`canon schema --error NOPE`) | `USAGE`, `field` `--error`, `received` the code, `hint` `canon schema --errors --json` (the same for an unknown `--warning` code: `field` `--warning`) |
@@ -47,6 +47,39 @@ These codes are in both registries, with the same meaning, because the same situ
 A hint is now exactly one of a command line, a template with `<UPPER_CASE>` placeholders, or one sentence of prose; a hint that starts with `canon ` holds that one command line and nothing else (spec 7.1.2). A test reads every hint in the sources and in the conformance corpus and holds it to that.
 
 **Consumers.** The dashboard's briefs page, the npm launcher and `evals/dogfood/trace_check.py` read only the members they know, skip an enum string they do not know (an approval `outcome`, a finding `severity`) instead of rejecting the document, and have tests that feed them a document with members and values from a later minor (contract 15.6). The guides teach the same.
+
+**`canon schema` is the L1 self-description.** The answers are the contract's documents (spec 10): a `tree`, a `group` and one `command` document per command, with the names of atip/1 and nothing else. The names below are deleted with no alias; `docs/cli/canon.cli.json` (the spec file), the skills, the website in English and Korean, `canon context`, the dogfood trace check, the design notes and the conformance corpus all read the new names, and a test fails when one of them reads an old name.
+
+| 0.33 | 0.34 |
+|---|---|
+| `canon schema --json`: `data` is `{commands, role?}`, a flat list of the 78 commands, each `{command, effect, about, roles, ...}` | `data.kind` is `tree`, `data.level` is `L1`, and `data.commands` lists the 27 groups and the 78 commands once each, a group before its commands. An entry is `{command, path, kind, summary}`, and a command also has `effect` and `x-canon.roles`. The top-level `role` is gone: `--as <ROLE>` still keeps only that role's commands and the groups that hold one, and `CANON_ROLE` still never filters |
+| `about` | `summary` (a group has one too) |
+| `roles` (a member of a command) | `x-canon.roles` (an extension member, spec 10.12; empty for the three human-only acts) |
+| `canon schema finding` (a group word) was an unknown path or an empty answer | a `group` document: `{kind: "group", command, path, summary, commands}` with the direct children |
+| `canon schema <COMMAND> --json`: `{command, effect, nodeKind, supportsJson, about, aliases, arguments, options, requiredOneOf, exits, errorCodes, outputs, inputs, examples, roles}` | `{kind: "command", command, path, summary, effect, idempotency?, effectNote?, operands, options, errors, outputs, input?, examples, schemas, x-canon}` |
+| `nodeKind` (`leaf` or `group`) | `kind` (`command` or `group`) |
+| `supportsJson` | none: every command takes `--json`, and its option says `flagOnly: true` |
+| `aliases` of a command | none (canon has no command alias) |
+| `arguments` | `operands`, each `{name, valueName, valueType, required, variadic, default, help}`; the name is the bare noun (`change`, not `change_ids`) |
+| an option's `kind` (`value` or `flag`) | `valueType`: `switch`, `count`, `string`, `integer`, `number`, `path`, `enum` or `json`, read from the clap action and value parser. A parser canon wrote itself is listed with its type in `CUSTOM_PARSERS`; an argument with one that is not listed fails the generation |
+| an option's `default` was an array of strings, `[]` for none, `["."]` for `init --repo`; `--limit` printed `[]` although its help said 100 | the typed default: `100`, `25`, `"."`, `false` for a switch, `0` for a count, an array for a repeatable option, `null` for none or for a required option. A default computed at run time is `null` with `defaultNote` (`--repo`: the nearest ancestor directory holding a canon.yaml). Every `[default: X]` of `--help` is the document's default, and the other way round |
+| an option's `aliases`, `conflictsWith`, `requires`, and an operand's `arity` | none: the relations are `constraints` of `canon-0-34-atip-constraints` |
+| `requiredOneOf` of a command | none in `canon schema` (the guides read clap's declaration); `argumentsRef` schemas carry it as `oneOf` |
+| `--actor`'s environment variable was in its help text | `env: "CANON_ACTOR"` |
+| options that cannot be given in an `--input` document were found by trying | `flagOnly: true` on `json`, `input`, `commit`, `plan-digest`, `repo` and `as` |
+| `exits` (each row a code and a meaning) | none: a command's exits are 0 and the exit of each code in its `errors`; the registry (`schema --errors`) says what a code exits |
+| `errorCodes` | `errors`: every code the command can emit, with the reserved ones of the features it has (`INPUT_INVALID`, `INPUT_CONFLICT`, `INPUT_TOO_LARGE` with `--input`, `BATCH_INCOMPLETE` with a batch, `PLAN_STALE` with `--commit`, `CURSOR_INVALID` with `--cursor`) |
+| `outputs[].report` (a name) | `outputs[].schemaRef` (`#/schemas/<Name>`); `kind`, `schemaVersion`, `mediaType` (an artifact) and `batch` stay; an output that is one of several says `when`; no two outputs share a `schemaRef` (`brief approve` has three, `init` two) |
+| `dashboard` declared a `stream` output | one `report` output: its `--json` is one envelope. A `stream` is for NDJSON event lines only |
+| every report schema in one top-level `schemas` map of the spec file, each with its own `$id` and `$defs` | each command document holds the schemas its refs name in `schemas`: the `$defs` of a report are siblings, every reference is `#/schemas/<Name>`, and no member has an `$id` |
+| `inputs[]` (a list of one: `schemaRef`, `batch`, `maxBytes`, `example`, `batchExample`) | `input` `{option, schemaRef, argumentsRef, batch, maxBytes, maxItems?, example}` on the 47 commands that take `--input`. `schemaRef` is the fragment schema of one document (no root `required`, no flag-only key, `additionalProperties: false`, an integer is a number or a numeric string); the 30 schemas that had `required` are now `argumentsRef`, the schema of the arguments after the document is merged with the command line. `example` is one complete valid document; `batchExample` is gone (an array of the example is a batch) |
+| one example per command, without `--json`, or with it before the path | `examples`: complete calls that end with `--json` after the path, no placeholder, no `--input`; a test parses each with the real parser |
+| the first line of `canon --help` was the introduction | `Agents: "canon schema --json" describes every command as JSON.`, on the root, every group and every command; the introduction is below it |
+| `specVersion` `"1"` and a spec file of `commands` (nodes), `globalOptions`, `schemas` | `specVersion` `"2"`: `tree` and `commands` (one command document each, byte-equal to `canon schema <COMMAND> --json`'s `data`); the global options are in each command's `options` |
+| `canon schema`'s own `data` had no `kind` for a listing or a command | `data.kind` is `tree`, `group` or `command`; `meta.schemaVersion` is `1.1` |
+| an unknown path: exit 2, `UNKNOWN_COMMAND`, message with the nearest matches | exit 2, `UNKNOWN_COMMAND`, `expected` the valid words where the path went wrong, `suggestions` the nearest of them; a path under a command (`schema finding close now`) is the same refusal |
+
+The shared part of the projection is in the `atip` crate (`atip::doc`: the typed documents, with their JSON Schema; `atip::project`: the tree and its paths, value types, typed defaults, the `--input` fragment schema, the schemas a command carries, the help line, and clap's declared relations). canon's own tables (`effect`, `idempotency`, error codes, outputs, roles, examples) stay in `canon-cli`.
 
 **`atip check`.** The `atip-check` crate (19 L0 checks in 0.33) now runs the 28 L0 checks of atip/1 1.1 (https://github.com/journeyWorker/atip, tag v1.1.0, `approaches/checker.md`). A fixture written for 0.33 needs the changes below; nothing is read under the old name.
 

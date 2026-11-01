@@ -72,7 +72,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 /// reaches the error that names the missing command instead of clap's
 /// "unexpected argument" (atip/1 spec 4.4, 4.5).
 pub fn command() -> clap::Command {
-    accept_json_on_groups(Cli::command())
+    atip::project::point_help_at_schema(accept_json_on_groups(Cli::command()), crate::spec::HELP_POINTER)
 }
 
 fn accept_json_on_groups(node: clap::Command) -> clap::Command {
@@ -109,7 +109,7 @@ Learn more:
   target without deleting user files."
 )]
 pub struct Cli {
-    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it
+    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given
     #[arg(long = "as", global = true, value_enum, value_name = "ROLE")]
     pub declared_role: Option<crate::role::Role>,
     #[command(subcommand)]

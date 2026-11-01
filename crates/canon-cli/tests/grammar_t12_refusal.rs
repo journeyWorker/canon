@@ -164,7 +164,7 @@ fn write_leaves() -> Vec<&'static Value> {
 }
 
 fn error_codes(node: &Value) -> Vec<String> {
-    strings(&node["errorCodes"])
+    strings(&node["errors"])
 }
 
 fn has_option(node: &Value, name: &str) -> bool {

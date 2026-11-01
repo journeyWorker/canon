@@ -121,7 +121,7 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
     let listing = schema(base.path(), home.path(), &[]);
-    let leaves: Vec<String> = listing["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    let leaves: Vec<String> = listing["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command").map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
     for (name, _) in NEEDS_STATE.iter().chain(SKIPPED) {
         assert!(leaves.iter().any(|l| l == name), "`{name}` is not a command");
@@ -153,7 +153,7 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
         }
         let mut argv = words(example);
         argv.remove(0);
-        argv.push("--json".into());
+        assert_eq!(argv.last().map(String::as_str), Some("--json"), "{leaf}: an example ends with --json");
         let out = canon(&cwd, home.path(), &argv);
         let code = out.status.code();
         // D3: every leaf's `--json` stdout is one envelope naming the leaf, and stderr stays empty.
@@ -181,10 +181,10 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
             (Some(code), Some(_)) => {
                 let body: Value = serde_json::from_slice(&out.stdout).unwrap_or(Value::Null);
                 let error = body["error"]["code"].as_str().unwrap_or_default();
-                let documented: Vec<i64> = detail["exits"].as_array().unwrap().iter().map(|e| e["code"].as_i64().unwrap()).collect();
-                let codes: Vec<&str> = detail["errorCodes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
-                if error == "USAGE" || !codes.contains(&error) || !documented.contains(&i64::from(code)) {
-                    problems.push(format!("{leaf}: exit {code} with `{error}` is not a documented refusal (exits {documented:?}, codes {codes:?}): {example}"));
+                let codes: Vec<&str> = detail["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+                let exit_of_error = canon_cli::cli_error::all_codes().iter().find(|info| info.code == error).map(|info| i64::from(info.exit));
+                if error == "USAGE" || !codes.contains(&error) || exit_of_error != Some(i64::from(code)) {
+                    problems.push(format!("{leaf}: exit {code} with `{error}` is not a documented refusal (codes {codes:?}): {example}"));
                 }
             }
             (code, _) => problems.push(format!("{leaf}: `{example}` exited {code:?}: {}", String::from_utf8_lossy(&out.stdout))),

@@ -29,9 +29,9 @@ pub fn path_of(node: &Value) -> String {
     node["command"].as_str().expect("a node names its command").to_string()
 }
 
-/// Every leaf node of the spec.
+/// Every command document of the spec.
 pub fn leaves() -> Vec<&'static Value> {
-    spec()["commands"].as_array().expect("commands").iter().filter(|n| n["nodeKind"] == "leaf").collect()
+    spec()["commands"].as_array().expect("commands").iter().collect()
 }
 
 pub fn leaf(path: &str) -> &'static Value {
@@ -83,11 +83,13 @@ pub fn words(line: &str) -> Vec<String> {
     out
 }
 
-/// A leaf's first example as argv without the leading `canon`.
+/// A leaf's first example as argv without the leading `canon` and without the trailing `--json` the example ends with:
+/// the caller adds the output option it wants.
 pub fn example_argv(node: &Value) -> Vec<String> {
     let example = node["examples"][0].as_str().unwrap_or_else(|| panic!("`{}` has no example", path_of(node)));
     let mut argv = words(example);
     assert_eq!(argv.remove(0), "canon");
+    assert_eq!(argv.pop().as_deref(), Some("--json"), "an example ends with --json");
     argv
 }
 
@@ -354,19 +356,58 @@ pub fn run_on_copy(base: &Path, home: &Path, args: &[String]) -> (Vec<PathBuf>, 
 // ---------------------------------------------------------------------------
 // Validating a document against the spec's schemas.
 
-fn compile(schema: &Value) -> jsonschema::Validator {
-    jsonschema::validator_for(schema).unwrap_or_else(|e| panic!("a schema of the spec does not compile: {e}"))
+/// The report name an output of a command document refers to (`#/schemas/FindingCloseReport`).
+pub fn report_of(output: &Value) -> String {
+    output["schemaRef"].as_str().and_then(|reference| reference.strip_prefix("#/schemas/")).unwrap_or_else(|| panic!("an output names a #/schemas ref: {output}")).to_string()
+}
+
+/// A validator of the schema `name` of the command document `node`: its `$ref`s resolve inside the document, as a
+/// reader of `canon schema <command>` resolves them.
+pub fn schema_validator(node: &Value, name: &str) -> jsonschema::Validator {
+    use jsonschema::{Registry, Resource};
+    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(node.clone())).expect("the document registers").prepare().expect("the registry prepares");
+    jsonschema::options().with_registry(&registry).build(&serde_json::json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).unwrap_or_else(|e| panic!("`{}`: the schema `{name}` does not compile: {e}", node["command"]))
+}
+
+/// Whether an option takes no value (a `switch` or a `count`).
+pub fn is_flag(option: &Value) -> bool {
+    matches!(option["valueType"].as_str(), Some("switch" | "count"))
+}
+
+/// The default of an option or an operand as the words help would print: none for a switch, a count, `null`.
+pub fn default_strings(argument: &Value) -> Vec<String> {
+    match &argument["default"] {
+        Value::Null | Value::Bool(false) => Vec::new(),
+        Value::Array(items) => items.iter().map(|item| item.as_str().map_or_else(|| item.to_string(), str::to_string)).collect(),
+        Value::String(text) => vec![text.clone()],
+        other if other == &serde_json::json!(0) && is_flag(argument) => Vec::new(),
+        other => vec![other.to_string()],
+    }
+}
+
+/// What clap declares about how the options of the command `path` go together (`atip::project::relations`).
+pub fn relations_of(path: &str) -> atip::project::Relations {
+    static ROOT: LazyLock<clap::Command> = LazyLock::new(|| {
+        let mut root = canon_cli::cli::command();
+        root.build();
+        root
+    });
+    let mut node = &*ROOT;
+    for word in path.split(' ') {
+        node = node.find_subcommand(word).unwrap_or_else(|| panic!("`{path}` is not a command of the tree"));
+    }
+    atip::project::relations(node)
 }
 
 /// What `canon --json` printed must be: an atip/1 envelope (`atip::envelope_problems`, the vendored contract
-/// schema) whose `data` is one of the reports its leaf declares in `outputs`. Returns the problems, empty when valid.
+/// schema) whose `data` is one of the reports its command declares in `outputs`. Returns the problems, empty when valid.
 pub fn validate_document(document: &Value) -> Vec<String> {
     use std::collections::HashMap;
     use std::sync::Mutex;
 
     static VALIDATORS: LazyLock<Mutex<HashMap<String, std::sync::Arc<jsonschema::Validator>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-    let validator = |key: &str, schema: &Value| -> std::sync::Arc<jsonschema::Validator> {
-        std::sync::Arc::clone(VALIDATORS.lock().unwrap().entry(key.to_string()).or_insert_with(|| std::sync::Arc::new(compile(schema))))
+    let validator = |node: &Value, name: &str| -> std::sync::Arc<jsonschema::Validator> {
+        std::sync::Arc::clone(VALIDATORS.lock().unwrap().entry(format!("{}:{name}", node["command"])).or_insert_with(|| std::sync::Arc::new(schema_validator(node, name))))
     };
 
     let mut problems = Vec::new();
@@ -396,9 +437,8 @@ pub fn validate_document(document: &Value) -> Vec<String> {
     let outputs = node["outputs"].as_array().expect("outputs");
     let mut best: Vec<String> = Vec::new();
     for output in outputs {
-        let name = output["report"].as_str().expect("report");
-        let Some(schema) = spec()["schemas"].get(name) else { continue };
-        let errors: Vec<String> = validator(&format!("report:{name}"), schema).iter_errors(data).map(|e| format!("{e} at {}", e.instance_path())).collect();
+        let name = report_of(output);
+        let errors: Vec<String> = validator(node, &name).iter_errors(data).map(|e| format!("{e} at {}", e.instance_path())).collect();
         if errors.is_empty() {
             let declared = output["schemaVersion"].as_str();
             if declared != document["meta"]["schemaVersion"].as_str() {
@@ -410,7 +450,7 @@ pub fn validate_document(document: &Value) -> Vec<String> {
             best = errors.into_iter().map(|e| format!("{name}: {e}")).collect();
         }
     }
-    problems.push(format!("`data` matches none of the reports `{command}` declares ({}): {}", outputs.iter().filter_map(|o| o["report"].as_str()).collect::<Vec<_>>().join(", "), best.join("; ")));
+    problems.push(format!("`data` matches none of the reports `{command}` declares ({}): {}", outputs.iter().map(report_of).collect::<Vec<_>>().join(", "), best.join("; ")));
     problems
 }
 

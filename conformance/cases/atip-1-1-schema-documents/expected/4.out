@@ -1,0 +1,1 @@
+{"ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"unknown command `finding nosuch`; valid here: add, close, list","retryable":false,"expected":["add","close","list"],"received":"nosuch","hint":"canon schema finding --json"},"meta":{"command":"schema","schemaVersion":"1.1","tool":"canon","toolVersion":"0.33.0","contract":"atip/1","contractVersion":"1.1"}}
