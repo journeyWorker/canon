@@ -62,7 +62,7 @@ const ENV_VARS: &[EnvVar] = &[
     EnvVar { name: "CANON_INGEST_CLAUDE_SESSIONS_DIR", about: "An extra directory `ingest sessions` scans for Claude Code sessions, besides `~/.claude/projects`" },
     EnvVar { name: "CANON_INGEST_OMP_SESSIONS_DIR", about: "An extra directory `ingest sessions` scans for omp sessions, besides the default roots" },
     EnvVar { name: "CANON_PG_DSN", about: "Connection string of the Postgres tier (falls back to `DATABASE_URL`)" },
-    EnvVar { name: "CANON_ROLE", about: "The role you act as: planner, implementer, reviewer or orchestrator; `--as` overrides it. Never filters or fails `schema`, `context` or `skills show`" },
+    EnvVar { name: "CANON_ROLE", about: "The role you act as: planner, implementer, reviewer or orchestrator; `--as` overrides it. Never filters or fails `context` or `skills show`; `schema` does not read it" },
     EnvVar { name: "CANON_S3_ACCESS_KEY", about: "Access key of an s3 tier's object store (required in a release build)" },
     EnvVar { name: "CANON_S3_ENDPOINT", about: "Endpoint of an s3 tier's object store (required in a release build)" },
     EnvVar { name: "CANON_S3_REGION", about: "Region of an s3 tier's object store (default `us-east-1`)" },
@@ -150,7 +150,23 @@ const DEFAULT_NOTES: &[(&str, &str, &str)] = &[
     ("skills check", "skills-source", "CANON_SKILLS_SOURCE, else canon/skills"),
     ("skills doctor", "skills-source", "CANON_SKILLS_SOURCE, else canon/skills"),
     ("skills install", "skills-source", "CANON_SKILLS_SOURCE, else the text built into the binary"),
+    ("skills install", "providers", "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories"),
+    ("skills check", "providers", "the providers `skills install` would use"),
+    ("skills doctor", "providers", "the providers `skills install` would use"),
 ];
+
+/// The environment variable a command reads to fill an option that clap does not give an `env` (spec 16.3: a variable may
+/// fill only an option that declares it, and a tool declares it per command). `canon schema` reads none: its `--as` is the flag alone.
+fn declared_env(command: &str, option: &str) -> Option<&'static str> {
+    match (command, option) {
+        ("schema", _) => None,
+        (_, "as" | "role") => Some(crate::role::ENV),
+        ("skills install" | "skills check" | "skills doctor", "skills-source") => Some(crate::skills::CANONICAL_SOURCE_ENV),
+        // The relayed human acts (`--relayed-via`) take the agent's actor id from the variable when `--actor` is not given.
+        ("brief approve" | "migrate" | "policy approve", "actor") => Some(crate::relay::ACTOR_ENV),
+        _ => None,
+    }
+}
 
 fn default_note(command: &str, name: &str) -> Option<&'static str> {
     DEFAULT_NOTES.iter().find(|(scope, known, _)| *scope == command && *known == name).or_else(|| DEFAULT_NOTES.iter().find(|(scope, known, _)| *scope == "*" && *known == name)).map(|(_, _, note)| *note)
@@ -179,6 +195,15 @@ fn entry(node: &Node<'_>) -> Built<TreeEntry> {
     })
 }
 
+/// Whether the tree of `role` lists `node`: a command of that role, or a group that holds one (`None`: everything).
+fn listed_for(nodes: &[Node<'_>], node: &Node<'_>, role: Option<Role>) -> bool {
+    match role {
+        None => true,
+        Some(role) if node.is_group => nodes.iter().any(|other| !other.is_group && other.command.starts_with(&format!("{} ", node.command)) && meta_for(&other.command).is_some_and(|meta| meta.roles.contains(&role))),
+        Some(role) => meta_for(&node.command).is_some_and(|meta| meta.roles.contains(&role)),
+    }
+}
+
 /// `canon schema --json`: every group and command, a group before its commands. `role` (`--as`) keeps the commands
 /// of that role and the groups that hold one, and the tree names the role in `x-canon.as`; nothing else, the environment
 /// included, filters it (spec 10.2.2).
@@ -186,12 +211,7 @@ pub fn tree(root: &Command, role: Option<Role>) -> Built<TreeDoc> {
     let nodes = project::nodes(root);
     let mut entries = Vec::with_capacity(nodes.len());
     for node in &nodes {
-        let listed = match role {
-            None => true,
-            Some(role) if node.is_group => nodes.iter().any(|other| !other.is_group && other.command.starts_with(&format!("{} ", node.command)) && meta_for(&other.command).is_some_and(|meta| meta.roles.contains(&role))),
-            Some(role) => meta_for(&node.command).is_some_and(|meta| meta.roles.contains(&role)),
-        };
-        if listed {
+        if listed_for(&nodes, node, role) {
             entries.push(entry(node)?);
         }
     }
@@ -200,13 +220,33 @@ pub fn tree(root: &Command, role: Option<Role>) -> Built<TreeDoc> {
     Ok(TreeDoc { kind: TreeDoc::KIND, level: LEVEL.to_string(), commands: entries, extensions })
 }
 
-/// `canon schema <GROUP> --json`.
-pub fn group(root: &Command, path: &[String]) -> Built<GroupDoc> {
+/// Whether the tree of `role` lists the group or command `path`.
+pub fn is_listed(root: &Command, path: &[String], role: Role) -> bool {
+    let nodes = project::nodes(root);
+    let wanted = path.join(" ");
+    nodes.iter().find(|node| node.command == wanted).is_some_and(|node| listed_for(&nodes, node, Some(role)))
+}
+
+/// The words that follow `path` in the tree of `role`: the valid next words of a path the role's tree does not list.
+pub fn listed_children(root: &Command, path: &[String], role: Role) -> Vec<String> {
+    let nodes = project::nodes(root);
+    nodes.iter().filter(|node| node.path.len() == path.len() + 1 && node.path.starts_with(path) && listed_for(&nodes, node, Some(role))).filter_map(|node| node.path.last().cloned()).collect()
+}
+
+/// `canon schema <GROUP> --json`. With `role` (`--as`) the group lists only the children the role's tree lists, so the
+/// group and the tree agree; a group the role's tree omits has none (the caller refuses it).
+pub fn group(root: &Command, path: &[String], role: Option<Role>) -> Built<GroupDoc> {
     let nodes = project::nodes(root);
     let command = path.join(" ");
     let node = nodes.iter().find(|node| node.is_group && node.command == command).ok_or_else(|| format!("`{command}` is not a group"))?;
-    let children = node.children.iter().map(|child| nodes.iter().find(|other| other.command == *child).ok_or_else(|| format!("`{child}` is not in the tree")).and_then(entry)).collect::<Built<Vec<_>>>()?;
-    Ok(GroupDoc { kind: GroupDoc::KIND, command, path: node.path.clone(), summary: built(project::summary(node))?, commands: children, extensions: BTreeMap::new() })
+    let mut children = Vec::new();
+    for child in &node.children {
+        let child = nodes.iter().find(|other| other.command == *child).ok_or_else(|| format!("`{child}` is not in the tree"))?;
+        if listed_for(&nodes, child, role) {
+            children.push(entry(child)?);
+        }
+    }
+    Ok(GroupDoc { kind: GroupDoc::KIND, command, path: node.path.clone(), summary: built(project::summary(node))?, commands: children, extensions: role.map(|role| ("x-canon".to_string(), json!({ "as": role.as_str() }))).into_iter().collect() })
 }
 
 /// The reserved codes of the features a command has (spec 7.2.1, 10.13 rule 4), with the codes it emits.
@@ -298,6 +338,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     let mut options = Vec::new();
     for arg in node.cmd.get_arguments().filter(|arg| !arg.is_positional() && !project::is_builtin_arg(arg)) {
         let mut option = built(project::option_doc(path, arg, CUSTOM_PARSERS, crate::input::FLAGS_ONLY))?;
+        option.env = option.env.or_else(|| declared_env(path, &option.name).map(str::to_string));
         if (option.default.is_null() && !option.required) || option.name == "promote" {
             option.default_note = default_note(path, &option.name).map(str::to_string);
         }

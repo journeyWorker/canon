@@ -53,6 +53,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -211,6 +212,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -514,6 +516,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -785,6 +788,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -1186,6 +1190,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -1387,6 +1392,7 @@
         {
           "default": null,
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+          "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
           "name": "actor",
           "repeatable": false,
@@ -1435,6 +1441,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -2030,6 +2037,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -2335,6 +2343,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -2633,6 +2642,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -3022,6 +3032,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -3124,6 +3135,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -4158,6 +4170,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -4884,6 +4897,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -5279,6 +5293,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -5424,6 +5439,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -5604,6 +5620,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -5951,6 +5968,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -6276,6 +6294,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "Role about to run; must equal --regime's leading segment",
           "name": "role",
           "repeatable": false,
@@ -6414,6 +6433,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -7033,6 +7053,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -7260,6 +7281,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -7725,6 +7747,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)",
           "name": "role",
           "repeatable": false,
@@ -7800,6 +7823,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -8355,6 +8379,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "name": "role",
           "repeatable": false,
@@ -8411,6 +8436,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -8953,6 +8979,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "name": "role",
           "repeatable": false,
@@ -8992,6 +9019,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -9442,6 +9470,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -9707,6 +9736,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "name": "role",
           "repeatable": false,
@@ -9746,6 +9776,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -10266,6 +10297,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared",
           "name": "role",
           "repeatable": false,
@@ -10432,6 +10464,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -11242,6 +11275,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -11444,6 +11478,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared",
           "name": "role",
           "repeatable": false,
@@ -11604,6 +11639,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -12441,6 +12477,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -13170,6 +13207,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -13688,6 +13726,7 @@
         },
         {
           "default": "reviewer",
+          "env": "CANON_ROLE",
           "help": "Attribution only — unlike `canon evidence add`, no partition key derives from it",
           "name": "role",
           "repeatable": false,
@@ -13753,6 +13792,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -14431,6 +14471,7 @@
         },
         {
           "default": "reviewer",
+          "env": "CANON_ROLE",
           "help": "Attribution only — no partition key derives from it",
           "name": "role",
           "repeatable": false,
@@ -14496,6 +14537,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -15052,6 +15094,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -15219,6 +15262,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -15356,6 +15400,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -15585,6 +15630,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -16008,6 +16054,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -16469,6 +16516,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -17311,6 +17359,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -17982,6 +18031,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -18899,6 +18949,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -19405,6 +19456,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -19886,6 +19938,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -20196,6 +20249,7 @@
         {
           "default": null,
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+          "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
           "name": "actor",
           "repeatable": false,
@@ -20242,6 +20296,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -20656,6 +20711,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -21125,6 +21181,7 @@
         {
           "default": null,
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+          "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
           "name": "actor",
           "repeatable": false,
@@ -21164,6 +21221,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -21589,6 +21647,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -21835,6 +21894,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -22291,6 +22351,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -22543,6 +22604,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -22951,6 +23013,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -23216,6 +23279,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -23328,6 +23392,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -23633,6 +23698,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -23765,6 +23831,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -24162,6 +24229,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -24334,6 +24402,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to",
           "name": "role",
           "repeatable": false,
@@ -24441,6 +24510,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -25047,6 +25117,7 @@
         {
           "default": null,
           "defaultNote": "the role declared with --as or CANON_ROLE",
+          "env": "CANON_ROLE",
           "help": "The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to",
           "name": "role",
           "repeatable": false,
@@ -25154,6 +25225,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -25834,6 +25906,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -27189,6 +27262,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -27511,6 +27585,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -27617,6 +27692,7 @@
         {
           "default": null,
           "defaultNote": "CANON_SKILLS_SOURCE, else canon/skills",
+          "env": "CANON_SKILLS_SOURCE",
           "help": "Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills",
           "name": "skills-source",
           "repeatable": false,
@@ -27637,6 +27713,7 @@
         },
         {
           "default": null,
+          "defaultNote": "the providers `skills install` would use",
           "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
           "name": "providers",
           "repeatable": false,
@@ -27655,6 +27732,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -27840,6 +27918,7 @@
         {
           "default": null,
           "defaultNote": "CANON_SKILLS_SOURCE, else canon/skills",
+          "env": "CANON_SKILLS_SOURCE",
           "help": "Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills",
           "name": "skills-source",
           "repeatable": false,
@@ -27860,6 +27939,7 @@
         },
         {
           "default": null,
+          "defaultNote": "the providers `skills install` would use",
           "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
           "name": "providers",
           "repeatable": false,
@@ -27878,6 +27958,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -27962,6 +28043,7 @@
         {
           "default": null,
           "defaultNote": "CANON_SKILLS_SOURCE, else the text built into the binary",
+          "env": "CANON_SKILLS_SOURCE",
           "help": "Developer override: read SKILL.src.md's frontmatter and scripts/ from this directory instead of the text built into the binary; defaults to CANON_SKILLS_SOURCE, else the built-in text",
           "name": "skills-source",
           "repeatable": false,
@@ -27982,6 +28064,7 @@
         },
         {
           "default": null,
+          "defaultNote": "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories",
           "help": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
           "name": "providers",
           "repeatable": false,
@@ -28018,6 +28101,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -28501,6 +28585,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -28611,6 +28696,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -29465,6 +29551,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -29650,6 +29737,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -30133,6 +30221,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -30636,6 +30725,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -31320,6 +31410,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -32167,6 +32258,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -32794,6 +32886,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -33203,6 +33296,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -33831,6 +33925,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -34221,6 +34316,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -34448,6 +34544,7 @@
         },
         {
           "default": null,
+          "env": "CANON_ROLE",
           "flagOnly": true,
           "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` is this role unless given",
           "name": "as",
@@ -34695,7 +34792,7 @@
       "name": "CANON_PG_DSN"
     },
     {
-      "about": "The role you act as: planner, implementer, reviewer or orchestrator; `--as` overrides it. Never filters or fails `schema`, `context` or `skills show`",
+      "about": "The role you act as: planner, implementer, reviewer or orchestrator; `--as` overrides it. Never filters or fails `context` or `skills show`; `schema` does not read it",
       "name": "CANON_ROLE"
     },
     {
