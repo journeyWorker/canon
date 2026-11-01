@@ -652,12 +652,10 @@ fn search(tool: &Tool, parsed: &Parsed) -> ExitCode {
         .first()
         .and_then(|filter| filter.get("team"))
         .and_then(Value::as_str);
-    if filter_team == Some("ghost") {
-        if tool.flag("ghostFilterCrash") {
-            // The seeded violation: the run ends with exit 1 and prints no envelope at all.
-            eprintln!("fake: the team ghost crashed the search");
-            return ExitCode::from(1);
-        }
+    if filter_team == Some("ghost") && tool.flag("ghostFilterCrash") {
+        // The seeded violation: the run ends with exit 1 and prints no envelope at all.
+        eprintln!("fake: the team ghost crashed the search");
+        return ExitCode::from(1);
     }
     let min_score = parsed.int("min-score").unwrap_or(0);
     let mut matches: Vec<(i64, &Member)> = MEMBERS

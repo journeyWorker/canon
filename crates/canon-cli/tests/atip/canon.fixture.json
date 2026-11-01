@@ -1,132 +1,5 @@
 {
   "commands": {
-    "finding close": {
-      "missingValue": [
-        [
-          "finding",
-          "close",
-          "add-login",
-          "--round",
-          "1",
-          "--disposition",
-          "fixed",
-          "--json"
-        ]
-      ]
-    },
-    "query": {
-      "ok": [
-        [
-          "query",
-          "--kind",
-          "subject",
-          "--limit",
-          "1",
-          "--json"
-        ]
-      ],
-      "paged": [
-        [
-          "query",
-          "--kind",
-          "subject",
-          "--limit",
-          "1",
-          "--json"
-        ]
-      ],
-      "fields": [
-        [
-          "domain",
-          "at"
-        ],
-        [
-          "actor",
-          "title"
-        ]
-      ],
-      "domainRejects": {
-        "since": [
-          "Core",
-          "-core"
-        ],
-        "change": [
-          "Core",
-          "-core"
-        ]
-      }
-    },
-    "status": {
-      "ok": [
-        [
-          "status",
-          "--json"
-        ]
-      ]
-    },
-    "finding list": {
-      "ok": [
-        [
-          "finding",
-          "list",
-          "--change",
-          "add-login",
-          "--json"
-        ]
-      ],
-      "paged": [
-        [
-          "finding",
-          "list",
-          "--change",
-          "add-login",
-          "--limit",
-          "1",
-          "--json"
-        ]
-      ],
-      "fields": [
-        [
-          "reviewer",
-          "summary"
-        ]
-      ],
-      "domainRejects": {
-        "change": [
-          "Core",
-          "-core"
-        ]
-      }
-    },
-    "divergence list": {
-      "ok": [
-        [
-          "divergence",
-          "list",
-          "--json"
-        ]
-      ],
-      "paged": [
-        [
-          "divergence",
-          "list",
-          "--limit",
-          "1",
-          "--json"
-        ]
-      ],
-      "fields": [
-        [
-          "state"
-        ]
-      ],
-      "domainRejects": {
-        "as-of": [
-          "Core",
-          "-core"
-        ]
-      }
-    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -159,17 +32,46 @@
         ]
       }
     },
+    "divergence list": {
+      "domainRejects": {
+        "as-of": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "state"
+        ]
+      ],
+      "ok": [
+        [
+          "divergence",
+          "list",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "divergence",
+          "list",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
+    },
     "evidence approval-payload": {
       "domainRejects": {
-        "task": [
+        "approval-at": [
           "Core",
           "-core"
+        ],
+        "approver": [
+          "",
+          " "
         ],
         "project": [
-          "Core",
-          "-core"
-        ],
-        "scenario": [
           "Core",
           "-core"
         ],
@@ -177,19 +79,67 @@
           "Core",
           "-core"
         ],
+        "scenario": [
+          "Core",
+          "-core"
+        ],
         "surface-ref": [
           "",
           " "
         ],
-        "approver": [
-          "",
-          " "
-        ],
-        "approval-at": [
+        "task": [
           "Core",
           "-core"
         ]
       }
+    },
+    "finding close": {
+      "missingValue": [
+        [
+          "finding",
+          "close",
+          "add-login",
+          "--round",
+          "1",
+          "--disposition",
+          "fixed",
+          "--json"
+        ]
+      ]
+    },
+    "finding list": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "reviewer",
+          "summary"
+        ]
+      ],
+      "ok": [
+        [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
     },
     "prompt show": {
       "domainRejects": {
@@ -199,16 +149,50 @@
         ]
       }
     },
+    "query": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ],
+        "since": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "domain",
+          "at"
+        ],
+        [
+          "actor",
+          "title"
+        ]
+      ],
+      "ok": [
+        [
+          "query",
+          "--kind",
+          "subject",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "query",
+          "--kind",
+          "subject",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
+    },
     "regime show": {
       "domainRejects": {
-        "role-segment": [
-          "",
-          " "
-        ],
-        "repo-name": [
-          "",
-          " "
-        ],
         "area": [
           "",
           " "
@@ -216,6 +200,14 @@
         "hash": [
           "Core",
           "-core"
+        ],
+        "repo-name": [
+          "",
+          " "
+        ],
+        "role-segment": [
+          "",
+          " "
         ]
       }
     },
@@ -259,13 +251,21 @@
         ]
       }
     },
+    "status": {
+      "ok": [
+        [
+          "status",
+          "--json"
+        ]
+      ]
+    },
     "strategy approval-payload": {
       "domainRejects": {
-        "strategy": [
+        "approval-at": [
           "Core",
           "-core"
         ],
-        "approval-at": [
+        "strategy": [
           "Core",
           "-core"
         ]
@@ -293,6 +293,24 @@
     [
       "--repo",
       "."
+    ]
+  ],
+  "prepare": [
+    [
+      "git",
+      "init",
+      "-q"
+    ],
+    [
+      "git",
+      "-c",
+      "user.name=fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "commit",
+      "--allow-empty",
+      "-qm",
+      "fixture"
     ]
   ],
   "probe": "status",
@@ -1367,23 +1385,5 @@
     "TASK_REIMPORT_INCOMPLETE",
     "TASK_STATUS_NOT_REFRESHED",
     "UNKNOWN_ROLE_IGNORED"
-  ],
-  "prepare": [
-    [
-      "git",
-      "init",
-      "-q"
-    ],
-    [
-      "git",
-      "-c",
-      "user.name=fixture",
-      "-c",
-      "user.email=fixture@example.invalid",
-      "commit",
-      "--allow-empty",
-      "-qm",
-      "fixture"
-    ]
   ]
 }

@@ -65,26 +65,17 @@ fn answer(args: &[&str]) -> Value {
     serde_json::from_slice(&output.stdout).expect("the answer is JSON")
 }
 
-/// The fixture as the binary says it should be: the registry and the warnings from `canon schema`, the rest as written here.
+/// The hand-written part of the fixture: `prepare`, `setup`, `probe`, the commands and what the L0 and L1 checks read of them (`paged`, `fields`, `domainRejects`).
+fn source_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/atip/canon.fixture.src.json")
+}
+
+/// The fixture as the binary says it should be: the registry and the warnings from `canon schema`, the rest as written in `canon.fixture.src.json`.
 fn generate() -> Value {
-    json!({
-        "contractVersion": "1.1",
-        "timeoutSeconds": 120,
-        "setup": [
-            ["init"],
-            ["subject", "new", "alpha", "--domain", "core", "--title", "Alpha"],
-            ["subject", "new", "beta", "--domain", "core", "--title", "Beta"]
-        ],
-        "probe": "status",
-        "globalOptions": [["--repo", "."]],
-        "registry": registry_rows(&answer(&["schema", "--errors"])),
-        "warnings": warning_codes(&answer(&["schema", "--warnings"])),
-        "commands": {
-            "query": {"ok": [["query", "--kind", "subject", "--limit", "1", "--json"]]},
-            "status": {"ok": [["status", "--json"]]},
-            "finding close": {"missingValue": [["finding", "close", "add-login", "--round", "1", "--disposition", "fixed", "--json"]]}
-        }
-    })
+    let mut fixture: Value = serde_json::from_str(&std::fs::read_to_string(source_path()).expect("tests/atip/canon.fixture.src.json")).expect("the source is JSON");
+    fixture["registry"] = Value::Array(registry_rows(&answer(&["schema", "--errors"])));
+    fixture["warnings"] = Value::Array(warning_codes(&answer(&["schema", "--warnings"])));
+    fixture
 }
 
 fn rendered(fixture: &Value) -> String {
@@ -109,7 +100,7 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.1"), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
-    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L0 keys only");
+    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L0 and L1 keys only");
     for row in fixture["registry"].as_array().expect("registry") {
         let mut members: Vec<&str> = row.as_object().expect("row").keys().map(String::as_str).collect();
         members.sort_unstable();

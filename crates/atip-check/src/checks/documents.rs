@@ -252,9 +252,15 @@ fn plain_patterns(value: &mut Value) {
             if members.get("pattern").is_some_and(Value::is_string) {
                 members.insert("pattern".to_string(), Value::String("^x$".to_string()));
             }
-            members.values_mut().for_each(plain_patterns);
+            for member in members.values_mut() {
+                plain_patterns(member);
+            }
         }
-        Value::Array(items) => items.iter_mut().for_each(plain_patterns),
+        Value::Array(items) => {
+            for item in items {
+                plain_patterns(item);
+            }
+        }
         _ => {}
     }
 }

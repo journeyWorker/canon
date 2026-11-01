@@ -442,9 +442,15 @@ fn strip_patterns(value: &mut Value, only_bad: bool) {
             if bad {
                 members.remove("pattern");
             }
-            members.values_mut().for_each(|member| strip_patterns(member, only_bad));
+            for member in members.values_mut() {
+                strip_patterns(member, only_bad);
+            }
         }
-        Value::Array(items) => items.iter_mut().for_each(|item| strip_patterns(item, only_bad)),
+        Value::Array(items) => {
+            for item in items {
+                strip_patterns(item, only_bad);
+            }
+        }
         _ => {}
     }
 }
@@ -937,11 +943,8 @@ fn inline_documents(doc: &CommandDoc, text: &str, problems: &mut Vec<String>) ->
             problems.push(format!("a batch of {count} over maxItems"));
         }
     }
-    let fragment = match doc.compile_ref(&input.schema_ref) {
-        Ok(fragment) => Some(fragment),
-        // A schema that does not compile is `L1.walk`'s (rule 2): the documents are not judged against it.
-        Err(_) => None,
-    };
+    // A schema that does not compile is `L1.walk`'s (rule 2): the documents are not judged against it.
+    let fragment = doc.compile_ref(&input.schema_ref).ok();
     let documents: Vec<&Value> = match &parsed {
         Value::Array(items) => items.iter().collect(),
         other => vec![other],
@@ -1131,16 +1134,13 @@ pub fn check_line(
                     format!("violates constraint {}", doc.constraints[index].label()),
                 )
             }));
-            match &validator {
-                Some(Ok(validator)) => {
-                    if let Some(why) = schema_problems(validator, &arguments_object(doc, merged)) {
-                        arguments.push(prefixed(
-                            at,
-                            format!("the argument object fails argumentsRef: {why}"),
-                        ));
-                    }
+            if let Some(Ok(validator)) = &validator {
+                if let Some(why) = schema_problems(validator, &arguments_object(doc, merged)) {
+                    arguments.push(prefixed(
+                        at,
+                        format!("the argument object fails argumentsRef: {why}"),
+                    ));
                 }
-                _ => {}
             }
         }
         out.push(("requirements", joined(&requirements)));

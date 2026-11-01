@@ -855,36 +855,35 @@ fn atip_check_32_level_l2_exits_2_with_level_unsupported_naming_the_release_and_
         }
         atip_in(&cwd, &tmp, &args)
     };
-    for (level, release) in [("L2", "0.35")] {
-        let output = run(level, true);
-        assert_eq!(output.code, Some(2));
-        let document = output.envelope();
-        assert_eq!(document["error"]["code"], "LEVEL_UNSUPPORTED");
-        assert!(
-            document["error"]["hint"]
-                .as_str()
-                .unwrap_or_default()
-                .contains(release),
-            "{level}: {}",
-            document["error"]["hint"]
-        );
-        assert_eq!(
-            (
-                document["error"]["field"].as_str(),
-                document["error"]["received"].as_str()
-            ),
-            (Some("--level"), Some(level))
-        );
-        assert_eq!(document["error"]["expected"], json!(["L0", "L1"]));
-        let text = run(level, false);
-        assert_eq!((text.code, text.stdout.is_empty()), (Some(2), true));
-        assert!(
-            text.stderr.starts_with("atip: LEVEL_UNSUPPORTED: "),
-            "{}",
-            text.stderr
-        );
-        assert!(text.stderr.contains(release));
-    }
+    let (level, release) = ("L2", "0.35");
+    let output = run(level, true);
+    assert_eq!(output.code, Some(2));
+    let document = output.envelope();
+    assert_eq!(document["error"]["code"], "LEVEL_UNSUPPORTED");
+    assert!(
+        document["error"]["hint"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(release),
+        "{level}: {}",
+        document["error"]["hint"]
+    );
+    assert_eq!(
+        (
+            document["error"]["field"].as_str(),
+            document["error"]["received"].as_str()
+        ),
+        (Some("--level"), Some(level))
+    );
+    assert_eq!(document["error"]["expected"], json!(["L0", "L1"]));
+    let text = run(level, false);
+    assert_eq!((text.code, text.stdout.is_empty()), (Some(2), true));
+    assert!(
+        text.stderr.starts_with("atip: LEVEL_UNSUPPORTED: "),
+        "{}",
+        text.stderr
+    );
+    assert!(text.stderr.contains(release));
     for level in ["L9", "0", "l0", ""] {
         let output = run(level, true);
         assert_eq!(output.code, Some(2), "{level:?}");

@@ -505,8 +505,10 @@ fn number(domain: &Value, key: &str) -> Option<f64> {
 
 fn format_number(value: f64, integral: bool) -> String {
     if integral || value.fract() == 0.0 && value.abs() < 9.0e15 {
-        // The bound is an integer value of a safe integer or a whole number.
-        format!("{}", value as i64)
+        // The bound is a whole number of at most 15 digits.
+        #[expect(clippy::cast_possible_truncation, reason = "the value is whole and below 9e15, so the cast is exact")]
+        let whole = value as i64;
+        format!("{whole}")
     } else {
         format!("{value}")
     }

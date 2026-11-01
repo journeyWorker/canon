@@ -597,7 +597,7 @@ fn atip_checkl1_fake_touch_takes_its_arguments_inline_and_refuses_what_the_regis
     assert_data_valid(&doc, &single);
     let wrong = fake.refused(&["touch", "--input", "[{\"name\":\"a\"},{\"bogus\":1}]"]);
     assert_eq!((wrong["code"].as_str(), wrong["field"].as_str()), (Some("INPUT_INVALID"), Some("/1/bogus")));
-    let many = format!("[{}]", vec!["{\"name\":\"a\"}"; 9].join(","));
+    let many = format!("[{}]", ["{\"name\":\"a\"}"; 9].join(","));
     assert_eq!(fake.refused(&["touch", "--input", &many])["code"], "INPUT_TOO_LARGE");
     assert_eq!(fake.refused(&["touch", "--input", "[]"])["code"], "INPUT_INVALID");
     let nameless = fake.refused(&["touch", "--input", "[{\"name\":\"a\"},{}]"]);

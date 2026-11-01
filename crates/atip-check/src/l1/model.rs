@@ -512,6 +512,6 @@ mod tests {
         assert!(validator.is_valid(&json!({"n": 1})));
         assert!(!validator.is_valid(&json!({"n": -1})));
         assert!(!validator.is_valid(&json!({})));
-        assert!(doc.compile_ref("#/schemas/Nope").is_err());
+        assert!(doc.compile_ref("#/schemas/Nope").err().is_some());
     }
 }

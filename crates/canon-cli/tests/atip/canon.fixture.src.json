@@ -1,0 +1,423 @@
+{
+  "commands": {
+    "brief check": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "brief show": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "context-pack show": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "context-pack verify": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "divergence list": {
+      "domainRejects": {
+        "as-of": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "state"
+        ]
+      ],
+      "ok": [
+        [
+          "divergence",
+          "list",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "divergence",
+          "list",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
+    },
+    "evidence approval-payload": {
+      "domainRejects": {
+        "approval-at": [
+          "Core",
+          "-core"
+        ],
+        "approver": [
+          "",
+          " "
+        ],
+        "project": [
+          "Core",
+          "-core"
+        ],
+        "run": [
+          "Core",
+          "-core"
+        ],
+        "scenario": [
+          "Core",
+          "-core"
+        ],
+        "surface-ref": [
+          "",
+          " "
+        ],
+        "task": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "finding close": {
+      "missingValue": [
+        [
+          "finding",
+          "close",
+          "add-login",
+          "--round",
+          "1",
+          "--disposition",
+          "fixed",
+          "--json"
+        ]
+      ]
+    },
+    "finding list": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "reviewer",
+          "summary"
+        ]
+      ],
+      "ok": [
+        [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "finding",
+          "list",
+          "--change",
+          "add-login",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
+    },
+    "prompt show": {
+      "domainRejects": {
+        "bundle": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "query": {
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ],
+        "since": [
+          "Core",
+          "-core"
+        ]
+      },
+      "fields": [
+        [
+          "domain",
+          "at"
+        ],
+        [
+          "actor",
+          "title"
+        ]
+      ],
+      "ok": [
+        [
+          "query",
+          "--kind",
+          "subject",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ],
+      "paged": [
+        [
+          "query",
+          "--kind",
+          "subject",
+          "--limit",
+          "1",
+          "--json"
+        ]
+      ]
+    },
+    "regime show": {
+      "domainRejects": {
+        "area": [
+          "",
+          " "
+        ],
+        "hash": [
+          "Core",
+          "-core"
+        ],
+        "repo-name": [
+          "",
+          " "
+        ],
+        "role-segment": [
+          "",
+          " "
+        ]
+      }
+    },
+    "retrieve": {
+      "domainRejects": {
+        "for-role": [
+          "Core",
+          "-core"
+        ],
+        "regime": [
+          "Core",
+          "-core"
+        ],
+        "subject": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "search": {
+      "domainRejects": {
+        "text": [
+          "",
+          " "
+        ]
+      }
+    },
+    "skills check": {
+      "domainRejects": {
+        "providers": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "skills doctor": {
+      "domainRejects": {
+        "providers": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "status": {
+      "ok": [
+        [
+          "status",
+          "--json"
+        ]
+      ]
+    },
+    "strategy approval-payload": {
+      "domainRejects": {
+        "approval-at": [
+          "Core",
+          "-core"
+        ],
+        "strategy": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "subject show": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    },
+    "trace": {
+      "domainRejects": {
+        "id": [
+          "Core",
+          "-core"
+        ]
+      }
+    }
+  },
+  "contractVersion": "1.1",
+  "globalOptions": [
+    [
+      "--repo",
+      "."
+    ]
+  ],
+  "prepare": [
+    [
+      "git",
+      "init",
+      "-q"
+    ],
+    [
+      "git",
+      "-c",
+      "user.name=fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "commit",
+      "--allow-empty",
+      "-qm",
+      "fixture"
+    ]
+  ],
+  "probe": "status",
+  "setup": [
+    [
+      "init"
+    ],
+    [
+      "subject",
+      "new",
+      "alpha",
+      "--domain",
+      "core",
+      "--title",
+      "Alpha"
+    ],
+    [
+      "subject",
+      "new",
+      "beta",
+      "--domain",
+      "core",
+      "--title",
+      "Beta"
+    ],
+    [
+      "change",
+      "new",
+      "add-login",
+      "--subject",
+      "alpha",
+      "--title",
+      "Add login"
+    ],
+    [
+      "finding",
+      "add",
+      "--change",
+      "add-login",
+      "--round",
+      "1",
+      "--seq",
+      "1",
+      "--severity",
+      "note",
+      "--actor",
+      "fixture",
+      "--summary",
+      "first"
+    ],
+    [
+      "finding",
+      "add",
+      "--change",
+      "add-login",
+      "--round",
+      "1",
+      "--seq",
+      "2",
+      "--severity",
+      "note",
+      "--actor",
+      "fixture",
+      "--summary",
+      "second"
+    ],
+    [
+      "scenario",
+      "new",
+      "auth.login.01",
+      "--title",
+      "First",
+      "--subject",
+      "alpha"
+    ],
+    [
+      "scenario",
+      "new",
+      "auth.login.02",
+      "--title",
+      "Second",
+      "--subject",
+      "alpha"
+    ],
+    [
+      "subject",
+      "show",
+      "alpha"
+    ],
+    [
+      "divergence",
+      "add",
+      "auth.login.01",
+      "--actor",
+      "fixture",
+      "--role",
+      "reviewer"
+    ],
+    [
+      "divergence",
+      "add",
+      "auth.login.02",
+      "--actor",
+      "fixture",
+      "--role",
+      "reviewer"
+    ]
+  ],
+  "timeoutSeconds": 120
+}

@@ -103,7 +103,7 @@ const REASON_SYNONYMS: [(&str, &str); 22] = [
 
 /// Whether `field` names the argument `arg`: its `--name`, its name, its value name, or a pointer ending in its document key.
 fn names_argument(field: &str, arg: &Arg) -> bool {
-    let squash = |text: &str| -> String { text.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_ascii_lowercase() };
+    let squash = |text: &str| -> String { text.chars().filter(char::is_ascii_alphanumeric).collect::<String>().to_ascii_lowercase() };
     let field = squash(field.rsplit('/').next().unwrap_or(field));
     field == squash(&arg.name) || arg.value_name.as_ref().is_some_and(|value_name| field == squash(value_name))
 }
