@@ -542,7 +542,8 @@ fn atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_
     assert_eq!(out.status.code(), Some(2));
     let document = json(&out);
     assert_eq!(document["error"]["code"], "USAGE", "{document}");
-    assert_eq!(document["error"]["field"], "--input");
+    // One stdin, two readers: the violation names the one given later (spec 5.5), here `--report`.
+    assert_eq!(document["error"]["field"], "--report");
     // On a terminal `--input -` has nothing to read.
     // A terminal stdin needs a pty: `script` makes one. Without it the case cannot run, and that is said, not passed over.
     let Some(text) = canon_on_a_terminal(repo.path(), &["scenario", "new", "--input", "-", "--json"]) else {

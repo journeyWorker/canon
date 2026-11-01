@@ -18,7 +18,11 @@ use crate::cli::policy::PolicyCommand;
 use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// Refuses the invocation when one of its validators does: the exit code to end with, or `None`.
-pub fn check(cli: &Cli) -> Option<ExitCode> {
+pub fn check(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> Option<ExitCode> {
+    // Domains, then constraints (step 6 of 11.7): enforced from the declarations, before the validators.
+    if let Some((label, error)) = crate::arg_rules::enforce::check(root, matches) {
+        return Some(ExitCode::from(error.emit(&label, atip::argv_wants_json())));
+    }
     let (label, json, result): (&str, bool, Result<(), CliError>) = match &cli.command {
         Command::Brief { action: BriefCommand::Approve(args) } => ("canon brief approve", args.json, crate::brief_approve::check_approve(args)),
         Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", args.json, crate::relay::check_arguments("canon policy approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() }).and_then(|()| crate::policy_approval::check_approver(&args.approver))),

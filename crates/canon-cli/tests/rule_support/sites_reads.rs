@@ -9,7 +9,7 @@ pub const SITES: &[Site] = &[
     site("input.rs:expand:USAGE#1", Kind::Other("`--input` is expanded to argv before clap runs, for every command that has it: a second `--input` is a fault of the expansion's own syntax")),
     site("input.rs:expand:USAGE#2", Kind::Other("`--input` is expanded to argv before clap runs: an `--input` without a value is a fault of the expansion's own syntax")),
     site("input.rs:run_batch:USAGE#1", Kind::Other("`--fields` with a batch: the output of a batch declares no `fields` (spec 6.10, 10.9.1), which is where the contract says it; the paging change's")),
-    site("input.rs:expand:USAGE#3", Kind::Validator { command: "evidence add", arguments: &["input", "report", "artifact"] }),
+    site("input.rs:expand:USAGE#3", Kind::Other("`--input -` beside another stdin reader: a violation of 5.5 (one stdin, two readers), `USAGE` naming the option given later; no document declares it (the ATIP author's ruling: not a validator)")),
     site("fields.rs:refusal:USAGE#1", Kind::Other("the paging change's: `--fields` takes the paths a command declares under `outputs[].fields.paths` (spec 10.9.1), a closed set that belongs to the output, not a domain, a constraint or a validator of the argument")),
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#1", Kind::Rule { command: "query", rule: "forbids", arguments: &["kind", "change"] }),
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#2", Kind::Validator { command: "query", arguments: &["kind", "status"] }),

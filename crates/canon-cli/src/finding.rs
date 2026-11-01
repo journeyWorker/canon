@@ -573,7 +573,7 @@ pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Option<u8
     if args.introduced_rev.is_some() && args.introduced_unknown {
         return Some(CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
             .hint("drop --introduced-rev, or drop --introduced-unknown")
-            .field("--introduced-unknown").emit("canon finding add", args.json));
+            .field("--introduced-rev").emit("canon finding add", args.json));
     }
     if args.introduced_rev.is_none() && !args.introduced_unknown && matches!(args.severity, FindingSeverity::Blocker | FindingSeverity::ShouldFix) {
         return Some(CliError::refused("FINDING_INTRODUCED_REQUIRED", format!("a new {} finding needs --introduced-rev <rev> (the commit that introduced the defect) or --introduced-unknown (it is not known); a note needs neither", severity_slug(args.severity)))

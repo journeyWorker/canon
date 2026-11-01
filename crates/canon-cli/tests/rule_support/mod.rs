@@ -307,7 +307,7 @@ fn names_of(rules: &[ConstraintDoc]) -> BTreeSet<String> {
 }
 
 /// The values a name may take in a search: each value an `in` list names, and one value no list names.
-fn candidates(doc: &Value, example: &[String], rules: &[ConstraintDoc], name: &str) -> Vec<String> {
+pub fn candidates(doc: &Value, example: &[String], rules: &[ConstraintDoc], name: &str) -> Vec<String> {
     let Some(argument) = argument(doc, name) else { return vec![] };
     if matches!(argument["valueType"].as_str(), Some("switch")) {
         return vec!["true".to_string()];

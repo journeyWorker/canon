@@ -103,7 +103,7 @@ fn run() -> ExitCode {
         canon_cli::json_out::warn("UNKNOWN_ROLE_IGNORED", error.message);
     }
     // The validators (ATIP 10.8.3) answer before any precondition or state read.
-    if let Some(code) = canon_cli::validators::check(&cli) {
+    if let Some(code) = canon_cli::validators::check(&cli, &command, &parsed) {
         return code;
     }
     if let Some(code) = refuse_without_config(&command, &parsed) {

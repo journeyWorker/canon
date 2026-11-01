@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, STDIN_DESCRIPTION, CALENDAR, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, ONE_LINE_NOT_BLANK, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE};
+use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, CALENDAR, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, ONE_LINE_NOT_BLANK, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE};
 
 /// A text that neither starts nor ends with white space, is not empty, and carries no `\n` and no `\r`: the approver of
 /// `evidence add` (the handler refuses only those two line breaks, unlike the shared `TRIMMED_ONE_LINE`).
@@ -34,13 +34,13 @@ pub(super) static TABLES: Tables = Tables {
                 Rule::forbids("all-scenarios", &["scenario", "task", "report-case", "approver", "approval-role", "signature-file", "approval-at"])
                     .code("EVIDENCE_INVALID_ARGUMENT")
                     .help("--all-scenarios writes one record per scenario its report owns, so it names no single subject."),
-                Rule::requires("all-scenarios", &["report"]).code("EVIDENCE_INVALID_ARGUMENT").help("--all-scenarios splits a --report by the scenario each case belongs to."),
+                Rule::requires("all-scenarios", &["report"]).code("EVIDENCE_INVALID_ARGUMENT").help("--all-scenarios splits a --report by the scenario each case belongs to.").says("--all-scenarios splits a --report by the scenario each case belongs to, and no --report was given: none was given"),
                 Rule::requires("report-case", &["report"]).code("EVIDENCE_INVALID_ARGUMENT").help("--report-case names a case of a --report."),
                 Rule::requires("command-result", &["summary"]).code("EVIDENCE_INVALID_ARGUMENT").help("The captured output backs a --summary."),
-                Rule::requires("approver", &["approval-role", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER),
-                Rule::requires("approval-role", &["approver", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER),
-                Rule::requires("signature-file", &["approver", "approval-role", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER),
-                Rule::requires("approval-at", &["approver", "approval-role", "signature-file"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER),
+                Rule::requires("approver", &["approval-role", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
+                Rule::requires("approval-role", &["approver", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
+                Rule::requires("signature-file", &["approver", "approval-role", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
+                Rule::requires("approval-at", &["approver", "approval-role", "signature-file"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
             ],
         ),
         (
@@ -62,7 +62,7 @@ pub(super) static TABLES: Tables = Tables {
         (
             "finding close",
             &[
-                Rule::requires_in("disposition", &["rejected", "deferred"], &["reason"]).code("FINDING_REASON_REQUIRED").help("A rejected or deferred finding records why."),
+                Rule::requires_in("disposition", &["rejected", "deferred"], &["reason"]).code("FINDING_REASON_REQUIRED").help("A rejected or deferred finding records why.").says("a rejected or deferred finding records why: --reason is required with --disposition rejected or deferred").hint("canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition {value} --reason \"<WHY>\""),
                 Rule::forbids_in("disposition", &["open", "rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_UNEXPECTED").help("Only a `fixed` finding was closed by a commit."),
             ],
         ),
@@ -85,27 +85,6 @@ pub(super) static TABLES: Tables = Tables {
                 code: "USAGE",
                 description: CALENDAR,
                 rejects: &["canon divergence defer auth.login.01 --actor alice --reason \"waiting on the vendor\" --expiry 2026-02-30 --role reviewer"],
-            }],
-        ),
-        (
-            "evidence add",
-            &[Validator {
-                arguments: &["input", "report", "artifact"],
-                code: "USAGE",
-                description: STDIN_DESCRIPTION,
-                rejects: &[
-                    "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --report junit:- --input -",
-                    "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact - --input -",
-                ],
-            }],
-        ),
-        (
-            "evidence audit",
-            &[Validator {
-                arguments: &["input", "artifact"],
-                code: "USAGE",
-                description: STDIN_DESCRIPTION,
-                rejects: &["canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact - --input -"],
             }],
         ),
         (
@@ -243,7 +222,7 @@ pub(super) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-digest"), Domain::matching(SHA256_HEX), "EVIDENCE_INVALID_ARGUMENT")
             .inside(&["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"])
             .outside(&["", "0123456789abcdef", "0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"]),
-        DomainRow::new(Scope::Arguments(&["evidence add"], "approver"), Domain::matching(APPROVER), "EVIDENCE_APPROVAL_INVALID").inside(&["alice", "a b", "a\u{2028}b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
+        DomainRow::new(Scope::Arguments(&["evidence add"], "approver"), Domain::matching(APPROVER), "EVIDENCE_APPROVAL_INVALID").reason("MALFORMED").inside(&["alice", "a b", "a\u{2028}b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
         DomainRow::new(Scope::Arguments(&["evidence approval-payload"], "approver"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_REFUSED").inside(&["alice", "a b"]).outside(&["", " a", "a ", "a\nb", "a\u{2028}b"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence approval-payload"], "surface-ref"), Domain::matching(SURFACE_REF), "USAGE").inside(&["src/lib.rs", "effect:payments", "a b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "report"), Domain::matching(REPORT), "USAGE").inside(&["junit:r.xml", "cucumber:r.json", "swift-testing:e.jsonl", "junit:a:b"]).outside(&["r.xml", "junit:", "mocha:r.xml", ":r.xml", "JUnit:r.xml"]),
@@ -253,8 +232,8 @@ pub(super) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["review scenario", "review change"], "reviewer-harness"), Domain::matching(RUNTIME_LABEL), "USAGE").inside(&["omp", "a b"]).outside(&["", " a", "a ", "a\tb", "a\nb"]),
         // divergence accept.
         DomainRow::new(Scope::Arguments(&["divergence accept"], "reason"), Domain::matching(NOT_BLANK), "DIVERGENCE_INVALID_ARGUMENT").inside(&["the engine drops the event", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "tracking"), Domain::matching(NOT_BLANK), "DIVERGENCE_INVALID_ARGUMENT").inside(&["https://example.com/issues/1", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "role"), Domain::matching("^reviewer$"), "DIVERGENCE_ACCEPT_REFUSED").inside(&["reviewer"]).outside(&["implementer", "planner"]),
+        DomainRow::new(Scope::Arguments(&["divergence accept"], "tracking"), Domain::matching(NOT_BLANK), "DIVERGENCE_INVALID_ARGUMENT").says("is empty: a blank tracking reference names no issue").inside(&["https://example.com/issues/1", " a "]).outside(&["", " ", "\t"]),
+        DomainRow::new(Scope::Arguments(&["divergence accept"], "role"), Domain::matching("^reviewer$"), "DIVERGENCE_ACCEPT_REFUSED").says("must name the reviewer step: only a reviewer step accepts a divergence").inside(&["reviewer"]).outside(&["implementer", "planner"]),
         // finding add / close.
         DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "round"), Domain::at_least(1), "FINDING_INVALID_ARGUMENT"),
         DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "seq"), Domain::at_least(1), "FINDING_INVALID_ARGUMENT"),

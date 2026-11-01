@@ -21,8 +21,8 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use atip::doc::RuleKind;
-use rule_support::{code_of, constraints, declared_role, docs, label, provision, run_call, solve, words_of, Goal, Outcome};
-use serde_json::Value;
+use rule_support::{code_of, constraints, declared_role, docs, label, provision, solve, words_of, Goal, Outcome};
+use serde_json::{json, Value};
 use tempfile::TempDir;
 
 /// The story repo (`tests/harness::fixture`) and the home the calls run with, built once.
@@ -136,7 +136,7 @@ pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
         None => problems.push(format!("{tag}: no call breaks it")),
         Some(found) => {
             let words = words_of(doc, &provision.example, &found.assignment);
-            let outcome = run_call(&provision, home(), &words, declared_role(path, &found.assignment));
+            let outcome = rule_support::run_empty(&words, declared_role(path, &found.assignment));
             if !found.also_breaks.is_empty() {
                 problems.push(format!("{tag}: no call breaks only it (`{}` also breaks {:?})", words.join(" "), found.also_breaks.iter().map(|other| label(&rules[*other])).collect::<Vec<_>>()));
             }
@@ -161,7 +161,7 @@ pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
         }
         Some(found) => {
             let words = words_of(doc, &provision.example, &found.assignment);
-            let outcome = run_call(&provision, home(), &words, declared_role(path, &found.assignment));
+            let outcome = rule_support::run_empty(&words, declared_role(path, &found.assignment));
             if refuses_for_unmet(&outcome, doc, rule, &words) {
                 problems.push(format!("{tag}: `{}` meets it and was refused for it: field {:?} message {:?}", words.join(" "), outcome.field, outcome.message));
             }
@@ -264,7 +264,7 @@ pub fn drive_domain(doc: &Value, argument: &Value) -> Vec<String> {
                 (_, None) => {}
             }
         }
-        let outcome = run_call(&provision, home(), &words, declared_role(path, &assignment));
+        let outcome = rule_support::run_empty(&words, declared_role(path, &assignment));
         let names = [format!("--{name}"), name.to_string(), format!("<{value_name}>"), value_name.to_string()];
         let refused_for_it = !outcome.ok && outcome.exit == 2 && outcome.code.as_deref() == Some(code) && outcome.field.as_ref().is_some_and(|field| names.contains(field));
         match (inside, refused_for_it) {
@@ -450,4 +450,123 @@ fn atip_constraints_13_a_declaration_with_no_check_behind_it_is_found() {
     let argument = domain["options"].as_array().and_then(|options| options.iter().find(|option| option["name"] == "limit")).expect("--limit").clone();
     let problems = drive_domain(&domain, &argument);
     assert!(!problems.is_empty(), "a domain the parser does not hold is found: {problems:?}");
+}
+
+// ------------------------------------------------------------------------------- every subset of the arguments of the rules
+
+/// A deterministic generator for the sampled subsets.
+struct Xorshift(u64);
+
+impl Xorshift {
+    fn below(&mut self, bound: usize) -> usize {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        usize::try_from(self.0 % bound as u64).unwrap_or(0)
+    }
+}
+
+/// The groups of names that share a rule: arguments no rule connects cannot change each other's answer.
+fn components(rules: &[atip::doc::ConstraintDoc]) -> Vec<Vec<String>> {
+    let mut groups: Vec<std::collections::BTreeSet<String>> = Vec::new();
+    for rule in rules {
+        let members: std::collections::BTreeSet<String> = atip::constraint::members(rule).into_iter().collect();
+        let (touching, rest): (Vec<_>, Vec<_>) = groups.into_iter().partition(|group| !group.is_disjoint(&members));
+        let mut merged = members;
+        for group in touching {
+            merged.extend(group);
+        }
+        groups = rest;
+        groups.push(merged);
+    }
+    groups.into_iter().map(|group| group.into_iter().collect()).collect()
+}
+
+/// How many combinations of one group are enumerated before the rest are sampled (`ARG_RULES_SUBSETS` overrides it).
+fn subset_budget() -> usize {
+    std::env::var("ARG_RULES_SUBSETS").ok().and_then(|value| value.parse().ok()).unwrap_or(1500)
+}
+
+/// One command: every combination (all of them up to the budget, then a fixed-seed sample) of the states of the arguments each group of
+/// its rules names (absent, or given with each value an `in` list needs and one it does not) is run in an empty directory. A call that
+/// breaks a rule is refused with the code of a rule it breaks and a `field` that rule names; a call that breaks none is refused by none.
+pub fn drive_subsets(doc: &Value) -> Vec<String> {
+    let path = doc["command"].as_str().unwrap_or_default();
+    let rules = constraints(doc);
+    if rules.is_empty() {
+        return Vec::new();
+    }
+    let example = provisioned(path).example.clone();
+    let mut problems = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for names in components(&rules) {
+        let options: Vec<Vec<Option<String>>> = names
+            .iter()
+            .map(|name| {
+                let mut states = vec![None];
+                states.extend(rule_support::candidates(doc, &example, &rules, name).into_iter().map(Some));
+                states
+            })
+            .collect();
+        let total: usize = options.iter().map(Vec::len).try_fold(1usize, usize::checked_mul).unwrap_or(usize::MAX);
+        let budget = subset_budget();
+        let mut generator = Xorshift(0x9E37_79B9_7F4A_7C15 ^ path.len() as u64 ^ (names.len() as u64) << 32);
+        let picks: Vec<Vec<usize>> = if total <= budget {
+            (0..total).map(|mut n| options.iter().map(|states| { let at = n % states.len(); n /= states.len(); at }).collect()).collect()
+        } else {
+            (0..budget).map(|_| options.iter().map(|states| generator.below(states.len())).collect()).collect()
+        };
+        for pick in picks {
+            let assignment: rule_support::Assignment = names.iter().zip(&pick).zip(&options).filter_map(|((name, at), states)| states[*at].clone().map(|value| (name.clone(), vec![value]))).collect();
+            let words = words_of(doc, &example, &assignment);
+            if !seen.insert(words.clone()) {
+                continue;
+            }
+            let Ok(parsed) = rule_support::parse_call(doc, &words) else { continue };
+            let broken = atip::constraint::violations(&rules, &parsed.given);
+            let outcome = rule_support::run_empty(&words, declared_role(path, &parsed.text));
+            let call = words.join(" ");
+            let fields: Vec<String> = broken.iter().flat_map(|(at, field)| field_names_of(doc, &rules[*at], field)).collect();
+            if broken.is_empty() {
+                // No rule is broken: no refusal that is a rule's (its code, naming an argument of one of the rules, that the call left out).
+                // (a validator's refusal, with its own code and naming an argument it reads, is not a rule's.)
+                let validator_refusal = doc["validators"].as_array().into_iter().flatten().any(|validator| {
+                    outcome.code.as_deref() == validator["code"].as_str() && outcome.field.as_deref().and_then(|field| field_argument(doc, field)).is_some_and(|field| validator["arguments"].as_array().is_some_and(|names| names.contains(&json!(field))))
+                });
+                let rule_refusal = !validator_refusal && rules.iter().any(|rule| refuses_for_unmet(&outcome, doc, rule, &words));
+                if rule_refusal {
+                    problems.push(format!("`{path}` `{call}` breaks no rule and was refused for one: code {:?} field {:?} {:?}", outcome.code, outcome.field, outcome.message));
+                }
+            } else {
+                let codes: Vec<String> = broken.iter().map(|(at, _)| code_of(&rules[*at])).collect();
+                let refused_right = !outcome.ok && outcome.exit == 2 && outcome.code.as_ref().is_some_and(|code| codes.contains(code)) && outcome.field.as_ref().is_some_and(|field| fields.contains(field));
+                if !refused_right {
+                    problems.push(format!("`{path}` `{call}` breaks {:?} and answered exit {} code {:?} field {:?} {:?}", broken.iter().map(|(at, _)| label(&rules[*at])).collect::<Vec<_>>(), outcome.exit, outcome.code, outcome.field, outcome.message));
+                }
+                if !outcome.changed.is_empty() {
+                    problems.push(format!("`{path}` `{call}` was refused and wrote {:?}", outcome.changed));
+                }
+            }
+        }
+    }
+    problems
+}
+
+/// The spellings a `field` naming `argument` of `rule` may have.
+fn field_names_of(doc: &Value, rule: &atip::doc::ConstraintDoc, argument: &str) -> Vec<String> {
+    let mut all = vec![format!("--{argument}"), argument.to_string()];
+    if let Some(operand) = doc["operands"].as_array().into_iter().flatten().find(|operand| operand["name"] == argument) {
+        all.push(operand["valueName"].as_str().unwrap_or_default().to_string());
+    }
+    let _ = rule;
+    all
+}
+
+/// atip.constraints.19: every combination of the arguments that the rules of a command name, run in an empty directory, is refused by a
+/// rule it breaks (with its code and a field that rule names) or by none, whatever else is given with it.
+#[test]
+fn atip_constraints_19_every_combination_of_the_arguments_of_the_rules_is_answered_by_the_rules() {
+    let jobs: Vec<&'static Value> = docs().into_iter().filter(|doc| selected(doc, &[])).collect();
+    let problems = in_parallel(&jobs, |doc| drive_subsets(doc));
+    assert!(problems.is_empty(), "{} problems, the first thirty:\n{}", problems.len(), problems.iter().take(30).cloned().collect::<Vec<_>>().join("\n"));
 }

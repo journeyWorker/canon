@@ -156,10 +156,10 @@ Feature: atip constraints: the relations, domains and validators of the command 
   @case:failure
   @flow:canon-0-34-atip-constraints.F4
   @atip.constraints.16
-  Scenario: A batch on a command that takes one object, and --input - beside another stdin reader, are validators over input and are refused in an empty directory
+  Scenario: The shape of --input is the parser's: an array on a command that takes no batch, --input twice and --input - beside another stdin reader are refused by the parser with no validator declared
     Given an empty directory with an empty HOME
-    When purge, ledger compact, tier age, artifacts move, dashboard and migrate run with --input a two-object array, and evidence add runs with --input - and --report junit:- or --artifact -
-    Then each array is exit 2, INPUT_INVALID, reason BATCH_UNSUPPORTED, field --input, and the same call with one object is not; the stdin pair is USAGE naming --input; nothing is written
+    When purge, ledger compact, tier age, artifacts move, dashboard and migrate run with --input a two-object array, purge runs with --input twice, and evidence add runs with --input - and --report junit:- or --artifact - in both orders
+    Then each array is exit 2, INPUT_INVALID, reason BATCH_UNSUPPORTED, field --input; the twice is USAGE naming --input; the stdin pair is USAGE naming the option given later; no document declares a validator over input, and no rejected call or example carries --input; nothing is written
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:19Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema
@@ -170,3 +170,53 @@ Feature: atip constraints: the relations, domains and validators of the command 
     Given a built canon and the story repo
     When canon schema --error EVIDENCE_APPROVAL_INVALID runs, evidence add runs with one to three of the four approval options or a blank approver in an empty directory, and with all four and a signature file that does not exist in the repo
     Then the registry lists the reasons MALFORMED and SIGNATURE_MISMATCH under the code, exit 2; the incomplete sets are MALFORMED naming the missing option; the missing file is SIGNATURE_MISMATCH naming --signature-file
+
+  # canon: {"schema":1,"at":"2026-11-01T16:13:30Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r3"}}
+  @subject:atip-schema
+  @case:happy
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.18
+  Scenario: The domains and the constraints a document declares answer before any state is read, in the contract's order: domains, constraints in the document's order, then validators
+    Given an empty directory with an empty HOME, and the story repo
+    When finding close without --reason, with --round 0, divergence add --state deferred without --expiry, evidence add --command-result without --summary, --task with --report-case, evidence approval-payload without --task or --scenario, and a call that breaks a domain, a constraint and a validator together
+    Then each is refused with the code the document declares and the argument at fault, in the empty directory and in the repository alike, and writes nothing; of a domain, a constraint and a validator broken together the domain answers, then the constraint in the document's order, then the validator; field is the first argument of the rule in its own order, not in argv order
+
+  # canon: {"schema":1,"at":"2026-11-01T16:13:35Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r3"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.19
+  Scenario: Every combination of the arguments that the rules of a command name is refused by a rule it breaks, or by none, whatever else is given with it
+    Given an empty directory
+    When every combination of the arguments each group of rules of a command names runs, with the values an if.in list needs, all of them up to 1500 per group and a fixed-seed sample beyond
+    Then a call that breaks a rule is refused with the code of a rule it breaks and a field that rule names, and writes nothing; a call that breaks none is refused by none of the rules
+
+  # canon: {"schema":1,"at":"2026-11-01T16:13:39Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r3"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.20
+  Scenario: A requires that clap skips because the argument it names conflicts with one present is enforced: migrate with --backup and --relayed-via, or --revert with --actor
+    Given an empty directory
+    When migrate runs with --backup and --relayed-via, with --revert and --actor, --approver or --note, and with --backup alone
+    Then each is USAGE naming the first missing argument of the rule (--revert or --relayed-via), although clap's own check skips it; the same calls with their requirements met are not refused for the rule
+
+  # canon: {"schema":1,"at":"2026-11-01T16:13:42Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r3"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F5
+  @atip.constraints.21
+  Scenario: A negative integer after an integer option names the option in field, and -0 is the integer 0
+    Given an empty directory
+    When query --limit, artifacts store --max-artifact-mib, ingest sessions --interval-secs, retrieve --limit and finding close --round run with a negative number after a space, and with -0 and +0
+    Then the negative number is USAGE with field the option, never the number; -0 and +0 are the integer 0 where 0 is in the domain and refused for the minimum where it is not; 9007199254740991 is accepted and 9007199254740992 refused
+
+  # canon: {"schema":1,"at":"2026-11-01T16:13:45Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r3"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-34-atip-constraints.F2
+  @atip.constraints.22
+  Scenario: The retrieve refusal of a role that disagrees with its regime names --for-role
+    Given an empty directory
+    When canon retrieve --for-role reviewer --regime dev/canon/join-spine/9c93d024b1a2 runs
+    Then the refusal is USAGE naming --regime and its message names --for-role, not --role

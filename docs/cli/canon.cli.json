@@ -718,18 +718,6 @@
         }
       },
       "summary": "Move the local artifact blobs to an object-store tier, verify them, and remove the local copies",
-      "validators": [
-        {
-          "arguments": [
-            "input"
-          ],
-          "code": "INPUT_INVALID",
-          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
-          "rejects": [
-            "canon artifacts move --tier cold --input '[{},{}]'"
-          ]
-        }
-      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -5731,18 +5719,6 @@
         }
       },
       "summary": "Serve the local status dashboard",
-      "validators": [
-        {
-          "arguments": [
-            "input"
-          ],
-          "code": "INPUT_INVALID",
-          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
-          "rejects": [
-            "canon dashboard --input '[{},{}]'"
-          ]
-        }
-      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -11793,19 +11769,6 @@
       "validators": [
         {
           "arguments": [
-            "input",
-            "report",
-            "artifact"
-          ],
-          "code": "USAGE",
-          "description": "`--input -` reads the document from stdin, and no other option reads stdin in the same call: a value `-` (or `<format>:-`) of another option is refused.",
-          "rejects": [
-            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --report junit:- --input -",
-            "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact - --input -"
-          ]
-        },
-        {
-          "arguments": [
             "approval-at"
           ],
           "code": "USAGE",
@@ -13123,17 +13086,6 @@
       },
       "summary": "Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)",
       "validators": [
-        {
-          "arguments": [
-            "input",
-            "artifact"
-          ],
-          "code": "USAGE",
-          "description": "`--input -` reads the document from stdin, and no other option reads stdin in the same call: a value `-` (or `<format>:-`) of another option is refused.",
-          "rejects": [
-            "canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact - --input -"
-          ]
-        },
         {
           "arguments": [
             "artifact",
@@ -21469,18 +21421,6 @@
         }
       },
       "summary": "Move superseded versions of every record out of the ledger into the archive",
-      "validators": [
-        {
-          "arguments": [
-            "input"
-          ],
-          "code": "INPUT_INVALID",
-          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
-          "rejects": [
-            "canon ledger compact --input '[{},{}]'"
-          ]
-        }
-      ],
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -22018,16 +21958,6 @@
       },
       "summary": "Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.28 hooks, scripts and skill stub (backed up under .canon/migrate-backup/), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins",
       "validators": [
-        {
-          "arguments": [
-            "input"
-          ],
-          "code": "INPUT_INVALID",
-          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
-          "rejects": [
-            "canon migrate --input '[{},{}]'"
-          ]
-        },
         {
           "arguments": [
             "relayed-via",
@@ -24401,16 +24331,6 @@
       },
       "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
       "validators": [
-        {
-          "arguments": [
-            "input"
-          ],
-          "code": "INPUT_INVALID",
-          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
-          "rejects": [
-            "canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'"
-          ]
-        },
         {
           "arguments": [
             "before"
@@ -37229,18 +37149,6 @@
         }
       },
       "summary": "Apply canon.yaml aging rules, moving old records to their destination tier",
-      "validators": [
-        {
-          "arguments": [
-            "input"
-          ],
-          "code": "INPUT_INVALID",
-          "description": "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.",
-          "rejects": [
-            "canon tier age --input '[{},{}]'"
-          ]
-        }
-      ],
       "x-canon": {
         "roles": [
           "orchestrator"

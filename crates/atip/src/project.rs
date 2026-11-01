@@ -236,6 +236,11 @@ fn integer_width(arg: &Arg) -> Option<(u32, bool)> {
     widths.iter().find(|(known, _, _)| id == *known).map(|(_, bits, signed)| (*bits, *signed))
 }
 
+/// Whether `arg` parses into one of Rust's integer types.
+pub fn is_integer_arg(arg: &Arg) -> bool {
+    integer_width(arg).is_some()
+}
+
 /// The restriction the Rust type of an integer argument carries (spec 10.7.4): an unsigned parser refuses a negative
 /// value, a narrow one its overflow. clap erases the bounds of `value_parser!(u64).range(1..)`, so a tool's own table
 /// says those and the two are merged ([`crate::domain::merge`]); a test holds the table and the parser to one answer.

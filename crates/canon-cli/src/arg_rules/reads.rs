@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, BATCH_DESCRIPTION, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION};
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
@@ -50,7 +50,7 @@ pub(super) static TABLES: Tables = Tables {
                 Rule::forbids_in("kind", NOT_DOMAIN_KINDS, &["domain"]).code("QUERY_INVALID_ARGUMENT").help("`--domain` applies only to `--kind subject`."),
             ],
         ),
-        ("retrieve", &[Rule::exactly_one(&["regime", "domain"]), Rule::requires("subject", &["domain"])]),
+        ("retrieve", &[Rule::exactly_one(&["regime", "domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>"), Rule::requires("subject", &["domain"])]),
     ],
     validators: &[
         (
@@ -78,29 +78,8 @@ pub(super) static TABLES: Tables = Tables {
             ],
         ),
         (
-            "artifacts move",
-            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon artifacts move --tier cold --input '[{},{}]'"] }],
-        ),
-        (
-            "dashboard",
-            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon dashboard --input '[{},{}]'"] }],
-        ),
-        (
-            "ledger compact",
-            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon ledger compact --input '[{},{}]'"] }],
-        ),
-        (
-            "purge",
-            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'"] }],
-        ),
-        (
-            "tier age",
-            &[Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon tier age --input '[{},{}]'"] }],
-        ),
-        (
             "migrate",
             &[
-                Validator { arguments: &["input"], code: "INPUT_INVALID", description: BATCH_DESCRIPTION, rejects: &["canon migrate --input '[{},{}]'"] },
                 Validator {
                     arguments: &["relayed-via", "as"],
                     code: "USAGE",
@@ -136,7 +115,7 @@ pub(super) static TABLES: Tables = Tables {
         ),
     ],
     domains: &[
-        DomainRow::new(Scope::Arguments(&["trace"], "id"), Domain::matching(TRACE_OPERAND), "TRACE_OPERAND_INVALID").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "abcdef0", "loop-change_9_9", " a_1_2 "]).outside(&["abc", "not a shape!", "abcdef", "a_1", "a__2", "a_1_x", "a_1_2_"]),
+        DomainRow::new(Scope::Arguments(&["trace"], "id"), Domain::matching(TRACE_OPERAND), "TRACE_OPERAND_INVALID").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "abcdef0", "loop-change_9_9", " a_1_2 "]).says("is none of the three shapes a trace operand takes: a review id (26 base32 characters), a commit sha (7 to 40 hex digits) or a finding key (<change>_<round>_<seq>)").outside(&["abc", "not a shape!", "abcdef", "a_1", "a__2", "a_1_x", "a_1_2_"]),
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_EMPTY").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_INVALID_ARGUMENT").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),

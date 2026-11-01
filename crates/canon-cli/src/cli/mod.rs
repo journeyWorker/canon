@@ -72,6 +72,14 @@ use clap::{CommandFactory, Parser, Subcommand};
 /// reaches the error that names the missing command instead of clap's
 /// "unexpected argument" (atip/1 spec 4.4, 4.5).
 pub fn command() -> clap::Command {
+    // A negative number after an integer option is that option's value, so a refusal names the option, not the `-1`.
+    fn negative_integers(node: clap::Command) -> clap::Command {
+        node.mut_args(|arg| if atip::project::is_integer_arg(&arg) { arg.allow_negative_numbers(true) } else { arg }).mut_subcommands(negative_integers)
+    }
+    negative_integers(command_without_negatives())
+}
+
+fn command_without_negatives() -> clap::Command {
     atip::project::point_help_at_schema(accept_json_on_groups(Cli::command()), crate::spec::HELP_POINTER)
 }
 
@@ -318,6 +326,38 @@ pub enum Command {
 /// The largest integer a JSON parser, JavaScript and a Rust `i64` all read the same: ±(2^53-1) (atip/1 spec 10.7.5). An
 /// integer option that parses into a 64-bit type is refused outside it, never rounded into it.
 pub const SAFE_INTEGER: u64 = atip::domain::SAFE_INTEGER as u64;
+
+/// Reads a non-negative integer option of 64 bits the way the contract's integer grammar does (spec 11.5): digits, with `-0` and
+/// `+0` the number 0, a negative value refused, and nothing above 2^53-1 rounded into range. The error names the bounds.
+fn safe_uint(text: &str, min: u64) -> Result<u64, String> {
+    let unsigned = text.strip_prefix('+').unwrap_or(text);
+    let (negative, digits) = unsigned.strip_prefix('-').map_or((false, unsigned), |digits| (true, digits));
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(format!("`{text}` is not an integer from {min} to {SAFE_INTEGER}"));
+    }
+    let value = digits.parse::<u128>().ok().filter(|value| *value <= u128::from(SAFE_INTEGER));
+    match value {
+        Some(value) if negative && value != 0 => Err(format!("`{text}` is negative: an integer from {min} to {SAFE_INTEGER}")),
+        Some(value) if value < u128::from(min) => Err(format!("`{text}` is below {min}: an integer from {min} to {SAFE_INTEGER}")),
+        Some(value) => Ok(u64::try_from(value).unwrap_or(SAFE_INTEGER)),
+        None => Err(format!("`{text}` is beyond 9007199254740991 (2^53-1): an integer from {min} to {SAFE_INTEGER}")),
+    }
+}
+
+/// An integer from 1 to 2^53-1 (`--limit`, `--max-artifact-mib`).
+pub fn safe_min1(text: &str) -> Result<u64, String> {
+    safe_uint(text, 1)
+}
+
+/// An integer from 0 to 2^53-1 (`--interval-secs`).
+pub fn safe_min0(text: &str) -> Result<u64, String> {
+    safe_uint(text, 0)
+}
+
+/// An integer from 0 to 2^53-1 that counts items (`retrieve --limit`).
+pub fn safe_min0_usize(text: &str) -> Result<usize, String> {
+    safe_uint(text, 0).map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+}
 
 /// `--promote`/`--no-promote`, flattened into every staged write
 /// (0.16 D2; `crate::write_mode`).

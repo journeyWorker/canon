@@ -523,35 +523,45 @@ fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refuse
     check("canon divergence accept auth.login.01 --actor alice --reason why --tracking t --relayed-via ask --approver alice --note ok", &[], "USAGE", "--relayed-via");
 }
 
-/// atip.constraints.16: the shape of `--input` is a validator: a batch on a command that takes one object, and `--input -` beside another
-/// stdin reader. Each is refused in an empty directory.
+/// atip.constraints.16: the shape of `--input` is the parser's, not a validator's (the ATIP author's ruling): an array on a command whose
+/// `input.batch` is false is step-1 `INPUT_INVALID` (`BATCH_UNSUPPORTED`), `--input` twice is `USAGE`, and `--input -` beside another option that
+/// reads stdin is a violation of 5.5, `USAGE` naming the one given later. No document declares any of them.
 #[test]
-fn atip_constraints_16_the_shape_of_input_is_a_validator_and_is_refused_before_any_state_is_read() {
-    for (command, line) in [
-        ("artifacts move", "canon artifacts move --tier cold --input '[{},{}]'"),
-        ("dashboard", "canon dashboard --input '[{},{}]'"),
-        ("ledger compact", "canon ledger compact --input '[{},{}]'"),
-        ("migrate", "canon migrate --input '[{},{}]'"),
-        ("purge", "canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'"),
-        ("tier age", "canon tier age --input '[{},{}]'"),
-    ] {
-        let validator = validator_of(leaf(command), &["input"]).unwrap_or_else(|| panic!("`{command}`: no `input` validator"));
-        assert_eq!(validator["code"], "INPUT_INVALID");
-        assert!(validator["rejects"].as_array().is_some_and(|calls| calls.contains(&json!(line))), "{validator}");
-        let outcome = rule_support::run_empty(&words(line), None);
-        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.reason.as_deref(), outcome.field.as_deref()), (2, Some("INPUT_INVALID"), Some("BATCH_UNSUPPORTED"), Some("--input")), "{command}: {outcome:?}");
-        assert!(outcome.changed.is_empty());
-        // One object is the way in: the same call with one object is not refused for its shape.
-        let one = line.replace("'[{},{}]'", "'{}'");
-        assert_ne!(rule_support::run_empty(&words(&one), None).reason.as_deref(), Some("BATCH_UNSUPPORTED"), "{one}");
+fn atip_constraints_16_the_shape_of_input_is_the_parsers_and_no_document_declares_it() {
+    for doc in leaves() {
+        for validator in doc["validators"].as_array().into_iter().flatten() {
+            assert!(!validator["arguments"].as_array().is_some_and(|names| names.contains(&json!("input"))), "`{}` declares a validator over `input`: {validator}", doc["command"]);
+            for call in validator["rejects"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                assert!(!call.contains("--input"), "`{}`: a rejected call carries --input: {call}", doc["command"]);
+            }
+        }
+        for example in doc["examples"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            assert!(!example.contains("--input -"), "`{}`: an example reads stdin: {example}", doc["command"]);
+        }
     }
-    for (command, line) in [
-        ("evidence add", "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --report junit:- --input -"),
-        ("evidence add", "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact - --input -"),
+    for line in [
+        "canon artifacts move --tier cold --input '[{},{}]'",
+        "canon dashboard --input '[{},{}]'",
+        "canon ledger compact --input '[{},{}]'",
+        "canon migrate --input '[{},{}]'",
+        "canon purge --kind session --before 2020-01-01T00:00:00Z --input '[{},{}]'",
+        "canon tier age --input '[{},{}]'",
     ] {
-        assert!(validator_of(leaf(command), &["input", "report", "artifact"]).is_some_and(|validator| validator["rejects"].as_array().is_some_and(|calls| calls.contains(&json!(line)))));
         let outcome = rule_support::run_empty(&words(line), None);
-        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.field.as_deref()), (2, Some("USAGE"), Some("--input")), "{outcome:?}");
+        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.reason.as_deref(), outcome.field.as_deref()), (2, Some("INPUT_INVALID"), Some("BATCH_UNSUPPORTED"), Some("--input")), "{line}: {outcome:?}");
+        assert!(outcome.changed.is_empty());
+    }
+    let twice = rule_support::run_empty(&words("canon purge --input '{}' --input '{}'"), None);
+    assert_eq!((twice.exit, twice.code.as_deref(), twice.field.as_deref()), (2, Some("USAGE"), Some("--input")), "{twice:?}");
+    let add = "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer";
+    for (tail, field) in [
+        ("--report junit:- --input -", "--input"),
+        ("--input - --report junit:-", "--report"),
+        ("--artifact - --input -", "--input"),
+        ("--input - --artifact -", "--artifact"),
+    ] {
+        let outcome = rule_support::run_empty(&words(&format!("{add} {tail}")), None);
+        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.field.as_deref()), (2, Some("USAGE"), Some(field)), "{tail}: {outcome:?}");
         assert!(outcome.message.is_some_and(|message| message.contains("both read stdin")));
     }
 }
@@ -582,4 +592,96 @@ fn atip_constraints_17_one_approval_code_has_a_reason_for_the_arguments_and_one_
     let signed = run(&["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--approver", "alice", "--approval-role", "human", "--signature-file", "nope.sig", "--approval-at", "2030-01-01T00:00:00Z"]);
     refused(&signed, "EVIDENCE_APPROVAL_INVALID", "--signature-file");
     assert_eq!(signed.body["error"]["reason"], "SIGNATURE_MISMATCH", "{}", signed.body);
+}
+
+// ------------------------------------------------------------------------------------------------ round 3 (review of c518cecd)
+
+fn empty(line: &str, role: Option<&str>) -> rule_support::Outcome {
+    rule_support::run_empty(&words(line), role)
+}
+
+fn assert_refused(outcome: &rule_support::Outcome, code: &str, field: &str) {
+    assert!(!outcome.ok && outcome.exit == 2, "{outcome:?}");
+    assert_eq!(outcome.code.as_deref(), Some(code), "{outcome:?}");
+    assert_eq!(outcome.field.as_deref(), Some(field), "{outcome:?}");
+    assert!(outcome.changed.is_empty(), "wrote {:?}", outcome.changed);
+}
+
+/// atip.constraints.18: the domains and the constraints a document declares answer before any state is read, in the contract's order
+/// (required, domains, constraints in the document's order, validators), the same in an empty directory as in a repository.
+#[test]
+fn atip_constraints_18_a_declared_domain_or_rule_answers_before_any_state_is_read_and_in_the_contracts_order() {
+    // The examples of the review: each answered CONFIG_MISSING, the missing file or PLAN_SOURCES_MISSING.
+    let implementer = Some("implementer");
+    for (line, code, field) in [
+        ("canon finding close add-login --round 1 --seq 1 --disposition rejected --actor a", "FINDING_REASON_REQUIRED", "--reason"),
+        ("canon finding close add-login --round 0 --seq 1 --disposition fixed --actor a", "FINDING_INVALID_ARGUMENT", "--round"),
+        ("canon divergence add auth.login.01 --state deferred --actor a --reason r", "DIVERGENCE_INVALID_ARGUMENT", "--expiry"),
+        ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt", "EVIDENCE_INVALID_ARGUMENT", "--summary"),
+        ("canon evidence audit auth.login.01 --ref r --evaluator e --evaluator-version 1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --report-case x", "EVIDENCE_INVALID_ARGUMENT", "--report"),
+        ("canon evidence approval-payload --rev HEAD --approver alice --approval-at 2030-01-01T00:00:00Z", "EVIDENCE_REFUSED", "--task"),
+        ("canon evidence add --task add-login#1 --class test-run --ref r --report-case x", "EVIDENCE_INVALID_ARGUMENT", "--report"),
+        ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt --signature-file nosuch", "EVIDENCE_INVALID_ARGUMENT", "--summary"),
+    ] {
+        assert_refused(&empty(line, implementer), code, field);
+    }
+    // The same calls with a repository answer the same.
+    let repo = run(&["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--actor", "a"]);
+    refused(&repo, "FINDING_REASON_REQUIRED", "--reason");
+    refused(&run(&["finding", "close", "add-login", "--round", "0", "--seq", "1", "--disposition", "fixed", "--actor", "a"]), "FINDING_INVALID_ARGUMENT", "--round");
+    // The order: a domain before a constraint before a validator, whichever code each has.
+    assert_refused(&empty("canon finding add --change add-login --round 0 --seq 1 --severity note --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--round");
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity blocker --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
+    assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class test-run --ref r", implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class audit --ref r --summary s", implementer), "EVIDENCE_INVALID_ARGUMENT", "--class");
+    // The field is the first argument of the rule in the rule's own order, not the order on the command line.
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-unknown --introduced-rev r", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
+    assert_refused(&empty("canon init --policy strict --check", None), "USAGE", "--check");
+}
+
+/// atip.constraints.20: `requires` is enforced when the argument it names conflicts with one present (clap skips it): `migrate`.
+#[test]
+fn atip_constraints_20_a_requires_clap_skips_because_of_a_conflict_is_enforced() {
+    let digest = "--commit --plan-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    assert_refused(&empty(&format!("canon migrate {digest} --relayed-via ask --backup f --actor a --approver b --note c"), None), "USAGE", "--revert");
+    assert_refused(&empty(&format!("canon migrate --revert {digest} --actor x"), None), "USAGE", "--relayed-via");
+    assert_refused(&empty(&format!("canon migrate --revert {digest} --approver x"), None), "USAGE", "--relayed-via");
+    assert_refused(&empty(&format!("canon migrate --revert {digest} --note x"), None), "USAGE", "--relayed-via");
+    assert_refused(&empty(&format!("canon migrate {digest} --backup f"), None), "USAGE", "--revert");
+    // The rest of the relation is intact: a revert with its backup, and a relayed commit with its actor, answer at the repository.
+    assert_ne!(empty(&format!("canon migrate --revert {digest} --backup f"), None).code.as_deref(), Some("USAGE"));
+}
+
+/// atip.constraints.21: a negative number after an integer option is that option's value, so the refusal names the option; `-0` is 0.
+#[test]
+fn atip_constraints_21_a_negative_integer_names_its_option_and_minus_zero_is_zero() {
+    for (line, field) in [
+        ("canon query --kind change --limit -1", "--limit"),
+        ("canon query --kind change --limit -9007199254740992", "--limit"),
+        ("canon artifacts store --max-artifact-mib -1", "--max-artifact-mib"),
+        ("canon artifacts store --max-artifact-mib -9007199254740992", "--max-artifact-mib"),
+        ("canon ingest sessions --interval-secs -1", "--interval-secs"),
+        ("canon retrieve --for-role reviewer --domain dev --limit -1", "--limit"),
+        ("canon finding close add-login --round -1 --seq 1 --disposition fixed", "--round"),
+    ] {
+        assert_refused(&empty(line, Some("implementer")), "USAGE", field);
+    }
+    // `-0` is the integer 0: accepted where 0 is, refused for the minimum where it is not.
+    for line in ["canon ingest sessions --interval-secs -0 --dry-run", "canon retrieve --for-role reviewer --domain dev --limit -0", "canon ingest sessions --interval-secs +0 --dry-run"] {
+        let outcome = empty(line, Some("implementer"));
+        assert_ne!(outcome.code.as_deref(), Some("USAGE"), "{line}: {outcome:?}");
+    }
+    assert_refused(&empty("canon query --kind change --limit -0", None), "USAGE", "--limit");
+    // The edge of the safe range with a space: accepted; one above, refused.
+    assert_ne!(empty("canon query --kind change --limit 9007199254740991", None).code.as_deref(), Some("USAGE"));
+    assert_refused(&empty("canon query --kind change --limit 9007199254740992", None), "USAGE", "--limit");
+}
+
+/// atip.constraints.22: the `retrieve` refusal of a role that disagrees with its regime names the option `--for-role`.
+#[test]
+fn atip_constraints_22_the_retrieve_role_regime_refusal_names_for_role() {
+    let outcome = empty("canon retrieve --for-role reviewer --regime dev/canon/join-spine/9c93d024b1a2", None);
+    assert_refused(&outcome, "USAGE", "--regime");
+    let message = outcome.message.unwrap_or_default();
+    assert!(message.contains("--for-role") && !message.contains("--role "), "{message}");
 }

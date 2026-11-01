@@ -744,7 +744,9 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     if value == "-" {
         if let Some(other) = lexed.opts.iter().find(|o| o.long.as_deref() != Some("input") && o.value.as_deref().is_some_and(|v| v == "-" || v.ends_with(":-"))) {
             let other_option = other.long.as_deref().map(|l| format!("--{l}")).unwrap_or_default();
-            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field("--input"));
+            // One stdin, two readers: the violation names the one given later on the command line (spec 5.5).
+            let field = if other.span.start > input.span.start { other_option.clone() } else { "--input".to_string() };
+            return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field(field));
         }
     }
     let (text, source) = match load(value) {

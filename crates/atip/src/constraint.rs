@@ -33,11 +33,17 @@ pub struct Rule {
     pub then: &'static [&'static str],
     pub code: Option<&'static str>,
     pub help: Option<&'static str>,
+    /// What the tool's own refusal says, in place of the sentence generated from the rule (not a document member).
+    pub says: Option<&'static str>,
+    /// The `hint` of the refusal (`{value}` is the value of the argument the `if` names); not a document member.
+    pub hint: Option<&'static str>,
+    /// The `reason` of the registered code the refusal carries; not a document member.
+    pub reason: Option<&'static str>,
 }
 
 impl Rule {
     const fn names(kind: RuleKind, names: &'static [&'static str]) -> Rule {
-        Rule { kind, names, when: None, then: &[], code: None, help: None }
+        Rule { kind, names, when: None, then: &[], code: None, help: None, says: None, hint: None, reason: None }
     }
 
     /// At least one of `names` is given.
@@ -57,22 +63,22 @@ impl Rule {
 
     /// When `name` is given, every name in `then` is given.
     pub const fn requires(name: &'static str, then: &'static [&'static str]) -> Rule {
-        Rule { kind: RuleKind::Requires, names: &[], when: Some(When { name, values: &[] }), then, code: None, help: None }
+        Rule { kind: RuleKind::Requires, names: &[], when: Some(When { name, values: &[] }), then, code: None, help: None, says: None, hint: None, reason: None }
     }
 
     /// When `name` is given with one of `values`, every name in `then` is given.
     pub const fn requires_in(name: &'static str, values: &'static [&'static str], then: &'static [&'static str]) -> Rule {
-        Rule { kind: RuleKind::Requires, names: &[], when: Some(When { name, values }), then, code: None, help: None }
+        Rule { kind: RuleKind::Requires, names: &[], when: Some(When { name, values }), then, code: None, help: None, says: None, hint: None, reason: None }
     }
 
     /// When `name` is given, no name in `then` is given.
     pub const fn forbids(name: &'static str, then: &'static [&'static str]) -> Rule {
-        Rule { kind: RuleKind::Forbids, names: &[], when: Some(When { name, values: &[] }), then, code: None, help: None }
+        Rule { kind: RuleKind::Forbids, names: &[], when: Some(When { name, values: &[] }), then, code: None, help: None, says: None, hint: None, reason: None }
     }
 
     /// When `name` is given with one of `values`, no name in `then` is given.
     pub const fn forbids_in(name: &'static str, values: &'static [&'static str], then: &'static [&'static str]) -> Rule {
-        Rule { kind: RuleKind::Forbids, names: &[], when: Some(When { name, values }), then, code: None, help: None }
+        Rule { kind: RuleKind::Forbids, names: &[], when: Some(When { name, values }), then, code: None, help: None, says: None, hint: None, reason: None }
     }
 
     /// The registered code a violation produces (default `USAGE`).
@@ -84,6 +90,24 @@ impl Rule {
     /// One sentence saying what the rule means.
     pub const fn help(mut self, help: &'static str) -> Rule {
         self.help = Some(help);
+        self
+    }
+
+    /// What the refusal says (the tool's own words for the violation).
+    pub const fn says(mut self, says: &'static str) -> Rule {
+        self.says = Some(says);
+        self
+    }
+
+    /// The refusal's `hint`: the action that fixes it; `{value}` stands for the value of the argument the `if` names.
+    pub const fn hint(mut self, hint: &'static str) -> Rule {
+        self.hint = Some(hint);
+        self
+    }
+
+    /// The `reason` the registered code of the refusal carries.
+    pub const fn reason(mut self, reason: &'static str) -> Rule {
+        self.reason = Some(reason);
         self
     }
 
@@ -127,7 +151,7 @@ impl Validator {
 // ------------------------------------------------------------------ from clap
 
 /// The name a document gives `arg`: its long name, or an operand's name.
-fn name_of(arg: &Arg) -> String {
+pub fn name_of(arg: &Arg) -> String {
     arg.get_long().map_or_else(|| project::operand_name(arg), str::to_string)
 }
 
@@ -240,9 +264,10 @@ fn same_value(a: &Value, b: &Value) -> bool {
     }
 }
 
-/// Whether `given` breaks `rule`, and, when it does, the argument a violation names: the first argument of the rule
-/// that is at fault (spec 10.8.1): the first name that is missing for a rule that demands one, the first
-/// given name that is not allowed for one that forbids.
+/// Whether `given` breaks `rule`, and, when it does, the argument a violation names (spec 10.8.1, 7.1.1): the first argument of the
+/// rule at fault in the order the rule declares them: the first of `names` for a rule that demands one and has none, the first
+/// given of `names` for a rule that allows one (or at most one) and has several, the first missing of `then` for a `requires`
+/// and the first given of `then` for a `forbids`. The order is the document's, never the order on the command line.
 pub fn violation(rule: &ConstraintDoc, given: &Given) -> Option<String> {
     let names = rule.names.as_deref().unwrap_or_default();
     let then = rule.then.as_deref().unwrap_or_default();
@@ -252,9 +277,9 @@ pub fn violation(rule: &ConstraintDoc, given: &Given) -> Option<String> {
         RuleKind::ExactlyOne => match given_names.len() {
             1 => None,
             0 => Some(names.first().cloned().unwrap_or_default()),
-            _ => Some(given_names[1].clone()),
+            _ => Some(given_names[0].clone()),
         },
-        RuleKind::AtMostOne => (given_names.len() > 1).then(|| given_names[1].clone()),
+        RuleKind::AtMostOne => (given_names.len() > 1).then(|| given_names[0].clone()),
         RuleKind::Requires => {
             let when = rule.when.as_ref()?;
             if !holds(given, when) {
@@ -474,7 +499,7 @@ mod tests {
         assert_eq!(violation(&conditional, &given(&[("disposition", json!("fixed"))])), None);
         let one = Rule::exactly_one(&["regime", "domain"]).doc();
         assert_eq!(violation(&one, &given(&[])), Some("regime".to_string()));
-        assert_eq!(violation(&one, &given(&[("regime", json!("k")), ("domain", json!("d"))])), Some("domain".to_string()));
+        assert_eq!(violation(&one, &given(&[("regime", json!("k")), ("domain", json!("d"))])), Some("regime".to_string()));
         assert_eq!(violation(&one, &given(&[("domain", json!("d"))])), None);
         let forbids = Rule::forbids("all-scenarios", &["task", "scenario"]).doc();
         assert_eq!(violation(&forbids, &given(&[("all-scenarios", json!(true)), ("scenario", json!("x"))])), Some("scenario".to_string()));

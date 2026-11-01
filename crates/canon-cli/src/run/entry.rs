@@ -101,6 +101,12 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
             if let Some(arg) = string(ContextKind::InvalidArg).map(first_word) {
                 usage = usage.field(crate::arg_rules::argument_name(&arg));
             }
+            if error.kind() == ErrorKind::ArgumentConflict {
+                // The violation names the first argument of the rule at fault, in the rule's own order, not the one clap met last (spec 10.8.1).
+                if let Some(field) = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &[]) {
+                    usage = usage.field(field);
+                }
+            }
             if error.kind() == ErrorKind::MissingRequiredArgument {
                 if let Some(ContextValue::Strings(names)) = error.get(ContextKind::InvalidArg) {
                     let names: Vec<String> = names.iter().flat_map(|name| crate::arg_rules::missing_names(name)).collect();

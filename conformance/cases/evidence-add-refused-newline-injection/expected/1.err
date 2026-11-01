@@ -1,3 +1,3 @@
-canon: EVIDENCE_INVALID_ARGUMENT: --summary carries the line separator '\n' at byte offset 10; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs
+canon: EVIDENCE_INVALID_ARGUMENT: --summary must be one line: it carries a line separator
   field: --summary
-  hint: `canon schema evidence add` lists the accepted arguments and their forms
+  hint: `canon schema evidence add --json` lists the domain of each argument

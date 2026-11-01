@@ -548,7 +548,7 @@ fn stdin_conflicts_and_oversize_documents_are_refused() {
 
     let out = canon(repo, home.path(), &["evidence", "add", "--input", "-", "--report", "junit:-", "--json"], Some(r#"{"scenario":"auth.login.01","class":"test-run","ref":"x","role":"implementer"}"#));
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("--input")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("--report")), "{body}");
 
     // over 8 MiB: refused from the file's size, before it is read
     let big = repo.join("big.ndjson");

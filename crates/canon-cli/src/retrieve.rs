@@ -97,11 +97,11 @@ pub fn parse_subject(s: &str) -> Result<SubjectId, JoinKeyError> {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum RetrieveCliError {
-    /// `--role` disagrees with `--regime`'s own leading segment (module
+    /// `--for-role` disagrees with `--regime`'s own leading segment (module
     /// doc). Caught here, never left to `retrieve_guidance`'s internal
     /// `debug_assert_eq!`.
     #[error(
-        "--role `{role}` does not match --regime `{regime_key}`'s own leading role segment `{regime_role}` — regime_key already embeds role as its first segment (design decision 1); pass the SAME role to both, or omit --role's disagreement entirely"
+        "--for-role `{role}` does not match --regime `{regime_key}`'s own leading role segment `{regime_role}` — regime_key already embeds role as its first segment (design decision 1); pass the SAME role to both, or drop --regime and scope with --domain"
     )]
     RoleRegimeMismatch { role: String, regime_key: String, regime_role: String },
 

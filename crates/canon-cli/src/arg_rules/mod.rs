@@ -43,15 +43,29 @@ pub struct DomainRow {
     pub inside: &'static [&'static str],
     /// Text values just outside it (an integer domain's are the values next to its bounds).
     pub outside: &'static [&'static str],
+    /// What the refusal of a value outside the domain says after the argument's name; empty: derived from the pattern.
+    pub says: &'static str,
+    /// The `reason` of the registered code (`EVIDENCE_APPROVAL_INVALID`: `MALFORMED`); empty: none.
+    pub reason: &'static str,
 }
 
 impl DomainRow {
     pub const fn new(scope: Scope, domain: Domain, code: &'static str) -> DomainRow {
-        DomainRow { scope, domain, code, inside: &[], outside: &[] }
+        DomainRow { scope, domain, code, inside: &[], outside: &[], says: "", reason: "" }
     }
 
     pub const fn inside(mut self, inside: &'static [&'static str]) -> DomainRow {
         self.inside = inside;
+        self
+    }
+
+    pub const fn reason(mut self, reason: &'static str) -> DomainRow {
+        self.reason = reason;
+        self
+    }
+
+    pub const fn says(mut self, says: &'static str) -> DomainRow {
+        self.says = says;
         self
     }
 
@@ -142,6 +156,7 @@ macro_rules! any_char {
     };
 }
 
+pub mod enforce;
 mod authoring;
 mod evidence;
 mod reads;
@@ -212,11 +227,6 @@ static SHARED: Tables = Tables {
 /// the option's domain, that the date exists is this.
 pub const CALENDAR: &str = "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.";
 
-/// `--input -` reads the document from stdin; one stdin is one reader (`input.rs`), so no other option's value is `-` (or `<format>:-`).
-pub const STDIN_DESCRIPTION: &str = "`--input -` reads the document from stdin, and no other option reads stdin in the same call: a value `-` (or `<format>:-`) of another option is refused.";
-/// A leaf that binds one plan (or serves until stopped) takes one JSON object as `--input`, never a batch.
-pub const BATCH_DESCRIPTION: &str = "`--input` is one JSON object on this command: an array, or NDJSON of several objects, is a batch, and the command does not take one. The refusal is `INPUT_INVALID` with the reason `BATCH_UNSUPPORTED`.";
-
 /// What the validators of a relayed approval say (`brief approve`, `policy approve`, `divergence accept`, `migrate`): the environment is
 /// a stateless input (spec 11.7), so the role and the actor the variables fill are read here, not by a precondition.
 pub const ROLE_DESCRIPTION: &str = "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.";
@@ -258,27 +268,40 @@ pub fn missing_names(raw: &str) -> Vec<String> {
 pub fn first_fault(node: &clap::Command, path: &str, tokens: &[String], missing: &[String]) -> Option<String> {
     let mut rules = atip::constraint::clap_rules(node);
     rules.extend(rules_for(path).iter().map(Rule::doc));
+    let args: Vec<&clap::Arg> = node.get_positionals().chain(node.get_arguments().filter(|arg| !arg.is_positional())).filter(|arg| !atip::project::is_builtin_arg(arg)).collect();
+    let positionals: Vec<&clap::Arg> = node.get_positionals().collect();
     let mut given = atip::constraint::Given::new();
-    let mut at = 0;
+    let mut operand_at = 0;
+    let mut only_operands = false;
+    // The words of the command path come first (`canon schema`, `canon finding add`): they are not operands.
+    let mut at = path.split(' ').filter(|word| !word.is_empty()).count().min(tokens.len());
     while at < tokens.len() {
         let token = &tokens[at];
         at += 1;
-        if token == "--" {
-            break;
+        if !only_operands && token == "--" {
+            only_operands = true;
+            continue;
         }
-        let Some(rest) = token.strip_prefix("--") else { continue };
-        let (name, inline) = rest.split_once('=').map_or((rest, None), |(name, value)| (name, Some(value.to_string())));
-        let Some(arg) = node.get_arguments().find(|arg| arg.get_long() == Some(name)) else { continue };
-        let value = if arg.get_action().takes_values() {
-            inline.or_else(|| {
-                let next = tokens.get(at).cloned();
-                at += usize::from(next.is_some());
-                next
-            })
-        } else {
-            None
-        };
-        given.entry(name.to_string()).or_default().push(value.map_or_else(|| serde_json::json!(true), serde_json::Value::String));
+        if !only_operands && token.starts_with("--") {
+            let (name, inline) = token[2..].split_once('=').map_or((&token[2..], None), |(name, value)| (name, Some(value.to_string())));
+            let Some(arg) = node.get_arguments().find(|arg| arg.get_long() == Some(name)) else { continue };
+            let value = if arg.get_action().takes_values() {
+                inline.or_else(|| {
+                    let next = tokens.get(at).cloned();
+                    at += usize::from(next.is_some());
+                    next
+                })
+            } else {
+                None
+            };
+            given.entry(name.to_string()).or_default().push(value.map_or_else(|| serde_json::json!(true), serde_json::Value::String));
+        } else if !token.starts_with('-') || only_operands {
+            let Some(arg) = positionals.get(operand_at.min(positionals.len().saturating_sub(1))) else { continue };
+            if !arg.get_num_args().is_some_and(|range| range.max_values() > 1) && !matches!(arg.get_action(), clap::ArgAction::Append) {
+                operand_at += 1;
+            }
+            given.entry(atip::constraint::name_of(arg)).or_default().push(serde_json::Value::String(token.clone()));
+        }
     }
-    atip::constraint::violations(&rules, &given).into_iter().map(|(_, field)| format!("--{field}")).find(|field| missing.contains(field))
+    atip::constraint::violations(&rules, &given).into_iter().map(|(_, field)| enforce::field_of(&args, &field)).find(|field| missing.is_empty() || missing.contains(field))
 }
