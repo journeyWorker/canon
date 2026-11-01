@@ -4,10 +4,10 @@
     "role": "reviewer",
     "session_id": "s-0-34-check-l1-rev"
   },
-  "at": "2026-11-01T15:49:46.533846Z",
-  "code_tree": "ae1e194965cb291c4f215a2c30901f83a9df16e7",
+  "at": "2026-11-01T16:41:19.977186Z",
+  "code_tree": "7f111ed603c2b3d23938b021e7ca77d54e223bc5",
   "kind": "review",
-  "pin": "dead0cb1460b62ca4783cd20f56d3975ad590ee7",
+  "pin": "d8102a7985adb6f61d761a586442671bfb37282d",
   "pins": {
     "checks": [
       {
@@ -18,14 +18,14 @@
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "511cf284b7c33f11aa9696e1d00936fdd8ae4b1ee7c278f5fe0a2fd9a527320f",
+    "scenario_digest": "6a463e935ffe29ebbd36996f09d3d037268e0fbe86223538d7748ce259243087",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-34-atip-check-l1/brief.md"
   },
-  "review_id": "01M6BWTWX56PSWDFDH0GX8CA51",
+  "review_id": "01M6BZS9V9AVXCXDMTE5HXPRHX",
   "reviewer": "rev-check-l1",
   "scenario_id": "atip.checkl1.23",
   "schema": 2,
