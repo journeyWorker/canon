@@ -72,6 +72,25 @@ fn refuses_for(outcome: &Outcome, doc: &Value, rule: &atip::doc::ConstraintDoc) 
     !outcome.ok && outcome.exit == 2 && outcome.code.as_deref() == Some(code_of(rule).as_str()) && outcome.field.as_ref().is_none_or(|field| field_names(doc, rule).contains(field))
 }
 
+/// The name of the argument a `field` stands for: `--name` is `name`, an operand's value name is the operand.
+fn field_argument(doc: &Value, field: &str) -> Option<String> {
+    if let Some(name) = field.strip_prefix("--") {
+        return Some(name.to_string());
+    }
+    doc["operands"].as_array().into_iter().flatten().find(|operand| operand["valueName"] == field || format!("<{}>", operand["valueName"].as_str().unwrap_or_default()) == field).and_then(|operand| operand["name"].as_str().map(str::to_string))
+}
+
+/// Whether a call that MEETS `rule` was refused for it: the refusal has the rule's code and names an argument of the rule that the
+/// call did not give (a violation names the argument at fault, spec 10.8.1). A refusal downstream that reuses the code and names
+/// an argument the call did give (a file that does not exist, a state) is another check's.
+fn refuses_for_unmet(outcome: &Outcome, doc: &Value, rule: &atip::doc::ConstraintDoc, words: &[String]) -> bool {
+    if !refuses_for(outcome, doc, rule) {
+        return false;
+    }
+    let Some(field) = outcome.field.as_deref().and_then(|field| field_argument(doc, field)) else { return false };
+    !rule_support::parse_call(doc, words).is_ok_and(|parsed| parsed.given.contains_key(&field))
+}
+
 /// Runs `jobs` on a handful of threads and returns the problems they report.
 fn in_parallel<T: Sync>(jobs: &[T], work: impl Fn(&T) -> Vec<String> + Sync) -> Vec<String> {
     let next = Mutex::new(0usize);
@@ -143,7 +162,7 @@ pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
         Some(found) => {
             let words = words_of(doc, &provision.example, &found.assignment);
             let outcome = run_call(&provision, home(), &words, declared_role(path, &found.assignment));
-            if refuses_for(&outcome, doc, rule) {
+            if refuses_for_unmet(&outcome, doc, rule, &words) {
                 problems.push(format!("{tag}: `{}` meets it and was refused for it: field {:?} message {:?}", words.join(" "), outcome.field, outcome.message));
             }
         }
@@ -172,30 +191,32 @@ fn blames(blamed: &str, name: &str, value_name: &str) -> bool {
 }
 
 /// Values just inside and just outside the domain of an argument, as the command line writes them: `(text, inside)`.
-fn boundaries(domain: &Value, row: Option<&canon_cli::arg_rules::DomainRow>) -> Vec<(String, bool)> {
+fn boundaries(domain: &Value, row: Option<&canon_cli::arg_rules::DomainRow>) -> Vec<(String, bool, bool)> {
+    // The third member: the bound is the row's own (the code of the row), not the Rust integer type's (clap's `USAGE`).
+    let own = |keyword: &str| row.is_some_and(|row| row.domain.to_value().get(keyword) == domain.get(keyword));
     let mut cases = Vec::new();
     let number = |keyword: &str| domain.get(keyword).and_then(Value::as_i64);
     if let Some(minimum) = number("minimum") {
-        cases.push((minimum.to_string(), true));
-        cases.push(((minimum - 1).to_string(), false));
+        cases.push((minimum.to_string(), true, own("minimum")));
+        cases.push(((minimum - 1).to_string(), false, own("minimum")));
     }
     if let Some(maximum) = number("maximum") {
-        cases.push((maximum.to_string(), true));
-        cases.push(((maximum + 1).to_string(), false));
+        cases.push((maximum.to_string(), true, own("maximum")));
+        cases.push(((maximum + 1).to_string(), false, own("maximum")));
     }
     if let Some(min) = number("minLength") {
-        cases.push(("a".repeat(usize::try_from(min).unwrap_or(0)), true));
+        cases.push(("a".repeat(usize::try_from(min).unwrap_or(0)), true, true));
         if min >= 1 {
-            cases.push(("a".repeat(usize::try_from(min - 1).unwrap_or(0)), false));
+            cases.push(("a".repeat(usize::try_from(min - 1).unwrap_or(0)), false, true));
         }
     }
     if let Some(max) = number("maxLength") {
-        cases.push(("a".repeat(usize::try_from(max).unwrap_or(0)), true));
-        cases.push(("a".repeat(usize::try_from(max + 1).unwrap_or(0)), false));
+        cases.push(("a".repeat(usize::try_from(max).unwrap_or(0)), true, true));
+        cases.push(("a".repeat(usize::try_from(max + 1).unwrap_or(0)), false, true));
     }
     if let Some(row) = row {
-        cases.extend(row.inside.iter().map(|value| ((*value).to_string(), true)));
-        cases.extend(row.outside.iter().map(|value| ((*value).to_string(), false)));
+        cases.extend(row.inside.iter().map(|value| ((*value).to_string(), true, true)));
+        cases.extend(row.outside.iter().map(|value| ((*value).to_string(), false, true)));
     }
     cases
 }
@@ -214,7 +235,8 @@ pub fn drive_domain(doc: &Value, argument: &Value) -> Vec<String> {
     let Ok(parsed) = rule_support::parse_call(doc, &provision.example) else { return vec![format!("`{path}`: the example does not parse")] };
     let base = rule_support::assignment_of(&parsed);
     let mut problems = Vec::new();
-    for (value, inside) in boundaries(domain, row) {
+    for (value, inside, own_bound) in boundaries(domain, row) {
+        let code = if own_bound { code } else { "USAGE" };
         let tag = format!("`{path}` --{name} {value:?} ({} {domain})", if inside { "inside" } else { "outside" });
         let mut assignment = base.clone();
         assignment.insert(name.to_string(), vec![value.clone()]);
@@ -244,7 +266,7 @@ pub fn drive_domain(doc: &Value, argument: &Value) -> Vec<String> {
         }
         let outcome = run_call(&provision, home(), &words, declared_role(path, &assignment));
         let names = [format!("--{name}"), name.to_string(), format!("<{value_name}>"), value_name.to_string()];
-        let refused_for_it = !outcome.ok && outcome.exit == 2 && outcome.code.as_deref() == Some(code) && outcome.field.as_ref().is_none_or(|field| names.contains(field));
+        let refused_for_it = !outcome.ok && outcome.exit == 2 && outcome.code.as_deref() == Some(code) && outcome.field.as_ref().is_some_and(|field| names.contains(field));
         match (inside, refused_for_it) {
             (true, true) => problems.push(format!("{tag}: `{}` was refused for it: {:?}", words.join(" "), outcome.message)),
             (false, false) => problems.push(format!("{tag}: `{}` was not refused with {code}: exit {} code {:?} field {:?} {:?}", words.join(" "), outcome.exit, outcome.code, outcome.field, outcome.message)),
@@ -352,9 +374,9 @@ pub fn example_problems(doc: &Value) -> Vec<String> {
     problems
 }
 
-/// atip.constraints.11: every example of every command document meets the constraints and the domains it declares.
+/// atip.constraints.12: every example of every command document meets the constraints and the domains it declares.
 #[test]
-fn atip_constraints_11_every_example_meets_the_declared_constraints_and_domains() {
+fn atip_constraints_12_every_example_meets_the_declared_constraints_and_domains() {
     let problems: Vec<String> = docs().into_iter().filter(|doc| selected(doc, &[])).flat_map(example_problems).collect();
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
 }
@@ -383,4 +405,50 @@ fn atip_constraints_04_a_new_handler_check_that_no_document_declares_is_found() 
     // The same text in a test module is not a site.
     let in_tests = "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn b() { let _ = \"EVIDENCE_INVALID_ARGUMENT\"; }\n}\n";
     assert!(!survey_problems(&[("evidence_seeded.rs", in_tests)]).iter().any(|problem| problem.contains("evidence_seeded.rs")), "a test module is not read");
+}
+
+// ------------------------------------------------------------------------------- the sweeps bite
+
+/// A copy of the real document of `path` with a rule or a validator added, which the binary does not enforce.
+fn seeded(path: &str, member: &str, extra: Value) -> Value {
+    let mut doc = harness::leaf(path).clone();
+    let list = doc.as_object_mut().expect("a document").entry(member).or_insert_with(|| Value::Array(Vec::new()));
+    list.as_array_mut().expect("a list").push(extra);
+    doc
+}
+
+/// atip.constraints.09: a validator whose `rejects` call the binary accepts, one refused with another code, and one that is also an
+/// example are each found by the sweep.
+#[test]
+fn atip_constraints_09_a_validator_whose_rejects_is_not_refused_is_found() {
+    let accepted = seeded("query", "validators", serde_json::json!({ "arguments": ["kind"], "code": "USAGE", "description": "Refuses nothing at all.", "rejects": ["canon query --kind change --json"] }));
+    let problems = drive_validator(&accepted, accepted["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
+    assert!(problems.iter().any(|problem| problem.contains("was not refused with USAGE")), "{problems:?}");
+    let other_code = seeded("query", "validators", serde_json::json!({ "arguments": ["limit"], "code": "QUERY_INVALID_ARGUMENT", "description": "Claims another code.", "rejects": ["canon query --kind change --limit 0 --json"] }));
+    let problems = drive_validator(&other_code, other_code["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
+    assert!(problems.iter().any(|problem| problem.contains("was not refused with QUERY_INVALID_ARGUMENT")), "{problems:?}");
+    let example = harness::leaf("query")["examples"][0].clone();
+    let also = seeded("query", "validators", serde_json::json!({ "arguments": ["kind"], "code": "USAGE", "description": "Is an example.", "rejects": [example] }));
+    let problems = drive_validator(&also, also["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
+    assert!(problems.iter().any(|problem| problem.contains("is also an example")), "{problems:?}");
+}
+
+/// atip.constraints.13: a constraint declared with no check behind it, a code the binary does not use and a domain that is wrong
+/// are each found by the sweeps (the handler's check removed makes its declaration's test fail).
+#[test]
+fn atip_constraints_13_a_declaration_with_no_check_behind_it_is_found() {
+    let doc = seeded("query", "constraints", serde_json::json!({ "rule": "atMostOne", "names": ["kind", "since"] }));
+    let at = doc["constraints"].as_array().map_or(0, Vec::len) - 1;
+    let problems = drive_rule(&doc, at);
+    assert!(problems.iter().any(|problem| problem.contains("was not refused for it")), "{problems:?}");
+    let wrong_code = seeded("finding close", "constraints", serde_json::json!({ "rule": "requires", "if": { "name": "disposition", "in": ["rejected"] }, "then": ["reason"], "code": "USAGE" }));
+    let at = wrong_code["constraints"].as_array().map_or(0, Vec::len) - 1;
+    let problems = drive_rule(&wrong_code, at);
+    assert!(!problems.is_empty(), "a rule whose code the binary does not give is found");
+    let mut domain = harness::leaf("query").clone();
+    let limit = domain["options"].as_array_mut().and_then(|options| options.iter_mut().find(|option| option["name"] == "limit")).expect("--limit");
+    limit["domain"] = serde_json::json!({ "minimum": 5 });
+    let argument = domain["options"].as_array().and_then(|options| options.iter().find(|option| option["name"] == "limit")).expect("--limit").clone();
+    let problems = drive_domain(&domain, &argument);
+    assert!(!problems.is_empty(), "a domain the parser does not hold is found: {problems:?}");
 }

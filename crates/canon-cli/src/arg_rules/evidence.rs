@@ -5,13 +5,6 @@ use atip::domain::Domain;
 
 use super::{DomainRow, Scope, Tables, CALENDAR, NOT_BLANK, ONE_LINE, ONE_LINE_NOT_BLANK, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE};
 
-/// What `str::trim` strips: the Unicode White_Space characters (the same class `super::white_space!` writes).
-macro_rules! white_space {
-    () => {
-        " \t\n\u{b}\u{c}\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}"
-    };
-}
-
 /// A text that neither starts nor ends with white space, is not empty, and carries no `\n` and no `\r`: the approver of
 /// `evidence add` (the handler refuses only those two line breaks, unlike the shared `TRIMMED_ONE_LINE`).
 const APPROVER: &str = concat!("^[^", white_space!(), "]([^\n\r]*[^", white_space!(), "])?$");

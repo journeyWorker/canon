@@ -20,10 +20,6 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-mod authoring;
-mod evidence;
-mod reads;
-
 /// Where a domain applies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -143,6 +139,10 @@ macro_rules! any_char {
         "[^\u{0}]"
     };
 }
+
+mod authoring;
+mod evidence;
+mod reads;
 
 /// A kebab-case slug: `[a-z0-9]+(-[a-z0-9]+)*` (change, subject and role ids, a domain, a lane).
 pub const KEBAB: &str = "^[a-z0-9]+(-[a-z0-9]+)*$";
