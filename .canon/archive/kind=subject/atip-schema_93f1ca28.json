@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-01T19:28:47.757610Z",
+  "change_ids": [
+    "canon-0-34-atip-schema-doc",
+    "canon-0-34-atip-constraints"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "building",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-34-orch"
+    },
+    "reason": "0.34 ATIP 1.1.2 + L1: all changes reviewed, gate clean"
+  },
+  "subject_id": "atip-schema",
+  "summary": "schema tree, group and command documents with value types, typed defaults, constraints, domains, validators and output schemas",
+  "title": "ATIP: canon's atip/1 L1 self-description (schema)"
+}
