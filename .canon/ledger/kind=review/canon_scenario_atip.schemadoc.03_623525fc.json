@@ -4,30 +4,31 @@
     "role": "reviewer",
     "session_id": "s-0-34-schema-doc-rev"
   },
-  "at": "2026-11-01T10:34:30.919362Z",
-  "code_tree": "5054cd1f165b16ecd65498d8c29a9d0e3caa935b",
+  "at": "2026-11-01T11:33:05.200319Z",
+  "code_tree": "de6ff7e4ee7514331ad59d042003ca9728b5610f",
   "kind": "review",
-  "pin": "9655dc4cf7a280f3031fe6cccc94a13a14f8a317",
+  "pin": "c819893fbcd09f0c444f3aece370d22dc9d00367",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l1"
+          "junit:atip_schemadoc_03_a_group_lists_its_children_and_a_path_in_words_or_one_string_is_one_answer",
+          "junit:atip_schemadoc_03_a_group_under_as_lists_what_the_roles_tree_lists"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "b63deada9e4efc6e42f58776c4e4e224b15e1c125cf7e9ca5a2ec286ca2262f4",
+    "scenario_digest": "4de99ef70d4d684dd8e526c65ac85cea75838199e294acd89edc6bc5ac5a7708",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-34-atip-schema-doc/brief.md"
   },
-  "review_id": "01M6BASMM748DX92RVSMQCY00B",
+  "review_id": "01M6BE4WHG365PVTGVT8P4ABKC",
   "reviewer": "rev-schema-doc",
-  "scenario_id": "atip.schemadoc.01",
+  "scenario_id": "atip.schemadoc.03",
   "schema": 2,
   "worktree_dirty": false
 }
