@@ -52,7 +52,7 @@ A hint is now exactly one of a command line, a template with `<UPPER_CASE>` plac
 
 | 0.33 | 0.34 |
 |---|---|
-| `canon schema --json`: `data` is `{commands, role?}`, a flat list of the 78 commands, each `{command, effect, about, roles, ...}` | `data.kind` is `tree`, `data.level` is `L1`, and `data.commands` lists the 27 groups and the 78 commands once each, a group before its commands. An entry is `{command, path, kind, summary}`, and a command also has `effect` and `x-canon.roles`. The top-level `role` is gone: `--as <ROLE>` still keeps only that role's commands and the groups that hold one, and `CANON_ROLE` still never filters |
+| `canon schema --json`: `data` is `{commands, role?}`, a flat list of the 78 commands, each `{command, effect, about, roles, ...}` | `data.kind` is `tree`, `data.level` is `L1`, and `data.commands` lists the 27 groups and the 78 commands once each, a group before its commands. An entry is `{command, path, kind, summary}`, and a command also has `effect` and `x-canon.roles`. The top-level `role` is gone: `--as <ROLE>` still keeps only that role's commands and the groups that hold one, and says so in `data.x-canon.as` (`{"as": "reviewer"}`; an unfiltered tree has no `x-canon`), and `CANON_ROLE` still never filters |
 | `about` | `summary` (a group has one too) |
 | `roles` (a member of a command) | `x-canon.roles` (an extension member, spec 10.12; empty for the three human-only acts) |
 | `canon schema finding` (a group word) was an unknown path or an empty answer | a `group` document: `{kind: "group", command, path, summary, commands}` with the direct children |
