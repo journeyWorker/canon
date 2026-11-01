@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="5" skipped="0" failures="0" errors="0" uuid="2662bb2c-3113-40d8-bcfb-cfa514929f37" timestamp="2026-11-01T18:17:03.457+09:00" time="5.799">
+    <testsuite name="canon-cli::hint_forms" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="atip_contract11_10_the_rule_catches_prose_after_a_command_and_a_lowercase_placeholder" classname="canon-cli::hint_forms" timestamp="2026-11-01T18:17:03.461+09:00" time="0.041"/>
+        <testcase name="atip_contract11_10_every_hint_in_the_sources_is_a_command_line_a_template_or_prose" classname="canon-cli::hint_forms" timestamp="2026-11-01T18:17:03.461+09:00" time="0.065"/>
+        <testcase name="atip_contract11_10_every_hint_the_conformance_corpus_froze_follows_the_same_rule" classname="canon-cli::hint_forms" timestamp="2026-11-01T18:17:03.461+09:00" time="0.161"/>
+        <testcase name="atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule" classname="canon-cli::hint_forms" timestamp="2026-11-01T18:17:03.461+09:00" time="5.795"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_contract11" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon" classname="canon-cli::atip_contract11" timestamp="2026-11-01T18:17:03.461+09:00" time="2.466"/>
+    </testsuite>
+</testsuites>
