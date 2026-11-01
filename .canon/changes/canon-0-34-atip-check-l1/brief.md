@@ -202,4 +202,4 @@ Source: https://github.com/journeyWorker/atip tag v1.1.1, approaches/checker.md 
 - 계약 문서, 스키마, 예시의 수정. 사본을 읽기만 한다.
 - canon이 L1을 만족하게 하는 일(`canon-0-34-atip-1-1`, `-schema-doc`, `-constraints`, `-paging-fields`).
 
-Approved: Journey Hwang 2026-11-01T11:53:57Z — "승인" (relayed by orchestrator orchestrator-main via ask) (brief sha256:1579985b4e7c3cc5283dc39e88fd35abcb24d50edd8ec47a7de5c102974d7643)
+Approved: Journey Hwang 2026-11-01T12:03:12Z — "휴가 중 승인 위임(2026-11-01 대화): fixture prepare 반영분" (relayed by orchestrator orchestrator-main via chat) (brief sha256:caec48bbc213717bf4a4566bf1af8648beacbd212f67c8449fd7c44ba7dde7ff)
