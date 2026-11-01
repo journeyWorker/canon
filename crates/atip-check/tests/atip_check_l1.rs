@@ -600,7 +600,7 @@ fn atip_checkl1_30_canons_fixture_claims_l1_and_the_ci_job_and_the_just_recipe_r
     assert!(!parsed.prepare.is_empty() && parsed.prepare[0][0] == "git", "{:?}", parsed.prepare);
     let commands = parsed.commands.expect("commands");
     let paged: Vec<&String> = commands.iter().filter(|(_, entry)| !entry.paged.is_empty()).map(|(id, _)| id).collect();
-    assert_eq!(paged, ["divergence list", "finding list", "query"]);
+    assert_eq!(paged, ["divergence list", "export", "finding list", "query"]);
     assert!(commands.values().any(|entry| !entry.fields.is_empty()));
     let workflow = std::fs::read_to_string(root.join(".github/workflows/test.yml")).expect("workflow");
     assert!(workflow.contains("atip-l1:") && workflow.contains("--level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "the CI job runs canon at L1");
