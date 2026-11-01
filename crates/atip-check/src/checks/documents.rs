@@ -279,10 +279,28 @@ fn neutralise_grammar(data: &mut Value) {
     if let Some(path) = data.get_mut("path") {
         neutralise_words(path);
     }
+    // Rule 5 (`input.batch` iff an output has `batch: true`) is `L1.walk`'s `rule-5`; the schema says it too, so the schema is shown the two in agreement.
+    if data.get("input").is_some() {
+        let batch_output = data.get("outputs").and_then(Value::as_array).is_some_and(|outputs| outputs.iter().any(|output| output.get("batch") == Some(&Value::Bool(true))));
+        if let Some(input) = data.get_mut("input").and_then(Value::as_object_mut) {
+            input.insert("batch".to_string(), Value::Bool(batch_output));
+            // `maxItems` goes with `batch: true` and only with it (spec 10.10).
+            if batch_output {
+                input.entry("maxItems").or_insert(Value::from(1));
+            } else {
+                input.remove("maxItems");
+            }
+        }
+    }
     for key in ["operands", "options"] {
         let Some(list) = data.get_mut(key).and_then(Value::as_array_mut) else { continue };
         for (at, arg) in list.iter_mut().enumerate() {
             let Some(object) = arg.as_object_mut() else { continue };
+            // A domain that rule 3 reports (outside its valueType's profile, or not a JSON Schema that compiles) is `L1.walk`'s `rule-3-domain-*`: the schema is shown a plain one.
+            let unusable = crate::l1::model::Arg::parse(&Value::Object(object.clone()), key == "options");
+            if crate::l1::rules::domain_unusable(&unusable) {
+                object.insert("domain".to_string(), serde_json::json!({"minLength": 0}));
+            }
             // A `pattern` is `L1.patterns`' (its form, anchors and compile): the schema judges the document with a plain one.
             if let Some(domain) = object.get_mut("domain") {
                 plain_patterns(domain);

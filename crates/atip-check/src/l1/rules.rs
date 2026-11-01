@@ -381,6 +381,11 @@ pub fn domain_profile_problems(arg: &Arg) -> Vec<String> {
     state.profile
 }
 
+/// Whether the domain of `arg` is one a value cannot be judged against: outside the profile of its valueType or not a JSON Schema that compiles. `L1.walk` reports it (rule 3); the other checks leave the argument's domain alone.
+pub fn domain_unusable(arg: &Arg) -> bool {
+    !domain_profile_problems(arg).is_empty() || arg.domain.as_ref().is_some_and(|domain| invocation::domain_compile_error(domain).is_some())
+}
+
 /// What rule 3 finds in the domain of one argument.
 #[derive(Debug, Default)]
 struct DomainState {

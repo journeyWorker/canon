@@ -455,6 +455,11 @@ fn strip_patterns(value: &mut Value, only_bad: bool) {
     }
 }
 
+/// Why `domain` does not compile as a JSON Schema (its `pattern` keywords aside: `L1.patterns`' to report); `None` when it does.
+pub fn domain_compile_error(domain: &Value) -> Option<String> {
+    domain_validator(domain).err()
+}
+
 fn domain_validator(domain: &Value) -> Result<Arc<Validator>, String> {
     static CACHE: OnceLock<DomainCache> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
@@ -504,16 +509,14 @@ pub fn value_problem(arg: &Arg, value: &Value) -> Option<String> {
     }
     let domain = arg.domain.as_ref()?;
     // A domain outside the profile of its valueType is `L1.walk`'s (rule 3): a value is not judged against it.
-    if !super::rules::domain_profile_problems(arg).is_empty() {
+    if super::rules::domain_unusable(arg) {
         return None;
     }
     match domain_validator(domain) {
         Ok(validator) => schema_problems(&validator, &normalised)
             .map(|why| format!("{value} is outside the domain of {}: {why}", arg.name)),
-        Err(reason) => Some(format!(
-            "the domain of {} does not compile: {reason}",
-            arg.name
-        )),
+        // A domain that does not compile is `L1.walk`'s (rule 3): a value is not judged against it.
+        Err(_) => None,
     }
 }
 

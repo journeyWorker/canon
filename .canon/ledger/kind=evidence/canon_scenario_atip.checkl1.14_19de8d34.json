@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-l1"
+  },
+  "at": "2026-11-01T16:30:12.712957Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_14_a_validator_that_does_not_refuse_or_answers_a_precondition_code_without_setup_fails_only_l1_validators",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "4a9ded99c16eb99ea72b3a31445581f42516df19f68283201eb43d98123fd44e"
+    }
+  ],
+  "code_tree": "7f111ed603c2b3d23938b021e7ca77d54e223bc5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "a9d3e93cbd7c5a31a019938e800f4314aca55898",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 47,
+  "scenario_id": "atip.checkl1.14",
+  "schema": 1,
+  "staging_id": "7fa5253f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

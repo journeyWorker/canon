@@ -23,7 +23,7 @@ pub(crate) const NO_SUCH_PATH: &str = "nosuch-xyz";
 pub(crate) const NO_SUCH_CODE: &str = "NOSUCH_XYZ";
 /// The path no field selection of a tool declares.
 pub(crate) const NO_SUCH_FIELD: &str = "nosuch-xyz";
-/// The most `next` entries one run follows.
+/// The most `next` entries of read commands one run follows; the report says how many it left (`L1.next`).
 const MAX_NEXT_RUNS: usize = 300;
 
 /// One document the tree names, and the invocations that read it.
@@ -136,6 +136,10 @@ pub(crate) struct UnknownFieldRun {
 #[derive(Debug, Default)]
 pub(crate) struct L1Run {
     pub docs: ToolDocs,
+    /// The write and destructive commands no fixture entry covers (not run, reported as information).
+    pub unprobed_writes: Vec<String>,
+    /// `meta.next` entries of read commands the run did not follow because of the cap.
+    pub nexts_dropped: usize,
     pub tree: usize,
     pub tree_again: usize,
     pub empty: usize,
@@ -317,12 +321,7 @@ impl Run<'_> {
             self.plan_domains(&mut run, doc, &bases)?;
             self.plan_validators(&mut run, doc, &tool)?;
         }
-        for doc in docs.iter().filter(|doc| doc.effect == "read") {
-            // A read command's validators are run whether or not the fixture lists it.
-            if !self.runnable(doc) {
-                continue;
-            }
-        }
+        run.unprobed_writes = docs.iter().filter(|doc| !self.runnable(doc)).map(|doc| doc.command.clone()).collect();
         for doc in &docs {
             if self.runnable(doc) {
                 let bases = self.bases(doc, &tool);
@@ -423,7 +422,7 @@ impl Run<'_> {
     }
 
     fn plan_domains(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation]) -> Result<(), RunError> {
-        for arg in doc.args().filter(|arg| arg.domain.is_some() && crate::l1::rules::domain_profile_problems(arg).is_empty()) {
+        for arg in doc.args().filter(|arg| arg.domain.is_some() && !crate::l1::rules::domain_unusable(arg)) {
             let plan = witness::domain_plan(arg);
             let rejects: Vec<String> = self
                 .fixture
@@ -706,7 +705,8 @@ impl Run<'_> {
                 }
             }
         }
-        for (source, argv) in pending.into_iter().take(MAX_NEXT_RUNS) {
+        let mut followed = 0;
+        for (source, argv) in pending {
             let Some(doc) = names_command(&run.docs, &argv) else { continue };
             let Some(CommandDoc { effect, .. }) = run.docs.commands.get(&doc).cloned() else { continue };
             if effect != "read" {
@@ -716,6 +716,11 @@ impl Run<'_> {
             if sequence == 0 {
                 continue;
             }
+            if followed == MAX_NEXT_RUNS {
+                run.nexts_dropped += 1;
+                continue;
+            }
+            followed += 1;
             let call = self.invoke_after(sequence, Call::new(argv.clone()))?;
             run.nexts.push(NextRun { source, argv, call });
         }

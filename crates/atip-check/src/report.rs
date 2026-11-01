@@ -50,6 +50,9 @@ pub struct Check {
     /// Facts the check found that do not change its result: the rules an `entailed` check rests on, a verified Unicode-version difference between the two regular-expression engines.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+    /// The write and destructive commands of the tool's documents that no fixture entry covers, named by `L1.constraints`, `L1.domains` and `L1.validators`: the checker never runs them, so they are outside what those checks probe (contract 1.1.2). Information only: it never changes the result.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unlisted: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -154,6 +157,11 @@ impl Check {
         } else {
             format!("{base} [{}]", self.notes.join("; "))
         };
+        let base = if self.unlisted.is_empty() {
+            base
+        } else {
+            format!("{base} (unlisted writes, not probed: {})", self.unlisted.join(", "))
+        };
         match &self.reason {
             Some(reason) => format!("{base}: {reason}"),
             None => base,
@@ -181,6 +189,7 @@ mod tests {
             reason: None,
             advisories: Vec::new(),
             notes: Vec::new(),
+            unlisted: Vec::new(),
             observed: Vec::new(),
         }
     }

@@ -93,3 +93,17 @@ fn atip_checkl1_25_regex_a_pattern_outside_the_form_that_the_engines_read_differ
         Answer::Refuses(_)
     ));
 }
+
+#[test]
+fn atip_checkl1_25_the_unicode_versions_the_report_names_belong_to_the_engines_that_are_locked() {
+    // The two versions are literals of `src/l1/regex.rs`: they hold for `regress` 0.12 (Unicode 17.0) and `regex-syntax` 0.8 (Unicode 16.0.0). A bump of either crate in
+    // Cargo.lock must re-read its tables (U+11DB0 is the code point that tells them apart) before it is accepted.
+    let lock = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock")).expect("Cargo.lock");
+    let version_of = |name: &str| -> String {
+        let at = lock.find(&format!("name = \"{name}\"\n")).unwrap_or_else(|| panic!("{name} in Cargo.lock"));
+        lock[at..].lines().nth(1).and_then(|line| line.strip_prefix("version = \"")).and_then(|line| line.strip_suffix('"')).unwrap_or_default().to_string()
+    };
+    assert!(version_of("regress").starts_with("0.12."), "regress {}: re-read its Unicode tables and update ECMASCRIPT_UNICODE", version_of("regress"));
+    assert!(version_of("regex-syntax").starts_with("0.8."), "regex-syntax {}: re-read its Unicode tables and update RUST_UNICODE", version_of("regex-syntax"));
+    assert_eq!((ECMASCRIPT_UNICODE, RUST_UNICODE), ("17.0", "16.0.0"));
+}

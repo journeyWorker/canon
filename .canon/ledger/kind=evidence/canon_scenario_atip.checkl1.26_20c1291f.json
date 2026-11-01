@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-l1"
+  },
+  "at": "2026-11-01T16:30:47.582411Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_26_contract_examples_every_invalid_self_description_example_with_one_rule_is_rejected_by_one_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "4a9ded99c16eb99ea72b3a31445581f42516df19f68283201eb43d98123fd44e"
+    },
+    {
+      "case": "atip_checkl1_26_the_embedded_guide_schema_is_the_original_of_the_contract_tag",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "4a9ded99c16eb99ea72b3a31445581f42516df19f68283201eb43d98123fd44e"
+    },
+    {
+      "case": "atip_checkl1_26_contract_examples_every_self_description_example_is_judged_by_its_owner_checks",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "4a9ded99c16eb99ea72b3a31445581f42516df19f68283201eb43d98123fd44e"
+    }
+  ],
+  "code_tree": "7f111ed603c2b3d23938b021e7ca77d54e223bc5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "a9d3e93cbd7c5a31a019938e800f4314aca55898",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 59,
+  "scenario_id": "atip.checkl1.26",
+  "schema": 1,
+  "staging_id": "0c71603f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
