@@ -229,6 +229,8 @@ struct Invocations {
     schema_warnings: usize,
     /// `schema --warning <CODE> --json` for each code the tool's warning registry lists.
     warning_entries: Vec<(String, usize)>,
+    /// `schema --error <CODE>` for each code only the warning registry lists.
+    warning_only: Vec<(String, usize)>,
     probe: Option<ProbeCalls>,
     commands: Vec<CommandCalls>,
     group: Option<GroupCalls>,
@@ -254,9 +256,8 @@ struct CommandCalls {
     ok: Vec<usize>,
     refused: Vec<usize>,
     missing: Vec<MissingCalls>,
-    /// The command once more with `--cursor x --json`, and whether its argv is an `ok` one of the fixture.
+    /// The command once more with `--cursor x --json`.
     cursor: usize,
-    cursor_from_ok: bool,
 }
 
 /// One `missingValue` invocation: the control run with stdin at end-of-file, and the run on a terminal.
@@ -312,12 +313,13 @@ impl Run<'_> {
         let schema_warnings = self.invoke(Call::new(["schema", "--warnings", "--json"]))?;
         let warning_codes = self.listed_codes(schema_warnings, "warnings");
         let mut warning_entries = Vec::new();
+        let mut warning_only = Vec::new();
         for code in &warning_codes {
             let index = self.invoke(Call::new(["schema", "--warning", code, "--json"]))?;
             warning_entries.push((code.clone(), index));
             if !error_codes.contains(code) {
-                // Judged on the answer by `L0.registry`, like every other document of the run.
-                self.invoke(Call::new(["schema", "--error", code, "--json"]))?;
+                let index = self.invoke(Call::new(["schema", "--error", code, "--json"]))?;
+                warning_only.push((code.clone(), index));
             }
         }
         let probe = match self.fixture.probe.clone() {
@@ -335,6 +337,7 @@ impl Run<'_> {
             error_entries,
             schema_warnings,
             warning_entries,
+            warning_only,
             probe,
             commands,
             group,
@@ -392,7 +395,6 @@ impl Run<'_> {
                 refused: Vec::new(),
                 missing: Vec::new(),
                 cursor: 0,
-                cursor_from_ok: !entry.ok.is_empty(),
             };
             for argv in &entry.ok {
                 calls.ok.push(self.invoke(Call::new(in_json_mode(argv)))?);
@@ -1335,7 +1337,7 @@ impl<'a> Judge<'a> {
     /// The document declares the claimed minor, and nothing of a later one (spec 15.7, 10.13 rule 16).
     fn contract_version(&'a self) -> Finding {
         let mut c = self.check("L0.contract-version");
-        for (index, document) in self.documents_of_json_runs() {
+        for (index, document) in self.envelopes() {
             for (condition, problem) in rules::contract_version_findings(document, self.claim) {
                 c.holds(condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())
@@ -1441,14 +1443,11 @@ impl<'a> Judge<'a> {
             .calls
             .commands
             .iter()
-            .filter_map(|command| match self.cursor_verdict(command.cursor) {
-                CursorVerdict::Unknown if !command.cursor_from_ok => None,
-                verdict => Some(verdict),
-            })
+            .map(|command| self.cursor_verdict(command.cursor))
             .collect();
         if verdicts.is_empty() || verdicts.iter().any(|verdict| *verdict != CursorVerdict::NoPaging) {
             return c.finish_as(End::Unprovided(
-                "no answer the run saw carried meta.page, and the fixture's commands do not all refuse --cursor as an option they do not have: list an `ok` invocation that pages".to_string(),
+                "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (an inconclusive answer counts as one that might page): list an `ok` invocation that pages".to_string(),
             ));
         }
         c.finish_as(End::Unsupported(
@@ -1670,6 +1669,15 @@ impl<'a> Judge<'a> {
                 })
                 .collect();
             c.holds("warning-answers", wrong.is_empty(), || reason_of(&wrong));
+            for (code, index) in &calls.warning_only {
+                c.observe(*index);
+                let Some(document) = self.documents[*index].as_ref().filter(|document| is_envelope(document)) else {
+                    continue;
+                };
+                for (condition, problem) in rules::warning_only_findings(document, &self.tool, code) {
+                    c.holds(condition, problem.is_none(), || format!("`schema --error {code} --json`: {}", problem.clone().unwrap_or_default()));
+                }
+            }
             if let Some(listed) = &self.fixture.warnings {
                 let tool: Vec<&str> = entries.iter().filter_map(|entry| entry.get("code").and_then(Value::as_str)).collect();
                 let mut only_fixture: Vec<&str> = listed.iter().map(String::as_str).filter(|code| !tool.contains(code)).collect();
@@ -1715,7 +1723,7 @@ impl<'a> Judge<'a> {
             (None, Some(_)) => Vec::new(),
             (None, None) => self.fixture.warnings.clone().unwrap_or_default(),
         };
-        for (index, document) in self.documents_of_json_runs() {
+        for (index, document) in self.envelopes() {
             for (condition, problem) in rules::registry_findings(document, rows, &warning_codes, self.claim) {
                 c.holds(condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())

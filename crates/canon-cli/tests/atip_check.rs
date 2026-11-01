@@ -69,6 +69,7 @@ fn answer(args: &[&str]) -> Value {
 fn generate() -> Value {
     json!({
         "contractVersion": "1.1",
+        "timeoutSeconds": 120,
         "setup": [
             ["init"],
             ["subject", "new", "alpha", "--domain", "core", "--title", "Alpha"],
@@ -108,7 +109,7 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.1"), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
-    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "probe", "registry", "setup", "warnings"], "the L0 keys only");
+    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L0 keys only");
     for row in fixture["registry"].as_array().expect("registry") {
         let mut members: Vec<&str> = row.as_object().expect("row").keys().map(String::as_str).collect();
         members.sort_unstable();

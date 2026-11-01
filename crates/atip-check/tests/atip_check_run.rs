@@ -1043,6 +1043,15 @@ fn atip_check_73_whether_the_tool_pages_is_decided_by_asking_each_command_for_a_
     });
     let output = harness.check(&listed, true);
     assert_eq!((output.code, result_of(&output, "L0.page")), (Some(1), "unprovided".to_string()), "{}", output.stdout);
+    // A paging command listed without an `ok` whose cursor probe is inconclusive (it needs an operand first) is not a refusal of
+    // `--cursor`: another command's refusal is not enough for unsupported.
+    let mut inconclusive = harness.fixture(&json!({"noNextNoPage": true, "cursorNeedsName": true}));
+    inconclusive["commands"] = json!({
+        "items": {"refused": [["items", "--bogus-xyz", "--json"]]},
+        "team add": {"ok": [["team", "add", "--json"]]}
+    });
+    let output = harness.check(&inconclusive, true);
+    assert_eq!((output.code, result_of(&output, "L0.page")), (Some(1), "unprovided".to_string()), "{}", output.stdout);
     // A tool that refuses `--cursor` as an option it does not have, for every command the fixture lists, does not page.
     let never = harness.check_config(&json!({"noNextNoPage": true, "noPaging": true}));
     assert_eq!((never.code, result_of(&never, "L0.page")), (Some(0), "unsupported".to_string()));

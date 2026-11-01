@@ -973,6 +973,7 @@
       "Beta"
     ]
   ],
+  "timeoutSeconds": 120,
   "warnings": [
     "BRIEF_ADOPTION_UNAPPROVED",
     "BRIEF_DRAFT_PENDING",

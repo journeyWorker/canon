@@ -210,25 +210,6 @@ pub fn registry_findings(
         .map(String::as_str)
         .filter(|code| is_upper_snake(code) && !warning_codes.iter().any(|known| known == code) && !rows.iter().any(|row| row.code == *code))
         .collect();
-    // `schema --error <CODE>` for a code only the warning registry has refuses with the hint that names `--warning` (7.3.4).
-    let warning_only = |code: &str| warning_codes.iter().any(|known| known == code) && !rows.iter().any(|row| row.code == code);
-    let tool = document.pointer("/meta/tool").and_then(Value::as_str).unwrap_or_default();
-    let wrong_answer: Option<String> = if document.get("ok") == Some(&Value::Bool(false)) {
-        let error = document.get("error");
-        let received = error.and_then(|error| error.get("received")).and_then(Value::as_str);
-        let field = error.and_then(|error| error.get("field")).and_then(Value::as_str);
-        received.filter(|received| field == Some("--error") && warning_only(received)).and_then(|received| {
-            let wanted = format!("{tool} schema --warning {received} --json");
-            let hint = error.and_then(|error| error.get("hint")).and_then(Value::as_str);
-            (hint != Some(wanted.as_str())).then(|| format!("the refusal of `--error {received}` has the hint {hint:?}, expected {wanted:?}"))
-        })
-    } else {
-        document
-            .pointer("/data/error/code")
-            .and_then(Value::as_str)
-            .filter(|code| document.pointer("/data/kind").and_then(Value::as_str) == Some("error") && warning_only(code))
-            .map(|code| format!("`--error {code}` answered an entry for a code only the warning registry has"))
-    };
     vec![
         (
             "emitted-codes-registered",
@@ -243,8 +224,55 @@ pub fn registry_findings(
             "emitted-warnings-registered",
             (!unlisted.is_empty()).then(|| format!("it warned with {}, which neither registry has", unlisted.join(", "))),
         ),
-        ("warning-only-code-refused", wrong_answer),
     ]
+}
+
+/// The code a document is the answer to `schema --error <CODE>` for, when `CODE` is only in the warning registry: the
+/// `received` of a refusal or the code of an entry answered. Used on documents whose call is not known (the examples).
+pub fn warning_only_code_of(document: &Value, rows: &[RegistryRow], warning_codes: &[String]) -> Option<String> {
+    let warning_only = |code: &str| warning_codes.iter().any(|known| known == code) && !rows.iter().any(|row| row.code == code);
+    let code = if document.get("ok") == Some(&Value::Bool(false)) {
+        let error = document.get("error");
+        let field = error.and_then(|error| error.get("field")).and_then(Value::as_str);
+        error
+            .and_then(|error| error.get("received"))
+            .and_then(Value::as_str)
+            .filter(|_| field == Some("--error"))
+    } else if document.pointer("/data/kind").and_then(Value::as_str) == Some("error") {
+        document.pointer("/data/error/code").and_then(Value::as_str)
+    } else {
+        None
+    };
+    code.filter(|code| warning_only(code)).map(str::to_string)
+}
+
+/// `L0.registry`, for the answer to `schema --error <CODE>` with a code only the warning registry has (7.3.4): it is a
+/// refusal (no entry), its code is `USAGE`, its field `--error`, and its hint `<tool> schema --warning <CODE> --json`.
+/// The exit (2) is `L0.ok-exit`'s, which holds every failure to the registered exit of its code.
+pub fn warning_only_findings(document: &Value, tool: &str, code: &str) -> Vec<Finding> {
+    let refused = document.get("ok") == Some(&Value::Bool(false));
+    let error = document.get("error");
+    let text = |member: &str| error.and_then(|error| error.get(member)).and_then(Value::as_str);
+    let wanted = format!("{tool} schema --warning {code} --json");
+    let mut findings: Vec<Finding> = vec![(
+        "warning-only-refused",
+        (!refused).then(|| format!("`--error {code}` answered an entry for a code only the warning registry has")),
+    )];
+    if refused {
+        findings.push((
+            "warning-only-code",
+            (text("code") != Some("USAGE")).then(|| format!("the refusal of `--error {code}` has the code {}, expected USAGE", text("code").unwrap_or("missing"))),
+        ));
+        findings.push((
+            "warning-only-field",
+            (text("field") != Some("--error")).then(|| format!("the refusal of `--error {code}` has the field {}, expected \"--error\"", text("field").unwrap_or("missing"))),
+        ));
+        findings.push((
+            "warning-only-hint",
+            (text("hint") != Some(wanted.as_str())).then(|| format!("the refusal of `--error {code}` has the hint {:?}, expected {wanted:?}", text("hint"))),
+        ));
+    }
+    findings
 }
 
 /// `UPPER_SNAKE_CASE`, the pattern of codes (error.schema.json `$defs/code`).

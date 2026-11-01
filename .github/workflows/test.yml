@@ -205,7 +205,7 @@ jobs:
   # runs the built binary from outside (argv, stdout, stderr, exit status, files,
   # a terminal) and reports the 28 L0 checks of contract 1.1; the MUST ones failing,
   # or missing a fixture entry, fail the job. 0.34: the fixture claims 1.1
-  # (`contractVersion`), so canon is judged on the 27 checks that apply to it, and
+  # (`contractVersion`), so canon is judged on the 26 checks that apply to it (`L0.contract` is a 1.0 rule and `L0.usage-hint` observes no USAGE without a field), and
   # the job is green only with the 1.1 output of `canon-0-34-atip-1-1` in the binary.
   # The fixture is `crates/canon-cli/tests/atip/canon.fixture.json`; its registry
   # and warning list are generated from `canon schema --errors --json` and

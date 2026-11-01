@@ -16,7 +16,8 @@ use sha2::{Digest, Sha256};
 
 use atip_check::checks::rules::{
     contract_version_findings, entry_problems, envelope_problems, hint_problems, next_findings,
-    null_problems, page_findings, reason_names, registry_findings,
+    null_problems, page_findings, reason_names, registry_findings, warning_only_code_of,
+    warning_only_findings,
 };
 use atip_check::checks::{failure_problems, unknown_command_problems};
 use atip_check::claim::Claim;
@@ -24,7 +25,7 @@ use atip_check::fixture::RegistryRow;
 use atip_check::schema::schemas;
 
 /// The tag of the contract repository the copies and the pinned digests come from, and the commit it points at.
-const PINNED: &str = "v1.1.0 (da069df042b1140915d6a5e674b306bf7b5cfd187)";
+const PINNED: &str = "v1.1.0 (da69df042b1140915d6a5e674b306bf7b5cfd187)";
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/atip-examples")
@@ -139,6 +140,9 @@ fn layers(document: &Value) -> Vec<(&'static str, Vec<String>)> {
                 .into_iter()
                 .filter_map(|(_, problem)| problem),
         );
+        if let Some(code) = warning_only_code_of(document, rows, warning_codes) {
+            registered.extend(warning_only_findings(document, tool, &code).into_iter().filter_map(|(_, problem)| problem));
+        }
     }
     found.push(("L0.registry", registered));
     let collect = |findings: Vec<(&'static str, Option<String>)>| -> Vec<String> { findings.into_iter().filter_map(|(_, problem)| problem).collect() };

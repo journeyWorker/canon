@@ -1,6 +1,6 @@
 # The contract repository's examples, as `atip check` tests them
 
-Copied from https://github.com/journeyWorker/atip at the tag v1.1.0 (commit `da069df042b1140915d6a5e674b306bf7b5cfd187`), unmodified:
+Copied from https://github.com/journeyWorker/atip at the tag v1.1.0 (commit `da69df042b1140915d6a5e674b306bf7b5cfd187`), unmodified:
 `examples/report-*.json`, `examples/schema-error*.json`, `examples/schema-warning*.json`, `examples/stream-*.ndjson` and, of `examples/invalid/`,
 `envelope-*`, `report-*`, `schema-error*`, `schema-warning*`, `schema-ledger-*`, `schema-version-not-contract-version.json` and `stream-*`.
 `tests/atip_examples.rs` reads this table, so a file without a row, or a row whose file is missing, fails the test.

@@ -219,6 +219,24 @@ fn atip_check_45_l0_page_fails_on_a_malformed_page_or_a_next_cursor_with_no_curs
 fn atip_check_64_l0_envelope_fails_when_a_document_breaks_the_envelope_schema_and_not_for_what_other_checks_own(
 ) {
     proves("L0.envelope");
+    // A document that is no envelope at all is the envelope check's alone: the contract-version and registry checks judge envelopes.
+    let harness = Harness::new();
+    for config in [json!({"teamAddNoEnvelope": true}), json!({"probeNotEnvelope": true})] {
+        let output = harness.check_config(&config);
+        let document = output.envelope();
+        let failing: Vec<&str> = document["data"]["checks"]
+            .as_array()
+            .expect("checks")
+            .iter()
+            .filter(|check| check["result"] == "fail")
+            .map(|check| check["id"].as_str().unwrap_or_default())
+            .collect();
+        if config["teamAddNoEnvelope"] == true {
+            assert_eq!(failing, ["L0.envelope"], "{config}: {}", output.stdout);
+        } else {
+            assert!(!failing.contains(&"L0.contract-version"), "{config}: {failing:?}");
+        }
+    }
 }
 
 #[test]
@@ -245,6 +263,24 @@ fn atip_check_68_l0_no_prompt_fails_when_a_missing_value_makes_the_tool_wait_on_
 fn atip_check_69_l0_registry_fails_when_the_tools_registries_or_what_it_emitted_disagree_with_the_contract_and_the_fixture(
 ) {
     proves("L0.registry");
+    // `schema --error <warning-only code>` is a refusal that is USAGE, field --error, exit 2 with the hint that names `--warning`: the
+    // code, the field and the hint are L0.registry's; the exit is held to the registered exit of USAGE by L0.ok-exit.
+    let harness = Harness::new();
+    let wrong_exit = harness.check_config(&json!({"warningOnlyErrorExit": 1}));
+    let document = wrong_exit.envelope();
+    let failing: Vec<&str> = document["data"]["checks"]
+        .as_array()
+        .expect("checks")
+        .iter()
+        .filter(|check| check["result"] == "fail")
+        .map(|check| check["id"].as_str().unwrap_or_default())
+        .collect();
+    assert_eq!(failing, ["L0.ok-exit"], "{}", wrong_exit.stdout);
+    assert!(
+        wrong_exit.check("L0.ok-exit")["reason"].as_str().unwrap_or_default().contains("schema --error STALE_VIEW"),
+        "{}",
+        wrong_exit.stdout
+    );
 }
 
 #[test]

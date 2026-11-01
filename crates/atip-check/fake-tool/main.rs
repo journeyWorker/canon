@@ -527,11 +527,18 @@ impl Tool {
             }
             if is_1_1 && warning_only && !self.flag("warningOnlyErrorAnswers") {
                 let tool = self.name();
-                let mut extras = vec![("field", json!("--error")), ("received", json!(code))];
+                // The seeded ways to refuse it wrongly: another code, another field, no hint, another exit.
+                let field = self.text("warningOnlyErrorField", "--error");
+                let refusal_code = self.text("warningOnlyErrorCode", "USAGE");
+                let mut extras = vec![("field", json!(field))];
+                extras.push(("received", json!(code)));
                 if !self.flag("warningOnlyErrorNoHint") {
                     extras.push(("hint", json!(format!("{tool} schema --warning {} --json", value("--error").unwrap_or_default()))));
                 }
-                return self.refuse("USAGE", "that is a warning code, not an error code", "schema", &extras);
+                let exit = self
+                    .number("warningOnlyErrorExit")
+                    .map_or(Self::registered_exit(&refusal_code), |exit| u8::try_from(exit).unwrap_or(2));
+                return self.fail("usage", &refusal_code, "that is a warning code, not an error code", Some("schema"), &extras, exit);
             }
             if is_1_1 && warning_only {
                 return self.success("schema", with_kind("error", json!({"error": {"code": code, "meaning": "m", "exit": 1, "retryable": false, "fix": "f"}})));
@@ -830,6 +837,12 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
             tool.refuse("USAGE", "the backend rejected the request", "reject", &extras)
         }
         "schema" => tool.schema(&options),
+        _ if has("--cursor") && tool.flag("cursorNeedsName") && value("--cursor").as_deref() == Some("x") => tool.refuse(
+            "USAGE",
+            "--name is required",
+            command,
+            &[("field", json!("--name"))],
+        ),
         _ if has("--cursor") => match value("--cursor").as_deref() {
             Some("c1") => tool.success(command, json!({"items": 0, "state": "second page"})),
             other => tool.refuse(
@@ -864,6 +877,10 @@ fn team(tool: &Tool, words: &[String], repo_given: bool) -> ExitCode {
             &[("expected", json!(["add"]))],
             2,
         ),
+        Some("add") if tool.flag("teamAddNoEnvelope") && tool.json => {
+            println!("{}", json!({"ok": true, "data": {}}));
+            ExitCode::SUCCESS
+        }
         Some("add") => tool.success("team add", json!({"added": true})),
         Some(word) => tool.unknown_command(word, &["add"], Some("team")),
     }

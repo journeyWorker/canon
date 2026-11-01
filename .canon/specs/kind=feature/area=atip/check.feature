@@ -404,9 +404,9 @@ Feature: atip check: the atip/1 L0 conformance checker
   @flow:canon-0-33-atip-check.F5
   @atip.check.37
   Scenario: atip check passes on atip itself
-    Given atip and its fixture whose probe is check and whose registry is generated from atip's own
+    Given atip and its fixture, which claims 1.1, whose probe is check, whose registry and warnings are generated from atip's own and whose commands are the refusal and the missing value of atip check
     When atip check runs on atip
-    Then it exits 0 with 17 checks pass and L0.next and L0.page not applicable (atip's answers carry no next step or page), and the committed fixture equals the one generated from the registry in the code
+    Then it exits 0 with 18 MUST and the other applicable checks passing and 6 not applicable (L0.next, L0.page, L0.registry, L0.contract, L0.usage-hint and L0.global-on-group: atip has no next step, page, schema, USAGE without a field or group), and the committed fixture equals the one generated from the registry and warnings in the code
 
   # canon: {"schema":1,"at":"2026-10-31T11:46:57Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
   @subject:atip-check
@@ -415,8 +415,8 @@ Feature: atip check: the atip/1 L0 conformance checker
   @flow:canon-0-33-atip-check.F5
   @atip.check.38
   Scenario: The embedded contract schemas are the originals and a format keyword is an annotation, not an assertion
-    Given the three contract schemas atip embeds
-    When their digests are compared with the originals at 365244c and a format keyword is validated
+    Given the five contract schemas atip embeds (envelope, error, registry-entry, warning-entry, stream-line)
+    When their digests are compared with the originals at v1.1.0 and a format keyword is validated
     Then they are byte for byte the originals, a null where the contract forbids one is rejected, and a value that is not a date-time passes a schema that says format date-time
 
   # canon: {"schema":1,"at":"2026-10-31T11:47:00Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
@@ -437,7 +437,7 @@ Feature: atip check: the atip/1 L0 conformance checker
   @flow:canon-0-33-atip-check.F6
   @atip.check.40
   Scenario: A stale registry in the canon fixture fails the generation test
-    Given a canon fixture with a row dropped, an exit changed, a fix reworded, a member added or a key added
+    Given a canon fixture with a row dropped, an exit changed, a retryable flipped, a member of prose added, a warning dropped, a call changed or a key added
     When the generation test compares it with the generated one
     Then each difference is noticed
 
@@ -802,7 +802,7 @@ Feature: atip check: the atip/1 L0 conformance checker
   Scenario: Whether a tool pages is decided by asking each command of the fixture for a cursor, not by the fixture
     Given a fake tool that pages but whose fixture lists no paging call, one whose paging command is listed without an ok invocation, one that refuses --cursor on every command, and a fixture without commands
     When atip check runs
-    Then L0.page is unprovided for the first and the third and unsupported for the second
+    Then L0.page is unprovided for the first, the second (also when its cursor probe is inconclusive, as when the command needs an operand first) and the fourth, and unsupported only for the third
 
   # canon: {"schema":1,"at":"2026-11-01T07:28:23Z","actor":{"agent_id":"impl-atip-check-1-1","role":"implementer","session_id":"s-0-34-check-1-1"}}
   @subject:atip-check

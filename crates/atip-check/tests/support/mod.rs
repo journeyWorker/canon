@@ -432,8 +432,20 @@ pub fn cases() -> Vec<Case> {
             json!({"warningAnswerDiffers": true}),
         ),
         case(
-            "registry/warning-only-code-refused",
+            "registry/warning-only-refused",
             json!({"warningOnlyErrorAnswers": true}),
+        ),
+        case(
+            "registry/warning-only-code",
+            json!({"warningOnlyErrorCode": "INPUT_INVALID"}),
+        ),
+        case(
+            "registry/warning-only-field",
+            json!({"warningOnlyErrorField": "--errors"}),
+        ),
+        case(
+            "registry/warning-only-hint",
+            json!({"warningOnlyErrorNoHint": true}),
         ),
         case(
             "registry/warnings-are-the-fixtures",
