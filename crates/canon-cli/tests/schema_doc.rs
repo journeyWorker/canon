@@ -347,7 +347,7 @@ fn atip_schemadoc_03_a_group_lists_its_children_and_a_path_in_words_or_one_strin
     for entry in entries.iter().filter(|entry| entry["kind"] == "group") {
         let command = entry["command"].as_str().expect("command");
         let root = canon_cli::spec::built_root();
-        let doc = serde_json::to_value(canon_cli::spec::group(&root, &names(entry, "path")).expect("a group")).expect("serializes");
+        let doc = serde_json::to_value(canon_cli::spec::group(&root, &names(entry, "path"), None).expect("a group")).expect("serializes");
         let direct: Vec<&Value> = entries.iter().filter(|other| other["path"].as_array().is_some_and(|path| path.len() == names(entry, "path").len() + 1) && other["command"].as_str().is_some_and(|c| c.starts_with(&format!("{command} ")))).collect();
         assert_eq!(doc["commands"].as_array().expect("commands").iter().collect::<Vec<_>>(), direct, "{command}");
         assert_eq!(doc["summary"], entry["summary"]);
@@ -374,6 +374,105 @@ fn atip_schemadoc_04_an_unknown_path_names_what_is_valid_and_overlapping_selecto
     let (code, required, _) = answer(&["finding", "--json"]);
     assert_eq!((code, required["error"]["code"].clone()), (Some(2), json!("COMMAND_REQUIRED")));
     assert_eq!(names(&required["error"], "expected"), ["add", "close", "list"]);
+}
+
+/// atip.schemadoc.03: a group document under `--as` lists the children the role's tree lists, and a group the role's tree
+/// omits is refused, so the tree and the groups never disagree about what a role has.
+#[test]
+fn atip_schemadoc_03_a_group_under_as_lists_what_the_roles_tree_lists() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let json = |args: &[&str]| -> (Option<i32>, Value) {
+        let out = run(args, dir.path(), None);
+        (out.status.code(), serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{args:?}: {e}")))
+    };
+    let mut refused = 0;
+    for role in ["planner", "implementer", "reviewer", "orchestrator"] {
+        let (_, tree) = json(&["schema", "--as", role, "--json"]);
+        let entries = tree["data"]["commands"].as_array().expect("commands").clone();
+        for group in TREE["commands"].as_array().expect("commands").iter().filter(|entry| entry["kind"] == "group") {
+            let path = names(group, "path");
+            let mut args: Vec<&str> = vec!["schema"];
+            args.extend(path.iter().map(String::as_str));
+            args.extend(["--as", role, "--json"]);
+            let (code, answer) = json(&args);
+            let wanted: Vec<&Value> = entries.iter().filter(|entry| entry["path"].as_array().is_some_and(|p| p.len() == path.len() + 1 && p[..path.len()] == group["path"].as_array().expect("path")[..])).collect();
+            if wanted.is_empty() {
+                refused += 1;
+                assert_eq!((code, answer["error"]["code"].clone(), answer["error"]["field"].clone()), (Some(2), json!("UNKNOWN_COMMAND"), json!("command")), "{role} {path:?}");
+                assert!(!entries.iter().any(|entry| entry["command"] == group["command"]), "the tree lists {path:?} for {role}");
+            } else {
+                assert_eq!(code, Some(0), "{role} {path:?}");
+                assert_eq!(answer["data"]["commands"].as_array().expect("commands").iter().collect::<Vec<_>>(), wanted, "{role} {path:?}");
+                assert_eq!(answer["data"]["x-canon"], json!({ "as": role }));
+                assert!(entries.iter().any(|entry| entry["command"] == group["command"]), "{role} {path:?}");
+            }
+        }
+    }
+    assert!(refused > 0, "some group holds no command of some role");
+    let (_, brief) = json(&["schema", "brief", "--as", "reviewer", "--json"]);
+    let commands = names_of_entries(&brief["data"]["commands"]);
+    assert!(!commands.contains(&"brief approve".to_string()) && commands.contains(&"brief check".to_string()), "{commands:?}");
+    let (_, plain) = json(&["schema", "brief", "--json"]);
+    assert!(plain["data"].get("x-canon").is_none() && names_of_entries(&plain["data"]["commands"]).contains(&"brief approve".to_string()));
+}
+
+fn names_of_entries(entries: &Value) -> Vec<String> {
+    entries.as_array().expect("entries").iter().map(|entry| entry["command"].as_str().expect("command").to_string()).collect()
+}
+
+/// atip.schemadoc.04: an unknown word is `UNKNOWN_COMMAND` with field `command`; `expected` is the valid words where it
+/// went wrong, and is absent after a command, where no word is valid (spec 7.1.1).
+#[test]
+fn atip_schemadoc_04_an_unknown_path_word_names_the_field_command_and_expects_only_where_a_word_is_valid() {
+    let (code, group, _) = answer(&["schema", "finding", "nosuch", "--json"]);
+    assert_eq!((code, group["error"]["code"].clone(), group["error"]["field"].clone()), (Some(2), json!("UNKNOWN_COMMAND"), json!("command")));
+    assert_eq!(names(&group["error"], "expected"), ["add", "close", "list"]);
+    let (code, past, _) = answer(&["schema", "finding", "close", "nosuch", "--json"]);
+    assert_eq!((code, past["error"]["code"].clone(), past["error"]["field"].clone()), (Some(2), json!("UNKNOWN_COMMAND"), json!("command")));
+    assert!(past["error"].get("expected").is_none(), "no word is valid after a command: {past}");
+    let (_, top, _) = answer(&["schema", "nosuch", "--json"]);
+    assert_eq!(top["error"]["field"], "command");
+    assert!(names(&top["error"], "expected").contains(&"finding".to_string()));
+}
+
+/// atip.schemadoc.05: a variable fills only an option that declares it (spec 16.3): `--as` and attribution `--role` declare
+/// `CANON_ROLE` on every command but `schema`, whose `--as` reads no variable; `--skills-source` declares
+/// `CANON_SKILLS_SOURCE` on the three commands that read it; and every `CANON_*` a help text names is the option's `env`.
+#[test]
+fn atip_schemadoc_05_an_option_that_an_environment_variable_fills_declares_it() {
+    let mut problems = Vec::new();
+    for doc in COMMANDS.iter() {
+        let command = doc["command"].as_str().expect("command");
+        for option in doc["options"].as_array().expect("options") {
+            let name = option["name"].as_str().expect("name");
+            let env = option.get("env").and_then(Value::as_str);
+            let expected = match (command, name) {
+                ("schema", _) => None,
+                (_, "as" | "role") => Some("CANON_ROLE"),
+                ("skills install" | "skills check" | "skills doctor", "skills-source") => Some("CANON_SKILLS_SOURCE"),
+                ("feature new" | "scenario new" | "brief approve" | "migrate" | "policy approve", "actor") => Some("CANON_ACTOR"),
+                _ => None,
+            };
+            if env != expected {
+                problems.push(format!("`{command}` --{name}: env is {env:?}, expected {expected:?}"));
+            }
+            // A variable the help names as filling the option is declared on it (the shared `--as` text names CANON_ROLE
+            // as what it overrides, which `schema` does not read).
+            let help = option["help"].as_str().expect("help");
+            for variable in ["CANON_ACTOR", "CANON_SKILLS_SOURCE"] {
+                if help.contains(variable) && env != Some(variable) {
+                    problems.push(format!("`{command}` --{name}: the help names {variable} and the option does not declare it"));
+                }
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    assert!(option(command_doc("schema"), "as").get("env").is_none(), "schema's --as reads no variable");
+    assert_eq!(option(command_doc("status"), "as")["env"], "CANON_ROLE");
+    assert_eq!(option(command_doc("skills install"), "providers")["defaultNote"].as_str().map(|note| note.contains("skills.providers")), Some(true));
+    for command in ["skills check", "skills doctor"] {
+        assert!(option(command_doc(command), "providers").get("defaultNote").is_some(), "{command}");
+    }
 }
 
 // ----------------------------------------------------------------------------------------------------------
@@ -492,7 +591,7 @@ fn atip_schemadoc_05_help_defaults_equal_the_documented_defaults_and_a_name_mean
                 problems.push(format!("`{command}` --{name}: the document says {default}, --help prints {:?}", printed.get(name)));
             }
             let help = option["help"].as_str().expect("help").to_lowercase();
-            let promises = help.contains("(default") || help.contains("defaults to") || help.contains("default is") || help.contains("default:") || help.contains("[default");
+            let promises = help.contains("(default") || help.contains("defaults to") || help.contains("default is") || help.contains("default:") || help.contains("[default") || help.contains("omitted:") || help.contains("as for install") || help.contains("default to") || help.contains("falls back");
             if promises && default.is_null() && option.get("defaultNote").is_none() {
                 problems.push(format!("`{command}` --{name} promises a default in its help and has neither a typed default nor a defaultNote: {help}"));
             }
@@ -812,6 +911,31 @@ fn atip_schemadoc_13_no_consumer_uses_an_old_name() {
         let text = std::fs::read_to_string(&path).unwrap_or_default();
         for name in old_names_in(&text) {
             problems.push(format!("{}: {name}", path.strip_prefix(repo_root()).unwrap_or(&path).display()));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// atip.schemadoc.13 (F7): the sources of the workspace do not spell a member name the old spec had. (`canon context`'s
+/// own report keeps `about` and `roles`: its `data` shape is not this change's; it reads the new documents.)
+#[test]
+fn atip_schemadoc_13_no_source_uses_an_old_name() {
+    let mut problems = Vec::new();
+    let mut stack: Vec<PathBuf> = std::fs::read_dir(repo_root().join("crates")).expect("crates").flatten().map(|entry| entry.path().join("src")).collect();
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                let text = std::fs::read_to_string(&path).unwrap_or_default();
+                for name in ["nodeKind", "errorCodes", "supportsJson", "requiredOneOf", "conflictsWith"] {
+                    if text.contains(name) {
+                        problems.push(format!("{}: {name}", path.strip_prefix(repo_root()).unwrap_or(&path).display()));
+                    }
+                }
+            }
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));

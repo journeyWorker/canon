@@ -155,6 +155,12 @@ pub fn warn_if_unknown(role: &canon_model::RoleId, repo: &std::path::Path) {
     crate::json_out::warn("ROLE_UNKNOWN_RECORDED", message);
 }
 
+/// Resolve the declared role from the flag alone: `canon schema` never reads `CANON_ROLE` (spec 10.2.2, 16.3), so its
+/// `--as` is the one thing that declares a role there and its document declares no `env` for it.
+pub fn init_flag_only(flag: Option<Role>) -> Option<Role> {
+    *DECLARED.get_or_init(|| flag)
+}
+
 /// Resolve the declared role once, at startup. The `--as` flag wins over
 /// `CANON_ROLE`; an unknown `CANON_ROLE` value is refused unless the flag
 /// overrides it.

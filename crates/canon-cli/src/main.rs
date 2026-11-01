@@ -91,9 +91,11 @@ fn run() -> ExitCode {
         Err(error) => return usage_error(&error.format(&mut command.clone())),
     };
     // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
-    // `canon schema`, `canon context` and `canon skills show` never fail on the role: a bad `CANON_ROLE` is a warning there.
-    if let Err(error) = canon_cli::role::init(cli.declared_role) {
-        let role_free = matches!(&cli.command, canon_cli::cli::Command::Schema(_) | canon_cli::cli::Command::Context(_) | canon_cli::cli::Command::Skills { action: canon_cli::cli::SkillsCommand::Show(_) });
+    // `canon context` and `canon skills show` never fail on the role: a bad `CANON_ROLE` is a warning there.
+    // `canon schema` does not read `CANON_ROLE` at all (spec 10.2.2, 16.3): only its own `--as` declares a role there.
+    let resolved = if matches!(&cli.command, canon_cli::cli::Command::Schema(_)) { Ok(canon_cli::role::init_flag_only(cli.declared_role)) } else { canon_cli::role::init(cli.declared_role) };
+    if let Err(error) = resolved {
+        let role_free = matches!(&cli.command, canon_cli::cli::Command::Context(_) | canon_cli::cli::Command::Skills { action: canon_cli::cli::SkillsCommand::Show(_) });
         if !role_free {
             return ExitCode::from(error.emit("canon", atip::argv_wants_json()));
         }
