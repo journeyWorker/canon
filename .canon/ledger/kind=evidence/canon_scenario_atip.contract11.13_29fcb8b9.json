@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-atip-1-1"
+  },
+  "at": "2026-11-01T08:57:16.303729Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_13_reviving_one_of_the_old_names_fails_the_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-r1-junit.xml",
+      "sha256": "47e6a8d222cdfa5efefbfa97f359c72357e0e55942e9b8894e3c8021ceb87dbc"
+    },
+    {
+      "case": "atip_contract11_13_a_revived_name_in_a_scanned_file_fails_the_scan",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-r1-junit.xml",
+      "sha256": "47e6a8d222cdfa5efefbfa97f359c72357e0e55942e9b8894e3c8021ceb87dbc"
+    },
+    {
+      "case": "atip_contract11_13_the_0_33_names_are_gone_from_every_guide_page_script_spec_and_scenario",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-atip-1-1-r1-junit.xml",
+      "sha256": "47e6a8d222cdfa5efefbfa97f359c72357e0e55942e9b8894e3c8021ceb87dbc"
+    }
+  ],
+  "code_tree": "7b922d4ecb8731dc64185a47646a3df53e18cf5b",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-atip-1-1-r1-junit.xml"
+  },
+  "evidence_sha": "6d2efc765778b47c8a7604adcc3d112f4cb95f75",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "atip.contract11.13",
+  "schema": 1,
+  "staging_id": "0f513f1d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
