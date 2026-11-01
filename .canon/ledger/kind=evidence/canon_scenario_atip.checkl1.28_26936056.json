@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-l1"
+  },
+  "at": "2026-11-01T16:30:54.309706Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_condition_a_conforming_run_judges_has_a_case",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "4a9ded99c16eb99ea72b3a31445581f42516df19f68283201eb43d98123fd44e"
+    }
+  ],
+  "code_tree": "7f111ed603c2b3d23938b021e7ca77d54e223bc5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "a9d3e93cbd7c5a31a019938e800f4314aca55898",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 61,
+  "scenario_id": "atip.checkl1.28",
+  "schema": 1,
+  "staging_id": "0f319aaf",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
