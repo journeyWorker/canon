@@ -45,12 +45,40 @@ pub fn no_commit(message: impl Into<String>) -> CliError {
     CliError::refused("NO_COMMIT", message).hint(NO_COMMIT_HINT)
 }
 
-fn git(repo: &Path, index: Option<&Path>, args: &[&str], stdin: Option<&[u8]>) -> Result<std::process::Output, String> {
+/// Where a computation of the code tree keeps what it writes: a temporary index and a temporary object
+/// directory. Git writes the blobs of `add -A` and the trees of `write-tree` into the object directory; the
+/// repository's own objects (and its own alternates) are read through `GIT_ALTERNATE_OBJECT_DIRECTORIES`. So the
+/// run reads the repository and writes nothing in it, `.git` included: a refusal changes nothing (atip/1 8.2),
+/// and a read command (`gate check`) does not grow `.git/objects`. A code tree is only ever compared as an id,
+/// never read back as an object, so its objects need not outlive the run.
+struct Scratch {
+    index: PathBuf,
+    objects: PathBuf,
+    /// The repository's object directory and the ones its `objects/info/alternates` lists, `:`-joined.
+    alternates: std::ffi::OsString,
+}
+
+impl Scratch {
+    fn new(repo: &Path, dir: &Path) -> Result<Self, String> {
+        let real = text(git(repo, None, &["rev-parse", "--path-format=absolute", "--git-path", "objects"], None)?);
+        let real = PathBuf::from(real);
+        let mut dirs = vec![real.clone()];
+        if let Ok(listed) = std::fs::read_to_string(real.join("info/alternates")) {
+            dirs.extend(listed.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).map(|l| real.join(l)));
+        }
+        let alternates = std::env::join_paths(dirs).map_err(|e| e.to_string())?;
+        let objects = dir.join("objects");
+        std::fs::create_dir_all(&objects).map_err(|e| e.to_string())?;
+        Ok(Self { index: dir.join("index"), objects, alternates })
+    }
+}
+
+fn git(repo: &Path, scratch: Option<&Scratch>, args: &[&str], stdin: Option<&[u8]>) -> Result<std::process::Output, String> {
     use std::io::Write;
     let mut cmd = Command::new("git");
     cmd.current_dir(repo).args(args).stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() }).stdout(Stdio::piped()).stderr(Stdio::piped());
-    if let Some(index) = index {
-        cmd.env("GIT_INDEX_FILE", index);
+    if let Some(scratch) = scratch {
+        cmd.env("GIT_INDEX_FILE", &scratch.index).env("GIT_OBJECT_DIRECTORY", &scratch.objects).env("GIT_ALTERNATE_OBJECT_DIRECTORIES", &scratch.alternates);
     }
     let mut child = cmd.spawn().map_err(|e| format!("cannot run git: {e}"))?;
     if let (Some(bytes), Some(mut pipe)) = (stdin, child.stdin.take()) {
@@ -186,7 +214,7 @@ fn spec_root_prefixes(repo: &Path) -> Result<Vec<String>, CliError> {
 
 /// Write the tree of the temporary index after dropping everything that is not code.
 /// Returns the tree id and whether any code file is left.
-fn filtered_tree(repo: &Path, index: &Path, exclude: &[String], roots: &[String]) -> Result<(String, bool), String> {
+fn filtered_tree(repo: &Path, index: &Scratch, exclude: &[String], roots: &[String]) -> Result<(String, bool), String> {
     let listing = git(repo, Some(index), &["ls-files", "-z"], None)?.stdout;
     let mut drop = Vec::new();
     let mut kept = false;
@@ -226,9 +254,9 @@ pub fn code_tree(repo: &Path, rev: Option<&str>) -> Result<CodeTree, CliError> {
     let head = resolve_rev(repo, "HEAD").ok();
     let tmp = TempIndex::new();
     std::fs::create_dir_all(&tmp.0).map_err(|e| fail(e.to_string()))?;
-    let index = tmp.0.join("index");
+    let index = Scratch::new(repo, &tmp.0).map_err(fail)?;
     let build = |source: Option<&str>| -> Result<(String, bool), String> {
-        let _ = std::fs::remove_file(&index);
+        let _ = std::fs::remove_file(&index.index);
         match source {
             Some(sha) => {
                 git(repo, Some(&index), &["read-tree", sha], None)?;
