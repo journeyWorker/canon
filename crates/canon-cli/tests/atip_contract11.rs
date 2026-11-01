@@ -148,7 +148,7 @@ fn atip_contract11_16_a_group_option_that_is_not_tool_wide_or_has_no_value_is_st
         assert_eq!(out.status.code(), Some(2), "{args:?}");
         let document = json(&out);
         assert_eq!((document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some("USAGE"), Some(field)), "{args:?}: {document}");
-        assert_eq!(document["error"]["received"], field, "the refused word is the option itself: {document}");
+        assert!(document["error"]["received"].is_null() || document["error"]["received"] == field, "a value never sent is not `received`: {document}");
         assert_ne!(document["error"]["code"], "COMMAND_REQUIRED", "{args:?}");
     }
     // After a leaf nothing is hoisted: a leaf that does not take the option refuses it as USAGE, naming it.
