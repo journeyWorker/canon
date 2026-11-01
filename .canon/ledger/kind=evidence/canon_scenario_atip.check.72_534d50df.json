@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-check-1-1",
+    "role": "implementer",
+    "session_id": "s-0-34-check-1-1"
+  },
+  "at": "2026-11-01T09:23:38.505159Z",
+  "attachments": [
+    {
+      "case": "atip_check_72_l0_global_on_group_reports_an_advisory_when_a_tool_wide_option_after_a_group_is_an_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-34-check-1-1-r3-junit.xml",
+      "sha256": "9731d7f6c2b378d91a0b08f6e071bf0710510d872e6fd198667d4fd3978f0044"
+    }
+  ],
+  "code_tree": "5c007a0040a3a57f298e1c085e574f76b5b01dab",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-34-check-1-1-r3-junit.xml"
+  },
+  "evidence_sha": "10cdac9e3c8006fea7835e3e812562f1370ab9ff",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 420,
+  "scenario_id": "atip.check.72",
+  "schema": 1,
+  "staging_id": "bb1204bd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
