@@ -5,14 +5,6 @@ use atip::domain::Domain;
 
 use super::{DomainRow, Scope, Tables, KEBAB, NOT_BLANK, TASK_ID};
 
-/// White space as Rust's `char::is_whitespace` and `str::trim` read it (the macro of `mod.rs` is not in scope in a child
-/// written before it, so the class is written here once more).
-macro_rules! white_space {
-    () => {
-        " \t\n\u{b}\u{c}\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}"
-    };
-}
-
 /// A scenario tag as `scenario new` reads it: `<area>.<surface>.<nn>` with at most one leading `@` (the form a scenario
 /// body writes it in).
 const SCENARIO_TAG: &str = "^@?[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$";

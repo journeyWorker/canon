@@ -10,7 +10,7 @@ pub const SITES: &[Site] = &[
     site("brief_approve.rs:run_approve:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["digest", "change"] }),
     site("brief_approve.rs:verify_shown:USAGE#1", Kind::Precondition("a relayed approval of the repo's only live change (no operand names it) needs the digest the human was shown: the change is read from the repo first")),
     // change new
-    site("change.rs:run_new:CHANGE_INVALID_ARGUMENT#1", Kind::Precondition("the staged brief and the plan adapter that reads it fail: reads and writes the staging directory, not an argument's shape")),
+    site("change.rs:run_new:CHANGE_INVALID_ARGUMENT#1", Kind::Unreachable("the staged brief is canon's own template and no --title (blank, several lines, a markdown heading, a colon, a tab) was found to make the plan adapter reject it; what is left is a failure of the staging directory, not an argument")),
     // context packs
     site("context_pack.rs:pack_id_usage_error:USAGE#1", Kind::Domain { command: "context-pack show", argument: "id" }),
     // task done
