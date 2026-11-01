@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-constraints",
+    "role": "reviewer",
+    "session_id": "s-0-34-constraints-rev"
+  },
+  "at": "2026-11-01T19:27:32.966444Z",
+  "change_id": "canon-0-34-atip-constraints",
+  "code_tree": "e0f1eaf7589003cf343776fd9cc0cab93360375d",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "37c6159ab44015669dc5eb99b20fc56310bc0a0d",
+  "resolution_sha": "a349f58a876cb2ce11db69f6c7f7ec13e06afc15",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "f86c34401b799acbb8c576fe65f5bf573af1fb0e",
+  "reviewer": "rev-constraints",
+  "round": 3,
+  "scenario_ids": [
+    "atip.constraints.23"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec fidelity] batch preflight still lets CONFIG_MISSING answer first in a directory with no repository when item 0 is valid: `export --input '[{\"kind\":\"change\"},{\"kind\":\"change\",\"before\":\"2026-01-02\",\"after\":\"2026-02-01\"}]'`, the same with `limit` 0 or a bad calendar date, `artifacts store --input '[{},{\"maxArtifactMib\":0}]'`, `ingest records` and `ingest sessions` with `intervalSecs` -1 all answer exit 2 CONFIG_MISSING at --repo instead of the item's fault at /items/1/...; in a repository every one of them is refused in preflight with the item's own code and nothing written, and the batches of finding add/close, divergence add/defer, evidence add, review change, change new, init, skills install and gate install-hooks answer the fault in both places; spec 11.7 and 11.11 make steps 1-6 independent of state; exit 2 and nothing written either way; blast radius: the four commands whose item 0 can be `{}` and that need a configured repository",
+  "worktree_dirty": false
+}
