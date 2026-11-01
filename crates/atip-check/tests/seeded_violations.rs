@@ -221,7 +221,7 @@ fn atip_check_64_l0_envelope_fails_when_a_document_breaks_the_envelope_schema_an
     proves("L0.envelope");
     // A document that is no envelope at all is the envelope check's alone: the contract-version and registry checks judge envelopes.
     let harness = Harness::new();
-    for config in [json!({"teamAddNoEnvelope": true}), json!({"probeNotEnvelope": true})] {
+    for config in [json!({"teamAddNoEnvelope": true}), json!({"teamAddNoEnvelopeCode": true}), json!({"probeNotEnvelope": true})] {
         let output = harness.check_config(&config);
         let document = output.envelope();
         let failing: Vec<&str> = document["data"]["checks"]
@@ -231,7 +231,8 @@ fn atip_check_64_l0_envelope_fails_when_a_document_breaks_the_envelope_schema_an
             .filter(|check| check["result"] == "fail")
             .map(|check| check["id"].as_str().unwrap_or_default())
             .collect();
-        if config["teamAddNoEnvelope"] == true {
+        if config["probeNotEnvelope"] != true {
+            // The unregistered code and reason of the second document are L0.registry's only on an envelope: here it fails nothing but L0.envelope.
             assert_eq!(failing, ["L0.envelope"], "{config}: {}", output.stdout);
         } else {
             assert!(!failing.contains(&"L0.contract-version"), "{config}: {failing:?}");

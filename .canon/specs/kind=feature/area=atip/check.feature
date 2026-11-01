@@ -703,7 +703,7 @@ Feature: atip check: the atip/1 L0 conformance checker
   Scenario: L0.envelope fails when a document breaks the envelope schema, and not for what other checks own
     Given a fake tool whose envelopes carry an unknown meta member
     When atip check runs
-    Then L0.envelope is fail and no other check fails; a null, a later-minor member or a code in the wrong case is judged by its own check
+    Then L0.envelope is fail and no other check fails; a null, a later-minor member or a code in the wrong case is judged by its own check, and a document that is no envelope (also one carrying an unregistered error.code) is judged by L0.envelope alone
 
   # canon: {"schema":1,"at":"2026-11-01T07:27:48Z","actor":{"agent_id":"impl-atip-check-1-1","role":"implementer","session_id":"s-0-34-check-1-1"}}
   @subject:atip-check

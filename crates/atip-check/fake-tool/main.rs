@@ -881,6 +881,11 @@ fn team(tool: &Tool, words: &[String], repo_given: bool) -> ExitCode {
             println!("{}", json!({"ok": true, "data": {}}));
             ExitCode::SUCCESS
         }
+        // A document that is no envelope but carries an error code no registry has: only L0.envelope may judge it.
+        Some("add") if tool.flag("teamAddNoEnvelopeCode") && tool.json => {
+            println!("{}", json!({"ok": false, "error": {"code": "NOT_REGISTERED", "reason": "NOT_A_REASON", "message": "m", "retryable": false}}));
+            ExitCode::SUCCESS
+        }
         Some("add") => tool.success("team add", json!({"added": true})),
         Some(word) => tool.unknown_command(word, &["add"], Some("team")),
     }
