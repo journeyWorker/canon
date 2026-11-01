@@ -1,6 +1,6 @@
 import "./style.css";
 import { renderNav } from "./nav";
-import { advisoryTotal, approvalRequest, approveDisabled, approveFailure, refusedIds, renderApproveError, renderBriefsPage, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
+import { advisoryTotal, approvalRequest, approvedChanges, approveDisabled, approveFailure, refusedIds, renderApproveError, renderBriefsPage, type RelayedBrief, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
 import { h, toDom } from "./vnode";
 
 // The briefs page: the changes whose brief awaits the human, and the form
@@ -21,7 +21,8 @@ renderNav(nav, "briefs");
 
 interface ApprovalEntry {
   change: string;
-  outcome: "written" | "unchanged" | "failed" | "skipped";
+  /** `written`, `unchanged`, `failed` or `skipped`; an entry with another string is left out of what counts as approved. */
+  outcome: string;
   brief?: string;
   digest?: string;
   error?: string;
@@ -60,7 +61,7 @@ function refresh(busy = false): void {
 }
 
 function afterApproval(data: ApprovalsData): void {
-  const done = new Set(data.approvals.filter((a) => a.outcome === "written" || a.outcome === "unchanged").map((a) => a.change));
+  const done = new Set(approvedChanges(data));
   for (const card of main!.querySelectorAll<HTMLElement>(".brief")) if (done.has(card.dataset.change ?? "")) card.remove();
   notices!.append(
     toDom(
