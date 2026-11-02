@@ -254,6 +254,28 @@ fn atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_co
     // a document problem is step 2: it answers before the argv's
     let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "--round", "abc", "--input", r#"{"seq":"x"}"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("INPUT_INVALID", Some("/seq")), "{body}");
+    // ... whatever the command line's own fault is: an unknown option, an option with no value (last word, or before another option), a bad value
+    for argv in [
+        vec!["finding", "close", "--bogus", "--input", r#"{"seq":"x"}"#, "--json"],
+        vec!["finding", "close", "--input", r#"{"seq":"x"}"#, "--bogus", "--json"],
+        vec!["finding", "close", "--round", "--input", r#"{"seq":"x"}"#, "--json"],
+        vec!["finding", "close", "--input", r#"{"seq":"x"}"#, "--round", "--json"],
+        vec!["finding", "close", "--round", "abc", "--input", r#"{"disposition":"nope"}"#, "--json"],
+        vec!["finding", "close", "--bogus", "--input", r#"[{"seq":"x"}]"#, "--json"],
+    ] {
+        let (exit, code, reason, field, body) = refusal(&canon(repo, &argv));
+        assert_eq!((exit, code.as_str(), reason.as_deref()), (Some(2), "INPUT_INVALID", Some("INVALID_VALUE")), "{argv:?}: {body}");
+        assert!(field.as_deref().is_some_and(|f| f.ends_with("/seq") || f.ends_with("/disposition")), "{argv:?}: {body}");
+    }
+    // with a document that is right, the same faults answer with their argv code
+    for (argv, field) in [
+        (vec!["finding", "close", "--round", "--input", r#"{"seq":1}"#, "--json"], "--round"),
+        (vec!["finding", "close", "--input", r#"{"seq":1}"#, "--round", "--json"], "--round"),
+        (vec!["finding", "close", "--bogus", "--input", r#"{"seq":1}"#, "--json"], "--bogus"),
+    ] {
+        let (exit, code, _, found, body) = refusal(&canon(repo, &argv));
+        assert_eq!((exit, code.as_str(), found.as_deref()), (Some(2), "USAGE", Some(field)), "{argv:?}: {body}");
+    }
     assert_eq!(tree(repo), before);
 }
 
@@ -330,7 +352,8 @@ fn atip_inputorder_10_the_environment_never_touches_a_key_the_document_gives() {
     let repo = dir.path();
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     let with_actor = json!({"operands": ["auth.login.02"], "title": "Two", "feature": feature, "actor": "alice"}).to_string();
-    let out = canon_with(repo, &["scenario", "new", "--input", &with_actor, "--json"], None, &[("CANON_ACTOR", "bob")]);
+    // an environment value no write would take (a newline in an actor) is never read for a key the document gives
+    let out = canon_with(repo, &["scenario", "new", "--input", &with_actor, "--json"], None, &[("CANON_ACTOR", "not\nan actor")]);
     assert_eq!(out.status.code(), Some(0), "{}", json_of(&out));
     let without_actor = json!({"operands": ["auth.login.03"], "title": "Three", "feature": feature}).to_string();
     let out = canon_with(repo, &["scenario", "new", "--input", &without_actor, "--json"], None, &[("CANON_ACTOR", "bob")]);

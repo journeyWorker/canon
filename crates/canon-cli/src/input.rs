@@ -365,7 +365,9 @@ fn lex(cmd: &Command, path: &[String], tokens: &[String]) -> Lexed {
             };
             let arg = find_long(cmd, name);
             let mut value = inline;
-            if arg.is_some_and(takes_value) && value.is_none() && i + 1 < tokens.len() {
+            // clap does not read a following long option as the value (`--round --input …` is a missing value), unless the option takes hyphen values
+            let next_is_option = tokens.get(i + 1).is_some_and(|next| next.len() > 2 && next.starts_with("--")) && !arg.is_some_and(Arg::is_allow_hyphen_values_set);
+            if arg.is_some_and(takes_value) && value.is_none() && i + 1 < tokens.len() && !next_is_option {
                 value = Some(tokens[i + 1].clone());
                 i += 1;
             }
@@ -948,18 +950,6 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     let lexed = lex(cmd, &path, &tokens);
     let inputs: Vec<&Opt> = lexed.opts.iter().filter(|o| o.long.as_deref() == Some("input")).collect();
     if inputs.is_empty() {
-        return Expanded::Argv(args);
-    }
-    // An option the leaf does not have is clap's to refuse (`USAGE` naming it), as it is without `--input`:
-    // reading its value as an operand here would turn the refusal into a conflict with the document.
-    let known_elsewhere = |token: &str| match token.strip_prefix("--") {
-        Some(rest) => {
-            let name = rest.split('=').next().unwrap_or_default();
-            matches!(name, "help" | "version") || find_long(root, name).is_some()
-        }
-        None => matches!(token, "-h" | "-V") || token.chars().nth(1).is_some_and(|c| find_short(root, c).is_some()),
-    };
-    if lexed.opts.iter().any(|o| o.long.is_none() && !known_elsewhere(&tokens[o.span.start])) {
         return Expanded::Argv(args);
     }
     let leaf = Leaf::of(cmd, &path);
