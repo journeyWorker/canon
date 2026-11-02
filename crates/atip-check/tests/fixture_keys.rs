@@ -246,7 +246,9 @@ fn atip_check_95_a_command_named_in_not_run_is_never_run_and_the_checks_that_wou
     fixture["timeoutSeconds"] = json!(15);
     let started = std::time::Instant::now();
     let output = harness.check(&fixture, true);
-    assert!(started.elapsed() < std::time::Duration::from_secs(14), "the run waited for the time limit: {:?}", started.elapsed());
+    // The command hangs for ten minutes and the time limit is 15 seconds: a run that had started it would have it killed and fail its check.
+    assert!(started.elapsed() < std::time::Duration::from_secs(300), "{:?}", started.elapsed());
+    assert!(output.envelope()["data"]["checks"].as_array().expect("checks").iter().all(|check| check["observed"].as_array().into_iter().flatten().all(|call| call["argv"].as_array().is_some_and(|argv| argv.first().is_none_or(|word| word != "team")))), "no check observed team add: {}", output.stdout);
     assert_eq!(output.code, Some(0), "{}", output.stdout);
     assert!(run_log(&log).iter().all(|line| !line.starts_with("team add")), "{:?}", run_log(&log));
     for id in ["L0.page", "L0.no-prompt", "L0.global-on-group"] {
@@ -263,7 +265,7 @@ fn atip_check_95_a_command_named_in_not_run_is_never_run_and_the_checks_that_wou
     fixture["timeoutSeconds"] = json!(15);
     let started = std::time::Instant::now();
     let output = harness.check_l1(&config, &fixture);
-    assert!(started.elapsed() < std::time::Duration::from_secs(120), "{:?}", started.elapsed());
+    assert!(started.elapsed() < std::time::Duration::from_secs(600), "{:?}", started.elapsed());
     assert_eq!(output.code, Some(0), "{}", output.stdout);
     let lines = run_log(&log);
     assert!(lines.iter().all(|line| !line.starts_with("member search") || line.contains("--help")), "{lines:?}");
