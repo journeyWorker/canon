@@ -136,8 +136,10 @@ impl<'a> Judge<'a> {
                             refusal_text(second_doc, second.exit)
                         )
                     });
-                    c.holds_at(run.second, "second-run-no-new-effect", second.changes.is_empty(), || {
-                        format!("{}: `{argv}` is `{kind}` and its second run changed {}", run.command, second.changes.join(", "))
+                    // A side effect the fixture names in `allowedEffects` (an audit line) does not count against replay-safety.
+                    let changed: Vec<&String> = second.changes.iter().filter(|path| !run.allowed.iter().any(|pattern| glob::matches(pattern, path))).collect();
+                    c.holds_at(run.second, "second-run-no-new-effect", changed.is_empty(), || {
+                        format!("{}: `{argv}` is `{kind}` and its second run changed {}", run.command, changed.iter().map(|path| path.as_str()).collect::<Vec<_>>().join(", "))
                     });
                     let _ = first;
                 }

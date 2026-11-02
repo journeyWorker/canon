@@ -347,6 +347,11 @@ fn stamp_run(tool: &Tool, _args: &[String], parsed: &Parsed) -> ExitCode {
     let key = digest(text).replace("sha256:", "");
     let path = std::path::Path::new("stamps").join(format!("{}.txt", &key[..16]));
     let kept = path.exists();
+    // Seeded: every run appends an audit line, a named side effect that is not a new effect of the stamp.
+    if tool.flag("stampAudit") && !parsed.has("dry-run") {
+        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(".stamp-audit.log").unwrap_or_else(|_| std::process::exit(70));
+        writeln!(file, "stamped").unwrap_or_default();
+    }
     if parsed.has("dry-run") {
         if tool.flag("dryRunWrites") {
             std::fs::write("dry-run-cache.txt", "written by a dry run").unwrap_or_default();

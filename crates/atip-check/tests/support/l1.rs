@@ -358,7 +358,7 @@ pub fn l1_cases() -> Vec<Case> {
         // tree
         case("tree/answered", json!({"treeAnswer": "usage"})),
         case("tree/valid", patch(&[("<tree>", vec![remove("/commands/0/summary")])])),
-        case("tree/level", patch(&[("<tree>", vec![set("/level", json!("L2"))])])),
+        case("tree/level", patch(&[("<tree>", vec![set("/level", json!("L0"))])])),
         case("tree/groups-first", json!({"treeGroupsLast": true})),
         case("tree/unique-ids", patch(&[("<tree>", vec![copy("/commands/0", "/commands/-")])])),
         case("tree/entry-path", patch(&[("<tree>", vec![set("/commands/0/command", json!("initx"))])])),

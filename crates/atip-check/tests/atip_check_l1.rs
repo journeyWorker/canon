@@ -698,3 +698,12 @@ fn draft_config() {
         }
     }
 }
+
+#[test]
+fn atip_checkl1_03_a_tree_that_declares_a_higher_level_than_the_claim_meets_it() {
+    // Levels are cumulative: an L1 claim against a tree that says L2 passes L1.tree.
+    let case = Case { condition: "tree/level", config: l1_config(&json!({"treeLevel": "L2"})), tweak: None };
+    let output = run_case(&case);
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L1.tree")["result"], "pass", "{}", output.stdout);
+}

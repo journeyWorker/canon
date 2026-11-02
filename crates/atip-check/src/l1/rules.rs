@@ -39,13 +39,22 @@ fn joined(prefix: &str, problems: &[String]) -> Option<String> {
 /// `answer` is the whole `schema --json` envelope; `claimed_level` is `"L1"`.
 ///
 /// `groups-first` is not judged for a search answer (`data.query`), which lists matches and not the tree.
+/// Levels are cumulative: a tree that declares a level at or above the claimed one meets it (L0 < L1 < L2).
+fn level_meets(declared: &str, claimed: &str) -> bool {
+    const ORDER: [&str; 3] = ["L0", "L1", "L2"];
+    match (ORDER.iter().position(|level| *level == declared), ORDER.iter().position(|level| *level == claimed)) {
+        (Some(declared), Some(claimed)) => declared >= claimed,
+        _ => declared == claimed,
+    }
+}
+
 pub fn tree_findings(answer: &Value, tree: &Tree, claimed_level: &str) -> Findings {
     let mut findings = Findings::new();
     findings.push((
         "level",
-        (tree.level != claimed_level).then(|| {
+        (!level_meets(&tree.level, claimed_level)).then(|| {
             format!(
-                "tree: level {:?} is not the claimed level {claimed_level}",
+                "tree: level {:?} is below the claimed level {claimed_level}",
                 tree.level
             )
         }),
@@ -1582,10 +1591,12 @@ mod tests {
     }
 
     #[test]
-    fn atip_checkl1_rules_a_tree_of_another_level_than_claimed_fails_only_level() {
+    fn atip_checkl1_rules_a_tree_at_or_above_the_claimed_level_meets_it_and_another_fails_only_level() {
         let (answer, tree) = tree_answer("schema-docs/schema-tree.json");
-        let findings = tree_findings(&answer, &tree, "L1");
-        assert_ne!(tree.level, "L1", "the example tree declares another level");
+        // The example tree declares L2: it meets an L1 claim (levels are cumulative) and fails an unknown one.
+        assert_eq!(tree.level, "L2");
+        assert!(tree_findings(&answer, &tree, "L1")[0].1.is_none());
+        let findings = tree_findings(&answer, &tree, "L3");
         assert!(findings[0].1.is_some(), "{findings:#?}");
         assert!(findings[1..].iter().all(|(_, problem)| problem.is_none()));
     }

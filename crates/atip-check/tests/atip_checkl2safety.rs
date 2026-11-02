@@ -246,3 +246,19 @@ fn atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_a
     assert_eq!(check["result"], "unsupported", "{check}");
     assert!(check["reason"].as_str().unwrap_or_default().contains("--wait"), "{check}");
 }
+
+#[test]
+fn atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against_a_repeat() {
+    // `stamp` appends an audit line on every run: with `allowedEffects` naming it the repeat is still replay-safe, without it the line is a new effect.
+    let named = Case { condition: "idempotency/second-run-no-new-effect", config: l2_config(&json!({"stampAudit": true})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["stamp"]["allowedEffects"] = json!([".stamp-audit.log"]);
+    });
+    let output = run_case(&named, "L2");
+    let document = output.envelope();
+    assert_eq!(check_of(&document["data"], "L2.idempotency")["result"], "pass", "{}", not_passing(&document["data"]));
+    let output = run_case(&Case { condition: "idempotency/second-run-no-new-effect", config: l2_config(&json!({"stampAudit": true})), tweak: None }, "L2");
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.idempotency");
+    assert_eq!(check["result"], "fail", "{check}");
+    assert!(check["reason"].as_str().unwrap_or_default().contains(".stamp-audit.log"), "{check}");
+}
