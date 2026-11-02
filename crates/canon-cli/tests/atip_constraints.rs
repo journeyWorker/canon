@@ -779,8 +779,8 @@ fn atip_constraints_25_an_integer_refusal_names_the_declared_bound() {
     assert!(seq.message.unwrap_or_default().contains("from 1 to 4294967295"));
 }
 
-/// atip.constraints.26: in a directory with no repository a batch answers the first stateless fault of any element, not the first valid
-/// element's `CONFIG_MISSING`: the stateless stage of every element runs before any element's dry run (spec 11.11).
+/// atip.constraints.26: in a directory with no repository a batch answers the first stateless fault of any element, in preflight; a
+/// batch with no such fault reaches the repository only when its first element runs, and answers its absence there (spec 11.11).
 #[test]
 fn atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elements_missing_repository() {
     for (command, items, code, field) in [
@@ -791,8 +791,9 @@ fn atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elem
     ] {
         let outcome = empty(&format!("canon {command} --input '{items}'"), None);
         assert_refused(&outcome, code, field);
-        // The same batch with every element valid still reaches the repository and answers its absence.
+        // The same batch with every element valid is not refused in preflight: the first element runs and fails with the missing repository.
         let valid = items.replace(r#"{"kind":"change","after":"2026-02-01","before":"2026-01-02"}"#, r#"{"kind":"change"}"#).replace(r#"{"maxArtifactMib":0}"#, "{}").replace(r#"{"intervalSecs":-1}"#, "{}");
-        assert_eq!(empty(&format!("canon {command} --input '{valid}'"), None).code.as_deref(), Some("CONFIG_MISSING"), "{command}");
+        let ran = empty(&format!("canon {command} --input '{valid}'"), None);
+        assert_eq!((ran.exit, ran.code.as_deref(), ran.field.as_deref()), (1, Some("BATCH_INCOMPLETE"), Some("/0")), "{command}: {ran:?}");
     }
 }
