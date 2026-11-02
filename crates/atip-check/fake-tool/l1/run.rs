@@ -892,6 +892,11 @@ fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
         record["status"] = json!("written");
         record["label"] = json!(format!("run-{}", std::process::id()));
     }
+    if tool.flag("dataStamp") {
+        // Seeded: a value that differs on every run, as a timestamp does (the label carries the nanoseconds of the run).
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_nanos());
+        record["label"] = json!(format!("{}@{nanos}", record["label"].as_str().unwrap_or("")));
+    }
     tool.success_with("record put", record, Map::new())
 }
 

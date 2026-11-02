@@ -73,7 +73,9 @@ impl<'a> Judge<'a> {
 
     /// What differs between two runs of the same invocation in two forms: exit, `ok`, the code of a failure, `data` and the members
     /// of `meta` that name the answer. A difference is a problem.
-    fn differences(&self, call: usize, reference: usize) -> Vec<String> {
+    /// `twin` is the reference run again on a fresh copy of the same state: the paths of `data` whose values differ between the two are varying
+    /// (a timestamp, an address derived from one) and are left out of the comparison; exit, `ok`, the code and the rest of `data` are compared.
+    fn differences(&self, call: usize, reference: usize, twin: usize) -> Vec<String> {
         let (a, b) = (self.at(call), self.at(reference));
         let mut problems = Vec::new();
         if a.exit != b.exit {
@@ -85,9 +87,25 @@ impl<'a> Judge<'a> {
             }
             return problems;
         };
+        let mut varying: Vec<String> = Vec::new();
+        if let (Some(first), Some(second)) = (self.envelope(reference).and_then(|document| document.get("data")), self.envelope(twin).and_then(|document| document.get("data"))) {
+            varying_paths(first, second, String::new(), &mut varying);
+        }
+        let masked = |document: &Value| {
+            let mut data = document.get("data").cloned();
+            if let Some(data) = data.as_mut() {
+                for path in &varying {
+                    if let Some(slot) = data.pointer_mut(path) {
+                        *slot = Value::Null;
+                    }
+                }
+            }
+            data
+        };
         for pointer in ["/ok", "/error/code", "/data", "/meta/command", "/meta/output", "/meta/warnings", "/meta/fields"] {
-            if a_doc.pointer(pointer) != b_doc.pointer(pointer) {
-                problems.push(format!("{pointer}: {} against {} of the argv form", show_value(a_doc.pointer(pointer)), show_value(b_doc.pointer(pointer))));
+            let (left, right) = if pointer == "/data" { (masked(a_doc), masked(b_doc)) } else { (a_doc.pointer(pointer).cloned(), b_doc.pointer(pointer).cloned()) };
+            if left != right {
+                problems.push(format!("{pointer}: {} against {} of the argv form", show_value(left.as_ref()), show_value(right.as_ref())));
             }
         }
         problems
@@ -101,7 +119,7 @@ impl<'a> Judge<'a> {
             }
             c.own(run.call);
             c.observe(run.reference);
-            let problems = self.differences(run.call, run.reference);
+            let problems = self.differences(run.call, run.reference, run.twin);
             c.holds_at(run.call, condition, problems.is_empty(), || {
                 format!("{command}: {} did not give the result of the argv form: {}", run.label, problems.join("; "))
             });
@@ -401,6 +419,7 @@ impl<'a> Judge<'a> {
 
     fn l2_input_env(&'a self) -> Finding {
         let mut c = self.check("L2.input-env");
+        let declarers = super::input_plan::env_declarers(self.docs().commands.values());
         let mut judged = false;
         for command in self.input_commands() {
             if self.gate(&mut c, &command.command) {
@@ -413,7 +432,7 @@ impl<'a> Judge<'a> {
                 }
                 c.own(run.call);
                 c.observe(run.reference);
-                let problems = self.differences(run.call, run.reference);
+                let problems = self.differences(run.call, run.reference, run.twin);
                 c.holds_at(run.call, "env-applies-after-the-merge", problems.is_empty(), || {
                     format!(
                         "{}: --{} given in the document with {}={} in the environment did not give the result it has without the variable: {} (an env value applies only to an argument absent after the merge, spec 11.7 step 5)",
@@ -424,8 +443,8 @@ impl<'a> Judge<'a> {
         }
         if judged {
             c.finish(true)
-        } else if self.has_tree() && !self.docs().commands.values().any(|doc| doc.input.is_some() && doc.options.iter().any(|option| option.env.is_some() && !option.flag_only)) {
-            c.finish_as(End::Unsupported("no option of a command with `input` declares `env`".to_string()))
+        } else if self.has_tree() && !self.docs().commands.values().any(|doc| doc.input.is_some() && doc.options.iter().any(|option| !option.flag_only && option.env.as_ref().is_some_and(|variable| declarers.get(variable) == Some(&1)))) {
+            c.finish_as(End::Unsupported("no option of a command with `input` is the sole declarer of its `env` variable".to_string()))
         } else {
             self.nothing_probed(c, "no option of a command with `input` declares `env` and has a value the checker knows to refuse")
         }
@@ -693,6 +712,24 @@ impl<'a> Judge<'a> {
             });
         }
         !runs.is_empty()
+    }
+}
+
+/// The JSON pointers of the leaves (or whole values, when the shapes differ) of `a` and `b` that differ.
+fn varying_paths(a: &Value, b: &Value, path: String, out: &mut Vec<String>) {
+    match (a, b) {
+        (Value::Object(left), Value::Object(right)) if left.len() == right.len() && left.keys().all(|key| right.contains_key(key)) => {
+            for (key, value) in left {
+                varying_paths(value, &right[key], format!("{path}/{}", key.replace('~', "~0").replace('/', "~1")), out);
+            }
+        }
+        (Value::Array(left), Value::Array(right)) if left.len() == right.len() => {
+            for (at, (x, y)) in left.iter().zip(right).enumerate() {
+                varying_paths(x, y, format!("{path}/{at}"), out);
+            }
+        }
+        _ if a != b => out.push(path),
+        _ => {}
     }
 }
 

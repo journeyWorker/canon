@@ -323,3 +323,29 @@ fn atip_checkl2input_07_a_finer_replacement_of_usage_names_an_argument_and_a_fie
     assert_eq!(check["result"], "fail", "{check}");
     assert!(check["reason"].as_str().unwrap_or_default().contains("registered finer replacement"), "{check}");
 }
+
+#[test]
+fn atip_checkl2input_09_a_value_that_varies_between_two_runs_of_the_reference_is_not_compared_and_the_rest_of_data_still_is() {
+    // `record put` prints a label with the nanoseconds of the run: the reference run twice on fresh state differs there, so /data/label is varying.
+    let output = run_config(&l2_config(&json!({"dataStamp": true})));
+    let document = output.envelope();
+    for row in ["L2.input-fragment", "L2.input-normalise", "L2.input-env"] {
+        assert_eq!(check_of(&document["data"], row)["result"], "pass", "{row}: {}", not_passing(&document["data"]));
+    }
+    // A real difference between the forms is still found.
+    let output = run_case(&case_of("input-fragment/same-as-argv"), "L2");
+    support::l2::verdict(&output.envelope()["data"], "L2.input-fragment").unwrap_or_else(|why| panic!("{why}"));
+}
+
+#[test]
+fn atip_checkl2input_11_only_an_option_that_is_the_sole_declarer_of_its_env_variable_is_probed_and_with_none_the_row_is_unsupported() {
+    // Every option that reads the environment reads FAKE_SHARED: none is the sole declarer of its own, whatever its command.
+    let output = run_config(&l2_config(&json!({"sharedEnv": true})));
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.input-env");
+    assert_eq!(check["result"], "unsupported", "{check}");
+    assert!(check["reason"].as_str().unwrap_or_default().contains("sole declarer"), "{check}");
+    // The conforming fake declares three distinct variables and the row judges them.
+    let output = run_config(&l2_standard_config());
+    assert_eq!(check_of(&output.envelope()["data"], "L2.input-env")["result"], "pass");
+}

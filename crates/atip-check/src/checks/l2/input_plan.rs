@@ -46,6 +46,8 @@ pub(crate) struct SameRun {
     pub label: String,
     pub call: usize,
     pub reference: usize,
+    /// The reference argv run again on a fresh copy of the same state: what differs from `reference` is varying (a timestamp), not compared.
+    pub twin: usize,
 }
 
 /// A document refused at the framing: the code, the reasons 7.2.3 reserves for the situation, the number of `details` it has.
@@ -80,6 +82,7 @@ pub(crate) struct EnvRun {
     pub variable: String,
     pub call: usize,
     pub reference: usize,
+    pub twin: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -221,6 +224,20 @@ fn flag_only_kind(doc: &CommandDoc, members: &[usize]) -> FlagOnly {
     }
 }
 
+/// How many options of the schema declare each environment variable: only an option that is the sole declarer of its variable is probed by
+/// `L2.input-env` (`--as` and `--role` share `CANON_ROLE`, so neither is: the variable does not say which of them it fills).
+pub(crate) fn env_declarers<'d>(docs: impl Iterator<Item = &'d CommandDoc>) -> std::collections::BTreeMap<String, usize> {
+    let mut counts = std::collections::BTreeMap::new();
+    for doc in docs {
+        for option in &doc.options {
+            if let Some(variable) = &option.env {
+                *counts.entry(variable.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    counts
+}
+
 /// A rule on an argument that a document cannot carry (a flag-only one) is broken on argv, not in a document.
 fn on_flag_only(doc: &CommandDoc, members: &[usize]) -> bool {
     members.iter().filter_map(|index| doc.constraints.get(*index)).any(|constraint| {
@@ -265,6 +282,7 @@ impl Run<'_> {
     pub(crate) fn plan_input(&mut self, calls: &Invocations, l1: &L1Run, claim: Claim) -> Result<InputRun, RunError> {
         let mut out = InputRun::default();
         let docs: Vec<CommandDoc> = l1.docs.commands.iter().map(|(id, doc)| CommandDoc { command: id.clone(), ..doc.clone() }).collect();
+        let declarers = env_declarers(docs.iter());
         for doc in &docs {
             if doc.input.is_none() || self.not_run(&doc.command) {
                 continue;
@@ -273,14 +291,14 @@ impl Run<'_> {
                 out.unlisted.push(doc.command.clone());
                 continue;
             }
-            let command = self.plan_input_command(calls, doc, claim)?;
+            let command = self.plan_input_command(calls, doc, claim, &declarers)?;
             self.plan_document_numbers(&mut out, doc, &command)?;
             out.commands.push(command);
         }
         Ok(out)
     }
 
-    fn plan_input_command(&mut self, calls: &Invocations, doc: &CommandDoc, claim: Claim) -> Result<InputCommand, RunError> {
+    fn plan_input_command(&mut self, calls: &Invocations, doc: &CommandDoc, claim: Claim, declarers: &std::collections::BTreeMap<String, usize>) -> Result<InputCommand, RunError> {
         let bases = self.ok_bases(calls, doc);
         let mut command = InputCommand {
             command: doc.command.clone(),
@@ -306,7 +324,7 @@ impl Run<'_> {
         self.plan_fragments(&mut command, doc, &bases)?;
         if let Some((base, reference)) = bases.first() {
             self.plan_conflicts(&mut command, doc, base, *reference)?;
-            self.plan_envs(&mut command, doc, base)?;
+            self.plan_envs(&mut command, doc, base, declarers)?;
             self.plan_pointers(&mut command, doc, base)?;
             self.plan_dashes(&mut command, doc, base)?;
         }
@@ -388,6 +406,7 @@ impl Run<'_> {
 
     fn plan_fragments(&mut self, command: &mut InputCommand, doc: &CommandDoc, bases: &[(Invocation, usize)]) -> Result<(), RunError> {
         for (base, reference) in bases.iter().take(2) {
+            let twin = self.invoke(Call::new(self.log[*reference].call.argv.clone()))?;
             let splits = [
                 ("the operands on argv and the rest in a document", Spec { operands: false, ..Spec::default() }),
                 ("every argument in a document", Spec { operands: true, ..Spec::default() }),
@@ -405,7 +424,7 @@ impl Run<'_> {
                 }
                 seen.push(argv.clone());
                 let call = self.invoke(Call::new(argv).measured())?;
-                command.fragments.push(SameRun { label: label.to_string(), call, reference: *reference });
+                command.fragments.push(SameRun { label: label.to_string(), call, reference: *reference, twin });
             }
             // The integers as numeric strings, apart from the complete document of L2.input-fragment: what stays on argv is
             // what the strings are not about.
@@ -424,7 +443,7 @@ impl Run<'_> {
                     continue;
                 }
                 let call = self.invoke(Call::new(split.argv()).measured())?;
-                command.normalise.push(SameRun { label: label.to_string(), call, reference: *reference });
+                command.normalise.push(SameRun { label: label.to_string(), call, reference: *reference, twin });
             }
         }
         Ok(())
@@ -514,9 +533,12 @@ impl Run<'_> {
         Ok(())
     }
 
-    fn plan_envs(&mut self, command: &mut InputCommand, doc: &CommandDoc, base: &Invocation) -> Result<(), RunError> {
+    fn plan_envs(&mut self, command: &mut InputCommand, doc: &CommandDoc, base: &Invocation, declarers: &std::collections::BTreeMap<String, usize>) -> Result<(), RunError> {
         for option in doc.options.iter().filter(|option| !option.flag_only && option.env.is_some() && !option.is_flag() && !option.repeatable) {
             let Some(variable) = option.env.clone() else { continue };
+            if declarers.get(&variable).copied().unwrap_or(0) != 1 {
+                continue;
+            }
             let Some(invalid) = Self::invalid_word(option) else { continue };
             let carried = if given_option(doc, base, &option.name).is_some() {
                 Some(base.clone())
@@ -527,8 +549,9 @@ impl Run<'_> {
             let spec = Spec { operands: true, options: Which::Only(vec![option.name.clone()]), ..Spec::default() };
             let Some(split) = document::split(doc, &carried, &spec) else { continue };
             let reference = self.invoke(Call::new(split.argv()))?;
+            let twin = self.invoke(Call::new(split.argv()))?;
             let call = self.invoke(Call::new(split.argv()).with_env(&variable, &invalid))?;
-            command.envs.push(EnvRun { option: option.name.clone(), variable, call, reference });
+            command.envs.push(EnvRun { option: option.name.clone(), variable, call, reference, twin });
         }
         Ok(())
     }

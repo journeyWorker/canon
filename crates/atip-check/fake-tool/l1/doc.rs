@@ -28,8 +28,17 @@ impl Model {
             batch: !tool.flag("noBatch"),
             tag_flag_only_rule: tool.flag("tagFlagOnlyRule"),
         };
+        let mut commands = super::spec::commands(shape, !tool.flag("noSchema"));
+        if tool.flag("sharedEnv") {
+            // Seeded: every option that reads the environment reads the same variable, so none is the sole declarer of its own.
+            for command in &mut commands {
+                for arg in command.args.iter_mut().filter(|arg| arg.env.is_some()) {
+                    arg.env = Some("FAKE_SHARED");
+                }
+            }
+        }
         Self {
-            commands: super::spec::commands(shape, !tool.flag("noSchema")),
+            commands,
             groups: super::spec::groups(shape),
         }
     }
