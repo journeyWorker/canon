@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T16:49:15.840768Z",
+  "attachments": [
+    {
+      "case": "plan::tests::atip_crateplan_10_one_option_without_the_other_is_usage_or_the_tools_finer_code_with_the_missing_field",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/fix-sub-junit.xml",
+      "sha256": "ca8170bfdbc97153a705d475ace41f420c2c1f417a12fb9436d896fc63a7f3ad"
+    }
+  ],
+  "code_tree": "ca63c482407ec7d931beba874e366be6f5cb0dba",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/fix-sub-junit.xml"
+  },
+  "evidence_sha": "27c46c4990384c656563529d61653bf62408c4d3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "atip.crateplan.10",
+  "schema": 1,
+  "staging_id": "20376b51",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
