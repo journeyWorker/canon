@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T12:31:56.823565Z",
+  "attachments": [
+    {
+      "case": "cursor::tests::atip_cratecursor_10_a_value_starting_with_a_dash_is_joined_and_an_earlier_cursor_is_replaced",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "given::tests::atip_cratecursor_10_a_value_that_is_empty_or_starts_with_a_dash_is_written_joined_like_every_other",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    }
+  ],
+  "code_tree": "ae4413d088710b98fac9bd70312272e59850f09d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-cursor-junit.xml"
+  },
+  "evidence_sha": "63861b2995380a2d7dfe4aebd8ad8f80a0a7eaa6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "atip.cratecursor.10",
+  "schema": 1,
+  "staging_id": "709af9e0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
