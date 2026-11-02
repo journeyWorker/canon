@@ -348,10 +348,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:failure
   @flow:canon-0-33-atip-check.F4
   @atip.check.32
-  Scenario: --level L1 and L2 exit 2 with LEVEL_UNSUPPORTED naming 0.34 and 0.35, and L9 is USAGE
-    Given --level L1, L2, L9, l0, 0 or an empty level
+  Scenario: --level L2 runs the checks and is never unsupported, and L9 is USAGE
+    Given --level L2, L9, l0, 0 or an empty level
     When atip check runs with --json and in text mode
-    Then L1 and L2 exit 2 with LEVEL_UNSUPPORTED, field --level, expected [L0] and a hint naming 0.34 or 0.35; the others exit 2 with USAGE and expected [L0, L1, L2]; L0 still runs
+    Then L2 runs: a tool that does not meet it exits 1 with LEVEL_NOT_MET and data.level L2, and text mode starts atip: LEVEL_NOT_MET; the others exit 2 with USAGE, field --level and expected [L0, L1, L2]; L0 still runs
 
   # canon: {"schema":1,"at":"2026-10-31T11:46:41Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
   @subject:atip-check

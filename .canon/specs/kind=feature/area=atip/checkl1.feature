@@ -18,10 +18,10 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @case:failure
   @flow:canon-0-34-atip-check-l1.F1
   @atip.checkl1.02
-  Scenario: --level L2 is LEVEL_UNSUPPORTED with the hint that L2 arrives in 0.35, and a level that is none of L0, L1, L2 is USAGE
+  Scenario: --level L2 runs and is never LEVEL_UNSUPPORTED, and a level that is none of L0, L1, L2 is USAGE
     Given a conforming fake tool and its fixture
     When atip check runs with --level L2, then with --level L9
-    Then the first exits 2 with LEVEL_UNSUPPORTED, field --level, expected ["L0", "L1"] and a hint naming 0.35, and no binary runs; the second exits 2 with USAGE
+    Then the first runs the checks: a tool that declares L1 exits 1 with LEVEL_NOT_MET, data.level L2 and L1.tree failed; the second exits 2 with USAGE
 
   # canon: {"schema":1,"at":"2026-11-01T12:49:39Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
   @subject:atip-check
