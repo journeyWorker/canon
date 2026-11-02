@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T17:02:08.205667Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "81d0990ad7fd4f00b832f676413269da9750c02a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_validate.rs",
+  "introduced_by": "87159df68f13f92a07ec7eed05e35a84b4f58e78",
+  "kind": "finding",
+  "resolution_code_tree": "30bfb187338f0f929b096dd65e0cfa300503e51d",
+  "resolution_sha": "0b2399c0ba1a9ead9155c696fbb6d188b5f5b071",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "30d3ae0f1bcfda139d4d5a33a34a12939f171635",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.cratecursor.01"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Scope: the feature commit 87159df6 also edits crates/canon-cli/tests/atip_validate.rs, the differential test of the already-reviewed canon-0-35-crate-validate chore: random pattern samples 400 -> 120 per alphabet and the pair floor 10_000 -> 5_000, with no mention in the commit message, the CHANGELOG or the brief (the test took ~250 s in a debug build, which is likely why). It halves the evidence that admits answers as the validator does and is outside this brief; my crate-validate sign-off (f21e5451) was of the stronger test. Fix: split it into its own commit that says why (or restore it and move the slow part behind an opt-in), and tell the crate-validate reviewer/orchestrator. Blast radius: nothing else in this change touches canon-cli.",
+  "worktree_dirty": false
+}

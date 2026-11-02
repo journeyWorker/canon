@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T17:02:09.066784Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "81d0990ad7fd4f00b832f676413269da9750c02a",
+  "disposition": "fixed",
+  "file_ref": "crates/atip/src/jcs.rs",
+  "introduced_by": "87159df68f13f92a07ec7eed05e35a84b4f58e78",
+  "kind": "finding",
+  "resolution_code_tree": "ca63c482407ec7d931beba874e366be6f5cb0dba",
+  "resolution_sha": "eb723c4a0d8c6bfad58cc55347ca0133a6d3ab7e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "30d3ae0f1bcfda139d4d5a33a34a12939f171635",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.cratecursor.12"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity: the brief asks for RFC 8785's appendix test vectors as the module's tests; the tests carry section 3.2.3 (member order) and appendix E without its numbers, and the number vectors are not run because the module refuses any non-integer by design. Correct for the narrower module, but an integer-valued float such as 1e2 is written 100 and any fraction is an error, which a reader of the module name alone would not expect. I confirmed by hand that the expected strings match the RFC text. Blast radius: a plan digest that holds a float (canon-0-35-crate-plan, plan-jcs) is an error, never a different digest.",
+  "worktree_dirty": false
+}
