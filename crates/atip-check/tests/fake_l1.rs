@@ -953,6 +953,10 @@ fn atip_checkl1_fake_every_seeded_case_changes_the_output_it_claims_to() {
     let mut cases = l1_cases();
     cases.push(l1_engine_difference_case());
     for case in &cases {
+        // `tree/level` is told from the conforming tool by the claim (L2 over an L1 tree), not by what the tool prints.
+        if case.condition == "tree/level" {
+            continue;
+        }
         let mut seeded = Fake::new(&case.config);
         seeded.bin = l1_bin(&harness, &case.config);
         let probes = probes(case);
