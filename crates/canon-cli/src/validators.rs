@@ -36,6 +36,8 @@ pub fn parse(command: &clap::Command, args: Vec<std::ffi::OsString>) -> Result<c
             return Err(crate::run::entry::usage_error(&error));
         }
     };
+    // The refusals below carry the repository the call named (`meta.context`), as they did when they were made after the real parse.
+    crate::run::entry::record_context(command, &first);
     if let Some((label, error)) = crate::arg_rules::enforce::check(command, &first) {
         return Err(ExitCode::from(error.emit(&label, atip::argv_wants_json())));
     }

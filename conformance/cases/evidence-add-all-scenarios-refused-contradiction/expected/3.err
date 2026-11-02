@@ -1,3 +1,3 @@
 canon: EVIDENCE_INVALID_ARGUMENT: `--all-scenarios` is given, which cannot be given with `--scenario`, `--task`, `--report-case`, `--approver`, `--approval-role`, `--signature-file`, `--approval-at`
   field: --scenario
-  hint: --all-scenarios writes one record per scenario its report owns, so it names no single subject. `canon schema evidence add --json` lists the constraints of the command
+  hint: --all-scenarios writes one record per scenario its report owns, so it names no single subject. a working call: canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer; `canon schema evidence add --json` lists the constraints of the command
