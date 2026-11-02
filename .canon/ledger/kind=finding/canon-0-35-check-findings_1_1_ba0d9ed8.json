@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev"
+  },
+  "at": "2026-11-02T10:26:58.825386Z",
+  "change_id": "canon-0-35-check-findings",
+  "code_tree": "270bae3f4c4f512bcf367a5df596b50ab839b177",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/mod.rs",
+  "introduced_by": "1ef486f341d808a809a387325a54a1632a2b0dd5",
+  "kind": "finding",
+  "reviewed_sha": "180496f738748c6fbe0d4f2a563a60a7409aa669",
+  "reviewer": "rev-check-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.81"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: brief F2/F3 keep the text 'reason' unchanged, but the time-limit finding now goes through reason_and_cut (mod.rs finish_as, the ran-over-time-limit branch); the old code printed it whole, so a killed call whose argv passes 240 characters now reads cut with an ellipsis and '(all in --json findings)' in the text line. findings[] keeps the whole message, so nothing is lost for a wrapper; only the one text reason differs from 0.34. Blast radius: only an argv over ~170 characters that runs past the time limit; no test seeds that case (scenario 81 plants a long message through another condition).",
+  "worktree_dirty": false
+}

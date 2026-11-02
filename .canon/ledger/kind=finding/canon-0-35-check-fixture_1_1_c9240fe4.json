@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev"
+  },
+  "at": "2026-11-02T10:27:26.502276Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "270bae3f4c4f512bcf367a5df596b50ab839b177",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l1_plan.rs",
+  "introduced_by": "11cd338cc0d004f0715f327374e7344819f9909c",
+  "kind": "finding",
+  "reviewed_sha": "180496f738748c6fbe0d4f2a563a60a7409aa669",
+  "reviewer": "rev-check-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.95"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: brief F4 says a notRun command is run by no invocation and scenario 95 says 'the command is never run'; the checker still runs '<command> --help' for a notRun command that has an option default (l1_plan.rs, the helps loop, for L1.defaults). The CHANGELOG says so, the L1 half of the test lets '--help' lines of the hung command through, and the fake tool's hangCommand never hangs on --help. canon's dashboard gets 'dashboard --help' on every L1 pass. A tool that starts serving on --help is not protected, and the report does not say the command was invoked (L1.defaults carries no notRun). Needs the author's word on whether --help counts; if not, the brief's sentence should say so. Blast radius: every notRun command with a documented default, at L1 only.",
+  "worktree_dirty": false
+}
