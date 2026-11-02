@@ -448,7 +448,16 @@ fn accepted(tool: &Tool, deployment: &str, environment: &str) -> ExitCode {
     let mut extra = Map::new();
     if !tool.flag("startNoWait") {
         let followed = if tool.flag("startIdentifierMismatch") { deployment.to_uppercase() } else { deployment.to_string() };
-        extra.insert("next".into(), json!([next_entry(tool, &wait_argv(&followed), "wait for the deployment to end")]));
+        let argv = if tool.flag("startNextWrites") {
+            // Seeded: next[0] starts more work instead of reading the outcome.
+            ["seal", "--json"].map(String::from).to_vec()
+        } else if tool.flag("startStatusOnly") {
+            // A correct tool whose next[0] only reads the status: no `--wait`, so the outcomes are not driven.
+            ["deploy", "status", followed.as_str(), "--json"].map(String::from).to_vec()
+        } else {
+            wait_argv(&followed)
+        };
+        extra.insert("next".into(), json!([next_entry(tool, &argv, "wait for the deployment to end")]));
     }
     tool.success_with("deploy start", json!({"deployment": deployment, "environment": environment, "state": state}), extra)
 }

@@ -711,3 +711,16 @@ fn atip_checkl1_03_a_tree_that_declares_a_higher_level_than_the_claim_meets_it()
     let data = &output.envelope()["data"];
     assert_eq!(check_of(data, "L1.tree")["result"], "pass", "{}", output.stdout);
 }
+
+#[test]
+fn atip_checkl1_03_a_tree_above_the_checked_level_says_the_higher_claim_was_not_checked() {
+    let case = Case { condition: "tree/level", config: l1_config(&json!({"treeLevel": "L2"})), tweak: None };
+    let output = run_case(&case);
+    let data = &output.envelope()["data"];
+    let tree = check_of(data, "L1.tree");
+    assert_eq!(tree["result"], "pass", "{}", output.stdout);
+    assert!(tree["notes"].to_string().contains("higher claim was not checked"), "{tree}");
+    // A tree at the checked level says nothing of the kind.
+    let output = run_config(&l1_standard_config());
+    assert!(!check_of(&output.envelope()["data"], "L1.tree")["notes"].to_string().contains("higher claim"), "{}", output.stdout);
+}

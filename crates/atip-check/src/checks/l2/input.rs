@@ -506,7 +506,7 @@ impl<'a> Judge<'a> {
         let Some(document) = self.envelope(run.call).filter(|document| document.get("ok") == Some(&Value::Bool(false))) else { return false };
         let named = document.pointer("/error/field").and_then(Value::as_str).is_some_and(|field| {
             let bare = field.trim_start_matches('/').trim_start_matches("--");
-            bare == run.argument || bare == crate::l1::model::camel(&run.argument) || field == "/operands" || field.starts_with("/operands/")
+            if run.operand { field == "/operands" || field.starts_with("/operands/") || bare == run.argument } else { bare == run.argument || bare == crate::l1::model::camel(&run.argument) }
         });
         named && document.pointer("/error/received").and_then(Value::as_str) == Some(run.value.as_str())
     }

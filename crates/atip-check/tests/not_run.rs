@@ -330,3 +330,16 @@ fn atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_un
     let document = output.envelope();
     assert_eq!((output.code, document["error"]["code"].as_str()), (Some(2), Some("FIXTURE_INVALID")), "{}", output.stdout);
 }
+
+#[test]
+fn atip_check_116_a_not_run_refusal_naming_an_argument_or_an_unregistered_code_is_a_fixture_error() {
+    for (key, value) in [("serveRefuseField", "--port"), ("serveRefuseCode", "NO_SUCH_CODE")] {
+        let harness = Harness::new();
+        let mut config = json!({"serveMode": "refuseStart"});
+        config[key] = json!(value);
+        let fixture = l0_fixture(&harness, &config, &[&["serve", "--json"]]);
+        let output = harness.check(&fixture, true);
+        let document = output.envelope();
+        assert_eq!((output.code, document["error"]["code"].as_str()), (Some(2), Some("FIXTURE_INVALID")), "{key}: {}", output.stdout);
+    }
+}

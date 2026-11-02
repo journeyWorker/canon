@@ -366,3 +366,17 @@ fn atip_checkl2input_13_a_candidate_refused_by_a_precondition_cannot_tell_and_th
     let output = run_case(&case_of("input-dash-values/value-is-a-value"), "L2");
     support::l2::verdict(&output.envelope()["data"], "L2.input-dash-values").unwrap_or_else(|why| panic!("{why}"));
 }
+
+#[test]
+fn atip_checkl2input_13_a_pointer_into_operands_names_an_operand_candidate_only() {
+    // Both option candidates are refused by a precondition naming `/operands` and the value: for an option that is not its pointer, so neither
+    // candidate decides and the row is unprovided (it was a pass when any `/operands` field counted).
+    let config = l2_config(&json!({"dashPrecondition": true, "dashPreconditionNamed": true, "dashPreconditionBoth": true, "dashPreconditionField": "/operands"}));
+    let output = run_config(&config);
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.input-dash-values");
+    assert_eq!(check["result"], "unprovided", "{check}");
+    assert!(check.to_string().contains("ALREADY_SEALED"), "{check}");
+    let named = run_config(&l2_config(&json!({"dashPrecondition": true, "dashPreconditionNamed": true, "dashPreconditionBoth": true})));
+    assert_eq!(check_of(&named.envelope()["data"], "L2.input-dash-values")["result"], "pass");
+}

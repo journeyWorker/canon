@@ -228,7 +228,7 @@ fn atip_checkl2safety_09_a_directory_made_to_hold_an_allowed_file_is_not_an_effe
 }
 
 #[test]
-fn atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_tool_without_wait_has_the_row_unsupported() {
+fn atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_next_that_only_reads_has_the_outcomes_unchecked() {
     let case = Case { condition: "async/outcomes", config: l2_standard_config(), tweak: None }.with_tweak(|fixture| {
         fixture["commands"]["deploy start"]["async"]["outcomes"] = json!(["done"]);
     });
@@ -238,13 +238,19 @@ fn atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_a
     assert_eq!(check["result"], "unprovided", "{check}");
     assert!(check.to_string().contains("commands.deploy start.async.outcomes"), "{check}");
     assert!(check["reason"].as_str().unwrap_or_default().contains("failed, timeout"), "{check}");
-    // No command has the reserved option --wait: nothing waits for an outcome, and the schema says so.
-    let config = l2_config(&support::l2::patch(&[("deploy status", vec![support::l2::remove("/options/0")])]));
-    let output = run_case(&Case { condition: "async/no-wait", config, tweak: None }, "L2");
+    // A correct tool whose next[0] only reads the status (no --wait): the start, next[0] and its being a read are checked; the outcomes are not.
+    let output = run_case(&Case { condition: "async/status-only", config: l2_config(&json!({"startStatusOnly": true})), tweak: None }, "L2");
     let document = output.envelope();
     let check = check_of(&document["data"], "L2.async");
-    assert_eq!(check["result"], "unsupported", "{check}");
-    assert!(check["reason"].as_str().unwrap_or_default().contains("--wait"), "{check}");
+    assert_eq!(check["result"], "pass", "{check}");
+    assert!(check["notes"].to_string().contains("not checked"), "{check}");
+    assert!(!argvs(check).iter().any(|argv| argv.contains("--wait")), "{check}");
+    // No next at all, and a next that starts more work: each fails only L2.async.
+    for condition in ["async/start-next-exists", "async/start-next-reads"] {
+        let case = case_of(condition);
+        let output = run_case(&case, "L2");
+        verdict(&output.envelope()["data"], "L2.async").unwrap_or_else(|why| panic!("{condition}: {why}"));
+    }
 }
 
 #[test]
@@ -261,6 +267,14 @@ fn atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against
     let check = check_of(&document["data"], "L2.idempotency");
     assert_eq!(check["result"], "fail", "{check}");
     assert!(check["reason"].as_str().unwrap_or_default().contains(".stamp-audit.log"), "{check}");
+    // The excluded path is in the report, and a glob that the effectNote does not back hides nothing: `**` does not let a duplicating write pass.
+    let output = run_case(&named, "L2");
+    assert!(check_of(&output.envelope()["data"], "L2.idempotency")["notes"].to_string().contains(".stamp-audit.log"), "the report names the excluded path");
+    let wide = Case { condition: "idempotency/second-run-no-new-effect", config: l2_config(&json!({"stampDuplicates": true})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["stamp"]["allowedEffects"] = json!(["**"]);
+    });
+    let output = run_case(&wide, "L2");
+    assert_eq!(check_of(&output.envelope()["data"], "L2.idempotency")["result"], "fail", "{}", output.stdout);
 }
 
 #[test]

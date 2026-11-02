@@ -43,6 +43,8 @@ pub(crate) struct IdempotencyRun {
     pub second: usize,
     /// The command's fixture `allowedEffects`: named side effects (an audit line) that a repeat may change.
     pub allowed: Vec<String>,
+    /// The command's `effectNote`: an allowed path is left out of the comparison only when the note names it.
+    pub note: String,
 }
 
 /// What a command's preview gave: the plan, the refusal of a stale digest, the halves, the commit, the replay from stdin.
@@ -159,11 +161,12 @@ impl Run<'_> {
                     out.unlisted_writes.push(doc.command.clone());
                 }
                 let allowed: Vec<String> = self.fixture.commands.as_ref().and_then(|commands| commands.get(&doc.command)).map(|entry| entry.allowed_effects.clone()).unwrap_or_default();
+                let note = doc.raw.get("effectNote").and_then(Value::as_str).unwrap_or_default().to_string();
                 for (_, first) in bases {
                     let sequence = self.log[first].sequence;
                     let argv = self.log[first].call.argv.clone();
                     let second = self.invoke_after(sequence, Call::new(argv).measured())?;
-                    out.idempotency.push(IdempotencyRun { command: doc.command.clone(), idempotency: raw_idempotency.clone(), first, second, allowed: allowed.clone() });
+                    out.idempotency.push(IdempotencyRun { command: doc.command.clone(), idempotency: raw_idempotency.clone(), first, second, allowed: allowed.clone(), note: note.clone() });
                 }
             }
             if doc.effect == "destructive" {

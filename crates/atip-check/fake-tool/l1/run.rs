@@ -873,9 +873,12 @@ fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
     // Seeded: a label that starts like an option, an inline document or a file is looked up in the state and refused by a precondition (as a revision
     // that is not in the repository is). With `dashPreconditionNamed` the refusal names the argument and the value it received.
     if tool.flag("dashPrecondition") {
-        if let Some(label) = parsed.text("label").filter(|label| label.starts_with(['-', '{', '['])) {
-            let extras: Vec<(&str, Value)> = if tool.flag("dashPreconditionNamed") { vec![("field", json!("/label")), ("received", json!(label))] } else { Vec::new() };
-            return tool.fail("usage", "ALREADY_SEALED", "the label names something that is not there", Some("record put"), &extras, 2);
+        let both = tool.flag("dashPreconditionBoth");
+        let given = parsed.text("label").map(|label| ("/label", label)).into_iter().chain(parsed.text("note").filter(|_| both).map(|note| ("/note", note)));
+        for (pointer, text) in given.filter(|(_, text)| text.starts_with(['-', '{', '['])) {
+            let field = tool.text("dashPreconditionField", pointer);
+            let extras: Vec<(&str, Value)> = if tool.flag("dashPreconditionNamed") { vec![("field", json!(field)), ("received", json!(text))] } else { Vec::new() };
+            return tool.fail("usage", "ALREADY_SEALED", "the value names something that is not there", Some("record put"), &extras, 2);
         }
     }
     let mut record = json!({"id": id, "round": parsed.int("round").unwrap_or_default()});

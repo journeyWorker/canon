@@ -137,7 +137,16 @@ impl<'a> Judge<'a> {
                         )
                     });
                     // A side effect the fixture names in `allowedEffects` (an audit line) does not count against replay-safety.
-                    let changed: Vec<&String> = second.changes.iter().filter(|path| !run.allowed.iter().any(|pattern| glob::matches(pattern, path))).collect();
+                    // It must also be a path the command's `effectNote` names: a glob of the fixture alone cannot hide a new effect. The excluded paths are in the notes.
+                    let excluded = |path: &str| run.allowed.iter().any(|pattern| glob::matches(pattern, path)) && run.note.contains(path.strip_prefix("./").unwrap_or(path));
+                    let changed: Vec<&String> = second.changes.iter().filter(|path| !excluded(path)).collect();
+                    let left_out: Vec<&String> = second.changes.iter().filter(|path| excluded(path)).collect();
+                    if !left_out.is_empty() {
+                        let note = format!("{}: the repeat of `{argv}` changed {}, which `allowedEffects` and the `effectNote` name: left out of the comparison", run.command, left_out.iter().map(|path| path.as_str()).collect::<Vec<_>>().join(", "));
+                        if !c.notes.contains(&note) {
+                            c.notes.push(note);
+                        }
+                    }
                     c.holds_at(run.second, "second-run-no-new-effect", changed.is_empty(), || {
                         format!("{}: `{argv}` is `{kind}` and its second run changed {}", run.command, changed.iter().map(|path| path.as_str()).collect::<Vec<_>>().join(", "))
                     });
@@ -366,9 +375,6 @@ impl<'a> Judge<'a> {
     fn l2_async(&'a self) -> Finding {
         let mut c = self.check("L2.async");
         let plan = self.safety();
-        if self.l1.is_some_and(|l1| l1.docs.tree.is_some()) && !self.docs().commands.values().any(|doc| doc.option("wait").is_some()) {
-            return c.finish_as(End::Unsupported("no command has the reserved option --wait: nothing in this tool waits for an outcome".to_string()));
-        }
         let mut judged = false;
         for (command, declared) in &plan.fixture_async {
             judged = true;
@@ -401,10 +407,19 @@ impl<'a> Judge<'a> {
                 let claims_done = words.iter().any(|word| COMPLETE_WORDS.contains(&word.to_ascii_lowercase().as_str()));
                 c.holds_at(outcome.start, "start-is-not-complete", !claims_done, || format!("{}: the start presents the work as complete ({}): accepted is not done (spec 13.2)", run.command, words.join(", ")));
                 let next = next_argv(&start.stdout);
-                // `--wait` is the reserved option a command that waits for the outcome carries (spec 13.3).
-                c.holds_at(outcome.start, "start-next-waits", next.as_ref().is_some_and(|argv| argv.iter().any(|word| word == "--wait" || word.starts_with("--wait="))), || {
-                    format!("{}: `meta.next[0]` of the start ({}) is not a wait: it must lead with the command that reads or waits for the outcome (spec 13.2)", run.command, next.as_ref().map_or("absent".to_string(), |argv| argv.join(" ")))
-                });
+                // Always: next[0] is there, and it reads (the command that reads or waits for the outcome, spec 13.2).
+                c.holds_at(outcome.start, "start-next-exists", next.is_some(), || format!("{}: the start has no `meta.next[0]`: it must lead with the command that reads or waits for the outcome (spec 13.2)", run.command));
+                let Some(next) = next else { continue };
+                let reads = self.docs().commands.values().filter(|doc| next.starts_with(&doc.path)).max_by_key(|doc| doc.path.len()).map(|doc| doc.effect == "read");
+                c.holds_at(outcome.start, "start-next-reads", reads != Some(false), || format!("{}: `meta.next[0]` of the start ({}) is not a read command: it must read or wait for the outcome, not start more work (spec 13.2)", run.command, next.join(" ")));
+                // The three outcomes are driven only when next[0] carries `--wait`, the reserved option of a command that waits (spec 13.3).
+                if !next.iter().any(|word| word == "--wait" || word.starts_with("--wait=")) {
+                    let note = format!("{}: `meta.next[0]` has no --wait, so the done, failed and timeout outcomes were not checked (unsupported)", run.command);
+                    if !c.notes.contains(&note) {
+                        c.notes.push(note);
+                    }
+                    continue;
+                }
                 let Some(wait) = outcome.wait else { continue };
                 c.own(wait);
                 let waited = self.at(wait);

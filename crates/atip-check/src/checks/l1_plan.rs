@@ -351,6 +351,18 @@ impl Run<'_> {
                 }
             }
         }
+        // A `notRun` command refused at its start: with its document, a code it declares on a constraint or a validator is stateless, a fixture error.
+        for served in &self.served {
+            let (Some(call), Some(doc)) = (served.call, run.docs.commands.get(&served.command)) else { continue };
+            if self.log[call].ended_alone && super::served_precondition(&self.log[call], self.fixture.registry.as_deref(), Some(doc)).is_none() {
+                return Err(RunError::Fixture(format!(
+                    "`notRun` names {}, and `{}` ended on its own ({}) within the time limit: a command that ends belongs in no `notRun`",
+                    served.command,
+                    self.log[call].call.argv.join(" "),
+                    super::exit_text(self.log[call].exit)
+                )));
+            }
+        }
         // The one run of a `notRun` command with no `ok` invocation: its first example.
         for position in 0..self.served.len() {
             if self.served[position].call.is_some() {

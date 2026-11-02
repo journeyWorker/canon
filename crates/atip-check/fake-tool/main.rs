@@ -917,7 +917,9 @@ fn serve(tool: &Tool) -> ExitCode {
         // Refused at the start with exit 2 and the code `serveRefuseCode` (a precondition when it is `CURSOR_INVALID`, a usage error as `USAGE`).
         "refuseStart" => {
             let code = tool.text("serveRefuseCode", "CURSOR_INVALID");
-            return tool.fail("usage", &code, "serve cannot start here", Some("serve"), &[], 2);
+            let field = tool.text("serveRefuseField", "");
+            let extras: Vec<(&str, Value)> = if field.is_empty() { Vec::new() } else { vec![("field", json!(field))] };
+            return tool.fail("usage", &code, "serve cannot start here", Some("serve"), &extras, 2);
         }
         "silent" => {}
         _ => {

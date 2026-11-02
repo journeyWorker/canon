@@ -319,7 +319,11 @@ impl<'a> Judge<'a> {
                 problems.into_iter().map(|problem| format!("`schema --json` does not validate against schema-doc.schema.json: {problem}")).collect(),
             );
             if let Some(tree) = &l1.docs.tree {
-                for (condition, problem) in doc_rules::tree_findings(document, tree, if self.l2.is_some() { "L2" } else { "L1" }) {
+                let checked = if self.l2.is_some() { "L2" } else { "L1" };
+                if tree.level == "L2" && checked == "L1" {
+                    c.notes.push("the tree declares level L2 and this run checked L1: the higher claim was not checked (levels are cumulative, so the declaration meets the L1 claim)".to_string());
+                }
+                for (condition, problem) in doc_rules::tree_findings(document, tree, checked) {
                     c.holds_at(l1.tree, condition, problem.is_none(), || problem.clone().unwrap_or_default());
                 }
             }

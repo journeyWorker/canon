@@ -37,6 +37,12 @@ impl Model {
                 }
             }
         }
+        if tool.flag("stampAudit") {
+            // Seeded: the audit line `stamp` appends is declared by its effectNote, as the contract asks of a named side effect.
+            if let Some(stamp) = commands.iter_mut().find(|command| command.id == "stamp") {
+                stamp.effect_note = Some("appends one line to .stamp-audit.log");
+            }
+        }
         Self {
             commands,
             groups: super::spec::groups(shape),

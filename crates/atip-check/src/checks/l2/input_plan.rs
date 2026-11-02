@@ -108,6 +108,8 @@ pub(crate) struct DashRun {
     pub group: usize,
     pub argument: String,
     pub value: String,
+    /// The candidate is an operand (its pointer is `/operands`), not an option.
+    pub operand: bool,
 }
 
 /// A batch whose last item breaks a rule that reads no state.
@@ -630,7 +632,7 @@ impl Run<'_> {
                 let spec = Spec { operands: !arg.is_option, options: Which::Nothing, omit: vec![arg.name.clone()], extra, ..Spec::default() };
                 let Some(split) = document::split(doc, base, &spec) else { continue };
                 let call = self.invoke(Call::new(split.argv()))?;
-                command.dashes.push(DashRun { label: format!("{} given the value {value}", arg.name), call, group, argument: arg.name.clone(), value: value.to_string() });
+                command.dashes.push(DashRun { label: format!("{} given the value {value}", arg.name), call, group, argument: arg.name.clone(), value: value.to_string(), operand: !arg.is_option });
             }
         }
         Ok(())

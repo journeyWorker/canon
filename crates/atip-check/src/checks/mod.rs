@@ -499,7 +499,7 @@ impl Run<'_> {
     /// own, before or after that document, is a fixture error.
     fn invoke_served(&mut self, id: &str, argv: &[String]) -> Result<usize, RunError> {
         let index = self.invoke(Call::new(in_json_mode(argv)).until_first_document())?;
-        if self.log[index].ended_alone && served_precondition(&self.log[index]).is_none() {
+        if self.log[index].ended_alone && served_precondition(&self.log[index], self.fixture.registry.as_deref(), None).is_none() {
             return Err(RunError::Fixture(format!(
                 "`notRun` names {id}, and `{}` ended on its own ({}) within the time limit: a command that ends belongs in no `notRun`",
                 self.log[index].call.argv.join(" "),
@@ -1484,7 +1484,7 @@ impl<'a> Judge<'a> {
             match served.call {
                 Some(index) if self.at(index).ended_alone => {
                     // Refused at the start by a precondition (kept by `invoke_served`): like any fixture call, unprovided with its code.
-                    if let Some(code) = served_precondition(self.at(index)) {
+                    if let Some(code) = served_precondition(self.at(index), self.fixture.registry.as_deref(), None) {
                         c.refused_by_precondition(index, &code);
                     }
                 }
@@ -2569,15 +2569,22 @@ fn first_document_text(text: &str) -> &str {
 }
 
 /// The code of a refusal at the start of a `notRun` command that the state or the environment of the fixture caused: exit 2 with an error
-/// envelope whose code is not one a step that reads no state gives (spec 11.7 steps 1-6, which are a fixture error as any other way to end).
-fn served_precondition(outcome: &Outcome) -> Option<String> {
+/// envelope whose code is registered (when the fixture lists a registry) and is not one a step that reads no state gives (spec 11.7 steps 1-6),
+/// which is a fixture error, as any other way to end is. A step that reads no state gives `USAGE` and its finer replacements, `UNKNOWN_COMMAND`,
+/// `COMMAND_REQUIRED`, every `INPUT_*` code, any code whose `field` names an argument, and, with the command's document, a code it declares on a
+/// constraint or a validator.
+fn served_precondition(outcome: &Outcome, registry: Option<&[crate::fixture::RegistryRow]>, doc: Option<&crate::l1::model::CommandDoc>) -> Option<String> {
     if outcome.exit != Exit::Code(2) {
         return None;
     }
     let document = first_document(&outcome.stdout).filter(|document| document.get("ok") == Some(&Value::Bool(false)))?;
     let code = document.pointer("/error/code").and_then(Value::as_str)?;
-    let stateless = matches!(code, "USAGE" | "UNKNOWN_COMMAND" | "COMMAND_REQUIRED" | "UNKNOWN_OPTION" | "OPTION_REQUIRED") || code.starts_with("INPUT_");
-    (!stateless).then(|| code.to_string())
+    let field = document.pointer("/error/field").and_then(Value::as_str);
+    let names_argument = field.is_some_and(|field| field.starts_with("--") || field.starts_with('/'));
+    let declared = doc.is_some_and(|doc| doc.constraints.iter().any(|constraint| constraint.code.as_deref() == Some(code)) || doc.validators.iter().any(|validator| validator.code == code));
+    let stateless = matches!(code, "USAGE" | "UNKNOWN_COMMAND" | "COMMAND_REQUIRED" | "UNKNOWN_OPTION" | "OPTION_REQUIRED" | "OPTION_INVALID") || code.starts_with("INPUT_") || names_argument || declared;
+    let registered = registry.is_none_or(|rows| rows.iter().any(|row| row.code == code));
+    (!stateless && registered).then(|| code.to_string())
 }
 
 /// Spec 5.1 and 5.4: UTF-8, one JSON document, one newline, nothing else.
