@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T16:43:30.749965Z",
+  "change_id": "canon-0-35-read-writes",
+  "code_tree": "1af2db291ecb2de2366ed07496189718d50cbf41",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/review.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "8606feadd8b3ad45e22ee204ee913003ab76f837",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Verified in the binary (8606fead), and against the parent of the pre-0.35 tree: in a repo whose scenario index was never written, subject show / subject move (no such subject, and a transition not allowed) / evidence add --all-scenarios with a report no case of which names a scenario / review scenario of a scenario no feature declares / divergence accept of one are refused with their own codes and leave the repository byte for byte as it was; the pre-change binary rewrites .canon/ledger/kind=scenario on every one of them. subject move without --to is USAGE --to and writes nothing (the brief's no --to form never existed: --to is required). subject show --json has empty stderr and a SCENARIO_INDEX_REFRESHED meta warning; its effectNote names the refresh and says a refused call writes nothing; dashboard is effect write with one report output and an effectNote 'serves until signalled', listed notRun by the fixture and by L0.page, L0.no-prompt and the L1 checks; report check and selftest leave no file in a private TMPDIR on success, refusal and failure. atip check L0 and L1 are met (L0.refusal-effects passes). Full nextest 3933 passed. Blast radius: the index is now computed in memory by the refusal path and written by the accepted path with the call's own record, so two computations of one index exist; no test compares the in-memory result with what the old refresh wrote, so a divergence between them would not be caught.",
+  "worktree_dirty": false
+}
