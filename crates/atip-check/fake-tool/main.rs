@@ -87,9 +87,12 @@ impl Tool {
         self.text("tool", "fake")
     }
 
-    /// The minor the tool claims (`"claims"`: `1.0`, `1.1` the default, or `1.2`).
+    /// The minor the tool claims (`"claims"`: `1.0`, `1.1` the default, or `1.2`). A copy of the tool whose name has `claims12` in it claims
+    /// 1.2 by default, so that the runs that get no configuration (`L1.no-state` runs in an empty directory) say what the configured ones say.
     fn minor(&self) -> String {
-        self.text("claims", "1.1")
+        let alias = std::env::args().next().unwrap_or_default();
+        let default = if alias.contains("claims12") { "1.2" } else { "1.1" };
+        self.text("claims", default)
     }
 
     /// Whether the tool claims 1.1 or later.

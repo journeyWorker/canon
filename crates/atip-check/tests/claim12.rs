@@ -125,3 +125,41 @@ fn atip_check_102_the_checker_declares_1_2_and_passes_its_own_l0_checks_as_a_1_2
         assert!(!code.contains("1.0 or 1.1") && !code.contains("1.0 or `1.1`"), "{source} names two minors");
     }
 }
+
+#[test]
+#[ignore = "scratch"]
+fn scratch_conforming_12() {
+    let harness = Harness::new();
+    let config = support::l1::l1_config_1_2(&json!({}));
+    let fixture = harness.l1_fixture(&config);
+    let output = harness.check_l1(&config, &fixture);
+    println!("{}", output.stdout);
+    for (id, result) in output.results() {
+        if result != "pass" {
+            println!("{id} {result} {}", output.check(&id));
+        }
+    }
+}
+
+#[test]
+#[ignore = "scratch"]
+fn scratch_order() {
+    let harness = Harness::new();
+    let config = support::l1::l1_config_1_2(&json!({}));
+    let fixture = harness.l1_fixture(&config);
+    let output = harness.check_l1(&config, &fixture);
+    println!("HEAD {}", output.stdout.chars().take(700).collect::<String>());
+    println!("RESULT {:?} {}", output.code, result_of(&output, "L1.check-order"));
+    println!("PAGING {}", output.check("L1.paging")["notes"]);
+    for call in output.check("L1.paging")["observed"].as_array().expect("observed") {
+        println!("OBSP {} => {}", call["argv"], call["stdout"].as_str().unwrap_or_default().chars().take(200).collect::<String>());
+    }
+    for call in output.check("L1.check-order")["observed"].as_array().expect("observed").iter().take(0) {
+        println!("OBS {} => {}", call["argv"], call["stdout"].as_str().unwrap_or_default().chars().take(150).collect::<String>());
+    }
+    for (id, result) in output.results() {
+        if result != "pass" && result != "unsupported" {
+            println!("NOT-PASS {id} {result}");
+        }
+    }
+}

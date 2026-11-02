@@ -114,6 +114,26 @@ pub(crate) struct PagingRun {
     pub changed: Vec<(String, usize)>,
     /// Why the run could not go on: the first page has no next page, or no argument could be changed.
     pub why_not: Option<String>,
+    /// For a claim of 1.2 (spec 6.9): the `next` entry with `--limit 1` replaced by `--all`.
+    pub all_swap: Option<usize>,
+    /// For a claim of 1.2: the `next` entry with an option written out at its declared non-null default: the option and the call.
+    pub defaults: Vec<(String, usize)>,
+    /// For a claim of 1.2: the `next` entry with the `env` variable of an option the invocation left out set to another valid value.
+    pub envs: Vec<(String, usize)>,
+    /// For a claim of 1.2, for a command with `input`: the paged invocation given its arguments as a document on stdin.
+    pub input: Option<InputPaging>,
+    /// For a claim of 1.2: the parts the command has nothing to test them with (`all`, `default`, `env`, `input`).
+    pub unsupported: Vec<&'static str>,
+}
+
+/// The paged invocation of a command with `input`, run with its arguments in a document on stdin (`--input -`): its first page and what follows.
+#[derive(Debug, Clone)]
+pub(crate) struct InputPaging {
+    pub first: usize,
+    /// The names of the options the invocation gave, on argv or in the document.
+    pub gave: BTreeSet<String>,
+    pub next_argv: Option<Vec<String>>,
+    pub next: Option<usize>,
 }
 
 /// One `--fields` selection: the answer without it, with it, and with a path nothing declares.
@@ -162,6 +182,9 @@ pub(crate) struct L1Run {
     pub domain_notes: Vec<DomainNote>,
     pub numbers: Vec<NumberRun>,
     pub validators: Vec<ValidatorRun>,
+    /// The pairs of faults `L1.check-order` runs (a claim of 1.2), and the commands with no passing invocation to build them from.
+    pub orders: Vec<super::l1_order::OrderRun>,
+    pub order_gaps: Vec<(String, String)>,
     pub nexts: Vec<NextRun>,
     pub paging: Vec<PagingRun>,
     /// Paging commands (their documents declare `--cursor`) the run could not page: the command and why.
@@ -223,7 +246,6 @@ impl Run<'_> {
     }
 
     pub(crate) fn invoke_l1(&mut self, warnings_offered: bool, claim: Claim) -> Result<L1Run, RunError> {
-        let _ = claim;
         let mut run = L1Run {
             tree: self.invoke(Call::new(["schema", "--json"]).measured())?,
             ..L1Run::default()
@@ -334,12 +356,15 @@ impl Run<'_> {
             self.plan_constraints(&mut run, doc, &bases)?;
             self.plan_domains(&mut run, doc, &bases)?;
             self.plan_validators(&mut run, doc, &tool)?;
+            if claim.at_least(Claim::V1_2) {
+                self.plan_order(&mut run, doc, &bases, &tool)?;
+            }
         }
         run.unprobed_writes = docs.iter().filter(|doc| !self.runnable(doc) && !self.not_run(&doc.command)).map(|doc| doc.command.clone()).collect();
         for doc in &docs {
             if self.runnable(doc) && !self.not_run(&doc.command) {
                 let bases = self.bases(doc, &tool);
-                self.plan_paging(&mut run, doc, &bases)?;
+                self.plan_paging(&mut run, doc, &bases, claim)?;
                 self.plan_fields(&mut run, doc, &bases)?;
             }
         }
@@ -524,7 +549,7 @@ impl Run<'_> {
 
     /// The invocations to page: the fixture's `paged` ones, else each observed one whose answer carried `meta.page.nextCursor`
     /// (approaches/checker.md 6, L1.paging), at most three. A command whose document declares `--cursor` with neither is a gap.
-    fn plan_paging(&mut self, run: &mut L1Run, doc: &CommandDoc, _bases: &[Invocation]) -> Result<(), RunError> {
+    fn plan_paging(&mut self, run: &mut L1Run, doc: &CommandDoc, _bases: &[Invocation], claim: Claim) -> Result<(), RunError> {
         if !doc.has_option("cursor") {
             return Ok(());
         }
@@ -566,7 +591,7 @@ impl Run<'_> {
             return Ok(());
         }
         for base in candidates {
-            self.plan_paging_of(run, doc, &base)?;
+            self.plan_paging_of(run, doc, &base, claim)?;
         }
         Ok(())
     }
@@ -588,7 +613,7 @@ impl Run<'_> {
             .or_else(|| witness::generate(option, avoid))
     }
 
-    fn plan_paging_of(&mut self, run: &mut L1Run, doc: &CommandDoc, base: &Invocation) -> Result<(), RunError> {
+    fn plan_paging_of(&mut self, run: &mut L1Run, doc: &CommandDoc, base: &Invocation, claim: Claim) -> Result<(), RunError> {
         let mut limited = base.clone();
         invocation::remove_option(&mut limited, "all");
         invocation::remove_option(&mut limited, "cursor");
@@ -597,7 +622,19 @@ impl Run<'_> {
         }
         let first = self.invoke(Call::new(invocation::render(&limited)))?;
         let sequence = self.log[first].sequence;
-        let mut paging = PagingRun { command: doc.command.clone(), limited: doc.has_option("limit"), first, next: None, changed: Vec::new(), why_not: None };
+        let mut paging = PagingRun {
+            command: doc.command.clone(),
+            limited: doc.has_option("limit"),
+            first,
+            next: None,
+            changed: Vec::new(),
+            why_not: None,
+            all_swap: None,
+            defaults: Vec::new(),
+            envs: Vec::new(),
+            input: None,
+            unsupported: Vec::new(),
+        };
         let document = first_document(&self.log[first].stdout).filter(|document| document.get("ok") == Some(&Value::Bool(true)));
         let cursor = document
             .as_ref()
@@ -663,8 +700,117 @@ impl Run<'_> {
         if paging.changed.is_empty() {
             paging.why_not = Some("no argument of the command could be changed to test that the cursor is bound to them".to_string());
         }
+        if claim.at_least(Claim::V1_2) {
+            self.plan_paging_1_2(doc, &mut paging, base, &next_argv, sequence)?;
+        }
         run.paging.push(paging);
         Ok(())
+    }
+
+    /// The 1.2 half of `L1.paging` (spec 6.9, 10.7.2, 12.5): what the cursor is bound to is what the invocation gave, so `--limit 1` may become `--all`, an option
+    /// written out at its default is another invocation, and so is the same invocation in an environment with another value for the variable of an option it left out.
+    fn plan_paging_1_2(&mut self, doc: &CommandDoc, paging: &mut PagingRun, base: &Invocation, next_argv: &[String], sequence: usize) -> Result<(), RunError> {
+        let Ok(carried) = invocation::parse(doc, next_argv) else { return Ok(()) };
+        let args = invocation::args(doc, &carried);
+        if doc.has_option("all") && doc.has_option("limit") {
+            let mut swapped = carried.clone();
+            invocation::remove_option(&mut swapped, "limit");
+            invocation::set_option(&mut swapped, "all", None);
+            paging.all_swap = Some(self.invoke_after(sequence, Call::new(invocation::render(&swapped)))?);
+        } else {
+            paging.unsupported.push("all");
+        }
+        let reserved: BTreeSet<&str> = ["json", "limit", "cursor", "all", "fields", "input"].into_iter().collect();
+        let global: BTreeSet<String> = self
+            .fixture
+            .global_options
+            .iter()
+            .flatten()
+            .filter_map(|option| option.first())
+            .map(|name| name.trim_start_matches('-').to_string())
+            .collect();
+        let others: Vec<&Arg> = doc
+            .options
+            .iter()
+            .filter(|option| !reserved.contains(option.name.as_str()) && !global.contains(&option.name) && !option.flag_only && !args.options.contains_key(&option.name))
+            .collect();
+        // An option other than a switch or a count, written out at its declared default that is not null.
+        for option in others.iter().filter(|option| !option.is_flag() && !option.default.is_null()).take(3) {
+            let mut added = carried.clone();
+            invocation::set_option(&mut added, &option.name, Some(witness::word_of(&option.default)));
+            let call = self.invoke_after(sequence, Call::new(invocation::render(&added)))?;
+            paging.defaults.push((format!("--{} written out at its default", option.name), call));
+        }
+        if paging.defaults.is_empty() {
+            paging.unsupported.push("default");
+        }
+        // The variable of an option the invocation left out, set to another valid value than the one the fixture gives it, if any.
+        for option in others.iter().filter(|option| option.env.is_some()).take(3) {
+            let Some(variable) = option.env.as_deref() else { continue };
+            let current = self.fixture.env.iter().find(|(name, _)| name.as_str() == variable).map(|(_, value)| Value::String(value.clone()));
+            let avoid: Vec<Value> = current.into_iter().chain(std::iter::once(option.default.clone()).filter(|default| !default.is_null())).collect();
+            let Some(word) = Self::choose(doc, option, &avoid) else { continue };
+            let call = self.invoke_after(sequence, Call::new(next_argv.to_vec()).with_env(variable, &word))?;
+            paging.envs.push((format!("{variable} set to {word}"), call));
+        }
+        if paging.envs.is_empty() {
+            paging.unsupported.push("env");
+        }
+        // A command with `input`: the same paged invocation with its arguments in a document on stdin.
+        if doc.input.is_some() && doc.has_option("input") {
+            let given = invocation::args(doc, base);
+            let mut document = serde_json::Map::new();
+            let mut gave: BTreeSet<String> = BTreeSet::new();
+            let mut stripped = base.clone();
+            invocation::remove_option(&mut stripped, "all");
+            invocation::remove_option(&mut stripped, "cursor");
+            if doc.has_option("limit") {
+                invocation::set_option(&mut stripped, "limit", Some("1".to_string()));
+            }
+            for option in doc.options.iter().filter(|option| given.options.contains_key(&option.name)) {
+                gave.insert(option.name.clone());
+                if option.flag_only {
+                    continue;
+                }
+                let value = Self::document_value(option, &given.options[&option.name]);
+                document.insert(crate::l1::model::camel(&option.name), value);
+                invocation::remove_option(&mut stripped, &option.name);
+            }
+            if !given.operands.is_empty() {
+                document.insert("operands".to_string(), Value::Array(given.operands.iter().zip(0..).map(|(value, index)| invocation::normalise(doc.operands.get(index).or(doc.operands.last()).map_or("string", |operand| operand.value_type.as_str()), value)).collect()));
+                invocation::remove_operand(&mut stripped, 0);
+            }
+            invocation::set_option(&mut stripped, "input", Some("-".to_string()));
+            let bytes = serde_json::to_vec(&Value::Object(document)).unwrap_or_default();
+            let first = self.invoke(Call::new(invocation::render(&stripped)).with_stdin(bytes))?;
+            let sequence = self.log[first].sequence;
+            let mut input = InputPaging { first, gave, next_argv: None, next: None };
+            let document = first_document(&self.log[first].stdout).filter(|document| document.get("ok") == Some(&Value::Bool(true)));
+            let cursor = document.as_ref().and_then(|document| document.pointer("/meta/page/nextCursor")).and_then(Value::as_str).map(str::to_string);
+            input.next_argv = cursor.as_deref().zip(document.as_ref()).and_then(|(cursor, document)| Self::next_page(document, cursor));
+            if let Some(next_argv) = &input.next_argv {
+                input.next = Some(self.invoke_after(sequence, Call::new(next_argv.clone()))?);
+            }
+            paging.input = Some(input);
+        } else {
+            paging.unsupported.push("input");
+        }
+        Ok(())
+    }
+
+    /// The value an `--input` document gives `option`: typed JSON (spec 11.5), the argument as the invocation gave it.
+    fn document_value(option: &Arg, value: &Value) -> Value {
+        let typed = |value: &Value| -> Value {
+            match (option.value_type.as_str(), value) {
+                ("integer" | "count", Value::String(text)) => text.parse::<i64>().map_or_else(|_| value.clone(), Value::from),
+                ("number", Value::String(text)) => text.parse::<f64>().ok().and_then(serde_json::Number::from_f64).map_or_else(|| value.clone(), Value::Number),
+                _ => value.clone(),
+            }
+        };
+        match value {
+            Value::Array(values) => Value::Array(values.iter().map(typed).collect()),
+            other => typed(other),
+        }
     }
 
     fn plan_fields(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation]) -> Result<(), RunError> {

@@ -29,6 +29,7 @@ use crate::schema::schemas;
 pub mod documents;
 pub mod rules;
 mod l1;
+mod l1_order;
 mod l1_plan;
 
 use l1_plan::L1Run;
@@ -556,7 +557,7 @@ pub(crate) fn run_checks(
     let mut table: Vec<&Entry> = TABLE.iter().collect();
     if l1.is_some() {
         findings.extend(judge.l1_findings());
-        table.extend(l1::TABLE.iter());
+        table.extend(l1::table(claim));
     }
     let checks = table
         .into_iter()
@@ -966,6 +967,7 @@ impl<'a> Judge<'a> {
         let entry = TABLE
             .iter()
             .chain(l1::TABLE.iter())
+            .chain(std::iter::once(&l1::CHECK_ORDER))
             .find(|entry| entry.id == id)
             .unwrap_or_else(|| panic!("{id} is not in a table"));
         Conditions {
@@ -1564,7 +1566,7 @@ impl<'a> Judge<'a> {
         let mut c = self.check("L0.contract");
         if self.claim.at_least(Claim::V1_1) {
             return c.finish_as(End::Unsupported(
-                "the claim is 1.1: L0.contract-version owns the presence of meta.contract".to_string(),
+                format!("the claim is {}: L0.contract-version owns the presence of meta.contract", self.claim.as_str()),
             ));
         }
         for (index, document) in self.envelopes() {

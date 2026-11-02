@@ -60,9 +60,22 @@ pub(crate) const TABLE: [Entry; 31] = [
     must("L1.fields", &["6.10"], &[Commands]),
 ];
 
-/// The ids of the L1 checks, in table order.
+/// The ids of the L1 checks of a claim of 1.1 or 1.0, in table order.
 pub(crate) fn ids() -> [&'static str; 31] {
     TABLE.each_ref().map(|entry| entry.id)
+}
+
+/// `L1.check-order`: the only check that only a claim of 1.2 runs (spec 11.7 step 6; approaches/checker.md 6).
+pub(crate) const CHECK_ORDER: Entry = must("L1.check-order", &["11.7"], &[Commands]);
+
+/// The L1 table of a claim: the 31 checks, and from 1.2 `L1.check-order` after `L1.validators`.
+pub(crate) fn table(claim: Claim) -> Vec<&'static Entry> {
+    let mut rows: Vec<&'static Entry> = TABLE.iter().collect();
+    if claim.at_least(Claim::V1_2) {
+        let at = rows.iter().position(|entry| entry.id == "L1.validators").map_or(rows.len(), |at| at + 1);
+        rows.insert(at, &CHECK_ORDER);
+    }
+    rows
 }
 
 
@@ -192,7 +205,7 @@ impl<'a> Judge<'a> {
 
     /// The findings of the 30 checks, in table order.
     pub(crate) fn l1_findings(&'a self) -> Vec<Finding> {
-        vec![
+        let mut findings = vec![
             self.l1_tree(),
             self.l1_no_state(),
             self.l1_walk(),
@@ -224,7 +237,63 @@ impl<'a> Judge<'a> {
             self.l1_deterministic(),
             self.l1_paging(),
             self.l1_fields(),
-        ]
+        ];
+        if self.claim.at_least(Claim::V1_2) {
+            let at = ids().iter().position(|id| *id == "L1.validators").map_or(findings.len(), |at| at + 1);
+            findings.insert(at, self.l1_check_order());
+        }
+        findings
+    }
+
+    /// `L1.check-order` (spec 11.7 step 6, a claim of 1.2): a passing invocation changed to break two stages at once is answered by the earlier
+    /// stage, with its code and its `field` (what the earlier fault alone is answered with).
+    fn l1_check_order(&'a self) -> Finding {
+        let l1 = self.l1();
+        let mut c = self.check("L1.check-order");
+        if l1.docs.tree.is_none() {
+            return self.no_tree(c);
+        }
+        let mut judged = 0;
+        for run in &l1.orders {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
+            // The earlier fault alone has to be refused for its answer to say what the stage answers: else `L1.constraints`, `L1.domains` and
+            // `L1.validators` say so, and the pair is not judged.
+            let Some((alone_code, alone_field)) = self.failure(run.alone).filter(|_| self.refused(run.alone)) else { continue };
+            c.own(run.call);
+            judged += 1;
+            let answer = self.failure(run.call).filter(|_| self.refused(run.call));
+            c.holds_at(run.call, "pair-refused", answer.is_some(), || {
+                format!("{}: `{}` breaks {} and {} ({}) and {}", run.command, self.at(run.call).call.argv.join(" "), run.earlier, run.later, run.pair, refusal_text(self.envelope(run.call), self.at(run.call).exit))
+            });
+            let Some((code, field)) = answer else { continue };
+            let same_code = code == alone_code || (self.is_usage(code) && self.is_usage(alone_code));
+            c.holds_at(run.call, "earlier-stage-answers", same_code && field == alone_field, || {
+                format!(
+                    "{}: `{}` breaks {} and {} ({}) and was answered {} on {}; the earlier stage answers {} on {} (`{}`)",
+                    run.command,
+                    self.at(run.call).call.argv.join(" "),
+                    run.earlier,
+                    run.later,
+                    run.pair,
+                    code.unwrap_or("no code"),
+                    field.unwrap_or("no field"),
+                    alone_code.unwrap_or("no code"),
+                    alone_field.unwrap_or("no field"),
+                    self.at(run.alone).call.argv.join(" ")
+                )
+            });
+        }
+        if judged == 0 {
+            if l1.order_gaps.is_empty() {
+                return c.finish_as(End::Unsupported("no command has two stages that one invocation can break, and answers the earlier fault alone with a refusal".to_string()));
+            }
+            let entries: Vec<String> = l1.order_gaps.iter().map(|(command, _)| format!("commands.{command}.ok")).collect();
+            return c.finish_as(End::missing_all(l1.order_gaps.iter().map(|(command, why)| format!("{command}: {why}")).collect(), entries));
+        }
+        c.notes.extend(l1.order_gaps.iter().map(|(command, why)| format!("{command}: {why}: not probed")));
+        c.finish(true)
     }
 
     fn l1_tree(&'a self) -> Finding {
@@ -1149,6 +1218,9 @@ impl<'a> Judge<'a> {
                     unprovided.push((run.command.clone(), format!("{}: no changed argument was refused as a reused cursor", run.command)));
                 }
             }
+            if self.claim.at_least(Claim::V1_2) {
+                self.judge_paging_1_2(&mut c, run);
+            }
             if let Some(why) = &run.why_not {
                 unprovided.push((run.command.clone(), format!("{}: {why}", run.command)));
             }
@@ -1164,6 +1236,69 @@ impl<'a> Judge<'a> {
             return c.finish_as(End::missing_all(missing.into_iter().map(|(_, why)| why).collect(), entries));
         }
         c.finish(true)
+    }
+
+    /// The 1.2 half of `L1.paging` for one paged command (spec 6.9, 10.7.2, 12.5): the cursor is bound to what the invocation gave.
+    fn judge_paging_1_2(&'a self, c: &mut Conditions<'a>, run: &super::l1_plan::PagingRun) {
+        let refused_as_cursor = |call: usize| self.failure(call).is_some_and(|(code, _)| code == Some("CURSOR_INVALID"));
+        if let Some(call) = run.all_swap {
+            c.own(call);
+            c.holds_at(call, "cursor-survives-all", !refused_as_cursor(call), || {
+                format!("{}: the cursor of a page asked with --limit 1 was refused with CURSOR_INVALID when --all replaced --limit ({})", run.command, self.label(call))
+            });
+        }
+        for (label, call) in &run.defaults {
+            c.own(*call);
+            c.holds_at(*call, "cursor-bound-to-given-arguments", self.failure(*call).is_some_and(|(code, field)| code == Some("CURSOR_INVALID") && field == Some("--cursor")), || {
+                format!("{}: the cursor was not refused with CURSOR_INVALID on --cursor with {label}: {}", run.command, refusal_text(self.envelope(*call), self.at(*call).exit))
+            });
+        }
+        for (label, call) in &run.envs {
+            c.own(*call);
+            c.holds_at(*call, "cursor-bound-to-environment", self.failure(*call).is_some_and(|(code, field)| code == Some("CURSOR_INVALID") && field == Some("--cursor")), || {
+                format!("{}: the cursor was not refused with CURSOR_INVALID on --cursor with {label}: {}", run.command, refusal_text(self.envelope(*call), self.at(*call).exit))
+            });
+        }
+        if let Some(input) = &run.input {
+            c.own(input.first);
+            let first = self.ok_envelope(input.first).and_then(|document| document.get("data"));
+            c.holds_at(input.first, "paged-through-input", first.is_some(), || {
+                format!("{}: the paged invocation with its arguments in a document on stdin failed: {}", run.command, refusal_text(self.envelope(input.first), self.at(input.first).exit))
+            });
+            if let (Some(next_argv), Some(doc)) = (&input.next_argv, self.docs().command(&run.command)) {
+                let mut problems: Vec<String> = Vec::new();
+                if next_argv.iter().any(|word| word == "--input" || word.starts_with("--input=")) {
+                    problems.push("it carries --input".to_string());
+                }
+                if let Ok(carried) = crate::l1::invocation::parse(doc, next_argv) {
+                    for item in &carried.items {
+                        let crate::l1::invocation::Item::Option { name, value } = item else { continue };
+                        let Some(option) = doc.option(name) else { continue };
+                        if input.gave.contains(name) || matches!(name.as_str(), "cursor" | "json") {
+                            continue;
+                        }
+                        if value.as_ref().is_some_and(|value| !option.default.is_null() && *value == crate::l1::witness::word_of(&option.default)) {
+                            problems.push(format!("it writes out the default of --{name}"));
+                        } else if option.env.is_some() {
+                            problems.push(format!("it carries --{name}, which the invocation did not give and the environment gave"));
+                        }
+                    }
+                }
+                c.holds_at(input.first, "next-after-input", problems.is_empty(), || {
+                    format!("{}: the next entry of the page given by a document on stdin (`{}`): {}", run.command, next_argv.join(" "), problems.join("; "))
+                });
+                if let Some(next) = input.next {
+                    c.own(next);
+                    let second = self.ok_envelope(next).and_then(|document| document.get("data"));
+                    c.holds_at(next, "next-after-input-continues", second.is_some() && second != first, || {
+                        format!("{}: {}", self.label(next), if second.is_none() { refusal_text(self.envelope(next), self.at(next).exit) } else { "returned the first page again".to_string() })
+                    });
+                }
+            }
+        }
+        if !run.unsupported.is_empty() {
+            c.notes.push(format!("{}: the 1.2 half of the paging check has nothing to test for: {}", run.command, run.unsupported.join(", ")));
+        }
     }
 
     fn l1_fields(&'a self) -> Finding {

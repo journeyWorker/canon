@@ -57,6 +57,8 @@ pub struct Call {
     pub without_setup: bool,
     /// Run this program instead of the tool (a `prepare` command of the fixture).
     pub program: Option<String>,
+    /// What stdin holds (`--input -`); without it stdin is closed.
+    pub stdin: Option<Vec<u8>>,
 }
 
 impl Call {
@@ -75,6 +77,7 @@ impl Call {
             empty: false,
             without_setup: false,
             program: None,
+            stdin: None,
         }
     }
 
@@ -110,6 +113,13 @@ impl Call {
     #[must_use]
     pub fn without_setup(mut self) -> Self {
         self.without_setup = true;
+        self
+    }
+
+    /// The same call with `bytes` on stdin (a document for `--input -`).
+    #[must_use]
+    pub fn with_stdin(mut self, bytes: impl Into<Vec<u8>>) -> Self {
+        self.stdin = Some(bytes.into());
         self
     }
 
@@ -404,7 +414,7 @@ impl Runner {
                     .map(|(name, value)| (name, value)),
             )
             .envs(call.env.iter().map(|(name, value)| (name, value)))
-            .stdin(Stdio::null())
+            .stdin(if call.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stderr(Stdio::piped())
             .process_group(0);
         command
@@ -425,6 +435,12 @@ impl Runner {
             None
         };
         let mut child = command.spawn()?;
+        // The document goes in from a thread of its own: a tool that answers before it reads must not block this one.
+        if let (Some(bytes), Some(mut pipe)) = (call.stdin.clone(), child.stdin.take()) {
+            thread::spawn(move || {
+                let _ = std::io::Write::write_all(&mut pipe, &bytes);
+            });
+        }
         drop(command);
         let ended = Arc::new(AtomicBool::new(false));
         let stdout = match (stdout_terminal, child.stdout.take()) {

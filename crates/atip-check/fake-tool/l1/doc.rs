@@ -114,6 +114,9 @@ fn option_doc(arg: &Arg) -> Value {
     if arg.flag_only {
         doc.insert("flagOnly".into(), json!(true));
     }
+    if let Some(env) = arg.env {
+        doc.insert("env".into(), json!(env));
+    }
     extras(arg, &mut doc);
     Value::Object(doc)
 }

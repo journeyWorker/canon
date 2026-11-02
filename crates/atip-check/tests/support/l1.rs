@@ -62,6 +62,17 @@ pub fn l1_config(extra: &Value) -> Value {
     config
 }
 
+/// The standard configuration of a fake tool that claims 1.2: the copy of the tool named `claims12` claims 1.2 in the runs that get no configuration too.
+pub fn l1_config_1_2(extra: &Value) -> Value {
+    let mut config = l1_config(&json!({"claims": "1.2", "binAlias": "atip-fake-tool-claims12"}));
+    if let (Some(config), Some(extra)) = (config.as_object_mut(), extra.as_object()) {
+        for (key, value) in extra {
+            config.insert(key.clone(), value.clone());
+        }
+    }
+    config
+}
+
 /// The executable a case runs: the fake tool itself, or, when the configuration has `binAlias`, a copy of it under
 /// that name in the harness's directory. The no-state cases need it: the run of `schema --json` in an empty
 /// directory gets no fixture environment, so the only thing that can make the tool misbehave there is how it is
@@ -78,7 +89,7 @@ pub fn l1_bin(harness: &Harness, config: &Value) -> PathBuf {
 }
 
 /// What the fixture says about the L1 commands of the fake tool (approaches/checker.md 5).
-fn l1_commands(is_1_1: bool) -> Value {
+fn l1_commands(is_1_1: bool, is_1_2: bool) -> Value {
     let mut fields = vec![
         json!(["profile.name"]),
         json!(["owners[].email", "tags"]),
@@ -101,7 +112,8 @@ fn l1_commands(is_1_1: bool) -> Value {
         "schema": {"ok": [["schema", "--errors", "--json"]]},
         "member list": {
             "ok": [["member", "list", "--team", "core", "--limit", "2", "--sort", "name", "--json"]],
-            "paged": [["member", "list", "--team", "core", "--limit", "1", "--sort", "name", "--json"]],
+            // A 1.2 tool is paged with no filter given, so that its defaults and environment variables are left to be written out.
+            "paged": if is_1_2 { json!([["member", "list", "--limit", "1", "--json"]]) } else { json!([["member", "list", "--team", "core", "--limit", "1", "--sort", "name", "--json"]]) },
             "fields": fields
         },
         "member search": {
@@ -179,7 +191,7 @@ impl Harness {
                 fixture["warnings"] = json!(warnings);
             }
         }
-        fixture["commands"] = l1_commands(is_1_1);
+        fixture["commands"] = l1_commands(is_1_1, config["claims"] == "1.2");
         fixture
     }
 

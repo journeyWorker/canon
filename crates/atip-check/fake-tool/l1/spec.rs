@@ -490,7 +490,11 @@ fn member_list(shape: Shape) -> Command {
     let mut command = Command::new("member list", "List the members of the directory, a page at a time")
         .options(options)
         .rule(Rule::at_most_one(&["limit", "all"]))
-        .errors(&["CURSOR_INVALID", "USAGE"])
+        .errors(if is_1_2 {
+            &["CURSOR_INVALID", "INPUT_CONFLICT", "INPUT_INVALID", "INPUT_TOO_LARGE", "USAGE"][..]
+        } else {
+            &["CURSOR_INVALID", "USAGE"][..]
+        })
         .output(
             "MemberListReport",
             json!({
