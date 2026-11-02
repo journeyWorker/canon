@@ -388,7 +388,7 @@ fn authoring_init_34_a_policy_level_with_no_policy_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let out = run_canon(&["init", "--policy", "light", "--no-policy"], dir.path());
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains("cannot be used with"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("exclusive") && stderr(&out).contains("--no-policy"), "{}", stderr(&out));
     assert!(!dir.path().join("canon.yaml").exists());
     assert!(!dir.path().join(".canon").exists());
 }

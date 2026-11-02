@@ -202,17 +202,18 @@ impl Leaf {
             }
             (min, max)
         });
-        let by_id = |id: &str| -> Option<String> {
-            match args.iter().find(|a| a.get_id() == id) {
+        let by_name = |name: &str| -> Option<String> {
+            match args.iter().find(|a| atip::constraint::name_of(a) == name) {
                 Some(a) if a.is_positional() => Some("operands".to_string()),
                 Some(a) => a.get_long().map(camel),
                 None => None,
             }
         };
-        let one_of = cmd
-            .get_groups()
-            .filter(|g| g.is_required_set() && !(*g).clone().is_multiple())
-            .map(|g| g.get_args().filter_map(|id| by_id(id.as_str())).collect::<Vec<String>>())
+        // The groups of which exactly one is required are the `exactlyOne` rules the command's tables state (`arg_rules::rules_of`).
+        let one_of = crate::arg_rules::rules_of(cmd, &path.join(" "))
+            .iter()
+            .filter(|rule| rule.kind == atip::doc::RuleKind::ExactlyOne)
+            .map(|rule| rule.names.iter().filter_map(|name| by_name(name)).collect::<Vec<String>>())
             .collect();
         Leaf {
             path: path.to_vec(),

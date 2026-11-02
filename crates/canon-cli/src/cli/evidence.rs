@@ -60,10 +60,10 @@ pub struct EvidenceAddArgs {
     #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`
-    #[arg(long, value_name = "CLASS", required_unless_present = "reports")]
+    #[arg(long, value_name = "CLASS")]
     pub class: Option<String>,
     /// The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon
-    #[arg(long = "ref", value_name = "TEXT", required_unless_present = "reports")]
+    #[arg(long = "ref", value_name = "TEXT")]
     pub evidence_ref: Option<String>,
     /// faithful / not-applicable / divergent. Given a --report and no --verdict, the verdict is derived from the bound cases (any failed: divergent; a skipped case and none failed: not-applicable; else faithful), one record at a time with --all-scenarios; with no report the default is faithful. An explicit faithful over a failed or skipped case is refused
     #[arg(long, value_parser = crate::evidence::verdict_parser(), value_name = "VERDICT")]

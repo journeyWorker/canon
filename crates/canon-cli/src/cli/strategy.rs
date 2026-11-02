@@ -22,13 +22,13 @@ pub struct StrategyPromoteArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Evaluation bundle produced by the honest promotion adapter
-    #[arg(long, requires = "approval", value_name = "FILE")]
+    #[arg(long, value_name = "FILE")]
     pub evaluation: Option<PathBuf>,
     /// Approval JSON containing the detached SSH signature
-    #[arg(long, requires = "evaluation", value_name = "FILE")]
+    #[arg(long, value_name = "FILE")]
     pub approval: Option<PathBuf>,
     /// Detached signature file to attach to the approval JSON
-    #[arg(long, requires = "approval", value_name = "FILE")]
+    #[arg(long, value_name = "FILE")]
     pub signature_file: Option<PathBuf>,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,

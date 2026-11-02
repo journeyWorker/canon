@@ -583,7 +583,7 @@ fn a_value_that_starts_with_a_dash_survives_and_is_never_parsed_as_a_flag() {
     let out = canon(dir.path(), home.path(), &["subject", "new", "--input", r#"{"operands":["-dashed"],"domain":"dev","title":"T"}"#, "--json"], None);
     let body = json_of(&out);
     assert_eq!(body["error"]["field"], "/operands", "{body}");
-    assert!(body["error"]["message"].as_str().unwrap().contains("-dashed"), "{body}");
+    assert_eq!(body["error"]["received"], "-dashed", "{body}");
 }
 
 // ---------------------------------------------------------------- batches

@@ -121,12 +121,13 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
     }
 }
 
-/// The sets of options clap requires one of, for the command `path`.
+/// The sets of options exactly one of which is required, for the command `path`.
 fn required_one_of(path: &str) -> Vec<Vec<String>> {
     let mut root = canon_cli::cli::command();
     root.build();
     let node = path.split(' ').fold(&root, |cmd, word| cmd.find_subcommand(word).expect("a command of the tree"));
-    atip::project::Relations::from_constraints(&atip::constraint::clap_rules(node)).required_one_of
+    let rules: Vec<atip::doc::ConstraintDoc> = canon_cli::arg_rules::rules_of(node, path).iter().map(atip::constraint::Rule::doc).collect();
+    atip::project::Relations::from_constraints(&rules).required_one_of
 }
 
 #[test]
@@ -169,15 +170,15 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
                 args.push(value_for(leaf, name, &regime));
             }
         }
-        // One member of each required one-of group clap declares.
-        for group in &required_one_of(leaf) {
-            let flag = format!("--{}", group[0]);
-            if !args.contains(&flag) {
-                args.push(flag);
-                args.push(value_for(leaf, &group[0], &regime));
-            }
-        }
         args.extend(extra_args(leaf, repo.path()));
+        // One member of each group of which exactly one is required, unless the call already gives one.
+        for group in &required_one_of(leaf) {
+            if group.iter().any(|name| args.contains(&format!("--{name}"))) {
+                continue;
+            }
+            args.push(format!("--{}", group[0]));
+            args.push(value_for(leaf, &group[0], &regime));
+        }
         args.push("--json".to_string());
 
         let out = canon(repo.path(), &args);

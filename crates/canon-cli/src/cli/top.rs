@@ -12,13 +12,13 @@ pub struct InitArgs {
     #[arg(long, default_value = ".", value_name = "DIR")]
     pub repo: PathBuf,
     /// Validate an existing canon.yaml instead of writing one
-    #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers", "language", "dry_run"])]
+    #[arg(long)]
     pub check: bool,
     /// Do not write or refresh the canon block in AGENTS.md
     #[arg(long)]
     pub no_agents_md: bool,
     /// Level of the starter .canon/policy.yaml
-    #[arg(long, value_enum, value_name = "LEVEL", default_value = "strict", conflicts_with = "no_policy")]
+    #[arg(long, value_enum, value_name = "LEVEL", default_value = "strict")]
     pub policy: Option<crate::policy_level::PolicyLevel>,
     /// Do not write the starter .canon/policy.yaml
     #[arg(long)]
@@ -48,19 +48,19 @@ pub struct MigrateArgs {
     #[arg(long)]
     pub revert: bool,
     /// With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)
-    #[arg(long, value_name = "DIR", requires = "revert")]
+    #[arg(long, value_name = "DIR")]
     pub backup: Option<PathBuf>,
     /// With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it
-    #[arg(long, value_name = "NAME", requires = "commit", conflicts_with = "revert")]
+    #[arg(long, value_name = "NAME")]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID", requires = "relayed_via")]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor: Option<String>,
     /// With --relayed-via, who the human is
-    #[arg(long, value_name = "NAME", requires = "relayed_via")]
+    #[arg(long, value_name = "NAME")]
     pub approver: Option<String>,
     /// With --relayed-via, the human's answer as they gave it
-    #[arg(long, value_name = "TEXT", requires = "relayed_via")]
+    #[arg(long, value_name = "TEXT")]
     pub note: Option<String>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
@@ -146,7 +146,7 @@ pub struct QueryArgs {
     #[arg(long = "plugin", value_name = "PLUGIN_ID")]
     pub plugin_id: Option<String>,
     /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
-    #[arg(long, conflicts_with = "plugin_id")]
+    #[arg(long)]
     pub history: bool,
     /// Scope --kind change/task to one ChangeId (other kinds exit 2)
     #[arg(long = "change", value_parser = crate::query::parse_change_id, value_name = "CHANGE_ID")]
@@ -288,16 +288,16 @@ pub struct SchemaArgs {
     #[arg(long)]
     pub json: bool,
     /// Print every error code any command can emit, with its meaning and reasons, instead of a command
-    #[arg(long, conflicts_with_all = ["path", "error", "warnings", "warning"])]
+    #[arg(long)]
     pub errors: bool,
     /// Show one error code: its meaning, exit, retryable, fix and reasons (an unknown code, or a code that is only a warning, exits 2)
-    #[arg(long, value_name = "CODE", conflicts_with_all = ["path", "warnings", "warning"])]
+    #[arg(long, value_name = "CODE")]
     pub error: Option<String>,
     /// Print every warning code, with its meaning, instead of a command
-    #[arg(long, conflicts_with_all = ["path", "warning"])]
+    #[arg(long)]
     pub warnings: bool,
     /// Show one warning code: its meaning and fix (an unknown code exits 2)
-    #[arg(long, value_name = "CODE", conflicts_with = "path")]
+    #[arg(long, value_name = "CODE")]
     pub warning: Option<String>,
 }
 

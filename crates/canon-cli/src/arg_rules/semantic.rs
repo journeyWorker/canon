@@ -1,8 +1,8 @@
 //! The validators clap's value parsers used to run: the calendar of a `<TIMESTAMP>` option, the forms of `--surface-ref` and
 //! `--introduced-rev`. The parsers take the text now, and the checks run here, in the stateless stage after the declared domains and
-//! constraints (ATIP 11.7 step 6: required, domains, constraints, validators), whatever the argument order of the call.
+//! constraints (ATIP 11.7 step 6: required, domains, constraints, validators), whatever the argument order of the call. A validator
+//! judges the argument object: the value given, else the one an environment variable fills, else the default.
 
-use clap::parser::ValueSource;
 use clap::{ArgMatches, Command};
 
 use crate::cli_error::{CliError, CliErrorExt as _};
@@ -24,7 +24,7 @@ pub fn check(root: &Command, matches: &ArgMatches) -> Option<(String, CliError)>
     let args = command.get_positionals().chain(command.get_arguments().filter(|arg| !arg.is_positional())).filter(|arg| !atip::project::is_builtin_arg(arg));
     for arg in args {
         let id = arg.get_id().as_str();
-        if leaf.try_contains_id(id).ok() != Some(true) || leaf.value_source(id) != Some(ValueSource::CommandLine) {
+        if leaf.try_contains_id(id).ok() != Some(true) {
             continue;
         }
         let Some(long) = arg.get_long() else { continue };

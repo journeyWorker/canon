@@ -163,10 +163,10 @@ pub struct DivergenceAcceptArgs {
     #[arg(long, value_name = "NAME")]
     pub relayed_via: Option<String>,
     /// With --relayed-via, who the human is
-    #[arg(long, value_name = "NAME", requires = "relayed_via")]
+    #[arg(long, value_name = "NAME")]
     pub approver: Option<String>,
     /// With --relayed-via, the human's answer as they gave it
-    #[arg(long, value_name = "TEXT", requires = "relayed_via")]
+    #[arg(long, value_name = "TEXT")]
     pub note: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

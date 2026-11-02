@@ -144,6 +144,10 @@ pub(crate) fn check_arguments(command: &str, call: &Call<'_>) -> Result<(), crat
 fn check_role(command: &str) -> Result<(), crate::cli_error::CliError> {
     use crate::cli_error::{CliError, CliErrorExt as _};
     if crate::role::Role::current(None).is_none() {
+        // `CANON_ROLE` holds something that is no role: that is the refusal, as for every other command.
+        if let Some(unknown) = crate::role::unknown_env_role() {
+            return Err(unknown);
+        }
         return Err(CliError::refused("USAGE", format!("{FLAG} records a human's answer on behalf of an agent, and no agent role is declared for `{command}`"))
             .field(FLAG)
             .hint("declare the role you act as (`--as <role>` or CANON_ROLE) to relay a human's answer; in the human's own shell, run the call without the relay option"));

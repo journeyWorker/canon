@@ -80,9 +80,10 @@ fn run() -> ExitCode {
         Expanded::Exit(code) => return code,
     };
     canon_cli::json_out::set_invocation(args.iter().skip(1).map(|arg| arg.to_string_lossy().into_owned()).collect());
-    let mut matches = match command.clone().try_get_matches_from(args) {
+    // The order of ATIP 11.7 step 6: a failure to parse, `required`, the domains, the constraints, (below) the validators.
+    let mut matches = match canon_cli::validators::parse(&command, args) {
         Ok(matches) => matches,
-        Err(error) => return usage_error(&error),
+        Err(code) => return code,
     };
     let parsed = matches.clone();
     record_context(&command, &parsed);
@@ -91,20 +92,30 @@ fn run() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),
     };
-    // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
+    // The role is resolved before any command runs. An unknown `CANON_ROLE` is a check that depends on an environment value, so it is a
+    // validator and answers after the others (spec 10.8.1).
     // `canon context` and `canon skills show` never fail on the role: a bad `CANON_ROLE` is a warning there.
     // `canon schema` does not read `CANON_ROLE` at all (spec 10.2.2, 16.3): only its own `--as` declares a role there.
-    let resolved = if matches!(&cli.command, canon_cli::cli::Command::Schema(_)) { Ok(canon_cli::role::init_flag_only(cli.declared_role)) } else { canon_cli::role::init(cli.declared_role) };
-    if let Err(error) = resolved {
+    let unknown_role = if matches!(&cli.command, canon_cli::cli::Command::Schema(_)) {
+        canon_cli::role::init_flag_only(cli.declared_role);
+        None
+    } else {
+        canon_cli::role::declare(cli.declared_role)
+    };
+    let unknown_role = unknown_role.and_then(|error| {
         let role_free = matches!(&cli.command, canon_cli::cli::Command::Context(_) | canon_cli::cli::Command::Skills { action: canon_cli::cli::SkillsCommand::Show(_) });
-        if !role_free {
-            return ExitCode::from(error.emit("canon", atip::argv_wants_json()));
+        if role_free {
+            canon_cli::json_out::warn("UNKNOWN_ROLE_IGNORED", error.message);
+            return None;
         }
-        canon_cli::json_out::warn("UNKNOWN_ROLE_IGNORED", error.message);
-    }
+        Some(error)
+    });
     // The validators (ATIP 10.8.3) answer before any precondition or state read.
     if let Some(code) = canon_cli::validators::check(&cli, &command, &parsed) {
         return code;
+    }
+    if let Some(error) = unknown_role {
+        return ExitCode::from(error.emit("canon", atip::argv_wants_json()));
     }
     if let Some(code) = refuse_without_config(&command, &parsed) {
         return code;

@@ -41,7 +41,7 @@ const PAGING_ARGS: [&str; 5] = ["limit", "all", "cursor", "fields", "json"];
 #[derive(Args, Debug, Clone, Default)]
 pub struct PageFlags {
     /// Return at most this many records per page
-    #[arg(long, value_parser = crate::cli::safe_min1, conflicts_with = "all", value_name = "N", default_value = "100")]
+    #[arg(long, value_parser = crate::cli::safe_min1, value_name = "N", default_value = "100")]
     pub limit: Option<u64>,
     /// Resume after the last record of the previous page (the `nextCursor` it reported)
     #[arg(long, value_name = "CURSOR")]
@@ -241,7 +241,9 @@ mod tests {
         assert_eq!(probe.page.limit, Some(DEFAULT_LIMIT as u64), "clap itself holds the default, so help and the schema print it");
         let all = Probe::command().try_get_matches_from(["probe", "--all"]).expect("--all alone parses: a default does not conflict with it");
         assert_eq!(Probe::from_arg_matches(&all).expect("the flags read").page.page().limit, None);
-        assert!(Probe::command().try_get_matches_from(["probe", "--all", "--limit", "5"]).is_err(), "--all with an explicit --limit still conflicts");
+        // The exclusion of `--all` and an explicit `--limit` is a rule of the command's tables (`arg_rules::rules_of`), refused by the stateless stage
+        // after the parse: clap alone parses the pair (spec 11.7 step 6 answers a failure to parse, then `required`, then domains, then constraints).
+        assert!(Probe::command().try_get_matches_from(["probe", "--all", "--limit", "5"]).is_ok(), "clap leaves the exclusion to the tables");
     }
 
     #[test]

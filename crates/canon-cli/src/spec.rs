@@ -369,8 +369,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     let input = input_of(path, node.cmd, &operands, &options, &mut schemas);
     let batch = input.as_ref().is_some_and(|input| input.batch);
     let outputs = outputs_of(path, batch, &mut schemas)?;
-    let mut constraints = atip::constraint::clap_rules(node.cmd);
-    constraints.extend(crate::arg_rules::rules_for(path).iter().map(atip::constraint::Rule::doc));
+    let constraints: Vec<_> = crate::arg_rules::rules_of(node.cmd, path).iter().map(atip::constraint::Rule::doc).collect();
     let validators: Vec<ValidatorDoc> = crate::arg_rules::validators_for(path).iter().map(atip::constraint::Validator::doc).collect();
     let examples = examples_of(path)?;
     let errors = errors_of(path, &options, &operands, batch);

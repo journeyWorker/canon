@@ -101,25 +101,12 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
             if let Some(arg) = string(ContextKind::InvalidArg).map(first_word) {
                 usage = usage.field(crate::arg_rules::argument_name(&arg));
             }
-            if error.kind() == ErrorKind::ArgumentConflict {
-                // The violation names the first argument of the rule at fault, in the rule's own order, not the one clap met last (spec 10.8.1).
-                if let Some(field) = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &[]) {
-                    usage = usage.field(field);
-                }
-            }
             if error.kind() == ErrorKind::MissingRequiredArgument {
                 if let Some(ContextValue::Strings(names)) = error.get(ContextKind::InvalidArg) {
                     let names: Vec<String> = names.iter().flat_map(|name| crate::arg_rules::missing_names(name)).collect();
-                    let field = crate::arg_rules::first_fault(node, &joined, &std::env::args().skip(1).collect::<Vec<_>>(), &names).or_else(|| names.first().cloned()).unwrap_or_default();
+                    // The first of the missing arguments the contract names (spec 11.7 step 6): operands in order, then options in declaration order.
+                    let field = crate::arg_rules::first_required(node, &names).or_else(|| names.first().cloned()).unwrap_or_default();
                     usage = CliError::refused("USAGE", format!("the following required arguments were not provided: {}", names.join(", "))).field(field);
-                }
-            }
-            // clap's range sentence for an integer (`-1 is not in 0..=4294967295`) must not contradict a declared minimum: the declared domain speaks.
-            if message.contains(" is not in ") {
-                if let (Some(field), Some(value)) = (usage.field_name().map(str::to_string), string(ContextKind::InvalidValue)) {
-                    if let Some(says) = crate::arg_rules::enforce::declared_integer_says(node, &joined, &field) {
-                        usage.message = format!("invalid value '{value}' for '{field}': {says}");
-                    }
                 }
             }
             if let Some(value) = string(ContextKind::InvalidValue) {

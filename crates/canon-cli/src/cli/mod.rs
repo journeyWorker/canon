@@ -364,7 +364,7 @@ pub fn safe_min0_usize(text: &str) -> Result<usize, String> {
 #[derive(clap::Args, Debug, Clone, Copy)]
 pub struct PromoteArgs {
     /// Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)
-    #[arg(long, conflicts_with = "no_promote")]
+    #[arg(long)]
     pub promote: bool,
     /// Keep this write staged even under canon.yaml `write: { promote: auto }`
     #[arg(long)]
@@ -408,10 +408,10 @@ pub struct InputArgs {
 #[derive(clap::Args, Clone, Debug, Default)]
 pub struct SafetyArgs {
     /// Act on the previewed plan; needs --plan-digest
-    #[arg(long, requires = "plan_digest")]
+    #[arg(long)]
     pub commit: bool,
     /// The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest
-    #[arg(long, value_name = "DIGEST", requires = "commit")]
+    #[arg(long, value_name = "DIGEST")]
     pub plan_digest: Option<String>,
 }
 
