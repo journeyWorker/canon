@@ -1044,6 +1044,9 @@ impl<'a> Judge<'a> {
             }
         }
         runs.extend(l1.examples.iter().map(|run| run.call));
+        // The one run of each `notRun` command: its first document is judged against the output schema like any other.
+        self.judge_served(&mut c, false);
+        runs.extend(self.calls.served.iter().filter_map(|served| served.call));
         let mut judged = false;
         for index in runs {
             let Some(document) = self.ok_envelope(index) else { continue };

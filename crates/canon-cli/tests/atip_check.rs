@@ -173,8 +173,9 @@ fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1()
     assert_eq!(report.advisories(), 1);
     // The tree says the level the claim is (L1.tree), and the fixture names every step it made outside canon.
     assert_eq!(report.find("L1.tree").map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{}", report.text());
-    assert!(report.prepare.iter().all(|step| step.first().is_some_and(|program| program == "git")), "{:?}", report.prepare);
-    assert_eq!(report.prepare.len(), 2);
+    // Two `git` steps and the stub app that `canon dashboard` (under `notRun`: it serves until it is signalled) needs in the sandbox repo.
+    assert!(report.prepare.iter().all(|step| step.first().is_some_and(|program| matches!(program.as_str(), "git" | "sh"))), "{:?}", report.prepare);
+    assert_eq!(report.prepare.len(), 3);
     // The checks that probe the arguments and the data were exercised, not skipped for lack of a fixture entry.
     for id in ["L1.constraints", "L1.domains", "L1.patterns", "L1.numbers", "L1.validators", "L1.paging", "L1.fields", "L1.output-data"] {
         assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
@@ -196,6 +197,12 @@ fn atip_check_98_canon_lists_dashboard_under_not_run_and_passes_its_own_level_wi
     }
     let tree = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == "L1.tree").expect("L1.tree");
     assert!(tree.get("notRun").is_none(), "{tree}");
+    // `canon dashboard --json` ran once, printed its envelope, and was ended by the checker's signal; the other runs of it that would succeed were skipped.
+    let envelope = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == "L0.envelope").expect("L0.envelope");
+    let served: Vec<&Value> = envelope["observed"].as_array().expect("observed").iter().filter(|call| call["served"] == true).collect();
+    assert_eq!(served.len(), 1, "{envelope}");
+    assert_eq!(served[0]["argv"][0], "dashboard");
+    assert!(served[0]["stdout"].as_str().is_some_and(|text| text.contains("\"url\"")), "{}", served[0]);
 }
 
 #[test]
@@ -203,7 +210,7 @@ fn atip_checkl1_34_a_canon_command_whose_example_does_not_parse_fails_only_l1_ex
     // canon with one planted violation: the documented example of `status` names `canonn`, a tool that is not this one, so the job that runs canon at L1 is red on `L1.examples` alone.
     let dir = tempfile::tempdir().expect("tempdir");
     let wrapper = dir.path().join("canon-with-a-broken-example");
-    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"canon status --json\"/\"canonn status --json\"/g'; fi\nexit $code\n");
+    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"canon status --json\"/\"canonn status --json\"/g'; fi\nexit $code\n");
     std::fs::write(&wrapper, script).expect("write");
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let args = CheckArgs { bin: wrapper.clone().into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
@@ -221,7 +228,7 @@ fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
     // canon with one planted violation: every error that has a hint also prints `"x-was-hint":null` before it, the way canon 0.32 printed a member it had no value for; the hint itself stays, so only L0.no-null owns the violation.
     let dir = tempfile::tempdir().expect("tempdir");
     let wrapper = dir.path().join("canon-with-null-hints");
-    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"/\"x-was-hint\":null,\"hint\":\"/'; fi\nexit $code\n");
+    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"/\"x-was-hint\":null,\"hint\":\"/'; fi\nexit $code\n");
     std::fs::write(&wrapper, script).expect("write");
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let report = run_checker(&wrapper);
@@ -238,7 +245,7 @@ fn atip_check_75_a_canon_whose_hint_is_prose_starting_with_its_name_fails_l0_hin
     // canon with one planted violation: every "a working call: ..." hint is replaced by prose that starts with `canon ` and is not one command line.
     let dir = tempfile::tempdir().expect("tempdir");
     let wrapper = dir.path().join("canon-with-prose-hints");
-    let script = format!("#!/bin/sh\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"a working call: /\"hint\":\"canon can'\"'\"'t run this; try: /'; fi\nexit $code\n");
+    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"a working call: /\"hint\":\"canon can'\"'\"'t run this; try: /'; fi\nexit $code\n");
     std::fs::write(&wrapper, script).expect("write");
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let report = run_checker(&wrapper);

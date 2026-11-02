@@ -1041,10 +1041,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:happy
   @flow:canon-0-35-check-fixture.F4
   @atip.check.95
-  Scenario: A command named in notRun is never run, and the checks that would run it list it
-    Given a fixture with notRun naming a command that hangs and that logs each run, at L0 and at L1
-    When atip check runs
-    Then the command is never run, no check waits for the time limit, each check that would run it lists it in notRun, and the results are those of the checks without it
+  Scenario: A command named in notRun runs once up to its first document and is ended by a signal, and its other runs that would succeed are skipped and reported
+    Given a fake tool whose command serve prints one envelope and serves until it is signalled, listed under notRun with two ok invocations (atip/1 1.2.1, checker.md 5, which governs where the first form of this change's brief said the command was never run)
+    When atip check runs at L0
+    Then the first ok runs once with --json, its stdout is read to the end of its first document and the process is ended by SIGTERM, the second ok is not run and is in skipped, the checks that run commands list serve in notRun, and the exit of the ended run is not judged
 
   # canon: {"schema":1,"at":"2026-11-02T07:04:50Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
   @subject:atip-check
@@ -1052,10 +1052,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:failure
   @flow:canon-0-35-check-fixture.F4
   @atip.check.96
-  Scenario: A notRun command that commands also lists, or that the tool does not document, is FIXTURE_INVALID and no check runs
-    Given a fixture whose notRun also appears in commands, and one at L1 whose notRun names a command the tool does not document
+  Scenario: A notRun command that is the probe, has no effectNote, or is not in the tool's documents is FIXTURE_INVALID and no check runs
+    Given a fixture whose notRun is a string, repeats an id, names the probe, or (at L1) names an id the tool's schema tree lacks or a command whose document has no effectNote
     When atip check runs
-    Then it is FIXTURE_INVALID with exit 2 and the binary under test is not run for either of the first and no check reports for the second
+    Then it is FIXTURE_INVALID with exit 2 on --fixture, the binary under test is not run for the shapes and the probe, and no check reports; a notRun command that commands also lists is allowed (the first ok is the one run)
 
   # canon: {"schema":1,"at":"2026-11-02T07:04:54Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
   @subject:atip-check
@@ -1063,10 +1063,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:edge
   @flow:canon-0-35-check-fixture.F4
   @atip.check.97
-  Scenario: The example syntax check still runs for a notRun command, and the command is never missing from the report
-    Given a tool whose documented example of a notRun command is malformed
+  Scenario: The example syntax check still judges the examples of a notRun command, and the command is on the report
+    Given a tool whose documented example of another command is malformed, and a command under notRun
     When atip check runs at L1
-    Then L1.examples fails on it although the command is not run, and a notRun command is on the report in the notRun of the checks that run commands
+    Then L1.examples fails on it, each check that runs commands lists serve in notRun, and the one run of serve is observed
 
   # canon: {"schema":1,"at":"2026-11-02T07:04:58Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
   @subject:atip-check
@@ -1074,10 +1074,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:happy
   @flow:canon-0-35-check-fixture.F4
   @atip.check.98
-  Scenario: canon lists dashboard under notRun and passes its own level with it
-    Given canon's fixture
+  Scenario: canon lists dashboard under notRun, runs it once up to its url envelope, and passes its own level
+    Given canon's fixture, whose prepare gives the sandbox repo a stub packages/dashboard app
     When atip check runs at L1 on the canon binary
-    Then the fixture lists dashboard under notRun, the level is met, and the checks that run commands list dashboard in notRun
+    Then dashboard --json ran once, printed its url envelope and was ended by the checker's signal, the level is met, and the checks that run commands list dashboard in notRun
 
   # canon: {"schema":1,"at":"2026-11-02T10:20:27Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
   @subject:atip-check
@@ -1195,10 +1195,10 @@ Feature: atip check: the atip/1 L0 conformance checker
   @case:failure
   @flow:canon-0-35-check-1-2.F3
   @atip.check.109
-  Scenario: Commands that are not run leave check-order unsupported, and no invocation to change leaves it unprovided and fails the level
-    Given a fixture whose every command is under notRun, and a tool with no example and no ok invocation
+  Scenario: A tool with no invocation to change leaves check-order unprovided and fails the level
+    Given a 1.2 fake tool with no example and a fixture with no ok invocation
     When atip check runs at L1
-    Then L1.check-order is unsupported for the first, and unprovided for the second with missing-fixture-entry findings commands.<id>.ok and exit 1
+    Then L1.check-order is unprovided with missing-fixture-entry findings commands.<id>.ok and the exit is 1 (a command under notRun is not unsupported: its refused pairs still run, atip.check.120)
 
   # canon: {"schema":1,"at":"2026-11-02T10:26:09Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
   @subject:atip-check
@@ -1243,3 +1243,91 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given a fake tool whose output schema of member list marks an optional field required, at a claim of 1.1 and of 1.2
     When atip check runs at L1
     Then L1.output-data fails with a finding of kind data-validates naming the field, and L1.fields fails with it and no other row does
+
+  # canon: {"schema":1,"at":"2026-11-02T15:42:02Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.114
+  Scenario: With no ok invocation the first example is the one run of a notRun command, and the other examples are skipped and reported
+    Given a fake tool whose serve command has examples and no ok invocation of the fixture, listed under notRun, at L1
+    When atip check runs
+    Then serve --json (its first example) runs once and is ended by a signal, the other example and the in-range values of its domain are not run and are in skipped of L1.example-runs, L1.output-data and L1.domains, and its document is judged by L1.output-data
+
+  # canon: {"schema":1,"at":"2026-11-02T15:42:43Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.115
+  Scenario: A notRun command that ignores SIGTERM is killed after the grace period and the checker does not hang
+    Given a fake tool whose serve command ignores SIGTERM
+    When atip check runs
+    Then the run is ended by SIGKILL after the grace period, the exit is the signal's and is not judged, and the run finishes
+
+  # canon: {"schema":1,"at":"2026-11-02T15:43:20Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.116
+  Scenario: A notRun command that ends on its own before or after its first document is FIXTURE_INVALID and no check runs
+    Given a fake tool whose serve command exits before printing a document, or exits right after it, at L0 and at L1
+    When atip check runs
+    Then it is FIXTURE_INVALID with exit 2 on --fixture, the message says the command ended on its own, and no check reports
+
+  # canon: {"schema":1,"at":"2026-11-02T15:43:55Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.117
+  Scenario: A notRun command that prints no document before the time limit fails L0.envelope and only it
+    Given a fake tool whose serve command prints nothing and keeps running, under notRun
+    When atip check runs with a short time limit
+    Then L0.envelope alone fails with a finding of kind document-before-timeout carrying the argv, and the level is not met
+
+  # canon: {"schema":1,"at":"2026-11-02T15:44:57Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.118
+  Scenario: A bad first document of a notRun command fails the check that owns the fault and no other
+    Given a fake tool whose serve document has a null in meta, a contractVersion that is not the claim, a next step without --json, or data that its output schema refuses
+    When atip check runs at L0 and at L1
+    Then only L0.no-null, L0.contract-version, L0.next or L1.output-data fails, one for each document
+
+  # canon: {"schema":1,"at":"2026-11-02T15:46:13Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.119
+  Scenario: A notRun command with no ok invocation and no example leaves the checks that judge its document unprovided
+    Given a fixture that names serve under notRun with no ok entry, and a tool with no example for it
+    When atip check runs at L0 and at L1
+    Then L0.envelope, L0.no-null, L0.contract-version, L0.next and L1.output-data are unprovided with the missing-fixture-entry commands.serve.ok and the level is not met
+
+  # canon: {"schema":1,"at":"2026-11-02T15:48:17Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.120
+  Scenario: The runs of a notRun command that are refused still run, and a domain it does not enforce fails L1.domains
+    Given a 1.2 fake tool whose serve has a domain on its port, under notRun, and one that accepts a port outside the domain and serves on
+    When atip check runs at L1
+    Then the pairs of L1.check-order and the values outside the domain run and pass for the first, and for the second L1.domains fails
+
+  # canon: {"schema":1,"at":"2026-11-02T15:49:26Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.121
+  Scenario: A check whose every run was skipped is unprovided, so listing commands under notRun cannot pass a level
+    Given a fake tool whose only command with examples is serve, under notRun, with two examples
+    When atip check runs at L1
+    Then L1.example-runs is unprovided with a finding of kind all-runs-not-run, and the level is not met

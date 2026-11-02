@@ -110,6 +110,9 @@ impl Tool {
         if !self.flag("noSchema") {
             commands.push("schema");
         }
+        if self.config.contains_key("serveMode") {
+            commands.push("serve");
+        }
         commands.sort_unstable();
         commands
     }
@@ -847,6 +850,36 @@ fn is_unknown_option(arg: &str) -> bool {
     arg.starts_with("--") && arg != "--" && !known.contains(&arg)
 }
 
+/// The command `serve` of the seeded `notRun` runs (`serveMode`): it prints one envelope and then serves until it is signalled.
+/// `exitBefore` ends without a document, `exitAfter` ends after it, `silent` prints none and keeps running, `ignoreTerm` ignores SIGTERM;
+/// `dataPatch` and `metaPatch` of `serve` seed a bad document, and `invocationLog` counts the runs.
+#[expect(
+    unsafe_code,
+    reason = "libc::signal is an unsafe FFI call; the seeded violation is a server that ignores SIGTERM"
+)]
+fn serve(tool: &Tool) -> ExitCode {
+    let mode = tool.text("serveMode", "serve");
+    if mode == "ignoreTerm" {
+        // SAFETY: sets the disposition of SIGTERM of this process to ignore; nothing else touches signals.
+        unsafe {
+            libc::signal(libc::SIGTERM, libc::SIG_IGN);
+        }
+    }
+    match mode.as_str() {
+        "exitBefore" => return ExitCode::SUCCESS,
+        "silent" => {}
+        _ => {
+            tool.success("serve", json!({"serving": true}));
+        }
+    }
+    if mode == "exitAfter" {
+        return ExitCode::SUCCESS;
+    }
+    loop {
+        std::thread::sleep(Duration::from_secs(1));
+    }
+}
+
 #[expect(
     unsafe_code,
     reason = "libc::raise is an unsafe FFI call; the seeded violation is a tool that dies by a signal"
@@ -929,6 +962,9 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
     };
     if let Some(refused) = tool.seeded_refusal(command) {
         return refused;
+    }
+    if command == "serve" {
+        return serve(tool);
     }
     if command == "team" {
         return team(tool, &words, repo_given);

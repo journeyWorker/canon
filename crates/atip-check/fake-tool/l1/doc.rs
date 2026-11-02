@@ -20,6 +20,8 @@ impl Model {
             is_1_2: tool.is_1_2(),
             limit_not_flag_only: tool.flag("limitNotFlagOnly"),
             repeatable_default: tool.flag("repeatableDefault"),
+            serve: tool.config.contains_key("serveMode"),
+            serve_without_note: tool.flag("serveNoEffectNote"),
             deep: tool.flag("deepTree"),
         };
         Self {

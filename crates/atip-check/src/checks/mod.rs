@@ -250,6 +250,25 @@ struct Invocations {
     schema_tree: usize,
     /// What the probe reports in an untouched copy, twice the same; `None` when it does not (or there is no probe).
     remote_baseline: Option<Value>,
+    /// The one run of each `notRun` command, and the runs of those commands that were skipped.
+    served: Vec<ServedRun>,
+    skipped: Vec<Skip>,
+}
+
+/// The one run of a `notRun` command (approaches/checker.md 5): its first fixture `ok` invocation, else its first example, with `--json`, read up to the
+/// end of its first JSON document and ended by a signal. `call` is `None` when the command has neither.
+#[derive(Debug, Clone)]
+pub(crate) struct ServedRun {
+    pub(crate) command: String,
+    pub(crate) call: Option<usize>,
+}
+
+/// A run of a `notRun` command that the checker did not make because it would succeed and so never end, reported by the check it would have fed
+/// (`check` empty: by every check that runs commands).
+#[derive(Debug, Clone)]
+pub(crate) struct Skip {
+    pub(crate) check: &'static str,
+    pub(crate) text: String,
 }
 
 /// The invocations that use the fixture's probe command.
@@ -292,6 +311,8 @@ struct Run<'a> {
     runner: Runner,
     fixture: &'a Fixture,
     log: Vec<Outcome>,
+    served: Vec<ServedRun>,
+    skipped: Vec<Skip>,
 }
 
 impl Run<'_> {
@@ -343,6 +364,12 @@ impl Run<'_> {
             Some(words) => Some(self.invoke_probe(&words)?),
         };
         let commands = self.invoke_commands()?;
+        // A `notRun` command without an `ok` invocation has no run yet: at L1 its first example gives one.
+        for id in self.fixture.not_run.clone() {
+            if self.served.iter().all(|served| served.command != id) {
+                self.served.push(ServedRun { command: id, call: None });
+            }
+        }
         let group = self.invoke_group()?;
         let schema_tree = self.invoke(Call::new(["schema", "--json"]))?;
         Ok(Invocations {
@@ -360,6 +387,8 @@ impl Run<'_> {
             group,
             schema_tree,
             remote_baseline,
+            served: Vec::new(),
+            skipped: Vec::new(),
         })
     }
 
@@ -415,11 +444,26 @@ impl Run<'_> {
                 paged: Vec::new(),
                 cursor: 0,
             };
-            for argv in &entry.ok {
-                calls.ok.push(self.invoke(Call::new(in_json_mode(argv)))?);
-            }
-            for argv in &entry.paged {
-                calls.paged.push(self.invoke(Call::new(in_json_mode(argv)))?);
+            if self.fixture.not_run.contains(id) {
+                // A command that does not end on its own: its first `ok` invocation runs once, up to its first document; the rest would succeed and never end.
+                if let Some(argv) = entry.ok.first() {
+                    let call = self.invoke_served(id, argv)?;
+                    self.served.push(ServedRun { command: id.clone(), call: Some(call) });
+                }
+                for argv in entry.ok.iter().skip(1) {
+                    self.skip("", id, format!("`{}` (a further ok)", in_json_mode(argv).join(" ")));
+                }
+                for argv in &entry.paged {
+                    self.skip("L0.page", id, format!("`{}` (paged)", in_json_mode(argv).join(" ")));
+                    self.skip("L1.paging", id, format!("`{}` (paged)", in_json_mode(argv).join(" ")));
+                }
+            } else {
+                for argv in &entry.ok {
+                    calls.ok.push(self.invoke(Call::new(in_json_mode(argv)))?);
+                }
+                for argv in &entry.paged {
+                    calls.paged.push(self.invoke(Call::new(in_json_mode(argv)))?);
+                }
             }
             for argv in &entry.refused {
                 calls.refused.push(self.invoke(Call::new(in_json_mode(argv)))?);
@@ -442,6 +486,25 @@ impl Run<'_> {
             all.push(calls);
         }
         Ok(all)
+    }
+
+    /// Records a run of the `notRun` command `command` that the checker did not make.
+    fn skip(&mut self, check: &'static str, command: &str, what: String) {
+        self.skipped.push(Skip { check, text: format!("{command}: {what}: notRun") });
+    }
+
+    /// The one run of the `notRun` command `id`: `argv` with `--json`, until its first JSON document, then ended by a signal. A command that ends on its
+    /// own, before or after that document, is a fixture error.
+    fn invoke_served(&mut self, id: &str, argv: &[String]) -> Result<usize, RunError> {
+        let index = self.invoke(Call::new(in_json_mode(argv)).until_first_document())?;
+        if self.log[index].ended_alone {
+            return Err(RunError::Fixture(format!(
+                "`notRun` names {id}, and `{}` ended on its own ({}) within the time limit: a command that ends belongs in no `notRun`",
+                self.log[index].call.argv.join(" "),
+                exit_text(self.log[index].exit)
+            )));
+        }
+        Ok(index)
     }
 
     /// The `missingValue` invocation on a terminal: it has `control_elapsed` x 2 + 2 seconds, at most the fixture's limit.
@@ -513,8 +576,10 @@ pub(crate) fn run_checks(
         runner,
         fixture,
         log: Vec::new(),
+        served: Vec::new(),
+        skipped: Vec::new(),
     };
-    let calls = run.invoke_all()?;
+    let mut calls = run.invoke_all()?;
     let l1 = if level == Level::L1 {
         let warnings_offered = claim.at_least(Claim::V1_1)
             && first_document(&run.log[calls.schema_warnings].stdout)
@@ -523,6 +588,8 @@ pub(crate) fn run_checks(
     } else {
         None
     };
+    calls.served = std::mem::take(&mut run.served);
+    calls.skipped = std::mem::take(&mut run.skipped);
     let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation, l1.as_ref());
     let mut findings = vec![
         judge.version(),
@@ -586,6 +653,7 @@ pub(crate) fn run_checks(
                 notes: finding.notes,
                 unlisted: if matches!(entry.id, "L1.constraints" | "L1.domains" | "L1.validators") { l1.as_ref().map(|l1| l1.unprobed_writes.clone()).unwrap_or_default() } else { Vec::new() },
                 not_run: if entry.needs.contains(&Commands) || entry.id == "L1.next" { fixture.not_run.clone() } else { Vec::new() },
+                skipped: calls.skipped.iter().filter(|skip| skip.check.is_empty() && entry.needs.contains(&Commands) || skip.check == entry.id).map(|skip| skip.text.clone()).collect(),
                 observed: finding
                     .observed
                     .iter()
@@ -640,6 +708,8 @@ struct Conditions<'j> {
     problems: Vec<Detail>,
     /// The invocations the fixture lists to succeed that a precondition refused: what the check could not judge for them.
     refused: Vec<Detail>,
+    /// The fixture entries the check lacks to judge the one run of a `notRun` command: the entry, and what is missing.
+    lacking: Vec<(String, String)>,
     advisories: Vec<String>,
     observed: Vec<usize>,
     /// Facts found that do not change the result.
@@ -806,6 +876,13 @@ impl<'j> Conditions<'j> {
             observed: Vec::new(),
             notes,
         };
+        if !self.lacking.is_empty() {
+            // A `notRun` command with neither an `ok` invocation nor (from L1) an example has no run to judge.
+            let (reason, cut) = reason_and_cut(&self.lacking.iter().map(|(_, why)| why.clone()).collect::<Vec<_>>());
+            let mut entries: Vec<String> = self.lacking.iter().map(|(entry, _)| entry.clone()).collect();
+            entries.dedup();
+            return unprovided(reason, cut, entries, self.advisories, self.notes);
+        }
         let quiet = |result, reason, observed, advisories, notes| Finding {
             result,
             reason,
@@ -846,6 +923,20 @@ impl<'j> Conditions<'j> {
             return unprovided(why, false, missing.iter().map(|(name, _)| (*name).to_string()).collect(), self.advisories, self.notes);
         }
         let exercised = matches!(end, End::Exercised(true));
+        // A check whose every run was a `notRun` command's that the checker skipped has nothing to judge, and listing commands must not pass a level.
+        let skipped: Vec<&Skip> = self.judge.calls.skipped.iter().filter(|skip| skip.check == self.entry.id).collect();
+        if !exercised && !skipped.is_empty() {
+            let reason = format!("every run this check would make is that of a command in `notRun`: {}", skipped.iter().take(3).map(|skip| skip.text.as_str()).collect::<Vec<_>>().join("; "));
+            return Finding {
+                result: CheckResult::Unprovided,
+                reason: Some(reason),
+                details: vec![Detail::new("all-runs-not-run", "notRun".to_string())],
+                cut: skipped.len() > 3,
+                advisories: self.advisories,
+                observed: self.observed,
+                notes: self.notes,
+            };
+        }
         let reason = (!exercised)
             .then(|| "no envelope the run saw carries what this check judges".to_string());
         quiet(
@@ -976,6 +1067,7 @@ impl<'a> Judge<'a> {
             name: &id[3..],
             problems: Vec::new(),
             refused: Vec::new(),
+            lacking: Vec::new(),
             advisories: Vec::new(),
             observed: Vec::new(),
             owned: Vec::new(),
@@ -1255,7 +1347,8 @@ impl<'a> Judge<'a> {
     fn ok_exit(&'a self) -> Finding {
         let mut c = self.check("L0.ok-exit");
         for (index, outcome) in self.log.iter().enumerate() {
-            if outcome.exit == Exit::TimedOut {
+            // The run of a `notRun` command ended by the checker's signal: its exit is the signal's (spec 8.4).
+            if outcome.exit == Exit::TimedOut || outcome.served {
                 continue;
             }
             let before = c.problems.len();
@@ -1344,6 +1437,7 @@ impl<'a> Judge<'a> {
     /// `null` in `meta` or `error` (spec 6.5).
     fn no_null(&'a self) -> Finding {
         let mut c = self.check("L0.no-null");
+        self.judge_served(&mut c, false);
         for (index, document) in self.documents_of_json_runs() {
             let found = rules::null_problems(document);
             c.holds_at(index, "no-null", found.is_empty(), || {
@@ -1361,8 +1455,29 @@ impl<'a> Judge<'a> {
     }
 
     /// Every JSON-mode document validates against the envelope schema, but for what other checks own.
+    /// The one run of each `notRun` command: a command that printed no document within the time limit fails `L0.envelope`; one with no run to make leaves the check that judges it unprovided.
+    fn judge_served(&self, c: &mut Conditions<'a>, no_document: bool) {
+        for served in &self.calls.served {
+            match served.call {
+                Some(index) => {
+                    c.observe(index);
+                    if no_document && self.at(index).exit == Exit::TimedOut {
+                        c.holds_at(index, "document-before-timeout", false, || {
+                            format!("`{}` printed no JSON document within the {} second limit; it is a command of `notRun`, run once up to its first document", self.at(index).call.argv.join(" "), self.fixture.timeout.as_secs_f64())
+                        });
+                    }
+                }
+                None => c.lacking.push((
+                    format!("commands.{}.ok", served.command),
+                    format!("`notRun` names {}, which has no `ok` invocation in the fixture{}: there is no run to judge", served.command, if self.l1.is_some() { " and no example" } else { "" }),
+                )),
+            }
+        }
+    }
+
     fn envelope_check(&'a self) -> Finding {
         let mut c = self.check("L0.envelope");
+        self.judge_served(&mut c, true);
         for (index, document) in self.documents_of_json_runs() {
             // A tool emits envelopes or stream lines (13.5): a stream is judged line by line by the stream-line schema.
             let found = if rules::is_stream_start(document) {
@@ -1587,6 +1702,7 @@ impl<'a> Judge<'a> {
     /// The document declares the claimed minor, and nothing of a later one (spec 15.7, 10.13 rule 16).
     fn contract_version(&'a self) -> Finding {
         let mut c = self.check("L0.contract-version");
+        self.judge_served(&mut c, false);
         for (index, document) in self.envelopes() {
             for (condition, problem) in rules::contract_version_findings(document, self.claim) {
                 c.holds_at(index, condition, problem.is_none(), || {
@@ -1664,6 +1780,7 @@ impl<'a> Judge<'a> {
     /// Every `meta.next` entry the run saw (spec 6.8).
     fn next(&'a self) -> Finding {
         let mut c = self.check("L0.next");
+        self.judge_served(&mut c, false);
         let mut exercised = false;
         for (index, document) in self.envelopes() {
             if document.pointer("/meta/next").is_none() {
@@ -2509,6 +2626,10 @@ fn summary(outcome: &Outcome) -> Value {
         Exit::Signal(signal) => entry.insert("signal".to_string(), json!(signal)),
         Exit::TimedOut => entry.insert("timedOut".to_string(), json!(true)),
     };
+    if outcome.served {
+        // The run of a `notRun` command that the checker ended by a signal after its first document.
+        entry.insert("served".to_string(), json!(true));
+    }
     if let Some(at) = &outcome.at_deadline {
         entry.insert(
             "atDeadline".to_string(),

@@ -27,6 +27,11 @@ use tempfile::TempDir;
 use crate::fixture::Fixture;
 use crate::snapshot::{changed, copy_tree, take, Snapshot};
 
+/// How long a `notRun` command has to end after SIGTERM before it gets SIGKILL.
+pub const SERVED_GRACE: Duration = Duration::from_secs(2);
+/// How long after its first document a `notRun` command is watched for ending on its own, before it is signalled.
+const SERVED_SETTLE_MILLIS: u64 = 200;
+
 /// How an invocation ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exit {
@@ -59,6 +64,9 @@ pub struct Call {
     pub program: Option<String>,
     /// What stdin holds (`--input -`); without it stdin is closed.
     pub stdin: Option<Vec<u8>>,
+    /// The run of a `notRun` command (approaches/checker.md 5): read stdout up to the end of its first JSON document, check the process is still
+    /// running, then signal it (SIGTERM, SIGKILL after [`SERVED_GRACE`]).
+    pub served: bool,
 }
 
 impl Call {
@@ -78,6 +86,7 @@ impl Call {
             without_setup: false,
             program: None,
             stdin: None,
+            served: false,
         }
     }
 
@@ -123,6 +132,13 @@ impl Call {
         self
     }
 
+    /// The same call as the run of a command that does not end on its own: until its first JSON document, then ended by a signal.
+    #[must_use]
+    pub fn until_first_document(mut self) -> Self {
+        self.served = true;
+        self
+    }
+
     /// The same call in an empty directory and a minimal environment, measured.
     #[must_use]
     pub fn in_empty_state(mut self) -> Self {
@@ -154,6 +170,10 @@ pub struct Outcome {
     pub probe_after: Option<Vec<u8>>,
     /// The number of the sequence (the copy of the fixture state) the invocation ran in: [`Runner::run_after`] continues it.
     pub sequence: usize,
+    /// The run of a `notRun` command that printed its first JSON document and was ended by the checker's signal: its exit is the signal's, its stdout stops at the end of that document.
+    pub served: bool,
+    /// The run of a `notRun` command that ended on its own within the time limit, before or after its first document: the fixture is wrong, the command belongs in no `notRun`.
+    pub ended_alone: bool,
 }
 
 /// What a terminal run showed when it was still running at its deadline.
@@ -355,8 +375,7 @@ impl Runner {
     /// Runs `call` once in its own fresh copy of the template (an empty one for a call in the empty state).
     pub fn run(&mut self, call: &Call) -> Result<Outcome, RunError> {
         let (number, sequence) = self.sequence(call.empty || call.without_setup)?;
-        let mut outcome = self
-            .execute(call, &sequence)
+        let mut outcome = (if call.served { self.execute_served(call, &sequence) } else { self.execute(call, &sequence) })
             .map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
         outcome.sequence = number;
         let before = if call.empty || call.without_setup { Snapshot::new() } else { self.template_files.clone() };
@@ -469,6 +488,127 @@ impl Runner {
             at_deadline: None,
             probe_after: None,
             sequence: 0,
+            served: false,
+            ended_alone: false,
+        })
+    }
+
+    /// The run of a `notRun` command: until the end of its first JSON document, then SIGTERM, and SIGKILL when the process outlives [`SERVED_GRACE`].
+    /// A process that ends on its own before or after the document is `ended_alone`; one that prints no document within the time limit is killed and is `TimedOut`.
+    fn execute_served(&self, call: &Call, root: &Path) -> std::io::Result<Outcome> {
+        let started = Instant::now();
+        let mut command = self.command(call, root);
+        command.stdout(Stdio::piped());
+        let mut child = command.spawn()?;
+        drop(command);
+        let printed = Arc::new(Mutex::new(Vec::new()));
+        let reading = child.stdout.take().map(|mut pipe| {
+            let sink = Arc::clone(&printed);
+            thread::spawn(move || {
+                let mut chunk = [0u8; 8192];
+                while let Ok(read) = pipe.read(&mut chunk) {
+                    if read == 0 {
+                        break;
+                    }
+                    if let Ok(mut bytes) = sink.lock() {
+                        bytes.extend_from_slice(&chunk[..read]);
+                    }
+                }
+            })
+        });
+        let stderr = child.stderr.take().map_or_else(|| thread::spawn(Vec::new), reader);
+        let limit = call.limit.unwrap_or(self.timeout);
+        // The end of the first JSON document in what stdout holds so far, with the newline that closes its line when it is there.
+        let first_document_end = |bytes: &[u8]| -> Option<usize> {
+            let mut documents = serde_json::Deserializer::from_slice(bytes).into_iter::<serde_json::Value>();
+            match documents.next() {
+                Some(Ok(_)) => Some(documents.byte_offset()),
+                _ => None,
+            }
+        };
+        let mut ended_alone = false;
+        let mut served = false;
+        let mut exit = Exit::TimedOut;
+        let mut end: Option<usize> = None;
+        loop {
+            let seen = printed.lock().map(|bytes| bytes.clone()).unwrap_or_default();
+            if let Some(at) = first_document_end(&seen) {
+                end = Some(at);
+                break;
+            }
+            if let Some(status) = child.try_wait()? {
+                // Ended before a document: whatever it printed up to its end is read, but it is a fixture error all the same.
+                exit = exit_of(status);
+                ended_alone = true;
+                break;
+            }
+            if started.elapsed() >= limit {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        if end.is_some() {
+            // The closing newline of the document's line, then a moment for a process that prints its document and ends.
+            thread::sleep(Duration::from_millis(SERVED_SETTLE_MILLIS));
+            if let Some(status) = child.try_wait()? {
+                exit = exit_of(status);
+                ended_alone = true;
+            } else {
+                let group = i32::try_from(child.id()).ok().map(Pid::from_raw);
+                if let Some(group) = group {
+                    // ESRCH is the usual answer for a group that is already gone.
+                    let _gone = killpg(group, Signal::SIGTERM);
+                }
+                let asked = Instant::now();
+                let ended = loop {
+                    if let Some(status) = child.try_wait()? {
+                        break Some(status);
+                    }
+                    if asked.elapsed() >= SERVED_GRACE {
+                        break None;
+                    }
+                    thread::sleep(Duration::from_millis(5));
+                };
+                exit = match ended {
+                    Some(status) => exit_of(status),
+                    None => {
+                        kill_group(&child);
+                        child.kill().unwrap_or_default();
+                        exit_of(child.wait()?)
+                    }
+                };
+                served = true;
+            }
+        } else if !ended_alone {
+            kill_group(&child);
+            child.kill().unwrap_or_default();
+            child.wait()?;
+        }
+        // Whatever the tool left running in its group must not hold the output open.
+        kill_group(&child);
+        if let Some(reading) = reading {
+            let _joined = reading.join();
+        }
+        let mut stdout = printed.lock().map(|bytes| bytes.clone()).unwrap_or_default();
+        if let Some(at) = first_document_end(&stdout) {
+            // Up to the end of the first document and the newline that closes its line; what a process printed after it while it was being ended is not read.
+            let line_end = if stdout.get(at) == Some(&b'\n') { at + 1 } else { at };
+            if served {
+                stdout.truncate(line_end);
+            }
+        }
+        Ok(Outcome {
+            call: call.clone(),
+            exit,
+            stdout,
+            stderr: stderr.join().unwrap_or_default(),
+            changes: Vec::new(),
+            elapsed: started.elapsed(),
+            at_deadline: None,
+            probe_after: None,
+            sequence: 0,
+            served,
+            ended_alone,
         })
     }
 
@@ -544,6 +684,8 @@ impl Runner {
             at_deadline,
             probe_after: None,
             sequence: 0,
+            served: false,
+            ended_alone: false,
         })
     }
 }

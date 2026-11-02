@@ -404,6 +404,10 @@ pub struct Shape {
     pub limit_not_flag_only: bool,
     /// Seeded: `member list` has a repeatable enum option whose declared default is an array (`--kind`, default `["a", "b"]`).
     pub repeatable_default: bool,
+    /// Seeded: the tool has a command `serve` that serves until it is signalled (`notRun`).
+    pub serve: bool,
+    /// Seeded: `serve` has no `effectNote`.
+    pub serve_without_note: bool,
     /// Whether the tree has a path of three words (`team roster list`).
     pub deep: bool,
 }
@@ -862,6 +866,23 @@ pub const MAX_BATCH_ITEMS: usize = 8;
 
 /// Every leaf command of the tool, in the order of the tree.
 pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
+    let serve = shape.serve.then(|| {
+        let mut command = Command::new("serve", "Serve a snapshot until it is signalled")
+            .options(vec![Arg::option("port", "integer", "The port to serve on").value("PORT").domain(json!({"minimum": 1, "maximum": 65535}))])
+            .errors(&["USAGE"])
+            .output(
+                "ServeReport",
+                json!({
+                    "type": "object",
+                    "required": ["serving"],
+                    "properties": {"serving": {"type": "boolean"}},
+                    "additionalProperties": false
+                }),
+            )
+            .examples(&["{tool} serve --json", "{tool} serve --port 8080 --json"]);
+        command.effect_note = if shape.serve_without_note { None } else { Some("Prints one envelope and then serves until it is signalled") };
+        command
+    });
     let mut commands = vec![
         Command::new("init", "Create the state file")
             .writes("replay-safe")
@@ -928,6 +949,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
                 .examples(&["{tool} team roster list --json"]),
         );
     }
+    commands.extend(serve);
     commands.sort_by_key(|command| command.id);
     commands
 }

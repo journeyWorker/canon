@@ -38,8 +38,21 @@ pub fn handle(tool: &Tool, args: &[String]) -> Option<ExitCode> {
     }
     match words.first().map(String::as_str) {
         Some("member") => Some(member(tool, args, &words)),
+        Some("serve") if tool.config.contains_key("serveMode") => Some(serve_command(tool, args)),
         Some("schema") if !tool.flag("noSchema") => Some(schema(tool, args)),
         _ => None,
+    }
+}
+
+/// `serve` of the seeded `notRun` runs: its arguments are parsed by the model, then it serves (`Tool::serve`).
+fn serve_command(tool: &Tool, args: &[String]) -> ExitCode {
+    let model = Model::of(tool);
+    let Some(command) = model.command("serve") else {
+        return tool.unknown_command("serve", &[], None);
+    };
+    match parse(tool, command, args, false) {
+        Err(failure) => refuse_failure(tool, "serve", failure),
+        Ok(_) => crate::serve(tool),
     }
 }
 
@@ -263,7 +276,7 @@ fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool, cache
     let mut doc = if let Some(command) = model.command(&current) {
         let mut doc = command_doc(&tool.name(), command);
         // Seeded: a tool whose documents carry no example (so no read command has an invocation to change into a pair).
-        if tool.flag("noExamples") {
+        if tool.flag("noExamples") || (tool.flag("examplesOnlyServe") && current != "serve") {
             doc["examples"] = json!([]);
         }
         doc

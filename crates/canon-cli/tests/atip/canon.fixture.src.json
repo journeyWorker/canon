@@ -1,5 +1,14 @@
 {
   "commands": {
+    "dashboard": {
+      "ok": [
+        [
+          "dashboard",
+          "--port",
+          "0"
+        ]
+      ]
+    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -370,6 +379,11 @@
       "--allow-empty",
       "-qm",
       "fixture"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
     ]
   ],
   "probe": "status",

@@ -341,19 +341,55 @@ impl Run<'_> {
                 run.helps.push((doc.command.clone(), index));
             }
         }
-        // Every example of a `read` command, in the fixture state.
+        // A command of `notRun` has an `effectNote` that says it serves until it is signalled (approaches/checker.md 5).
+        for id in self.fixture.not_run.clone() {
+            if let Some(doc) = run.docs.commands.get(&id) {
+                if doc.raw.get("effectNote").and_then(Value::as_str).is_none_or(|note| note.trim().is_empty()) {
+                    return Err(RunError::Fixture(format!(
+                        "`notRun` names {id}, whose command document has no `effectNote`: a command that does not end on its own says so there (spec 10.5)"
+                    )));
+                }
+            }
+        }
+        // The one run of a `notRun` command with no `ok` invocation: its first example.
+        for position in 0..self.served.len() {
+            if self.served[position].call.is_some() {
+                continue;
+            }
+            let id = self.served[position].command.clone();
+            let first = run.docs.commands.get(&id).and_then(|doc| {
+                doc.examples.iter().find_map(|line| invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| *word == tool)).map(|words| (line.clone(), words)))
+            });
+            if let Some((_, words)) = first {
+                let call = self.invoke_served(&id, &words[1..])?;
+                self.served[position].call = Some(call);
+            }
+        }
+        // Every example of a `read` command, in the fixture state; a `notRun` command's examples would never end (the first of them was its one run).
         let not_run = self.fixture.not_run.clone();
-        for doc in docs.iter().filter(|doc| doc.effect == "read" && !not_run.contains(&doc.command)) {
+        for doc in docs.iter().filter(|doc| doc.effect == "read") {
+            let served = not_run.contains(&doc.command);
+            let mut spent = false;
             for line in &doc.examples {
                 let Some(words) = invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| *word == tool)) else {
                     continue;
                 };
+                if served {
+                    let one_run = self.served.iter().any(|run| run.command == doc.command && run.call.is_some_and(|call| self.log[call].call.argv == in_json_mode(&words[1..])));
+                    if one_run && !spent {
+                        spent = true;
+                    } else {
+                        self.skip("L1.example-runs", &doc.command, format!("`{line}` (an example)"));
+                        self.skip("L1.output-data", &doc.command, format!("`{line}` (an example)"));
+                    }
+                    continue;
+                }
                 let call = self.invoke(Call::new(in_json_mode(&words[1..])))?;
                 run.examples.push(ExampleRun { command: doc.command.clone(), line: line.clone(), call });
             }
         }
         for doc in &docs {
-            if !self.runnable(doc) || self.not_run(&doc.command) {
+            if !self.runnable(doc) {
                 continue;
             }
             let bases = self.bases(doc, &tool);
@@ -370,6 +406,13 @@ impl Run<'_> {
                 let bases = self.bases(doc, &tool);
                 self.plan_paging(&mut run, doc, &bases, claim)?;
                 self.plan_fields(&mut run, doc, &bases, claim)?;
+            } else if self.runnable(doc) {
+                if doc.has_option("cursor") {
+                    self.skip("L1.paging", &doc.command, "the runs that page it".to_string());
+                }
+                if doc.has_option("fields") {
+                    self.skip("L1.fields", &doc.command, "the runs that select fields".to_string());
+                }
             }
         }
         self.plan_nexts(&mut run)?;
@@ -490,6 +533,11 @@ impl Run<'_> {
                 why: "a value outside the domain, from the fixture's domainRejects".to_string(),
             }));
             for probe in probes {
+                // A value the domain admits would be accepted and a command of `notRun` would then never end; the values it refuses still run.
+                if probe.expect == Expect::Accepted && self.not_run(&doc.command) {
+                    self.skip("L1.domains", &doc.command, format!("{}={:?} (a value inside the domain)", arg.spelling(), probe.word));
+                    continue;
+                }
                 let Some(changed) = Self::carrying(doc, bases, arg, &probe.word) else {
                     note.no_base = true;
                     continue;
@@ -903,6 +951,7 @@ impl Run<'_> {
         for (source, argv) in pending {
             let Some(doc) = names_command(&run.docs, &argv) else { continue };
             if self.not_run(&doc) {
+                self.skip("L1.next", &doc, format!("`{}` (a next entry)", argv.join(" ")));
                 continue;
             }
             let Some(CommandDoc { effect, .. }) = run.docs.commands.get(&doc).cloned() else { continue };

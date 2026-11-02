@@ -70,8 +70,9 @@ pub struct Fixture {
     pub warnings: Option<Vec<String>>,
     /// The L0 invocations by command id; `None` when the fixture has no `commands`.
     pub commands: Option<BTreeMap<String, CommandEntry>>,
-    /// Commands the checker never runs, by any invocation (`notRun`): a command that does not end when it is run (a server), or one that
-    /// must not run here. Not in `commands`; from L1 each is a command of the tool's documents. Every check that runs commands says it left them out.
+    /// Commands that do not end on their own (`notRun`: a server that serves until it is signalled). The checker runs each once, up to its first JSON
+    /// document, and ends it by a signal; its other runs that would succeed are skipped and reported. From L1 each is a command of the tool's documents
+    /// with an `effectNote`.
     pub not_run: Vec<String>,
 }
 
@@ -146,7 +147,8 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
         return Err("the fixture must be a JSON object".to_string());
     };
     let commands = object.get("commands").map(commands).transpose()?;
-    let not_run = object.get("notRun").map(|value| not_run(value, commands.as_ref())).transpose()?.unwrap_or_default();
+    let probe_words = object.get("probe").map(probe).transpose()?;
+    let not_run = object.get("notRun").map(|value| not_run(value, probe_words.as_deref())).transpose()?.unwrap_or_default();
     Ok(Fixture {
         contract_version: object
             .get("contractVersion")
@@ -168,7 +170,7 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
             .map(timeout)
             .transpose()?
             .unwrap_or(DEFAULT_TIMEOUT),
-        probe: object.get("probe").map(probe).transpose()?,
+        probe: probe_words,
         global_options: object
             .get("globalOptions")
             .map(global_options)
@@ -201,11 +203,12 @@ fn contract_version(value: &Value) -> Result<Claim, String> {
         })
 }
 
-/// `notRun`: an array of command ids, each once and none of them a key of `commands`.
-fn not_run(value: &Value, commands: Option<&BTreeMap<String, CommandEntry>>) -> Result<Vec<String>, String> {
+/// `notRun`: an array of command ids, each once, none of them the `probe` (approaches/checker.md 5). A command may be in `commands` too: its first `ok`
+/// invocation is the one run, and the rest of its entries are skipped.
+fn not_run(value: &Value, probe: Option<&[String]>) -> Result<Vec<String>, String> {
     let list = value
         .as_array()
-        .ok_or("`notRun` must be an array of command ids: the commands the checker never runs")?;
+        .ok_or("`notRun` must be an array of command ids: the commands that do not end on their own")?;
     let mut ids: Vec<String> = Vec::with_capacity(list.len());
     for (index, item) in list.iter().enumerate() {
         let id = item
@@ -215,10 +218,8 @@ fn not_run(value: &Value, commands: Option<&BTreeMap<String, CommandEntry>>) -> 
         if ids.iter().any(|earlier| earlier == id) {
             return Err(format!("`notRun/{index}` repeats {id}"));
         }
-        if commands.is_some_and(|commands| commands.contains_key(id)) {
-            return Err(format!(
-                "`notRun/{index}` names {id}, which `commands` lists too: a command the checker runs is not one it leaves out"
-            ));
+        if probe.is_some_and(|probe| probe.join(" ") == id) {
+            return Err(format!("`notRun/{index}` names {id}, which is the `probe`: the probe is a command that ends and runs without state"));
         }
         ids.push(id.to_string());
     }

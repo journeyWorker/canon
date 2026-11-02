@@ -101,6 +101,9 @@ pub struct Check {
     /// The commands the fixture names under `notRun`: the checker never ran them, so this check, which runs commands, did not run them either. Information only: it never changes the result, and a command left out of the run is always on the report.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub not_run: Vec<String>,
+    /// The runs of those commands that this check did not make, each `<command>: <what>: notRun`: runs that would succeed and so never end.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub skipped: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -247,6 +250,7 @@ mod tests {
             notes: Vec::new(),
             unlisted: Vec::new(),
             not_run: Vec::new(),
+            skipped: Vec::new(),
             observed: Vec::new(),
         }
     }

@@ -401,18 +401,8 @@ fn atip_check_108_a_1_2_tool_whose_commands_have_no_all_no_env_and_no_input_has_
 }
 
 #[test]
-fn atip_check_109_a_tool_whose_commands_are_not_run_has_check_order_unsupported_and_one_with_no_invocation_to_change_has_it_unprovided_and_fails_the_level() {
-    let harness = Harness::new();
-    let config = l1_config_1_2(&json!({}));
-    let mut fixture = harness.l1_fixture(&config);
-    let ids: Vec<String> = fixture["commands"].as_object().expect("commands").keys().cloned().collect();
-    fixture["commands"] = json!({});
-    fixture["notRun"] = json!(ids);
-    let output = run_l1(&harness, &config, &fixture);
-    let check = output.check("L1.check-order");
-    assert_eq!(check["result"], "unsupported", "{check}");
-    assert!(check.get("findings").is_none() && check["notRun"].as_array().is_some_and(|list| list.len() == 9), "{check}");
-    // No fixture invocation and no example to change: unprovided, a MUST, so the level is not met.
+fn atip_check_109_a_tool_with_no_invocation_to_change_has_check_order_unprovided_and_the_level_is_not_met() {
+    // No fixture invocation and no example to change: unprovided, a MUST, so the level is not met. (A command under `notRun` is not unsupported: its refused pairs still run, atip.check.120.)
     let harness = Harness::new();
     let no_examples = l1_config_1_2(&json!({"noExamples": true}));
     let mut fixture = harness.l1_fixture(&no_examples);
