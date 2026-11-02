@@ -189,6 +189,26 @@ impl Harness {
     }
 }
 
+impl Harness {
+    /// `atip check --bin <the fake tool of config> --level L1 --fixture <fixture> --json`, with the given arguments after.
+    pub fn check_l1_with(&self, config: &Value, fixture: &Value, extra: &[&str]) -> super::Output {
+        let fixture_path = self.write("fixture.json", fixture);
+        let bin = l1_bin(self, config);
+        let work = self.path("cwd");
+        std::fs::create_dir_all(&work).expect("cwd");
+        let tmp = self.path("tmp");
+        std::fs::create_dir_all(&tmp).expect("tmp");
+        let mut args = vec!["check", "--bin", bin.to_str().expect("utf8"), "--level", "L1", "--fixture", fixture_path.to_str().expect("utf8"), "--json"];
+        args.extend(extra);
+        super::atip_in(&work, &tmp, &args)
+    }
+
+    /// The same without more arguments.
+    pub fn check_l1(&self, config: &Value, fixture: &Value) -> super::Output {
+        self.check_l1_with(config, fixture, &[])
+    }
+}
+
 /// The fixture of the conforming L1 fake (the function form of [`Harness::l1_standard_fixture`]).
 pub fn l1_standard_fixture(harness: &Harness) -> Value {
     harness.l1_standard_fixture()

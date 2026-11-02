@@ -182,6 +182,23 @@ fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1()
 }
 
 #[test]
+fn atip_check_98_canon_lists_dashboard_under_not_run_and_passes_its_own_level_with_it() {
+    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(fixture_path()).expect("fixture")).expect("json");
+    assert_eq!(fixture["notRun"], json!(["dashboard"]), "the fixture leaves the command that does not end out of the run");
+    let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
+    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
+    assert!(report.passed, "{}", report.text());
+    let data = serde_json::to_value(&report).expect("the report is JSON");
+    // The checks that run commands say they left it out, and the other checks do not.
+    for id in ["L1.example-runs", "L1.constraints", "L1.domains", "L1.validators", "L1.output-data", "L1.next", "L1.paging", "L1.fields", "L0.page"] {
+        let check = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == id).unwrap_or_else(|| panic!("{id}"));
+        assert_eq!(check["notRun"], json!(["dashboard"]), "{id}");
+    }
+    let tree = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == "L1.tree").expect("L1.tree");
+    assert!(tree.get("notRun").is_none(), "{tree}");
+}
+
+#[test]
 fn atip_checkl1_34_a_canon_command_whose_example_does_not_parse_fails_only_l1_examples() {
     // canon with one planted violation: the documented example of `status` names `canonn`, a tool that is not this one, so the job that runs canon at L1 is red on `L1.examples` alone.
     let dir = tempfile::tempdir().expect("tempdir");

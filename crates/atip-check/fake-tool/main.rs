@@ -108,6 +108,19 @@ impl Tool {
             .map_or(2, |(_, exit, _)| u8::try_from(*exit).unwrap_or(2))
     }
 
+    /// The seeded refusal of the command `id` (`refuseWith`: `{code, commands, unlessEnv?}`): the command is refused with `code` when its
+    /// environment does not hold the variable `unlessEnv` (always, when the knob names none). A refusal of state or environment, not of the arguments.
+    fn seeded_refusal(&self, id: &str) -> Option<ExitCode> {
+        let knob = self.config.get("refuseWith")?;
+        let listed = knob.get("commands").and_then(Value::as_array)?.iter().any(|command| command == id);
+        let given = knob.get("unlessEnv").and_then(Value::as_str).is_some_and(|name| std::env::var_os(name).is_some());
+        if !listed || given {
+            return None;
+        }
+        let code = knob.get("code").and_then(Value::as_str).unwrap_or("NEEDS_TOKEN");
+        Some(self.refuse(code, "the backend needs a credential", id, &[]))
+    }
+
     fn meta(&self, command: Option<&str>) -> Map<String, Value> {
         let mut meta = Map::new();
         let schema_answer = command == Some("schema");
@@ -624,6 +637,15 @@ impl Tool {
                 ((*code).to_string(), *exit, &[][..], (*meaning).to_string(), fix.replace("{tool}", &tool))
             }));
         }
+        for row in self.config.get("extraCodes").and_then(Value::as_array).into_iter().flatten() {
+            table.push((
+                row["code"].as_str().unwrap_or_default().to_string(),
+                row["exit"].as_i64().unwrap_or(2),
+                &[][..],
+                "m".to_string(),
+                "f".to_string(),
+            ));
+        }
         table.sort_by(|left, right| left.0.cmp(&right.0));
         table
             .into_iter()
@@ -720,6 +742,18 @@ fn main() -> ExitCode {
     if tool.flag("dirtyMarker") && std::path::Path::new("dirty.txt").exists() {
         eprintln!("state leaked in from an earlier invocation");
         return ExitCode::from(70);
+    }
+    if let Some(log) = tool.config.get("invocationLog").and_then(Value::as_str) {
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(log) {
+            let _ = std::io::Write::write_all(&mut file, format!("{}\n", args.join(" ")).as_bytes());
+        }
+    }
+    if let Some(command) = tool.config.get("hangCommand").and_then(Value::as_str) {
+        let words: Vec<&str> = args.iter().take_while(|arg| arg.as_str() != "--").filter(|arg| !arg.starts_with('-')).map(String::as_str).collect();
+        let asks_help = args.iter().any(|arg| arg == "--help" || arg == "-h");
+        if !asks_help && words.join(" ").starts_with(command) {
+            std::thread::sleep(Duration::from_secs(600));
+        }
     }
     run(&tool, &args)
 }
@@ -873,6 +907,9 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
             .find(|(option, _)| option == name)
             .and_then(|(_, value)| value.clone())
     };
+    if let Some(refused) = tool.seeded_refusal(command) {
+        return refused;
+    }
     if command == "team" {
         return team(tool, &words, repo_given);
     }

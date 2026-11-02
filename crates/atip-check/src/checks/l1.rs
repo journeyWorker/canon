@@ -1273,4 +1273,33 @@ mod tests {
         assert_eq!(help_default(text, "sort").as_deref(), Some("newest"));
         assert_eq!(help_default(text, "other"), None);
     }
+
+    #[test]
+    fn atip_check_87_a_short_option_before_the_long_one_still_names_the_line_and_a_line_without_a_first_long_option_starts_no_block() {
+        let text = concat!(
+            "Usage: tool list [OPTIONS]\n",
+            "\n",
+            "Return members; --limit asks for fewer [default: 1]\n",
+            "\n",
+            "  - see --limit (the usual [default: 99])\n",
+            "\n",
+            "Options:\n",
+            "  -l, --limit <N>      How many, like --json does [default: 20]\n",
+            "  -o, --order <ORDER>  Sorted, see --limit [default: name]\n",
+            "      --max=<N>        The most (default 7)\n",
+            "      --json           Print JSON\n",
+            "  -h, --help\n",
+        );
+        // The block of an option is the line that opens with its first long name, behind blanks and a short option.
+        assert_eq!(help_default(text, "limit").as_deref(), Some("20"));
+        assert_eq!(help_default(text, "order").as_deref(), Some("name"));
+        assert_eq!(help_default(text, "max").as_deref(), Some("7"));
+        // The usage line, the sentence and the bullet open no block, and a name in a description is no option line.
+        assert_eq!(help_default(text, "json"), None);
+        assert_eq!(help_default(text, "help"), None);
+        assert_eq!(help_default("Usage: tool --limit <N> [default: 5]\n", "limit"), None);
+        assert_eq!(help_default("  - --limit <N> [default: 5]\n", "limit"), None);
+        // A longer name is another option.
+        assert_eq!(help_default("  --limit-all <N>  all [default: 1]\n", "limit"), None);
+    }
 }

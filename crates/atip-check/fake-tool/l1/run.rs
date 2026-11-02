@@ -302,11 +302,16 @@ fn member(tool: &Tool, args: &[String], words: &[String]) -> ExitCode {
             };
             match parse(tool, command, args, false) {
                 Err(failure) => refuse_failure(tool, &id, failure),
-                Ok(parsed) => match verb {
-                    "list" => list(tool, args, &parsed),
-                    "search" => search(tool, &parsed),
-                    _ => tag(tool, &parsed),
-                },
+                Ok(parsed) => {
+                    if let Some(refused) = tool.seeded_refusal(&id) {
+                        return refused;
+                    }
+                    match verb {
+                        "list" => list(tool, args, &parsed),
+                        "search" => search(tool, &parsed),
+                        _ => tag(tool, &parsed),
+                    }
+                }
             }
         }
         Some(word) => tool.unknown_command(word, &verbs, Some("member")),

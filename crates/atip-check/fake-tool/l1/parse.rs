@@ -55,8 +55,13 @@ pub enum Failure {
 }
 
 fn usage(source: &'static str, message: String, field: String) -> Failure {
+    usage_coded("USAGE", source, message, field)
+}
+
+/// A refusal of the model's own rule with `code`.
+fn usage_coded(code: &str, source: &'static str, message: String, field: String) -> Failure {
     Failure::Refuse {
-        code: "USAGE".to_string(),
+        code: code.to_string(),
         message,
         field: Some(field),
         expected: None,
@@ -284,7 +289,9 @@ fn check_domains(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), 
                     .iter()
                     .any(|keyword| domain.get(keyword) == Some(value));
             if !validator.is_valid(value) || on_bound {
-                return Err(usage(
+                let code = tool.text("domainCode", "USAGE");
+                return Err(usage_coded(
+                    &code,
                     "domain",
                     format!("{value} is outside the domain of {}", arg.field()),
                     arg.field(),

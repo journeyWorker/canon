@@ -935,3 +935,146 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given the seeded-violation tests of 0.34
     When they run on the checker with findings
     Then every result, level and exit code is what it was
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:05Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-fixture.F1
+  @atip.check.86
+  Scenario: An option whose description names --json does not change the default read for --json
+    Given a fake tool whose --limit description names --json and whose --json line shows no default
+    When atip check runs at L1
+    Then L1.defaults judges --limit by its own line and does not give --json the default of the --limit line
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:11Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-fixture.F1
+  @atip.check.87
+  Scenario: A short option before the long one still names the line, and a line without a first long option starts no block
+    Given help lines of the forms `-l, --limit <N>  ... [default: 20]`, `--limit=<N>`, a usage line, a bullet that names --limit and an intro sentence
+    When the default of --limit is read from the help text
+    Then the line that opens with `-l, --limit` or `--limit` is the block of --limit, and the usage line, the bullet and the sentence open none
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:15Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F1
+  @atip.check.88
+  Scenario: A name inside a description never takes the default of another option, whatever default it would have
+    Given a fake tool whose help has, before the options, a bullet that names --limit with another default, and an option whose description says --limit and gives a default
+    When atip check runs at L1
+    Then L1.defaults compares the default of the --limit line only, and no name inside a description or a bullet fails the check
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:20Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-fixture.F2
+  @atip.check.89
+  Scenario: A fixture call refused with a registered precondition code makes the checks that run it unprovided and names the code
+    Given a fake tool whose ok and paged calls are refused with a registered exit 2 code when its environment has no token
+    When atip check runs
+    Then L0.page, L0.one-document and, at L1, L1.paging and L1.output-data are unprovided with a finding of kind refused-precondition carrying the argv and the code, the reason names the code, and the level is not met
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:24Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-fixture.F2
+  @atip.check.90
+  Scenario: The same checks pass when the environment removes the refusal
+    Given the same tool and a fixture whose env gives the token
+    When atip check runs
+    Then those checks pass and the level is met
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:30Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F2
+  @atip.check.91
+  Scenario: A violation seen before the refusal stays a fail, and the CURSOR_INVALID of L1.paging is not a precondition
+    Given a tool whose page violation shows before a paged call is refused with the precondition code, and a conforming L1 tool whose L1.paging provokes CURSOR_INVALID
+    When atip check runs
+    Then L0.page stays fail, and L1.paging passes, so the CURSOR_INVALID it provokes is not read as a precondition
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:34Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-fixture.F3
+  @atip.check.92
+  Scenario: A fixture call refused before any state is read fails the check that runs it
+    Given a tool that refuses a fixture ok call with USAGE, UNKNOWN_COMMAND, INPUT_INVALID, a code declared on a constraint or a validator, or a code L1.domains saw as a domain refusal
+    When atip check runs
+    Then the check that runs the call is fail with a finding of kind ok-is-not-refused naming the code, and none is unprovided
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:38Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-fixture.F3
+  @atip.check.93
+  Scenario: At L0 with no registry a strange exit 2 code is unprovided and a reserved one fails
+    Given an L0 run without a registry, and a tool that refuses an ok call with a code of its own and then with USAGE
+    When atip check runs at L0
+    Then the strange code leaves the check unprovided with refused-precondition, so the level is not met, and USAGE is fail
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:42Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F3
+  @atip.check.94
+  Scenario: A precondition code named like a validator code is the validator's and fails
+    Given a tool that refuses an ok call with a code that a validator of the command declares, and that is registered as exit 2 as a precondition code would be
+    When atip check runs at L1
+    Then the code is the validator's, the check that runs the call is fail and is not unprovided
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:46Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.95
+  Scenario: A command named in notRun is never run, and the checks that would run it list it
+    Given a fixture with notRun naming a command that hangs and that logs each run, at L0 and at L1
+    When atip check runs
+    Then the command is never run, no check waits for the time limit, each check that would run it lists it in notRun, and the results are those of the checks without it
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:50Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.96
+  Scenario: A notRun command that commands also lists, or that the tool does not document, is FIXTURE_INVALID and no check runs
+    Given a fixture whose notRun also appears in commands, and one at L1 whose notRun names a command the tool does not document
+    When atip check runs
+    Then it is FIXTURE_INVALID with exit 2 and the binary under test is not run for either of the first and no check reports for the second
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:54Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.97
+  Scenario: The example syntax check still runs for a notRun command, and the command is never missing from the report
+    Given a tool whose documented example of a notRun command is malformed
+    When atip check runs at L1
+    Then L1.examples fails on it although the command is not run, and a notRun command is on the report in the notRun of the checks that run commands
+
+  # canon: {"schema":1,"at":"2026-11-02T07:04:58Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-fixture.F4
+  @atip.check.98
+  Scenario: canon lists dashboard under notRun and passes its own level with it
+    Given canon's fixture
+    When atip check runs at L1 on the canon binary
+    Then the fixture lists dashboard under notRun, the level is met, and the checks that run commands list dashboard in notRun
