@@ -727,7 +727,7 @@
     {
       "command": "artifacts store",
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
@@ -5774,7 +5774,7 @@
     {
       "command": "dashboard",
       "effect": "write",
-      "effectNote": "regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
+      "effectNote": "prints one report, then serves until signalled; regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
       "errors": [
         "APPROVAL_INCOMPLETE",
         "BRIEF_APPROVE_REFUSED",
@@ -8395,7 +8395,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_MISSING",
@@ -11478,7 +11478,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "BRIEF_CHANGED_SINCE_APPROVAL",
@@ -12944,7 +12944,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "BRIEF_CHANGED_SINCE_APPROVAL",
@@ -28341,7 +28341,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
@@ -29155,7 +29155,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
@@ -36267,7 +36267,7 @@
     {
       "command": "subject move",
       "effect": "write",
-      "effectNote": "reads without --to: `subject move <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once the transition is allowed; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
@@ -37987,7 +37987,7 @@
     {
       "command": "subject show",
       "effect": "read",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes the stale scenario-index cache once the subject is found; a refused call writes nothing",
       "errors": [
         "CHANGE_ADOPTION_INCOMPLETE",
         "CONFIG_MISSING",

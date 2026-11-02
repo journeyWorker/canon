@@ -407,7 +407,11 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
     if let Err(error) = crate::inventory::require_spec_root(&repo, &args.project_id) {
         return error.emit(CMD, args.json);
     }
-    let context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| canon_gate::GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
+    let context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| canon_gate::GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())).map(|mut ctx| {
+        // The index a refresh would write, in memory: a refusal below must leave the files as they were (spec 8.2).
+        crate::inventory::overlay_stale_index(&mut ctx);
+        ctx
+    }) {
         Ok(context) => context,
         Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
@@ -445,6 +449,8 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
     if let Some(code) = crate::write_mode::refuse_unwritable(&[&crate::gate::evidence_staging_dir(&context.ctx.ledger_root), &context.ctx.ledger_root], CMD, args.json) {
         return code;
     }
+    // Every refusal is behind us: the index refresh this writer owes (`effectNote`) happens now, with the first acceptance.
+    crate::inventory::refresh_stale_index(&repo, CMD);
     let mut wrote: Vec<(String, std::path::PathBuf)> = Vec::new();
     for scenario in &scenarios {
         let record = candidate(CandidateSpec {

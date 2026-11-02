@@ -87,7 +87,6 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 Ok(commit) => commit,
                 Err(error) => return ExitCode::from(error.emit("canon evidence add", json)),
             };
-            crate::inventory::refresh_stale_index(&repo, "canon evidence add");
             ExitCode::from(
                 crate::evidence::run_add(
                     &repo,
@@ -163,7 +162,6 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 Ok(commit) => commit,
                 Err(error) => return ExitCode::from(error.emit("canon evidence audit", json)),
             };
-            crate::inventory::refresh_stale_index(&repo, "canon evidence audit");
             ExitCode::from(
                 crate::evidence::run_add(
                     &repo,

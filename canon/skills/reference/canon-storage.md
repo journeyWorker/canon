@@ -314,9 +314,12 @@ or when the index holds a scenario of a spec root that no `.feature` file
 of it declares any more.
 
 The commands that write records (`canon subject move`, `canon review
-scenario`, `canon evidence add` and `canon artifacts store`) rebuild a stale index on disk first: they
+scenario`, `canon evidence add` and `canon artifacts store`) rebuild a stale index on disk, once nothing
+refuses the call (a refused call writes nothing, whatever the index; until then they read the index as the
+refresh would leave it, in memory): they
 run `canon inventory sync`'s code on the changed files (validation still
-covers the whole root) and print one stderr line:
+covers the whole root) and print one stderr line (in JSON mode the line is a `meta.warnings` entry,
+never a line on stderr):
 
 ```stderr
 stderr: canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
@@ -324,7 +327,9 @@ stderr: canon artifacts store: refreshed the scenario index from 1 changed featu
 
 The commands that only read (`canon gate check`, `canon status`) write
 nothing: they grade a stale index as the refresh would leave it, built in
-memory, and print no refresh line. `canon query --kind scenario` and the
+memory, and print no refresh line. `canon subject show` is the one read
+command that declares the refresh, as a cache effect (its `effectNote`), after the subject is found.
+`canon query --kind scenario` and the
 report panels read the index on disk as it is.
 
 A deleted scenario is not erased: `canon inventory sync` — and a writer's

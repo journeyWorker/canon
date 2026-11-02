@@ -239,7 +239,11 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     if let Err(error) = crate::inventory::require_spec_root(&repo, &args.project_id) {
         return error.emit(&args.full(), args.json);
     }
-    let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
+    let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())).map(|mut ctx| {
+        // The index a refresh would write, in memory: a refusal below must leave the files as they were (spec 8.2).
+        crate::inventory::overlay_stale_index(&mut ctx);
+        ctx
+    }) {
         Ok(ctx) => ctx,
         Err(e) => {
             return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
@@ -381,7 +385,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     // store lacks. All or nothing (0.18 D1): a failed write removes what
     // this call wrote and stored.
     let only_reviews: Vec<Review> = reviews.iter().map(|(review, _)| review.clone()).collect();
-    let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
+    let (stored, written) = match write_reviews(&repo, &cmd, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
         Ok(landed) => landed,
         Err(error) => {
             let error = if reviews.len() > 1 && error.code == "WRITE_FAILED" { error.hint("no review is written: every review and blob this run wrote or stored was removed") } else { error };
@@ -442,6 +446,7 @@ fn chore_brief_digest(repo: &Path, change: &ChangeId) -> Result<canon_model::Spe
 /// review's `(location, deduped)`.
 fn write_reviews(
     repo: &Path,
+    command: &str,
     ledger_root: &Path,
     files: &[crate::evidence_attach::BoundFile],
     reviews: &[Review],
@@ -463,6 +468,8 @@ fn write_reviews(
         };
         CliError::refused(code, format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint())).hint(e.hint())
     })?;
+    // Every refusal is behind us (an unwritable directory and a blob that cannot be stored are two): the index refresh this writer owes happens with the first review.
+    crate::inventory::refresh_stale_index(repo, command);
     let committed = GitTier::new(ledger_root);
     let mut written: Vec<(String, bool)> = Vec::new();
     for review in reviews {
@@ -541,13 +548,24 @@ mod tests {
         GitTier::new(GateCtx::from_repo(dir.path()).unwrap().ledger_root)
     }
 
-    /// A repo whose ledger holds `args()`'s scenario record.
+    /// A repo whose feature file declares `args()`'s scenario and whose index holds its record: `run_add` reads the index as a refresh
+    /// would leave it (in memory), so an index record no feature file declares is not there for it.
     fn repo_with_scenario() -> TempDir {
         let dir = repo_dir();
-        let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-        let a = args();
-        ledger(&dir).write(&Scenario::new(envelope, a.project_id, a.scenario_ids[0].clone(), "t", "", SpecDigest::of(b"feature bytes"))).unwrap();
+        let provenance = r#"  # canon: {"schema":1,"at":"2026-07-10T00:00:00Z","actor":{"agent_id":"canon-fmt"}}"#;
+        let feature = dir.path().join("specs/kind=feature/area=world/firstbuy-hotdeal.feature");
+        std::fs::create_dir_all(feature.parent().unwrap()).unwrap();
+        std::fs::write(&feature, format!("Feature: world firstbuy-hotdeal\n{provenance}\n\n  @world.firstbuy-hotdeal.26\n  Scenario: Opening\n{provenance}\n    Given a precondition\n")).unwrap();
+        let outcome = crate::inventory::run_sync(dir.path(), None).expect("the fixture indexes");
+        assert!(outcome.roots.iter().all(crate::inventory::RootSyncOutcome::is_clean), "the fixture's feature file is clean");
         dir
+    }
+
+    /// The scenario digest the index holds for `args()`'s scenario: what a review pins.
+    fn indexed_digest(dir: &TempDir) -> SpecDigest {
+        let record = ledger(dir).read(&TierQuery::kind(RecordKind::Scenario)).unwrap().records.into_iter().next().expect("one scenario record");
+        let scenario: Scenario = serde_json::from_value(record.0).unwrap();
+        scenario.scenario_digest.unwrap_or(scenario.source_digest)
     }
 
     fn reviews(dir: &TempDir) -> Vec<Review> {
@@ -580,7 +598,7 @@ mod tests {
         let dir = repo_with_scenario();
         assert_eq!(run_add(dir.path(), &args()), 0);
         let pins = reviews(&dir)[0].pins.clone().expect("review add always pins");
-        assert_eq!(pins.scenario_digest, SpecDigest::of(b"feature bytes"));
+        assert_eq!(pins.scenario_digest, indexed_digest(&dir));
         assert_eq!(pins.checks, Some(Vec::new()), "no evidence yet: an empty list, still pinned");
         assert!(pins.evidence.is_empty(), "a new review never pins evidence record ids");
 
@@ -674,7 +692,7 @@ mod tests {
             }
             tier.write(review)
         };
-        let error = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut failing_second).unwrap_err();
+        let error = write_reviews(dir.path(), "canon review scenario", &ledger_root, &files, &batch, &mut failing_second).unwrap_err();
         assert!(error.message.contains("writing review 2 of 2 failed: ") && error.message.contains("disk full"), "{}", error.message);
         assert!(reviews(&dir).is_empty(), "the first review is removed");
         assert_eq!(blobs(), 0, "the blob this call stored is removed");
@@ -682,7 +700,7 @@ mod tests {
         // One scenario: the error is the write's own, as before 0.18,
         // so `run_add` prints `canon review add: <error>` unchanged.
         let disk_full = || canon_store::tier::StoreError::Io(std::io::Error::other("disk full"));
-        let single = write_reviews(dir.path(), &ledger_root, &files, &batch[..1], &mut |_, _| Err(disk_full())).unwrap_err();
+        let single = write_reviews(dir.path(), "canon review scenario", &ledger_root, &files, &batch[..1], &mut |_, _| Err(disk_full())).unwrap_err();
         assert_eq!((single.code, single.exit), ("WRITE_FAILED", 1));
         assert_eq!(single.message, disk_full().to_string(), "a single review's failure keeps its pre-0.18 wording");
         assert_eq!((reviews(&dir).len(), blobs()), (0, 0));
@@ -692,14 +710,14 @@ mod tests {
         let mut readonly = original.clone();
         readonly.set_readonly(true);
         std::fs::set_permissions(&review_dir, readonly).unwrap();
-        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
+        let refused = write_reviews(dir.path(), "canon review scenario", &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
         std::fs::set_permissions(&review_dir, original).unwrap();
         let refused = refused.unwrap_err();
         assert_eq!((refused.code, refused.exit), ("WRITE_UNAVAILABLE", 2));
         assert!(refused.message.contains("is read-only"));
         assert_eq!(blobs(), 0);
 
-        let (stored, written) = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review)).unwrap();
+        let (stored, written) = write_reviews(dir.path(), "canon review scenario", &ledger_root, &files, &batch, &mut |tier, review| tier.write(review)).unwrap();
         assert_eq!((stored, written.len(), reviews(&dir).len(), blobs()), (1, 2, 2, 1));
     }
 }

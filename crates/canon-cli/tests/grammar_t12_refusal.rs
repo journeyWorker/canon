@@ -7,10 +7,9 @@
 //!   a copy of the fixture it exits with the recipe's code, and the whole tree
 //!   (`.git` excluded) and `git status --porcelain` are as they were. A table
 //!   row is required for every write leaf of the spec;
-//! - a refused leaf that refreshes the scenario index first
-//!   (`effectNote: refreshes stale scenario-index records first`) is held to
-//!   that note: on the fixture, whose index is stale, it may touch nothing
-//!   but the index's own records, and only a leaf that declares the refresh;
+//! - no refusal refreshes the scenario index (`canon-0-35-read-writes`): on the
+//!   fixture, whose index is stale, every recipe leaves the index's own
+//!   records as they were, and an accepted call is shown to refresh them;
 //! - every write leaf that needs canon state, pointed at a directory without
 //!   `canon.yaml`, exits 2 `CONFIG_MISSING` and writes nothing, in either
 //!   directory;
@@ -439,34 +438,31 @@ fn atip_contract11_15_computing_the_code_tree_adds_nothing_to_dot_git_and_gives_
     assert!(!at_head.dirty && at_head.tree != first.tree);
 }
 
-/// A leaf may refresh the scenario index before it refuses, only when its `effectNote` says so.
+/// No leaf refreshes the scenario index before it refuses (spec 8.2, 12.2: a refused call writes nothing, and a declared cache
+/// effect is no exception, `canon-0-35-read-writes`). On the fixture, whose index is stale, every recipe leaves the index as it was.
 #[test]
-fn a_refusal_before_which_the_index_is_refreshed_is_declared() {
+fn a_refusal_never_refreshes_the_scenario_index() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
+    // the fixture's index is stale: a call that is accepted refreshes it (so that what follows is not vacuous)
+    let t = trial(base.path(), &[]);
+    let before = snap(&t);
+    let accepted = run(&t, home.path(), &["subject".to_string(), "show".to_string(), "demo".to_string(), "--json".to_string()], &[]);
+    assert_eq!(accepted.status.code(), Some(0), "{}", String::from_utf8_lossy(&accepted.stdout));
+    let refreshed = changed(&before.repo, &snap(&t).repo);
+    assert!(!refreshed.is_empty() && refreshed.iter().all(|p| p.starts_with(".canon/ledger/kind=scenario") || p.starts_with(".canon/archive/kind=scenario")), "the fixture's index is not stale any more: {refreshed:?}");
+
     let mut found = Vec::new();
-    let mut refreshed = BTreeSet::new();
     for row in REFUSALS {
         let t = trial(base.path(), row.setup);
         let before = snap(&t);
         let _ = run(&t, home.path(), &recipe_argv(row), &[]);
         let after = snap(&t);
         let paths = changed(&before.repo, &after.repo);
-        if paths.is_empty() && before.status == after.status {
-            continue;
-        }
-        let index_only = paths.iter().all(|p| p.starts_with(".canon/ledger/kind=scenario") || p.starts_with(".canon/archive/kind=scenario"));
-        let declared = leaf(row.leaf)["effectNote"].as_str().is_some_and(|note| note.contains("refreshes stale scenario-index records"));
-        if !index_only || before.status != after.status {
-            // Writes of another kind are the previous test's: it runs on a fresh index.
-            continue;
-        }
-        refreshed.insert(row.leaf);
-        if !declared {
-            found.push((row.leaf.to_string(), format!("refreshed the scenario index before refusing {} and does not declare it in its effectNote: {paths:?}", row.code)));
+        if paths.iter().any(|p| p.starts_with(".canon/ledger/kind=scenario") || p.starts_with(".canon/archive/kind=scenario")) {
+            found.push((row.leaf.to_string(), format!("refreshed the scenario index and then refused {}: {paths:?}", row.code)));
         }
     }
-    assert!(!refreshed.is_empty(), "no recipe reached an index refresh: the fixture's index is not stale any more");
     settle("stale-index", found);
 }
 
