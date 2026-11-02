@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-canon-input",
+    "role": "implementer",
+    "session_id": "s-0-35-canon-input"
+  },
+  "at": "2026-11-02T15:51:41.681887Z",
+  "attachments": [
+    {
+      "case": "atip_readwrites_07_artifacts_store_refused_for_an_unwritable_store_leaves_a_stale_index_alone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-read-writes-junit.xml",
+      "sha256": "711a160ddd01111454490ef848acab8d8df1e9f6efa5116cf97bb3d13f3e4a64"
+    }
+  ],
+  "code_tree": "4148060c6032ff114ec0f69fb47f6d02f3a974e6",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-read-writes-junit.xml"
+  },
+  "evidence_sha": "19365a6ee747b8eb44c9a109280bbba1082ff8a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "atip.readwrites.07",
+  "schema": 1,
+  "staging_id": "39b702b3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
