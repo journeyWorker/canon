@@ -466,22 +466,24 @@ fn decode_cursor(tool: &Tool, cursor: &str, binding: &str, total: usize) -> Resu
 }
 
 /// `argv` of the next page: the invocation again, with the cursor of the next page.
-fn next_page_argv(args: &[String], cursor: &str) -> Vec<String> {
+fn next_page_argv(args: &[String], cursor: &str, document: &[String]) -> Vec<String> {
     let mut argv = Vec::new();
     let mut words = args.iter().take_while(|arg| arg.as_str() != "--");
     while let Some(word) = words.next() {
         if word == "--json" {
             continue;
         }
-        if word == "--cursor" {
+        if word == "--cursor" || word == "--input" {
             words.next();
             continue;
         }
-        if word.starts_with("--cursor=") {
+        if word.starts_with("--cursor=") || word.starts_with("--input=") {
             continue;
         }
         argv.push(word.clone());
     }
+    // What an `--input` document gave is written out as options: the next page needs no document.
+    argv.extend(document.iter().cloned());
     argv.push("--cursor".to_string());
     argv.push(cursor.to_string());
     argv.push("--json".to_string());
@@ -556,8 +558,14 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
         // The seeded violation: a refusal the model does not declare, for a value its documents accept.
         return tool.refuse("USAGE", "there is no such team", "member list", &[("field", json!("--team"))]);
     }
-    let team = parsed.text("team");
+    let env_team = std::env::var("FAKE_TEAM").ok().filter(|_| tool.is_1_2());
+    let team_text = parsed.text("team").map(ToString::to_string).or_else(|| env_team.clone());
+    let team = team_text.as_deref();
     let sort = parsed.text("sort").unwrap_or("name");
+    if tool.flag("fieldsNeedsJson") && !tool.json && parsed.has("fields") {
+        // The seeded violation of 1.2: `--fields` is refused without `--json`.
+        return tool.refuse("USAGE", "--fields needs --json", "member list", &[("field", json!("--fields"))]);
+    }
     let mut members: Vec<&Member> = MEMBERS
         .iter()
         .filter(|member| team.is_none_or(|team| member.team == team))
@@ -567,7 +575,18 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
     } else {
         members.sort_by_key(|member| member.id);
     }
-    let binding = format!("team={};sort={sort}", team.unwrap_or_default());
+    // A cursor is bound to the arguments the invocation gave (a default written out is another invocation) and, for
+    // an option it left out, to the value its environment variable has (spec 6.9, 1.2); before 1.2, to the effective values.
+    let binding = if tool.is_1_2() && !tool.flag("cursorBindsEffective") {
+        let env = if tool.flag("cursorIgnoresEnv") || parsed.has("team") { String::new() } else { env_team.clone().unwrap_or_default() };
+        format!("team={};sort={};env={env}", parsed.text("team").unwrap_or_default(), parsed.text("sort").unwrap_or_default())
+    } else {
+        format!("team={};sort={sort}", team.unwrap_or_default())
+    };
+    if tool.flag("cursorRefusesAll") && parsed.has("all") && parsed.has("cursor") {
+        // The seeded violation of 1.2: a cursor made under `--limit` is refused when `--all` replaces it.
+        return tool.refuse("CURSOR_INVALID", "that cursor was made with --limit", "member list", &[("field", json!("--cursor"))]);
+    }
     let offset = match parsed.text("cursor") {
         None => 0,
         Some(cursor) => match decode_cursor(tool, cursor, &binding, members.len()) {
@@ -591,7 +610,20 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
         let next_offset = if tool.flag("cursorRepeats") { offset } else { offset + size };
         let cursor = encode_cursor(next_offset, &binding);
         page_meta["nextCursor"] = json!(cursor);
-        let argv = next_page_argv(args, &cursor);
+        // The arguments an `--input` document gave, as options (and, seeded, a default written out beside them).
+        let mut document: Vec<String> = Vec::new();
+        if parsed.has("input") {
+            for name in ["team", "sort"] {
+                let written = args.iter().any(|word| word == &format!("--{name}") || word.starts_with(&format!("--{name}=")));
+                if let (Some(value), false) = (parsed.text(name), written) {
+                    document.extend([format!("--{name}"), value.to_string()]);
+                }
+            }
+            if tool.flag("nextCarriesDefault") && !document.iter().any(|word| word == "--sort") {
+                document.extend(["--sort".to_string(), "name".to_string()]);
+            }
+        }
+        let argv = next_page_argv(args, &cursor, &document);
         meta.insert(
             "next".into(),
             json!([{"command": display(tool, &argv), "argv": argv, "reason": "the next page of members"}]),

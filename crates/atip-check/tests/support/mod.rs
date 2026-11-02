@@ -126,7 +126,7 @@ impl Harness {
             }
         });
         if is_1_1 {
-            fixture["contractVersion"] = json!("1.1");
+            fixture["contractVersion"] = json!(config["claims"].as_str().unwrap_or("1.1"));
             fixture["warnings"] = json!(["STALE_VIEW"]);
         }
         fixture

@@ -8,13 +8,14 @@
 use serde_json::Value;
 
 /// The minors this checker knows.
-pub const MINORS: [&str; 2] = ["1.0", "1.1"];
+pub const MINORS: [&str; 3] = ["1.0", "1.1", "1.2"];
 
 /// The minor a tool claims.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Claim {
     V1_0,
     V1_1,
+    V1_2,
 }
 
 impl Claim {
@@ -23,6 +24,7 @@ impl Claim {
         match text {
             "1.0" => Some(Self::V1_0),
             "1.1" => Some(Self::V1_1),
+            "1.2" => Some(Self::V1_2),
             _ => None,
         }
     }
@@ -31,12 +33,21 @@ impl Claim {
         match self {
             Self::V1_0 => "1.0",
             Self::V1_1 => "1.1",
+            Self::V1_2 => "1.2",
         }
     }
 
-    /// Whether the tool implements 1.1 or later: its documents carry the contract markers (15.7).
-    pub fn is_1_1(self) -> bool {
-        self == Self::V1_1
+    /// Whether the claim is `other` or a later minor: a 1.2 tool implements everything 1.1 and 1.0 do (spec 15.1).
+    pub fn at_least(self, other: Self) -> bool {
+        self.rank() >= other.rank()
+    }
+
+    fn rank(self) -> u8 {
+        match self {
+            Self::V1_0 => 0,
+            Self::V1_1 => 1,
+            Self::V1_2 => 2,
+        }
     }
 }
 
@@ -118,11 +129,12 @@ pub fn without_later_members(document: &Value) -> Value {
 /// `document` as the envelope schema should see it for `L0.envelope`: without what other checks own. Every `null`
 /// inside `meta` or `error` is `L0.no-null`'s and is dropped; for a 1.0 claim the later members are dropped
 /// ([`without_later_members`]); a `contractVersion` without `contract` is `L0.contract-version`'s (the schema makes
-/// one depend on the other), so `contract` is supplied.
+/// one depend on the other), so `contract` is supplied; for a later claim a `contractVersion` written as `"1.0"`
+/// (the schema's pattern refuses it) is `L0.contract-version`'s too (`version-is-claim`), so the claim stands for it.
 pub fn for_envelope_schema(document: &Value, claim: Claim) -> Value {
     let mut copy = match claim {
         Claim::V1_0 => without_later_members(document),
-        Claim::V1_1 => document.clone(),
+        Claim::V1_1 | Claim::V1_2 => document.clone(),
     };
     for member in ["meta", "error"] {
         if let Some(value) = copy.get_mut(member) {
@@ -132,6 +144,9 @@ pub fn for_envelope_schema(document: &Value, claim: Claim) -> Value {
     if let Some(meta) = copy.get_mut("meta").and_then(Value::as_object_mut) {
         if meta.contains_key("contractVersion") && !meta.contains_key("contract") {
             meta.insert("contract".to_string(), Value::String("atip/1".to_string()));
+        }
+        if claim.at_least(Claim::V1_1) && meta.get("contractVersion").and_then(Value::as_str) == Some("1.0") {
+            meta.insert("contractVersion".to_string(), Value::String(claim.as_str().to_string()));
         }
     }
     copy

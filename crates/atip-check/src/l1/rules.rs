@@ -272,7 +272,7 @@ pub fn command_findings(doc: &CommandDoc, tool: &str, claim: Claim, exit_of: &dy
         findings.push(("rule-10", rule_10(doc)));
     }
     if doc.outputs.iter().any(|output| output.fields.is_some()) {
-        findings.push(("rule-11", rule_11(doc, claim.is_1_1())));
+        findings.push(("rule-11", rule_11(doc, claim.at_least(Claim::V1_1))));
     }
     if !doc.validators.is_empty() {
         findings.push(("rule-13", rule_13(doc, tool, exit_of, &domains)));
@@ -1242,10 +1242,10 @@ mod tests {
     /// The tool and the claim of an answer: `meta.tool` and `meta.contractVersion` (absent means 1.0).
     fn identity(answer: &Value) -> (String, Claim) {
         let tool = answer["meta"]["tool"].as_str().unwrap_or("tool").to_string();
-        let claim = if answer["meta"]["contractVersion"] == "1.1" {
-            Claim::V1_1
-        } else {
-            Claim::V1_0
+        let claim = match answer["meta"]["contractVersion"].as_str() {
+            Some("1.2") => Claim::V1_2,
+            Some("1.1") => Claim::V1_1,
+            _ => Claim::V1_0,
         };
         (tool, claim)
     }
@@ -1381,7 +1381,7 @@ mod tests {
     #[test]
     fn atip_checkl1_rules_valid_commands_hold_every_condition_that_does_not_read_invocation() {
         let names = valid_commands();
-        assert_eq!(names.len(), 16, "{names:?}");
+        assert_eq!(names.len(), 17, "{names:?}");
         for name in names {
             let (_, findings) = judge(&format!("schema-docs/{name}"));
             let failing: Vec<&str> = failing(&findings)

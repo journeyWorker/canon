@@ -63,7 +63,7 @@ Options:
       --level <LEVEL>    The level the tool claims: L0 or L1 (L2 is not supported yet)
       --fixture <FILE>   The tool's fixture file: JSON with contractVersion, prepare, setup, env, timeoutSeconds, probe, globalOptions, registry, warnings, commands (and, in commands, ok, refused, paged, missingValue, fields and domainRejects) and notRun (the ids of commands the checker never runs, such as a server; not in commands)
       --contract <MAJOR.MINOR>
-                         The contract minor the tool claims: 1.0 or 1.1. Defaults to the fixture's contractVersion, and to 1.0
+                         The contract minor the tool claims: 1.0, 1.1 or 1.2. Defaults to the fixture's contractVersion, and to 1.0
       --json             Print one JSON envelope on stdout instead of text
   -h, --help             Print help
 

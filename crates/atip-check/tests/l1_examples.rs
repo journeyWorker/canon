@@ -1,6 +1,6 @@
 //! The contract repository's self-description examples as input of the L1 document rules (approaches/checker.md 7.2, last paragraph).
 //!
-//! `tests/fixtures/schema-docs/` holds every `examples/schema-*.json` and every `examples/invalid/schema-*.json` of the tag v1.1.1 (copies,
+//! `tests/fixtures/schema-docs/` holds every `examples/schema-*.json` and every `examples/invalid/schema-*.json` of the tag v1.2.0 (copies,
 //! unmodified). The same functions a run of `atip check --level L1` calls judge each one: the self-description schema (`L1.tree`, `L1.walk`), the
 //! tree and group rules, the command rules 1-11 and 13, the grammar, the examples, the patterns, the registry and the reasons and warnings.
 //! A valid example passes all of them; an invalid one is rejected by the checks of its row in `l1_examples.table` and by no other (one owner per
@@ -31,6 +31,7 @@ fn load(path: &Path) -> Option<Value> {
 
 fn claim_of(document: &Value) -> Claim {
     match document.pointer("/meta/contractVersion").and_then(Value::as_str) {
+        Some("1.2") => Claim::V1_2,
         Some("1.1") => Claim::V1_1,
         _ => Claim::V1_0,
     }
@@ -38,7 +39,7 @@ fn claim_of(document: &Value) -> Claim {
 
 /// The exit a registered code has: the reserved ones and the rows of the contract's `schema-errors*.json` examples.
 fn exit_of(code: &str) -> Option<i64> {
-    let reserved = atip::reserved_code(code, atip::Minor::V1_1).map(|reserved| i64::from(reserved.exit));
+    let reserved = atip::reserved_code(code, atip::Minor::V1_2).map(|reserved| i64::from(reserved.exit));
     reserved.or_else(|| {
         ["schema-errors-acme.json", "schema-errors.json", "schema-errors-ledger.json"].iter().find_map(|file| {
             let document = load(&dir("schema-docs").join(file))?;
@@ -54,6 +55,7 @@ fn exit_of(code: &str) -> Option<i64> {
 /// The checks that find something wrong with one self-description document, as `L1.<check>/<condition>` strings.
 fn rejected_by(document: &Value) -> Vec<String> {
     let claim = claim_of(document);
+    let minor = atip_check::checks::documents::minor_of(claim);
     let mut found: Vec<String> = Vec::new();
     let mut add = |check: &str, findings: Vec<Finding>| {
         for (condition, problem) in findings {
@@ -76,7 +78,7 @@ fn rejected_by(document: &Value) -> Vec<String> {
             if let Some(tree) = Tree::parse(data) {
                 add("L1.tree", tree_findings(document, &tree, tree.level.as_str()));
                 let paths: Vec<(&str, &[String])> = tree.commands.iter().map(|entry| (entry.command.as_str(), entry.path.as_slice())).collect();
-                add("L1.grammar", grammar_findings(&paths, None));
+                add("L1.grammar", grammar_findings(&paths, None, minor));
             }
         }
         "group" => {
@@ -84,7 +86,7 @@ fn rejected_by(document: &Value) -> Vec<String> {
                 let tree = Tree { level: "L1".to_string(), commands: group.commands.clone() };
                 let _ = &tree;
                 let paths: Vec<(&str, &[String])> = vec![(group.command.as_str(), group.path.as_slice())];
-                add("L1.grammar", grammar_findings(&paths, None));
+                add("L1.grammar", grammar_findings(&paths, None, minor));
                 let own = Tree { level: "L1".to_string(), commands: group.commands.clone() };
                 add("L1.walk", group_findings(&group, &own));
             }
@@ -93,7 +95,7 @@ fn rejected_by(document: &Value) -> Vec<String> {
             if let Some(doc) = CommandDoc::parse(data) {
                 let tool = document.pointer("/meta/tool").and_then(Value::as_str).unwrap_or_default();
                 add("L1.walk", command_findings(&doc, tool, claim, &exit_of).into_iter().filter(|(condition, _)| *condition != "rule-3-domain-pattern").collect());
-                add("L1.grammar", grammar_findings(&[], Some(&doc)));
+                add("L1.grammar", grammar_findings(&[], Some(&doc), minor));
                 add("L1.examples", examples_findings(&doc, tool));
                 add("L1.patterns", pattern_findings(&doc));
                 add("L1.reserved-applicable", reserved_applicable_findings(&doc));
@@ -101,7 +103,7 @@ fn rejected_by(document: &Value) -> Vec<String> {
         }
         "errors" => {
             let entries = data.get("errors").and_then(Value::as_array).cloned().unwrap_or_default();
-            add("L1.registry", registry_findings(&entries, atip::Minor::V1_1));
+            add("L1.registry", registry_findings(&entries, minor));
             add("L1.reasons", reasons_findings(&entries));
         }
         "error" => {
@@ -170,6 +172,7 @@ const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("invalid/schema-errors-acme-duplicate-code.json", &["L1.registry/codes-unique"]),
     ("invalid/schema-errors-acme-duplicate-reason.json", &["L1.reasons/reasons-unique"]),
     ("invalid/schema-errors-acme-reasons-in-1-0.json", &[]),
+    ("invalid/schema-errors-acme-stopped-midway-exit-2.json", &["L1.registry/reserved-exit"]),
     ("invalid/schema-example-count-outside-domain.json", &["L1.examples/values"]),
     ("invalid/schema-example-fails-arguments-ref.json", &["L1.walk/rule-7"]),
     ("invalid/schema-example-input-incomplete.json", &["L1.examples/requirements"]),
@@ -207,6 +210,7 @@ const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("invalid/schema-fields-path-undeclared.json", &["L1.walk/rule-11"]),
     ("invalid/schema-fields-records-not-pointer.json", &["L1.reserved-applicable/cursor-code", "L1.walk/rule-11", "L1.walk/valid"]),
     ("invalid/schema-flag-only-not-marked.json", &["L1.grammar/reserved-shape"]),
+    ("invalid/schema-command-acme-member-list-limit-not-flag-only.json", &["L1.grammar/reserved-shape"]),
     ("invalid/schema-fragment-flag-only-property.json", &["L1.walk/rule-10"]),
     ("invalid/schema-fragment-open.json", &["L1.walk/rule-10"]),
     ("invalid/schema-fragment-required.json", &["L1.walk/rule-10"]),
@@ -245,6 +249,7 @@ const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("schema-command-acme-lint.json", &[]),
     ("schema-command-acme-member-export.json", &[]),
     ("schema-command-acme-member-list.json", &[]),
+    ("schema-command-tally-entry-list.json", &[]),
     ("schema-command-acme-member-roster.json", &[]),
     ("schema-command-acme-member-show.json", &[]),
     ("schema-command-acme-member-tag.json", &[]),
@@ -257,6 +262,7 @@ const SCHEMA_DOCS: &[(&str, &[&str])] = &[
     ("schema-error-acme-input-invalid.json", &[]),
     ("schema-error.json", &[]),
     ("schema-errors-acme.json", &[]),
+    ("schema-errors-tally.json", &[]),
     ("schema-errors-ledger.json", &[]),
     ("schema-errors.json", &[]),
     ("schema-group.json", &[]),
@@ -413,7 +419,7 @@ fn draft_the_table() {
 fn atip_checkl1_26_the_embedded_guide_schema_is_the_original_of_the_contract_tag() {
     use sha2::{Digest, Sha256};
     let digest: String = Sha256::digest(atip_check::schema::GUIDE_SCHEMA.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect();
-    assert_eq!(digest, "43229f3cfbd518307b1e6071b9e12adad114c0da4f8fdba695c06d2e16c47d3f", "schema/guide.schema.json of v1.1.1 (16544ec22c022335eab4a0df17bf59e7508c67e8)");
+    assert_eq!(digest, "43229f3cfbd518307b1e6071b9e12adad114c0da4f8fdba695c06d2e16c47d3f", "schema/guide.schema.json of v1.2.0 (65c89a9b45fec06163223ab1d5969f807c20fc26), byte-identical to v1.1.1");
 }
 
 /// Prints the rows of `REPORTS` as the checks find them now; run by hand when the checks change, and read the diff.

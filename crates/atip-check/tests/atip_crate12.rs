@@ -34,12 +34,12 @@ fn checker_sources() -> Vec<(PathBuf, String)> {
 }
 
 #[test]
-fn atip_crate12_02_the_checker_still_declares_contract_version_1_1_though_the_crate_is_at_1_2() {
+fn atip_crate12_02_the_checker_declares_its_own_contract_version_apart_from_the_crates() {
     assert_eq!(atip::CONTRACT_VERSION, "1.2", "the crate implements 1.2");
-    assert_eq!(atip_check::output::DECLARED_MINOR, "1.1", "the checker declares 1.1");
+    assert_eq!(atip_check::output::DECLARED_MINOR, "1.2", "the checker declares 1.2 since canon-0-35-check-1-2");
     let line = atip_check::output::success_line(&json!({}), 0);
     let envelope: Value = serde_json::from_str(&line).expect("one JSON line");
-    assert_eq!(envelope["meta"]["contractVersion"], "1.1", "{line}");
+    assert_eq!(envelope["meta"]["contractVersion"], "1.2", "{line}");
     assert!(atip::envelope_problems(&envelope).is_empty(), "{line}");
 }
 

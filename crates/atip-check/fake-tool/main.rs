@@ -87,9 +87,19 @@ impl Tool {
         self.text("tool", "fake")
     }
 
-    /// Whether the tool claims 1.1 (the default).
+    /// The minor the tool claims (`"claims"`: `1.0`, `1.1` the default, or `1.2`).
+    fn minor(&self) -> String {
+        self.text("claims", "1.1")
+    }
+
+    /// Whether the tool claims 1.1 or later.
     fn is_1_1(&self) -> bool {
-        self.text("claims", "1.1") == "1.1"
+        self.minor() != "1.0"
+    }
+
+    /// Whether the tool claims 1.2.
+    fn is_1_2(&self) -> bool {
+        self.minor() == "1.2"
     }
 
     fn commands(&self) -> Vec<&'static str> {
@@ -127,7 +137,7 @@ impl Tool {
         let version = if schema_answer {
             self.text(
                 "schemaAnswerVersion",
-                if self.is_1_1() { "1.1" } else { "1.0" },
+                &if self.is_1_1() { self.minor() } else { "1.0".to_string() },
             )
         } else {
             "1.0".to_string()
@@ -146,7 +156,7 @@ impl Tool {
         if markers {
             meta.insert(
                 "contractVersion".into(),
-                json!(self.text("contractVersionSays", "1.1")),
+                json!(self.text("contractVersionSays", &self.minor())),
             );
         }
         if self.flag("metaUnknownMember") {
@@ -637,6 +647,11 @@ impl Tool {
                 ((*code).to_string(), *exit, &[][..], (*meaning).to_string(), fix.replace("{tool}", &tool))
             }));
         }
+        // `stoppedMidway` registers the code `STOPPED_MIDWAY` (spec 8.3.2): exit 1 and not retryable (`reservedExit` and
+        // `stoppedMidwayRetryable` seed it wrong; below 1.2 it is a code of the tool's own).
+        if self.flag("stoppedMidway") {
+            table.push(("STOPPED_MIDWAY".to_string(), 1, &[][..], "m".to_string(), "f".to_string()));
+        }
         for row in self.config.get("extraCodes").and_then(Value::as_array).into_iter().flatten() {
             table.push((
                 row["code"].as_str().unwrap_or_default().to_string(),
@@ -661,7 +676,8 @@ impl Tool {
                         .and_then(Value::as_i64)
                         .unwrap_or(exit)
                 };
-                let mut row = json!({"code": code, "exit": exit, "retryable": false, "meaning": meaning, "fix": fix});
+                let retryable = code == "STOPPED_MIDWAY" && self.flag("stoppedMidwayRetryable");
+                let mut row = json!({"code": code, "exit": exit, "retryable": retryable, "meaning": meaning, "fix": fix});
                 if self.is_1_1() && !reasons.is_empty() {
                     row["reasons"] = json!(reasons
                         .iter()
@@ -1002,7 +1018,7 @@ fn team(tool: &Tool, words: &[String], repo_given: bool) -> ExitCode {
         }
         // A stream command (13.5): a start line, an event, an end line holding the envelope.
         Some("add") if tool.flag("teamAddStream") && tool.json => {
-            let version = tool.text("streamStartContractVersion", "1.1");
+            let version = tool.text("streamStartContractVersion", &tool.minor());
             let mut start = json!({"type": "start", "contract": "atip/1", "tool": tool.name(), "toolVersion": "1.2.3", "command": "team add", "schemaVersion": "1.0"});
             if version != "none" {
                 start["contractVersion"] = json!(version);

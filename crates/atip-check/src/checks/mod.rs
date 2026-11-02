@@ -515,7 +515,7 @@ pub(crate) fn run_checks(
     };
     let calls = run.invoke_all()?;
     let l1 = if level == Level::L1 {
-        let warnings_offered = claim.is_1_1()
+        let warnings_offered = claim.at_least(Claim::V1_1)
             && first_document(&run.log[calls.schema_warnings].stdout)
                 .is_some_and(|document| document.get("ok") == Some(&Value::Bool(true)) && document.pointer("/data/warnings").is_some_and(Value::is_array));
         Some(run.invoke_l1(warnings_offered, claim)?)
@@ -912,7 +912,7 @@ impl<'a> Judge<'a> {
                 .cloned()
         };
         let tool_errors = listed(calls.schema_errors, "errors");
-        let tool_warnings = listed(calls.schema_warnings, "warnings").filter(|_| claim.is_1_1());
+        let tool_warnings = listed(calls.schema_warnings, "warnings").filter(|_| claim.at_least(Claim::V1_1));
         let tool_rows = tool_errors.as_ref().map(|entries| {
             entries
                 .iter()
@@ -1562,7 +1562,7 @@ impl<'a> Judge<'a> {
     /// `meta.contract` on every envelope: SHOULD for a 1.0 claim; for 1.1, `L0.contract-version` owns the presence.
     fn contract(&'a self) -> Finding {
         let mut c = self.check("L0.contract");
-        if self.claim.is_1_1() {
+        if self.claim.at_least(Claim::V1_1) {
             return c.finish_as(End::Unsupported(
                 "the claim is 1.1: L0.contract-version owns the presence of meta.contract".to_string(),
             ));
@@ -1922,7 +1922,7 @@ impl<'a> Judge<'a> {
             c.holds_at(
                 calls.schema_errors,
                 "kind",
-                if self.claim.is_1_1() {
+                if self.claim.at_least(Claim::V1_1) {
                     kind == Some("errors")
                 } else {
                     kind.is_none_or(|kind| kind == "errors")
@@ -2030,7 +2030,7 @@ impl<'a> Judge<'a> {
         let Some(document) = document.filter(|document| document.get("ok") == Some(&Value::Bool(true))) else {
             return Some("did not answer with a success envelope".to_string());
         };
-        if self.claim.is_1_1() && document.pointer("/data/kind").and_then(Value::as_str) != Some(kind) {
+        if self.claim.at_least(Claim::V1_1) && document.pointer("/data/kind").and_then(Value::as_str) != Some(kind) {
             return Some(format!("has no data.kind {kind:?}"));
         }
         let without_reasons = |entry: Option<&Value>| -> Option<Value> {
@@ -2113,7 +2113,7 @@ impl<'a> Judge<'a> {
     /// A hint that starts with the tool name and a space is one command line (spec 7.1.2); not run for a 1.0 claim.
     fn hint_form(&'a self) -> Finding {
         let mut c = self.check("L0.hint-form");
-        if !self.claim.is_1_1() {
+        if !self.claim.at_least(Claim::V1_1) {
             return c.finish_as(End::Unsupported(
                 "the claim is 1.0: a prose hint may start with the tool name".to_string(),
             ));

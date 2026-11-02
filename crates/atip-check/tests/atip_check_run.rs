@@ -1411,7 +1411,7 @@ fn atip_check_57_the_contract_option_and_the_fixtures_contract_version_pick_the_
     let unknown = harness.check_with(&watched, true, &["--contract", "1.9"]);
     let document = unknown.envelope();
     assert_eq!((unknown.code, document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("--contract")), "{}", unknown.stdout);
-    assert_eq!(document["error"]["expected"], json!(["1.0", "1.1"]));
+    assert_eq!(document["error"]["expected"], json!(["1.0", "1.1", "1.2"]));
     assert!(!marker.exists());
 }
 

@@ -229,6 +229,13 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
         }
     }
     bind_operands(tool, command, &operands, &mut parsed)?;
+    if let Some(text) = parsed.text("input").map(ToString::to_string) {
+        merge_input(tool, command, &text, &mut parsed)?;
+    }
+    // The seeded violations of `L1.check-order` (spec 11.7 step 6): a stage answers before an earlier one.
+    if tool.flag("orderDomainFirst") {
+        check_domains(tool, command, &parsed, false)?;
+    }
     for arg in command.args.iter().filter(|arg| arg.required) {
         if !parsed.has(arg.name) {
             return Err(usage(
@@ -238,12 +245,51 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
             ));
         }
     }
-    check_domains(tool, command, &parsed)?;
+    if tool.flag("orderConstraintFirst") && !skip_rules {
+        check_rules(tool, command, &parsed)?;
+    }
+    check_domains(tool, command, &parsed, tool.flag("orderLaterDomain"))?;
+    if tool.flag("orderValidatorFirst") {
+        check_validators(tool, command, &parsed)?;
+    }
     if !skip_rules {
         check_rules(tool, command, &parsed)?;
     }
     check_validators(tool, command, &parsed)?;
     Ok(parsed)
+}
+
+/// Reads the document of `--input` (`-`: the document on stdin) into the arguments it gives; an argument that argv gave stays as it is.
+fn merge_input(tool: &Tool, command: &Command, text: &str, parsed: &mut Parsed) -> Result<(), Failure> {
+    let body = if text == "-" {
+        let mut buffer = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buffer).unwrap_or_default();
+        buffer
+    } else {
+        text.to_string()
+    };
+    let invalid = |why: String| Failure::Refuse {
+        code: "INPUT_INVALID".to_string(),
+        message: why,
+        field: Some("--input".to_string()),
+        expected: None,
+        source: "parse",
+    };
+    let Ok(Value::Object(document)) = serde_json::from_str::<Value>(&body) else {
+        return Err(invalid("--input is not a JSON object".to_string()));
+    };
+    for (key, value) in document {
+        let Some(arg) = command.flags().find(|arg| arg.name == key && !arg.flag_only) else {
+            return Err(invalid(format!("{key} is not an argument a document may give")));
+        };
+        let word = match &value {
+            Value::String(word) => word.clone(),
+            other => other.to_string(),
+        };
+        let value = typed(tool, arg, &word)?;
+        parsed.given.entry(arg.name).or_insert_with(|| vec![value]);
+    }
+    Ok(())
 }
 
 /// Binds the operand words to the command's operands in order; the variadic one takes the rest.
@@ -275,8 +321,9 @@ fn compiled(domain: &Value) -> Option<jsonschema::Validator> {
         .ok()
 }
 
-fn check_domains(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), Failure> {
-    for arg in &command.args {
+fn check_domains(tool: &Tool, command: &Command, parsed: &Parsed, reverse: bool) -> Result<(), Failure> {
+    let order: Vec<&Arg> = if reverse { command.args.iter().rev().collect() } else { command.args.iter().collect() };
+    for arg in order {
         let Some(domain) = &arg.domain else { continue };
         if listed(tool, "acceptDomain", command.id, &json!(arg.name)) {
             continue;

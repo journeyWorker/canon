@@ -1,2 +1,2 @@
 {"type":"event","data":{"step":"compile","status":"done"}}
-{"type":"end","result":{"ok":true,"data":{"artifacts":2},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.1","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0","output":"BuildResult"}}}
+{"type":"end","result":{"ok":true,"data":{"artifacts":2},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.2","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0","output":"BuildResult"}}}

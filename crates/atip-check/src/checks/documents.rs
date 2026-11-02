@@ -332,8 +332,9 @@ pub fn is_kebab(word: &str) -> bool {
     first_ok && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
 }
 
-/// `L1.grammar`, for the entries of a tree (their paths) and one command document: `kebab-words`, `no-id-suffix`, `reserved-shape`.
-pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandDoc>) -> Vec<Finding> {
+/// `L1.grammar`, for the entries of a tree (their paths) and one command document: `kebab-words`, `no-id-suffix`, `reserved-shape`. For a 1.2 claim
+/// `limit`, `cursor`, `all` and `fields` are flag-only too (spec 11.6).
+pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandDoc>, minor: atip::Minor) -> Vec<Finding> {
     let mut bad_words: Vec<String> = Vec::new();
     for (command, path) in entry_paths {
         bad_words.extend(path.iter().filter(|word| !is_kebab(word)).map(|word| format!("the path word {word:?} of {command}")));
@@ -356,7 +357,7 @@ pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandD
                     shapes.push(format!("{}: --{} is {}, reserved as {shape}", doc.command, option.name, option.value_type));
                 }
             }
-            if FLAG_ONLY.contains(&option.name.as_str()) && !option.flag_only {
+            if atip::flag_only_options(minor).contains(&option.name.as_str()) && !option.flag_only {
                 shapes.push(format!("{}: --{} is not flagOnly", doc.command, option.name));
             }
         }

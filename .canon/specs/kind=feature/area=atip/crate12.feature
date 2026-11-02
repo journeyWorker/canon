@@ -16,10 +16,10 @@ Feature: atip crate: the 1.2 constants, reserved codes, flag-only sets and minor
   @case:happy
   @flow:canon-0-35-crate-1-2.F1
   @atip.crate12.02
-  Scenario: canon status and atip check still declare contractVersion 1.1 after the crate moves to 1.2
-    Given the canon binary and the atip checker, which keep their own declarations
+  Scenario: canon status declares contractVersion 1.1 and atip check its own minor, apart from the crate's 1.2
+    Given the canon binary and the atip checker, which keep their own declarations (the checker's moved to 1.2 in canon-0-35-check-1-2)
     When canon status --json runs and atip check prints an envelope
-    Then meta.contractVersion is 1.1 in both, though atip::CONTRACT_VERSION is 1.2
+    Then meta.contractVersion is 1.1 for canon and 1.2 for the checker, each its own constant, and atip::CONTRACT_VERSION is read by neither
 
   # canon: {"schema":1,"at":"2026-11-02T07:08:13Z","actor":{"agent_id":"impl-crate-0-35","role":"implementer","session_id":"s-0-35-crate"}}
   @subject:atip-contract

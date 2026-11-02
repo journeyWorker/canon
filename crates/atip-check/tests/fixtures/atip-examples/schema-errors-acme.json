@@ -65,6 +65,13 @@
         "fix": "Wait again with the same command (meta.next)"
       },
       {
+        "code": "ENVIRONMENT_FROZEN",
+        "exit": 2,
+        "retryable": false,
+        "meaning": "The environment is frozen and takes no deployments",
+        "fix": "Wait until the environment is unfrozen (acme.yaml names who freezes it), then deploy again"
+      },
+      {
         "code": "ENVIRONMENT_NOT_FOUND",
         "exit": 2,
         "retryable": false,
@@ -169,6 +176,20 @@
         "fix": "Check the page slug; it is the last part of the page's address"
       },
       {
+        "code": "STOPPED_MIDWAY",
+        "exit": 1,
+        "retryable": false,
+        "meaning": "A command that works in steps stopped after an earlier step made changes, because a later step was refused; the reason is the refusal's code",
+        "fix": "Read what was done (meta.next), then act on the reason's fix before running the command again",
+        "reasons": [
+          {
+            "reason": "ENVIRONMENT_FROZEN",
+            "meaning": "deploy start recorded the deployment, then the environment refused to queue it because it was frozen in between",
+            "fix": "acme deploy status <DEPLOYMENT> --json shows the recorded deployment; deploy again once the environment is unfrozen"
+          }
+        ]
+      },
+      {
         "code": "STORE_UNAVAILABLE",
         "exit": 2,
         "retryable": true,
@@ -208,8 +229,8 @@
   "meta": {
     "command": "schema",
     "contract": "atip/1",
-    "contractVersion": "1.1",
-    "schemaVersion": "1.1",
+    "contractVersion": "1.2",
+    "schemaVersion": "1.2",
     "tool": "acme",
     "toolVersion": "1.0.0"
   }

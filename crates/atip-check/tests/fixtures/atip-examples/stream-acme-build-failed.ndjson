@@ -1,3 +1,3 @@
-{"type":"start","contract":"atip/1","contractVersion":"1.1","tool":"acme","toolVersion":"1.0.0","command":"build","schemaVersion":"1.0","output":"BuildResult"}
+{"type":"start","contract":"atip/1","contractVersion":"1.2","tool":"acme","toolVersion":"1.0.0","command":"build","schemaVersion":"1.0","output":"BuildResult"}
 {"type":"event","data":{"step":"compile","status":"done"}}
-{"type":"end","result":{"ok":false,"error":{"code":"BUILD_FAILED","message":"step link failed: undefined symbol","retryable":false},"data":{"artifacts":0},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.1","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0","output":"BuildResult"}}}
+{"type":"end","result":{"ok":false,"error":{"code":"BUILD_FAILED","message":"step link failed: undefined symbol","retryable":false},"data":{"artifacts":0},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.2","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0","output":"BuildResult"}}}

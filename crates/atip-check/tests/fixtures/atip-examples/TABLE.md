@@ -1,11 +1,11 @@
 # The contract repository's examples, as `atip check` tests them
 
-Copied from https://github.com/journeyWorker/atip at the tag v1.1.0 (commit `da69df042b1140915d6a5e674b306bf7b5cfd187`), unmodified:
+Copied from https://github.com/journeyWorker/atip at the tag v1.2.0 (commit `65c89a9b45fec06163223ab1d5969f807c20fc26`), unmodified:
 `examples/report-*.json`, `examples/schema-error*.json`, `examples/schema-warning*.json`, `examples/stream-*.ndjson` and, of `examples/invalid/`,
 `envelope-*`, `report-*`, `schema-error*`, `schema-warning*`, `schema-ledger-*`, `schema-version-not-contract-version.json` and `stream-*`.
 `tests/atip_examples.rs` reads this table, so a file without a row, or a row whose file is missing, fails the test.
 
-A document is judged by the layers a run of `atip check` applies to one envelope, the functions of `checks::rules`: `L0.envelope`, `L0.no-null`, `L0.contract-version`, `L0.hint-form`, `L0.registry`, `L0.next`, `L0.page`, and, for a failure, `L0.ok-exit` and `L0.unknown-command`. The tool `acme` claims 1.1; another tool claims what its document declares. A stream is judged by the envelope in the `result` of its `end` line.
+A document is judged by the layers a run of `atip check` applies to one envelope, the functions of `checks::rules`: `L0.envelope`, `L0.no-null`, `L0.contract-version`, `L0.hint-form`, `L0.registry`, `L0.next`, `L0.page`, and, for a failure, `L0.ok-exit` and `L0.unknown-command`. The tool `acme` claims 1.2 and the tool `tally` 1.1; another tool claims what its document declares. A stream is judged by the envelope in the `result` of its `end` line.
 
 - `accept`: no layer reports anything.
 - `reject`: the layer named in `By` reports something and no other layer does (one owner per pass condition).
@@ -26,6 +26,7 @@ A document is judged by the layers a run of `atip check` applies to one envelope
 | `report-acme-member-list-warning.json` | accept | - | an envelope of the contract examples |
 | `report-acme-member-roster-fields.json` | accept | - | an envelope of the contract examples |
 | `report-acme-member-tag-batch.json` | accept | - | an envelope of the contract examples |
+| `report-failure-acme-deploy-start-stopped-midway.json` | accept | - | an envelope of the contract examples: a 1.2 failure with `STOPPED_MIDWAY` and the refusal's code as its reason (8.3.2) |
 | `report-failure-acme-input-details-reason.json` | accept | - | an envelope of the contract examples |
 | `report-failure-acme-input-reason.json` | accept | - | an envelope of the contract examples |
 | `report-failure-acme-schema-error-warning-only.json` | accept | - | an envelope of the contract examples |
@@ -47,6 +48,7 @@ A document is judged by the layers a run of `atip check` applies to one envelope
 | `schema-error.json` | accept | - | a schema answer of the contract examples |
 | `schema-errors-acme.json` | accept | - | a schema answer of the contract examples |
 | `schema-errors-ledger.json` | accept | - | a schema answer of the contract examples |
+| `schema-errors-tally.json` | accept | - | a schema answer of the contract examples: a 1.1 registry whose own `STOPPED_MIDWAY` is retryable (7.2.1) |
 | `schema-errors.json` | accept | - | a schema answer of the contract examples |
 | `schema-warning-acme-member-archived.json` | accept | - | a schema answer of the contract examples |
 | `schema-warnings-acme.json` | accept | - | a schema answer of the contract examples |
@@ -111,6 +113,7 @@ A document is judged by the layers a run of `atip check` applies to one envelope
 | `invalid/report-skills-show-markdown-key.json` | skip | L2.skills | a guide with a key the guide schema does not define (14) |
 | `invalid/schema-error-acme-reason-lowercase.json` | reject | L0.registry | a registry reason that is not UPPER_SNAKE_CASE (7.6.1) |
 | `invalid/schema-errors-acme-duplicate-code.json` | skip | L1.registry | a code listed twice in the registry (7.3.4) |
+| `invalid/schema-errors-acme-stopped-midway-exit-2.json` | skip | L1.registry | `STOPPED_MIDWAY` at exit 2 in a 1.2 registry (7.2.1, 8.3.2) |
 | `invalid/schema-errors-acme-duplicate-reason.json` | skip | L1.reasons | a reason listed twice under one code (7.6.1) |
 | `invalid/schema-errors-acme-reasons-in-1-0.json` | reject | L0.contract-version | registry reasons in a schema answer without the 1.1 markers (7.6, 10.13 rule 16) |
 | `invalid/schema-ledger-meta-bracket-field.json` | reject | L0.contract-version | a bracketed key in meta.fields of a 1.0 tool (6.10, 10.13 rule 16) |
@@ -133,6 +136,7 @@ A document is judged by the layers a run of `atip check` applies to one envelope
 | `invalid/stream-acme-build-one-line-not-refusal.ndjson` | skip | L2.stream | a usage error that prints a stream that is not one refusal envelope (13.5) |
 | `invalid/stream-acme-build-quiet-with-event.ndjson` | skip | L2.stream | an event of a stream that declares none (13.5) |
 | `invalid/stream-acme-build-start-contract-version-mismatch.ndjson` | skip | L2.stream | start and end that declare different minors (13.5, 15.7) |
+| `invalid/stream-acme-build-start-contract-version-1-0.ndjson` | reject | L0.contract-version | a stream that writes `contractVersion` as "1.0" (6.6, 13.5) |
 | `invalid/stream-acme-build-start-contract-version-unknown.ndjson` | reject | L0.contract-version | the end result declares a minor that is not the claimed one (15.7, 13.5) |
 | `invalid/stream-acme-build-start-output-mismatch.ndjson` | skip | L2.stream | a start line that names another output than the end result (13.5) |
 | `invalid/stream-acme-build-start-without-output.ndjson` | skip | L2.stream | a start line without the output a multi-output command must name (13.5) |

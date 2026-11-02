@@ -1,0 +1,166 @@
+{
+  "ok": true,
+  "data": {
+    "kind": "command",
+    "command": "entry list",
+    "path": [
+      "entry",
+      "list"
+    ],
+    "summary": "List a ledger's entries, one page at a time",
+    "effect": "read",
+    "operands": [],
+    "options": [
+      {
+        "name": "ledger",
+        "valueName": "LEDGER",
+        "valueType": "string",
+        "required": true,
+        "repeatable": false,
+        "default": null,
+        "short": "l",
+        "help": "The ledger whose entries to list"
+      },
+      {
+        "name": "limit",
+        "valueName": "N",
+        "valueType": "integer",
+        "required": false,
+        "repeatable": false,
+        "default": 50,
+        "help": "Return at most this many entries",
+        "domain": {
+          "minimum": 1
+        }
+      },
+      {
+        "name": "cursor",
+        "valueName": "CURSOR",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Resume after the last entry of the previous page (meta.page.nextCursor)"
+      },
+      {
+        "name": "all",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "help": "Return every entry from the cursor on"
+      },
+      {
+        "name": "fields",
+        "valueName": "FIELDS",
+        "valueType": "string",
+        "required": false,
+        "repeatable": false,
+        "default": null,
+        "help": "Keep only these entry fields (comma-separated dot paths); see outputs[0].fields"
+      },
+      {
+        "name": "json",
+        "valueType": "switch",
+        "required": false,
+        "repeatable": false,
+        "default": false,
+        "flagOnly": true,
+        "help": "Output JSON instead of the human-readable form"
+      }
+    ],
+    "constraints": [
+      {
+        "rule": "atMostOne",
+        "names": [
+          "limit",
+          "all"
+        ]
+      }
+    ],
+    "errors": [
+      "CURSOR_INVALID",
+      "INTERNAL",
+      "LEDGER_NOT_FOUND",
+      "USAGE"
+    ],
+    "outputs": [
+      {
+        "kind": "report",
+        "schemaRef": "#/schemas/EntryListReport",
+        "schemaVersion": "1.0",
+        "fields": {
+          "records": "/entries",
+          "keep": [
+            "id"
+          ],
+          "paths": [
+            "name",
+            "attributes"
+          ],
+          "default": [
+            "name"
+          ]
+        }
+      }
+    ],
+    "examples": [
+      "tally entry list -l main --fields attributes --limit 2 --json",
+      "tally entry list --ledger=main --all --json"
+    ],
+    "schemas": {
+      "EntryListReport": {
+        "type": "object",
+        "required": [
+          "ledger",
+          "entries"
+        ],
+        "properties": {
+          "ledger": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/schemas/EntryRow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "EntryRow": {
+        "type": "object",
+        "description": "One entry.",
+        "required": [
+          "id",
+          "name",
+          "attributes"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "attributes": {
+            "description": "Entry attributes, a map: in a 1.1 document its keys are selectable and it is a cut node, so it has no minProperties.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "meta": {
+    "command": "schema",
+    "contract": "atip/1",
+    "contractVersion": "1.1",
+    "schemaVersion": "1.1",
+    "tool": "tally",
+    "toolVersion": "1.0.0"
+  }
+}

@@ -31,7 +31,7 @@ fn generated() -> Value {
         .collect();
     let warnings: Vec<&str> = WARNINGS.iter().map(|warning| warning.code).collect();
     json!({
-        "contractVersion": "1.1",
+        "contractVersion": atip_check::output::DECLARED_MINOR,
         "probe": "check",
         "globalOptions": [],
         "registry": rows,

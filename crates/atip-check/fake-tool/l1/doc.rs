@@ -17,6 +17,7 @@ impl Model {
     pub fn of(tool: &Tool) -> Self {
         let shape = Shape {
             is_1_1: tool.is_1_1(),
+            is_1_2: tool.is_1_2(),
             deep: tool.flag("deepTree"),
         };
         Self {

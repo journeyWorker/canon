@@ -138,7 +138,7 @@ mod tests {
         Sha256::digest(text.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
     }
 
-    /// The digests of the files as the atip repository published them (tag v1.1.1 for the envelope, v1.1.0 for the rest, which did not change). A
+    /// The digests of the files as the atip repository published them (tag v1.1.1 for the envelope, v1.2.0 for `schema-doc` (only the description of `flagOnly` changed), v1.1.0 for the rest, which did not change). A
     /// changed copy fails here; re-vendoring updates the file and its digest
     /// together.
     const ENVELOPE_DIGEST: &str = "81a05fac5a09dd8f16543590d061bf94ac1f16136d3c129e0696e996c868503b";
@@ -146,7 +146,7 @@ mod tests {
     const REGISTRY_ENTRY_DIGEST: &str = "18e73eec11f662d6c19e18574a1c1d3424f037f0ad5d232f24ab0a56fab28622";
     const WARNING_ENTRY_DIGEST: &str = "66d2eaaea38eaf723343c262dea4b710bcd1b22dc547124f68f0abc2ee0fcfde";
     const STREAM_LINE_DIGEST: &str = "cfa0647e4907a9447a992be8f9226b5873dc9b3cae89b5a9073c5fafef75c145";
-    const SCHEMA_DOC_DIGEST: &str = "1aaa4625f000df3221f355be2725e5d36f353b835b822cbce11498e11540484a";
+    const SCHEMA_DOC_DIGEST: &str = "ffa4a5e3a4605136f51a6c7767416e25a8e5919e2c2bd152f79a882ebd35f57b";
     const INPUT_DOCUMENT_DIGEST: &str = "a3e194a8f5b2d232bd46f84dc664a8a7d3bb38c2b7658a0edbfd4767d58c97a7";
     const BATCH_REPORT_DIGEST: &str = "74ed7e2a5a0f234d447da186f313500756850313e752d500711401d41498944e";
 

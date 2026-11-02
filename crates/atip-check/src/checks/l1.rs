@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 
 use super::documents;
+use crate::claim::Claim;
 use super::l1_plan::{names_command, output_with_fields, refusal_of, L1Run};
 use super::{
     excerpt, exit_text, must, should, show, Conditions, End, Entry, Finding, Judge,
@@ -568,11 +569,11 @@ impl<'a> Judge<'a> {
         let Some(tree) = &self.docs().tree else { return self.no_tree(c) };
         let l1_tree_call = self.l1().tree;
         let paths: Vec<(&str, &[String])> = tree.commands.iter().map(|entry| (entry.command.as_str(), entry.path.as_slice())).collect();
-        for (condition, problem) in documents::grammar_findings(&paths, None) {
+        for (condition, problem) in documents::grammar_findings(&paths, None, documents::minor_of(self.claim)) {
             c.holds_in(Some(l1_tree_call), condition, problem.is_none(), || problem.clone().unwrap_or_default());
         }
         for doc in self.docs().commands.values() {
-            for (condition, problem) in documents::grammar_findings(&[], Some(doc)) {
+            for (condition, problem) in documents::grammar_findings(&[], Some(doc), documents::minor_of(self.claim)) {
                 c.holds_in(self.doc_call(&doc.command), condition, problem.is_none(), || problem.clone().unwrap_or_default());
             }
         }
@@ -1014,7 +1015,7 @@ impl<'a> Judge<'a> {
     fn l1_hint_command(&'a self) -> Finding {
         let l1 = self.l1();
         let mut c = self.check("L1.hint-command");
-        if !self.claim.is_1_1() {
+        if !self.claim.at_least(Claim::V1_1) {
             return c.finish_as(End::Unsupported("the claim is 1.0: a prose hint may start with the tool name (spec 7.1.2 binds 1.1 documents only)".to_string()));
         }
         if l1.docs.tree.is_none() {

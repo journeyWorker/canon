@@ -1,6 +1,6 @@
 //! The contract repository's examples as test input (approaches/checker.md 7.2, the last paragraph).
 //!
-//! `tests/fixtures/atip-examples/` holds copies pinned to the tag v1.1.0 of https://github.com/journeyWorker/atip;
+//! `tests/fixtures/atip-examples/` holds copies pinned to the tag v1.2.0 of https://github.com/journeyWorker/atip;
 //! `TABLE.md` says what each file is expected to do. The valid documents pass every layer `atip check` applies to
 //! one envelope (the envelope schema, `null`, the contract markers, the registry entries and what the document emits,
 //! the hint form, the failure rules of `L0.ok-exit`), the ones that break one of those rules are rejected by the
@@ -25,7 +25,7 @@ use atip_check::fixture::RegistryRow;
 use atip_check::schema::schemas;
 
 /// The tag of the contract repository the copies and the pinned digests come from, and the commit it points at.
-const PINNED: &str = "v1.1.0 (da69df042b1140915d6a5e674b306bf7b5cfd187)";
+const PINNED: &str = "v1.2.0 (65c89a9b45fec06163223ab1d5969f807c20fc26)";
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/atip-examples")
@@ -77,6 +77,7 @@ fn load(file: &str) -> Option<Value> {
 fn registry_of(tool: &str) -> Option<(Vec<RegistryRow>, Vec<String>)> {
     let (errors, warnings) = match tool {
         "acme" => ("schema-errors-acme.json", Some("schema-warnings-acme.json")),
+        "tally" => ("schema-errors-tally.json", None),
         "canon" => ("schema-errors.json", None),
         "ledger" => ("schema-errors-ledger.json", None),
         _ => return None,
@@ -101,16 +102,19 @@ fn registry_of(tool: &str) -> Option<(Vec<RegistryRow>, Vec<String>)> {
     Some((rows, warning_codes))
 }
 
-/// The minor the tool of a document claims: the synthetic tool `acme` claims 1.1 (a document of it without the markers
-/// is a 1.1 tool's ordinary answer that lacks them); another tool claims what its document declares, 1.1 when
-/// `meta.contractVersion` is there and other than `"1.0"` (an unknown minor is a claim of 1.1 it does not keep), else 1.0.
+/// The minor the tool of a document claims: the synthetic tool `acme` claims 1.2 and `tally` claims 1.1 (a document of either without the
+/// markers is that tool's ordinary answer that lacks them); another tool claims what its document declares, 1.1 or 1.2 when
+/// `meta.contractVersion` says so and other than `"1.0"` (an unknown minor is a claim of the newest one it does not keep), else 1.0.
 fn claim_of(document: &Value) -> Claim {
-    if document.pointer("/meta/tool").and_then(Value::as_str) == Some("acme") {
-        return Claim::V1_1;
+    match document.pointer("/meta/tool").and_then(Value::as_str) {
+        Some("acme") => return Claim::V1_2,
+        Some("tally") => return Claim::V1_1,
+        _ => {}
     }
     match document.pointer("/meta/contractVersion").and_then(Value::as_str) {
         Some("1.0") | None => Claim::V1_0,
-        Some(_) => Claim::V1_1,
+        Some("1.1") => Claim::V1_1,
+        Some(_) => Claim::V1_2,
     }
 }
 
@@ -129,7 +133,7 @@ fn layers(document: &Value) -> Vec<(&'static str, Vec<String>)> {
         ),
     ];
     let tool = document.pointer("/meta/tool").and_then(Value::as_str).unwrap_or_default();
-    if claim.is_1_1() {
+    if claim.at_least(Claim::V1_1) {
         found.push(("L0.hint-form", hint_problems(document, tool)));
     }
     let registry = registry_of(tool);
@@ -298,7 +302,7 @@ fn atip_check_35_a_failure_envelope_that_breaks_the_registry_is_rejected_by_the_
 fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_keyword_is_an_annotation(
 ) {
     // The schemas the checker validates against are byte for byte the pinned originals (sha256 of `schema/*.schema.json`:
-    // the envelope at v1.1.1, the others at v1.1.0, which 1.1.1 did not change).
+    // the envelope at v1.1.1, the others at v1.1.0, which neither 1.1.1 nor v1.2.0 changed).
     for (name, text, digest) in [
         (
             "envelope.schema.json",
@@ -332,7 +336,7 @@ fn atip_check_38_the_embedded_contract_schemas_are_the_originals_and_a_format_ke
             .collect();
         assert_eq!(
             actual, digest,
-            "{name} is not the original of {PINNED} (the envelope: v1.1.1)"
+            "{name} is not the original of {PINNED} (the envelope schema is unchanged since v1.1.1)"
         );
     }
     // A null where the contract forbids one is rejected by the schema; `L0.no-null` names it, and `L0.envelope` leaves it.

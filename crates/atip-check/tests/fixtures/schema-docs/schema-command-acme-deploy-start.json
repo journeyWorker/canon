@@ -11,7 +11,7 @@
     "effect": "write",
     "idempotency": "replay-safe",
     "async": true,
-    "effectNote": "queues one deployment on the deploy worker; a repeat with the same --operation and arguments returns the deployment it started",
+    "effectNote": "records one deployment, then queues it on the deploy worker; a repeat with the same --operation and arguments returns the deployment it started",
     "operands": [
       {
         "name": "environment",
@@ -47,9 +47,11 @@
       }
     ],
     "errors": [
+      "ENVIRONMENT_FROZEN",
       "ENVIRONMENT_NOT_FOUND",
       "INTERNAL",
       "OPERATION_REUSED",
+      "STOPPED_MIDWAY",
       "USAGE"
     ],
     "outputs": [
@@ -91,8 +93,8 @@
   "meta": {
     "command": "schema",
     "contract": "atip/1",
-    "contractVersion": "1.1",
-    "schemaVersion": "1.1",
+    "contractVersion": "1.2",
+    "schemaVersion": "1.2",
     "tool": "acme",
     "toolVersion": "1.0.0"
   }

@@ -14,7 +14,7 @@ pub const TOOL: &str = "atip";
 pub const SCHEMA_VERSION: &str = "1.0";
 /// `meta.contractVersion` of every envelope `atip check` prints: the minor the checker itself declares (spec 15.7). It is
 /// the checker's own constant, apart from `atip::CONTRACT_VERSION`, the newest minor the crate implements.
-pub const DECLARED_MINOR: &str = "1.1";
+pub const DECLARED_MINOR: &str = "1.2";
 
 /// `atip`'s error registry (spec 7.3), sorted by code: the four reserved codes it can produce (`USAGE`, `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INTERNAL`) and four of its own.
 pub const REGISTRY: [CodeInfo; 8] = [
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn atip_check_03_a_failure_omits_what_it_does_not_have() {
         let line = failure_line(&Failure::new(Code::UnknownCommand, "no such command"));
-        assert_eq!(line, r#"{"ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"no such command","retryable":false},"meta":{"contract":"atip/1","contractVersion":"1.1","schemaVersion":"1.0","tool":"atip","toolVersion":""#.to_string() + env!("CARGO_PKG_VERSION") + r#""}}"#);
+        assert_eq!(line, r#"{"ok":false,"error":{"code":"UNKNOWN_COMMAND","message":"no such command","retryable":false},"meta":{"contract":"atip/1","contractVersion":"1.2","schemaVersion":"1.0","tool":"atip","toolVersion":""#.to_string() + env!("CARGO_PKG_VERSION") + r#""}}"#);
         let full = failure_line(
             &Failure::new(Code::Usage, "m")
                 .in_command("check")
@@ -380,6 +380,6 @@ mod tests {
         assert!(success_line(&serde_json::json!({"level": "L0"}), 0).contains(r#""command":"check""#));
         let warned = success_line(&serde_json::json!({"level": "L0"}), 2);
         assert!(warned.contains(r#""warnings":[{"code":"SHOULD_FAILED""#), "{warned}");
-        assert!(warned.contains(r#""contractVersion":"1.1""#));
+        assert!(warned.contains(r#""contractVersion":"1.2""#));
     }
 }

@@ -27,6 +27,8 @@ pub struct Arg {
     pub possible: Vec<&'static str>,
     pub domain: Option<Value>,
     pub flag_only: bool,
+    /// The variable that gives the option its value when argv does not (spec 10.7.3).
+    pub env: Option<&'static str>,
     pub help: &'static str,
 }
 
@@ -50,6 +52,7 @@ impl Arg {
             possible: Vec::new(),
             domain: None,
             flag_only: false,
+            env: None,
             help,
         }
     }
@@ -104,6 +107,12 @@ impl Arg {
 
     pub fn flag_only(mut self) -> Self {
         self.flag_only = true;
+        self
+    }
+
+    /// The environment variable that gives the option its value when argv gives none.
+    pub fn env(mut self, name: &'static str) -> Self {
+        self.env = Some(name);
         self
     }
 
@@ -389,6 +398,8 @@ pub struct Group {
 pub struct Shape {
     /// Whether the tool claims 1.1 (the warning registry, `--warning`).
     pub is_1_1: bool,
+    /// Whether the tool claims 1.2 (`limit`, `cursor`, `all` and `fields` are flag-only; `member list` reads `--input -`).
+    pub is_1_2: bool,
     /// Whether the tree has a path of three words (`team roster list`).
     pub deep: bool,
 }
@@ -442,33 +453,42 @@ fn state_read(id: &'static str, summary: &'static str, report: &'static str) -> 
         .output(name, schema)
 }
 
-fn member_list(is_1_1: bool) -> Command {
+fn member_list(shape: Shape) -> Command {
+    let (is_1_1, is_1_2) = (shape.is_1_1, shape.is_1_2);
+    // Since 1.2 `limit`, `cursor`, `all` and `fields` are flag-only: they cannot appear in an `--input` document (spec 11.6).
+    let flag = |arg: Arg| if is_1_2 { arg.flag_only() } else { arg };
+    let mut options = vec![
+        {
+            let team = Arg::option("team", "string", "Only the members of this team").value("TEAM");
+            if is_1_2 { team.env("FAKE_TEAM") } else { team }
+        },
+        Arg::option("sort", "enum", "The order of the members")
+            .value("SORT")
+            .possible(&["name", "id"])
+            .default(json!("name")),
+        flag(Arg::option("limit", "integer", "Return at most this many members")
+            .value("N")
+            .default(json!(50))
+            .domain(json!({"minimum": 1}))),
+        flag(Arg::option(
+            "cursor",
+            "string",
+            "Resume after the last member of the previous page (meta.page.nextCursor)",
+        )
+        .value("CURSOR")),
+        flag(Arg::option("all", "switch", "Return every member from the cursor on")),
+        flag(Arg::option(
+            "fields",
+            "string",
+            "Keep only these member fields (comma-separated paths); see outputs[0].fields",
+        )
+        .value("FIELDS")),
+    ];
+    if is_1_2 {
+        options.push(Arg::option("input", "string", "The arguments as a JSON document, or - for the document on stdin").value("JSON").flag_only());
+    }
     let mut command = Command::new("member list", "List the members of the directory, a page at a time")
-        .options(vec![
-            Arg::option("team", "string", "Only the members of this team")
-                .value("TEAM"),
-            Arg::option("sort", "enum", "The order of the members")
-                .value("SORT")
-                .possible(&["name", "id"])
-                .default(json!("name")),
-            Arg::option("limit", "integer", "Return at most this many members")
-                .value("N")
-                .default(json!(50))
-                .domain(json!({"minimum": 1})),
-            Arg::option(
-                "cursor",
-                "string",
-                "Resume after the last member of the previous page (meta.page.nextCursor)",
-            )
-            .value("CURSOR"),
-            Arg::option("all", "switch", "Return every member from the cursor on"),
-            Arg::option(
-                "fields",
-                "string",
-                "Keep only these member fields (comma-separated paths); see outputs[0].fields",
-            )
-            .value("FIELDS"),
-        ])
+        .options(options)
         .rule(Rule::at_most_one(&["limit", "all"]))
         .errors(&["CURSOR_INVALID", "USAGE"])
         .output(
@@ -542,6 +562,33 @@ fn member_list(is_1_1: bool) -> Command {
         command.examples.push(
             "{tool} member list --fields 'attributes[\"http.status-code\"]' --json",
         );
+    }
+    if is_1_2 {
+        command = command
+            .schema(
+                "MemberListInput",
+                json!({
+                    "type": "object",
+                    "properties": {"team": {"type": "string"}, "sort": {"enum": ["name", "id"]}},
+                    "additionalProperties": false
+                }),
+            )
+            .schema(
+                "MemberListArguments",
+                json!({
+                    "type": "object",
+                    "properties": {"team": {"type": "string"}, "sort": {"enum": ["name", "id"]}},
+                    "additionalProperties": false
+                }),
+            )
+            .input(json!({
+                "option": "--input",
+                "schemaRef": "#/schemas/MemberListInput",
+                "argumentsRef": "#/schemas/MemberListArguments",
+                "batch": false,
+                "maxBytes": MAX_INPUT_BYTES,
+                "example": {"team": "core"}
+            }));
     }
     command
 }
@@ -716,7 +763,7 @@ fn schema_command(shape: Shape) -> Command {
                 }
             }),
         )
-        .version(if shape.is_1_1 { "1.1" } else { "1.0" })
+        .version(if shape.is_1_2 { "1.2" } else if shape.is_1_1 { "1.1" } else { "1.0" })
         .examples(&[
             "{tool} schema --json",
             "{tool} schema member list --json",
@@ -823,7 +870,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
             )
             .examples(&["{tool} init --json"]),
         state_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
-        member_list(shape.is_1_1),
+        member_list(shape),
         member_search(),
         member_tag(),
         Command::new("reject", "Send a request the backend always rejects")
