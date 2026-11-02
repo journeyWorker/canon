@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="35" skipped="0" failures="0" errors="0" uuid="6792e932-1bd1-431c-b632-d882c87ca5a1" timestamp="2026-11-02T20:22:04.062+09:00" time="60.587">
+    <testsuite name="atip" tests="16" skipped="0" errors="0" failures="0">
+        <testcase name="error::tests::atip_crate12_09_a_reason_of_a_code_the_table_does_not_hold_stops_the_evaluation" classname="atip" timestamp="2026-11-02T20:22:04.062+09:00" time="0.012"/>
+        <testcase name="minor::tests::atip_crate12_01_at_least_orders_the_minors" classname="atip" timestamp="2026-11-02T20:22:04.063+09:00" time="0.012"/>
+        <testcase name="minor::tests::atip_crate12_01_the_minors_are_1_0_1_1_and_1_2_and_the_constant_is_the_newest" classname="atip" timestamp="2026-11-02T20:22:04.062+09:00" time="0.012"/>
+        <testcase name="project::tests::atip_crate12_07_an_option_of_the_set_that_a_document_does_not_mark_flag_only_is_a_problem" classname="atip" timestamp="2026-11-02T20:22:04.062+09:00" time="0.013"/>
+        <testcase name="project::tests::atip_crate12_06_the_flag_only_set_is_four_options_at_1_1_and_eight_at_1_2_and_option_doc_marks_limit" classname="atip" timestamp="2026-11-02T20:22:04.062+09:00" time="0.015"/>
+        <testcase name="fields::tests::atip_crate12_11_a_minor_the_crate_does_not_know_is_refused_never_read_as_the_nearest_one" classname="atip" timestamp="2026-11-02T20:22:04.063+09:00" time="0.015"/>
+        <testcase name="error::tests::atip_crate12_08_a_row_in_a_static_table_gets_its_reasons_from_the_other_rows_whatever_their_order" classname="atip" timestamp="2026-11-02T20:22:04.063+09:00" time="0.016"/>
+        <testcase name="reserved::tests::atip_crate12_04_a_code_is_reserved_only_in_a_document_of_the_minor_that_introduced_it" classname="atip" timestamp="2026-11-02T20:22:04.063+09:00" time="0.017"/>
+        <testcase name="fields::tests::atip_crate12_10_rules_follow_the_declared_minor_and_1_1_and_1_2_agree" classname="atip" timestamp="2026-11-02T20:22:04.063+09:00" time="0.020"/>
+        <testcase name="minor::tests::atip_crate12_03_a_text_that_is_not_a_known_minor_is_refused" classname="atip" timestamp="2026-11-02T20:22:04.063+09:00" time="0.021"/>
+        <testcase name="reserved::tests::atip_crate12_05_a_stopped_midway_registered_with_exit_2_fails_in_a_1_2_document_and_not_in_a_1_1_one" classname="atip" timestamp="2026-11-02T20:22:04.075+09:00" time="0.014"/>
+        <testcase name="reserved::tests::atip_crate12_04_the_table_has_thirteen_codes_and_stopped_midway_is_exit_1_not_retryable_since_1_2" classname="atip" timestamp="2026-11-02T20:22:04.074+09:00" time="0.016"/>
+        <testcase name="schema::tests::atip_l0_07_one_changed_character_fails_the_pin" classname="atip" timestamp="2026-11-02T20:22:04.078+09:00" time="0.016"/>
+        <testcase name="schema::tests::atip_l0_07_the_vendored_schemas_are_the_published_bytes" classname="atip" timestamp="2026-11-02T20:22:04.078+09:00" time="0.017"/>
+        <testcase name="schema::tests::atip_l0_07_a_null_meta_a_null_member_and_an_undefined_meta_key_are_refused" classname="atip" timestamp="2026-11-02T20:22:04.075+09:00" time="0.028"/>
+        <testcase name="schema::tests::atip_l0_07_an_error_with_a_null_hint_is_refused" classname="atip" timestamp="2026-11-02T20:22:04.075+09:00" time="0.030"/>
+    </testsuite>
+    <testsuite name="atip-check::atip_crate12" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="atip_crate12_05_stopped_midway_with_exit_2_is_found_in_a_1_2_registry_and_not_in_a_1_1_one" classname="atip-check::atip_crate12" timestamp="2026-11-02T20:22:04.083+09:00" time="0.012"/>
+        <testcase name="atip_crate12_02_the_checker_declares_its_own_contract_version_apart_from_the_crates" classname="atip-check::atip_crate12" timestamp="2026-11-02T20:22:04.079+09:00" time="0.032"/>
+        <testcase name="atip_crate12_03_no_source_of_the_checker_reads_the_crates_contract_version" classname="atip-check::atip_crate12" timestamp="2026-11-02T20:22:04.080+09:00" time="0.116"/>
+        <testcase name="atip_crate12_04_the_checker_keeps_no_table_of_the_reserved_codes" classname="atip-check::atip_crate12" timestamp="2026-11-02T20:22:04.083+09:00" time="0.114"/>
+    </testsuite>
+    <testsuite name="atip-check::claim12" tests="15" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_100_two_claims_that_differ_or_a_minor_the_checker_does_not_know_are_refused_before_a_binary_runs" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.089+09:00" time="2.128"/>
+        <testcase name="atip_check_102_the_checker_declares_1_2_and_passes_its_own_l0_checks_as_a_1_2_claim" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.094+09:00" time="3.599"/>
+        <testcase name="atip_check_111_the_vendored_schema_doc_is_the_published_v1_2_0_and_one_changed_character_breaks_the_pin" classname="atip-check::claim12" timestamp="2026-11-02T20:22:07.693+09:00" time="0.047"/>
+        <testcase name="atip_check_112_the_tally_examples_fail_no_1_2_rule_and_a_1_2_document_with_a_limit_that_is_not_flag_only_is_refused" classname="atip-check::claim12" timestamp="2026-11-02T20:22:07.739+09:00" time="0.054"/>
+        <testcase name="atip_check_101_a_1_2_claim_whose_plain_answer_says_1_1_fails_l0_contract_version" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.091+09:00" time="7.312"/>
+        <testcase name="atip_check_109_a_tool_whose_commands_are_not_run_has_check_order_unsupported_and_one_with_no_invocation_to_change_has_it_unprovided_and_fails_the_level" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.197+09:00" time="10.673"/>
+        <testcase name="atip_check_99_contract_1_2_from_the_option_or_the_fixture_is_a_claim_of_1_2_and_the_report_carries_it" classname="atip-check::claim12" timestamp="2026-11-02T20:22:11.404+09:00" time="7.465"/>
+        <testcase name="atip_check_108_a_1_2_tool_whose_commands_have_no_all_no_env_and_no_input_has_those_parts_unsupported_and_the_row_passes" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.195+09:00" time="15.894"/>
+        <testcase name="atip_check_110_every_stage_pair_a_command_can_have_is_run_and_a_pair_that_needs_a_third_fault_is_not" classname="atip-check::claim12" timestamp="2026-11-02T20:22:06.217+09:00" time="15.404"/>
+        <testcase name="atip_check_113_an_output_schema_that_marks_an_optional_field_required_is_caught_by_l1_output_data_when_a_run_returns_the_record_without_it" classname="atip-check::claim12" timestamp="2026-11-02T20:22:07.793+09:00" time="19.568"/>
+        <testcase name="atip_check_104_the_same_violations_at_a_claim_of_1_1_fail_no_row_and_the_1_2_rows_are_not_run" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.096+09:00" time="25.555"/>
+        <testcase name="atip_check_105_the_same_tool_and_fixture_at_1_1_and_at_1_2_differ_only_in_the_1_2_rows" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.104+09:00" time="29.684"/>
+        <testcase name="atip_check_103_each_1_2_violation_fails_the_row_that_owns_it_and_no_other_row_at_a_claim_of_1_2" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.096+09:00" time="34.857"/>
+        <testcase name="atip_check_107_stopped_midway_registered_with_exit_1_passes_and_one_that_is_not_registered_passes_and_a_1_1_registry_may_use_the_name_as_its_own" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.111+09:00" time="40.719"/>
+        <testcase name="atip_check_106_a_row_forced_to_pass_or_a_condition_switched_off_makes_its_1_2_case_fail_and_every_1_2_condition_a_conforming_run_judges_has_a_case" classname="atip-check::claim12" timestamp="2026-11-02T20:22:04.105+09:00" time="60.544"/>
+    </testsuite>
+</testsuites>
