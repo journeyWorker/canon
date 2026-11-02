@@ -623,10 +623,10 @@ fn atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation
     let mut cmd = clap::Command::new("canon").subcommand(clap::Command::new("probe").about("Probe").arg(clap::Arg::new("thing").long("thing").value_name("THING_ID").value_parser(parse_thing).help("A thing")));
     cmd.build();
     let arg = cmd.find_subcommand("probe").and_then(|probe| probe.get_arguments().find(|arg| arg.get_id() == "thing")).expect("the probe argument");
-    let failure = atip::project::option_doc("probe", arg, canon_cli::spec::CUSTOM_PARSERS, canon_cli::input::FLAGS_ONLY).expect_err("a parser with no table entry is refused");
+    let failure = atip::project::option_doc("probe", arg, canon_cli::spec::CUSTOM_PARSERS, canon_cli::input::flags_only()).expect_err("a parser with no table entry is refused");
     assert!(failure.to_string().contains("THING_ID"), "{failure}");
     let table: Vec<(&str, atip::doc::ValueType)> = canon_cli::spec::CUSTOM_PARSERS.iter().copied().chain([("THING_ID", atip::doc::ValueType::String)]).collect();
-    assert_eq!(atip::project::option_doc("probe", arg, &table, canon_cli::input::FLAGS_ONLY).expect("listed").value_type, atip::doc::ValueType::String);
+    assert_eq!(atip::project::option_doc("probe", arg, &table, canon_cli::input::flags_only()).expect("listed").value_type, atip::doc::ValueType::String);
     // Every value name in the table is used by a parser of canon's own: no entry stands for nothing.
     let used: BTreeSet<String> = {
         let mut root = canon_cli::cli::command();

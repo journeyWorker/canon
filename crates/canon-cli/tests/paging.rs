@@ -57,10 +57,9 @@ fn paging_with_next_cursor_yields_exactly_the_all_set_in_order() {
         match page["meta"]["page"]["nextCursor"].as_str() {
             Some(next) => {
                 // The next page is the same call plus `--cursor <nextCursor>`.
-                let step = page["meta"]["next"].as_array().and_then(|steps| steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w == "--cursor")))).unwrap_or_else(|| panic!("a next page is a next step: {page}"));
+                let step = page["meta"]["next"].as_array().and_then(|steps| steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w.as_str().is_some_and(|w| w.starts_with("--cursor=")))))).unwrap_or_else(|| panic!("a next page is a next step: {page}"));
                 let argv: Vec<&str> = step["argv"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
-                let at = argv.iter().position(|w| *w == "--cursor").unwrap();
-                assert_eq!(argv[at + 1], next, "{step}");
+                assert_eq!(argv.iter().find_map(|w| w.strip_prefix("--cursor=")), Some(next), "{step}");
                 assert_eq!(argv[0], "query", "{step}");
                 cursor = Some(next.to_string());
             }

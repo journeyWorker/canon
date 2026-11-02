@@ -51,10 +51,17 @@ pub const MAX_BYTES: u64 = 8 * 1024 * 1024;
 /// The most elements one batch may hold.
 pub const MAX_ELEMENTS: usize = 10_000;
 
-/// Options a document can never carry: the globals, the safety pair and `--fields`. A
-/// document is a command invocation, not a way past a preview; `--fields` is read against the output the
-/// invocation selects, and a batch output declares none (spec 6.10). The spec marks each `flagOnly`.
-pub const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest", "fields"];
+/// The options canon defines beside the contract's flag-only ones: the tool-wide `--repo` and `--as`.
+pub const OWN_FLAGS_ONLY: [&str; 2] = ["repo", "as"];
+
+/// Options a document can never carry: the contract's flag-only set at 1.2 ([`atip::flag_only_options`]: `--json`, `--input`,
+/// `--commit`, `--plan-digest`, `--limit`, `--cursor`, `--all`, `--fields`) and canon's own ([`OWN_FLAGS_ONLY`]). A
+/// document is a command invocation, not a way past a preview, a page or a projection; `--fields` is read against the
+/// output the invocation selects, and a batch output declares none (spec 6.10). The spec marks each `flagOnly`.
+pub fn flags_only() -> &'static [&'static str] {
+    static SET: std::sync::LazyLock<Vec<&'static str>> = std::sync::LazyLock::new(|| OWN_FLAGS_ONLY.into_iter().chain(atip::flag_only_options(atip::Minor::V1_2).iter().copied()).collect());
+    &SET
+}
 
 // ---------------------------------------------------------------- batch report
 
@@ -191,7 +198,7 @@ impl Leaf {
             .filter(|a| !a.is_positional())
             .filter_map(|a| {
                 let long = a.get_long()?;
-                if FLAGS_ONLY.contains(&long) {
+                if flags_only().contains(&long) {
                     return None;
                 }
                 let kind = match a.get_action() {
@@ -688,7 +695,7 @@ fn key_suggestions(name: &str, valid: &[String]) -> Vec<String> {
 
 /// The refusal of a key the leaf does not take: a flag-only key (`FLAG_ONLY_KEY`) or an unknown one (`UNKNOWN_KEY`).
 fn unknown_key(leaf: &Leaf, name: &str, pointer: &str) -> CliError {
-    let forbidden = FLAGS_ONLY.iter().any(|f| camel(f) == name);
+    let forbidden = flags_only().iter().any(|f| camel(f) == name);
     let valid = leaf.valid_keys();
     let message = if forbidden { format!("`{name}` is a command-line flag and cannot be set in a document") } else { format!("`{name}` is not an option of `{}`", leaf.command()) };
     let suggestions = key_suggestions(name, &valid);

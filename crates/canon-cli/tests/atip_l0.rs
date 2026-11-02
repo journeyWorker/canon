@@ -202,11 +202,10 @@ fn atip_l0_08_a_page_is_in_meta_page_with_a_next_step_for_the_next_one() {
         assert!(meta.get(old).is_none(), "`{old}` is not a top-level meta member any more");
     }
     let steps = meta["next"].as_array().expect("the next page is a step");
-    let step = steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w == "--cursor"))).expect("a step with --cursor");
+    let step = steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w.as_str().is_some_and(|w| w.starts_with("--cursor="))))).expect("a step with --cursor");
     let argv: Vec<&str> = step["argv"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
-    let at = argv.iter().position(|w| *w == "--cursor").unwrap();
-    assert_eq!(argv[at + 1], cursor);
-    assert!(argv.contains(&"query") && argv.contains(&"--json") && argv.contains(&"--limit"));
+    assert_eq!(argv.iter().find_map(|w| w.strip_prefix("--cursor=")), Some(cursor));
+    assert!(argv.contains(&"query") && argv.contains(&"--json") && argv.contains(&"--limit=1"));
     // Running the step gives the last page: neither a cursor nor a step for one.
     let second = json(&canon(repo.path(), &argv));
     assert_eq!(second["meta"]["page"]["returned"], 1);

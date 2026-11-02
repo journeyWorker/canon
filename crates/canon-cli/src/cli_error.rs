@@ -221,12 +221,6 @@ const INPUT_TOO_LARGE_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "TOO_MANY_ITEMS", meaning: "a batch is over 10000 items", fix: "Split the batch into several runs, each under the limit." },
 ];
 
-const CURSOR_INVALID_REASONS: &[ReasonInfo] = &[
-    ReasonInfo { reason: "ARGUMENTS_CHANGED", meaning: "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor, --fields and --json", fix: "Repeat the call with the arguments that issued the cursor, or restart without --cursor." },
-    ReasonInfo { reason: "EXPIRED", meaning: "this command issued the cursor for these arguments but the record it points after is gone", fix: "Restart the listing without --cursor." },
-    ReasonInfo { reason: "FOREIGN", meaning: "the cursor is not one this command issued, or is not a cursor", fix: "Pass the `nextCursor` this same command returned, or restart without --cursor." },
-];
-
 /// The reasons registered under `STOPPED_MIDWAY` (spec 8.3.2, 7.6): each is the name of an exit-2 code, the refusal a later
 /// step met after an earlier step made its effects. A reason is registered for a refusal the sources can meet that way and
 /// no other (`canon-0-35-canon-stopped-midway`), and never for an I/O category that has its own code for the work
@@ -270,7 +264,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "CONTEXT_PACK_TAMPERED", meaning: "a context pack is stale or was changed after it was created", exit: 1, retryable: false, fix: "Discard the stale or altered pack and build a new one.", reasons: &[] },
     CodeInfo { code: "CONTEXT_SECRET_DETECTED", meaning: "a selected context input contains plaintext secret material", exit: 2, retryable: false, fix: "Remove the plaintext secret from the selected input or deselect it, then build the pack again.", reasons: &[] },
     CodeInfo { code: "CONTEXT_UNSAFE_PATH", meaning: "a selected path is absolute, leaves the repository, or contains a symlink", exit: 2, retryable: false, fix: "Select only repository-relative paths that stay inside the repository and contain no symlink.", reasons: &[] },
-    CodeInfo { code: "CURSOR_INVALID", meaning: "`--cursor` is not one this listing issued, was issued for other arguments, or points after a record that is gone; `reason` says which", exit: 2, retryable: false, fix: "Restart the listing without --cursor and page with the cursor it returns.", reasons: CURSOR_INVALID_REASONS },
+    CodeInfo { code: "CURSOR_INVALID", meaning: "`--cursor` is not one this listing issued, was issued for other arguments, or points after a record that is gone; `reason` says which", exit: 2, retryable: false, fix: "Restart the listing without --cursor and page with the cursor it returns.", reasons: &atip::CURSOR_INVALID_REASONS },
     CodeInfo { code: "DASHBOARD_BAD_REQUEST", meaning: "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body", exit: 2, retryable: false, fix: "Send requests only through the briefs page the dashboard serves.", reasons: &[] },
     CodeInfo { code: "DASHBOARD_CONFIG_INVALID", meaning: "the dashboard's canon.yaml section is present but unusable", exit: 2, retryable: false, fix: "Fix the dashboard section of canon.yaml, then start the dashboard again.", reasons: &[] },
     CodeInfo { code: "DASHBOARD_FAILED", meaning: "the dashboard could not start for a reason that is not one of the other DASHBOARD_ codes (an I/O failure)", exit: 1, retryable: false, fix: "Read the I/O error in the message, fix its cause, then start the dashboard again.", reasons: &[] },

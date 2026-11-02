@@ -228,8 +228,8 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   Read the members you know and ignore the ones you do not: a later canon
   adds members, and a value of a closed set you have not seen (a `severity`, an
   `outcome`, a `reason`) is one item to leave out, never a reason to reject the document. A paged list puts
-  `meta.page.nextCursor` on the call's `meta.next` as `--cursor <nextCursor>`;
-  no `nextCursor` means no more.
+  `meta.page.nextCursor` in the first entry of the call's `meta.next` as `--cursor=<nextCursor>`
+  (run that entry as it is); no `nextCursor` means no more.
   On failure branch on `error.code`, and on `error.reason` where the code has
   reasons (`INPUT_INVALID` says `NOT_JSON`, `UNKNOWN_KEY`, `STDIN_TTY`, … so you
   know whether to fix the JSON or the shell); fix the option `error.field` names
@@ -258,7 +258,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   has blockers; the approval step appears only when the brief is clean and
   unapproved.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
-  for everything); a cursor holds only for the call that issued it, so change nothing but `--limit`, `--all` and `--fields` (`CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED` otherwise). Project fields with `--fields a,b`
+  for everything); a cursor holds only for the call that issued it, so change nothing but `--limit`, `--all`, `--fields` and `--json`, and keep `CANON_ROLE` as it was (`CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED` otherwise; `FOREIGN` for a cursor of another command or another canon version: start again from the first page). `--limit`, `--cursor`, `--all` and `--fields` are flags: an `--input` document key of that name is `INPUT_INVALID` with `reason` `FLAG_ONLY_KEY`. Project fields with `--fields a,b`
   (`status`, `export`, `query`, `finding list`, `divergence list`, `context`): the paths `canon schema <command> --json` lists under `outputs[].fields`, spelled as the answer spells them; `meta.fields` lists what was kept.
 - `--override-reason <text>` is the only way to proceed past a waivable
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`

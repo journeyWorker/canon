@@ -359,7 +359,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     }
     let mut options = Vec::new();
     for arg in node.cmd.get_arguments().filter(|arg| !arg.is_positional() && !project::is_builtin_arg(arg)) {
-        let mut option = built(project::option_doc(path, arg, CUSTOM_PARSERS, crate::input::FLAGS_ONLY))?;
+        let mut option = built(project::option_doc(path, arg, CUSTOM_PARSERS, crate::input::flags_only()))?;
         option.env = option.env.or_else(|| declared_env(path, &option.name).map(str::to_string));
         if (option.default.is_null() && !option.required) || option.name == "promote" {
             option.default_note = default_note(path, &option.name).map(str::to_string);

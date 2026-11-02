@@ -490,11 +490,11 @@ same. Outside git, or with no commit, the command refuses with `NO_COMMIT`.
 records (default 100). `--all` returns everything; `--cursor <nextCursor>`
 continues. `--json` adds `meta.page` = `{returned, total, nextCursor}`: a
 `nextCursor` means more records follow, and `meta.next`
-holds the same call plus `--cursor <nextCursor>`. A cursor holds only for the
-call that issued it: change `--limit`, `--all` or `--fields` and nothing else,
+holds the call's explicit arguments plus `--cursor=<nextCursor>`. A cursor holds only for the
+call that issued it, the value `CANON_ROLE` gave `--as` included: change `--limit`, `--all`, `--fields` or `--json` and nothing else,
 or the call is `CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED`
-(`FOREIGN`: not a cursor of this command; `EXPIRED`: the record it points after
-is gone). `canon query`, `canon finding list`, `canon divergence list`,
+(`FOREIGN`: not a cursor of this command, or one an older canon issued; `EXPIRED`: the record it points after
+is gone). `--limit`, `--cursor`, `--all` and `--fields` are flags, never `--input` document keys (`FLAG_ONLY_KEY`). `canon query`, `canon finding list`, `canon divergence list`,
 `canon export`, `canon status` and `canon context` also take `--fields a,b,c`
 to project records: the paths `canon schema <command> --json` lists under
 `outputs[].fields`, each spelled as the answer spells it (a path into a list is

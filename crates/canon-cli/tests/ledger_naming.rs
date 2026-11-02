@@ -341,7 +341,7 @@ fn ledger_naming_04_escaping_is_only_in_the_name_and_git_and_r2_agree() {
     git.write(&raw(&second)).unwrap();
     let paged = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]));
     let cursor = paged["meta"]["page"]["nextCursor"].as_str().expect("a second page exists");
-    let decoded = String::from_utf8(cursor.as_bytes().chunks(2).map(|c| u8::from_str_radix(std::str::from_utf8(c).unwrap(), 16).unwrap()).collect()).unwrap();
+    let decoded = cursor_position(cursor);
     assert!(decoded.contains("Sess/One_A") && !decoded.contains("+2f"), "the cursor key names the value, not the escaped form: {decoded:?}");
 }
 
@@ -545,8 +545,11 @@ fn ledger_files(repo: &Path, kind: &str) -> Vec<String> {
 
 // ── ledger.naming.10 ─────────────────────────────────────────────────────
 
-fn hex_decode(cursor: &str) -> String {
-    String::from_utf8(cursor.as_bytes().chunks(2).map(|c| u8::from_str_radix(std::str::from_utf8(c).unwrap(), 16).unwrap()).collect()).unwrap()
+/// The position (the key of the last record of the page) a cursor of the `atip` crate holds: `atip.<scope>.<binding>.<position>.<check>`, the position in base64url.
+fn cursor_position(cursor: &str) -> String {
+    use base64::Engine as _;
+    let position = cursor.split('.').nth(3).unwrap_or_else(|| panic!("a cursor of four parts and a check: {cursor}"));
+    String::from_utf8(base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(position).expect("base64url")).expect("UTF-8")
 }
 
 /// ledger.naming.10: the ID column and the cursor key hold the typed components joined by `_`,
@@ -572,10 +575,7 @@ fn ledger_naming_10_query_shows_the_id_before_escaping() {
     let first = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]));
     assert_eq!(first["data"]["records"][0]["session_id"], "Sess/One_A");
     let cursor = first["meta"]["page"]["nextCursor"].as_str().expect("a second page");
-    let key = hex_decode(cursor);
-    let mut cursor_parts = key.splitn(3, '\u{1f}');
-    let (scope, _binding, key) = (cursor_parts.next().unwrap(), cursor_parts.next().unwrap(), cursor_parts.next().unwrap());
-    assert_eq!(scope, "query");
+    let key = cursor_position(cursor);
     let parts: Vec<&str> = key.split('|').collect();
     assert_eq!(parts[1], "Sess/One_A", "the cursor key holds the value, not `+53ess+2f…`: {key}");
     assert!(parts[2].trim_end_matches("#1").len() == 8 && parts[2].trim_end_matches("#1").bytes().all(|b| b.is_ascii_hexdigit()), "digest8: {key}");

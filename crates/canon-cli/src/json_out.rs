@@ -229,7 +229,6 @@ impl Report for NoData {
 static REPO: OnceLock<Option<Option<PathBuf>>> = OnceLock::new();
 static WARNINGS: std::sync::Mutex<Vec<Warning>> = std::sync::Mutex::new(Vec::new());
 static FIRST_NEXT: std::sync::Mutex<Vec<crate::status::NextStep>> = std::sync::Mutex::new(Vec::new());
-static INVOCATION: OnceLock<Vec<String>> = OnceLock::new();
 
 /// Says a warning: on stderr in human mode; in JSON mode it waits for the
 /// document and travels in `meta.warnings`. `code` is registered in
@@ -272,12 +271,6 @@ pub fn set_repo(repo: Option<PathBuf>) {
 /// Records that the command takes no context option: `meta.context` is absent.
 pub fn set_repo_unused() {
     let _ = REPO.set(None);
-}
-
-/// The argv the run was parsed from (after `--input` expansion): the words
-/// after the program name. The next-page step repeats it with a new `--cursor`.
-pub fn set_invocation(args: Vec<String>) {
-    let _ = INVOCATION.set(args);
 }
 
 /// `command` as the schema id: `canon gate check`, `gate check` and `canon report check` are `gate check` and `report`.
@@ -446,30 +439,9 @@ fn split_extra(extra: Value) -> Extra {
     out
 }
 
-/// The `--cursor` step of a page: the same invocation with the next cursor.
+/// The `--cursor` step of a page: the explicit arguments of the call, normalised, with the next cursor ([`crate::paging::next_page_argv`]).
 fn next_page_step(cursor: &str) -> Option<NextEntry> {
-    let invocation = INVOCATION.get()?;
-    let mut argv: Vec<String> = Vec::with_capacity(invocation.len() + 2);
-    let mut words = invocation.iter().peekable();
-    let mut inserted = false;
-    while let Some(word) = words.next() {
-        if word == "--" && !inserted {
-            argv.extend(["--cursor".to_string(), cursor.to_string()]);
-            inserted = true;
-        }
-        if word == "--cursor" {
-            words.next();
-            continue;
-        }
-        if word.starts_with("--cursor=") {
-            continue;
-        }
-        argv.push(word.clone());
-    }
-    if !inserted {
-        argv.extend(["--cursor".to_string(), cursor.to_string()]);
-    }
-    NextEntry::runnable(argv, "the next page of this listing", None)
+    NextEntry::runnable(crate::paging::next_page_argv(cursor)?, "the next page of this listing", None)
 }
 
 /// The `meta` for `command`: its steps, then `extra`'s members. `extra`'s

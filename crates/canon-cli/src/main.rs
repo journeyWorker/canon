@@ -79,7 +79,6 @@ fn run() -> ExitCode {
         Expanded::Argv(args) => args,
         Expanded::Exit(code) => return code,
     };
-    canon_cli::json_out::set_invocation(args.iter().skip(1).map(|arg| arg.to_string_lossy().into_owned()).collect());
     // The order of ATIP 11.7 step 6: a failure to parse, `required`, the domains, the constraints, (below) the validators.
     let mut matches = match canon_cli::validators::parse(&command, args) {
         Ok(matches) => matches,

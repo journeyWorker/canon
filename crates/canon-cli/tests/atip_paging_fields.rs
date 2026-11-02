@@ -90,7 +90,7 @@ fn run_argv(dir: &Path, argv: &[String]) -> Output {
 
 /// The step of `meta.next` that is the next page: the call with `--cursor`.
 fn next_page(document: &Value) -> Option<Vec<String>> {
-    document["meta"]["next"].as_array()?.iter().map(argv_of).find(|argv| argv.iter().any(|word| word == "--cursor"))
+    document["meta"]["next"].as_array()?.iter().map(argv_of).find(|argv| argv.iter().any(|word| word.starts_with("--cursor=")))
 }
 
 fn error_of(output: &Output) -> Value {
@@ -145,7 +145,7 @@ fn atip_paging_01_a_paged_listing_reports_its_page_and_the_next_call_reads_the_n
         seen.push(document["data"]["records"][0]["subject_id"].as_str().unwrap().to_string());
         match next_page(&document) {
             Some(next) => {
-                assert_eq!(document["meta"]["page"]["nextCursor"].as_str(), next.iter().skip_while(|word| *word != "--cursor").nth(1).map(String::as_str), "`meta.next` names the cursor `meta.page` issued");
+                assert_eq!(document["meta"]["page"]["nextCursor"].as_str(), next.iter().find_map(|word| word.strip_prefix("--cursor=")), "`meta.next` names the cursor `meta.page` issued");
                 assert_eq!(next[0], "query");
                 assert!(next.iter().any(|word| word == "--json"), "{next:?}");
                 call = next;
@@ -263,7 +263,7 @@ fn atip_paging_05_a_changed_page_size_or_field_selection_continues_at_the_same_p
     assert_eq!(projected["data"]["findings"][0], json!({ "round": 1, "seq": 2, "summary": "Finding 2" }), "--fields changes what is shown, not the place");
     // The next page of a call with --fields keeps --fields, and its cursor is the same kind of cursor.
     let next = next_page(&projected).expect("a third finding follows");
-    assert!(next.iter().any(|word| word == "--fields"), "{next:?}");
+    assert!(next.iter().any(|word| word.starts_with("--fields=")), "{next:?}");
     let third = json(&run_argv(repo.path(), &next));
     assert_eq!(third["data"]["findings"], json!([{ "round": 1, "seq": 3, "summary": "Finding 3" }]));
     assert!(third["meta"]["page"].get("nextCursor").is_none());

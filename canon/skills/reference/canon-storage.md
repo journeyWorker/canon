@@ -105,9 +105,9 @@ canon query --kind trajectory --json
 
 # Page a long result and keep only the fields you need; `meta` carries
 # `page` = {returned, total, nextCursor} and `fields` = the paths kept; a present `nextCursor` means more, and
-# `meta.next` repeats the call with `--cursor <nextCursor>` (`--all` returns everything). A cursor is bound to the
-# call that issued it: change only `--limit`, `--all` or `--fields`; any other change is `CURSOR_INVALID`
-# (`error.reason` `ARGUMENTS_CHANGED`). A field path is the record's own key, written as it is.
+# `meta.next` repeats the call's explicit arguments with `--cursor=<nextCursor>` (`--all` returns everything). A cursor is bound to the
+# call that issued it, `CANON_ROLE` included: change only `--limit`, `--all`, `--fields` or `--json`; any other change is `CURSOR_INVALID`
+# (`error.reason` `ARGUMENTS_CHANGED`; `FOREIGN` for a cursor an older canon issued: start from the first page). A field path is the record's own key, written as it is.
 canon query --kind trajectory --json --limit 50 --fields at,kind
 canon query --kind trajectory --json --limit 50 --fields at,kind --cursor <nextCursor>
 ```

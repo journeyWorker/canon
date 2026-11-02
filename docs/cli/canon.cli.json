@@ -10538,6 +10538,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -10547,6 +10548,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -10556,6 +10558,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -14154,6 +14157,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -14163,6 +14167,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -14172,6 +14177,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -14519,16 +14525,8 @@
               "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
               "type": "string"
             },
-            "all": {
-              "description": "Return every record from the cursor on, not one page",
-              "type": "boolean"
-            },
             "before": {
               "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
-              "type": "string"
-            },
-            "cursor": {
-              "description": "Resume after the last record of the previous page (the `nextCursor` it reported)",
               "type": "string"
             },
             "dryRun": {
@@ -14556,14 +14554,6 @@
                 "evidence",
                 "subject",
                 "finding"
-              ]
-            },
-            "limit": {
-              "description": "Return at most this many records per page",
-              "pattern": "^-?(0|[1-9][0-9]*)$",
-              "type": [
-                "integer",
-                "string"
               ]
             },
             "output": {
@@ -14584,16 +14574,8 @@
               "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
               "type": "string"
             },
-            "all": {
-              "description": "Return every record from the cursor on, not one page",
-              "type": "boolean"
-            },
             "before": {
               "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
-              "type": "string"
-            },
-            "cursor": {
-              "description": "Resume after the last record of the previous page (the `nextCursor` it reported)",
               "type": "string"
             },
             "dryRun": {
@@ -14621,14 +14603,6 @@
                 "evidence",
                 "subject",
                 "finding"
-              ]
-            },
-            "limit": {
-              "description": "Return at most this many records per page",
-              "pattern": "^-?(0|[1-9][0-9]*)$",
-              "type": [
-                "integer",
-                "string"
               ]
             },
             "output": {
@@ -17394,6 +17368,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -17403,6 +17378,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -17412,6 +17388,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -26399,6 +26376,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -26408,6 +26386,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -26417,6 +26396,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -28221,6 +28201,7 @@
           "domain": {
             "minimum": 0
           },
+          "flagOnly": true,
           "help": "Cap on the guidance items returned",
           "name": "limit",
           "repeatable": false,
@@ -31887,6 +31868,7 @@
             "maximum": 4294967295,
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "The most hits to list, best first (there is no next page)",
           "name": "limit",
           "repeatable": false,
@@ -40379,16 +40361,16 @@
       "reasons": [
         {
           "fix": "Repeat the call with the arguments that issued the cursor, or restart without --cursor.",
-          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor, --fields and --json",
+          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except the options that never change the result set",
           "reason": "ARGUMENTS_CHANGED"
         },
         {
           "fix": "Restart the listing without --cursor.",
-          "meaning": "this command issued the cursor for these arguments but the record it points after is gone",
+          "meaning": "this command issued the cursor for these arguments but the position it points at can no longer be resumed",
           "reason": "EXPIRED"
         },
         {
-          "fix": "Pass the `nextCursor` this same command returned, or restart without --cursor.",
+          "fix": "Pass the nextCursor this same command returned, or restart without --cursor.",
           "meaning": "the cursor is not one this command issued, or is not a cursor",
           "reason": "FOREIGN"
         }
