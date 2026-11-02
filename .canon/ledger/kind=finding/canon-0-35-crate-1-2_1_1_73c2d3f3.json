@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T10:10:49.084187Z",
+  "change_id": "canon-0-35-crate-1-2",
+  "code_tree": "989d91064a153d3c4a15a5f01aadddd066266be6",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/project.rs",
+  "introduced_by": "efd3dab1df526a9e6ad60419a43800ed59ecb9ee",
+  "kind": "finding",
+  "reviewed_sha": "4cf85cba2737a021cfe56edcf9122d829e4d83e0",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.crate12.06",
+    "atip.crate12.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: brief F3's failure path says a 1.2-set option without flagOnly makes 'schema document validation' fail; the change adds a separate flag_only_problems(options, minor) that atip::schema_doc_problems and every tool ignore, so no document is judged by it yet. Both flag_only_options and flag_only_problems have no caller outside their own tests. Blast radius: the checker's FLAG_ONLY (4 names, documents.rs:324,359) and canon's FLAGS_ONLY (input.rs:50, already holds 'fields' at 1.1 where the crate's 1.1 set does not) stay as copies, as the brief orders; they can drift from the crate's set until canon-0-35-canon-cursor-1-2 and the checker adopt it.",
+  "worktree_dirty": false
+}
