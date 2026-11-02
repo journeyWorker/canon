@@ -61,11 +61,19 @@ Usage: atip check --bin <BINARY> --level <LEVEL> --fixture <FILE> [--contract <M
 Options:
       --bin <BINARY>     The binary to check: a path, or a name found on PATH
       --level <LEVEL>    The level the tool claims: L0, L1 or L2
-      --fixture <FILE>   The tool's fixture file: JSON with contractVersion, prepare, setup, env, timeoutSeconds, probe, globalOptions, registry, warnings, commands (and, in commands, ok, refused, paged, missingValue, fields, domainRejects, batchFailsAt and batchFailsFirst) and notRun (the ids of commands that do not end on their own, such as a server: each runs once, up to its first JSON document, and is then signalled)
+      --fixture <FILE>   The tool's fixture file: JSON with contractVersion, prepare, setup, env, timeoutSeconds, probe, globalOptions, registry, warnings, commands (and, in commands, ok, refused, paged, missingValue, fields, domainRejects, batchFailsAt, batchFailsFirst, preview, async and allowedEffects), search and notRun (the ids of commands that do not end on their own, such as a server: each runs once, up to its first JSON document, and is then signalled)
       --contract <MAJOR.MINOR>
                          The contract minor the tool claims: 1.0, 1.1 or 1.2. Defaults to the fixture's contractVersion, and to 1.0
       --json             Print one JSON envelope on stdout instead of text
   -h, --help             Print help
+
+Fixture keys of L2:
+  commands.<id>.preview        argv arrays that preview a destructive command (no --commit)
+  commands.<id>.async          {start, worker, outcomes}: the argv that starts the work, the NAME of the environment variable the tool's test build reads to pick its worker's outcome (the checker sets it to done, failed or timeout), and the outcomes that fake worker supports; a missing outcome leaves L2.async unprovided
+  commands.<id>.allowedEffects glob list of the files a successful read may change (a read with an effectNote)
+  search                       [{query, expect}]: a question for schema --search and the command it must find among the first five
+
+allowedEffects glob: a path is relative to the working directory (a leading ./ is optional) or to HOME with a ~/ prefix; * matches any run of characters within one path segment (not /), ** matches across segments, ? one character but /, nothing else is special (no classes or braces); the whole path must match. A directory made to hold a changed file is not judged on its own (the file is).
 
 Every MUST check passing exits 0, a failed level exits 1 (LEVEL_NOT_MET), a refusal exits 2.";
 
