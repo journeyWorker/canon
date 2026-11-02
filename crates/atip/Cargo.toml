@@ -21,6 +21,8 @@ jsonschema = { version = "0.47.0", default-features = false, optional = true }
 # The Rust reading of a domain `pattern` (spec 10.7.4): a pattern must compile with the crate's default limits, and
 # `domain::admits` judges a `pattern` with it.
 regex = "1"
+# The SHA-256 of a cursor's binding and of a plan digest (`cursor`, `plan`).
+sha2 = { workspace = true }
 
 [features]
 default = []
@@ -28,7 +30,6 @@ default = []
 validate = ["dep:jsonschema"]
 
 [dev-dependencies]
-sha2 = { workspace = true }
 # The crate's own `validate` feature, for its tests (`cargo test -p atip` tests the validators too).
 atip = { path = ".", features = ["validate"] }
 
