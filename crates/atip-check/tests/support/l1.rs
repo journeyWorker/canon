@@ -73,6 +73,48 @@ pub fn l1_config_1_2(extra: &Value) -> Value {
     config
 }
 
+/// A pass condition of a 1.2 row: `condition` is `<check>/<condition>` as the checker names it, `owner` is the check.
+pub fn l1_case_1_2(condition: &'static str, extra: Value, tweak: Option<fn(&mut Value)>) -> Case {
+    Case { condition, config: l1_config_1_2(&extra), tweak }
+}
+
+/// Every pass condition of the 1.2 halves of the L1 rows and of `L1.check-order`, each with the configuration of a 1.2 tool that breaks it
+/// (approaches/checker.md 7.2). A 1.2 case fails its owner and no other check at a claim of 1.2, and fails nothing at a claim of 1.1.
+pub fn l1_cases_1_2() -> Vec<Case> {
+    vec![
+        // grammar: `limit`, `cursor`, `all` and `fields` are flag-only
+        l1_case_1_2("grammar/reserved-shape", json!({"limitNotFlagOnly": true}), None),
+        // registry: `STOPPED_MIDWAY` is exit 1 and not retryable
+        l1_case_1_2("registry/reserved-exit", json!({"stoppedMidway": true, "stoppedMidwayExit2": true}), None),
+        l1_case_1_2("registry/reserved-exit", json!({"stoppedMidway": true, "stoppedMidwayRetryable": true}), None),
+        // paging: the cursor is bound to what the invocation gave
+        l1_case_1_2("paging/cursor-survives-all", json!({"cursorRefusesAll": true}), None),
+        l1_case_1_2("paging/cursor-bound-to-given-arguments", json!({"cursorBindsEffective": true}), None),
+        l1_case_1_2("paging/cursor-bound-to-environment", json!({"cursorIgnoresEnv": true}), None),
+        l1_case_1_2("paging/paged-through-input", json!({"inputRefused": true}), None),
+        l1_case_1_2("paging/next-after-input", json!({"nextCarriesDefault": true}), None),
+        l1_case_1_2("paging/next-after-input", json!({"nextKeepsInput": true}), None),
+        // fields: `--fields` alone is no reason to refuse, and an unknown path is USAGE without `--json` too
+        l1_case_1_2("fields/fields-without-json", json!({"fieldsNeedsJson": true}), None),
+        l1_case_1_2("fields/unknown-path-refused-in-text", json!({"fieldsUnknownAcceptedInText": true}), None),
+        // check-order: the earlier stage answers
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderConstraintFirst": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderDomainFirst": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderLaterDomain": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderValidatorFirst": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"unknownOptionLast": true}), None),
+    ]
+}
+
+/// The 1.2 case fixture: the standard fixture of the tool, changed by the case.
+pub fn l1_fixture_of(harness: &Harness, case: &Case) -> Value {
+    let mut fixture = harness.l1_fixture(&case.config);
+    if let Some(tweak) = case.tweak {
+        tweak(&mut fixture);
+    }
+    fixture
+}
+
 /// The executable a case runs: the fake tool itself, or, when the configuration has `binAlias`, a copy of it under
 /// that name in the harness's directory. The no-state cases need it: the run of `schema --json` in an empty
 /// directory gets no fixture environment, so the only thing that can make the tool misbehave there is how it is

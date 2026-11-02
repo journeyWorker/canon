@@ -143,6 +143,8 @@ pub(crate) struct FieldsRun {
     pub selection: Vec<String>,
     pub plain: usize,
     pub projected: usize,
+    /// For a claim of 1.2 (spec 12.5), the first selection of a command, with no `--json` at all: its text invocation.
+    pub text: Option<usize>,
 }
 
 /// The refusal of a path no selection declares, once per command that offers `--fields`.
@@ -150,6 +152,8 @@ pub(crate) struct FieldsRun {
 pub(crate) struct UnknownFieldRun {
     pub command: String,
     pub call: usize,
+    /// For a claim of 1.2: the same unknown path with no `--json`.
+    pub text: Option<usize>,
 }
 
 /// Everything the L1 judgments read besides the log.
@@ -365,7 +369,7 @@ impl Run<'_> {
             if self.runnable(doc) && !self.not_run(&doc.command) {
                 let bases = self.bases(doc, &tool);
                 self.plan_paging(&mut run, doc, &bases, claim)?;
-                self.plan_fields(&mut run, doc, &bases)?;
+                self.plan_fields(&mut run, doc, &bases, claim)?;
             }
         }
         self.plan_nexts(&mut run)?;
@@ -813,7 +817,7 @@ impl Run<'_> {
         }
     }
 
-    fn plan_fields(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation]) -> Result<(), RunError> {
+    fn plan_fields(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation], claim: Claim) -> Result<(), RunError> {
         if !doc.has_option("fields") {
             return Ok(());
         }
@@ -835,12 +839,28 @@ impl Run<'_> {
             let mut projected = unprojected.clone();
             invocation::set_option(&mut projected, "fields", Some(selection.join(",")));
             let projected = self.invoke_after(sequence, Call::new(invocation::render(&projected)))?;
-            run.fields.push(FieldsRun { command: doc.command.clone(), selection, plain, projected });
+            // Since 1.2 a selection is no reason to refuse a text invocation (spec 12.5): the first one is run with no `--json` at all.
+            let text = if claim.at_least(Claim::V1_2) && run.fields.iter().all(|found| found.command != doc.command) {
+                let mut text = unprojected.clone();
+                invocation::remove_option(&mut text, "json");
+                invocation::set_option(&mut text, "fields", Some(selection.join(",")));
+                Some(self.invoke_after(sequence, Call::new(invocation::render(&text)))?)
+            } else {
+                None
+            };
+            run.fields.push(FieldsRun { command: doc.command.clone(), selection, plain, projected, text });
         }
         let mut unknown = unprojected;
         invocation::set_option(&mut unknown, "fields", Some(NO_SUCH_FIELD.to_string()));
         let call = self.invoke(Call::new(invocation::render(&unknown)))?;
-        run.unknown_fields.push(UnknownFieldRun { command: doc.command.clone(), call });
+        let text = if claim.at_least(Claim::V1_2) {
+            let mut text = unknown.clone();
+            invocation::remove_option(&mut text, "json");
+            Some(self.invoke(Call::new(invocation::render(&text)))?)
+        } else {
+            None
+        };
+        run.unknown_fields.push(UnknownFieldRun { command: doc.command.clone(), call, text });
         Ok(())
     }
 

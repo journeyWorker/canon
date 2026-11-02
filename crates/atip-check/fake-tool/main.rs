@@ -653,7 +653,8 @@ impl Tool {
         // `stoppedMidway` registers the code `STOPPED_MIDWAY` (spec 8.3.2): exit 1 and not retryable (`reservedExit` and
         // `stoppedMidwayRetryable` seed it wrong; below 1.2 it is a code of the tool's own).
         if self.flag("stoppedMidway") {
-            table.push(("STOPPED_MIDWAY".to_string(), 1, &[][..], "m".to_string(), "f".to_string()));
+            let exit = if self.flag("stoppedMidwayExit2") { 2 } else { 1 };
+            table.push(("STOPPED_MIDWAY".to_string(), exit, &[][..], "m".to_string(), "f".to_string()));
         }
         for row in self.config.get("extraCodes").and_then(Value::as_array).into_iter().flatten() {
             table.push((

@@ -261,7 +261,12 @@ fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool, cache
         }
     }
     let mut doc = if let Some(command) = model.command(&current) {
-        command_doc(&tool.name(), command)
+        let mut doc = command_doc(&tool.name(), command);
+        // Seeded: a tool whose documents carry no example (so no read command has an invocation to change into a pair).
+        if tool.flag("noExamples") {
+            doc["examples"] = json!([]);
+        }
+        doc
     } else {
         group_doc(model, &current)
     };
@@ -466,18 +471,18 @@ fn decode_cursor(tool: &Tool, cursor: &str, binding: &str, total: usize) -> Resu
 }
 
 /// `argv` of the next page: the invocation again, with the cursor of the next page.
-fn next_page_argv(args: &[String], cursor: &str, document: &[String]) -> Vec<String> {
+fn next_page_argv(args: &[String], cursor: &str, document: &[String], keep_input: bool) -> Vec<String> {
     let mut argv = Vec::new();
     let mut words = args.iter().take_while(|arg| arg.as_str() != "--");
     while let Some(word) = words.next() {
         if word == "--json" {
             continue;
         }
-        if word == "--cursor" || word == "--input" {
+        if word == "--cursor" || (word == "--input" && !keep_input) {
             words.next();
             continue;
         }
-        if word.starts_with("--cursor=") || word.starts_with("--input=") {
+        if word.starts_with("--cursor=") || (word.starts_with("--input=") && !keep_input) {
             continue;
         }
         argv.push(word.clone());
@@ -527,7 +532,7 @@ fn projection(tool: &Tool, value: &str, doc: &Value) -> Result<(Vec<String>, Vec
     let mut selection: Vec<String> = Vec::new();
     for path in project::split_list(value) {
         if !selectable(tool, &declared, &["attributes"], &path) {
-            if tool.flag("fieldsAcceptsUnknown") {
+            if tool.flag("fieldsAcceptsUnknown") || (tool.flag("fieldsUnknownAcceptedInText") && !tool.json) {
                 continue;
             }
             return Err(tool.refuse(
@@ -557,6 +562,9 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
     if tool.flag("ghostTeamUsage") && parsed.text("team") == Some("ghost") {
         // The seeded violation: a refusal the model does not declare, for a value its documents accept.
         return tool.refuse("USAGE", "there is no such team", "member list", &[("field", json!("--team"))]);
+    }
+    if tool.flag("inputRefused") && parsed.has("input") {
+        return tool.refuse("INPUT_INVALID", "the document is not read", "member list", &[("field", json!("--input"))]);
     }
     let env_team = std::env::var("FAKE_TEAM").ok().filter(|_| tool.is_1_2());
     let team_text = parsed.text("team").map(ToString::to_string).or_else(|| env_team.clone());
@@ -623,7 +631,7 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
                 document.extend(["--sort".to_string(), "name".to_string()]);
             }
         }
-        let argv = next_page_argv(args, &cursor, &document);
+        let argv = next_page_argv(args, &cursor, &document, tool.flag("nextKeepsInput"));
         meta.insert(
             "next".into(),
             json!([{"command": display(tool, &argv), "argv": argv, "reason": "the next page of members"}]),

@@ -18,6 +18,7 @@ impl Model {
         let shape = Shape {
             is_1_1: tool.is_1_1(),
             is_1_2: tool.is_1_2(),
+            limit_not_flag_only: tool.flag("limitNotFlagOnly"),
             deep: tool.flag("deepTree"),
         };
         Self {

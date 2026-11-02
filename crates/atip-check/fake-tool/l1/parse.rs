@@ -180,8 +180,13 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
         } else {
             None
         };
+        // Seeded: of two unknown options the tool answers the later one (the checker's own are named `--no-such-*`).
+        let later_unknown = tool.flag("unknownOptionLast") && args[index..].iter().any(|later| later.starts_with("--no-such"));
         let Some((arg, written, joined)) = option else {
             if word != "-" && word.starts_with('-') {
+                if later_unknown {
+                    continue;
+                }
                 return Err(Failure::Unknown(word.clone()));
             }
             if path_seen < path_len && command.path().get(path_seen) == Some(&word.as_str()) {
@@ -192,6 +197,9 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
             continue;
         };
         let Some(arg) = arg else {
+            if later_unknown {
+                continue;
+            }
             return Err(Failure::Unknown(written));
         };
         if !arg.takes_value() {

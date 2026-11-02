@@ -1078,3 +1078,168 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given canon's fixture
     When atip check runs at L1 on the canon binary
     Then the fixture lists dashboard under notRun, the level is met, and the checks that run commands list dashboard in notRun
+
+  # canon: {"schema":1,"at":"2026-11-02T10:20:27Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-1-2.F1
+  @atip.check.99
+  Scenario: Contract 1.2 from the option or the fixture is a claim of 1.2 and the report carries it
+    Given a conforming fake tool that claims 1.2
+    When atip check runs with --contract 1.2, or with the fixture's contractVersion 1.2, or with both
+    Then it is a claim of 1.2, the exit is 0, data.contractVersion is 1.2, and a 1.2 tool whose plain answer lacks the markers fails L0.contract-version
+
+  # canon: {"schema":1,"at":"2026-11-02T10:22:39Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F1
+  @atip.check.100
+  Scenario: Two claims that differ, or a minor the checker does not know, are refused before a binary runs
+    Given a fixture that claims 1.2 and a different --contract, or --contract 1.3, or a fixture that claims 1.3
+    When atip check runs
+    Then it is USAGE or FIXTURE_INVALID with exit 2, the error lists 1.0, 1.1 and 1.2 where it lists the minors, and the binary is not run
+
+  # canon: {"schema":1,"at":"2026-11-02T10:24:06Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F1
+  @atip.check.101
+  Scenario: A 1.2 claim whose plain answer says 1.1 fails L0.contract-version
+    Given a 1.2 claim whose plain answer says contractVersion 1.1
+    When atip check runs
+    Then L0.contract-version is the only failing check, with findings of kind version-is-claim, and the same answers are right for a 1.1 claim
+
+  # canon: {"schema":1,"at":"2026-11-02T10:24:26Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-1-2.F1
+  @atip.check.102
+  Scenario: The checker declares 1.2 and passes its own L0 checks as a 1.2 claim
+    Given the atip binary and its own fixture atip.fixture.json
+    When atip check runs on it at L0 with --contract 1.2
+    Then it passes, meta.contractVersion and data.contractVersion are 1.2, the fixture says 1.2, --contract 1.1 is USAGE, and neither the help nor the sources name a list of two minors
+
+  # canon: {"schema":1,"at":"2026-11-02T10:24:45Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-1-2.F6
+  @atip.check.103
+  Scenario: Each 1.2 violation fails the row that owns it and no other row at a claim of 1.2
+    Given a fake tool that claims 1.2 and breaks one condition of L1.grammar, L1.registry, L1.paging, L1.fields or L1.check-order at a time
+    When atip check runs at L1
+    Then only the owner of the condition fails or is unprovided, with a finding of the kind of the condition, and every 1.2 row has a violation
+
+  # canon: {"schema":1,"at":"2026-11-02T10:24:59Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F2
+  @atip.check.104
+  Scenario: The same violations at a claim of 1.1 fail no row and the 1.2 rows are not run
+    Given the same violations in fake tools that claim 1.1
+    When atip check runs at L1
+    Then no row fails, the exit is 0 and the report has no L1.check-order
+
+  # canon: {"schema":1,"at":"2026-11-02T10:25:29Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-1-2.F2
+  @atip.check.105
+  Scenario: The same tool and fixture at 1.1 and at 1.2 differ only in the 1.2 rows
+    Given one conforming fake tool and its fixture, claiming 1.2, 1.1 and 1.0
+    When atip check runs at L1 with each claim
+    Then the 1.2 report has 60 checks and the 1.1 report 59, L1.check-order stands after L1.validators, no row that ran at 1.1 changed its result, and a claim of 1.0 has no L1.check-order
+
+  # canon: {"schema":1,"at":"2026-11-02T10:25:36Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F6
+  @atip.check.106
+  Scenario: A row forced to pass or a condition switched off makes its 1.2 case fail, and every 1.2 condition a conforming run judges has a case
+    Given the 1.2 cases and a conforming 1.2 run
+    When a row is forced to pass and when each condition is switched off
+    Then the case of the row no longer fails, and every condition that the 1.2 run judges and the 1.1 run does not has a case
+
+  # canon: {"schema":1,"at":"2026-11-02T10:25:43Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-1-2.F5
+  @atip.check.107
+  Scenario: STOPPED_MIDWAY registered with exit 1 passes, one not registered passes, and a 1.1 registry may use the name as its own
+    Given a 1.2 registry that registers STOPPED_MIDWAY with exit 1 not retryable, one that does not register it, a 1.1 registry with the name retryable at exit 2, and a 1.2 registry with exit 2 and retryable
+    When atip check runs at L1
+    Then the first three pass L1.registry and the last fails it with a reason that names STOPPED_MIDWAY
+
+  # canon: {"schema":1,"at":"2026-11-02T10:25:50Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-1-2.F4
+  @atip.check.108
+  Scenario: A 1.2 tool whose commands have no all, no env and no input has those parts unsupported and the row passes
+    Given a 1.2 tool whose member list has no --all, no env variable and no input
+    When atip check runs at L1
+    Then L1.paging passes, its notes say those parts have nothing to test for, and the part it does have is judged
+
+  # canon: {"schema":1,"at":"2026-11-02T10:26:00Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F3
+  @atip.check.109
+  Scenario: Commands that are not run leave check-order unsupported, and no invocation to change leaves it unprovided and fails the level
+    Given a fixture whose every command is under notRun, and a tool with no example and no ok invocation
+    When atip check runs at L1
+    Then L1.check-order is unsupported for the first, and unprovided for the second with missing-fixture-entry findings commands.<id>.ok and exit 1
+
+  # canon: {"schema":1,"at":"2026-11-02T10:26:09Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-1-2.F3
+  @atip.check.110
+  Scenario: Every stage pair a command can have is run and a pair that needs a third fault is not
+    Given a conforming 1.2 tool with constraints, domains, validators and a required argument
+    When atip check runs at L1
+    Then each pair that a command can have is run with its earlier fault alone, no invocation is run twice, and a pair that needs a third fault is not used
+
+  # canon: {"schema":1,"at":"2026-11-02T10:26:17Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F6
+  @atip.check.111
+  Scenario: The vendored schema-doc is the published v1.2.0 and one changed character breaks the pin
+    Given the schema-doc.schema.json that crates/atip ships
+    When it is hashed
+    Then its digest is that of the tag v1.2.0, one changed character gives another digest, and the checker's example tests pin the commit of v1.2.0
+
+  # canon: {"schema":1,"at":"2026-11-02T10:26:41Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-1-2.F6
+  @atip.check.112
+  Scenario: The tally examples fail no 1.2 rule and a 1.2 document with a limit that is not flag-only is refused
+    Given the tally (1.1) and acme (1.2) examples of v1.2.0
+    When the 1.2 rules read them
+    Then tally fails no rule at its claim, acme passes, and the acme document whose limit is not flag-only fails L1.grammar naming limit
+
+  # canon: {"schema":1,"at":"2026-11-02T10:27:03Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F4
+  @atip.check.113
+  Scenario: An output schema that marks an optional field required is caught by L1.output-data
+    Given a fake tool whose output schema of member list marks an optional field required, at a claim of 1.1 and of 1.2
+    When atip check runs at L1
+    Then L1.output-data fails with a finding of kind data-validates naming the field, and L1.fields fails with it and no other row does

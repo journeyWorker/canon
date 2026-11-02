@@ -400,6 +400,8 @@ pub struct Shape {
     pub is_1_1: bool,
     /// Whether the tool claims 1.2 (`limit`, `cursor`, `all` and `fields` are flag-only; `member list` reads `--input -`).
     pub is_1_2: bool,
+    /// Seeded: a 1.2 document that leaves `--limit` without `flagOnly`.
+    pub limit_not_flag_only: bool,
     /// Whether the tree has a path of three words (`team roster list`).
     pub deep: bool,
 }
@@ -456,7 +458,7 @@ fn state_read(id: &'static str, summary: &'static str, report: &'static str) -> 
 fn member_list(shape: Shape) -> Command {
     let (is_1_1, is_1_2) = (shape.is_1_1, shape.is_1_2);
     // Since 1.2 `limit`, `cursor`, `all` and `fields` are flag-only: they cannot appear in an `--input` document (spec 11.6).
-    let flag = |arg: Arg| if is_1_2 { arg.flag_only() } else { arg };
+    let flag = |arg: Arg| if is_1_2 && !(arg.name == "limit" && shape.limit_not_flag_only) { arg.flag_only() } else { arg };
     let mut options = vec![
         {
             let team = Arg::option("team", "string", "Only the members of this team").value("TEAM");
@@ -568,23 +570,14 @@ fn member_list(shape: Shape) -> Command {
         );
     }
     if is_1_2 {
+        // The arguments a document may give: not `limit`, which is flag-only, unless the tool leaves it unmarked (seeded).
+        let mut document_properties = json!({"team": {"type": "string"}, "sort": {"enum": ["name", "id"]}});
+        if shape.limit_not_flag_only {
+            document_properties["limit"] = json!({"type": "integer", "minimum": 1});
+        }
         command = command
-            .schema(
-                "MemberListInput",
-                json!({
-                    "type": "object",
-                    "properties": {"team": {"type": "string"}, "sort": {"enum": ["name", "id"]}},
-                    "additionalProperties": false
-                }),
-            )
-            .schema(
-                "MemberListArguments",
-                json!({
-                    "type": "object",
-                    "properties": {"team": {"type": "string"}, "sort": {"enum": ["name", "id"]}},
-                    "additionalProperties": false
-                }),
-            )
+            .schema("MemberListInput", json!({"type": "object", "properties": document_properties, "additionalProperties": false}))
+            .schema("MemberListArguments", json!({"type": "object", "properties": document_properties, "additionalProperties": false}))
             .input(json!({
                 "option": "--input",
                 "schemaRef": "#/schemas/MemberListInput",

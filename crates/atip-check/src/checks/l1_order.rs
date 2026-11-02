@@ -23,6 +23,8 @@ const UNKNOWN_B: &str = "no-such-b";
 /// A value of every type, wrong for an integer, a number and an enum.
 const NOT_A_NUMBER: &str = "not-a-number";
 const NOT_A_MEMBER: &str = "no-such-value";
+/// The most pairs of one kind a command is run with.
+const MAX_PER_KIND: usize = 2;
 
 /// One pair of faults run: the invocation that breaks both, the one that breaks the earlier alone, and what each is called.
 #[derive(Debug, Clone)]
@@ -213,7 +215,7 @@ fn build(doc: &CommandDoc, base: &Invocation, faults: &[&Fault]) -> Option<Invoc
 
 impl Run<'_> {
     /// Plans the pairs of `doc` (spec 11.7 step 6), from the first of `bases`; a command with no passing invocation is a gap.
-    pub(super) fn plan_order(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation], tool: &str) -> Result<(), RunError> {
+    pub(crate) fn plan_order(&mut self, run: &mut L1Run, doc: &CommandDoc, bases: &[Invocation], tool: &str) -> Result<(), RunError> {
         let Some(base) = bases.first().filter(|base| broken(doc, base) == Broken::default()) else {
             run.order_gaps.push((doc.command.clone(), "no passing `ok` invocation of the command to change into a pair".to_string()));
             return Ok(());
@@ -230,109 +232,94 @@ impl Run<'_> {
                 let fault = Fault { stage: Stage::Parse, position: 2, label: format!("the wrong {} {word} of {}", arg.value_type, arg.spelling()), edit: Edit::Set { arg: arg.clone(), word: word.to_string() }, members: Vec::new(), code: None };
                 build(doc, base, &[&fault]).map(|_| fault)
             });
+        let required: Vec<&Fault> = pick(Stage::Required).collect();
+        let domains: Vec<&Fault> = pick(Stage::Domain).collect();
+        let constraints: Vec<&Fault> = pick(Stage::Constraint).collect();
+        let validators: Vec<&Fault> = pick(Stage::Validator).collect();
         let mut pairs: Vec<(&'static str, Fault, Fault, Invocation)> = Vec::new();
-        // Two parse failures: two unknown options; an unknown option before a value of the wrong type.
-        if let Some(invocation) = build(doc, base, &[&unknown_b, &unknown_a]) {
-            pairs.push(("two unknown options", unknown_a.clone(), unknown_b.clone(), invocation));
-        }
-        if let Some(wrong) = &wrong_type {
-            if let Some(invocation) = build(doc, base, &[wrong, &unknown_a]) {
-                pairs.push(("an unknown option and a value of the wrong type", unknown_a.clone(), wrong.clone(), invocation));
+        // At most `MAX_PER_KIND` pairs of a kind: the first ones the command can have, in the order of the faults.
+        let mut add = |kind: &'static str, found: Vec<(&Fault, &Fault, Invocation)>| {
+            for (earlier, later, invocation) in found.into_iter().take(MAX_PER_KIND) {
+                pairs.push((kind, earlier.clone(), later.clone(), invocation));
             }
+        };
+        // Two parse failures: two unknown options; an unknown option before a value of the wrong type.
+        add("two unknown options", build(doc, base, &[&unknown_b, &unknown_a]).map(|invocation| (&unknown_a, &unknown_b, invocation)).into_iter().collect());
+        if let Some(wrong) = &wrong_type {
+            add("an unknown option and a value of the wrong type", build(doc, base, &[wrong, &unknown_a]).map(|invocation| (&unknown_a, wrong, invocation)).into_iter().collect());
         }
         // An unknown option and a missing required argument.
-        if let Some((required, invocation)) = pick(Stage::Required).find_map(|required| build(doc, base, &[required, &unknown_a]).map(|invocation| (required, invocation))) {
-            pairs.push(("an unknown option and a missing required argument", unknown_a.clone(), required.clone(), invocation));
-        }
+        add(
+            "an unknown option and a missing required argument",
+            required.iter().filter_map(|required| build(doc, base, &[required, &unknown_a]).map(|invocation| (&unknown_a, *required, invocation))).collect(),
+        );
         // A missing required argument and a broken domain, or a broken constraint.
-        let mut required_domain = None;
-        'outer: for required in pick(Stage::Required) {
-            for domain in pick(Stage::Domain) {
+        let mut found = Vec::new();
+        for required in &required {
+            for domain in &domains {
                 if let Some(invocation) = build(doc, base, &[domain, required]) {
-                    required_domain = Some((required, domain, invocation));
-                    break 'outer;
+                    found.push((*required, *domain, invocation));
                 }
             }
         }
-        if let Some((required, domain, invocation)) = required_domain {
-            pairs.push(("a missing required argument and a broken domain", required.clone(), domain.clone(), invocation));
-        }
-        let mut required_constraint = None;
-        'outer: for required in pick(Stage::Required) {
-            for constraint in pick(Stage::Constraint) {
+        add("a missing required argument and a broken domain", found);
+        let mut found = Vec::new();
+        for required in &required {
+            for constraint in &constraints {
                 if let Some(invocation) = build(doc, base, &[constraint, required]) {
-                    required_constraint = Some((required, constraint, invocation));
-                    break 'outer;
+                    found.push((*required, *constraint, invocation));
                 }
             }
         }
-        if let Some((required, constraint, invocation)) = required_constraint {
-            pairs.push(("a missing required argument and a broken constraint", required.clone(), constraint.clone(), invocation));
-        }
+        add("a missing required argument and a broken constraint", found);
         // Two broken domains: the one that stands first answers.
-        let domains: Vec<&Fault> = pick(Stage::Domain).collect();
-        let mut two_domains = None;
-        'outer: for (at, first) in domains.iter().enumerate() {
+        let mut found = Vec::new();
+        for (at, first) in domains.iter().enumerate() {
             for second in &domains[at + 1..] {
                 if let Some(invocation) = build(doc, base, &[second, first]) {
-                    two_domains = Some((*first, *second, invocation));
-                    break 'outer;
+                    found.push((*first, *second, invocation));
                 }
             }
         }
-        if let Some((first, second, invocation)) = two_domains {
-            pairs.push(("two broken domains", first.clone(), second.clone(), invocation));
-        }
+        add("two broken domains", found);
         // A broken domain and a broken constraint.
-        let mut domain_constraint = None;
-        'outer: for domain in pick(Stage::Domain) {
-            for constraint in pick(Stage::Constraint) {
+        let mut found = Vec::new();
+        for domain in &domains {
+            for constraint in &constraints {
                 if let Some(invocation) = build(doc, base, &[constraint, domain]) {
-                    domain_constraint = Some((domain, constraint, invocation));
-                    break 'outer;
+                    found.push((*domain, *constraint, invocation));
                 }
             }
         }
-        if let Some((domain, constraint, invocation)) = domain_constraint {
-            pairs.push(("a broken domain and a broken constraint", domain.clone(), constraint.clone(), invocation));
-        }
+        add("a broken domain and a broken constraint", found);
         // Two constraints with different codes: the one declared first answers.
-        let constraints: Vec<&Fault> = pick(Stage::Constraint).collect();
-        let mut two_constraints = None;
-        'outer: for (at, first) in constraints.iter().enumerate() {
+        let mut found = Vec::new();
+        for (at, first) in constraints.iter().enumerate() {
             for second in &constraints[at + 1..] {
-                if first.code != second.code {
-                    if let Some(invocation) = build(doc, base, &[second, first]) {
-                        two_constraints = Some((*first, *second, invocation));
-                        break 'outer;
-                    }
-                }
-            }
-        }
-        if let Some((first, second, invocation)) = two_constraints {
-            pairs.push(("two constraints with different codes", first.clone(), second.clone(), invocation));
-        }
-        // A constraint and a validator with different codes: the validator's `rejects` invocation, changed to break the constraint too.
-        let mut constraint_validator = None;
-        'outer: for validator in pick(Stage::Validator) {
-            let Edit::Rejects { invocation: rejects } = &validator.edit else { continue };
-            for constraint in pick(Stage::Constraint) {
-                if constraint.code == validator.code {
+                if first.code == second.code {
                     continue;
                 }
-                // The constraint must leave the arguments the validator reads as they are.
+                if let Some(invocation) = build(doc, base, &[second, first]) {
+                    found.push((*first, *second, invocation));
+                }
+            }
+        }
+        add("two constraints with different codes", found);
+        // A constraint and a validator with different codes: the validator's `rejects` invocation, changed to break the constraint too.
+        let mut found = Vec::new();
+        for validator in &validators {
+            let Edit::Rejects { invocation: rejects } = &validator.edit else { continue };
+            for constraint in constraints.iter().filter(|constraint| constraint.code != validator.code) {
+                // The constraint must leave the arguments the validators read as they are, and the pair breaks only it besides.
                 let Some(changed) = apply(doc, constraint, rejects) else { continue };
                 let mut expected = Broken::default();
                 add_to(&mut expected, doc, constraint);
                 if broken(doc, rejects) == Broken::default() && broken(doc, &changed) == expected && validator_args_kept(doc, rejects, &changed) {
-                    constraint_validator = Some((constraint, validator, changed));
-                    break 'outer;
+                    found.push((*constraint, *validator, changed));
                 }
             }
         }
-        if let Some((constraint, validator, invocation)) = constraint_validator {
-            pairs.push(("a constraint and a validator with different codes", constraint.clone(), validator.clone(), invocation));
-        }
+        add("a constraint and a validator with different codes", found);
         let mut alone_runs: BTreeMap<Vec<String>, usize> = BTreeMap::new();
         for (pair, earlier, later, invocation) in pairs {
             let Some(alone) = apply(doc, &earlier, base) else { continue };

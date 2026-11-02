@@ -264,21 +264,19 @@ impl<'a> Judge<'a> {
             c.own(run.call);
             judged += 1;
             let answer = self.failure(run.call).filter(|_| self.refused(run.call));
-            c.holds_at(run.call, "pair-refused", answer.is_some(), || {
-                format!("{}: `{}` breaks {} and {} ({}) and {}", run.command, self.at(run.call).call.argv.join(" "), run.earlier, run.later, run.pair, refusal_text(self.envelope(run.call), self.at(run.call).exit))
-            });
-            let Some((code, field)) = answer else { continue };
-            let same_code = code == alone_code || (self.is_usage(code) && self.is_usage(alone_code));
-            c.holds_at(run.call, "earlier-stage-answers", same_code && field == alone_field, || {
+            let same = answer.is_some_and(|(code, field)| (code == alone_code || (self.is_usage(code) && self.is_usage(alone_code))) && field == alone_field);
+            c.holds_at(run.call, "earlier-stage-answers", same, || {
+                let answered = match answer {
+                    Some((code, field)) => format!("was answered {} on {}", code.unwrap_or("no code"), field.unwrap_or("no field")),
+                    None => format!("was not refused: {}", refusal_text(self.envelope(run.call), self.at(run.call).exit)),
+                };
                 format!(
-                    "{}: `{}` breaks {} and {} ({}) and was answered {} on {}; the earlier stage answers {} on {} (`{}`)",
+                    "{}: `{}` breaks {} and {} ({}) and {answered}; the earlier stage answers {} on {} (`{}`)",
                     run.command,
                     self.at(run.call).call.argv.join(" "),
                     run.earlier,
                     run.later,
                     run.pair,
-                    code.unwrap_or("no code"),
-                    field.unwrap_or("no field"),
                     alone_code.unwrap_or("no code"),
                     alone_field.unwrap_or("no field"),
                     self.at(run.alone).call.argv.join(" ")
@@ -1284,16 +1282,19 @@ impl<'a> Judge<'a> {
                         }
                     }
                 }
-                c.holds_at(input.first, "next-after-input", problems.is_empty(), || {
-                    format!("{}: the next entry of the page given by a document on stdin (`{}`): {}", run.command, next_argv.join(" "), problems.join("; "))
-                });
+                // The next entry is run in the same environment; it has to go on from the page that the document gave.
                 if let Some(next) = input.next {
                     c.own(next);
                     let second = self.ok_envelope(next).and_then(|document| document.get("data"));
-                    c.holds_at(next, "next-after-input-continues", second.is_some() && second != first, || {
-                        format!("{}: {}", self.label(next), if second.is_none() { refusal_text(self.envelope(next), self.at(next).exit) } else { "returned the first page again".to_string() })
-                    });
+                    if second.is_none() {
+                        problems.push(format!("`{}` {}", self.at(next).call.argv.join(" "), refusal_text(self.envelope(next), self.at(next).exit)));
+                    } else if second == first {
+                        problems.push("it returns the first page again".to_string());
+                    }
                 }
+                c.holds_at(input.first, "next-after-input", problems.is_empty(), || {
+                    format!("{}: the next entry of the page given by a document on stdin (`{}`): {}", run.command, next_argv.join(" "), problems.join("; "))
+                });
             }
         }
         if !run.unsupported.is_empty() {
@@ -1340,6 +1341,14 @@ impl<'a> Judge<'a> {
                 c.holds_at(run.projected, condition, problem.is_none(), || format!("{}: {}", self.label(run.projected), problem.clone().unwrap_or_default()));
             }
             c.observe(run.projected);
+            // Since 1.2 `--fields` alone is no reason to refuse (spec 12.5): the first selection with no `--json` is not refused; the text is not compared.
+            if let Some(text) = run.text {
+                c.own(text);
+                let outcome = self.at(text);
+                c.holds_at(text, "fields-without-json", outcome.exit == Exit::Code(0) && !outcome.stdout.is_empty(), || {
+                    format!("{}: `{}` ended with {} and printed {}: --fields without --json is not a reason to refuse", run.command, outcome.call.argv.join(" "), exit_text(outcome.exit), if outcome.stdout.is_empty() { "nothing" } else { "its answer" })
+                });
+            }
         }
         for run in &l1.unknown_fields {
             if self.gate(&mut c, &run.command) {
@@ -1350,6 +1359,14 @@ impl<'a> Judge<'a> {
             c.holds_at(run.call, "unknown-path-refused", failure.is_some_and(|(code, field)| self.is_usage(code) && field == Some("--fields")), || {
                 format!("{}: {} {}, expected USAGE on --fields", run.command, self.label(run.call), refusal_text(self.envelope(run.call), self.at(run.call).exit))
             });
+            // Since 1.2 an unknown path is a USAGE refusal with no `--json` too: exit 2, an error on stderr and nothing on stdout.
+            if let Some(text) = run.text {
+                c.own(text);
+                let outcome = self.at(text);
+                c.holds_at(text, "unknown-path-refused-in-text", outcome.exit == Exit::Code(2) && outcome.stdout.is_empty() && !outcome.stderr.is_empty(), || {
+                    format!("{}: `{}` ended with {} (stdout {:?}, stderr {:?}), expected exit 2 with the error on stderr", run.command, outcome.call.argv.join(" "), exit_text(outcome.exit), excerpt(&outcome.stdout), excerpt(&outcome.stderr))
+                });
+            }
         }
         // The selections must reach a nested path and an `[]` path when the output declares one.
         for doc in self.docs().commands.values() {
