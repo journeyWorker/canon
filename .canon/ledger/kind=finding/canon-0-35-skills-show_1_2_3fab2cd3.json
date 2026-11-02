@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T14:43:51.934906Z",
+  "change_id": "canon-0-35-skills-show",
+  "code_tree": "b8a48c4b4956ea1c0592ba6b9d6f6080ddb8852b",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_skills_show.rs",
+  "introduced_by": "314ab1f10bd7c2a17f2bad4d387c1aa76ba4c969",
+  "kind": "finding",
+  "reviewed_sha": "c8b373e15621138f77bf3954acea54a3d404ba62",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Verified in the binary (c8b373e1): skills show --json is {name,text,guides,full,x-canon:{version}} for the default guide and every one of the 27 names, name is the one asked, text equals the text-mode bytes, bare equals 'skills show canon', nothing is written in an empty directory (ls -A empty), unknown, upper-case, spaced and empty names are USAGE field NAME with expected the 27 names, the first line of root, group, leaf and skills show --help is the new line, the guide schema copies in crates/atip and crates/atip-check are byte-identical to the contract's schema/guide.schema.json at v1.2.0, atip check L1 is met. Blast radius: schemaVersion of the report is 2.0 (member removed) and installed stubs are untouched; the line rule covers fenced blocks that start with 'canon ' only, 86 lines with a pipe or redirection are outside it by the brief; 50 trailing shell comments, 16 output samples and the generated Commands blocks were edited to fit and are listed in the CHANGELOG, none run by a test beyond the parse. The cli_ids change masks any all-letter 8-hex word as a digest, which hides a real 8-letter a-f word in test output; harmless today.",
+  "worktree_dirty": false
+}

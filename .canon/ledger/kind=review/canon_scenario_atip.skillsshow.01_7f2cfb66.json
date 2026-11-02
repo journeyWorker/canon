@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T14:45:03.503703Z",
+  "code_tree": "b8a48c4b4956ea1c0592ba6b9d6f6080ddb8852b",
+  "kind": "review",
+  "pin": "c8b373e15621138f77bf3954acea54a3d404ba62",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_skillsshow_01_the_default_guide_lists_every_guide"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b4e286231e32ff723760036ed2c98640685d6bcd71614f59cc4c41151cd327fa",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-skills-show/brief.md"
+  },
+  "review_id": "01M6EBH3WFXJE8PD47GCWRPM76",
+  "reviewer": "rev-canon-0-35",
+  "scenario_id": "atip.skillsshow.01",
+  "schema": 2,
+  "worktree_dirty": false
+}
