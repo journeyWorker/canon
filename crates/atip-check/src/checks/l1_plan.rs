@@ -217,6 +217,11 @@ impl Run<'_> {
                 .is_some_and(|entry| !entry.ok.is_empty())
     }
 
+    /// Whether the fixture names `command` under `notRun`: the checker never runs it.
+    fn not_run(&self, command: &str) -> bool {
+        self.fixture.not_run.iter().any(|id| id == command)
+    }
+
     pub(crate) fn invoke_l1(&mut self, warnings_offered: bool, claim: Claim) -> Result<L1Run, RunError> {
         let _ = claim;
         let mut run = L1Run {
@@ -237,6 +242,14 @@ impl Run<'_> {
             .and_then(|document| document.get("data"))
             .and_then(Tree::parse);
         let entries = run.docs.tree.as_ref().map(|tree| tree.commands.clone()).unwrap_or_default();
+        // `notRun` names commands of the tool: the tree is what says which there are (approaches/checker.md 5).
+        if let Some(unknown) = self.fixture.not_run.iter().find(|id| !entries.iter().any(|entry| !entry.is_group() && entry.command == **id)) {
+            if run.docs.tree.is_some() {
+                return Err(RunError::Fixture(format!(
+                    "`notRun` names {unknown}, which is no command of the tool's `schema --json` tree"
+                )));
+            }
+        }
         // The invocations that are the same whatever the fixture says.
         run.root_help = self.invoke(Call::new(["--help"]))?;
         run.unknown_path = self.invoke(Call::new(["schema", NO_SUCH_PATH, "--json"]))?;
@@ -303,7 +316,8 @@ impl Run<'_> {
             }
         }
         // Every example of a `read` command, in the fixture state.
-        for doc in docs.iter().filter(|doc| doc.effect == "read") {
+        let not_run = self.fixture.not_run.clone();
+        for doc in docs.iter().filter(|doc| doc.effect == "read" && !not_run.contains(&doc.command)) {
             for line in &doc.examples {
                 let Some(words) = invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| *word == tool)) else {
                     continue;
@@ -313,7 +327,7 @@ impl Run<'_> {
             }
         }
         for doc in &docs {
-            if !self.runnable(doc) {
+            if !self.runnable(doc) || self.not_run(&doc.command) {
                 continue;
             }
             let bases = self.bases(doc, &tool);
@@ -321,9 +335,9 @@ impl Run<'_> {
             self.plan_domains(&mut run, doc, &bases)?;
             self.plan_validators(&mut run, doc, &tool)?;
         }
-        run.unprobed_writes = docs.iter().filter(|doc| !self.runnable(doc)).map(|doc| doc.command.clone()).collect();
+        run.unprobed_writes = docs.iter().filter(|doc| !self.runnable(doc) && !self.not_run(&doc.command)).map(|doc| doc.command.clone()).collect();
         for doc in &docs {
-            if self.runnable(doc) {
+            if self.runnable(doc) && !self.not_run(&doc.command) {
                 let bases = self.bases(doc, &tool);
                 self.plan_paging(&mut run, doc, &bases)?;
                 self.plan_fields(&mut run, doc, &bases)?;
@@ -708,6 +722,9 @@ impl Run<'_> {
         let mut followed = 0;
         for (source, argv) in pending {
             let Some(doc) = names_command(&run.docs, &argv) else { continue };
+            if self.not_run(&doc) {
+                continue;
+            }
             let Some(CommandDoc { effect, .. }) = run.docs.commands.get(&doc).cloned() else { continue };
             if effect != "read" {
                 continue;

@@ -312,9 +312,7 @@ fn atip_check_97_the_example_syntax_check_still_runs_for_a_not_run_command_and_t
     let harness = Harness::new();
     let case = support::l1::l1_cases().into_iter().find(|case| case.condition == "examples/grammar").expect("the case");
     let mut fixture = harness.l1_fixture(&case.config);
-    for entry in ["member list"] {
-        fixture["commands"].as_object_mut().expect("commands").remove(entry);
-    }
+    fixture["commands"].as_object_mut().expect("commands").remove("member list");
     fixture["notRun"] = json!(["member list"]);
     let output = harness.check_l1(&case.config, &fixture);
     let check = output.check("L1.examples");
@@ -325,7 +323,6 @@ fn atip_check_97_the_example_syntax_check_still_runs_for_a_not_run_command_and_t
     for id in ["L1.example-runs", "L1.paging", "L1.fields", "L0.page"] {
         assert_eq!(output.check(id)["notRun"], json!(["member list"]), "{id}");
     }
-    // With no command left to run, a check that needs one has nothing to judge and does not apply.
-    assert_eq!(result_of(&output, "L1.paging"), "unsupported", "{}", output.check("L1.paging"));
-    assert_eq!(result_of(&output, "L1.fields"), "unsupported", "{}", output.check("L1.fields"));
+    // The command left out is not judged by the others: the checks that run commands are not made unprovided by it.
+    assert_eq!(with_result(&output, "unprovided"), Vec::<String>::new(), "{:?}", output.results());
 }

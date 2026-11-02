@@ -584,6 +584,7 @@ pub(crate) fn run_checks(
                 cut: finding.cut,
                 notes: finding.notes,
                 unlisted: if matches!(entry.id, "L1.constraints" | "L1.domains" | "L1.validators") { l1.as_ref().map(|l1| l1.unprobed_writes.clone()).unwrap_or_default() } else { Vec::new() },
+                not_run: if entry.needs.contains(&Commands) || entry.id == "L1.next" { fixture.not_run.clone() } else { Vec::new() },
                 observed: finding
                     .observed
                     .iter()
@@ -636,6 +637,8 @@ struct Conditions<'j> {
     entry: &'static Entry,
     name: &'static str,
     problems: Vec<Detail>,
+    /// The invocations the fixture lists to succeed that a precondition refused: what the check could not judge for them.
+    refused: Vec<Detail>,
     advisories: Vec<String>,
     observed: Vec<usize>,
     /// Facts found that do not change the result.
@@ -654,6 +657,31 @@ impl<'j> Conditions<'j> {
     /// Like [`Conditions::holds`], for a condition the invocation `index` of the log decided: the finding carries its argv.
     fn holds_at(&mut self, index: usize, condition: &'static str, holds: bool, why: impl FnOnce() -> String) {
         self.holds_in(Some(index), condition, holds, why);
+    }
+
+    /// The invocation `index` of `command`, which the fixture lists to succeed, was refused by a precondition (not a stateless refusal): the check records
+    /// it and the caller leaves the invocation unjudged. `true` when it was.
+    fn skips_refused(&mut self, command: &str, index: usize) -> bool {
+        match self.judge.fixture_refusal(command, index) {
+            Some(Refusal::Precondition(code)) => {
+                self.refused_by_precondition(index, &code);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn refused_by_precondition(&mut self, index: usize, code: &str) {
+        if self.refused.iter().any(|found| found.argv.as_deref() == Some(self.judge.at(index).call.argv.as_slice())) {
+            return;
+        }
+        self.observe(index);
+        let argv = self.judge.at(index).call.argv.clone();
+        let message = format!(
+            "`{}` was refused with {code} (exit 2), a precondition: the state or the environment the fixture gives did not give the command what it needs",
+            argv.join(" ")
+        );
+        self.refused.push(Detail::new("refused-precondition", message).with_argv(&argv).with_code(code));
     }
 
     /// Judges condition `condition` that fails once for each of `problems` (none: it holds): one finding each, whole.
@@ -748,6 +776,20 @@ impl<'j> Conditions<'j> {
                 result: CheckResult::Fail,
                 reason: Some(reason),
                 details: self.problems,
+                cut,
+                advisories: self.advisories,
+                observed: self.observed,
+                notes: self.notes,
+            };
+        }
+        if !self.refused.is_empty() {
+            // Nothing it judged failed, and what it was to judge was refused for want of state or environment: it cannot tell, which fails a MUST level.
+            let messages: Vec<String> = self.refused.iter().map(|found| found.message.clone()).collect();
+            let (reason, cut) = reason_and_cut(&messages);
+            return Finding {
+                result: CheckResult::Unprovided,
+                reason: Some(reason),
+                details: self.refused,
                 cut,
                 advisories: self.advisories,
                 observed: self.observed,
@@ -931,6 +973,7 @@ impl<'a> Judge<'a> {
             entry,
             name: &id[3..],
             problems: Vec::new(),
+            refused: Vec::new(),
             advisories: Vec::new(),
             observed: Vec::new(),
             owned: Vec::new(),
@@ -941,6 +984,46 @@ impl<'a> Judge<'a> {
     /// The registry row of `code`.
     fn row(&self, code: &str) -> Option<&RegistryRow> {
         self.rows.as_ref()?.iter().find(|row| row.code == code)
+    }
+
+    /// A check that works from the probes of `command`, which the checker derives from the fixture's `ok` invocations of it: when the tool refused one of
+    /// the fixture's `ok` or `paged` invocations of `command` as a precondition, the probes cannot be told from that refusal. The check records the refusal,
+    /// leaves the command out and gets `true`.
+    fn gate(&self, c: &mut Conditions<'_>, command: &str) -> bool {
+        let Some(commands) = &self.fixture.commands else { return false };
+        let Some((_, calls)) = commands.iter().zip(&self.calls.commands).find(|((id, _), _)| id.as_str() == command) else { return false };
+        for index in calls.ok.iter().chain(&calls.paged) {
+            if let Some(Refusal::Precondition(code)) = self.fixture_refusal(command, *index) {
+                c.refused_by_precondition(*index, &code);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// How the tool refused `index`, an invocation of `command` that the fixture lists to succeed: with exit 2 and an error code, by a step that reads no state
+    /// (spec 11.7 steps 1-6) or by a precondition.
+    fn fixture_refusal(&self, command: &str, index: usize) -> Option<Refusal> {
+        if self.at(index).exit != Exit::Code(2) {
+            return None;
+        }
+        let document = self.envelope(index).filter(|document| document.get("ok") == Some(&Value::Bool(false)))?;
+        let code = document.pointer("/error/code").and_then(Value::as_str)?;
+        Some(if self.is_stateless(command, code) {
+            Refusal::Stateless(code.to_string())
+        } else {
+            Refusal::Precondition(code.to_string())
+        })
+    }
+
+    /// Whether a refusal with `code` of `command` is made before any state is read: `USAGE` and its registered finer replacements, `UNKNOWN_COMMAND`,
+    /// `COMMAND_REQUIRED`, every `INPUT_*` code; from L1 also a code the command document declares on a constraint or a validator and a code the run
+    /// saw refuse an argument's domain. At L0 there is no command document, so any other exit 2 code is a precondition, registered or not.
+    fn is_stateless(&self, command: &str, code: &str) -> bool {
+        matches!(code, "USAGE" | "UNKNOWN_COMMAND" | "COMMAND_REQUIRED")
+            || code.starts_with("INPUT_")
+            || self.is_usage(Some(code))
+            || (self.l1.is_some() && self.declared_before_state(command, code))
     }
 
     /// The JSON-mode invocations that finished: those whose stdout is read as one document.
@@ -1319,13 +1402,21 @@ impl<'a> Judge<'a> {
         let calls = self.calls;
         let mut c = self.check("L0.one-document");
         let probe = calls.probe.as_ref().map(|probe| probe.json_variations[0].1);
-        let ok_runs = calls.commands.iter().flat_map(|command| command.ok.iter().copied());
+        let ok_runs: Vec<(&str, usize)> = self
+            .fixture
+            .commands
+            .iter()
+            .flatten()
+            .zip(&calls.commands)
+            .flat_map(|((id, _), command)| command.ok.iter().map(move |index| (id.as_str(), *index)))
+            .collect();
         for index in [Some(calls.unknown_command), Some(calls.bare), probe]
             .into_iter()
             .flatten()
-            .chain(ok_runs.clone())
+            .chain(ok_runs.iter().map(|(_, index)| *index))
         {
-            let is_ok_run = ok_runs.clone().any(|ok| ok == index);
+            let ok_id = ok_runs.iter().find(|(_, ok)| *ok == index).map(|(id, _)| *id);
+            let is_ok_run = ok_id.is_some();
             // Output that holds no document at all is the owner of that invocation's to report,
             // except for an `ok` invocation, which has no other owner.
             if self.documents[index].is_none() && !is_ok_run {
@@ -1333,6 +1424,26 @@ impl<'a> Judge<'a> {
             }
             if self.at(index).exit == Exit::TimedOut {
                 continue;
+            }
+            // An `ok` invocation the tool refused: for want of state or environment the check cannot tell; before any state is read it is the fixture's or the tool's fault.
+            if let Some(id) = ok_id {
+                match self.fixture_refusal(id, index) {
+                    Some(Refusal::Precondition(code)) => {
+                        c.refused_by_precondition(index, &code);
+                        continue;
+                    }
+                    Some(Refusal::Stateless(code)) => {
+                        c.observe(index);
+                        c.holds_at(index, "ok-is-not-refused", false, || {
+                            format!(
+                                "{} is listed under `ok` for {id} and was refused with {code} (exit 2) before any state is read: the fixture invocation is wrong, or the tool enforces a rule it does not declare",
+                                self.label(index)
+                            )
+                        });
+                        continue;
+                    }
+                    None => {}
+                }
             }
             // A stream is NDJSON by design (13.5): its lines are `L0.envelope`'s.
             if self.documents[index].as_ref().is_some_and(rules::is_stream_start) {
@@ -1587,8 +1698,15 @@ impl<'a> Judge<'a> {
         }
         // A `paged` invocation is one the fixture says returns a next cursor in its state.
         for (id, command) in self.fixture.commands.iter().flatten().zip(&self.calls.commands).map(|((id, _), calls)| (id, calls)) {
+            // An `ok` invocation refused for want of state or environment leaves the paging of the command unjudged too.
+            for index in &command.ok {
+                c.skips_refused(id, *index);
+            }
             for index in &command.paged {
                 c.own(*index);
+                if c.skips_refused(id, *index) {
+                    continue;
+                }
                 let carries = self
                     .envelope(*index)
                     .and_then(|document| document.pointer("/meta/page/nextCursor"))
@@ -1604,7 +1722,7 @@ impl<'a> Judge<'a> {
         }
         // Nothing carried a page. Which commands page (spec 6.9): from L1 the command documents say, at L0 observation does.
         if let Some(l1) = self.l1 {
-            let pages: Vec<&str> = l1.docs.commands.iter().filter(|(_, doc)| doc.has_option("cursor")).map(|(id, _)| id.as_str()).collect();
+            let pages: Vec<&str> = l1.docs.commands.iter().filter(|(id, doc)| doc.has_option("cursor") && !self.fixture.not_run.contains(id)).map(|(id, _)| id.as_str()).collect();
             return c.finish_as(if pages.is_empty() {
                 End::Unsupported("no command document declares --cursor".to_string())
             } else {
@@ -2076,6 +2194,15 @@ impl<'a> Judge<'a> {
         }
         c.finish(true)
     }
+}
+
+/// How the tool refused an invocation the fixture lists to succeed (`ok`, `paged`, `fields`), with exit 2 and the code it names (approaches/checker.md 5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Refusal {
+    /// A step that reads no state refused it (spec 11.7 steps 1-6): the fixture invocation is wrong, or the tool enforces a rule it does not declare. The check that runs it fails.
+    Stateless(String),
+    /// Any other exit 2 code: the state or the environment the fixture gives did not give the command what it needs (a credential, a reachable backend). The checks that run it are `unprovided`, which still fails a MUST level.
+    Precondition(String),
 }
 
 /// What a command that was run with `--cursor x` showed about paging.

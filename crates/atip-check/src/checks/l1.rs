@@ -140,7 +140,7 @@ impl<'a> Judge<'a> {
     }
 
     /// Whether `code` is `USAGE` or its registered finer replacement (spec 7.2.2: `UNKNOWN_OPTION`, `OPTION_REQUIRED`, registered with exit 2).
-    fn is_usage(&self, code: Option<&str>) -> bool {
+    pub(crate) fn is_usage(&self, code: Option<&str>) -> bool {
         code.is_some_and(|code| {
             code == "USAGE" || (matches!(code, "UNKNOWN_OPTION" | "OPTION_REQUIRED") && self.row(code).is_some_and(|row| row.exit == 2))
         })
@@ -156,6 +156,20 @@ impl<'a> Judge<'a> {
     /// Whether the invocation was refused as a usage problem: exit 2 and a failure envelope.
     fn refused(&self, index: usize) -> bool {
         self.at(index).exit == Exit::Code(2) && self.failure(index).is_some()
+    }
+
+    /// Whether `code` is one a step before the state is read gives for `command` (approaches/checker.md 5): a code its document declares on a constraint or on a
+    /// validator (the fixture's `env` decides a validator that reads an `env` value), or one the run of `L1.domains` saw refuse an argument of it, since a domain declares none.
+    pub(crate) fn declared_before_state(&self, command: &str, code: &str) -> bool {
+        let Some(doc) = self.docs().command(command) else { return false };
+        doc.constraints.iter().any(|constraint| constraint.code.as_deref() == Some(code))
+            || doc.validators.iter().any(|validator| validator.code == code)
+            || self.l1().domains.iter().any(|run| {
+                run.command == command
+                    && run.probe.expect == Expect::Refused
+                    && self.refused(run.call)
+                    && self.failure(run.call).is_some_and(|(found, _)| found == Some(code))
+            })
     }
 
     /// A finding for a check that has nothing to read because the tool printed no tree.
@@ -689,6 +703,10 @@ impl<'a> Judge<'a> {
                 _ if !agree => Verdict::Fail,
                 GroupOutcome::Witness { words } => {
                     let call = run.call.expect("a witness group has an invocation");
+                    if self.gate(&mut c, &run.command) {
+                        verdicts.push(Verdict::Fail);
+                        continue;
+                    }
                     c.own(call);
                     let refused = self.refused(call);
                     c.holds_at(call, "refused", refused, || {
@@ -761,6 +779,9 @@ impl<'a> Judge<'a> {
             return self.no_tree(c);
         }
         for run in &l1.domains {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
             let Some(doc) = self.docs().command(&run.command) else { continue };
             let Some(arg) = doc.arg(&run.arg) else { continue };
             c.own(run.call);
@@ -896,6 +917,9 @@ impl<'a> Judge<'a> {
             return self.no_tree(c);
         }
         for run in &l1.numbers {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
             c.own(run.call);
             c.holds_at(run.call, "beyond-safe-range-refused", self.refused(run.call), || {
                 format!("{}: --{} {} is one beyond the safe integers and was not refused: {}", run.command, run.arg, run.word, refusal_text(self.envelope(run.call), self.at(run.call).exit))
@@ -911,6 +935,9 @@ impl<'a> Judge<'a> {
             return self.no_tree(c);
         }
         for run in &l1.validators {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
             let Some(doc) = self.docs().command(&run.command) else { continue };
             let Some(validator) = doc.validators.get(run.validator) else { continue };
             c.own(run.call);
@@ -933,7 +960,12 @@ impl<'a> Judge<'a> {
         if l1.docs.tree.is_none() {
             return self.no_tree(c);
         }
-        let mut runs: Vec<usize> = self.calls.commands.iter().flat_map(|command| command.ok.iter().copied()).collect();
+        let mut runs: Vec<usize> = Vec::new();
+        for ((id, _), command) in self.fixture.commands.iter().flatten().zip(&self.calls.commands) {
+            if !self.gate(&mut c, id) {
+                runs.extend(command.ok.iter().copied());
+            }
+        }
         runs.extend(l1.examples.iter().map(|run| run.call));
         let mut judged = false;
         for index in runs {
@@ -1071,13 +1103,16 @@ impl<'a> Judge<'a> {
         if l1.docs.tree.is_none() {
             return self.no_tree(c);
         }
-        let offered = self.docs().commands.values().any(|doc| doc.has_option("cursor"));
+        let offered = self.docs().commands.values().any(|doc| doc.has_option("cursor") && !self.fixture.not_run.contains(&doc.command));
         if !offered {
             return c.finish_as(End::Unsupported("no command document declares --cursor".to_string()));
         }
         let mut unprovided: Vec<(String, String)> = Vec::new();
         let mut proven: BTreeSet<String> = BTreeSet::new();
         for run in &l1.paging {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
             c.own(run.first);
             let returned = self.ok_envelope(run.first).and_then(|document| document.pointer("/meta/page/returned")).and_then(Value::as_u64);
             c.holds_at(run.first, "returned-at-most-limit", !run.limited || returned.is_some_and(|returned| returned <= 1), || {
@@ -1136,12 +1171,15 @@ impl<'a> Judge<'a> {
         if l1.docs.tree.is_none() {
             return self.no_tree(c);
         }
-        let offered = self.docs().commands.values().any(|doc| doc.has_option("fields"));
+        let offered = self.docs().commands.values().any(|doc| doc.has_option("fields") && !self.fixture.not_run.contains(&doc.command));
         if !offered {
             return c.finish_as(End::Unsupported("no command offers --fields".to_string()));
         }
         let mut unprovided: Vec<(String, String)> = Vec::new();
         for run in &l1.fields {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
             let Some(doc) = self.docs().command(&run.command) else { continue };
             c.own(run.projected);
             let (Some(plain), Some(projected)) = (self.ok_envelope(run.plain), self.ok_envelope(run.projected)) else {
@@ -1168,6 +1206,9 @@ impl<'a> Judge<'a> {
             c.observe(run.projected);
         }
         for run in &l1.unknown_fields {
+            if self.gate(&mut c, &run.command) {
+                continue;
+            }
             c.own(run.call);
             let failure = self.failure(run.call);
             c.holds_at(run.call, "unknown-path-refused", failure.is_some_and(|(code, field)| self.is_usage(code) && field == Some("--fields")), || {
@@ -1200,7 +1241,7 @@ impl<'a> Judge<'a> {
             return c.finish_as(End::missing_all(unprovided.into_iter().map(|(_, why)| why).collect(), entries));
         }
         if l1.fields.is_empty() {
-            let entries: Vec<String> = self.docs().commands.values().filter(|doc| doc.has_option("fields")).map(|doc| format!("commands.{}.fields", doc.command)).collect();
+            let entries: Vec<String> = self.docs().commands.values().filter(|doc| doc.has_option("fields") && !self.fixture.not_run.contains(&doc.command)).map(|doc| format!("commands.{}.fields", doc.command)).collect();
             return c.finish_as(End::Unprovided { reason: "the fixture lists no `fields` selection for a command that offers --fields".to_string(), cut: false, entries });
         }
         c.finish(true)
@@ -1217,17 +1258,40 @@ fn default_text(default: &Value) -> Option<String> {
     }
 }
 
-/// The default `text` shows for `--option` in a recognised form (`[default: X]`, `(default X)`), when it shows one.
+/// The first long name of an option line: the line opens, behind blanks, with an option (`--name`, or short options `-l, --name`, each with a value `<V>` or `[V]`
+/// of its own), and the first `--name` is the option the line describes. A usage line, a sentence, a bullet (`- see --limit`) and a description that names an
+/// option open no option.
+fn option_of_line(line: &str) -> Option<&str> {
+    let mut rest = line.trim_start();
+    loop {
+        if let Some(long) = rest.strip_prefix("--") {
+            let end = long.find(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-')).unwrap_or(long.len());
+            return (end > 0).then(|| &long[..end]);
+        }
+        let short = rest.strip_prefix('-')?;
+        let mut chars = short.chars();
+        if !chars.next().is_some_and(|ch| ch.is_ascii_alphanumeric()) {
+            return None;
+        }
+        rest = chars.as_str().trim_start_matches([' ', '\t']);
+        for (open, close) in [('<', '>'), ('[', ']')] {
+            if rest.starts_with(open) {
+                rest = rest.find(close).map_or("", |at| &rest[at + 1..]);
+                break;
+            }
+        }
+        // Only a comma goes on to the long name.
+        rest = rest.trim_start().strip_prefix(',')?.trim_start();
+    }
+}
+
+/// The default `text` shows for `--option` in a recognised form (`[default: X]`, `(default X)`), when it shows one: in the block of the line that opens with `--option` as its first long name.
 fn help_default(text: &str, option: &str) -> Option<String> {
-    let marker = format!("--{option}");
     let lines: Vec<&str> = text.lines().collect();
-    let start = lines.iter().position(|line| {
-        let trimmed = line.trim_start();
-        trimmed.starts_with('-') && trimmed.match_indices(&marker).any(|(at, _)| trimmed[at + marker.len()..].chars().next().is_none_or(|next| !(next.is_ascii_alphanumeric() || next == '-')))
-    })?;
+    let start = lines.iter().position(|line| option_of_line(line) == Some(option))?;
     let mut block = String::from(lines[start]);
     for line in &lines[start + 1..] {
-        if line.trim_start().starts_with('-') || line.trim().is_empty() {
+        if option_of_line(line).is_some() || line.trim().is_empty() {
             break;
         }
         block.push(' ');

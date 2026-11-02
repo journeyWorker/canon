@@ -70,6 +70,9 @@ pub struct Fixture {
     pub warnings: Option<Vec<String>>,
     /// The L0 invocations by command id; `None` when the fixture has no `commands`.
     pub commands: Option<BTreeMap<String, CommandEntry>>,
+    /// Commands the checker never runs, by any invocation (`notRun`): a command that does not end when it is run (a server), or one that
+    /// must not run here. Not in `commands`; from L1 each is a command of the tool's documents. Every check that runs commands says it left them out.
+    pub not_run: Vec<String>,
 }
 
 impl Fixture {
@@ -142,6 +145,8 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
     let Some(object) = document.as_object() else {
         return Err("the fixture must be a JSON object".to_string());
     };
+    let commands = object.get("commands").map(commands).transpose()?;
+    let not_run = object.get("notRun").map(|value| not_run(value, commands.as_ref())).transpose()?.unwrap_or_default();
     Ok(Fixture {
         contract_version: object
             .get("contractVersion")
@@ -179,7 +184,8 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
             }
             (_, warnings_value) => warnings_value.map(warnings).transpose()?,
         },
-        commands: object.get("commands").map(commands).transpose()?,
+        commands,
+        not_run,
     })
 }
 
@@ -193,6 +199,30 @@ fn contract_version(value: &Value) -> Result<Claim, String> {
                 MINORS.join(", ")
             )
         })
+}
+
+/// `notRun`: an array of command ids, each once and none of them a key of `commands`.
+fn not_run(value: &Value, commands: Option<&BTreeMap<String, CommandEntry>>) -> Result<Vec<String>, String> {
+    let list = value
+        .as_array()
+        .ok_or("`notRun` must be an array of command ids: the commands the checker never runs")?;
+    let mut ids: Vec<String> = Vec::with_capacity(list.len());
+    for (index, item) in list.iter().enumerate() {
+        let id = item
+            .as_str()
+            .filter(|id| is_command_id(&id.split(' ').map(str::to_string).collect::<Vec<_>>()))
+            .ok_or_else(|| format!("`notRun/{index}` must be a command id (lower kebab-case words separated by one space)"))?;
+        if ids.iter().any(|earlier| earlier == id) {
+            return Err(format!("`notRun/{index}` repeats {id}"));
+        }
+        if commands.is_some_and(|commands| commands.contains_key(id)) {
+            return Err(format!(
+                "`notRun/{index}` names {id}, which `commands` lists too: a command the checker runs is not one it leaves out"
+            ));
+        }
+        ids.push(id.to_string());
+    }
+    Ok(ids)
 }
 
 /// One argv array of strings at `path`, not empty.

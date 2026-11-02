@@ -164,6 +164,8 @@ pub enum RunError {
     Setup(String),
     /// A `prepare` command failed or could not be started: a defect of the fixture, not of the tool.
     Prepare(String),
+    /// The fixture does not fit the tool's documents (a `notRun` command the tool does not have): known only after the tool was asked.
+    Fixture(String),
     /// The checker's own scratch space failed.
     Scratch(String),
 }

@@ -351,6 +351,9 @@
       "."
     ]
   ],
+  "notRun": [
+    "dashboard"
+  ],
   "prepare": [
     [
       "git",

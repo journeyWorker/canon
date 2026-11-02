@@ -98,6 +98,9 @@ pub struct Check {
     /// The write and destructive commands of the tool's documents that no fixture entry covers, named by `L1.constraints`, `L1.domains` and `L1.validators`: the checker never runs them, so they are outside what those checks probe (contract 1.1.2). Information only: it never changes the result.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub unlisted: Vec<String>,
+    /// The commands the fixture names under `notRun`: the checker never ran them, so this check, which runs commands, did not run them either. Information only: it never changes the result, and a command left out of the run is always on the report.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub not_run: Vec<String>,
     /// The invocations the verdict rests on: argv, exit, and what the binary printed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub observed: Vec<Value>,
@@ -207,6 +210,11 @@ impl Check {
         } else {
             format!("{base} (unlisted writes, not probed: {})", self.unlisted.join(", "))
         };
+        let base = if self.not_run.is_empty() {
+            base
+        } else {
+            format!("{base} (not run: {})", self.not_run.join(", "))
+        };
         match &self.reason {
             Some(reason) if self.cut => format!("{base}: {reason} (all in --json findings)"),
             Some(reason) => format!("{base}: {reason}"),
@@ -238,6 +246,7 @@ mod tests {
             cut: false,
             notes: Vec::new(),
             unlisted: Vec::new(),
+            not_run: Vec::new(),
             observed: Vec::new(),
         }
     }
