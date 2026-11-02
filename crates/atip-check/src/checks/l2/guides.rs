@@ -75,6 +75,7 @@ impl<'a> Judge<'a> {
         if let Some(unknown) = plan.unknown {
             calls.push(("skills show nosuch-xyz".to_string(), unknown));
         }
+        calls.extend(plan.listed.iter().map(|(argv, call)| (format!("the fixture's `{argv}`"), *call)));
         for (label, call) in &calls {
             c.own(*call);
             c.holds_at(*call, "writes-nothing", self.at(*call).changes.is_empty(), || format!("`{label}` changed {}", self.at(*call).changes.join(", ")));

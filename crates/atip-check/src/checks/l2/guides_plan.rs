@@ -5,7 +5,7 @@
 use serde_json::Value;
 
 use super::super::l1_plan::L1Run;
-use super::super::{first_document, Invocations, Run};
+use super::super::{first_document, in_json_mode, Invocations, Run};
 use crate::exec::{Call, RunError};
 use crate::fixture::SearchQuery;
 use crate::l1::model::CommandDoc;
@@ -28,6 +28,8 @@ pub(crate) struct SkillsRun {
     pub default: Option<usize>,
     pub guides: Vec<(String, usize)>,
     pub unknown: Option<usize>,
+    /// The fixture's `ok` invocations of `skills show`, measured: the words and the call.
+    pub listed: Vec<(String, usize)>,
 }
 
 /// One stream command: the fixture's `ok` invocations of it (already in the log) and a usage error before the start.
@@ -64,6 +66,12 @@ impl Run<'_> {
             out.skills.guides.push((name.clone(), call));
         }
         out.skills.unknown = Some(self.invoke(Call::new(["skills", "show", "nosuch-xyz", "--json"]).in_empty_state())?);
+        // The fixture's own `skills show` invocations, which run with the fixture's environment: what they write is this row's, never `L2.effects`'.
+        let listed: Vec<Vec<String>> = self.fixture.commands.as_ref().and_then(|commands| commands.get("skills show")).map(|entry| entry.ok.clone()).unwrap_or_default();
+        for argv in listed {
+            let call = self.invoke(Call::new(in_json_mode(&argv)).measured())?;
+            out.skills.listed.push((argv.join(" "), call));
+        }
 
         let docs: Vec<CommandDoc> = l1.docs.commands.iter().map(|(id, doc)| CommandDoc { command: id.clone(), ..doc.clone() }).collect();
         for doc in &docs {

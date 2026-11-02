@@ -75,8 +75,8 @@ impl Run<'_> {
                     out.dry_runs.push(EffectRun { label: format!("{} --dry-run", doc.command), call });
                 }
             }
-            // What `schema` changes is `L1.no-state`'s: one owner for one pass condition.
-            if doc.effect == "read" && doc.command != "schema" {
+            // What `schema` changes is `L1.no-state`'s and what `skills show` changes is `L2.skills`': one owner for one pass condition.
+            if doc.effect == "read" && doc.command != "schema" && doc.command != "skills show" {
                 let note = doc.raw.get("effectNote").and_then(serde_json::Value::as_str).is_some_and(|note| !note.trim().is_empty());
                 for argv in &listed {
                     let call = self.invoke(Call::new(in_json_mode(argv)).measured())?;

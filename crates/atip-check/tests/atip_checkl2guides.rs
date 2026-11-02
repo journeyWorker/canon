@@ -178,3 +178,17 @@ fn atip_checkl2guides_14_the_conforming_fake_and_the_checker_itself_pass() {
     let output = support::atip_in(&work, &tmp, &["check", "--bin", support::ATIP, "--level", "L0", "--fixture", fixture.to_str().expect("utf8"), "--json"]);
     assert_eq!((output.code, output.envelope()["data"]["passed"].as_bool()), (Some(0), Some(true)), "{}", output.stdout);
 }
+
+#[test]
+fn atip_checkl2guides_01_a_skills_show_that_writes_fails_l2_skills_alone_and_l2_effects_leaves_it_to_it() {
+    // The fixture lists `skills show` under `ok` and the tool, run with the fixture's environment, writes a file: one check fails, never two.
+    let case = Case { condition: "skills/writes-nothing", config: l2_config(&json!({"skillsPutsFile": true})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["skills show"] = json!({"ok": [["skills", "show", "--json"]]});
+    });
+    let output = run_case(&case, "L2");
+    let data = &output.envelope()["data"];
+    verdict(data, "L2.skills").unwrap_or_else(|why| panic!("{why}\n{}", not_passing(data)));
+    let skills = check_of(data, "L2.skills");
+    assert!(skills["reason"].as_str().unwrap_or_default().contains("skills show"), "{skills}");
+    assert!(!argvs(check_of(data, "L2.effects")).iter().any(|argv| argv == "skills show --json"), "L2.effects does not run the fixture's skills show");
+}
