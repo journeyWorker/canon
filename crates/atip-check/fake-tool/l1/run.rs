@@ -11,7 +11,7 @@ use super::project;
 use crate::Tool;
 
 /// The words of a path: the arguments before `--` that are no option, `--repo` taking its value with it.
-fn path_words(args: &[String]) -> Vec<String> {
+pub fn path_words(args: &[String]) -> Vec<String> {
     let mut words = Vec::new();
     let mut rest = args.iter().take_while(|arg| arg.as_str() != "--");
     while let Some(arg) = rest.next() {
@@ -36,9 +36,15 @@ pub fn handle(tool: &Tool, args: &[String]) -> Option<ExitCode> {
     if before.iter().any(|arg| arg == "--help" || arg == "-h") {
         return Some(help_for(tool, &words));
     }
+    if tool.flag("l2") {
+        if let Some(code) = super::safety::handle(tool, args, &words).or_else(|| super::guides::handle(tool, args, &words)) {
+            return Some(code);
+        }
+    }
     match words.first().map(String::as_str) {
         Some("member") => Some(member(tool, args, &words)),
         Some("serve") if tool.config.contains_key("serveMode") => Some(serve_command(tool, args)),
+        Some("record") if tool.flag("l2") => Some(record(tool, args, &words)),
         Some("schema") if !tool.flag("noSchema") => Some(schema(tool, args)),
         _ => None,
     }
@@ -76,6 +82,9 @@ fn help_for(tool: &Tool, words: &[String]) -> ExitCode {
             break;
         }
     }
+    if tool.flag("helpWrites") {
+        std::fs::write("help-cache.txt", "written by --help").unwrap_or_default();
+    }
     let text = if let Some(command) = model.command(&current) {
         let doc = patched(
             tool,
@@ -91,7 +100,7 @@ fn help_for(tool: &Tool, words: &[String]) -> ExitCode {
 }
 
 /// A refusal of the model's own rules, in the shape the configuration asks for.
-fn refuse_failure(tool: &Tool, command: &str, failure: Failure) -> ExitCode {
+pub fn refuse_failure(tool: &Tool, command: &str, failure: Failure) -> ExitCode {
     match failure {
         Failure::Unknown(option) => tool.unknown_option(&option, Some(command)),
         Failure::Refuse {
@@ -183,6 +192,11 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
         .flat_map(str::split_whitespace)
         .map(ToString::to_string)
         .collect();
+    if let Some(query) = parsed.text("search") {
+        cache();
+        let tree = patched(tool, "<tree>", super::guides::search_tree(tool, &model, query));
+        return tool.success("schema", tree);
+    }
     let registry: Vec<(String, Option<String>)> = ["errors", "error", "warnings", "warning"]
         .iter()
         .filter(|name| parsed.has(name))
@@ -219,7 +233,7 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
             &[("field", json!("--errors"))],
         );
     }
-    let tree = patched(tool, "<tree>", tree_doc(&model, tool.flag("treeGroupsLast")));
+    let tree = patched(tool, "<tree>", tree_doc(&model, tool.flag("treeGroupsLast"), &tool.text("treeLevel", if tool.flag("l2") { "L2" } else { "L1" })));
     cache();
     tool.success("schema", tree)
 }
@@ -759,21 +773,41 @@ fn search(tool: &Tool, parsed: &Parsed) -> ExitCode {
     tool.success_with("member search", data, meta)
 }
 
+/// A refusal of an item of a command: what [`Tool::refuse`] prints, or what a failed item of a batch reports.
+pub struct ItemError {
+    code: &'static str,
+    message: String,
+    extras: Vec<(&'static str, Value)>,
+}
+
 fn tag(tool: &Tool, parsed: &Parsed) -> ExitCode {
+    match tag_item(tool, parsed) {
+        Ok(data) => {
+            let mut meta = Map::new();
+            if tool.flag("l2") {
+                meta.insert("output".into(), json!("MemberTagReport"));
+            }
+            tool.success_with("member tag", data, meta)
+        }
+        Err(error) => tool.refuse(error.code, &error.message, "member tag", &error.extras),
+    }
+}
+
+/// One `member tag`: the data it reports, or the refusal.
+fn tag_item(tool: &Tool, parsed: &Parsed) -> Result<Value, ItemError> {
     let id = parsed.int("member").unwrap_or_default();
     if !MEMBERS.iter().any(|member| member.id == id) {
         // The hint is a runnable command line; the seeded violation names a command the tool does not have.
         let listing = if tool.flag("hintNoCommand") { "member lst" } else { "member list" };
-        return tool.refuse(
-            "MEMBER_NOT_FOUND",
-            &format!("there is no member {id}"),
-            "member tag",
-            &[
+        return Err(ItemError {
+            code: "MEMBER_NOT_FOUND",
+            message: format!("there is no member {id}"),
+            extras: vec![
                 ("field", json!("MEMBER")),
                 ("received", json!(id.to_string())),
                 ("hint", json!(format!("{} {listing} --json", tool.name()))),
             ],
-        );
+        });
     }
     let path = std::path::Path::new("tags").join(format!("{id}.json"));
     let before: Value = std::fs::read_to_string(&path)
@@ -806,5 +840,148 @@ fn tag(tool: &Tool, parsed: &Parsed) -> ExitCode {
         std::fs::write(&path, after.to_string()).unwrap_or_default();
     }
     after["status"] = json!(status);
-    tool.success_with("member tag", after, Map::new())
+    Ok(after)
+}
+
+// ---- record ----
+
+fn record(tool: &Tool, args: &[String], words: &[String]) -> ExitCode {
+    let model = Model::of(tool);
+    match words.get(1).map(String::as_str) {
+        None => tool.fail("group", "COMMAND_REQUIRED", "record needs a command", Some("record"), &[("expected", json!(["put"]))], 2),
+        Some("put") => {
+            let Some(command) = model.command("record put") else {
+                return tool.unknown_command("put", &["put"], Some("record"));
+            };
+            match parse(tool, command, args, false) {
+                Err(failure) => refuse_failure(tool, "record put", failure),
+                Ok(parsed) => {
+                    if let Some(refused) = tool.seeded_refusal("record put") {
+                        return refused;
+                    }
+                    put(tool, &parsed)
+                }
+            }
+        }
+        Some(word) => tool.unknown_command(word, &["put"], Some("record")),
+    }
+}
+
+/// `record put <ID> --round <N> ...`: writes `records/<ID>.json`; the same record again is `unchanged`.
+fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
+    let id = parsed.int("id").unwrap_or_default();
+    let mut record = json!({"id": id, "round": parsed.int("round").unwrap_or_default()});
+    for (key, value) in [("label", parsed.text("label").map(|text| json!(text))), ("weight", parsed.values("weight").first().cloned()), ("score", parsed.values("score").first().cloned()), ("meta", parsed.values("meta").first().cloned())] {
+        if let Some(value) = value {
+            record[key] = value;
+        }
+    }
+    if let Some(note) = parsed.text("note").filter(|_| !parsed.has("clear-note")) {
+        record["note"] = json!(note);
+    }
+    let path = std::path::Path::new("records").join(format!("{id}.json"));
+    let before: Option<Value> = std::fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str(&text).ok());
+    let status = if before.as_ref() == Some(&record) { "unchanged" } else { "written" };
+    if status == "written" {
+        std::fs::create_dir_all("records").unwrap_or_default();
+        std::fs::write(&path, record.to_string()).unwrap_or_default();
+    }
+    record["status"] = json!(status);
+    if tool.flag("replayStatusWritten") && status == "unchanged" {
+        // The seeded violation: a repeat is reported as new work, with a result that differs from the first run's.
+        record["status"] = json!("written");
+        record["label"] = json!(format!("run-{}", std::process::id()));
+    }
+    tool.success_with("record put", record, Map::new())
+}
+
+// ---- batches ----
+
+/// Executes a batch whose preflight passed (spec 11.11): the items one at a time, in order, stopping at the first that fails.
+pub fn execute_batch(tool: &Tool, id: &'static str, items: Vec<Parsed>) -> ExitCode {
+    let mut report: Vec<Value> = Vec::new();
+    let mut failed: Option<(usize, ItemError)> = None;
+    for (index, parsed) in items.iter().enumerate() {
+        if failed.is_some() {
+            if tool.flag("batchStatusWrong") {
+                // The seeded violation: an item that did not run is reported as written: a valid item, the wrong status.
+                report.push(json!({"index": index, "status": "unchanged", "data": {}}));
+            } else {
+                report.push(json!({"index": index, "status": "skipped"}));
+            }
+            continue;
+        }
+        let result = if parsed.has("__late__") {
+            Err(ItemError { code: "USAGE", message: "the item is not valid".to_string(), extras: vec![("field", json!(format!("/{index}")))] })
+        } else {
+            match id {
+                "member tag" => tag_item(tool, parsed),
+                _ => Err(ItemError { code: "USAGE", message: format!("{id} takes no batch"), extras: Vec::new() }),
+            }
+        };
+        match result {
+            Ok(data) => {
+                let status = data["status"].as_str().unwrap_or("written").to_string();
+                report.push(json!({"index": index, "status": status, "data": data}));
+            }
+            Err(error) => {
+                let object = json!({"code": error.code, "message": error.message, "retryable": tool.flag("batchRetryableWrong"), "field": format!("/{index}/operands/0")});
+                report.push(json!({"index": index, "status": "failed", "error": object}));
+                failed = Some((index, error));
+            }
+        }
+    }
+    let mut meta = tool.meta(Some(id));
+    let failing = failed.is_some() || tool.flag("batchFailsOnSuccess");
+    if !(tool.flag("batchNoOutput") || tool.flag(if failing { "batchNoOutputOnFailure" } else { "batchNoOutputOnSuccess" })) {
+        let output = if id == "member tag" { "MemberTagBatchReport" } else { "BatchReport" };
+        meta.insert("output".into(), json!(output));
+    }
+    if tool.flag("batchItemsShort") {
+        report.retain(|item| item["status"] != "skipped");
+    }
+    let failed = failed.or_else(|| {
+        // The seeded violation: a batch whose items all ran is reported as stopped at its last item.
+        tool.flag("batchFailsOnSuccess").then(|| (items.len().saturating_sub(1), ItemError { code: "INTERNAL", message: "the batch stopped".to_string(), extras: Vec::new() }))
+    });
+    let Some((index, error)) = failed else {
+        if tool.flag("batchOkSingleReport") {
+            return tool.success(id, json!({"items": report.len()}));
+        }
+        if tool.flag("batchOkItemsShort") {
+            report.pop();
+        }
+        if tool.flag("batchOkStatusOdd") {
+            if let Some(item) = report.first_mut() {
+                *item = json!({"index": 0, "status": "skipped"});
+            }
+        }
+        if tool.flag("batchOkReportBadShape") {
+            if let Some(item) = report.first_mut() {
+                item["note"] = json!("extra");
+            }
+        }
+        tool.print_document(&json!({"ok": true, "data": {"items": report}, "meta": meta}));
+        return ExitCode::SUCCESS;
+    };
+    if index == 0 && tool.flag("batchFirstFailPlain") {
+        return tool.refuse(error.code, &error.message, id, &error.extras);
+    }
+    let field = if tool.flag("batchWrongField") { "--input".to_string() } else { format!("/{index}") };
+    if tool.flag("batchReportBadShape") {
+        if let Some(item) = report.first_mut() {
+            item["note"] = json!("extra");
+        }
+    }
+    let mut document = json!({
+        "ok": false,
+        "error": {"code": "BATCH_INCOMPLETE", "message": format!("item {index} of {} failed ({})", items.len(), error.code), "retryable": false, "field": field},
+        "data": {"items": report},
+        "meta": meta,
+    });
+    if tool.flag("batchNoData") {
+        document.as_object_mut().map(|object| object.remove("data"));
+    }
+    tool.print_document(&document);
+    ExitCode::from(1)
 }

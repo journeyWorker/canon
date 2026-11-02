@@ -207,7 +207,7 @@ fn ok_data(stdout: &[u8]) -> Option<Value> {
 
 impl Run<'_> {
     /// The fixture's `ok` invocations of `id`, as argv words in JSON mode, and a parse of each against `doc`.
-    fn bases(&self, doc: &CommandDoc, tool: &str) -> Vec<Invocation> {
+    pub(crate) fn bases(&self, doc: &CommandDoc, tool: &str) -> Vec<Invocation> {
         let listed: Vec<Vec<String>> = self
             .fixture
             .commands
@@ -234,7 +234,7 @@ impl Run<'_> {
     }
 
     /// Whether the checker may run probes of `doc`: a `read` command, or a command the fixture lists with an `ok` invocation.
-    fn runnable(&self, doc: &CommandDoc) -> bool {
+    pub(crate) fn runnable(&self, doc: &CommandDoc) -> bool {
         doc.effect == "read"
             || self
                 .fixture
@@ -245,7 +245,7 @@ impl Run<'_> {
     }
 
     /// Whether the fixture names `command` under `notRun`: the checker never runs it.
-    fn not_run(&self, command: &str) -> bool {
+    pub(crate) fn not_run(&self, command: &str) -> bool {
         self.fixture.not_run.iter().any(|id| id == command)
     }
 
@@ -464,7 +464,7 @@ impl Run<'_> {
 
     /// An invocation like one of `bases` with `arg` given as `word`, and the requirements and constraints of the command still satisfied, so that a refusal of the value is the value's: the
     /// base as it is, else with the options that the broken rules name left out or given another value of their enum (at most two changes).
-    fn carrying(doc: &CommandDoc, bases: &[Invocation], arg: &Arg, word: &str) -> Option<Invocation> {
+    pub(crate) fn carrying(doc: &CommandDoc, bases: &[Invocation], arg: &Arg, word: &str) -> Option<Invocation> {
         let satisfied = |invocation: &Invocation| {
             let args = invocation::args(doc, invocation);
             invocation::requirement_problems(doc, &args).is_empty() && invocation::violated_constraints(doc, &args).is_empty()
@@ -649,7 +649,7 @@ impl Run<'_> {
     }
 
     /// A value for `option`: one a documented example gives it (a value the author wrote is a value the parser takes), else a generated one; never one of `avoid`.
-    fn choose(doc: &CommandDoc, option: &Arg, avoid: &[Value]) -> Option<String> {
+    pub(crate) fn choose(doc: &CommandDoc, option: &Arg, avoid: &[Value]) -> Option<String> {
         let avoided: Vec<String> = avoid.iter().map(witness::word_of).collect();
         let from_examples = doc.examples.iter().filter_map(|line| {
             let words = invocation::split_line(line).ok()?;

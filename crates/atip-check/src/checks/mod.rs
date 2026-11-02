@@ -31,8 +31,10 @@ pub mod rules;
 mod l1;
 mod l1_order;
 mod l1_plan;
+mod l2;
 
 use l1_plan::L1Run;
+use l2::L2Run;
 
 /// A fixture entry a check needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -580,7 +582,7 @@ pub(crate) fn run_checks(
         skipped: Vec::new(),
     };
     let mut calls = run.invoke_all()?;
-    let l1 = if level == Level::L1 {
+    let l1 = if level != Level::L0 {
         let warnings_offered = claim.at_least(Claim::V1_1)
             && first_document(&run.log[calls.schema_warnings].stdout)
                 .is_some_and(|document| document.get("ok") == Some(&Value::Bool(true)) && document.pointer("/data/warnings").is_some_and(Value::is_array));
@@ -590,7 +592,9 @@ pub(crate) fn run_checks(
     };
     calls.served = std::mem::take(&mut run.served);
     calls.skipped = std::mem::take(&mut run.skipped);
-    let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation, l1.as_ref());
+    let l2 = if level == Level::L2 { Some(run.invoke_l2(&calls, l1.as_ref(), claim)?) } else { None };
+    let effects = run.plan_effects(l1.as_ref())?;
+    let judge = Judge::new(&run.log, fixture, claim, &calls, bin_name, mutation, Runs { l1: l1.as_ref(), l2: l2.as_ref(), effects: &effects });
     let mut findings = vec![
         judge.version(),
         judge.version_format(),
@@ -626,6 +630,14 @@ pub(crate) fn run_checks(
         findings.extend(judge.l1_findings());
         table.extend(l1::table(claim));
     }
+    if l2.is_some() {
+        findings.extend(judge.l2_findings());
+        table.extend(l2::table());
+    } else {
+        // `L2.effects` is advisory at L0 and L1: no level gains a rule of a higher level (spec 3.2).
+        findings.push(judge.l2_effects(&effects));
+        table.push(l2::effects_entry());
+    }
     let checks = table
         .into_iter()
         .zip(findings)
@@ -643,7 +655,7 @@ pub(crate) fn run_checks(
             };
             Check {
                 id: entry.id,
-                strength: entry.strength,
+                strength: if (entry.id == "L2.input-usage" && !claim.at_least(Claim::V1_1)) || (entry.id == l2::EFFECTS_ID && level != Level::L2) { Strength::Should } else { entry.strength },
                 result: finding.result,
                 rules: entry.rules.to_vec(),
                 reason: finding.reason,
@@ -651,7 +663,11 @@ pub(crate) fn run_checks(
                 findings: finding.details,
                 cut: finding.cut,
                 notes: finding.notes,
-                unlisted: if matches!(entry.id, "L1.constraints" | "L1.domains" | "L1.validators") { l1.as_ref().map(|l1| l1.unprobed_writes.clone()).unwrap_or_default() } else { Vec::new() },
+                unlisted: if matches!(entry.id, "L1.constraints" | "L1.domains" | "L1.validators") {
+                    l1.as_ref().map(|l1| l1.unprobed_writes.clone()).unwrap_or_default()
+                } else {
+                    l2.as_ref().map(|l2| l2::unlisted(entry.id, l2)).unwrap_or_default()
+                },
                 not_run: if entry.needs.contains(&Commands) || entry.id == "L1.next" { fixture.not_run.clone() } else { Vec::new() },
                 skipped: calls.skipped.iter().filter(|skip| skip.check.is_empty() && entry.needs.contains(&Commands) || skip.check == entry.id).map(|skip| skip.text.clone()).collect(),
                 observed: finding
@@ -664,7 +680,7 @@ pub(crate) fn run_checks(
         .collect();
     let conditions = judge.seen.into_inner();
     Ok(Judged {
-        report: Report::new(if level == Level::L1 { "L1" } else { "L0" }, claim, checks).with_prepare(fixture.prepare.clone()),
+        report: Report::new(match level { Level::L0 => "L0", Level::L1 => "L1", Level::L2 => "L2" }, claim, checks).with_prepare(fixture.prepare.clone()),
         conditions,
     })
 }
@@ -971,18 +987,22 @@ struct Judge<'a> {
     rows: Option<Vec<RegistryRow>>,
     /// What the L1 invocations read, for an L1 run.
     l1: Option<&'a L1Run>,
+    /// What the L2 invocations read, for an L2 run.
+    l2: Option<&'a L2Run>,
+    /// What `L2.effects` reads, at every level.
+    effects: &'a l2::EffectsRun,
+}
+
+/// What the invocations of the levels above L0 read, handed to the judge.
+struct Runs<'a> {
+    l1: Option<&'a L1Run>,
+    l2: Option<&'a L2Run>,
+    effects: &'a l2::EffectsRun,
 }
 
 impl<'a> Judge<'a> {
-    fn new(
-        log: &'a [Outcome],
-        fixture: &'a Fixture,
-        claim: Claim,
-        calls: &'a Invocations,
-        bin_name: &str,
-        mutation: Mutation<'a>,
-        l1: Option<&'a L1Run>,
-    ) -> Self {
+    fn new(log: &'a [Outcome], fixture: &'a Fixture, claim: Claim, calls: &'a Invocations, bin_name: &str, mutation: Mutation<'a>, runs: Runs<'a>) -> Self {
+        let Runs { l1, l2, effects } = runs;
         let documents: Vec<Option<Value>> = log
             .iter()
             .map(|outcome| first_document(&outcome.stdout))
@@ -1032,6 +1052,8 @@ impl<'a> Judge<'a> {
             tool_warnings,
             rows,
             l1,
+            l2,
+            effects,
         }
     }
 
@@ -1059,6 +1081,7 @@ impl<'a> Judge<'a> {
             .iter()
             .chain(l1::TABLE.iter())
             .chain(std::iter::once(&l1::CHECK_ORDER))
+            .chain(l2::table())
             .find(|entry| entry.id == id)
             .unwrap_or_else(|| panic!("{id} is not in a table"));
         Conditions {

@@ -17,13 +17,12 @@ pub const SCHEMA_VERSION: &str = "1.0";
 pub const DECLARED_MINOR: &str = "1.2";
 
 /// `atip`'s error registry (spec 7.3), sorted by code: the four reserved codes it can produce (`USAGE`, `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INTERNAL`) and four of its own.
-pub const REGISTRY: [CodeInfo; 8] = [
+pub const REGISTRY: [CodeInfo; 7] = [
     CodeInfo { code: "BINARY_UNUSABLE", meaning: "the binary named by --bin does not exist, is not a file, is not executable, or cannot be started", exit: 2, retryable: false, fix: "Pass the path of a built, executable binary with --bin <BINARY>.", reasons: &[] },
     CodeInfo { code: "COMMAND_REQUIRED", meaning: "atip was run without a command", exit: 2, retryable: false, fix: "Run atip check --bin <BINARY> --level L0 --fixture <FILE>.", reasons: &[] },
     CodeInfo { code: "FIXTURE_INVALID", meaning: "the fixture file cannot be read, is not JSON, has a member of the wrong shape, or its prepare or setup command failed", exit: 2, retryable: false, fix: "Fix the member the message names, or the setup command, then run atip check again.", reasons: &FIXTURE_INVALID_REASONS },
     CodeInfo { code: "INTERNAL", meaning: "a bug in atip, or its scratch space could not be used", exit: 1, retryable: false, fix: "Report it at https://github.com/journeyWorker/atip/issues with the command line; if the message names a scratch directory, point TMPDIR at a writable one.", reasons: &[] },
     CodeInfo { code: "LEVEL_NOT_MET", meaning: "a MUST check of the level failed or is unprovided", exit: 1, retryable: false, fix: "Read data.checks, fix every check whose result is fail or unprovided, then run atip check again.", reasons: &[] },
-    CodeInfo { code: "LEVEL_UNSUPPORTED", meaning: "the level is known but this release of atip has no checks for it", exit: 2, retryable: false, fix: "Run atip check with --level L0.", reasons: &[] },
     CodeInfo { code: "UNKNOWN_COMMAND", meaning: "the command word is not a command of atip", exit: 2, retryable: false, fix: "Run atip check; it is the only command.", reasons: &[] },
     CodeInfo { code: "USAGE", meaning: "the command line does not parse or does not satisfy the command's requirements", exit: 2, retryable: false, fix: "Run atip check --help for the options.", reasons: &[] },
 ];
@@ -52,7 +51,6 @@ pub enum Code {
     FixtureInvalid,
     Internal,
     LevelNotMet,
-    LevelUnsupported,
     UnknownCommand,
     Usage,
 }
@@ -332,7 +330,6 @@ mod tests {
             (Code::FixtureInvalid, "FIXTURE_INVALID", 2),
             (Code::Internal, "INTERNAL", 1),
             (Code::LevelNotMet, "LEVEL_NOT_MET", 1),
-            (Code::LevelUnsupported, "LEVEL_UNSUPPORTED", 2),
             (Code::UnknownCommand, "UNKNOWN_COMMAND", 2),
             (Code::Usage, "USAGE", 2),
         ] {

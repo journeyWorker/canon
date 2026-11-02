@@ -3,6 +3,7 @@
 #![allow(dead_code, reason = "each integration test uses a part of this module")]
 
 pub mod l1;
+pub mod l2;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,8 +13,8 @@ use serde_json::{json, Value};
 pub const ATIP: &str = env!("CARGO_BIN_EXE_atip");
 pub const FAKE_TOOL: &str = env!("CARGO_BIN_EXE_atip-fake-tool");
 
-/// The number of L0 checks of contract 1.1.
-pub const CHECKS: usize = 28;
+/// The number of checks of a run at L0: the 28 L0 checks of contract 1.1 and `L2.effects`, which every level reports (an advisory below L2).
+pub const CHECKS: usize = 29;
 
 /// The result of one run of `atip`.
 #[derive(Debug)]

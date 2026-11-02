@@ -16,6 +16,8 @@ use support::{atip_in, kind_verdict, Case, Harness, Output};
 /// The L0 checks of a run and the L1 ones that apply to a 1.1 claim.
 const L0_CHECKS: usize = 28;
 const L1_CHECKS: usize = 31;
+/// `L2.effects` is in every report (a SHOULD below L2).
+const EFFECTS: usize = 1;
 /// Conditions a case plants that the conforming fake gives no occasion to judge (a code in both registries, which the conforming fake has none of).
 const EXEMPT_FROM_CONFORMING_RUN: &[&str] = &["warnings/meaning-agrees"];
 
@@ -63,8 +65,8 @@ fn check_of<'a>(data: &'a Value, id: &str) -> &'a Value {
 /// The owner is `fail` with a reason and rule numbers, and every other check passes or does not apply.
 fn verdict(data: &Value, owner: &str) -> Result<(), String> {
     let checks = data["checks"].as_array().ok_or("data.checks is missing")?;
-    if checks.len() != L0_CHECKS + L1_CHECKS {
-        return Err(format!("{} checks, expected {}", checks.len(), L0_CHECKS + L1_CHECKS));
+    if checks.len() != L0_CHECKS + L1_CHECKS + EFFECTS {
+        return Err(format!("{} checks, expected {}", checks.len(), L0_CHECKS + L1_CHECKS + EFFECTS));
     }
     for check in checks {
         let id = check["id"].as_str().unwrap_or_default();
@@ -155,7 +157,7 @@ fn atip_checkl1_01_a_conforming_1_1_tool_passes_the_28_l0_and_the_31_l1_checks_w
     let data = &document["data"];
     assert_eq!((data["level"].as_str(), data["contractVersion"].as_str()), (Some("L1"), Some("1.1")));
     let checks = data["checks"].as_array().expect("checks");
-    assert_eq!(checks.len(), L0_CHECKS + L1_CHECKS);
+    assert_eq!(checks.len(), L0_CHECKS + L1_CHECKS + EFFECTS);
     let ids: Vec<&str> = checks.iter().filter_map(|check| check["id"].as_str()).collect();
     assert_eq!(ids.iter().filter(|id| id.starts_with("L0.")).count(), L0_CHECKS);
     let l1: Vec<&str> = ids.iter().copied().filter(|id| id.starts_with("L1.")).collect();
@@ -178,15 +180,16 @@ fn atip_checkl1_01_a_conforming_1_1_tool_passes_the_28_l0_and_the_31_l1_checks_w
 }
 
 #[test]
-fn atip_checkl1_02_level_l2_is_level_unsupported_naming_0_35_and_an_unknown_level_is_usage() {
+fn atip_checkl1_02_level_l2_runs_and_an_unknown_level_is_usage() {
     let harness = Harness::new();
     let config = l1_standard_config();
     let fixture = harness.l1_fixture(&config);
+    // L2 is a level of the checker: a tool that declares L1 does not meet it (its tree says L1), and nothing says it is unsupported.
     let output = run_fixture(&harness, &config, &fixture, "L2");
     let document = output.envelope();
-    assert_eq!((output.code, document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some(2), Some("LEVEL_UNSUPPORTED"), Some("--level")), "{}", output.stdout);
-    assert_eq!(document["error"]["expected"], json!(["L0", "L1"]));
-    assert!(document["error"]["hint"].as_str().unwrap_or_default().contains("0.35"), "{}", output.stdout);
+    assert_eq!((output.code, document["error"]["code"].as_str()), (Some(1), Some("LEVEL_NOT_MET")), "{}", output.stdout);
+    assert_eq!(document["data"]["level"], "L2");
+    assert_eq!(check_of(&document["data"], "L1.tree")["result"], "fail", "{}", output.stdout);
     let output = run_fixture(&harness, &config, &fixture, "L9");
     assert_eq!((output.code, output.envelope()["error"]["code"].as_str()), (Some(2), Some("USAGE")), "{}", output.stdout);
 }
@@ -530,7 +533,8 @@ fn atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_c
     assert!(report.passed, "{}", report.text());
     let l0_args = CheckArgs { level: Level::L0, ..args.clone() };
     let (_, judged_l0) = check_binary_mutated(&l0_args, &[], &[]).expect("a report");
-    let judged: BTreeSet<String> = judged.difference(&judged_l0).cloned().collect();
+    // The conditions of `L2.effects` are planted by `atip_checkl2safety`: the row runs at every level.
+    let judged: BTreeSet<String> = judged.difference(&judged_l0).filter(|condition| !condition.starts_with("effects/")).cloned().collect();
     let mut named: BTreeSet<String> = l1_cases().iter().map(|case| case.condition.to_string()).collect();
     named.insert(l1_engine_difference_case().condition.to_string());
     let l1_judged = judged;

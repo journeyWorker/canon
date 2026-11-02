@@ -36,7 +36,7 @@ fn atip_check_99_contract_1_2_from_the_option_or_the_fixture_is_a_claim_of_1_2_a
     let output = harness.check(&fixture, true);
     assert_eq!(output.code, Some(0), "{}", output.stdout);
     assert_eq!(output.envelope()["data"]["contractVersion"], "1.2");
-    assert_eq!(output.envelope()["data"]["checks"].as_array().map(Vec::len), Some(28));
+    assert_eq!(output.envelope()["data"]["checks"].as_array().map(Vec::len), Some(29));
     assert!(failing(&output).is_empty(), "{:?}", output.results());
     // The option alone.
     let mut without = fixture.clone();
@@ -258,7 +258,7 @@ fn atip_check_105_the_same_tool_and_fixture_at_1_1_and_at_1_2_differ_only_in_the
     let fixture_12 = harness.l1_fixture(&config_12);
     let at_12 = run_l1(&harness, &config_12, &fixture_12);
     assert_eq!(at_12.code, Some(0), "{:?} {}", failing(&at_12), at_12.stdout.chars().take(300).collect::<String>());
-    assert_eq!(at_12.envelope()["data"]["checks"].as_array().map(Vec::len), Some(60), "28 L0 and 32 L1 checks");
+    assert_eq!(at_12.envelope()["data"]["checks"].as_array().map(Vec::len), Some(61), "28 L0 and 32 L1 checks, and L2.effects");
     assert_eq!(result_of(&at_12, "L1.check-order"), "pass", "{}", at_12.check("L1.check-order"));
     // The checker's own claim stands for the same tool: only the claim differs.
     let mut config_11 = config_12.clone();
@@ -272,7 +272,7 @@ fn atip_check_105_the_same_tool_and_fixture_at_1_1_and_at_1_2_differ_only_in_the
     assert_eq!(at_11.envelope()["data"]["contractVersion"], "1.1");
     let ids = |output: &Output| -> Vec<String> { output.results().into_iter().map(|(id, _)| id).collect() };
     let (ids_12, ids_11) = (ids(&at_12), ids(&at_11));
-    assert_eq!(ids_11.len(), 59);
+    assert_eq!(ids_11.len(), 60);
     let only_12: Vec<&String> = ids_12.iter().filter(|id| !ids_11.contains(id)).collect();
     assert_eq!(only_12, ["L1.check-order"]);
     // `L1.check-order` stands behind `L1.validators`, and no row that ran at 1.1 changed its result.

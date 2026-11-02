@@ -116,14 +116,14 @@ const REASON_SYNONYMS: [(&str, &str); 22] = [
 ];
 
 /// Whether `field` names the argument `arg`: its `--name`, its name, its value name, or a pointer ending in its document key.
-fn names_argument(field: &str, arg: &Arg) -> bool {
+pub(crate) fn names_argument(field: &str, arg: &Arg) -> bool {
     let squash = |text: &str| -> String { text.chars().filter(char::is_ascii_alphanumeric).collect::<String>().to_ascii_lowercase() };
     let field = squash(field.rsplit('/').next().unwrap_or(field));
     field == squash(&arg.name) || arg.value_name.as_ref().is_some_and(|value_name| field == squash(value_name))
 }
 
 /// What a failure envelope says, for a reason.
-fn refusal_text(document: Option<&Value>, exit: Exit) -> String {
+pub(crate) fn refusal_text(document: Option<&Value>, exit: Exit) -> String {
     match document {
         Some(document) if document.get("ok") == Some(&Value::Bool(false)) => {
             let (code, field) = refusal_of(document);
@@ -135,11 +135,11 @@ fn refusal_text(document: Option<&Value>, exit: Exit) -> String {
 }
 
 impl<'a> Judge<'a> {
-    fn l1(&self) -> &'a L1Run {
+    pub(crate) fn l1(&self) -> &'a L1Run {
         self.l1.expect("the L1 checks run only with an L1 run")
     }
 
-    fn docs(&self) -> &'a ToolDocs {
+    pub(crate) fn docs(&self) -> &'a ToolDocs {
         &self.l1().docs
     }
 
@@ -149,7 +149,7 @@ impl<'a> Judge<'a> {
     }
 
     /// The envelope of an invocation when it is a success.
-    fn ok_envelope(&self, index: usize) -> Option<&Value> {
+    pub(crate) fn ok_envelope(&self, index: usize) -> Option<&Value> {
         self.envelope(index).filter(|document| document.get("ok") == Some(&Value::Bool(true)))
     }
 
@@ -161,14 +161,14 @@ impl<'a> Judge<'a> {
     }
 
     /// The failure `(code, field)` of an invocation's envelope.
-    fn failure(&self, index: usize) -> Option<(Option<&str>, Option<&str>)> {
+    pub(crate) fn failure(&self, index: usize) -> Option<(Option<&str>, Option<&str>)> {
         self.envelope(index)
             .filter(|document| document.get("ok") == Some(&Value::Bool(false)))
             .map(refusal_of)
     }
 
     /// Whether the invocation was refused as a usage problem: exit 2 and a failure envelope.
-    fn refused(&self, index: usize) -> bool {
+    pub(crate) fn refused(&self, index: usize) -> bool {
         self.at(index).exit == Exit::Code(2) && self.failure(index).is_some()
     }
 
@@ -187,7 +187,7 @@ impl<'a> Judge<'a> {
     }
 
     /// A finding for a check that has nothing to read because the tool printed no tree.
-    fn no_tree(&self, c: Conditions<'a>) -> Finding {
+    pub(crate) fn no_tree(&self, c: Conditions<'a>) -> Finding {
         c.finish_as(End::Unsupported("`schema --json` printed no tree: L1.tree reports it".to_string()))
     }
 
@@ -319,7 +319,7 @@ impl<'a> Judge<'a> {
                 problems.into_iter().map(|problem| format!("`schema --json` does not validate against schema-doc.schema.json: {problem}")).collect(),
             );
             if let Some(tree) = &l1.docs.tree {
-                for (condition, problem) in doc_rules::tree_findings(document, tree, "L1") {
+                for (condition, problem) in doc_rules::tree_findings(document, tree, if self.l2.is_some() { "L2" } else { "L1" }) {
                     c.holds_at(l1.tree, condition, problem.is_none(), || problem.clone().unwrap_or_default());
                 }
             }
@@ -389,6 +389,10 @@ impl<'a> Judge<'a> {
                 for (condition, problem) in doc_rules::command_findings(doc, &tool, self.claim, &exit_of) {
                     // The form of a `pattern` and the Rust limit are `L1.patterns`' (checker.md 6, 7.2).
                     if condition == "rule-3-domain-pattern" {
+                        continue;
+                    }
+                    // At L2 `input.example` is `L2.input-example`'s: one owner for one pass condition.
+                    if condition == "rule-7" && self.l2.is_some() {
                         continue;
                     }
                     c.holds_at(call.call, condition, problem.is_none(), || problem.clone().unwrap_or_default());
@@ -649,7 +653,14 @@ impl<'a> Judge<'a> {
             c.holds_in(Some(l1_tree_call), condition, problem.is_none(), || problem.clone().unwrap_or_default());
         }
         for doc in self.docs().commands.values() {
-            for (condition, problem) in documents::grammar_findings(&[], Some(doc), documents::minor_of(self.claim)) {
+            // At L2 `commit` and `plan-digest` of a destructive command are flag-only by `L2.destructive-safety`'s judgment: one owner for one pass condition.
+            let mut judged = doc.clone();
+            if self.l2.is_some() && doc.effect == "destructive" {
+                for option in judged.options.iter_mut().filter(|option| matches!(option.name.as_str(), "commit" | "plan-digest")) {
+                    option.flag_only = true;
+                }
+            }
+            for (condition, problem) in documents::grammar_findings(&[], Some(&judged), documents::minor_of(self.claim)) {
                 c.holds_in(self.doc_call(&doc.command), condition, problem.is_none(), || problem.clone().unwrap_or_default());
             }
         }
@@ -1002,7 +1013,8 @@ impl<'a> Judge<'a> {
                 format!("{}: --{} {} is one beyond the safe integers and was not refused: {}", run.command, run.arg, run.word, refusal_text(self.envelope(run.call), self.at(run.call).exit))
             });
         }
-        c.finish(!l1.numbers.is_empty())
+        let in_documents = self.l2.is_some() && self.l2_numbers_in_documents(&mut c);
+        c.finish(!l1.numbers.is_empty() || in_documents)
     }
 
     fn l1_validators(&'a self) -> Finding {

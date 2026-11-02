@@ -56,11 +56,6 @@
       "retryable": false
     },
     {
-      "code": "LEVEL_UNSUPPORTED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "UNKNOWN_COMMAND",
       "exit": 2,
       "retryable": false

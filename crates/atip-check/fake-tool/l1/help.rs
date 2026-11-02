@@ -9,7 +9,9 @@ use crate::Tool;
 
 fn agents_line(tool: &Tool, path: &str) -> String {
     let name = tool.name();
-    if path.is_empty() {
+    if path.is_empty() && tool.flag("l2") && !tool.flag("helpNoSkillsLine") {
+        format!("Agents: \"{name} schema --json\" describes every command as JSON; \"{name} skills show\" prints the guides.\n\n")
+    } else if path.is_empty() {
         format!("Agents: \"{name} schema --json\" describes every command as JSON.\n\n")
     } else {
         format!("Agents: \"{name} schema {path} --json\" describes this command as JSON.\n\n")

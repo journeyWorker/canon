@@ -107,6 +107,10 @@ impl Tool {
 
     fn commands(&self) -> Vec<&'static str> {
         let mut commands = vec!["init", "items", "member", "reject", "status", "team", "touch"];
+        if self.flag("l2") {
+            commands.retain(|command| *command != "touch");
+            commands.extend(["build", "deploy", "log", "peek", "purge", "record", "seal", "skills", "stamp"]);
+        }
         if !self.flag("noSchema") {
             commands.push("schema");
         }
@@ -659,6 +663,17 @@ impl Tool {
             let exit = if self.flag("stoppedMidwayExit2") { 2 } else { 1 };
             table.push(("STOPPED_MIDWAY".to_string(), exit, &[][..], "m".to_string(), "f".to_string()));
         }
+        if self.flag("l2") {
+            const INPUT_INVALID: &[&str] = &["BATCH_UNSUPPORTED", "EMPTY", "FLAG_ONLY_KEY", "INVALID_VALUE", "NOT_JSON", "NOT_OBJECT", "STDIN_TTY", "UNKNOWN_KEY", "UNREADABLE"];
+            const TOO_LARGE: &[&str] = &["TOO_MANY_BYTES", "TOO_MANY_ITEMS"];
+            for row in &mut table {
+                match row.0.as_str() {
+                    "INPUT_INVALID" => row.2 = INPUT_INVALID,
+                    "INPUT_TOO_LARGE" => row.2 = TOO_LARGE,
+                    _ => {}
+                }
+            }
+        }
         for row in self.config.get("extraCodes").and_then(Value::as_array).into_iter().flatten() {
             table.push((
                 row["code"].as_str().unwrap_or_default().to_string(),
@@ -683,7 +698,8 @@ impl Tool {
                         .and_then(Value::as_i64)
                         .unwrap_or(exit)
                 };
-                let retryable = code == "STOPPED_MIDWAY" && self.flag("stoppedMidwayRetryable");
+                let retryable = (code == "STOPPED_MIDWAY" && self.flag("stoppedMidwayRetryable"))
+                    || self.config.get("retryableCodes").and_then(Value::as_array).is_some_and(|codes| codes.iter().any(|retryable| retryable == &code));
                 let mut row = json!({"code": code, "exit": exit, "retryable": retryable, "meaning": meaning, "fix": fix});
                 if self.is_1_1() && !reasons.is_empty() {
                     row["reasons"] = json!(reasons
@@ -747,10 +763,34 @@ fn wait_in_raw_mode(mode: &str) {
 }
 
 fn main() -> ExitCode {
-    let config: Map<String, Value> = std::env::var_os("FAKE_ATIP_CONFIG")
+    let mut config: Map<String, Value> = std::env::var_os("FAKE_ATIP_CONFIG")
         .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default();
+    // An executable named `...claims12...` is a tool that claims 1.2 when no configuration says otherwise (the run in an empty directory has no environment).
+    if config.is_empty() {
+        // The name of the executable alone: the directory it is in says nothing.
+        let name = std::env::args().next().and_then(|path| std::path::Path::new(&path).file_name().map(|file| file.to_string_lossy().into_owned())).unwrap_or_default();
+        if name.contains("claims12") {
+            config.insert("claims".to_string(), json!("1.2"));
+        }
+        // An L2 tool answers `skills show` in an empty directory with a minimal environment, which has no configuration to read.
+        if name.contains("-l2") {
+            config.insert("l2".to_string(), json!(true));
+            config.insert("l1Registry".to_string(), json!(true));
+            // The seeded violations of what that run answers are named in the executable's name, after `-l2`: `...-l2-skillswrites`.
+            const KNOBS: [&str; 11] = [
+                "skillsPutsFile", "skillsNeedsState", "skillsBadSchema", "skillsDefaultNotListed", "skillsGuideBadSchema", "skillsWrongName", "skillsGuidesDiffer", "skillsUnknownOk",
+                "skillsUnknownNoExpected", "skillsMissingName", "guideBadOption",
+            ];
+            let file = name.to_lowercase();
+            for knob in KNOBS {
+                if file.split('-').any(|token| token == knob.to_lowercase()) {
+                    config.insert(knob.to_string(), json!(true));
+                }
+            }
+        }
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut tool = Tool {
         config,
@@ -846,6 +886,11 @@ fn is_unknown_option(arg: &str) -> bool {
         "--total",
         "--note",
         "--clear-note",
+        "--round",
+        "--label",
+        "--weight",
+        "--score",
+        "--meta",
     ];
     arg.starts_with("--") && arg != "--" && !known.contains(&arg)
 }
@@ -892,6 +937,21 @@ fn die_by_signal() {
 }
 
 fn run(tool: &Tool, args: &[String]) -> ExitCode {
+    // An L2 tool reads `--input` first (spec 11.7): a refusal, a batch, or the argv that says what the document and argv say.
+    let synthesized: Vec<String>;
+    let args: &[String] = if tool.flag("l2") {
+        match l1::prepare_input(tool, args) {
+            l1::Prepared::Unchanged => args,
+            l1::Prepared::Done(code) => return code,
+            l1::Prepared::Argv(words) => {
+                synthesized = words;
+                &synthesized
+            }
+            l1::Prepared::Batch(id, items) => return l1::execute_batch(tool, id, items),
+        }
+    } else {
+        args
+    };
     if let Some(code) = l1::handle(tool, args) {
         return code;
     }
@@ -982,6 +1042,13 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
     match command.as_str() {
         "init" => {
             std::fs::write("state.txt", "initialised").unwrap_or_default();
+            if tool.flag("l2") {
+                // The logs `purge` removes.
+                std::fs::create_dir_all("logs").unwrap_or_default();
+                for name in ["run-a", "session-a", "session-b"] {
+                    std::fs::write(format!("logs/{name}.log"), format!("{name}\n")).unwrap_or_default();
+                }
+            }
             if let Some(log) = tool.config.get("initLog").and_then(Value::as_str) {
                 let mut file = std::fs::OpenOptions::new()
                     .create(true)
@@ -1183,6 +1250,9 @@ fn touch(tool: &Tool, name: &Option<String>, input: &Option<String>) -> ExitCode
 }
 
 fn version(tool: &Tool) -> ExitCode {
+    if tool.flag("versionWrites") {
+        std::fs::write("version-cache.txt", "written by --version").unwrap_or_default();
+    }
     if tool.flag("versionStderr") {
         eprintln!("warming up");
     }

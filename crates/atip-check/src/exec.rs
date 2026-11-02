@@ -397,6 +397,33 @@ impl Runner {
         Ok(outcome)
     }
 
+    /// Runs `calls` all at once in one fresh copy of the template: requests that meet at the same state. The number of the
+    /// sequence they ran in and one outcome each, in order; none is measured.
+    pub fn run_concurrently(&mut self, calls: &[Call]) -> Result<(usize, Vec<Outcome>), RunError> {
+        let (number, sequence) = self.sequence(false)?;
+        let runner = &*self;
+        let results: Vec<std::io::Result<Outcome>> = thread::scope(|scope| {
+            let handles: Vec<_> = calls.iter().map(|call| scope.spawn(|| runner.execute(call, &sequence))).collect();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap_or_else(|_| Err(std::io::Error::other("an invocation thread panicked"))))
+                .collect()
+        });
+        let mut outcomes = Vec::with_capacity(results.len());
+        for result in results {
+            let mut outcome = result.map_err(|error| RunError::Spawn(format!("{}: {error}", self.bin.display())))?;
+            outcome.sequence = number;
+            outcomes.push(outcome);
+        }
+        Ok((number, outcomes))
+    }
+
+    /// The state of sequence `number` as text: two sequences with the same files, sizes and contents give the same text.
+    pub fn fingerprint(&self, number: usize) -> Result<String, RunError> {
+        let state = Self::both(&self.sequence_dir(number)).map_err(|error| RunError::Scratch(error.to_string()))?;
+        Ok(format!("{state:?}"))
+    }
+
     /// Runs `call` with stdin and stdout on one terminal (canonical input, no echo, output untranslated), in its
     /// own fresh copy. A process still running after `deadline` gets the end-of-file character at the start of a
     /// line and two more seconds; [`Outcome::at_deadline`] says what it did.

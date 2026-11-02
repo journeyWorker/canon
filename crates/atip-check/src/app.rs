@@ -6,7 +6,7 @@ use std::process::ExitCode;
 
 use crate::checks::{run_checks, Judged, Mutation};
 use crate::claim::Claim;
-use crate::cli::{self, CheckArgs, Command, Level, CHECK_HELP, ROOT_HELP};
+use crate::cli::{self, CheckArgs, Command, CHECK_HELP, ROOT_HELP};
 use crate::exec::{RunError, Runner};
 use crate::fixture;
 use crate::output::{failure_line, failure_text, success_line, Code, Failure};
@@ -134,10 +134,6 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
     let refuse = |code: Code, message: String, field: &str| {
         Failure::new(code, message).in_command("check").field(field)
     };
-    match args.level {
-        Level::L0 | Level::L1 => {}
-        Level::L2 => return Err(unsupported("L2", "0.35")),
-    }
     let fixture_path = Path::new(&args.fixture);
     let fixture = fixture::load(fixture_path).map_err(|error| {
         refuse(Code::FixtureInvalid, error.message, "--fixture").reason(error.reason)
@@ -194,20 +190,6 @@ fn check_binary_with(args: &CheckArgs, mutation: Mutation<'_>) -> Result<Judged,
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
     run_checks(runner, &fixture, claim, &name, mutation, args.level).map_err(from_run)
-}
-
-fn unsupported(level: &str, release: &str) -> Failure {
-    Failure::new(
-        Code::LevelUnsupported,
-        format!("{level} is not supported yet: this release of atip has the L0 and L1 checks only"),
-    )
-    .in_command("check")
-    .field("--level")
-    .expected(["L0", "L1"])
-    .received(level)
-    .hint(format!(
-        "{level} checks arrive in {release}; run atip check --level L1 until then."
-    ))
 }
 
 /// The binary as an absolute path: a path as given, a bare name found on `PATH`; it must be an executable file.

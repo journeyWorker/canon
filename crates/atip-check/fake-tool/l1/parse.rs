@@ -18,6 +18,8 @@ const SAFE: i128 = 9_007_199_254_740_991;
 pub struct Parsed {
     /// Each given argument by name, its values in order; a switch holds `true`, a count its number of occurrences.
     pub given: BTreeMap<&'static str, Vec<Value>>,
+    /// The first option the command does not have, when the tool defers its refusal behind the requirements (`unknownOptionDeferred`).
+    pub deferred_unknown: Option<String>,
 }
 
 impl Parsed {
@@ -109,7 +111,7 @@ fn parse_integer(tool: &Tool, arg: &Arg, text: &str) -> Result<Value, Failure> {
 }
 
 /// The typed value of `text` for `arg` (10.7.2).
-fn typed(tool: &Tool, arg: &Arg, text: &str) -> Result<Value, Failure> {
+pub fn typed(tool: &Tool, arg: &Arg, text: &str) -> Result<Value, Failure> {
     let field = arg.field();
     match arg.value_type {
         "integer" => parse_integer(tool, arg, text),
@@ -147,6 +149,17 @@ fn typed(tool: &Tool, arg: &Arg, text: &str) -> Result<Value, Failure> {
 /// Reads `args` (the whole argv: path words, options and operands) by the grammar of 9.12 against `command`,
 /// then enforces required arguments, domains, constraints and validators, in that order (spec 11.7 step 6).
 pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) -> Result<Parsed, Failure> {
+    let mut parsed = read_words(tool, command, args)?;
+    if let Some(text) = parsed.text("input").map(ToString::to_string) {
+        merge_input(tool, command, &text, &mut parsed)?;
+    }
+    enforce(tool, command, &parsed, skip_rules)?;
+    Ok(parsed)
+}
+
+/// Reads `args` (the whole argv: path words, options and operands) by the grammar of 9.12 against `command`: no
+/// requirement, domain, constraint or validator is enforced (spec 11.7 step 3).
+pub fn read_words(tool: &Tool, command: &Command, args: &[String]) -> Result<Parsed, Failure> {
     let path_len = command.path().len();
     let mut parsed = Parsed::default();
     let mut path_seen = 0;
@@ -248,12 +261,15 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
         }
     }
     bind_operands(tool, command, &operands, &mut parsed)?;
-    if let Some(text) = parsed.text("input").map(ToString::to_string) {
-        merge_input(tool, command, &text, &mut parsed)?;
-    }
+    parsed.deferred_unknown = deferred_unknown;
+    Ok(parsed)
+}
+
+/// What is left of `parse` after the words are read and the document merged: the stages of spec 11.7 step 6.
+fn enforce(tool: &Tool, command: &Command, parsed: &Parsed, skip_rules: bool) -> Result<(), Failure> {
     // The seeded violations of `L1.check-order` (spec 11.7 step 6): a stage answers before an earlier one.
     if tool.flag("orderDomainFirst") {
-        check_domains(tool, command, &parsed, false)?;
+        check_domains(tool, command, parsed, false)?;
     }
     for arg in command.args.iter().filter(|arg| arg.required) {
         if !parsed.has(arg.name) {
@@ -264,21 +280,21 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
             ));
         }
     }
-    if let Some(word) = deferred_unknown {
-        return Err(Failure::Unknown(word));
+    if let Some(word) = &parsed.deferred_unknown {
+        return Err(Failure::Unknown(word.clone()));
     }
     if tool.flag("orderConstraintFirst") && !skip_rules {
-        check_rules(tool, command, &parsed)?;
+        check_rules(tool, command, parsed)?;
     }
-    check_domains(tool, command, &parsed, tool.flag("orderLaterDomain"))?;
+    check_domains(tool, command, parsed, tool.flag("orderLaterDomain"))?;
     if tool.flag("orderValidatorFirst") {
-        check_validators(tool, command, &parsed)?;
+        check_validators(tool, command, parsed)?;
     }
     if !skip_rules {
-        check_rules(tool, command, &parsed)?;
+        check_rules(tool, command, parsed)?;
     }
-    check_validators(tool, command, &parsed)?;
-    Ok(parsed)
+    check_validators(tool, command, parsed)?;
+    Ok(())
 }
 
 /// Reads the document of `--input` (`-`: the document on stdin) into the arguments it gives; an argument that argv gave stays as it is.
@@ -335,7 +351,7 @@ fn bind_operands(tool: &Tool, command: &Command, words: &[String], parsed: &mut 
     Ok(())
 }
 
-fn compiled(domain: &Value) -> Option<jsonschema::Validator> {
+pub fn compiled(domain: &Value) -> Option<jsonschema::Validator> {
     jsonschema::options()
         .with_draft(Draft::Draft202012)
         .should_validate_formats(false)
@@ -343,7 +359,7 @@ fn compiled(domain: &Value) -> Option<jsonschema::Validator> {
         .ok()
 }
 
-fn check_domains(tool: &Tool, command: &Command, parsed: &Parsed, reverse: bool) -> Result<(), Failure> {
+pub fn check_domains(tool: &Tool, command: &Command, parsed: &Parsed, reverse: bool) -> Result<(), Failure> {
     let order: Vec<&Arg> = if reverse { command.args.iter().rev().collect() } else { command.args.iter().collect() };
     for arg in order {
         let Some(domain) = &arg.domain else { continue };
@@ -371,11 +387,11 @@ fn check_domains(tool: &Tool, command: &Command, parsed: &Parsed, reverse: bool)
     Ok(())
 }
 
-fn given(command: &Command, parsed: &Parsed, name: &str) -> bool {
+pub fn given(command: &Command, parsed: &Parsed, name: &str) -> bool {
     command.arg(name).is_some() && parsed.has(name)
 }
 
-fn field_of(command: &Command, name: &str) -> String {
+pub fn field_of(command: &Command, name: &str) -> String {
     command
         .arg(name)
         .map_or_else(|| name.to_string(), Arg::field)
@@ -410,7 +426,7 @@ fn violation(command: &Command, parsed: &Parsed, rule: &Rule) -> Option<&'static
     }
 }
 
-fn check_rules(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), Failure> {
+pub fn check_rules(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), Failure> {
     // Seeded: the constraints are judged from the last declared to the first.
     let mut rules: Vec<(usize, &super::spec::Rule)> = command.rules.iter().enumerate().collect();
     if tool.flag("rulesReversed") {
@@ -456,7 +472,7 @@ fn is_calendar_date(text: &str) -> bool {
     (1..=days).contains(&day)
 }
 
-fn check_validators(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), Failure> {
+pub fn check_validators(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), Failure> {
     if tool.flag("validatorRejectsNothing") {
         return Ok(());
     }

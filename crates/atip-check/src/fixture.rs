@@ -3,8 +3,8 @@
 //! A fixture is a JSON object. At L0 the checker reads `contractVersion`, `setup`, `env`, `timeoutSeconds`,
 //! `prepare` (programs run before `setup`), `probe`, `globalOptions`, `registry` (a list, or `"from-schema"`), `warnings` and, in `commands`, the invocations `ok`, `refused`,
 //! `paged` and `missingValue`. At L1 it also reads, in `commands`, `fields` (selections) and `domainRejects` (values outside a
-//! pattern or a structural domain, by argument). The other members of `commands` (`batchFailsAt`, `preview`,
-//! `allowedEffects`, `async`, ...), `search` and any other member belong to L2 and are ignored when present.
+//! pattern or a structural domain, by argument). At L2 it reads, in `commands`, `batchFailsAt`, `batchFailsFirst`, `preview`,
+//! `async` and `allowedEffects`, and `search`; a member this checker does not know is ignored when present.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -44,6 +44,41 @@ pub struct CommandEntry {
     pub paged: Vec<Vec<String>>,
     /// Values outside a `pattern` or a structural domain, by argument name: the fixture author knows them, the checker cannot generate them (`L1.domains`, `L1.patterns`).
     pub domain_rejects: BTreeMap<String, Vec<String>>,
+    /// Batches whose item `index` fails during execution: the documents and the index of the failing one (`L2.batch-incomplete`).
+    pub batch_fails_at: Vec<BatchCase>,
+    /// Batches whose first item fails during execution (`L2.batch-incomplete`).
+    pub batch_fails_first: Vec<BatchCase>,
+    /// Invocations of a destructive command that print its plan (`L2.destructive-preview` and the rows after it).
+    pub preview: Vec<Vec<String>>,
+    /// The async start of the command and the controllable worker (`L2.async`, `L2.operation-key`).
+    pub async_entry: Option<AsyncEntry>,
+    /// Glob patterns of the paths a successful `read` command of the fixture may change (`L2.effects`).
+    pub allowed_effects: Vec<String>,
+}
+
+/// The `async` entry of a command (approaches/checker.md 5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AsyncEntry {
+    /// The invocation that starts the work.
+    pub start: Vec<String>,
+    /// The environment variable the tool's test build reads to pick the outcome of its worker.
+    pub worker: String,
+    /// The outcomes the worker is driven to, of `done`, `failed` and `timeout`.
+    pub outcomes: Vec<String>,
+}
+
+/// One question of the fixture's `search` and the command it expects among the first five entries (`L2.search`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchQuery {
+    pub query: String,
+    pub expect: String,
+}
+
+/// One batch of `--input` documents that stops at its item `index` (approaches/checker.md 5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchCase {
+    pub input: Vec<Value>,
+    pub index: usize,
 }
 
 /// What the checker reads from a fixture.
@@ -74,6 +109,8 @@ pub struct Fixture {
     /// document, and ends it by a signal; its other runs that would succeed are skipped and reported. From L1 each is a command of the tool's documents
     /// with an `effectNote`.
     pub not_run: Vec<String>,
+    /// The questions `schema --search` is asked (`L2.search`); empty when the fixture has none.
+    pub search: Vec<SearchQuery>,
 }
 
 impl Fixture {
@@ -188,6 +225,7 @@ pub fn parse(document: &Value) -> Result<Fixture, String> {
         },
         commands,
         not_run,
+        search: object.get("search").map(search).transpose()?.unwrap_or_default(),
     })
 }
 
@@ -425,6 +463,37 @@ fn registry(value: &Value) -> Result<Vec<RegistryRow>, String> {
     Ok(parsed)
 }
 
+/// `batchFailsAt` and `batchFailsFirst`: a list of `{input: [document...], index}`; the first one fails, so its `index` is 0.
+fn batch_cases(value: Option<&Value>, id: &str, key: &str) -> Result<Vec<BatchCase>, String> {
+    let Some(value) = value else { return Ok(Vec::new()) };
+    let list = value.as_array().ok_or_else(|| format!("`commands/{id}/{key}` must be an array of {{input, index}}"))?;
+    let mut cases = Vec::with_capacity(list.len());
+    for (at, item) in list.iter().enumerate() {
+        let path = format!("commands/{id}/{key}/{at}");
+        let object = item.as_object().ok_or_else(|| format!("`{path}` must be an object {{input, index}}"))?;
+        if let Some(member) = object.keys().find(|member| !["input", "index"].contains(&member.as_str())) {
+            return Err(format!("`{path}/{member}` is not a member of a batch entry: only `input` and `index`"));
+        }
+        let input = object
+            .get("input")
+            .and_then(Value::as_array)
+            .filter(|documents| !documents.is_empty() && documents.iter().all(Value::is_object))
+            .ok_or_else(|| format!("`{path}/input` must be a non-empty array of JSON objects: the documents of the batch"))?
+            .clone();
+        let index = object
+            .get("index")
+            .and_then(Value::as_u64)
+            .and_then(|index| usize::try_from(index).ok())
+            .filter(|index| *index < input.len())
+            .ok_or_else(|| format!("`{path}/index` must be the index of an item of `input`"))?;
+        if key == "batchFailsFirst" && index != 0 {
+            return Err(format!("`{path}/index` must be 0 in `batchFailsFirst`: the first item fails"));
+        }
+        cases.push(BatchCase { input, index });
+    }
+    Ok(cases)
+}
+
 fn commands(value: &Value) -> Result<BTreeMap<String, CommandEntry>, String> {
     let object = value
         .as_object()
@@ -456,10 +525,87 @@ fn commands(value: &Value) -> Result<BTreeMap<String, CommandEntry>, String> {
                 fields: list("fields")?,
                 paged: list("paged")?,
                 domain_rejects: domain_rejects(entry.get("domainRejects"), id)?,
+                batch_fails_at: batch_cases(entry.get("batchFailsAt"), id, "batchFailsAt")?,
+                batch_fails_first: batch_cases(entry.get("batchFailsFirst"), id, "batchFailsFirst")?,
+                preview: list("preview")?,
+                async_entry: entry.get("async").map(|value| async_entry(value, id)).transpose()?,
+                allowed_effects: allowed_effects(entry.get("allowedEffects"), id)?,
             },
         );
     }
     Ok(entries)
+}
+
+/// `async` of command `id`: `{start, worker, outcomes}`.
+fn async_entry(value: &Value, id: &str) -> Result<AsyncEntry, String> {
+    let path = format!("commands/{id}/async");
+    let object = value.as_object().ok_or_else(|| format!("`{path}` must be an object {{start, worker, outcomes}}"))?;
+    if let Some(member) = object.keys().find(|member| !["start", "worker", "outcomes"].contains(&member.as_str())) {
+        return Err(format!("`{path}/{member}` is not a member of an async entry: only `start`, `worker` and `outcomes`"));
+    }
+    let start = argv(object.get("start").ok_or_else(|| format!("`{path}/start` is missing: the invocation that starts the work"))?, &format!("{path}/start"))?;
+    let worker = object
+        .get("worker")
+        .and_then(Value::as_str)
+        .filter(|name| !name.is_empty() && !name.contains(['=', '\0']))
+        .ok_or_else(|| format!("`{path}/worker` must be the name of the environment variable the tool's test build reads to pick its worker's outcome"))?
+        .to_string();
+    let outcomes: Vec<String> = object
+        .get("outcomes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("`{path}/outcomes` must be an array of done, failed and timeout"))?
+        .iter()
+        .enumerate()
+        .map(|(at, outcome)| {
+            outcome
+                .as_str()
+                .filter(|outcome| ["done", "failed", "timeout"].contains(outcome))
+                .map(str::to_string)
+                .ok_or_else(|| format!("`{path}/outcomes/{at}` must be done, failed or timeout"))
+        })
+        .collect::<Result<_, _>>()?;
+    if outcomes.is_empty() {
+        return Err(format!("`{path}/outcomes` must name at least one outcome"));
+    }
+    Ok(AsyncEntry { start, worker, outcomes })
+}
+
+/// `allowedEffects` of command `id`: a list of non-empty glob patterns.
+fn allowed_effects(value: Option<&Value>, id: &str) -> Result<Vec<String>, String> {
+    let Some(value) = value else { return Ok(Vec::new()) };
+    let list = value.as_array().ok_or_else(|| format!("`commands/{id}/allowedEffects` must be an array of path patterns"))?;
+    list.iter()
+        .enumerate()
+        .map(|(at, pattern)| {
+            pattern
+                .as_str()
+                .filter(|pattern| !pattern.is_empty() && !pattern.contains('\0'))
+                .map(str::to_string)
+                .ok_or_else(|| format!("`commands/{id}/allowedEffects/{at}` must be a non-empty path pattern"))
+        })
+        .collect()
+}
+
+/// `search`: a list of `{query, expect}`, `expect` a command id.
+fn search(value: &Value) -> Result<Vec<SearchQuery>, String> {
+    let list = value.as_array().ok_or("`search` must be an array of {query, expect}")?;
+    list.iter()
+        .enumerate()
+        .map(|(at, item)| {
+            let path = format!("search/{at}");
+            let object = item.as_object().ok_or_else(|| format!("`{path}` must be an object {{query, expect}}"))?;
+            if let Some(member) = object.keys().find(|member| !["query", "expect"].contains(&member.as_str())) {
+                return Err(format!("`{path}/{member}` is not a member of a search entry: only `query` and `expect`"));
+            }
+            let query = object.get("query").and_then(Value::as_str).filter(|query| !query.trim().is_empty() && !query.contains('\0')).ok_or_else(|| format!("`{path}/query` must be a non-empty string"))?;
+            let expect = object
+                .get("expect")
+                .and_then(Value::as_str)
+                .filter(|id| is_command_id(&id.split(' ').map(str::to_string).collect::<Vec<_>>()))
+                .ok_or_else(|| format!("`{path}/expect` must be a command id"))?;
+            Ok(SearchQuery { query: query.to_string(), expect: expect.to_string() })
+        })
+        .collect()
 }
 
 /// `domainRejects` of command `id`: an object of argument name to a list of values (strings, as argv words).
@@ -520,10 +666,10 @@ mod tests {
                 "finding close": {
                     "ok": [["finding", "close", "x", "--json"]],
                     "missingValue": [["finding", "close", "--json"]],
-                    "fields": [["round"]], "domainRejects": {"tag": ["x"]}, "batchFailsAt": 7
+                    "fields": [["round"]], "domainRejects": {"tag": ["x"]}, "batchFailsAt": [{"input": [{}], "index": 0}], "preview": [["purge", "--json"]], "allowedEffects": ["a/*"], "async": {"start": ["deploy", "start"], "worker": "W", "outcomes": ["done"]}
                 }
             },
-            "search": 3, "other": true
+            "search": [{"query": "close it", "expect": "finding close"}], "other": true
         }))
         .expect("valid");
         assert_eq!(fixture.claim(), Claim::V1_1);
@@ -539,6 +685,8 @@ mod tests {
         assert_eq!(fixture.missing_values().len(), 1);
         let entry = &fixture.commands.as_ref().expect("commands")["finding close"];
         assert_eq!(entry.ok.len(), 1);
+        assert_eq!((entry.preview.len(), entry.allowed_effects.len(), entry.async_entry.as_ref().map(|entry| entry.worker.as_str())), (1, 1, Some("W")));
+        assert_eq!(fixture.search, [super::SearchQuery { query: "close it".to_string(), expect: "finding close".to_string() }]);
         let empty = parse(&json!({})).expect("an empty fixture is valid");
         assert_eq!(
             (empty.timeout, empty.probe.is_none(), empty.registry.is_none(), empty.claim()),

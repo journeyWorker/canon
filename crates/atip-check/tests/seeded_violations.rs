@@ -382,7 +382,8 @@ fn atip_check_56_each_pass_condition_fails_exactly_its_owner_and_a_run_with_the_
         let args = args_for(&harness, &harness.fixture(&config));
         let (report, conditions) = check_binary_mutated(&args, &[], &[]).expect("a report");
         assert!(report.passed, "{config}: {}", report.text());
-        judged.extend(conditions);
+        // The conditions of `L2.effects` are planted by `atip_checkl2safety`: the row runs at every level.
+        judged.extend(conditions.into_iter().filter(|condition| !condition.starts_with("effects/")));
     }
     let named: BTreeSet<String> = cases()
         .iter()

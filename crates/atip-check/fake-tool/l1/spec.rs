@@ -218,6 +218,8 @@ pub struct Output {
     pub version: &'static str,
     /// The report of a batch input (spec 11.11).
     pub batch: bool,
+    /// The name of the schema of an event, for an output that is a stream (spec 13.5).
+    pub event: Option<&'static str>,
 }
 
 /// A leaf command.
@@ -228,6 +230,8 @@ pub struct Command {
     pub effect: &'static str,
     pub idempotency: Option<&'static str>,
     pub effect_note: Option<&'static str>,
+    /// The command starts work it does not finish (spec 13.2): `async: true` in its document.
+    pub is_async: bool,
     pub args: Vec<Arg>,
     pub rules: Vec<Rule>,
     pub validators: Vec<Validator>,
@@ -248,6 +252,7 @@ impl Command {
             effect: "read",
             idempotency: None,
             effect_note: None,
+            is_async: false,
             args: Vec::new(),
             rules: Vec::new(),
             validators: Vec::new(),
@@ -307,6 +312,7 @@ impl Command {
             fields: None,
             version: "1.0",
             batch: false,
+            event: None,
         });
         self.schemas.push((schema, schema_value));
         self
@@ -319,8 +325,24 @@ impl Command {
             fields: None,
             version: "1.0",
             batch: false,
+            event: None,
         });
         self.schemas.push((schema, schema_value));
+        self
+    }
+
+    /// An output that is a stream of `event`s ending in a result of `schema`, chosen by `when`.
+    pub fn output_stream(mut self, schema: &'static str, event: &'static str, when: Option<&'static str>, schema_value: Value, event_value: Value) -> Self {
+        self.outputs.push(Output {
+            schema,
+            when,
+            fields: None,
+            version: "1.0",
+            batch: false,
+            event: Some(event),
+        });
+        self.schemas.push((schema, schema_value));
+        self.schemas.push((event, event_value));
         self
     }
 
@@ -332,6 +354,7 @@ impl Command {
             fields: None,
             version: "1.0",
             batch: true,
+            event: None,
         });
         self.schemas.push((schema, schema_value));
         self
@@ -368,6 +391,25 @@ impl Command {
         self
     }
 
+    /// What `member tag` is in an L2 tool: its note comes from `FAKE_NOTE` when no document or argv gives one, and it takes a batch.
+    fn with_l2(mut self, l2: bool) -> Self {
+        if l2 {
+            if let Some(note) = self.args.iter_mut().find(|arg| arg.name == "note") {
+                note.env = Some("FAKE_NOTE");
+            }
+            self = self.output_batch(
+                "MemberTagBatchReport",
+                "--input is a list of documents",
+                json!({
+                    "type": "object",
+                    "required": ["items"],
+                    "properties": {"items": {"type": "array", "items": {"type": "object", "properties": {"data": {"$ref": "#/schemas/MemberTagReport"}}}}}
+                }),
+            );
+        }
+        self
+    }
+
     pub fn arg(&self, name: &str) -> Option<&Arg> {
         self.args.iter().find(|arg| arg.name == name)
     }
@@ -396,6 +438,12 @@ pub struct Group {
 /// What the tool's command set depends on: the claim and the seeded extras.
 #[derive(Debug, Clone, Copy)]
 pub struct Shape {
+    /// Whether the tool is an L2 tool: `--input` on every write command, a batch for `member tag`, and the `record` group.
+    pub l2: bool,
+    /// Whether the relation of `--commit` and `--plan-digest` of `purge` states a code of its own.
+    pub pair_code: bool,
+    /// Whether `member tag` takes a batch in an L2 tool.
+    pub batch: bool,
     /// Whether the tool claims 1.1 (the warning registry, `--warning`).
     pub is_1_1: bool,
     /// Whether the tool claims 1.2 (`limit`, `cursor`, `all` and `fields` are flag-only; `member list` reads `--input -`).
@@ -423,6 +471,22 @@ pub fn groups(shape: Shape) -> Vec<Group> {
             summary: "Manage teams",
         },
     ];
+    if shape.l2 {
+        groups.push(Group {
+            id: "record",
+            summary: "Keep records",
+        });
+    }
+    if shape.l2 {
+        groups.push(Group {
+            id: "skills",
+            summary: super::guides::SKILLS_SUMMARY,
+        });
+        groups.push(Group {
+            id: "deploy",
+            summary: super::safety::DEPLOY_SUMMARY,
+        });
+    }
     if shape.deep {
         groups.push(Group {
             id: "team roster",
@@ -704,7 +768,7 @@ fn member_search() -> Command {
         ])
 }
 
-fn member_tag() -> Command {
+fn member_tag(l2: bool) -> Command {
     Command::new("member tag", "Tag a member; the tags go to tags/<MEMBER>.json")
         .writes("replay-safe")
         .operand(
@@ -743,6 +807,7 @@ fn member_tag() -> Command {
             }),
         )
         .examples(&["{tool} member tag 3 --tag lead --tag core --note promoted --json"])
+        .with_l2(l2)
 }
 
 fn schema_command(shape: Shape) -> Command {
@@ -751,6 +816,10 @@ fn schema_command(shape: Shape) -> Command {
         Arg::option("error", "string", "Print one error registry entry").value("CODE"),
     ];
     let mut names = vec!["path", "errors", "error"];
+    if shape.l2 {
+        options.push(Arg::option("search", "string", "Find the commands that answer a question").value("QUERY"));
+        names.push("search");
+    }
     if shape.is_1_1 {
         options.push(Arg::option("warnings", "switch", "Print the warning registry"));
         options.push(Arg::option("warning", "string", "Print one warning registry entry").value("CODE"));
@@ -901,7 +970,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
         state_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
         member_list(shape),
         member_search(),
-        member_tag(),
+        member_tag(shape.l2 && shape.batch),
         Command::new("reject", "Send a request the backend always rejects")
             .writes("replay-safe")
             .options(Vec::new())
@@ -949,7 +1018,80 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
                 .examples(&["{tool} team roster list --json"]),
         );
     }
+    if shape.l2 {
+        commands.retain(|command| command.id != "touch");
+        commands.push(record_put());
+        commands.extend(super::safety::commands(shape.pair_code));
+        commands.extend(super::guides::commands());
+        for command in &mut commands {
+            if command.id == "member tag" {
+                super::inputdoc::add_input(command, shape.batch, json!({"operands": [3], "tag": ["lead"]}));
+            } else if command.effect != "read" || command.id == "member list" {
+                let example = match command.id {
+                    "record put" => json!({"operands": [7], "round": 1, "label": "alpha"}),
+                    "member list" => json!({"team": "core"}),
+                    "purge" => json!({"kind": "session", "before": "2030-01-01"}),
+                    "deploy start" => json!({"operands": ["staging"]}),
+                    "stamp" | "log" => json!({"operands": ["hello"]}),
+                    _ => json!({}),
+                };
+                super::inputdoc::add_input(command, false, example);
+            }
+        }
+    }
     commands.extend(serve);
     commands.sort_by_key(|command| command.id);
     commands
+}
+
+/// `record put`: a write whose arguments have every value type, for the rows that read how a document and argv are merged.
+fn record_put() -> Command {
+    Command::new("record put", "Put one record; it is written to records/<ID>.json")
+        .writes("replay-safe")
+        .operand(
+            Arg::operand("id", "integer", "The record number")
+                .value("ID")
+                .required()
+                .domain(json!({"minimum": 1})),
+        )
+        .options(vec![
+            Arg::option("round", "integer", "The round the record belongs to")
+                .value("ROUND")
+                .required()
+                .domain(json!({"minimum": 1, "maximum": 99})),
+            Arg::option("label", "string", "A label kept with the record")
+                .value("LABEL")
+                .env("FAKE_LABEL")
+                .domain(json!({"maxLength": 40})),
+            Arg::option("weight", "number", "The weight of the record")
+                .value("WEIGHT")
+                .domain(json!({"minimum": 0})),
+            Arg::option("score", "integer", "The score of the record")
+                .value("SCORE")
+                .domain(json!({"minimum": 0, "maximum": 1000})),
+            Arg::option("meta", "json", "Free metadata kept with the record").value("JSON"),
+            Arg::option("note", "string", "A note kept with the record").value("TEXT"),
+            Arg::option("clear-note", "switch", "Remove the note kept with the record"),
+        ])
+        .rule(Rule::at_most_one(&["note", "clear-note"]).code("NOTE_CONFLICT"))
+        .errors(&["NOTE_CONFLICT", "USAGE"])
+        .output(
+            "RecordPutReport",
+            json!({
+                "type": "object",
+                "required": ["id", "round", "status"],
+                "properties": {
+                    "id": {"type": "integer"},
+                    "round": {"type": "integer"},
+                    "label": {"type": "string"},
+                    "weight": {"type": "number"},
+                    "score": {"type": "integer"},
+                    "meta": {},
+                    "note": {"type": "string"},
+                    "status": {"enum": ["written", "unchanged"]}
+                },
+                "additionalProperties": false
+            }),
+        )
+        .examples(&["{tool} record put 7 --round 1 --label alpha --weight 1 --meta '{\"a\":1,\"b\":2}' --json"])
 }

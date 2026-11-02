@@ -853,6 +853,14 @@ fn document_args(doc: &CommandDoc, item: &Value, at: &str, problems: &mut Vec<St
     out
 }
 
+/// The explicit arguments of one `--input` document (the keys are camelCase option names and `operands`) and the problems of its values:
+/// a key no option has, a flag-only key, a value outside its type or domain.
+pub fn document_arguments(doc: &CommandDoc, item: &Value) -> (Args, Vec<String>) {
+    let mut problems = Vec::new();
+    let args = document_args(doc, item, "", &mut problems);
+    (args, problems)
+}
+
 /// Compares a document's arguments with argv's and merges them (spec 11.7 steps 3-4).
 fn merge_args(
     doc: &CommandDoc,

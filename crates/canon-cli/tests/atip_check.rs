@@ -147,7 +147,8 @@ fn run_checker(bin: &Path) -> atip_check::report::Report {
 fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_committed_fixture() {
     let report = run_checker(Path::new(CANON));
     assert!(report.passed, "{}", report.text());
-    assert_eq!(report.checks.len(), 28);
+    // The 28 L0 checks and `L2.effects`, which every level reports (a SHOULD below L2).
+    assert_eq!(report.checks.len(), 28 + 1);
     assert_eq!(report.contract_version, "1.1");
     // The fixture has a paging call and a next-step call, so these two are judged, and only `L0.contract` (a 1.0 rule) does not apply.
     for id in ["L0.next", "L0.page"] {
@@ -166,11 +167,13 @@ fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1()
     let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
     let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
     assert!(report.passed, "{}", report.text());
-    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.1", 28 + 31));
+    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.1", 28 + 31 + 1));
     let failing: Vec<&str> = report.checks.iter().filter(|check| matches!(check.result, atip_check::report::CheckResult::Fail | atip_check::report::CheckResult::Unprovided)).map(|check| check.id).collect();
     // The one advisory canon does not meet: `--kind` names the set of ledger kinds on `gate promote` and the kinds `gate purge` can delete, which share no value (L1.one-meaning-values, a SHOULD).
-    assert_eq!(failing, ["L1.one-meaning-values"], "no MUST check fails or is unprovided for canon, and the one advisory is the known one:\n{}", report.text());
-    assert_eq!(report.advisories(), 1);
+    // The other is `L2.effects`, a SHOULD below L2: `query` writes its access line to `.canon/audit/access.jsonl`, which the fixture does not list under
+    // `allowedEffects` until `canon-0-35-claim-l2` (canon declares `effectNote` and the path in `canon-0-35-read-writes`).
+    assert_eq!(failing, ["L1.one-meaning-values", "L2.effects"], "no MUST check fails or is unprovided for canon, and the two advisories are the known ones:\n{}", report.text());
+    assert_eq!(report.advisories(), 2);
     // The tree says the level the claim is (L1.tree), and the fixture names every step it made outside canon.
     assert_eq!(report.find("L1.tree").map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{}", report.text());
     // Two `git` steps and the stub app that `canon dashboard` (under `notRun`: it serves until it is signalled) needs in the sandbox repo.
