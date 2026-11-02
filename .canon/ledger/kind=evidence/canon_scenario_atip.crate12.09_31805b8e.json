@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T08:17:54.457077Z",
+  "attachments": [
+    {
+      "case": "error::tests::atip_crate12_09_a_reason_of_a_code_the_table_does_not_hold_stops_the_evaluation",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-1-2-junit.xml",
+      "sha256": "91377b7a664444adb05ce2f42a272a37ce30d2dcb676acad005ec4675026d068"
+    }
+  ],
+  "code_tree": "f64b9176e07eda1b87097b51662cc4bd8a7059db",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-1-2-junit.xml"
+  },
+  "evidence_sha": "6e50ee5f81818f8e44320231928fa5e5f1fa64d1",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "atip.crate12.09",
+  "schema": 1,
+  "staging_id": "f204caad",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
