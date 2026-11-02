@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T17:40:10.848067Z",
+  "change_id": "canon-0-35-canon-cursor-1-2",
+  "code_tree": "276e9a2237949d440c74791e0fc4d5450c7b4b92",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_canoncursor.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "792712dc344fb492b687e823fed87af2df55c2ea",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Verified on the real binary (792712dc, one commit after the evidence run): query --kind subject --limit 1 -> meta.next[0].argv is [query, --kind=subject, --limit=1, --cursor=<v>, --json] only, under CANON_ROLE=reviewer too (the role is bound, not carried); changing --limit, --fields, or replacing --limit by --all continues (all returns the remaining 3 of 4); other --kind, an added --domain, --repo ., CANON_ROLE set, --as reviewer -> CURSOR_INVALID ARGUMENTS_CHANGED field --cursor; a changed character and another command's cursor -> FOREIGN; --limit with --all -> USAGE --limit; the cursor is atip.<b64 scope>.<sha256>.<b64 key>.<mac>, no key in the clear; a 0.34 hex cursor -> FOREIGN; --fields nosuch is USAGE --fields with expected in text and JSON; export --input with limit, cursor, all or fields -> INPUT_INVALID FLAG_ONLY_KEY /<key>; refused export cursor leaves .canon byte-identical; schema documents mark limit/cursor/all/fields flagOnly on the four commands (retrieve and search --limit too). Full nextest 3954 passed; atip check L1 met at the 1.1 claim, and with a 1.2 fixture copy L1.grammar and L1.check-order now pass: the only failures left are meta.contractVersion (claim-l2) and the old SHOULD L1.one-meaning-values. Check-order 1_1 and 2_1 closed: finding/evidence/schema --as zzz nosuch and the other group-word shapes answer USAGE --as, an unknown word before --as still answers UNKNOWN_COMMAND, an unknown option before it answers first.",
+  "worktree_dirty": false
+}

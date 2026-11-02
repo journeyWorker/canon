@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T17:40:06.207044Z",
+  "change_id": "canon-0-35-canon-check-order",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/arg_rules/relaxed.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "276e9a2237949d440c74791e0fc4d5450c7b4b92",
+  "resolution_sha": "1ca58cd28d5ad25de4ca4dce0c8c1963d7a28af6",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (brief F1, spec 11.7 step 6; scenarios atip.checkorder.01, .02): a value outside a possibleValues set that stands before an unknown command word, or before a missing command word, does not answer; the later one does. Real binary: 'canon --as zzz nosuch' -> UNKNOWN_COMMAND field command, 'canon finding --as zzz nosuch' -> UNKNOWN_COMMAND, 'canon --as zzz' -> COMMAND_REQUIRED; the earliest failure on the line is --as, so USAGE field --as is required. 0.34 answers the same (not a regression), but F1 names the unknown command word as a failure to parse and asks for the earliest one. Cause: clap checks the subcommand before it validates the root's global --as value; earlier_failure reparses args[..at] and the prefix 'canon --as zzz' gives it no error. No scenario pairs a command-word failure with an earlier bad value (02 pairs it only with a later domain; 01 pairs --as zzz with an unknown option only). Blast radius: only a bad --as before the command words; every leaf-level pair I tried (enum value, wrong integer, missing value, stray operand, unknown option, both orders) answers the earliest.",
+  "worktree_dirty": false
+}
