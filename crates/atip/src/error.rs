@@ -21,8 +21,10 @@
 //!   code, since 1.1), `message`, `retryable`, then `field` (the argument or
 //!   JSON pointer refused), `expected` (the valid set when there is one),
 //!   `received` (the refused value, secrets redacted; `""` when the caller
-//!   sent an empty value), `suggestions` and `hint`. A member with no value is
-//!   absent, never `null` and never `[]` (spec 6.5).
+//!   sent an empty value), `suggestions` and `hint`. When one input yields
+//!   several errors (spec 7.1.1) the first is the error itself and
+//!   [`CliError::details`] lists every one as `details`. A member with no value
+//!   is absent, never `null` and never `[]` (spec 6.5).
 //!
 //! Exit codes: `0` ok; `1` the command ran and its answer is negative or
 //! incomplete ([`EXIT_FAILED`]); `2` the command refused to run
@@ -251,6 +253,8 @@ struct CliErrorDetail {
     suggestions: Vec<String>,
     /// Tool extension members of the error object (`x-<tool>`, spec 7.1): name and value.
     extensions: BTreeMap<String, Value>,
+    /// Every error of an input that yields several, the first included (spec 7.1.1); empty for an error alone.
+    details: Vec<CliError>,
 }
 
 /// The `error` member of a failure envelope. Field order is the document
@@ -283,6 +287,32 @@ pub struct ErrorBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
     /// The tool's own members (`x-canon`); the contract's error schema allows any `x-<tool>` member.
+    #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, Value>,
+    /// Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Vec<ErrorDetailBody>>,
+}
+
+/// One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorDetailBody {
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub received: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub suggestions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
     #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(skip)]
     pub extensions: BTreeMap<String, Value>,
@@ -386,6 +416,18 @@ impl CliError {
         self
     }
 
+    /// Lists every error of an input that yields several (spec 7.1.1), the error itself first. The body carries
+    /// them as `details` when there are two or more.
+    pub fn details(mut self, errors: Vec<CliError>) -> Self {
+        self.detail_mut().details = errors;
+        self
+    }
+
+    /// The errors listed with [`CliError::details`].
+    pub fn detail_errors(&self) -> &[CliError] {
+        self.detail.as_deref().map_or(&[], |detail| detail.details.as_slice())
+    }
+
     /// The stderr text: `<tool>: <CODE>: <message>`, then one indented line for
     /// each of `field`, `expected`, `suggestions` and `hint` the error has
     /// (spec 7.4.1). `tool` is the executable name (`canon`). `field` is the
@@ -404,6 +446,9 @@ impl CliError {
         if let Some(hint) = self.hint_text() {
             text.push_str(&format!("\n  hint: {hint}"));
         }
+        for item in self.detail_errors() {
+            text.push_str(&format!("\n  problem: {}: {}", item.field_name().unwrap_or_default(), item.message));
+        }
         text
     }
 
@@ -421,6 +466,22 @@ impl CliError {
             expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
             received: self.received_value().map(|received| redact(self.field_name(), received)),
             suggestions,
+            hint: self.hint_text().filter(|hint| !hint.is_empty()).map(str::to_string),
+            extensions: self.extensions().cloned().unwrap_or_default(),
+            details: (self.detail_errors().len() > 1).then(|| self.detail_errors().iter().map(CliError::detail_body).collect()),
+        }
+    }
+
+    /// This error as one item of `details`: the item's own `field` and suggestions, `received` redacted by that field.
+    fn detail_body(&self) -> ErrorDetailBody {
+        ErrorDetailBody {
+            code: self.code.to_string(),
+            reason: self.reason_name().map(str::to_string),
+            message: self.message.clone(),
+            field: self.field_name().filter(|field| !field.is_empty()).map(str::to_string),
+            expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
+            received: self.received_value().map(|received| redact(self.field_name(), received)),
+            suggestions: self.suggested().to_vec(),
             hint: self.hint_text().filter(|hint| !hint.is_empty()).map(str::to_string),
             extensions: self.extensions().cloned().unwrap_or_default(),
         }
@@ -586,5 +647,22 @@ mod tests {
         assert!(wrong_length.is_err(), "the length of the reasons is the count of the rows");
         let wrong_table_length = std::panic::catch_unwind(|| with_row::<9>(ROWS, STOPPED_MIDWAY));
         assert!(wrong_table_length.is_err(), "the length of the table is the number of rows plus one");
+    }
+
+    #[test]
+    fn several_errors_of_one_input_are_details_and_one_error_has_none() {
+        let first = CliError::from_row("USAGE", "a is wrong", None).field("/a").reason("SHAPE");
+        let second = CliError::from_row("USAGE", "b is wrong", None).field("/api-token").received("hunter2").suggestions(["c"]);
+        let several = first.clone().details(vec![first.clone(), second.clone()]);
+        assert_eq!(several.detail_errors().len(), 2);
+        let body = several.body_with(Some("/a".to_string()), Vec::new());
+        assert_eq!(
+            serde_json::to_string(&body).expect("a body serializes"),
+            r#"{"code":"USAGE","reason":"SHAPE","message":"a is wrong","retryable":false,"field":"/a","details":[{"code":"USAGE","reason":"SHAPE","message":"a is wrong","field":"/a"},{"code":"USAGE","message":"b is wrong","field":"/api-token","received":"<redacted>","suggestions":["c"]}]}"#
+        );
+        assert_eq!(several.human("canon", Some("/a"), &[]), "canon: USAGE: a is wrong\n  field: /a\n  problem: /a: a is wrong\n  problem: /api-token: b is wrong");
+        // one item is not "several": the member is absent
+        let one = first.clone().details(vec![first]);
+        assert!(one.body_with(None, Vec::new()).details.is_none());
     }
 }

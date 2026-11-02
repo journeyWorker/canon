@@ -1069,6 +1069,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -1126,6 +1136,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -1922,6 +1987,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -1979,6 +2054,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -3039,6 +3169,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -3096,6 +3236,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -4738,6 +4933,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -4795,6 +5000,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -5978,6 +6238,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -6035,6 +6305,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -6318,6 +6643,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -6375,6 +6710,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -7019,6 +7409,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -7076,6 +7476,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -7759,6 +8214,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -7816,6 +8281,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -8395,6 +8915,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -8452,6 +8982,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -9094,6 +9679,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -9151,6 +9746,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -9650,6 +10300,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -9707,6 +10367,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -10466,6 +11181,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -10523,6 +11248,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -11242,6 +12022,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -11299,6 +12089,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -12544,6 +13389,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -12601,6 +13456,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -13463,6 +14373,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -13520,6 +14440,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -14325,6 +15300,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -14382,6 +15367,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -15035,6 +16075,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -15092,6 +16142,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -15850,6 +16955,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -15907,6 +17022,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -16955,6 +18125,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -17012,6 +18192,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -17389,6 +18624,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -17446,6 +18691,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -17940,6 +19240,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -17997,6 +19307,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -18850,6 +20215,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -18907,6 +20282,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -19484,6 +20914,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -19541,6 +20981,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -20347,6 +21842,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -20404,6 +21909,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -20858,6 +22418,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -20915,6 +22485,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -22252,6 +23877,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -22309,6 +23944,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -22824,6 +24514,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -22881,6 +24581,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -23492,6 +25247,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -23549,6 +25314,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -25560,6 +27380,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -25617,6 +27447,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -26005,6 +27890,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -26062,6 +27957,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -26741,6 +28691,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -26798,6 +28758,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -27489,6 +29504,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -27546,6 +29571,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -28224,6 +30304,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -28281,6 +30371,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -30800,6 +32945,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -30857,6 +33012,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -32466,6 +34676,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -32523,6 +34743,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -32977,6 +35252,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -33034,6 +35319,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -33491,6 +35831,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -33548,6 +35898,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -34188,6 +36593,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -34245,6 +36660,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -35048,6 +37518,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -35105,6 +37585,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -36095,6 +38630,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -36152,6 +38697,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -36709,6 +39309,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -36766,6 +39376,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
