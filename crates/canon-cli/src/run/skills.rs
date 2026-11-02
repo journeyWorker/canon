@@ -170,7 +170,7 @@ fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
 }
 
 /// A failed skills command. An unknown provider, a malformed `skills:` section or a `--skills-source` directory that does not exist is an invalid argument, a refusal (exit 2, D4); anything else is an operational failure (exit 1).
-fn skills_error(err: &crate::skills::SkillsError) -> CliError {
+pub(crate) fn skills_error(err: &crate::skills::SkillsError) -> CliError {
     use crate::skills::SkillsError;
     match err {
         SkillsError::Unavailable(error) => error.clone(),

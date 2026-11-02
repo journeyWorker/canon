@@ -21575,12 +21575,14 @@
         "INIT_AGENTS_MD_CONFLICT",
         "INIT_CONFIG_EXISTS",
         "INIT_INVALID_ARGUMENT",
-        "INIT_SKILL_INSTALL_FAILED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
+        "SKILLS_FAILED",
+        "SKILLS_INVALID_ARGUMENT",
+        "STOPPED_MIDWAY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -40784,13 +40786,6 @@
       "retryable": false
     },
     {
-      "code": "INIT_SKILL_INSTALL_FAILED",
-      "exit": 1,
-      "fix": "Fix the skill install target the error names, then run `canon skills install`.",
-      "meaning": "canon.yaml was written but the canon skill was not installed",
-      "retryable": false
-    },
-    {
       "code": "INPUT_CONFLICT",
       "exit": 2,
       "fix": "Give the value once: drop the flag or the key, or make the two equal.",
@@ -41316,6 +41311,20 @@
       "exit": 2,
       "fix": "Pass --project with the id of the spec root to use.",
       "meaning": "no single spec root could be chosen; pass --project",
+      "retryable": false
+    },
+    {
+      "code": "STOPPED_MIDWAY",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step reads it), then act on the fix of the reason; never run the same command again unread.",
+      "meaning": "a command that works in steps stopped after an earlier step made its effects, because a later step met what the command refuses before its work; `reason` is the code of that refusal, and the message and `meta.next` say what was already done",
+      "reasons": [
+        {
+          "fix": "Read what init wrote (`canon status`), fix the skill source or the `skills:` section the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md, or the providers or the `skills:` section are invalid: what `canon skills install` refuses before it starts",
+          "reason": "SKILLS_INVALID_ARGUMENT"
+        }
+      ],
       "retryable": false
     },
     {

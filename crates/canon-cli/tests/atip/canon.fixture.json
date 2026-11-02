@@ -829,11 +829,6 @@
       "retryable": false
     },
     {
-      "code": "INIT_SKILL_INSTALL_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
       "code": "INPUT_CONFLICT",
       "exit": 2,
       "retryable": false
@@ -1181,6 +1176,14 @@
     {
       "code": "SPEC_ROOT_UNRESOLVED",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STOPPED_MIDWAY",
+      "exit": 1,
+      "reasons": [
+        "SKILLS_INVALID_ARGUMENT"
+      ],
       "retryable": false
     },
     {

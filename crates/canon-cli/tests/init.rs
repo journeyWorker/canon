@@ -698,7 +698,9 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
 }
 
 /// authoring.init.95: when the skill source is missing, init still
-/// records the choice, then exits 1 naming the install to run.
+/// records the choice, then exits 1 with `STOPPED_MIDWAY` (the refusal
+/// `canon skills install` gives before its work is the reason) naming
+/// the install to run.
 #[test]
 fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry() {
     let tmp = tempfile::tempdir().unwrap();
@@ -707,7 +709,7 @@ fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry(
 
     let out = init_with_source(&[], &repo, &tmp.path().join("missing"));
     assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
-    assert!(stderr(&out).contains("INIT_SKILL_INSTALL_FAILED"), "{}", stderr(&out));
+    assert!(stderr(&out).starts_with("canon: STOPPED_MIDWAY: "), "{}", stderr(&out));
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [pi]\n"));
     assert!(projected(&repo).is_empty());
 

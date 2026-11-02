@@ -1033,11 +1033,16 @@ fn pointed(error: CliError, map: &DocMap, prefix: &str) -> CliError {
     error.field(field)
 }
 
-/// The error of a child's failure envelope, `field` pointed into the batch.
+/// The error of a child's failure envelope, `field` pointed into the batch. The element's `reason` is its own: an item that
+/// stopped midway is `STOPPED_MIDWAY` with the refusal's code as its reason (spec 8.3.2, 11.11), and the batch is `BATCH_INCOMPLETE`.
 fn error_of(envelope: &Value, map: &DocMap, prefix: &str) -> CliError {
     let body = &envelope["error"];
-    let code = body["code"].as_str().and_then(crate::cli_error::code_info).map_or("INTERNAL", |info| info.code);
+    let row = body["code"].as_str().and_then(crate::cli_error::code_info);
+    let code = row.map_or("INTERNAL", |info| info.code);
     let mut error = CliError::failed(code, body["message"].as_str().unwrap_or("the element failed without a message")).hint(body["hint"].as_str().unwrap_or("run the element on its own to see its output"));
+    if let Some(reason) = row.zip(body["reason"].as_str()).and_then(|(info, reason)| info.find_reason(reason)) {
+        error = error.reason(reason.reason);
+    }
     if let Some(field) = body["field"].as_str() {
         error = error.field(field);
     }
@@ -1266,4 +1271,31 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
         }
     }
     Some(Value::Object(object))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn map() -> DocMap {
+        DocMap { fields: Vec::new(), operand_names: Vec::new(), operands_on_cmdline: false }
+    }
+
+    /// atip.midway.08: a batch element that stops midway is `failed` with `STOPPED_MIDWAY` and its reason as its own error, the
+    /// batch is `BATCH_INCOMPLETE` (spec 8.3.2, 11.11); a reason the registry does not hold under the code is not carried.
+    #[test]
+    fn atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error() {
+        let child = json!({"ok": false, "error": {"code": "STOPPED_MIDWAY", "reason": "SKILLS_INVALID_ARGUMENT", "message": "wrote canon.yaml, then the install was refused", "retryable": false}});
+        let element = error_of(&child, &map(), "/items/0");
+        assert_eq!((element.code, element.reason_name(), element.exit, element.retryable), ("STOPPED_MIDWAY", Some("SKILLS_INVALID_ARGUMENT"), 1, false));
+        let item = serde_json::to_value(element.body()).expect("an error body serializes");
+        assert_eq!((item["code"].clone(), item["reason"].clone()), (json!("STOPPED_MIDWAY"), json!("SKILLS_INVALID_ARGUMENT")), "{item}");
+        let batch = incomplete(&element, 0);
+        assert_eq!((batch.code, batch.exit), ("BATCH_INCOMPLETE", 1));
+        assert!(batch.message.contains("STOPPED_MIDWAY"), "{}", batch.message);
+        let made_up = json!({"ok": false, "error": {"code": "STOPPED_MIDWAY", "reason": "MADE_UP", "message": "m", "retryable": false}});
+        assert_eq!(error_of(&made_up, &map(), "/items/0").reason_name(), None, "an unregistered reason is dropped, so the item error stays one the registry holds");
+        let plain = json!({"ok": false, "error": {"code": "WRITE_FAILED", "message": "m", "retryable": false}});
+        assert_eq!(error_of(&plain, &map(), "/items/0").reason_name(), None);
+    }
 }

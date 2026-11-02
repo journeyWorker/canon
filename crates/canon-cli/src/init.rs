@@ -605,18 +605,51 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
             log.step("skills-installed", dirs.clone(), format!("canon init: {verb} the canon skill for {} ({dirs})", skills::provider_names(&report.providers)));
             Ok(())
         }
-        Err(e) => {
-            Err(CliError::refused(
-                "INIT_SKILL_INSTALL_FAILED",
-                format!(
-                    "wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}",
-                    chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
-                    canon_yaml_path.display()
-                ),
-            )
-            .hint(format!("once the skill source is available, run `canon skills install` (the override {} names a directory without a SKILL.src.md; unset it, or pass --skills-source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
-            .emit(log.command(), log.json))
-        }
+        Err(e) => Err(skill_install_error(&e, canon_yaml_path, chosen, dry_run).emit(log.command(), log.json)),
+    }
+}
+
+/// What a failed skill install of a fresh `init` is. `canon skills install` says of the same error a refusal before its work
+/// (`SKILLS_INVALID_ARGUMENT`: the skill source, the providers or the `skills:` section; `WRITE_UNAVAILABLE`: a target that
+/// cannot be written) or a failure (`SKILLS_FAILED`), and `init` says the same with what its step order changes (spec 8.3,
+/// 8.3.2): by this step the run has written `canon.yaml` and the files beside it, so nothing can be an exit 2 any more.
+/// - the refusal of an argument (`SKILLS_INVALID_ARGUMENT`) is `STOPPED_MIDWAY` with that code as its reason;
+/// - a target that cannot be written is the I/O category's code for the work, `WRITE_FAILED`, which keeps its name;
+/// - any other failure is `SKILLS_FAILED`.
+///
+/// `meta.next` leads with the command that reads what `init` wrote. A preview (`--dry-run`) wrote nothing, so there a
+/// refusal stays what it is, exit 2 with its own code.
+fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool) -> CliError {
+    let said = crate::run::skills::skills_error(error).code;
+    if dry_run {
+        let hint = format!("fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset), then run the command again", skills::CANONICAL_SOURCE_ENV);
+        return match said {
+            code @ ("SKILLS_INVALID_ARGUMENT" | "WRITE_UNAVAILABLE") => CliError::refused(code, error.to_string()).hint(hint),
+            _ => CliError::failed("SKILLS_FAILED", error.to_string()).hint(hint),
+        };
+    }
+    let message = format!(
+        "wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {error}",
+        chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
+        canon_yaml_path.display()
+    );
+    crate::json_out::prepend_next(crate::status::NextStep {
+        command: "canon status --json".into(),
+        why: "read what `canon init` already wrote (canon.yaml, .gitignore, the starter policy, the AGENTS.md block) before running anything again".into(),
+        actor: crate::status::StepActor::Agent,
+        role: Some(crate::role::Role::Orchestrator),
+    });
+    crate::json_out::prepend_next(crate::status::NextStep {
+        command: "canon skills install --json".into(),
+        why: "install the canon skill once its cause is fixed; it follows skills.providers in canon.yaml".into(),
+        actor: crate::status::StepActor::Agent,
+        role: Some(crate::role::Role::Orchestrator),
+    });
+    let hint = format!("read what init wrote with `canon status`, fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset; the skill directories must be writable), then run `canon skills install`; it follows skills.providers", skills::CANONICAL_SOURCE_ENV);
+    match said {
+        "SKILLS_INVALID_ARGUMENT" => CliError::failed("STOPPED_MIDWAY", message).hint(hint).reason(said),
+        "WRITE_UNAVAILABLE" => CliError::failed("WRITE_FAILED", message).hint(hint),
+        _ => CliError::failed("SKILLS_FAILED", message).hint(hint),
     }
 }
 
@@ -697,7 +730,11 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 ///   refuse (exit `2`) before anything is written.
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
-///   exits `1` naming the retry. A rerun never asks and never installs.
+///   exits `1`: `STOPPED_MIDWAY` when `canon skills install` would have
+///   refused its arguments (the reason is that refusal's code),
+///   `WRITE_FAILED` when a target cannot be written, `SKILLS_FAILED`
+///   otherwise, and `meta.next` leads with `canon status`. A rerun never
+///   asks and never installs.
 pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> u8 {
     run_init_in(repo, options, json, true)
 }
