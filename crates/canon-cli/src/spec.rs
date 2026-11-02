@@ -516,7 +516,7 @@ pub fn generate() -> Value {
         "envVars": ENV_VARS.iter().map(|v| json!({ "name": v.name, "about": v.about })).collect::<Vec<_>>(),
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
         "contract": atip::CONTRACT,
-        "contractVersion": atip::CONTRACT_VERSION,
+        "contractVersion": crate::json_out::DECLARED_MINOR,
         "errors": error_rows(),
         "warnings": warning_rows(),
         "removed": removed_rows(),

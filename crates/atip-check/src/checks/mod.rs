@@ -148,13 +148,6 @@ const ENV_VARIATIONS: [(&str, &str); 5] = [
     ("NO_COLOR", "1"),
     ("TERM", "dumb"),
 ];
-/// The reserved codes an L0 tool registers, with the exit the contract gives them (spec 7.2.1).
-const RESERVED: [(&str, i64); 4] = [
-    ("USAGE", 2),
-    ("UNKNOWN_COMMAND", 2),
-    ("COMMAND_REQUIRED", 2),
-    ("INTERNAL", 1),
-];
 
 /// What a check concluded, and the log entries it rests on.
 struct Finding {
@@ -1196,13 +1189,15 @@ impl<'a> Judge<'a> {
             }
         }
         if let Some(registry) = &self.rows {
-            let wrong: Vec<String> = RESERVED
+            let wrong: Vec<String> = documents::L0_RESERVED
                 .iter()
-                .filter_map(|(code, exit)| {
+                .filter_map(|code| {
+                    // The four L0 codes exist since 1.0, so the minor of the lookup does not matter.
+                    let exit = i64::from(atip::reserved_code(code, atip::Minor::V1_0)?.exit);
                     registry
                         .iter()
                         .find(|row| row.code == *code)
-                        .filter(|row| row.exit != *exit)
+                        .filter(|row| row.exit != exit)
                         .map(|row| {
                             format!(
                                 "{code} is registered with exit {}, the contract says {exit}",

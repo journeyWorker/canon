@@ -166,7 +166,7 @@ impl<'a> Judge<'a> {
     fn registered_exit(&self, code: &str) -> Option<i64> {
         self.row(code)
             .map(|row| row.exit)
-            .or_else(|| documents::RESERVED_CODES.iter().find(|(name, _)| *name == code).map(|(_, exit)| *exit))
+            .or_else(|| atip::reserved_code(code, documents::minor_of(self.claim)).map(|reserved| i64::from(reserved.exit)))
     }
 
     /// The problems of a `schema` answer against `schema-doc.schema.json`, but for what another check owns: the path words and
@@ -366,7 +366,7 @@ impl<'a> Judge<'a> {
             return c.finish(true);
         };
         c.own(self.calls.schema_errors);
-        for (condition, problem) in documents::registry_findings(entries) {
+        for (condition, problem) in documents::registry_findings(entries, documents::minor_of(self.claim)) {
             c.holds_at(self.calls.schema_errors, condition, problem.is_none(), || problem.clone().unwrap_or_default());
         }
         let codes: Vec<String> = entries.iter().filter_map(|entry| entry.get("code").and_then(Value::as_str)).map(str::to_string).collect();

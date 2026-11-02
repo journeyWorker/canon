@@ -12,6 +12,9 @@ use atip::{CodeInfo, ReasonInfo, WarningInfo};
 pub const TOOL: &str = "atip";
 /// The version of the one output `atip check` has.
 pub const SCHEMA_VERSION: &str = "1.0";
+/// `meta.contractVersion` of every envelope `atip check` prints: the minor the checker itself declares (spec 15.7). It is
+/// the checker's own constant, apart from `atip::CONTRACT_VERSION`, the newest minor the crate implements.
+pub const DECLARED_MINOR: &str = "1.1";
 
 /// `atip`'s error registry (spec 7.3), sorted by code: the four reserved codes it can produce (`USAGE`, `UNKNOWN_COMMAND`, `COMMAND_REQUIRED`, `INTERNAL`) and four of its own.
 pub const REGISTRY: [CodeInfo; 8] = [
@@ -237,7 +240,7 @@ fn meta(command: Option<&'static str>, warnings: Vec<MetaWarning>) -> Meta {
     Meta {
         command,
         contract: atip::schema::CONTRACT,
-        contract_version: atip::schema::CONTRACT_VERSION,
+        contract_version: DECLARED_MINOR,
         schema_version: SCHEMA_VERSION,
         tool: TOOL,
         tool_version: env!("CARGO_PKG_VERSION"),

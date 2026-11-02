@@ -13,6 +13,11 @@ use atip::fields::{FieldPath, Rules};
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
+/// The rules of the minor canon declares (`canon_cli::json_out::DECLARED_MINOR`).
+fn declared_rules() -> Rules {
+    Rules::for_minor(canon_cli::json_out::DECLARED_MINOR).expect("canon declares a minor the atip crate knows")
+}
+
 fn canon(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-paging").output().expect("spawn canon binary")
 }
@@ -293,7 +298,7 @@ fn atip_paging_06_every_projected_output_declares_its_fields_and_the_declaration
         }
         // The pointer, the record schema and every path are held to spec 10.13 rule 11 by the shared checker.
         let schemas = doc["schemas"].as_object().unwrap();
-        let problems = atip::fields::check_declaration(&atip::fields::schemas_document(schemas), &json!({ "$ref": output["schemaRef"] }), fields["records"].as_str().unwrap(), &paths, &keep, &default, Rules { v11: true });
+        let problems = atip::fields::check_declaration(&atip::fields::schemas_document(schemas), &json!({ "$ref": output["schemaRef"] }), fields["records"].as_str().unwrap(), &paths, &keep, &default, declared_rules());
         assert_eq!(problems, Vec::<String>::new(), "{command}");
         let members = atip::fields::member_names(&atip::fields::schemas_document(schemas), &json!({ "$ref": output["schemaRef"] }), fields["records"].as_str().unwrap());
         for path in paths.iter().chain(&keep) {
@@ -322,7 +327,7 @@ fn atip_paging_07_a_declaration_or_schema_that_breaks_the_contract_is_found() {
     let (paths, keep) = (list("paths"), list("keep"));
     let check = |schemas: &Value, paths: &[String], keep: &[String], default: &[String]| {
         let doc = json!({ "schemas": schemas });
-        atip::fields::check_declaration(&doc, &json!({ "$ref": "#/schemas/FindingListReport" }), "/findings", paths, keep, default, Rules { v11: true })
+        atip::fields::check_declaration(&doc, &json!({ "$ref": "#/schemas/FindingListReport" }), "/findings", paths, keep, default, declared_rules())
     };
     let clean = Value::Object(doc["schemas"].as_object().unwrap().clone());
     assert_eq!(check(&clean, &paths, &keep, &[]), Vec::<String>::new(), "the published declaration is clean");
@@ -365,7 +370,7 @@ fn atip_paging_07_a_declaration_or_schema_that_breaks_the_contract_is_found() {
     let nested = json!({ "R": { "type": "object", "required": ["rows"], "properties": { "rows": { "type": "array", "items": { "$ref": "#/schemas/Row" } } } }, "Row": { "type": "object", "properties": { "owners": { "type": "array", "items": { "$ref": "#/schemas/Owner" } } } }, "Owner": { "type": "object", "properties": { "email": { "type": "string" } } } });
     let run = |paths: &[&str]| {
         let paths: Vec<String> = paths.iter().map(ToString::to_string).collect();
-        atip::fields::check_declaration(&json!({ "schemas": nested }), &json!({ "$ref": "#/schemas/R" }), "/rows", &paths, &[], &[], Rules { v11: true })
+        atip::fields::check_declaration(&json!({ "schemas": nested }), &json!({ "$ref": "#/schemas/R" }), "/rows", &paths, &[], &[], declared_rules())
     };
     assert_eq!(run(&["owners", "owners[].email"]), Vec::<String>::new());
     assert!(!run(&["owners.email"]).is_empty(), "an array is crossed only with []");
@@ -513,7 +518,7 @@ fn atip_paging_11_a_schema_that_cannot_hold_a_projection_and_a_meta_member_outsi
     let projected = json!({ "rows": [{ "a": 1 }] });
     assert!(!atip::fields::projected_problems(&doc, &root, "/rows", &[FieldPath::parse("a").unwrap()], &projected).is_empty(), "the enum rejects the projection of a valid value");
     let paths = vec!["a".to_string(), "b".to_string()];
-    assert!(!atip::fields::check_declaration(&doc, &root, "/rows", &paths, &[], &[], Rules { v11: true }).is_empty(), "so a declaration over that schema is not projectable");
+    assert!(!atip::fields::check_declaration(&doc, &root, "/rows", &paths, &[], &[], declared_rules()).is_empty(), "so a declaration over that schema is not projectable");
     // A key `meta` does not define fails the envelope validation, on a paged and projected answer too.
     let repo = repo();
     let mut document = json(&canon(repo.path(), &["query", "--kind", "subject", "--limit", "1", "--fields", "subject_id", "--json"]));

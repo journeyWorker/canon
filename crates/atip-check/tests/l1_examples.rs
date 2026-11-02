@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use atip_check::checks::documents::{
     examples_findings, fields_findings, grammar_findings, output_findings, pattern_findings, reasons_findings, registry_findings,
-    reserved_applicable_findings, schema_doc_problems, warnings_findings, Finding, RESERVED_CODES,
+    reserved_applicable_findings, schema_doc_problems, warnings_findings, Finding,
 };
 use atip_check::claim::Claim;
 use atip_check::l1::model::{CommandDoc, GroupDoc, Tree};
@@ -38,7 +38,7 @@ fn claim_of(document: &Value) -> Claim {
 
 /// The exit a registered code has: the reserved ones and the rows of the contract's `schema-errors*.json` examples.
 fn exit_of(code: &str) -> Option<i64> {
-    let reserved = RESERVED_CODES.iter().find(|(name, _)| *name == code).map(|(_, exit)| *exit);
+    let reserved = atip::reserved_code(code, atip::Minor::V1_1).map(|reserved| i64::from(reserved.exit));
     reserved.or_else(|| {
         ["schema-errors-acme.json", "schema-errors.json", "schema-errors-ledger.json"].iter().find_map(|file| {
             let document = load(&dir("schema-docs").join(file))?;
@@ -101,7 +101,7 @@ fn rejected_by(document: &Value) -> Vec<String> {
         }
         "errors" => {
             let entries = data.get("errors").and_then(Value::as_array).cloned().unwrap_or_default();
-            add("L1.registry", registry_findings(&entries));
+            add("L1.registry", registry_findings(&entries, atip::Minor::V1_1));
             add("L1.reasons", reasons_findings(&entries));
         }
         "error" => {

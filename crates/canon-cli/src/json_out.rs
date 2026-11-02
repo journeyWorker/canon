@@ -72,8 +72,10 @@ pub const TOOL: &str = "canon";
 /// `meta.contract`: the contract the output follows.
 pub const CONTRACT: &str = atip::CONTRACT;
 
-/// `meta.contractVersion`: the minor of the contract the output follows, on every envelope (spec 15.7).
-pub const CONTRACT_VERSION: &str = atip::CONTRACT_VERSION;
+/// `meta.contractVersion`: the minor of the contract canon declares on every envelope (spec 15.7). It is canon's own
+/// constant: the `atip` crate's `CONTRACT_VERSION` is the newest minor the crate implements, which canon adopts by
+/// changing this value, not by updating the crate.
+pub const DECLARED_MINOR: &str = "1.1";
 
 /// `meta.context`: the context options a command took, with the value it used.
 /// canon's only context option is `--repo`.
@@ -502,7 +504,7 @@ fn build_meta(command: &str, schema_version: String, output: Option<String>, aft
         tool: TOOL,
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
         contract: CONTRACT,
-        contract_version: CONTRACT_VERSION,
+        contract_version: DECLARED_MINOR,
         output,
         context: context(),
         next: (!next.is_empty()).then_some(next),

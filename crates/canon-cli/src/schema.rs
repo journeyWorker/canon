@@ -256,7 +256,7 @@ pub struct WarningEntry {
 
 impl crate::json_out::Report for SchemaReport {
     /// The version of the self-description format is the contract version canon implements (spec 10.1.4).
-    const SCHEMA_VERSION: &'static str = crate::json_out::CONTRACT_VERSION;
+    const SCHEMA_VERSION: &'static str = crate::json_out::DECLARED_MINOR;
 }
 
 /// The registry options of `canon schema`, which exclude a path and one another.

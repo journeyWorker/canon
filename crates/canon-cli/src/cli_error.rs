@@ -484,3 +484,39 @@ mod fix_tests {
         assert!(codes.iter().all(|info| matches!(info.exit, 1 | 2)), "a registry exit is 1 or 2");
     }
 }
+
+/// `canon-0-35-crate-1-2` (`atip.crate12.08`): canon's own code table can carry a `STOPPED_MIDWAY` row (spec 8.3.2) whose
+/// reasons are made from its exit-2 rows, with the helpers of the `atip` crate. The probe row has another name, so it
+/// stays a probe whatever canon registers.
+#[cfg(test)]
+mod stopped_midway_probe {
+    use atip::{count_with_exit, find_code, reasons_with_exit, with_row, CodeInfo, ReasonInfo, EXIT_FAILED, EXIT_REFUSED};
+
+    use super::CODES;
+
+    const REASONS: [ReasonInfo; count_with_exit(CODES, EXIT_REFUSED)] = reasons_with_exit(CODES, EXIT_REFUSED);
+    const PROBE: CodeInfo = CodeInfo { code: "STOPPED_MIDWAY_PROBE", meaning: "probe", exit: EXIT_FAILED, retryable: false, fix: "probe", reasons: &REASONS };
+    static WITH_PROBE: [CodeInfo; CODES.len() + 1] = with_row(CODES, PROBE);
+
+    #[test]
+    fn atip_crate12_08_canons_code_table_gives_a_probe_row_every_exit_2_row_as_a_reason() {
+        let refusals: Vec<&str> = CODES.iter().filter(|row| row.exit == EXIT_REFUSED).map(|row| row.code).collect();
+        assert!(refusals.len() > 10, "canon has exit-2 rows");
+        let reasons: Vec<&str> = REASONS.iter().map(|reason| reason.reason).collect();
+        assert_eq!(reasons, refusals, "the reasons are the exit-2 codes, in the table's sort order");
+        for row in CODES.iter().filter(|row| row.exit == EXIT_REFUSED) {
+            let reason = REASONS.iter().find(|reason| reason.reason == row.code).expect("a reason");
+            assert_eq!((reason.meaning, reason.fix), (row.meaning, row.fix), "{}: the meaning and the fix are the row's", row.code);
+        }
+        // The order of the table does not matter: the same rows reversed make the same reasons.
+        let mut reversed = CODES.to_vec();
+        reversed.reverse();
+        let from_reversed: [ReasonInfo; count_with_exit(CODES, EXIT_REFUSED)] = reasons_with_exit(&reversed, EXIT_REFUSED);
+        assert_eq!(from_reversed, REASONS);
+        // The probe row sits in the table in its place, so the table stays sorted by code.
+        assert!(WITH_PROBE.windows(2).all(|pair| pair[0].code < pair[1].code));
+        let probe = find_code(&WITH_PROBE, "STOPPED_MIDWAY_PROBE").expect("the probe row");
+        assert_eq!(probe.reasons.len(), refusals.len());
+        assert_eq!(WITH_PROBE.len(), CODES.len() + 1);
+    }
+}
