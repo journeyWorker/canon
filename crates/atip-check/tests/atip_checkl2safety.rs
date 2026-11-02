@@ -205,3 +205,44 @@ fn atip_checkl2safety_14_the_conforming_fake_and_the_checker_itself_pass() {
     let output = support::atip_in(&work, &tmp, &["check", "--bin", support::ATIP, "--level", "L0", "--fixture", fixture.to_str().expect("utf8"), "--json"]);
     assert_eq!((output.code, output.envelope()["data"]["passed"].as_bool()), (Some(0), Some(true)), "{}", output.stdout);
 }
+
+#[test]
+fn atip_checkl2safety_09_a_directory_made_to_hold_an_allowed_file_is_not_an_effect_and_an_unallowed_file_is_named() {
+    // The read creates `.audit` and appends to `.audit/access.log`: the contract's own example lists the file only.
+    let case = Case { condition: "effects/read-changes-only-allowed", config: l2_config(&json!({"peekAuditDir": true})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["peek"]["allowedEffects"] = json!([".audit/access.log"]);
+    });
+    let output = run_case(&case, "L2");
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L2.effects")["result"], "pass", "{}\n{}", check_of(data, "L2.effects"), not_passing(data));
+    // Without the allowance the file is named, and the directory is not named on its own.
+    let case = Case { condition: "effects/read-changes-only-allowed", config: l2_config(&json!({"peekAuditDir": true})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["peek"]["allowedEffects"] = json!([]);
+    });
+    let output = run_case(&case, "L2");
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.effects");
+    let reason = check["reason"].as_str().unwrap_or_default();
+    assert_eq!(check["result"], "fail", "{check}");
+    assert!(reason.contains("./.audit/access.log") && !reason.contains("./.audit,") && !reason.contains("./.audit "), "{reason}");
+}
+
+#[test]
+fn atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_tool_without_wait_has_the_row_unsupported() {
+    let case = Case { condition: "async/outcomes", config: l2_standard_config(), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["deploy start"]["async"]["outcomes"] = json!(["done"]);
+    });
+    let output = run_case(&case, "L2");
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.async");
+    assert_eq!(check["result"], "unprovided", "{check}");
+    assert!(check.to_string().contains("commands.deploy start.async.outcomes"), "{check}");
+    assert!(check["reason"].as_str().unwrap_or_default().contains("failed, timeout"), "{check}");
+    // No command has the reserved option --wait: nothing waits for an outcome, and the schema says so.
+    let config = l2_config(&support::l2::patch(&[("deploy status", vec![support::l2::remove("/options/0")])]));
+    let output = run_case(&Case { condition: "async/no-wait", config, tweak: None }, "L2");
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.async");
+    assert_eq!(check["result"], "unsupported", "{check}");
+    assert!(check["reason"].as_str().unwrap_or_default().contains("--wait"), "{check}");
+}

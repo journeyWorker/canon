@@ -364,6 +364,9 @@ impl<'a> Judge<'a> {
     fn l2_async(&'a self) -> Finding {
         let mut c = self.check("L2.async");
         let plan = self.safety();
+        if self.l1.is_some_and(|l1| l1.docs.tree.is_some()) && !self.docs().commands.values().any(|doc| doc.option("wait").is_some()) {
+            return c.finish_as(End::Unsupported("no command has the reserved option --wait: nothing in this tool waits for an outcome".to_string()));
+        }
         let mut judged = false;
         for (command, declared) in &plan.fixture_async {
             judged = true;
@@ -396,7 +399,8 @@ impl<'a> Judge<'a> {
                 let claims_done = words.iter().any(|word| COMPLETE_WORDS.contains(&word.to_ascii_lowercase().as_str()));
                 c.holds_at(outcome.start, "start-is-not-complete", !claims_done, || format!("{}: the start presents the work as complete ({}): accepted is not done (spec 13.2)", run.command, words.join(", ")));
                 let next = next_argv(&start.stdout);
-                c.holds_at(outcome.start, "start-next-waits", next.as_ref().is_some_and(|argv| argv.iter().any(|word| word == "--wait")), || {
+                // `--wait` is the reserved option a command that waits for the outcome carries (spec 13.3).
+                c.holds_at(outcome.start, "start-next-waits", next.as_ref().is_some_and(|argv| argv.iter().any(|word| word == "--wait" || word.starts_with("--wait="))), || {
                     format!("{}: `meta.next[0]` of the start ({}) is not a wait: it must lead with the command that reads or waits for the outcome (spec 13.2)", run.command, next.as_ref().map_or("absent".to_string(), |argv| argv.join(" ")))
                 });
                 let Some(wait) = outcome.wait else { continue };
@@ -426,6 +430,11 @@ impl<'a> Judge<'a> {
                     }
                 }
             }
+        }
+        if !plan.missing_outcomes.is_empty() {
+            let whys: Vec<String> = plan.missing_outcomes.iter().map(|(command, outcomes)| format!("{command}: the fixture's async.outcomes leaves out {}, which the checker cannot drive", outcomes.join(", "))).collect();
+            let entries: Vec<String> = plan.missing_outcomes.iter().map(|(command, _)| format!("commands.{command}.async.outcomes")).collect();
+            return c.finish_as(End::missing_all(whys, entries));
         }
         if judged {
             c.finish(true)
@@ -531,9 +540,12 @@ impl<'a> Judge<'a> {
             }
             c.own(read.call);
             let outcome = self.at(read.call);
+            // Files only: a directory made to hold a changed file is no effect of its own (the file is judged), so `.canon/audit/access.jsonl`
+            // is all a read that creates `.canon/audit` has to allow. A directory with nothing under it is an effect.
             let stray: Vec<&String> = outcome
                 .changes
                 .iter()
+                .filter(|path| !outcome.changes.iter().any(|other| other.strip_prefix(path.as_str()).is_some_and(|rest| rest.starts_with('/'))))
                 .filter(|path| !(read.has_note && read.patterns.iter().any(|pattern| glob::matches(pattern, path))))
                 .collect();
             c.holds_at(read.call, "read-changes-only-allowed", stray.is_empty(), || {

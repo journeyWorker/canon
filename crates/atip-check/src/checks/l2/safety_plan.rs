@@ -29,6 +29,8 @@ pub(crate) struct SafetyRun {
     pub missing_async: Vec<String>,
     /// The commands the fixture gives an `async` entry, and whether their document declares `async: true`.
     pub fixture_async: Vec<(String, bool)>,
+    /// The async commands whose fixture entry leaves out some of `done`, `failed` and `timeout`, and which.
+    pub missing_outcomes: Vec<(String, Vec<String>)>,
     pub operations: Vec<OperationRun>,
 }
 
@@ -238,6 +240,11 @@ impl Run<'_> {
         };
         let start_argv = in_json_mode(&entry.start);
         let mut run = AsyncRun { command: doc.command.clone(), outcomes: Vec::new() };
+        // The fixture lists what its fake worker supports: an outcome it leaves out is not driven, and the row cannot tell without it.
+        let absent: Vec<String> = ["done", "failed", "timeout"].into_iter().filter(|outcome| !entry.outcomes.iter().any(|listed| listed == outcome)).map(str::to_string).collect();
+        if !absent.is_empty() {
+            out.missing_outcomes.push((doc.command.clone(), absent));
+        }
         for outcome in &entry.outcomes {
             let start = self.invoke(Call::new(start_argv.clone()).with_env(&entry.worker, outcome))?;
             let mut wait = None;

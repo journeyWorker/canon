@@ -370,7 +370,14 @@ fn log_run(tool: &Tool, _args: &[String], parsed: &Parsed) -> ExitCode {
 }
 
 fn peek_run(tool: &Tool, _args: &[String], _parsed: &Parsed) -> ExitCode {
-    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(".peek-access.log").unwrap_or_else(|_| std::process::exit(70));
+    // Seeded: the access line goes to a directory the read creates (`.audit/access.log`), as canon's `.canon/audit/access.jsonl` does.
+    let path = if tool.flag("peekAuditDir") {
+        std::fs::create_dir_all(".audit").unwrap_or_else(|_| std::process::exit(70));
+        ".audit/access.log"
+    } else {
+        ".peek-access.log"
+    };
+    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path).unwrap_or_else(|_| std::process::exit(70));
     writeln!(file, "peeked").unwrap_or_default();
     if tool.flag("peekWritesOther") {
         std::fs::write("peek-cache.txt", "written by a read").unwrap_or_default();
