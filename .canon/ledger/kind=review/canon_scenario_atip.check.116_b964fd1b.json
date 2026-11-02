@@ -4,15 +4,16 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev-b"
   },
-  "at": "2026-11-02T19:31:07.047972Z",
-  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "at": "2026-11-02T21:45:32.030059Z",
+  "code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
   "kind": "review",
-  "pin": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "pin": "916a0bf65ffd8358552dd3111813f2400a898997",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_check_116_a_command_that_ends_on_its_own_before_or_after_its_first_document_is_a_fixture_error_and_no_check_runs"
+          "junit:atip_check_116_a_command_that_ends_on_its_own_before_or_after_its_first_document_is_a_fixture_error_and_no_check_runs",
+          "junit:atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_unprovided_with_its_code_and_any_other_refusal_is_a_fixture_error"
         ],
         "role": "implementer",
         "verdict": "faithful"
@@ -25,9 +26,9 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-fixture/brief.md"
   },
-  "review_id": "01M6EVWX576PCZSCDAWEQQCCAF",
+  "review_id": "01M6F3K13YRGVH8C1933RQEZY4",
   "reviewer": "rev-check-0-35b",
   "scenario_id": "atip.check.116",
   "schema": 2,
-  "worktree_dirty": true
+  "worktree_dirty": false
 }

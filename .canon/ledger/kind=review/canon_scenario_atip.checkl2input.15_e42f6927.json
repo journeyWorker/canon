@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T21:45:38.148185Z",
+  "code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
+  "kind": "review",
+  "pin": "916a0bf65ffd8358552dd3111813f2400a898997",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2input_15_a_conforming_batch_tool_passes_the_three_batch_rows_with_the_counts_order_and_statuses",
+          "junit:atip_checkl2input_15_a_rule_on_flag_only_arguments_is_never_broken_by_a_batch_item"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "6d76c77b4bf222dd0882846fcf56d09347836371cdbb573905985414f87a53dc",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
+  },
+  "review_id": "01M6F3K734RMBPRX1887H2QGSY",
+  "reviewer": "rev-check-0-35b",
+  "scenario_id": "atip.checkl2input.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

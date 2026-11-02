@@ -4,14 +4,15 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev-b"
   },
-  "at": "2026-11-02T19:31:24.546682Z",
-  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "at": "2026-11-02T21:45:44.905679Z",
+  "code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
   "kind": "review",
-  "pin": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "pin": "916a0bf65ffd8358552dd3111813f2400a898997",
   "pins": {
     "checks": [
       {
         "checks": [
+          "junit:atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_tool_without_wait_has_the_row_unsupported",
           "junit:atip_checkl2safety_10_the_worker_is_driven_to_done_failed_and_timeout_and_the_wait_exits_as_the_contract_says"
         ],
         "role": "implementer",
@@ -25,9 +26,9 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-l2-safety/brief.md"
   },
-  "review_id": "01M6EVXE82KQGYEGNSHRE0R1PE",
+  "review_id": "01M6F3KDP93ZH5B284V9A0N6DQ",
   "reviewer": "rev-check-0-35b",
   "scenario_id": "atip.checkl2safety.10",
   "schema": 2,
-  "worktree_dirty": true
+  "worktree_dirty": false
 }
