@@ -139,6 +139,8 @@ pub(crate) struct BatchPlan {
     pub ok: Option<OkBatchRun>,
     /// The fixture entries `L2.batch-incomplete` lacks (`commands.<id>.batchFailsAt` or `batchFailsFirst`).
     pub missing: Vec<String>,
+    /// The rules on flag-only arguments alone: an item cannot break them, so no batch probe is built from them.
+    pub unbuildable: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -199,6 +201,31 @@ fn framing_argv(before: &[String], path: &[String], input: &str) -> Vec<String> 
         .cloned()
         .chain(["--input".to_string(), input.to_string(), "--json".to_string()])
         .collect()
+}
+
+/// How many of the arguments a rule names are flag-only.
+#[derive(Debug, PartialEq, Eq)]
+enum FlagOnly {
+    None,
+    Some,
+    All,
+}
+
+fn flag_only_kind(doc: &CommandDoc, members: &[usize]) -> FlagOnly {
+    let names: Vec<&String> = members.iter().filter_map(|index| doc.constraints.get(*index)).flat_map(|constraint| constraint.names.iter().chain(constraint.if_name.iter()).chain(constraint.then.iter())).collect();
+    let flag_only = names.iter().filter(|name| doc.arg(name).is_some_and(|arg| arg.flag_only)).count();
+    match flag_only {
+        0 => FlagOnly::None,
+        count if count == names.len() => FlagOnly::All,
+        _ => FlagOnly::Some,
+    }
+}
+
+/// A rule on an argument that a document cannot carry (a flag-only one) is broken on argv, not in a document.
+fn on_flag_only(doc: &CommandDoc, members: &[usize]) -> bool {
+    members.iter().filter_map(|index| doc.constraints.get(*index)).any(|constraint| {
+        constraint.names.iter().chain(constraint.if_name.iter()).chain(constraint.then.iter()).any(|name| doc.arg(name).is_some_and(|arg| arg.flag_only))
+    })
 }
 
 /// The value the option `name` is given in `base`, as a document value, when it is.
@@ -522,11 +549,7 @@ impl Run<'_> {
         let all = Spec { operands: false, ..Spec::default() };
         for plan in witness::plan_constraints(doc, base).into_iter().take(8) {
             let GroupOutcome::Witness { words } = &plan.outcome else { continue };
-            // A rule on an argument that a document cannot carry (a flag-only one) is broken on argv, not in a document.
-            let on_flag_only = plan.members.iter().filter_map(|index| doc.constraints.get(*index)).any(|constraint| {
-                constraint.names.iter().chain(constraint.if_name.iter()).chain(constraint.then.iter()).any(|name| doc.arg(name).is_some_and(|arg| arg.flag_only))
-            });
-            if on_flag_only {
+            if on_flag_only(doc, &plan.members) {
                 continue;
             }
             let Ok(broken) = invocation::parse(doc, &in_json_mode(words)) else { continue };
@@ -625,13 +648,33 @@ impl Run<'_> {
                 plan.preflights.push(PreflightRun { label: format!("a last item whose {key} has the wrong type"), call, index: last, codes: vec!["INPUT_INVALID".to_string()] });
             }
             if let Some((base, _)) = bases.first() {
-                for group in witness::plan_constraints(doc, base).into_iter().take(2) {
+                let mut built = 0;
+                for group in witness::plan_constraints(doc, base) {
                     let GroupOutcome::Witness { words } = &group.outcome else { continue };
+                    let label = group.members.iter().filter_map(|index| doc.constraints.get(*index)).map(crate::l1::model::Constraint::label).collect::<Vec<_>>().join(" = ");
+                    let kind = flag_only_kind(doc, &group.members);
+                    if kind == FlagOnly::All {
+                        // A rule on flag-only arguments alone is broken on argv: no item can break it.
+                        plan.unbuildable.push(label);
+                        continue;
+                    }
+                    if built == 2 {
+                        continue;
+                    }
                     let Ok(broken) = invocation::parse(doc, &in_json_mode(words)) else { continue };
                     let Some(split) = document::split(doc, &broken, &whole) else { continue };
+                    built += 1;
+                    if kind == FlagOnly::Some {
+                        // The flag-only arguments of the rule go on argv, for every item, and the last item carries the rest: alone, so that no
+                        // earlier item meets the rule first.
+                        let Some(argv_split) = document::split(doc, &broken, &Spec { operands: true, omit: document::names_of(doc), ..Spec::default() }) else { continue };
+                        let text = Value::Array(vec![Value::Object(split.document)]).to_string();
+                        let call = self.invoke(Call::new(argv_split.argv_with(&text)).measured())?;
+                        plan.preflights.push(PreflightRun { label: format!("an item that breaks {label}, with its flag-only arguments on argv"), call, index: 0, codes: group.codes.iter().cloned().collect() });
+                        continue;
+                    }
                     let mut items = documents.clone();
                     items.push(Value::Object(split.document));
-                    let label = group.members.iter().filter_map(|index| doc.constraints.get(*index)).map(crate::l1::model::Constraint::label).collect::<Vec<_>>().join(" = ");
                     let call = self.invoke(Call::new(batch_argv(&Value::Array(items).to_string(), first_base)).measured())?;
                     plan.preflights.push(PreflightRun { label: format!("a last item that breaks {label}"), call, index: last, codes: group.codes.iter().cloned().collect() });
                 }

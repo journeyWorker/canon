@@ -391,6 +391,15 @@ impl Command {
         self
     }
 
+    fn with_flag_only_rule(mut self, on: bool) -> Self {
+        if on {
+            self.args.push(Arg::option("keep", "switch", "Keep the earlier tags").flag_only());
+            self.args.push(Arg::option("drop", "switch", "Drop the earlier tags").flag_only());
+            self.rules.push(Rule::at_most_one(&["keep", "drop"]));
+        }
+        self
+    }
+
     /// What `member tag` is in an L2 tool: its note comes from `FAKE_NOTE` when no document or argv gives one, and it takes a batch.
     fn with_l2(mut self, l2: bool) -> Self {
         if l2 {
@@ -444,6 +453,8 @@ pub struct Shape {
     pub pair_code: bool,
     /// Whether `member tag` takes a batch in an L2 tool.
     pub batch: bool,
+    /// Seeded: `member tag` has two flag-only switches `--keep` and `--drop` and a rule that at most one is given (a document cannot carry either).
+    pub tag_flag_only_rule: bool,
     /// Whether the tool claims 1.1 (the warning registry, `--warning`).
     pub is_1_1: bool,
     /// Whether the tool claims 1.2 (`limit`, `cursor`, `all` and `fields` are flag-only; `member list` reads `--input -`).
@@ -768,7 +779,7 @@ fn member_search() -> Command {
         ])
 }
 
-fn member_tag(l2: bool) -> Command {
+fn member_tag(l2: bool, flag_only_rule: bool) -> Command {
     Command::new("member tag", "Tag a member; the tags go to tags/<MEMBER>.json")
         .writes("replay-safe")
         .operand(
@@ -808,6 +819,7 @@ fn member_tag(l2: bool) -> Command {
         )
         .examples(&["{tool} member tag 3 --tag lead --tag core --note promoted --json"])
         .with_l2(l2)
+        .with_flag_only_rule(flag_only_rule)
 }
 
 fn schema_command(shape: Shape) -> Command {
@@ -970,7 +982,7 @@ pub fn commands(shape: Shape, schema_offered: bool) -> Vec<Command> {
         state_read("items", "Count the items", "ItemsReport").examples(&["{tool} items --json"]),
         member_list(shape),
         member_search(),
-        member_tag(shape.l2 && shape.batch),
+        member_tag(shape.l2 && shape.batch, shape.tag_flag_only_rule),
         Command::new("reject", "Send a request the backend always rejects")
             .writes("replay-safe")
             .options(Vec::new())

@@ -26,6 +26,7 @@ impl Model {
             l2: tool.flag("l2"),
             pair_code: tool.flag("pairCode"),
             batch: !tool.flag("noBatch"),
+            tag_flag_only_rule: tool.flag("tagFlagOnlyRule"),
         };
         Self {
             commands: super::spec::commands(shape, !tool.flag("noSchema")),
