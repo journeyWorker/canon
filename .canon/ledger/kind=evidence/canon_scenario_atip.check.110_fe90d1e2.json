@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T13:46:14.994558Z",
+  "attachments": [
+    {
+      "case": "atip_check_110_every_stage_pair_a_command_can_have_is_run_and_a_pair_that_needs_a_third_fault_is_not",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-1-2-fix-junit.xml",
+      "sha256": "ae5369b703aa90320bb272940bf0edaedd7ea2287943425845a2fc3b1ebca0d5"
+    }
+  ],
+  "code_tree": "fcbb683443599e8db6bdb7d4052b2a5117417e4a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-1-2-fix-junit.xml"
+  },
+  "evidence_sha": "b0404d2957cb9e5e7b1fdaf9fbf8247415972187",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 538,
+  "scenario_id": "atip.check.110",
+  "schema": 1,
+  "staging_id": "0ff2ba80",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
