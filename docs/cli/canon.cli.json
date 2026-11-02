@@ -1033,7 +1033,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -1044,7 +1044,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -1762,7 +1762,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -1773,7 +1773,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -3020,7 +3020,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -3031,7 +3031,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -4601,7 +4601,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -4612,7 +4612,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -6149,7 +6149,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -6160,7 +6160,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -6558,7 +6558,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -6569,7 +6569,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -7157,7 +7157,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -7168,7 +7168,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -8068,7 +8068,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -8079,7 +8079,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -8718,7 +8718,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -8729,7 +8729,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -9453,7 +9453,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -9464,7 +9464,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -10110,7 +10110,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -10121,7 +10121,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -11001,7 +11001,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -11012,7 +11012,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -11986,7 +11986,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -11997,7 +11997,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -13353,7 +13353,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -13364,7 +13364,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -14337,7 +14337,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -14348,7 +14348,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -15264,7 +15264,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -15275,7 +15275,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16039,7 +16039,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -16050,7 +16050,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16919,7 +16919,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -16930,7 +16930,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18089,7 +18089,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -18100,7 +18100,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18588,7 +18588,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -18599,7 +18599,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -19140,7 +19140,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -19151,7 +19151,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -20148,7 +20148,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -20159,7 +20159,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -20878,7 +20878,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -20889,7 +20889,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -21806,7 +21806,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -21817,7 +21817,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22382,7 +22382,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -22393,7 +22393,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23768,7 +23768,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -23779,7 +23779,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -24406,7 +24406,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -24417,7 +24417,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -25157,7 +25157,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -25168,7 +25168,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -27298,7 +27298,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -27309,7 +27309,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -27802,7 +27802,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -27813,7 +27813,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -28622,7 +28622,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -28633,7 +28633,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -29435,7 +29435,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -29446,7 +29446,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -30213,7 +30213,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -30224,7 +30224,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -32809,7 +32809,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -32820,7 +32820,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -34578,7 +34578,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -34589,7 +34589,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -35133,7 +35133,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -35144,7 +35144,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -35758,7 +35758,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -35769,7 +35769,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -36520,7 +36520,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -36531,7 +36531,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -37445,7 +37445,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -37456,7 +37456,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -38557,7 +38557,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -38568,7 +38568,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -39216,7 +39216,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -39227,7 +39227,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",

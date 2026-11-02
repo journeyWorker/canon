@@ -603,23 +603,24 @@ fn one_invalid_element_writes_nothing_and_points_at_it() {
     let out = canon(repo, home.path(), &["scenario", "new", "--input", &doc, "--json"], None);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("/items/2/title")), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("/2/title")), "{body}");
     assert_eq!(tree(repo), before, "nothing was written, not even the valid elements");
 
     // an unknown key and a bad value of a leaf with a value set
     let doc = json!([{"change":"add-login","round":1,"seq":2,"severity":"note","actor":"a","summary":"s"},{"change":"add-login","round":1,"seq":3,"severity":"urgent","actor":"a","summary":"s"}]).to_string();
     let out = canon(repo, home.path(), &["finding", "add", "--input", &doc, "--json"], None);
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["field"].as_str()), (Some(2), Some("/items/1/severity")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["field"].as_str()), (Some(2), Some("/1/severity")), "{body}");
     assert_eq!(tree(repo), before);
 
-    // the destructive leaves' own refusals ride the leaf's --dry-run: a leaf with one validates the whole batch first
+    // preflight reads no state, even for a leaf with a `--dry-run`: an element naming a change that does not exist fails when it runs,
+    // after the element before it did its work (spec 11.11)
     let doc = json!([{"operands": ["demo"], "change": "add-login"}, {"operands": ["demo"], "change": "no-such-change"}]).to_string();
     let out = canon(repo, home.path(), &["subject", "unadopt", "--input", &doc, "--json"], None);
     let body = json_of(&out);
-    assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!(body["error"]["field"], "/items/1", "{body}");
-    assert_eq!(tree(repo), before, "the dry run of element 1 refused before element 0 wrote");
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("BATCH_INCOMPLETE"), Some("/1")), "{body}");
+    assert_ne!(tree(repo), before, "element 0 ran before element 1 failed");
 }
 
 #[test]
@@ -640,7 +641,7 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     assert_eq!(statuses, ["written", "written", "failed", "skipped"], "{body}");
     assert_eq!(body["data"]["items"][2]["error"]["code"], "TASK_NOT_FOUND", "the failed element keeps its own error: {body}");
     assert_eq!(body["error"]["code"], "BATCH_INCOMPLETE", "{body}");
-    assert_eq!(body["error"]["field"], "/items/2", "{body}");
+    assert_eq!(body["error"]["field"], "/2", "{body}");
     assert!(body["data"]["items"][0]["data"]["records"].is_array(), "{body}");
     assert_eq!(body["meta"]["command"], "evidence add");
     validates(&spec_command("evidence add"), "BatchEvidenceAddReport", &body["data"]);
@@ -690,9 +691,9 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     let statuses: Vec<&str> = body["data"]["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect();
     assert_eq!(statuses, ["written", "failed", "skipped"], "{body}");
     assert_eq!(body["error"]["code"], "BATCH_INCOMPLETE", "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/operands", "the runtime refusal points into the batch: {body}");
+    assert_eq!(body["error"]["field"], "/1", "{body}");
     assert_eq!(body["data"]["items"][1]["error"]["code"], "SCENARIO_TAG_EXISTS", "the failed element keeps its own error: {body}");
-    assert_eq!(body["data"]["items"][1]["error"]["field"], "/items/1/operands", "{body}");
+    assert_eq!(body["data"]["items"][1]["error"]["field"], "/1/operands", "{body}");
     let feature = std::fs::read_to_string(batch.join(".canon/specs/kind=feature/area=auth/login.feature")).unwrap();
     assert!(feature.contains("auth.login.03") && !feature.contains("auth.login.04"), "{feature}");
 }

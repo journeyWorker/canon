@@ -44,6 +44,15 @@ For contributors: no relation is declared to clap any more (`conflicts_with`, `r
 | a number was accepted for a string option (`{"title":5}` was `"5"`) | `INPUT_INVALID`, `INVALID_VALUE`: no coercion happens (spec 11.5). Write `"5"` |
 | `{"operands":[]}` and more operands than the command takes were `USAGE` | `INPUT_INVALID`, `INVALID_VALUE`, `field` `/operands` (the fragment schema: `minItems` 1, and `maxItems` when no operand is variadic) |
 
+**Batches follow spec 11.8 and 11.11** (`canon-0-35-batch-pointers`, scenarios `atip.batchpointers.01-07`): preflight reads no state, and the three outcomes of a batch are the contract's table.
+
+| 0.34 | 0.35 |
+|---|---|
+| a refusal of an element of a batch pointed at `/items/1/round` | `/1/round`: the index, then the key (`/0/operands/0`); no pointer holds `/items/`. A single `--input` is still `/round` |
+| `BATCH_INCOMPLETE` had the `field` of the failed element's own error (`/items/1/operands`) | `field` is exactly `/<index>` (`/1`); the element's own pointer is in its `data.items[1].error.field` (`/1/operands`) |
+| the 14 commands that have `--dry-run` (`artifacts store`, `export`, `gate install-hooks`, `gate promote`, `ingest plans`, `ingest records`, `ingest sessions`, `init`, `inventory sync`, `plugin sync`, `skills install`, `strategy promote`, `subject adopt`, `subject unadopt`) ran every element's `--dry-run` in preflight, which reads state: an element naming an object that does not exist (or a missing repository) refused the whole batch, exit 2, with the element's code, no `data`, and nothing run | preflight is steps 1 to 6 of spec 11.7 and reads no state, so those elements run: the element fails when it runs, exit 1, `BATCH_INCOMPLETE`, `field` `/<index>`, the elements before it done, it `failed` with its own `error`, the rest `skipped`. **Upgrade note: a batch of one of these commands that preflight used to refuse whole can now stop part-way, with the earlier elements written. A batch is not a transaction: read `data.items` to see how far it went, fix the failed element and run it again (the written ones report `unchanged`).** A fault that reads no state (a type, an enumeration, an unknown key, a domain, a constraint, a validator) still refuses the whole batch in preflight, exit 2 |
+| an element that fails a state precondition at index 0 of one of those commands was exit 2 | exit 1, `BATCH_INCOMPLETE`, `field` `/0`, for every command, whether or not it has `--dry-run` |
+| a `failed` element could carry the `data` its run printed with its failure | a `failed` element has `error` and no `data`; a `skipped` one has neither |
 ### Added
 
 - **`error.details`** (spec 7.1.1): `atip::CliError::details(errors)` lists every error of one input and `ErrorBody.details` carries them, as `ErrorDetailBody` items (`code`, `reason?`, `message`, `field?`, `expected?`, `received?`, `suggestions?`, `hint?`; no `retryable`, no nested `details`), when there are two or more; the first is also the error itself. In text mode each is a `problem: <field>: <message>` line. canon uses it for the problems of an `--input` document (`canon-0-35-input-order`).

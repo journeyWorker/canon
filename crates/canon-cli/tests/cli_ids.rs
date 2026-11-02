@@ -533,7 +533,7 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
     assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/scenarioId", "{body}");
+    assert_eq!(body["error"]["field"], "/1/scenarioId", "{body}");
     assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "scenario"), "{body}");
     assert_eq!(body["error"]["suggestions"][0], "scenario", "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("use \"scenario\""), "{body}");
@@ -552,7 +552,7 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
     assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/subjectId", "{body}");
+    assert_eq!(body["error"]["field"], "/1/subjectId", "{body}");
     assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "subject"), "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("use \"subject\""), "{body}");
     unchanged(repo, &before, "a refused scenario batch, its first element included");

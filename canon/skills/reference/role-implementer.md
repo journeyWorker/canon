@@ -252,7 +252,7 @@ canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref
    JSON array: inline, a file or `-` for stdin, one object per scenario whose
    keys are the option names in camelCase plus `operands` (the scenario id);
    every element is validated before the first write, so a bad element
-   writes nothing and `error.field` names it (`/items/1/case`).
+   writes nothing and `error.field` names it (`/1/case`).
    `canon schema scenario new --json` shows `input`: the schema of one document and a complete `example`.
    (`scenario new --from` is gone.) When the gate asks for a missing case
    (`require_cases`), add a new scenario; never retag an existing one. Every

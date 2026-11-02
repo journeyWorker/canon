@@ -20,9 +20,11 @@
 //! - **Steps 4 to 6, merge, environment and defaults, invocation validation.** Every value becomes one
 //!   `--kebab=value` element, never shell-parsed, and clap parses the result: it applies `env` and defaults to
 //!   the options the merged line lacks, and checks requirements, domains and constraints.
-//! - **A batch** puts every element through steps 1 to 6 (clap, then the leaf's own `--dry-run` where it has
-//!   one) before the first write. Then the elements run in order, each as one `canon … --json` child process; the
-//!   first failure stops the run (`failed`, the rest `skipped`, exit 1).
+//! - **A batch** puts every element through steps 1 to 6 before the first write, and those steps read no state
+//!   (spec 11.11): a failure there is the element's own code, exit 2, `field` `/<index>/…`, no `data`, and nothing
+//!   has run. Then the elements run in order, each as one `canon … --json` child process (step 7); the first
+//!   failure, a failed state-dependent precondition included, stops the run: `BATCH_INCOMPLETE`, exit 1, `field`
+//!   `/<index>`, the element `failed` with its own `error` and no `data`, the rest `skipped`.
 //!
 //! The same [`Leaf`] description (keys, types, value sets) is what the example document of the spec
 //! is read with ([`example_document`]); the JSON Schemas the spec publishes for a document
@@ -77,10 +79,10 @@ pub struct BatchItem<R> {
     /// 0-based position in the input.
     pub index: usize,
     pub status: ItemStatus,
-    /// The element's ordinary report (`written`, `unchanged`, and a failure that kept one).
+    /// The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<R>,
-    /// The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`).
+    /// The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`).
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<ErrorBody>")]
     pub error: Option<Value>,
@@ -146,7 +148,6 @@ pub struct Leaf {
     operand_specs: Vec<Spec>,
     /// Option groups of which exactly one is required, as document keys.
     one_of: Vec<Vec<String>>,
-    has_dry_run: bool,
 }
 
 fn camel(long: &str) -> String {
@@ -238,7 +239,6 @@ impl Leaf {
             .collect();
         Leaf {
             path: path.to_vec(),
-            has_dry_run: keys.iter().any(|k| k.long == "dry-run"),
             keys,
             operands,
             operand_specs: positionals.iter().map(|a| spec_of(a)).collect(),
@@ -1086,15 +1086,13 @@ fn crashed(child: &Child) -> CliError {
     CliError::failed("INTERNAL", message).hint("run the element on its own to see its output, and report what it prints at https://github.com/journeyWorker/canon/issues")
 }
 
-/// The error of a batch that stopped at element `index`: `BATCH_INCOMPLETE`, which says where and why,
-/// while `data.items[index].error` keeps the element's own error (its code, `field` as a pointer into the document).
+/// The error of a batch that stopped at element `index` (spec 11.11): `BATCH_INCOMPLETE`, `field` exactly `/<index>`, which
+/// says where and why, while `data.items[index].error` keeps the element's own error (its code, `field` a pointer
+/// deeper into the document).
 fn incomplete(element: &CliError, index: usize) -> CliError {
-    let mut error = CliError::failed("BATCH_INCOMPLETE", format!("the batch stopped at element {index}: {}: {}; the elements before it were applied and the ones after it were skipped", element.code, element.message))
-        .hint("`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)");
-    if let Some(field) = element.field_name() {
-        error = error.field(field);
-    }
-    error
+    CliError::failed("BATCH_INCOMPLETE", format!("the batch stopped at element {index}: {}: {}; the elements before it were applied and the ones after it were skipped", element.code, element.message))
+        .hint("`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)")
+        .field(format!("/{index}"))
 }
 
 #[expect(clippy::too_many_arguments, reason = "the pieces of one batch run, each already computed by `expand`")]
@@ -1106,18 +1104,18 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         Err(e) => return exit_refused(CliError::failed("INTERNAL", format!("canon cannot find its own executable to run the batch: {e}")).hint("run the elements one by one instead")),
     };
     let wants_json = has_flag(lexed, "json");
-    let dry_run_given = has_flag(lexed, "dry-run");
     // `--fields` is read against the output the invocation selects, and the output of a batch declares no `fields` (spec 6.10):
     // refused before any element is planned, so no element is run and nothing is written.
     if has_flag(lexed, "fields") {
         return exit_refused(refused("USAGE", format!("`{command_name}` takes no `--fields` with a batch: the output of a batch declares no fields"), "drop `--fields`, or run one element at a time with it").field("--fields"));
     }
 
-    // Validate every element before the first write.
+    // Preflight: steps 1 to 6 of every element before the first write. It reads no state, so an element may name an
+    // object an earlier element creates; what the state refuses is the failure of that element when it runs.
     let mut argvs: Vec<Vec<String>> = Vec::with_capacity(items.len());
     let mut argv_checked = false;
     for (i, item) in items.iter().enumerate() {
-        let prefix = format!("/items/{i}");
+        let prefix = format!("/{i}");
         let members = match item {
             Item::Object(members) => members,
             Item::Other(value) => return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(value)), SCHEMA_HINT).reason("NOT_OBJECT").field(prefix).received(value.to_string())),
@@ -1149,23 +1147,6 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         argvs.push(argv);
     }
 
-    // Then each element's own dry run, which reads state (a missing repository is `CONFIG_MISSING`): after every element's stateless stage, so
-    // a stateless fault in a later element is the answer, not the first element's missing repository (spec 11.11).
-    if leaf.has_dry_run && !dry_run_given {
-        for (i, argv) in argvs.iter().enumerate() {
-            let prefix = format!("/items/{i}");
-            let child = spawn(&exe, argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });
-            let ok = child.exit == 0 && child.envelope.as_ref().is_some_and(|e| e["ok"] == true);
-            if !ok {
-                let error = match &child.envelope {
-                    Some(envelope) if envelope["ok"] == false => error_of(envelope, map, &prefix),
-                    _ => crashed(&child),
-                };
-                return exit_refused(error);
-            }
-        }
-    }
-
     // Run in order; the first failure stops the run.
     let mut report: Vec<BatchItem<Value>> = Vec::with_capacity(argvs.len());
     let mut failure: Option<CliError> = None;
@@ -1175,7 +1156,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
             continue;
         }
         let child = spawn(&exe, argv, if wants_json { &[] } else { &["--json"] });
-        let prefix = format!("/items/{i}");
+        let prefix = format!("/{i}");
         match &child.envelope {
             Some(envelope) if envelope["ok"] == true && child.exit == 0 => {
                 // `unchanged` is a member of the report, or of `meta.x-canon` for a report that cannot take one.
@@ -1188,7 +1169,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                     Some(envelope) if envelope["ok"] == false => error_of(envelope, map, &prefix),
                     _ => crashed(&child),
                 };
-                report.push(BatchItem { index: i, status: ItemStatus::Failed, data: envelope.as_ref().and_then(|e| e.get("data")).cloned(), error: Some(serde_json::to_value(error.body()).expect("an error body serializes")) });
+                report.push(BatchItem { index: i, status: ItemStatus::Failed, data: None, error: Some(serde_json::to_value(error.body()).expect("an error body serializes")) });
                 failure = Some(incomplete(&error, i));
             }
         }

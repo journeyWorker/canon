@@ -682,7 +682,7 @@ fn atip_paging_16_a_batch_takes_no_fields_and_fields_is_a_flag_a_document_cannot
     let batch = format!(r#"[{{"kind":"subject","output":"{a}"}},{{"kind":"subject","output":"{b}","fields":"id"}}]"#);
     let refused = canon(repo.path(), &["export", "--json", "--input", &batch]);
     let error = error_of(&refused);
-    assert_eq!((error["code"].as_str(), error["reason"].as_str(), error["field"].as_str()), (Some("INPUT_INVALID"), Some("FLAG_ONLY_KEY"), Some("/items/1/fields")), "{error}");
+    assert_eq!((error["code"].as_str(), error["reason"].as_str(), error["field"].as_str()), (Some("INPUT_INVALID"), Some("FLAG_ONLY_KEY"), Some("/1/fields")), "{error}");
     assert_ne!(error["code"], "BATCH_INCOMPLETE");
     assert_eq!(snapshot(repo.path()), before, "nothing was written, the first element included: no file, no audit line");
     // A single document is refused the same way.

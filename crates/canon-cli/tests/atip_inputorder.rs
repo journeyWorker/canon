@@ -172,8 +172,8 @@ fn atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order()
     // in a batch too, each item in its own prefix
     let out = canon(repo, &["finding", "close", "--input", r#"[{"round":1,"bogus":1,"seq":"x"}]"#, "--json"]);
     let body = json_of(&out);
-    assert_eq!(body["error"]["field"], "/items/0/bogus", "{body}");
-    assert_eq!(body["error"]["details"].as_array().unwrap().iter().map(|d| d["field"].as_str().unwrap()).collect::<Vec<_>>(), ["/items/0/bogus", "/items/0/seq"], "{body}");
+    assert_eq!(body["error"]["field"], "/0/bogus", "{body}");
+    assert_eq!(body["error"]["details"].as_array().unwrap().iter().map(|d| d["field"].as_str().unwrap()).collect::<Vec<_>>(), ["/0/bogus", "/0/seq"], "{body}");
     assert_eq!(tree(repo), before);
 
     // the text form lists them too
@@ -230,7 +230,7 @@ fn atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_arg
     // preflight takes the elements in order: element 0 is whole, element 1 holds the problem
     let out = canon(repo, &["finding", "close", "--input", r#"[{"operands":["add-login"],"round":1,"seq":1,"disposition":"open"},{"disposition":"nope"}]"#, "--json"]);
     let (exit, code, reason, field, body) = refusal(&out);
-    assert_eq!((exit, code.as_str(), reason.as_deref(), field.as_deref()), (Some(2), "INPUT_INVALID", Some("INVALID_VALUE"), Some("/items/1/disposition")), "{body}");
+    assert_eq!((exit, code.as_str(), reason.as_deref(), field.as_deref()), (Some(2), "INPUT_INVALID", Some("INVALID_VALUE"), Some("/1/disposition")), "{body}");
 }
 
 #[test]
@@ -266,7 +266,7 @@ fn atip_inputorder_07_a_value_given_two_ways_that_differ_is_a_conflict_at_the_do
     let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--input", r#"{"disposition":"fixed"}"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/disposition")), "{body}");
     let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--input", r#"[{"round":2}]"#, "--json"]));
-    assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/items/0/round")), "{body}");
+    assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/0/round")), "{body}");
     let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "--seq", "1", "--disposition", "open", "--input", r#"{"operands":["other"],"round":1}"#, "--json"]));
     assert_ne!(code, "INPUT_CONFLICT", "{body}");
     let _ = field;

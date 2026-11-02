@@ -234,7 +234,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   reasons (`INPUT_INVALID` says `NOT_JSON`, `UNKNOWN_KEY`, `STDIN_TTY`, … so you
   know whether to fix the JSON or the shell); fix the option `error.field` names
   using the `error.expected` values (`field` is an option name, or a JSON
-  pointer such as `/items/2/scenario` into an `--input` document), and
+  pointer such as `/2/scenario` into an `--input` document, `/<index>/<key>` in a batch), and
   follow `error.hint`: it is one runnable command line that starts with `canon`, the
   same with `<PLACEHOLDER>`s you fill in, or one sentence. The codes
   are stable; `canon schema --errors --json` lists them with their reasons and
@@ -277,9 +277,10 @@ the positional arguments. An object is one invocation; a JSON array (or NDJSON
 from a file or stdin) is a batch, run in order and answered with
 `data.items[]` (`index`, `status` of `written`, `unchanged`, `failed` or
 `skipped`, and that element's `data` or `error`). A batch is validated whole
-before anything is written: an invalid element writes nothing and exits 2,
-`error.field` pointing at `/items/<i>/<key>`; a write that fails stops there
-(exit 1, `BATCH_INCOMPLETE`) and re-running the same batch reports the finished elements
+before anything is written, and that check reads no state: an invalid element writes nothing and exits 2 with
+its own code, `error.field` pointing at `/<i>/<key>` and no `data`. An element that fails when it runs (the object
+it names does not exist) stops the batch: exit 1, `BATCH_INCOMPLETE`, `error.field` exactly `/<i>`, the element
+`failed` with its own `error` (no `data`), the later ones `skipped`, and the earlier ones done (not undone). Re-running the same batch reports the finished elements
 `unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped; a document with several problems reports them all, the first as the error and every one in `error.details` in the order the document wrote its keys, and a value outside a closed set is `INPUT_INVALID` too (`reason` `INVALID_VALUE`, `field` the key), not `USAGE`. Every non-empty line of an NDJSON file is a document (a `#` line is not a comment). Integers compare by number: `1`, `"1"` and `--round +1` are one value, and `"+1"`, `"0x1"` and `1.0` in a document are `INVALID_VALUE`.
 `canon schema <command> --json` shows the leaf's `input`: the schema of one document and a complete `example`.
 
