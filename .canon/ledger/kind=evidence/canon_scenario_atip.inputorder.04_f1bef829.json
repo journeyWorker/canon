@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-canon-input",
+    "role": "implementer",
+    "session_id": "s-0-35-canon-input"
+  },
+  "at": "2026-11-02T10:38:56.821416Z",
+  "attachments": [
+    {
+      "case": "atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-input-order-junit.xml",
+      "sha256": "b495841f2ab8c883599eb56050a0589696f3357a083c68f97c4776c577a79953"
+    }
+  ],
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-input-order-junit.xml"
+  },
+  "evidence_sha": "fb5334a4b55ad6dd9c6383a472e223002830fbdd",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "atip.inputorder.04",
+  "schema": 1,
+  "staging_id": "f18336b0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

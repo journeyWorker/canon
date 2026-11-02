@@ -43,6 +43,7 @@ For contributors: no relation is declared to clap any more (`conflicts_with`, `r
 | `{"round":"+1"}` and `{"round":1.0}` reached clap and were accepted or `USAGE` | an integer of a document is a JSON integer or a string of `-?(0|[1-9][0-9]*)` within ±(2^53-1) (`-0` is `0`); `"+1"`, `"0x1"`, `"1e3"`, `" 1"`, `1.0` and `9007199254740992` are `INPUT_INVALID`, `INVALID_VALUE` at the key |
 | a number was accepted for a string option (`{"title":5}` was `"5"`) | `INPUT_INVALID`, `INVALID_VALUE`: no coercion happens (spec 11.5). Write `"5"` |
 | `{"operands":[]}` and more operands than the command takes were `USAGE` | `INPUT_INVALID`, `INVALID_VALUE`, `field` `/operands` (the fragment schema: `minItems` 1, and `maxItems` when no operand is variadic) |
+
 ### Added
 
 - **`error.details`** (spec 7.1.1): `atip::CliError::details(errors)` lists every error of one input and `ErrorBody.details` carries them, as `ErrorDetailBody` items (`code`, `reason?`, `message`, `field?`, `expected?`, `received?`, `suggestions?`, `hint?`; no `retryable`, no nested `details`), when there are two or more; the first is also the error itself. In text mode each is a `problem: <field>: <message>` line. canon uses it for the problems of an `--input` document (`canon-0-35-input-order`).

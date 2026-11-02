@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-canon-input",
+    "role": "implementer",
+    "session_id": "s-0-35-canon-input"
+  },
+  "at": "2026-11-02T10:38:56.821416Z",
+  "attachments": [
+    {
+      "case": "atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-input-order-junit.xml",
+      "sha256": "b495841f2ab8c883599eb56050a0589696f3357a083c68f97c4776c577a79953"
+    }
+  ],
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-input-order-junit.xml"
+  },
+  "evidence_sha": "fb5334a4b55ad6dd9c6383a472e223002830fbdd",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "atip.inputorder.02",
+  "schema": 1,
+  "staging_id": "b16b75da",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
