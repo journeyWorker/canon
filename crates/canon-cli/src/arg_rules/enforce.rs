@@ -149,7 +149,7 @@ fn says_for(domain: &Domain) -> String {
 /// The argument object of the invocation (spec 11.7 step 6): name to its values, as a document normalises them (an integer is a number,
 /// a switch is `true`) with the text that was typed. `explicit_only` keeps what the command line gave, which is what a constraint counts
 /// (spec 10.8.1); without it a value an environment variable fills and a default are there too, which is what a domain judges.
-pub(super) fn values_of(matches: &ArgMatches, args: &[&Arg], explicit_only: bool) -> std::collections::BTreeMap<String, Vec<(Value, String)>> {
+pub(crate) fn values_of(matches: &ArgMatches, args: &[&Arg], explicit_only: bool) -> std::collections::BTreeMap<String, Vec<(Value, String)>> {
     let mut given = std::collections::BTreeMap::new();
     for arg in args {
         let id = arg.get_id().as_str();
@@ -272,6 +272,7 @@ mod tests {
             assert!(relaxed.clone().try_get_matches_from(["canon", "query", "--kind", "change", "--limit", text]).is_err(), "`{text}` is no integer of the safe range: a failure to parse");
         }
         // The real tree refuses what is outside the type itself.
-        assert!(real.clone().try_get_matches_from(["canon", "query", "--kind", "change", "--limit", "0"]).is_err());
+        let refused = real.clone().try_get_matches_from(["canon", "query", "--kind", "change", "--limit", "0"]).expect_err("the real tree refuses a limit of 0 itself");
+        assert_eq!(refused.kind(), clap::error::ErrorKind::ValueValidation);
     }
 }

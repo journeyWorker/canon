@@ -243,7 +243,7 @@ mod tests {
         assert_eq!(Probe::from_arg_matches(&all).expect("the flags read").page.page().limit, None);
         // The exclusion of `--all` and an explicit `--limit` is a rule of the command's tables (`arg_rules::rules_of`), refused by the stateless stage
         // after the parse: clap alone parses the pair (spec 11.7 step 6 answers a failure to parse, then `required`, then domains, then constraints).
-        assert!(Probe::command().try_get_matches_from(["probe", "--all", "--limit", "5"]).is_ok(), "clap leaves the exclusion to the tables");
+        Probe::command().try_get_matches_from(["probe", "--all", "--limit", "5"]).expect("clap leaves the exclusion to the tables");
     }
 
     #[test]

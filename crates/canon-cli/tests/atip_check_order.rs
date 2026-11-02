@@ -18,10 +18,13 @@ use atip::constraint::violations;
 use rule_support::{constraints, declared_role, given_from, parse_call, run_empty_with, solve, Assignment, Found, Goal, Outcome};
 use serde_json::Value;
 
+/// The call that breaks rule `at` of a command: the command's name and the rule's index, and what the search found.
+type Searched = BTreeMap<(String, usize), Option<Found>>;
+
 /// The call that breaks rule `at` of `doc` and, when it can, nothing else: searched once per rule (the search looks at every set of the
 /// arguments the rules name), and shared by the sweeps of this binary.
 fn violate(doc: &Value, rules: &[atip::doc::ConstraintDoc], at: usize) -> Option<Found> {
-    static FOUND: LazyLock<Mutex<BTreeMap<(String, usize), Option<Found>>>> = LazyLock::new(|| Mutex::new(BTreeMap::new()));
+    static FOUND: LazyLock<Mutex<Searched>> = LazyLock::new(|| Mutex::new(BTreeMap::new()));
     let key = (doc["command"].as_str().unwrap_or_default().to_string(), at);
     if let Some(found) = FOUND.lock().expect("the cache").get(&key) {
         return found.clone();
@@ -677,7 +680,7 @@ fn atip_checkorder_14_the_command_tree_declares_no_relation_to_clap() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
     // `--promote --no-promote` parses (the parser has no conflict) and is refused by the tables.
     let relaxed = canon_cli::arg_rules::relaxed::tree(canon_cli::cli::command());
-    assert!(relaxed.try_get_matches_from(["canon", "finding", "list", "--change", "add-login", "--all", "--limit", "5"]).is_ok());
+    relaxed.try_get_matches_from(["canon", "finding", "list", "--change", "add-login", "--all", "--limit", "5"]).expect("the parser has no conflict to refuse");
 }
 
 /// atip.checkorder.15 (the failure path): the order table is not decorative: a rule table row that is removed makes the sweeps fail,

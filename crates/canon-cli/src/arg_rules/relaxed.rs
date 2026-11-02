@@ -90,7 +90,7 @@ fn signed_safe_integer(text: &str) -> Result<i64, String> {
         return Err(format!("`{text}` is not an integer"));
     }
     let magnitude = digits.parse::<u128>().ok().filter(|value| *value <= u128::from(SAFE_INTEGER as u64));
-    let Some(magnitude) = magnitude else { return Err(format!("`{text}` is beyond 9007199254740991 (2^53-1): an integer within ±{}", SAFE_INTEGER)) };
+    let Some(magnitude) = magnitude else { return Err(format!("`{text}` is beyond 9007199254740991 (2^53-1): an integer within ±{SAFE_INTEGER}")) };
     let value = i64::try_from(magnitude).unwrap_or(SAFE_INTEGER);
     Ok(if negative { -value } else { value })
 }
