@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T11:02:33.936606Z",
+  "change_id": "canon-0-35-crate-validate",
+  "code_tree": "270bae3f4c4f512bcf367a5df596b50ab839b177",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/judge.rs",
+  "introduced_by": "f21e5451b30ee1d690d7e768f619f8559ed5571c",
+  "kind": "finding",
+  "reviewed_sha": "f21e5451b30ee1d690d7e768f619f8559ed5571c",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: the brief says admits answers as the validator does and a domain that does not compile is an error; the native reader accepts schemas the validator's metaschema check refuses (type: [], type: [\"string\",\"string\"], required: [\"a\",\"a\"]): admits gives Ok(false)/Ok(true) where compile and the old admits gave Err. I ran 19 odd schemas against compile: only these three differ in the profile (patterns with backslash-d or backslash-w differ too, but pattern_problem already forbids them in a domain). Blast radius: unreachable for canon's static table (the 40-domain differential test passes), but canon-cli arg_rules/enforce.rs maps an admits Err to 'admitted' (unwrap_or(true)) and atip constraint.rs to 'outside the domain' (unwrap_or(false)), so a third-party tool with such a malformed json domain would now be refused or admitted differently; domain::profile_problems does not check type or required for these shapes.",
+  "worktree_dirty": false
+}

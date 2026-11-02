@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T11:02:37.326909Z",
+  "change_id": "canon-0-35-crate-validate",
+  "code_tree": "270bae3f4c4f512bcf367a5df596b50ab839b177",
+  "disposition": "open",
+  "file_ref": "crates/atip-probe/tests/dependency_tree.rs",
+  "introduced_by": "f21e5451b30ee1d690d7e768f619f8559ed5571c",
+  "kind": "finding",
+  "reviewed_sha": "f21e5451b30ee1d690d7e768f619f8559ed5571c",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards: nothing builds atip with default features, so a break that only shows without 'validate' (an unused import, a cfg'd item still used) would pass CI: the probe's proof is cargo tree, which resolves but does not compile, and cargo test/clippy --workspace unify validate on through atip-check and canon-cli. I ran cargo clippy -p atip -p atip-probe --lib -- -D warnings (default features): clean today. Also not recorded anywhere: the brief's first Check, a byte comparison of canon and atip check output with a 0.34 binary; I ran it (baseline 4cf85cba vs f21e5451): 2210 canon cases (schema of every command, --help, each argument's domain with values inside/outside its bounds) are byte-equal (4 differ only because both binaries wrote into one directory; equal in fresh directories), and the atip check L0/L1 reports of canon differ only in time-derived data (timestamps, cursors, digests of them), with no verdict differing. Blast radius: the differential test admits_answers_as_the_validator_does takes about 250 s in a debug build.",
+  "worktree_dirty": false
+}
