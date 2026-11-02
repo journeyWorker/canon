@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T07:40:31.851849Z",
+  "attachments": [
+    {
+      "case": "atip_check_81_a_message_longer_than_240_characters_is_whole_in_findings_and_cut_only_in_the_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-findings-junit.xml",
+      "sha256": "7f76603ac22f233ae123266d116c4f875818ecea6f2ae34302c61e63089ef7b3"
+    }
+  ],
+  "code_tree": "b74870659bd64a4becc08bfe4c14591c33ffd173",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-findings-junit.xml"
+  },
+  "evidence_sha": "f82af0f862e37536be4820f981a8f5d9abe4d46b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 504,
+  "scenario_id": "atip.check.81",
+  "schema": 1,
+  "staging_id": "f6cc940a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
