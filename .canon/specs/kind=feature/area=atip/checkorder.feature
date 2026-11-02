@@ -160,3 +160,13 @@ Feature: ATIP: the order of the stateless checks
     Given the argument object of a command with a default, and the real and relaxed trees
     When a default is read, a limit of 0 or -3 is parsed, and a value that is no integer is parsed
     Then a constraint sees only what was given, the domain stage refuses 0 and -3, and the relaxed tree refuses the text that is no integer
+
+  # canon: {"schema":1,"at":"2026-11-02T11:27:03Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-35-canon-check-order.F1
+  @atip.checkorder.17
+  Scenario: A leading --as that is no role answers before an unknown or missing command, and an excluding pair names the closed set at fault
+    Given a built canon
+    When canon runs with --as zzz before an unknown command word, before nothing, before a group, and after an unknown option, and init runs with --policy and --no-policy
+    Then --as answers USAGE first, an earlier unknown option still answers first, and the excluding pair names light, standard and strict as expected

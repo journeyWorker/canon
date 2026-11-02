@@ -1,3 +1,4 @@
 canon: USAGE: `--check`, `--policy`, `--no-policy` are exclusive: at most one may be given
   field: --policy
+  expected: light, standard, strict
   hint: a working call: canon init; `canon schema init --json` lists the constraints of the command

@@ -28,6 +28,13 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 /// `command` is the built command tree (`crate::cli::command()` after `build`). `Err` is the exit code, the refusal already printed.
 pub fn parse(command: &clap::Command, args: Vec<std::ffi::OsString>) -> Result<clap::ArgMatches, ExitCode> {
     let relaxed = crate::arg_rules::relaxed::tree(crate::cli::command());
+    // `--as` written before the command words (`canon --as zzz nosuch`) is moved after them to be read by the leaf: a value that is no role is
+    // a failure to parse at the place it was written, so it answers ahead of an unknown command word or a missing one.
+    if let Some(value) = leading_unknown_role() {
+        if let Err(error) = relaxed.clone().try_get_matches_from([std::ffi::OsString::from("canon"), "--as".into(), value.into()]) {
+            return Err(crate::run::entry::usage_error(&error));
+        }
+    }
     let first = match relaxed.clone().try_get_matches_from(args.clone()) {
         Ok(matches) => matches,
         Err(error) => {
@@ -42,6 +49,30 @@ pub fn parse(command: &clap::Command, args: Vec<std::ffi::OsString>) -> Result<c
         return Err(ExitCode::from(error.emit(&label, atip::argv_wants_json())));
     }
     command.clone().try_get_matches_from(args).map_err(|error| crate::run::entry::usage_error(&error))
+}
+
+/// The value of a `--as` written first on the command line, among the tool-wide options only (`--repo`, `--json`, `--as`), when it is no role.
+fn leading_unknown_role() -> Option<String> {
+    let words: Vec<String> = std::env::args().skip(1).take_while(|word| word != "--").collect();
+    let mut at = 0;
+    while at < words.len() {
+        let word = words[at].as_str();
+        match word {
+            "--json" => at += 1,
+            "--repo" => at += 2,
+            "--as" => {
+                let value = words.get(at + 1)?;
+                return crate::role::Role::parse(value).is_none().then(|| value.clone());
+            }
+            _ if word.starts_with("--repo=") => at += 1,
+            _ if word.starts_with("--as=") => {
+                let value = &word["--as=".len()..];
+                return crate::role::Role::parse(value).is_none().then(|| value.to_string());
+            }
+            _ => return None,
+        }
+    }
+    None
 }
 
 /// The refusal of the first stateless fault of an invocation, with the label of its command, in the order of step 6 of 11.7: domains,

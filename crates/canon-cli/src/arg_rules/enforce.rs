@@ -71,6 +71,11 @@ pub fn check(root: &Command, matches: &ArgMatches) -> Option<(String, CliError)>
         let value = rule.when.as_ref().and_then(|when| given_values.get(&when.name)).and_then(|values| values.first()).map(|(_, text)| text.clone()).unwrap_or_default();
         let hint = table.hint.map_or_else(|| rule.help.clone().map_or_else(|| points_to(&path, "lists the constraints of the command"), |help| format!("{help} {}", points_to(&path, "lists the constraints of the command"))), |hint| hint.replace("{value}", &value));
         let mut error = CliError::refused(code, message).hint(hint).field(field_of(&args, &fault));
+        // The closed set of the argument at fault, as clap's own refusal of the pair gave it (`--policy`: light, standard, strict).
+        let closed: Vec<String> = args.iter().find(|arg| atip::constraint::name_of(arg) == fault).map(|arg| arg.get_possible_values().iter().filter(|value| !value.is_hide_set()).map(|value| value.get_name().to_string()).collect()).unwrap_or_default();
+        if !closed.is_empty() {
+            error = error.expected(closed);
+        }
         if let Some(reason) = table.reason {
             error = error.reason(reason);
         }
