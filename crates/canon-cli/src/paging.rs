@@ -8,7 +8,8 @@
 //! a line naming the next cursor when more remain. Field selection (`--fields`)
 //! is [`crate::fields`].
 //!
-//! A cursor is opaque to the caller and the `atip` crate's to write and read ([`atip::cursor`]): it names the command
+//! A cursor is the `atip` crate's to write and read ([`atip::cursor`]); a caller hands it back unchanged and never reads it (it is
+//! bound to its call and checked, not encrypted: the position is the base64url text of the record's key). It names the command
 //! (`scope`), a digest of the arguments of the call that issued it (the binding) and the key of the last record it
 //! returned. canon hands the crate the arguments the call gave ([`bind_arguments`]): every explicit argument (one given with
 //! its default value included), the value `CANON_ROLE` supplied for `--as`, and canon's own flag-only options

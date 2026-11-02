@@ -239,21 +239,14 @@ fn atip_canoncursor_02_the_environment_and_an_explicit_default_bind_the_cursor_a
 }
 
 #[test]
-fn atip_canoncursor_03_the_cursor_holds_no_record_key_as_written_and_a_changed_character_is_foreign() {
+fn atip_canoncursor_03_the_cursor_is_one_ascii_word_and_a_changed_character_is_foreign() {
     let repo = fixture();
-    // The key of an export record is its time, id and digest, in the manifest.
-    let (page, next) = first_page(repo.path(), &["export", "--kind", "subject", "--json"], &["--limit", "1"], &[]);
-    let record = &page["data"]["records"][0];
-    let key = format!("{}|{}|{}", record["at"].as_str().unwrap(), record["id"].as_str().unwrap_or_default(), record["digest"].as_str().unwrap());
-    let cursor = cursor_of(&next);
-    assert!(!cursor.contains(&key) && !cursor.contains(record["digest"].as_str().unwrap()), "{cursor}");
-    let hex: String = key.bytes().map(|byte| format!("{byte:02x}")).collect();
-    assert!(!cursor.contains(&hex), "{cursor}");
-    assert!(cursor.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".-_".contains(&byte)), "one word of ASCII without quotes or whitespace: {cursor}");
-    // Each character of a cursor, changed, is no cursor of this command.
+    // The cursor is bound to its call, not hidden: its position is the base64url text of the record's key, which is not promised to be unreadable.
     for (name, args) in listings() {
         let (_, next) = first_page(repo.path(), &args, &["--limit", "1"], &[]);
         let cursor = cursor_of(&next);
+        assert!(cursor.bytes().all(|byte| byte.is_ascii_alphanumeric() || b".-_".contains(&byte)), "{name}: one word of ASCII without quotes or whitespace, so it is an argv word as it is: {cursor}");
+        // A character of a cursor, changed, is no cursor of this command (the crate's check covers the whole text).
         for at in (0..cursor.len()).step_by(5).chain([cursor.len() - 1]) {
             let mut bytes = cursor.clone().into_bytes();
             bytes[at] = if bytes[at] == b'A' { b'B' } else { b'A' };

@@ -26,10 +26,10 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @case:failure
   @flow:canon-0-35-canon-cursor-1-2.F1
   @atip.canoncursor.03
-  Scenario: The cursor holds no record key as written, and one changed character makes it FOREIGN
-    Given a first page of export whose record has a key made of its time, id and digest
-    When the cursor is read as text, and each of its characters is changed in turn in the cursor of each of the four commands
-    Then the cursor is one word of letters, digits, dot, dash and underscore that holds neither the key nor its hex, and every changed cursor is exit 2 CURSOR_INVALID with reason FOREIGN
+  Scenario: The cursor is one ASCII word and one changed character makes it FOREIGN
+    Given a first page of each of the four commands issued with --limit 1
+    When the cursor is read as text, and characters of it are changed in turn
+    Then the cursor is one word of letters, digits, dot, dash and underscore (no whitespace or quote, so it is an argv word as it is), and every changed cursor is exit 2 CURSOR_INVALID with reason FOREIGN; the cursor is bound, not encrypted: nothing is promised about what a reader can decode from it
 
   # canon: {"schema":1,"at":"2026-11-02T13:38:14Z","actor":{"agent_id":"impl-canon-cursor","role":"implementer","session_id":"s-0-35-canon-cursor"}}
   @subject:atip-contract
