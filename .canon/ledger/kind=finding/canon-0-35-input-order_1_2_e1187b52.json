@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T11:14:28.190773Z",
+  "change_id": "canon-0-35-input-order",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_inputorder.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards (scenario atip.inputorder.10, brief F6): the test sets CANON_ACTOR=bob, a value the option accepts, so it proves the document's key wins over the variable but not that the variable is never validated when the document gives the key (what L2.input-env judges: a variable the option refuses). canon has no integer option that reads an environment variable, so the brief's literal case (an integer variable) cannot be made; the refusable case that exists is CANON_ACTOR on a relayed approval (one word). I ran it on the real binary: brief approve --input with a document actor and CANON_ACTOR='two words' answers as without the variable (CONFIG_MISSING after the stateless stage), and without the actor key it is USAGE /actor 'must be one word', so the behaviour holds; the test does not pin it. Blast radius: a change that validated the variable before the merge would pass 10.",
+  "worktree_dirty": false
+}

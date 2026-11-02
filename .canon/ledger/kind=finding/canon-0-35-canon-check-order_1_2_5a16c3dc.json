@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T11:14:10.190884Z",
+  "change_id": "canon-0-35-canon-check-order",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/main.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Spec fidelity (brief F5, spec 10.8.1; scenario atip.checkorder.09): the brief and the contract make the CANON_ROLE check a validator ('declared in validators'), and it answers last, which I verified (CANON_ROLE=bogus with a broken domain, a broken constraint, a broken validator, a missing required argument, an unknown option: each answers first; alone UNKNOWN_ROLE). But no command document lists it in validators (canon schema status has validators null; finding add and brief approve list only their own), so a checker cannot place it by the document and the order holds by construction only. The brief keeps the schema documents unchanged (I diffed all 105 command documents against the parent commit: identical), so this is not a defect of the change; it is for the 1.2 claim (canon-0-35-claim-l2) to decide whether to declare a role validator. Blast radius: L1.validators and a 1.2 L1.check-order do not probe it today.",
+  "worktree_dirty": false
+}

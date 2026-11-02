@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T11:14:13.060039Z",
+  "change_id": "canon-0-35-canon-check-order",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_check_order.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Standards (scenarios atip.checkorder.05, .07, .12): the sweeps compute the expected code and field of a constraint with atip::constraint::violations, the function the enforcement itself uses (enforce.rs), so for the constraint field they agree with the code by construction. Not a tautology overall: 11 pins the field table with literal calls for requires, forbids, atMostOne, exactlyOne (both ways) and atLeastOne, and 03/05/07/08 compare against the earlier stage run alone, so an order inversion fails. Mitigated; recorded so the sweeps are not read as the proof of the F6 table. Blast radius: a wrong atip::constraint::violations would move code and tests together; the literal calls in 11 are the only independent pin.",
+  "worktree_dirty": false
+}

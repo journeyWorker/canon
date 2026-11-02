@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T11:15:33.597039Z",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "kind": "review",
+  "pin": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:arg_rules::enforce::tests::atip_checkorder_16_an_integer_outside_its_bound_is_a_domain_and_no_integer_is_a_failure_to_parse",
+          "junit:arg_rules::enforce::tests::atip_checkorder_16_the_argument_object_has_the_default_and_a_constraint_sees_only_what_was_given"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "728cb660f0f57fca0648811e5eb23e9a9f38384fbbfdbb4ccf8334e04ba0adc2",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-canon-check-order/brief.md"
+  },
+  "review_id": "01M6DZHGJXGDJCWDT28F0MXARR",
+  "reviewer": "rev-canon-0-35",
+  "scenario_id": "atip.checkorder.16",
+  "schema": 2,
+  "worktree_dirty": false
+}
