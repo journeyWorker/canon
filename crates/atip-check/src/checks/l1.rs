@@ -262,7 +262,16 @@ impl<'a> Judge<'a> {
             // `L1.validators` say so, and the pair is not judged.
             let Some((alone_code, alone_field)) = self.failure(run.alone).filter(|_| self.refused(run.alone)) else { continue };
             c.own(run.call);
+            c.observe(run.alone);
             judged += 1;
+            // A passing report says which pairs it judged and against which answer.
+            c.notes.push(format!(
+                "{}: {} (`{}` against `{}`)",
+                run.command,
+                run.pair,
+                self.at(run.call).call.argv.join(" "),
+                self.at(run.alone).call.argv.join(" ")
+            ));
             let answer = self.failure(run.call).filter(|_| self.refused(run.call));
             let same = answer.is_some_and(|(code, field)| (code == alone_code || (self.is_usage(code) && self.is_usage(alone_code))) && field == alone_field);
             c.holds_at(run.call, "earlier-stage-answers", same, || {

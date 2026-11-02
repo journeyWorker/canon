@@ -432,18 +432,61 @@ fn atip_check_110_every_stage_pair_a_command_can_have_is_run_and_a_pair_that_nee
     let output = run_l1(&harness, &config, &harness.l1_fixture(&config));
     let check = output.check("L1.check-order");
     assert_eq!(check["result"], "pass", "{check}");
-    let argvs: Vec<String> = check["observed"].as_array().expect("observed").iter().map(|call| call["argv"].as_array().expect("argv").iter().filter_map(Value::as_str).collect::<Vec<_>>().join(" ")).collect();
-    let has = |needle: &str| argvs.iter().any(|argv| argv.contains(needle));
-    assert!(has("--no-such-a") && has("--no-such-b"), "the two unknown options: {argvs:?}");
-    // Each pair is run with its earlier fault alone.
-    let alone = argvs.iter().filter(|argv| argv.contains("--no-such-a") && !argv.contains("--no-such-b")).count();
-    assert!(alone >= 1, "{argvs:?}");
-    // The pairs that need the stages the fake has: a missing required argument, a domain and a constraint, a validator.
-    let stages = ["member search", "touch", "member tag", "team add"];
-    assert!(argvs.iter().any(|argv| stages.iter().any(|stage| argv.starts_with(stage))), "{argvs:?}");
-    // No invocation of the check breaks three rules: each pair has at most two faults besides what the fixture invocation has, and none is a duplicate.
-    let unique: BTreeSet<&String> = argvs.iter().collect();
-    assert_eq!(unique.len(), argvs.len(), "an invocation is run once: {argvs:?}");
+    // The report says each pair it judged, with the invocation of the earlier fault alone that its answer is compared with: `<command>: <pair> (`<pair argv>` against `<alone argv>`)`.
+    let notes: Vec<String> = check["notes"].as_array().expect("notes").iter().filter_map(Value::as_str).map(str::to_string).collect();
+    let parse = |note: &str| -> (String, String, Vec<String>, Vec<String>) {
+        let (command, rest) = note.split_once(": ").expect("command");
+        let (kind, runs) = rest.split_once(" (`").expect("kind");
+        let (pair, alone) = runs.trim_end_matches(')').trim_end_matches('`').split_once("` against `").expect("runs");
+        (command.to_string(), kind.to_string(), pair.split(' ').map(str::to_string).collect(), alone.split(' ').map(str::to_string).collect())
+    };
+    let pairs: Vec<(String, String, Vec<String>, Vec<String>)> = notes.iter().map(|note| parse(note)).collect();
+    // The fake has every kind of the brief (F3) in some command, and a command has at most two pairs of a kind: the exact table of what is run.
+    let mut table: Vec<String> = pairs.iter().map(|(command, kind, _, _)| format!("{command}: {kind}")).collect();
+    table.sort();
+    let mut expected: Vec<String> = Vec::new();
+    let mut add = |command: &str, kind: &str, times: usize| {
+        for _ in 0..times {
+            expected.push(format!("{command}: {kind}"));
+        }
+    };
+    for command in ["items", "member list", "member search", "member tag", "schema", "status", "team add", "touch"] {
+        add(command, "two unknown options", 1);
+    }
+    for command in ["member list", "member search", "member tag"] {
+        add(command, "an unknown option and a value of the wrong type", 1);
+    }
+    for command in ["member tag", "touch"] {
+        add(command, "an unknown option and a missing required argument", 1);
+    }
+    add("member tag", "a missing required argument and a broken domain", 2);
+    add("member tag", "a missing required argument and a broken constraint", 1);
+    add("member tag", "two broken domains", 2);
+    add("member search", "two broken domains", 2);
+    add("member tag", "a broken domain and a broken constraint", 2);
+    add("member search", "a broken domain and a broken constraint", 2);
+    add("member list", "a broken domain and a broken constraint", 1);
+    add("member search", "two constraints with different codes", 2);
+    add("member search", "a constraint and a validator with different codes", 2);
+    expected.sort();
+    assert_eq!(table, expected, "the pairs the check runs, by command and kind");
+    // Each pair is its earlier fault alone plus one more change; a pair that needed a third fault would differ from it by more.
+    for (command, kind, pair, alone) in &pairs {
+        assert_ne!(pair, alone, "{command}: {kind}");
+        // The pair of a constraint and a validator starts from the validator's own `rejects` invocation, not from the fixture's: it differs from the alone run by what the two start from.
+        if kind.contains("validator") {
+            continue;
+        }
+        let (only_pair, only_alone): (Vec<&String>, Vec<&String>) = (pair.iter().filter(|word| !alone.contains(word)).collect(), alone.iter().filter(|word| !pair.contains(word)).collect());
+        assert!(only_pair.len() + only_alone.len() <= 3, "{command}: {kind}: `{}` differs from `{}` by {only_pair:?} and {only_alone:?}", pair.join(" "), alone.join(" "));
+    }
+    // Both runs of each pair are in the observed list: the check does not hide the answer its verdict rests on.
+    let observed: Vec<String> = check["observed"].as_array().expect("observed").iter().map(|call| call["argv"].as_array().expect("argv").iter().filter_map(Value::as_str).collect::<Vec<_>>().join(" ")).collect();
+    for (_, _, pair, alone) in &pairs {
+        assert!(observed.contains(&pair.join(" ")) && observed.contains(&alone.join(" ")), "{pair:?} and {alone:?} are observed");
+    }
+    // A command a pair of two kinds cannot be made for gets none: `member search` has no required argument and `touch` no domain or constraint.
+    assert!(pairs.iter().all(|(command, kind, _, _)| !(command == "member search" && kind.contains("required")) && !(command == "touch" && (kind.contains("domain") || kind.contains("constraint")))));
 }
 
 #[test]
@@ -512,4 +555,41 @@ fn atip_check_113_an_output_schema_that_marks_an_optional_field_required_is_caug
         // The row that projects with `--fields` validates the same data against the same schema and fails with it; nothing else does.
         assert_eq!(failing(&output), ["L1.output-data", "L1.fields"], "{claim}: {:?}", output.results());
     }
+}
+
+#[test]
+fn atip_check_103_a_repeatable_option_with_an_array_default_is_written_out_one_occurrence_for_each_element() {
+    let argvs = |output: &Output, id: &str| -> Vec<Vec<String>> {
+        output.check(id)["observed"]
+            .as_array()
+            .expect("observed")
+            .iter()
+            .map(|call| call["argv"].as_array().expect("argv").iter().filter_map(Value::as_str).map(str::to_string).collect())
+            .collect()
+    };
+    // `--kind` is repeatable, an enum of a, b and c, and declares the default ["a", "b"]: one value `["a","b"]` is no member of the enum.
+    let harness = Harness::new();
+    let config = l1_config_1_2(&json!({"repeatableDefault": true}));
+    let output = run_l1(&harness, &config, &harness.l1_fixture(&config));
+    let paging = output.check("L1.paging");
+    assert_eq!(paging["result"], "pass", "{paging}");
+    let calls = argvs(&output, "L1.paging");
+    let written: Vec<&Vec<String>> = calls.iter().filter(|argv| argv.iter().any(|word| word == "--kind=a") && argv.iter().any(|word| word == "--kind=b")).collect();
+    assert!(!written.is_empty(), "the default of --kind is written out: {calls:?}");
+    for argv in &calls {
+        assert!(argv.iter().all(|word| !word.contains('[')), "no JSON text as a value: {argv:?}");
+    }
+    // The cursor of the page that gave no `--kind` is refused when the defaults are written out, and only for being another invocation.
+    let refused = paging["observed"].as_array().expect("observed").iter().find(|call| call["argv"].as_array().is_some_and(|argv| argv.iter().any(|word| word == "--kind=b"))).expect("the call");
+    assert_eq!(refused["exit"], 2);
+    assert!(refused["stdout"].as_str().unwrap_or_default().contains("CURSOR_INVALID"), "{refused}");
+    // A tool that binds the cursor to the effective values accepts it, and the finding names the option.
+    let lax = l1_config_1_2(&json!({"repeatableDefault": true, "cursorBindsEffective": true}));
+    let output = run_l1(&harness, &lax, &harness.l1_fixture(&lax));
+    let paging = output.check("L1.paging");
+    assert_eq!(paging["result"], "fail", "{paging}");
+    assert!(
+        paging["findings"].as_array().is_some_and(|findings| findings.iter().any(|finding| finding["kind"] == "cursor-bound-to-given-arguments" && finding["message"].as_str().is_some_and(|text| text.contains("--kind written out at its default")))),
+        "{paging}"
+    );
 }

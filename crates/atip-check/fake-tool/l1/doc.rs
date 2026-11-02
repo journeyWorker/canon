@@ -19,6 +19,7 @@ impl Model {
             is_1_1: tool.is_1_1(),
             is_1_2: tool.is_1_2(),
             limit_not_flag_only: tool.flag("limitNotFlagOnly"),
+            repeatable_default: tool.flag("repeatableDefault"),
             deep: tool.flag("deepTree"),
         };
         Self {

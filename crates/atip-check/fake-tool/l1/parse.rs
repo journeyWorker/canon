@@ -153,6 +153,7 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
     let mut operands: Vec<String> = Vec::new();
     let mut done = false;
     let mut index = 0;
+    let mut deferred_unknown: Option<String> = None;
     while index < args.len() {
         let word = &args[index];
         index += 1;
@@ -182,9 +183,15 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
         };
         // Seeded: of two unknown options the tool answers the later one (the checker's own are named `--no-such-*`).
         let later_unknown = tool.flag("unknownOptionLast") && args[index..].iter().any(|later| later.starts_with("--no-such"));
+        // Seeded: an unknown option is answered after the values and the required arguments (the checker's own are named `--no-such-*`).
+        let deferred = tool.flag("unknownOptionDeferred") && word.starts_with("--no-such");
         let Some((arg, written, joined)) = option else {
             if word != "-" && word.starts_with('-') {
                 if later_unknown {
+                    continue;
+                }
+                if deferred {
+                    deferred_unknown.get_or_insert_with(|| word.clone());
                     continue;
                 }
                 return Err(Failure::Unknown(word.clone()));
@@ -198,6 +205,10 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
         };
         let Some(arg) = arg else {
             if later_unknown {
+                continue;
+            }
+            if deferred {
+                deferred_unknown.get_or_insert(written);
                 continue;
             }
             return Err(Failure::Unknown(written));
@@ -252,6 +263,9 @@ pub fn parse(tool: &Tool, command: &Command, args: &[String], skip_rules: bool) 
                 arg.field(),
             ));
         }
+    }
+    if let Some(word) = deferred_unknown {
+        return Err(Failure::Unknown(word));
     }
     if tool.flag("orderConstraintFirst") && !skip_rules {
         check_rules(tool, command, &parsed)?;
@@ -397,7 +411,12 @@ fn violation(command: &Command, parsed: &Parsed, rule: &Rule) -> Option<&'static
 }
 
 fn check_rules(tool: &Tool, command: &Command, parsed: &Parsed) -> Result<(), Failure> {
-    for (index, rule) in command.rules.iter().enumerate() {
+    // Seeded: the constraints are judged from the last declared to the first.
+    let mut rules: Vec<(usize, &super::spec::Rule)> = command.rules.iter().enumerate().collect();
+    if tool.flag("rulesReversed") {
+        rules.reverse();
+    }
+    for (index, rule) in rules {
         if listed(tool, "ignoreConstraint", command.id, &json!(index)) {
             continue;
         }

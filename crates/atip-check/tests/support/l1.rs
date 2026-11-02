@@ -103,6 +103,8 @@ pub fn l1_cases_1_2() -> Vec<Case> {
         l1_case_1_2("check-order/earlier-stage-answers", json!({"orderLaterDomain": true}), None),
         l1_case_1_2("check-order/earlier-stage-answers", json!({"orderValidatorFirst": true}), None),
         l1_case_1_2("check-order/earlier-stage-answers", json!({"unknownOptionLast": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"unknownOptionDeferred": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"rulesReversed": true}), None),
     ]
 }
 

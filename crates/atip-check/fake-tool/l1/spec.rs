@@ -402,6 +402,8 @@ pub struct Shape {
     pub is_1_2: bool,
     /// Seeded: a 1.2 document that leaves `--limit` without `flagOnly`.
     pub limit_not_flag_only: bool,
+    /// Seeded: `member list` has a repeatable enum option whose declared default is an array (`--kind`, default `["a", "b"]`).
+    pub repeatable_default: bool,
     /// Whether the tree has a path of three words (`team roster list`).
     pub deep: bool,
 }
@@ -486,6 +488,15 @@ fn member_list(shape: Shape) -> Command {
         )
         .value("FIELDS")),
     ];
+    if shape.repeatable_default {
+        options.push(
+            Arg::option("kind", "enum", "Only the members of these kinds")
+                .value("KIND")
+                .possible(&["a", "b", "c"])
+                .repeatable()
+                .default(json!(["a", "b"])),
+        );
+    }
     if is_1_2 {
         options.push(Arg::option("input", "string", "The arguments as a JSON document, or - for the document on stdin").value("JSON").flag_only());
     }

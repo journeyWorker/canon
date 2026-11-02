@@ -714,7 +714,11 @@ impl Run<'_> {
     /// The 1.2 half of `L1.paging` (spec 6.9, 10.7.2, 12.5): what the cursor is bound to is what the invocation gave, so `--limit 1` may become `--all`, an option
     /// written out at its default is another invocation, and so is the same invocation in an environment with another value for the variable of an option it left out.
     fn plan_paging_1_2(&mut self, doc: &CommandDoc, paging: &mut PagingRun, base: &Invocation, next_argv: &[String], sequence: usize) -> Result<(), RunError> {
-        let Ok(carried) = invocation::parse(doc, next_argv) else { return Ok(()) };
+        let Ok(carried) = invocation::parse(doc, next_argv) else {
+            // The next entry does not parse in the document of its own command: nothing of the 1.2 half can be built from it, and the row says so.
+            paging.unsupported.push("anything (its next entry does not parse against its own document)");
+            return Ok(());
+        };
         let args = invocation::args(doc, &carried);
         if doc.has_option("all") && doc.has_option("limit") {
             let mut swapped = carried.clone();
@@ -739,9 +743,19 @@ impl Run<'_> {
             .filter(|option| !reserved.contains(option.name.as_str()) && !global.contains(&option.name) && !option.flag_only && !args.options.contains_key(&option.name))
             .collect();
         // An option other than a switch or a count, written out at its declared default that is not null.
-        for option in others.iter().filter(|option| !option.is_flag() && !option.default.is_null()).take(3) {
+        // A repeatable option has an array default: it is written out as one occurrence for each element, and an empty array writes nothing out.
+        let words_of = |default: &Value| -> Vec<String> {
+            match default {
+                Value::Array(items) => items.iter().map(witness::word_of).collect(),
+                other => vec![witness::word_of(other)],
+            }
+        };
+        for option in others.iter().filter(|option| !option.is_flag() && !option.default.is_null() && !words_of(&option.default).is_empty()).take(3) {
             let mut added = carried.clone();
-            invocation::set_option(&mut added, &option.name, Some(witness::word_of(&option.default)));
+            invocation::remove_option(&mut added, &option.name);
+            for word in words_of(&option.default) {
+                added.items.push(Item::Option { name: option.name.clone(), value: Some(word) });
+            }
             let call = self.invoke_after(sequence, Call::new(invocation::render(&added)))?;
             paging.defaults.push((format!("--{} written out at its default", option.name), call));
         }

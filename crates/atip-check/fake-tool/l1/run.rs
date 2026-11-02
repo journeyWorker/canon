@@ -587,7 +587,8 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
     // an option it left out, to the value its environment variable has (spec 6.9, 1.2); before 1.2, to the effective values.
     let binding = if tool.is_1_2() && !tool.flag("cursorBindsEffective") {
         let env = if tool.flag("cursorIgnoresEnv") || parsed.has("team") { String::new() } else { env_team.clone().unwrap_or_default() };
-        format!("team={};sort={};env={env}", parsed.text("team").unwrap_or_default(), parsed.text("sort").unwrap_or_default())
+        let kinds: Vec<&str> = parsed.values("kind").iter().filter_map(Value::as_str).collect();
+        format!("team={};sort={};env={env};kind={}", parsed.text("team").unwrap_or_default(), parsed.text("sort").unwrap_or_default(), kinds.join(","))
     } else {
         format!("team={};sort={sort}", team.unwrap_or_default())
     };
