@@ -67,7 +67,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.8, 11.11, appr
 
 ### F3 실행 중 실패
 
-- 항목이 실행 중 실패하면(상태에 따른 선행 조건 포함) 배치가 멈춘다. exit 1, `BATCH_INCOMPLETE`, `field`가 `/<index>`이다. 항목 번호가 0이어도 같다.
+- 항목이 실행 중 실패하면(상태에 따른 선행 조건 포함) 배치가 멈춘다. exit 1, `BATCH_INCOMPLETE`, `field`가 `/<index>`이다. 항목 번호가 0이어도 같다. 첫 항목이 실패해도 exit 2가 아니다.
 - 앞 항목은 `written`이나 `unchanged`, 실패한 항목은 `failed`와 자기 `error`, 뒤 항목은 `skipped`이다.
 - `failed`는 되돌렸다는 뜻이 아니다. 그 항목의 `error` 코드의 종료 값이 1이면 효과가 있었을 수 있고 2이면 실행을 거절한 것이다. 배치는 트랜잭션이 아니다.
 - `data`는 `BATCH_INCOMPLETE` 오류와 함께 배치 보고서로 온다.
@@ -105,7 +105,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.8, 11.11, appr
 
 ## Questions and assumptions
 
-- 가정: 배치의 사전 `--dry-run`을 없애는 것이 계약 11.11의 표에서 직접 나온다. 표는 상태 없는 사전 검사 실패만 exit 2로 정하고 상태에 따른 실패를 실행 중 실패(exit 1, `BATCH_INCOMPLETE`)로 정한다. canon의 사전 `--dry-run`은 더 엄격한 방식이라 계약과 어긋난다. 계약 저자에게 이 해석이 맞는지 확인한다.
+- 결정(계약 저자 답): 11.11의 표대로 실행 중 상태 실패는 항목 번호가 0이어도 exit 1, `BATCH_INCOMPLETE`, `field` `/0`이다. 그 항목은 자기 `error`로 `failed`이고 뒤 항목은 `skipped`이다. exit 2와 `data` 없음은 상태를 읽지 않는 1-6단계의 사전 검사 실패에만 쓴다. 이에 따라 canon의 상태를 읽는 사전 `--dry-run`을 없앤다.
 - 가정: 사전 `--dry-run` 없이 실행되면 앞 항목들이 일을 한 뒤 중간에 멈출 수 있다. 계약은 이것을 정상으로 본다(배치는 트랜잭션이 아니다). 호출자는 `data.items`로 어디까지 갔는지 읽는다. 업그레이드 노트에 싣는다.
 - 가정: 이 변경은 항목의 `error` 모양과 `status` 이름을 바꾸지 않는다. 포인터와 `BATCH_INCOMPLETE`의 `field`와 `data`의 유무만 바꾼다.
 - 정책 질문은 없다.

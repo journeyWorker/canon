@@ -42,7 +42,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.2-11.9, approa
 - 한 문서의 모든 조각 검증 문제가 문서의 키 순서로 보고된다. 첫 문제가 오류의 `field`이고 문제가 여럿이면 `details`가 있다.
 - 열거형 값 위반이 `INPUT_INVALID`와 그 키의 포인터이다.
 - ==**argv의 파싱 실패가 충돌 검사보다 먼저 답한다.**==
-- 정수 표기는 정규화한 값으로 비교하고, 계약의 정수 문법을 argv와 문서 모두에 쓴다.
+- 정수 표기는 정규화한 값으로 비교한다. 문서의 정수 문자열은 계약의 정수 문법을 따르고, argv의 정수 표기는 지금 그대로 둔다.
 - NDJSON의 비어 있지 않은 모든 줄이 문서이고 `#` 줄을 건너뛰지 않는다.
 
 ## User flow
@@ -84,7 +84,8 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.2-11.9, approa
 ### F5 정수 정규화
 
 - 정수 인수의 문서 값은 JSON 정수이거나 `-?(0|[1-9][0-9]*)` 문자열이다. 둘 다 ±(2^53-1) 안이고 반올림하지 않는다. `-0`은 `0`이고 숫자 문자열 `"-0"`도 `0`이다. 비교는 정규화한 값으로 한다.
-- 그 밖의 표기(`+1`, 16진수, `1e3`, 공백)는 `INPUT_INVALID`, 이유 `INVALID_VALUE`이다. argv도 같은 문법이다. 지금 argv의 `+1`이 받아들여지는 것은 고친다.
+- 문서의 그 밖의 표기(`+1`, 16진수, `1e3`, 공백)는 `INPUT_INVALID`, 이유 `INVALID_VALUE`이다. 이 문법은 문서의 숫자 문자열에만 적용된다(spec 11.5).
+- argv의 정수 표기는 계약이 정하지 않으므로 바꾸지 않는다. 지금 받아들이는 `+1`을 계속 받아들인다. 충돌 비교는 정규화한 값으로 하므로 argv `+1`과 문서 `1`은 충돌하지 않는다.
 - 문서의 `1.0`처럼 정수가 아닌 JSON 수는 `INPUT_INVALID`이다. 지금은 `USAGE`가 나온다. canon에는 `number`와 `json` 값 타입의 인수가 없으므로 멤버 순서와 `1.0`과 `1` 같은 표기 변형은 정수에서만 시험된다.
 
 ### F6 환경과 기본값
@@ -109,14 +110,15 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.2-11.9, approa
   - 실패 경로: argv만 있는 호출과 문서만 있는 호출은 충돌 검사의 영향을 받지 않는다.
 - F5:
   - argv의 `--round 1`과 문서 `{"round":"1"}`, 문서 `{"round":1}`이 충돌하지 않는다. 문서 `-0`과 argv `0`도 충돌하지 않는다. 숫자 문자열 `"-0"`도 같다.
-  - 실패 경로: `+1`, `0x1`, `1e3`, `" 1"`이 argv와 문서에서 모두 거절된다. 문서에서는 `INPUT_INVALID`, `INVALID_VALUE`이다. `9007199254740992`는 거절된다.
+  - 실패 경로: 문서의 `"+1"`, `"0x1"`, `"1e3"`, `" 1"`이 `INPUT_INVALID`, `INVALID_VALUE`로 거절된다. `9007199254740992`는 문서와 argv 모두에서 거절된다.
+  - argv의 `--round +1`은 지금처럼 받아들여지고 문서 `1`과 충돌하지 않는다.
 - F6:
   - 환경 변수가 정수 옵션이 거절할 값으로 설정되어도 문서가 그 키를 주면 결과가 환경 변수가 없을 때와 같다. 문서가 주지 않은 옵션은 환경에서 채워진다.
 - `atip check`의 `L2.input-refusals`, `L2.input-normalise`, `L2.input-conflict`, `L2.input-env`, `L2.input-fragment`, `L2.input-pointer`, `L2.input-dash-values`가 canon에서 통과한다. 그 외에 `cargo test --workspace`, conformance, 생성 문서 drift 시험이 통과한다.
 
 ## Questions and assumptions
 
-- 가정: 정수 문법 규칙이 argv에도 적용된다는 것은 계약 10.7.2의 `valueType` 표에서 읽었다. 그 표는 argv와 문서에 공통인 문법을 적는다. 계약 저자에게 argv의 `+1`을 거절해야 하는지 확인한다. 지금 canon은 argv에서 `+1`을 받아들인다. 거절하면 argv를 쓰던 호출이 깨진다.
+- 결정(계약 저자 답): 현재 계약은 argv의 정수 표기를 정하지 않는다. 11.5의 `-?(0|[1-9][0-9]*)`는 `--input`의 숫자 문자열에만 적용된다. 0.35는 argv의 `+1`을 계속 받아들인다. 거절은 계약 1.3 후보이다.
 - 가정: 문서의 열거형 위반이 `USAGE`에서 `INPUT_INVALID`로 바뀌는 것은 spec 11.7 2단계("types and enum membership")에서 직접 나온다. 0.34의 `USAGE`는 clap으로 넘어간 뒤에 나오던 부수 효과였다.
 - 가정: 조각 검증의 문제 순서는 문서에 쓰인 키 순서이다. 계약이 "all problems"만 말하고 순서를 정하지 않는다. 키 순서는 구현이 입력 순서를 보존할 때 가장 자연스럽다.
 - 가정: 이 변경은 argv의 전체 clap 파싱을 하지 않는 현재 방식(lexer)을 유지한다. rust.md §6이 권하는 대로다.

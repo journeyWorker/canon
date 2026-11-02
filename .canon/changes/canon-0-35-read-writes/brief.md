@@ -1,5 +1,8 @@
 ---
 waive:
+  - rule: "prose.length"
+    section: "acceptance"
+    reason: "다섯 단계마다 실패 경로를 요구하는 규칙 때문에 줄일 수 없다"
   - rule: "prose.code-citation"
     section: "detail"
     reason: "이름과 철자는 사용자가 읽는 철자 자체이고 이 변경의 대상이다"
@@ -57,13 +60,13 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 8.2, 12.1, 12.2, 
 ### F1 거절 앞의 쓰기
 
 - ==**색인 새로 쓰기는 명령이 모든 거절 지점을 지난 뒤에만 한다.**== 대상 객체의 존재, 전이 허용, 인수 유효성처럼 색인 없이 알 수 있는 거절은 색인을 쓰기 전에 낸다.
-- 거절을 알려면 새 색인이 필요한 명령(`evidence add`의 시나리오 확인)은 색인을 메모리에서 계산해 판정하고, 성공할 때만 쓴다. 거절하는 호출은 색인 파일을 쓰지 않는다.
+- 거절을 알려면 새 색인이 필요한 명령인 `evidence add`의 시나리오 확인은 색인을 메모리에서 계산해 판정하고, 성공할 때만 쓴다. 거절하는 호출은 색인 파일을 쓰지 않는다.
 - 해당 호출 지점은 `subject show`와 `subject move`, `evidence add`, `evidence audit`, `review`, `divergence accept`, `artifacts store`이다. 구현자가 각 지점에서 거절이 앞서는지 확인한다.
 - `subject move <id>`를 `--to` 없이 부르는 호출은 아무것도 쓰지 않는다고 `effectNote`가 말한다. 지금은 색인을 쓴다. 이 호출은 거절 경로와 같은 규칙을 따른다.
 
 ### F2 subject show의 캐시
 
-- `subject show`는 읽기 명령이다. 시나리오 색인은 파생된 캐시이고 계약 12.1은 읽기 명령이 `effectNote`가 이름 붙인 캐시 효과를 낼 수 있다고 허용한다. 그래서 갱신을 유지하되 `effectNote`가 "오래된 시나리오 색인을 새로 쓴다"고 말한다.
+- `subject show`는 읽기 명령이다. 시나리오 색인은 파생된 캐시이고 계약 12.1은 읽기 명령이 `effectNote`가 이름 붙인 캐시 효과를 낼 수 있다고 허용한다. 조건은 둘이다. `effectNote`가 색인 갱신을 이름으로 말해야 하고, 거절도 캐시를 쓰지 않아야 한다(spec 12.2). 갱신을 유지하되 `effectNote`가 "오래된 시나리오 색인을 새로 쓴다"고 말한다.
 - JSON 모드에서 stderr에 한 줄을 쓰지 않는다. 텍스트 모드의 진행 줄은 그대로 둔다. 계약은 stderr가 비어 있기를 권고하고 JSON 모드의 진행 줄은 허용한다. 이 변경은 `subject show`의 JSON 모드에서 줄을 없앤다.
 - canon의 fixture가 `subject show`의 `allowedEffects`로 색인 경로를 싣는다(`canon-0-35-claim-l2`).
 
@@ -75,7 +78,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 8.2, 12.1, 12.2, 
 ### F4 도움말, 버전, schema, skills show, --dry-run
 
 - 이 호출들은 아무것도 쓰지 않는다. `--dry-run`을 가진 14개 명령 모두 해당한다. 색인 새로 쓰기, 접근 감사 줄, 캐시, 텔레메트리, 스크래치 파일이 없다.
-- 시험은 모든 `--dry-run`과 `--help`와 `--version` 호출의 스냅샷을 비교한다.
+- 시험은 모든 `--dry-run`과 `--help`와 `--version` 호출의 스냅샷을 비교한다. `report check`와 `selftest`가 운영체제 임시 디렉터리에 만드는 파일은 한 실행 안에서 지워지는 한 효과가 아니고, 거절과 실패 경로에서 남으면 효과이다.
 
 ### F5 dashboard
 
@@ -91,6 +94,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 8.2, 12.1, 12.2, 
 - F2:
   - `canon subject show <id> --json`이 색인을 갱신하고 stderr가 비어 있다. `schema subject show --json`의 `effectNote`가 캐시 갱신을 말한다.
   - ==**거절이 앞서는 호출에서는 색인이 새로 쓰이지 않는다.**==
+  - `report check`와 `selftest`의 거절과 실패 경로를 지난 뒤 운영체제 임시 디렉터리에 canon이 만든 파일이 남지 않는다. 성공 경로도 같다. 시험은 임시 디렉터리를 이 호출 전용 경로로 지정해 호출 전후의 목록을 비교한다.
   - 실패 경로: 텍스트 모드의 `subject show`는 진행 줄을 stderr에 쓸 수 있다. JSON 모드에서는 쓰지 않는다.
 - F3:
   - 모든 거절 호출의 스냅샷이 같다. `atip check`의 `L0.refusal-effects`가 canon에서 통과한다.
@@ -103,10 +107,10 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 8.2, 12.1, 12.2, 
 
 ## Questions and assumptions
 
-- 결정(계약 저자 답): `dashboard`는 스트림이 아니다. spec 1.2는 서버를 범위 밖으로 두고 시작 명령이 출력과 `effectNote`를 선언하는 것만 요구한다. 서버가 신호를 받으면 봉투가 없다는 것을 spec 8.4가 약속하지 않는다. `notRun`은 checker.md의 다음 패치에 들어간다. 서버 명령의 기계 판독 선언은 계약 1.3 후보이다.
-- 가정: `subject show`의 색인 갱신은 읽기 명령의 캐시 효과로 유지한다. 마이그레이션 문서는 읽기에서 옮기거나 명령을 `write`로 바꾸라고 두 방식을 말한다. `write`로 바꾸면 읽기 역할이 쓰는 모든 호출이 쓰기 명령이 된다. 선언된 캐시로 유지하는 쪽이 호출자에게 덜 깨진다. 이 선택이 맞는지 저자에게 확인한다.
+- 계약 저자가 정했다. `dashboard`는 스트림이 아니다. spec 1.2는 서버를 범위 밖으로 두고 시작 명령이 출력과 `effectNote`를 선언하는 것만 요구한다. 서버가 신호를 받으면 봉투가 없다는 것을 spec 8.4가 약속하지 않는다. `notRun`은 checker.md의 다음 패치에 들어간다. 서버 명령의 기계 판독 선언은 계약 1.3 후보이다.
+- 계약 저자가 정했다. `subject show`는 읽기 명령으로 남고 선언한 캐시 효과로 색인을 갱신할 수 있다(12.1). `effectNote`가 색인 갱신을 말하고 거절이 캐시도 쓰지 않는 두 조건을 지킨다(12.2).
 - 가정: 색인을 메모리에서 계산해 거절을 판정하는 방식은 구현자의 선택이다. 조건은 거절이 파일을 쓰지 않는 것이다.
-- 가정: `report check`와 `selftest`가 운영체제 임시 디렉터리에 쓰는 스크래치 파일은 이 변경에 넣지 않는다. 검사기의 스냅샷이 작업 디렉터리와 `HOME`만 보기 때문이다. 계약 12.2의 "파일" 범위에 들어가는지는 저자에게 묻는다.
+- 계약 저자가 정했다. 한 실행 안에서 만들고 지운 운영체제 임시 파일은 효과가 아니다. 남은 파일은 효과이다. `report check`와 `selftest`가 거절과 실패 경로에서도 임시 파일을 지우는지 이 변경이 확인한다.
 - 정책 질문은 없다.
 
 ## Out of scope
