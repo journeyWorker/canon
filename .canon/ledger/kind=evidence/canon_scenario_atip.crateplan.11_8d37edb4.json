@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T14:21:32.357314Z",
+  "attachments": [
+    {
+      "case": "plan::tests::atip_crateplan_11_a_changed_plan_after_some_effects_is_stopped_midway_with_the_reason_plan_stale",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-plan-rebased-junit.xml",
+      "sha256": "3b75675d1c6a053f6a19997d1478f25a38fd55ad6a34ee70a4e4ff9aee685c14"
+    }
+  ],
+  "code_tree": "13d48fbe16050596bb8c5c26c07bfb63f643cd98",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-plan-rebased-junit.xml"
+  },
+  "evidence_sha": "50aa914ab24124690cb125ba696c5c0d530cd60e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "atip.crateplan.11",
+  "schema": 1,
+  "staging_id": "55de4022",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
