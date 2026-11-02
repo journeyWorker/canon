@@ -310,3 +310,23 @@ fn atip_check_97_the_example_syntax_check_still_judges_the_examples_of_a_not_run
     assert!(output.check("L1.tree").get("notRun").is_none());
     assert_eq!(observed_served(&output, "L0.envelope").len(), 1);
 }
+
+#[test]
+fn atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_unprovided_with_its_code_and_any_other_refusal_is_a_fixture_error() {
+    let harness = Harness::new();
+    let config = json!({"serveMode": "refuseStart"});
+    let fixture = l0_fixture(&harness, &config, &[&["serve", "--json"]]);
+    let output = harness.check(&fixture, true);
+    let document = output.envelope();
+    assert_eq!((output.code, document["error"]["code"].as_str()), (Some(1), Some("LEVEL_NOT_MET")), "{}", output.stdout);
+    let check = output.check("L0.envelope");
+    assert_eq!(check["result"], "unprovided", "{check}");
+    assert!(check["findings"].as_array().is_some_and(|findings| findings.iter().any(|found| found["code"] == "CURSOR_INVALID")), "{check}");
+    // A refusal of a step that reads no state (here USAGE) is a fixture error, as ending on its own is.
+    let harness = Harness::new();
+    let config = json!({"serveMode": "refuseStart", "serveRefuseCode": "USAGE"});
+    let fixture = l0_fixture(&harness, &config, &[&["serve", "--json"]]);
+    let output = harness.check(&fixture, true);
+    let document = output.envelope();
+    assert_eq!((output.code, document["error"]["code"].as_str()), (Some(2), Some("FIXTURE_INVALID")), "{}", output.stdout);
+}

@@ -499,7 +499,7 @@ impl Run<'_> {
     /// own, before or after that document, is a fixture error.
     fn invoke_served(&mut self, id: &str, argv: &[String]) -> Result<usize, RunError> {
         let index = self.invoke(Call::new(in_json_mode(argv)).until_first_document())?;
-        if self.log[index].ended_alone {
+        if self.log[index].ended_alone && served_precondition(&self.log[index]).is_none() {
             return Err(RunError::Fixture(format!(
                 "`notRun` names {id}, and `{}` ended on its own ({}) within the time limit: a command that ends belongs in no `notRun`",
                 self.log[index].call.argv.join(" "),
@@ -1482,6 +1482,12 @@ impl<'a> Judge<'a> {
     fn judge_served(&self, c: &mut Conditions<'a>, no_document: bool) {
         for served in &self.calls.served {
             match served.call {
+                Some(index) if self.at(index).ended_alone => {
+                    // Refused at the start by a precondition (kept by `invoke_served`): like any fixture call, unprovided with its code.
+                    if let Some(code) = served_precondition(self.at(index)) {
+                        c.refused_by_precondition(index, &code);
+                    }
+                }
                 Some(index) => {
                     c.observe(index);
                     if no_document && self.at(index).exit == Exit::TimedOut {
@@ -2560,6 +2566,18 @@ fn first_document_text(text: &str) -> &str {
         Some(Ok(_)) => &trimmed[..values.byte_offset()],
         _ => trimmed,
     }
+}
+
+/// The code of a refusal at the start of a `notRun` command that the state or the environment of the fixture caused: exit 2 with an error
+/// envelope whose code is not one a step that reads no state gives (spec 11.7 steps 1-6, which are a fixture error as any other way to end).
+fn served_precondition(outcome: &Outcome) -> Option<String> {
+    if outcome.exit != Exit::Code(2) {
+        return None;
+    }
+    let document = first_document(&outcome.stdout).filter(|document| document.get("ok") == Some(&Value::Bool(false)))?;
+    let code = document.pointer("/error/code").and_then(Value::as_str)?;
+    let stateless = matches!(code, "USAGE" | "UNKNOWN_COMMAND" | "COMMAND_REQUIRED" | "UNKNOWN_OPTION" | "OPTION_REQUIRED") || code.starts_with("INPUT_");
+    (!stateless).then(|| code.to_string())
 }
 
 /// Spec 5.1 and 5.4: UTF-8, one JSON document, one newline, nothing else.
