@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-canon-misc",
+    "role": "implementer",
+    "session_id": "s-0-35-canon-misc"
+  },
+  "at": "2026-11-02T13:11:17.431310Z",
+  "attachments": [
+    {
+      "case": "atip_skillsshow_04_the_old_members_are_gone_and_the_schema_is_held",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "evidence-tmp/workspace.xml",
+      "sha256": "35144c198a6e9f386b0ae73182d00881be24c0360df8e00612144d7602bfcd92"
+    }
+  ],
+  "code_tree": "49ccff408ff5c599c79d0bb808687cba3bfec7b5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked (3857 passed) from the clean worktree; clippy, check_visibility.sh green"
+  },
+  "evidence_sha": "8023248dd59647a5b4b10ff46b2d78534276ad81",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "atip.skillsshow.04",
+  "schema": 1,
+  "staging_id": "fc3ef6b6",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}
