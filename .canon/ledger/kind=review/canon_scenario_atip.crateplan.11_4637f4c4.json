@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T14:30:56.276556Z",
+  "code_tree": "eb390035522bf0f250331f0eb54da38ba7da24e3",
+  "kind": "review",
+  "pin": "194a1457e53ca29e9f8e8b4e6871d16744eea25a",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:plan::tests::atip_crateplan_11_a_changed_plan_after_some_effects_is_stopped_midway_with_the_reason_plan_stale"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e4d5ae8011fae680358c55e33bde2056eaf87bc6d6fac35fdc2df37ca426338b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-plan/brief.md"
+  },
+  "review_id": "01M6EAQ8GMB5YHWR0FMM6MXNWH",
+  "reviewer": "rev-crate-0-35",
+  "scenario_id": "atip.crateplan.11",
+  "schema": 2,
+  "worktree_dirty": false
+}
