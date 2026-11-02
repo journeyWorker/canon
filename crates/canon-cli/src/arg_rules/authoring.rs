@@ -23,7 +23,7 @@ const RELAY_ACTOR: &str = concat!("^[", white_space!(), "]*[^", white_space!(), 
 /// One `--digest` entry: `<change>=sha256:<digest>`, the change not empty.
 const DIGEST: &str = "^[^=]+=sha256:[^\u{0}]*$";
 
-pub(super) static TABLES: Tables = Tables {
+pub(crate) static TABLES: Tables = Tables {
     rules: &[
         ("brief approve", &[Rule::requires("actor", &["relayed-via"]), Rule::requires("digest", &["relayed-via"])]),
         ("policy approve", &[Rule::requires("actor", &["relayed-via"]), Rule::requires("relayed-via", &["note"])]),

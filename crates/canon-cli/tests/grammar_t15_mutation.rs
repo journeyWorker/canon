@@ -47,7 +47,7 @@ const MUTATIONS: &[Mutation] = &[
     Mutation {
         name: "drop a metadata row",
         file: "crates/canon-cli/src/schema.rs",
-        apply: |text| drop_line(text, |l| l.trim_start().starts_with("row_exits(\"brief show\"")),
+        apply: |text| drop_line(text, |l| l.trim_start().starts_with("row(\"brief show\"")),
         catches: ("cli_tree", "every_leaf_has_one_metadata_row_and_every_row_a_leaf"),
     },
     Mutation {

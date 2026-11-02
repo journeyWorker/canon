@@ -38,7 +38,7 @@ const NOT_CHANGE_KINDS: &[&str] = &["scenario", "session", "run", "event", "hand
 const NOT_STATUS_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
 const NOT_DOMAIN_KINDS: &[&str] = &["change", "task", "scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
 
-pub(super) static TABLES: Tables = Tables {
+pub(crate) static TABLES: Tables = Tables {
     rules: &[
         ("ingest plans", &[Rule::requires("dialect", &["plan-source"]), Rule::requires("plan-source", &["dialect"])]),
         ("migrate", &[Rule::requires("backup", &["revert"]), Rule::requires("relayed-via", &["commit"]), Rule::requires("actor", &["relayed-via"]), Rule::requires("approver", &["relayed-via"]), Rule::requires("note", &["relayed-via"])]),
