@@ -380,3 +380,12 @@ fn atip_checkl2input_13_a_pointer_into_operands_names_an_operand_candidate_only(
     let named = run_config(&l2_config(&json!({"dashPrecondition": true, "dashPreconditionNamed": true, "dashPreconditionBoth": true})));
     assert_eq!(check_of(&named.envelope()["data"], "L2.input-dash-values")["result"], "pass");
 }
+
+#[test]
+fn atip_checkl2input_13_a_framing_refusal_naming_the_value_is_not_a_value_read_as_a_value() {
+    // A tool that reads `-x` as an option or `{x` as a document refuses with INPUT_INVALID, the field and the value as `received`: that is the failure.
+    let config = l2_config(&json!({"dashPrecondition": true, "dashPreconditionNamed": true, "dashPreconditionCode": "INPUT_INVALID"}));
+    let output = run_config(&config);
+    let document = output.envelope();
+    assert_eq!(check_of(&document["data"], "L2.input-dash-values")["result"], "fail", "{}", not_passing(&document["data"]));
+}

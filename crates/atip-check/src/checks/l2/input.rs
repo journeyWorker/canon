@@ -508,7 +508,9 @@ impl<'a> Judge<'a> {
             let bare = field.trim_start_matches('/').trim_start_matches("--");
             if run.operand { field == "/operands" || field.starts_with("/operands/") || bare == run.argument } else { bare == run.argument || bare == crate::l1::model::camel(&run.argument) }
         });
-        named && document.pointer("/error/received").and_then(Value::as_str) == Some(run.value.as_str())
+        // Not a framing code: INPUT_INVALID with the value as `received` is how a tool that read the value as an option or a document refuses it.
+        let framing = document.pointer("/error/code").and_then(Value::as_str).is_some_and(|code| code.starts_with("INPUT_") || code == "USAGE");
+        named && !framing && document.pointer("/error/received").and_then(Value::as_str) == Some(run.value.as_str())
     }
 
     fn l2_input_dash_values(&'a self) -> Finding {

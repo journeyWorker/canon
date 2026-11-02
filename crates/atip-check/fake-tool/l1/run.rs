@@ -875,10 +875,11 @@ fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
     if tool.flag("dashPrecondition") {
         let both = tool.flag("dashPreconditionBoth");
         let given = parsed.text("label").map(|label| ("/label", label)).into_iter().chain(parsed.text("note").filter(|_| both).map(|note| ("/note", note)));
-        for (pointer, text) in given.filter(|(_, text)| text.starts_with(['-', '{', '['])) {
+        if let Some((pointer, text)) = given.filter(|(_, text)| text.starts_with(['-', '{', '['])).next() {
             let field = tool.text("dashPreconditionField", pointer);
             let extras: Vec<(&str, Value)> = if tool.flag("dashPreconditionNamed") { vec![("field", json!(field)), ("received", json!(text))] } else { Vec::new() };
-            return tool.fail("usage", "ALREADY_SEALED", "the value names something that is not there", Some("record put"), &extras, 2);
+            let code = tool.text("dashPreconditionCode", "ALREADY_SEALED");
+            return tool.fail("usage", &code, "the value names something that is not there", Some("record put"), &extras, 2);
         }
     }
     let mut record = json!({"id": id, "round": parsed.int("round").unwrap_or_default()});
