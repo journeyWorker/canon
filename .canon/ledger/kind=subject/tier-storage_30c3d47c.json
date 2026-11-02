@@ -1,0 +1,42 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-02T06:54:47.649532Z",
+  "change_ids": [
+    "canon-0-30-ledger-naming",
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill",
+    "canon-0-30-record-links",
+    "canon-0-33-atip-l0",
+    "canon-0-35-canon-cursor-1-2",
+    "canon-0-35-canon-stopped-midway",
+    "canon-0-35-plan-jcs"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-35-orch"
+    },
+    "change": "canon-0-35-plan-jcs",
+    "reason": "0.35 wave C approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-35-orch"
+    },
+    "reason": "0.35 wave C approved"
+  },
+  "subject_id": "tier-storage",
+  "summary": "",
+  "title": "Tier: storage rungs, routing, and aging"
+}
