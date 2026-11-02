@@ -28,7 +28,7 @@ waive:
 
 # atip check L2: --input 문서와 배치 검사
 
-Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md §3과 §5-§7, spec 11, CHANGELOG 1.2.0의 Checker 항목, issue 134
+Source: https://github.com/journeyWorker/atip tag v1.2.1, approaches/checker.md §3과 §5-§7, spec 11, CHANGELOG 1.2.0의 Checker 항목, issue 134
 
 ## Intent
 
@@ -111,7 +111,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
   - 값 `-x`를 옵션으로 읽으면 `L2.input-dash-values`.
   - 첫 항목이 사전 검사에서 거절되면 `L2.batch-incomplete`.
 - 1.1 이상에서 `--input`을 두 번 주고 `INPUT_INVALID`로 답하는 도구는 `L2.input-usage`가 실패한다. 1.0 주장에서는 SHOULD로 권고만 한다.
-- 계약 저장소의 예시 중 입력과 배치의 것(`schema-command-acme-member-tag`, 배치 보고서)을 시험 입력으로 쓴다. 사본은 `v1.2.0`에 고정한다.
+- 계약 저장소의 예시 중 입력과 배치의 것(`schema-command-acme-member-tag`, 배치 보고서)을 시험 입력으로 쓴다. 사본은 `v1.2.1`에 고정한다.
 
 ## Acceptance
 
@@ -134,7 +134,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
   - 실패 경로: 모양이 틀린 fixture 항목은 exit 2, `FIXTURE_INVALID`이다.
 - F6:
   - ==**L2 입력 행 15개 모두에 위반 설정 시험이 있고 소유 행 하나만 실패한다.**==
-  - 고정한 예시 사본의 digest가 `v1.2.0` 값과 같다. 정상 가짜 도구와 검사기 자신(L0)이 통과한다.
+  - 고정한 예시 사본의 digest가 `v1.2.1` 값과 같다. 정상 가짜 도구와 검사기 자신(L0)이 통과한다.
   - 실패 경로: 행 하나를 항상 통과하도록 바꾸면 그 행의 위반 시험이 실패한다.
 
 ## Questions and assumptions

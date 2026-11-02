@@ -28,7 +28,7 @@ waive:
 
 # atip check가 atip/1 1.2를 주장으로 받고 L0와 L1의 1.2 행을 돌린다
 
-Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md §2와 §5-§7, CHANGELOG 1.2.0의 Checker 항목, approaches/migration.md §7, issue 134
+Source: https://github.com/journeyWorker/atip tag v1.2.1, approaches/checker.md §2와 §5-§7, CHANGELOG 1.2.0의 Checker 항목, approaches/migration.md §7, issue 134
 
 ## Intent
 
@@ -39,7 +39,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
 - `--contract 1.2`와 fixture의 `contractVersion: "1.2"`가 주장이다. 1.1 이상에 적용되던 규칙이 1.2에도 적용된다.
 - 1.2를 주장하면 L1.check-order와 다섯 행의 1.2 절반이 돈다. ==**1.1과 1.0 주장에서는 새 행이 돌지 않고 결과가 바뀌지 않는다.**==
 - 보고 데이터의 `contractVersion`이 주장을 그대로 싣는다. 검사기 자신의 봉투도 1.2를 선언하고 자기 검사를 1.2 주장으로 통과한다.
-- 시험에 쓰는 계약 예시와 스키마 사본이 태그 `v1.2.0`이다.
+- 시험에 쓰는 계약 예시와 스키마 사본이 태그 `v1.2.1`이다.
 
 ## User flow
 
@@ -108,8 +108,8 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
   - `--json` 없는 `--fields`를 거절하는 도구는 `L1.fields`.
   - `L1.check-order`: 깨진 도메인과 깨진 제약에 제약의 코드로 답하는 도구.
   - 같은 행: 빠진 필수 인수와 깨진 도메인에 도메인의 코드로 답하는 도구, 깨진 도메인 둘에 뒤 옵션의 `field`로 답하는 도구.
-- 시험에 쓰는 계약 예시와 `schema-doc` 스키마, 안내 스키마 사본이 태그 `v1.2.0`이다. 새 예시 `acme`(1.2)와 `tally`(1.1)가 시험에 들어가고, 1.2 규칙이 `tally`에 적용되지 않음을 보인다. 스키마 사본의 digest 시험이 갱신된다.
-- `crates/atip`가 묶어 둔 `schema-doc` 스키마 사본이 `v1.2.0`의 것이다. 바뀐 것은 `flagOnly`의 설명 문구뿐이다.
+- 시험에 쓰는 계약 예시와 `schema-doc` 스키마, 안내 스키마 사본이 태그 `v1.2.1`이다. 새 예시 `acme`(1.2)와 `tally`(1.1)가 시험에 들어가고, 1.2 규칙이 `tally`에 적용되지 않음을 보인다. 스키마 사본의 digest 시험이 갱신된다.
+- `crates/atip`가 묶어 둔 `schema-doc` 스키마 사본이 `v1.2.1`의 것이다. 바뀐 것은 `flagOnly`의 설명 문구뿐이다.
 
 ## Acceptance
 
@@ -134,7 +134,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
   - 실패 경로: 1.2 레지스트리의 `STOPPED_MIDWAY`가 종료 값 2이거나 재시도 가능이면 `L1.registry`가 실패한다. 등록하지 않은 도구는 통과한다.
 - F6:
   - ==**1.2 행 5개 모두에 위반 설정 시험이 있고 소유 행 하나만 실패한다.**== `tally` 예시는 1.2 행에서 아무것도 실패하지 않는다.
-  - 고정한 계약 사본의 digest 시험이 `v1.2.0` 값과 일치하고, 사본 한 글자를 바꾸면 실패한다.
+  - 고정한 계약 사본의 digest 시험이 `v1.2.1` 값과 일치하고, 사본 한 글자를 바꾸면 실패한다.
   - 실패 경로: 행 하나를 항상 통과하도록 바꾸면 그 행의 위반 시험이 실패한다.
 
 ## Questions and assumptions

@@ -22,7 +22,7 @@ waive:
 
 # atip check L2: 스트림, 안내, 안내 속 명령 줄, 검색, 도움말 첫 줄
 
-Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md §6의 L2 표와 §7.1, spec 13.5, 14, 10.11, 4.8, 저자의 세 번째 답
+Source: https://github.com/journeyWorker/atip tag v1.2.1, approaches/checker.md §6의 L2 표와 §7.1, spec 13.5, 14, 10.11, 4.8, 저자의 세 번째 답
 
 ## Intent
 
@@ -99,7 +99,7 @@ L2의 나머지 행 다섯 개는 에이전트가 도구를 쓰는 입구를 다
   - fixture의 질문이 기대한 명령을 처음 다섯 안에 내면 통과이다. 여섯 번째면 권고이고 레벨이 통과한다.
   - 실패 경로: `schema --search`가 없는 도구는 `unsupported`이다.
 - 공통:
-  - ==**L2 안내 행 5개 모두에 위반 설정 시험이 있고 소유 행 하나만 실패한다.**== 고정한 예시 사본(`stream-*`, `guide` 예시)의 digest가 `v1.2.0` 값이다.
+  - ==**L2 안내 행 5개 모두에 위반 설정 시험이 있고 소유 행 하나만 실패한다.**== 고정한 예시 사본(`stream-*`, `guide` 예시)의 digest가 `v1.2.1` 값이다.
   - 실패 경로: 행 하나를 항상 통과하도록 바꾸면 그 행의 위반 시험이 실패한다.
 
 ## Questions and assumptions

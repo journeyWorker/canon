@@ -25,7 +25,7 @@ waive:
 
 # atip check L2: 멱등성, 파괴적 계획, 비동기, 효과 검사
 
-Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md §3, §4, §5와 §6의 L2 표, spec 12와 13.2-13.4, issue 134
+Source: https://github.com/journeyWorker/atip tag v1.2.1, approaches/checker.md §3, §4, §5와 §6의 L2 표, spec 12와 13.2-13.4, issue 134
 
 ## Intent
 
@@ -94,7 +94,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
   - `--commit`만으로 확정되면 `L2.destructive-half`.
   - `--dry-run`이 파일을 쓰면 `L2.effects`.
   - 같은 `--operation` 두 번째가 작업자를 또 시작하면 `L2.operation-key`.
-- 계약 저장소의 예시(`acme deploy start`, `purge` 미리보기)를 시험 입력으로 쓴다. 사본은 `v1.2.0`에 고정한다.
+- 계약 저장소의 예시(`acme deploy start`, `purge` 미리보기)를 시험 입력으로 쓴다. 사본은 `v1.2.1`에 고정한다.
 
 ## Acceptance
 
@@ -116,7 +116,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
   - 실패 경로: `async: true`를 쓰지 않는 도구와 `--operation`이 없는 도구는 해당 행이 `unsupported`이다. 접수만 하고 완료를 주장하는 도구는 `L2.async`가 실패한다.
 - F6:
   - ==**L2 안전 행 10개 모두에 위반 설정 시험이 있고 소유 행 하나만 실패한다.**==
-  - 고정한 예시 사본의 digest가 `v1.2.0` 값과 같다. 정상 가짜 도구와 검사기 자신(L0)이 통과한다.
+  - 고정한 예시 사본의 digest가 `v1.2.1` 값과 같다. 정상 가짜 도구와 검사기 자신(L0)이 통과한다.
   - 실패 경로: 행 하나를 항상 통과하도록 바꾸면 그 행의 위반 시험이 실패한다.
 
 ## Questions and assumptions
