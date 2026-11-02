@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-02T06:30:08.361396Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "atip-plan",
+  "summary": "Plan digest over effects and inputs, preview next entries and the PLAN_STALE gate of atip/1 L2",
+  "title": "ATIP: canon's destructive plan, preview and commit (L2)"
+}
