@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="14" skipped="0" failures="0" errors="0" uuid="21727386-c512-4ae5-9d98-14aa5fb34f87" timestamp="2026-11-03T05:36:54.951+09:00" time="26.541">
+    <testsuite name="canon-cli::atip_canoncursor" tests="14" skipped="0" errors="0" failures="0">
+        <testcase name="atip_canoncursor_07_a_refused_cursor_writes_nothing_and_an_export_refusal_writes_no_audit_line" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="15.660"/>
+        <testcase name="atip_canoncursor_05_limit_with_all_is_usage_naming_the_first_name_of_the_rule" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="16.285"/>
+        <testcase name="atip_canoncursor_08_fields_is_checked_the_same_in_text_mode_and_in_json_mode" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="16.928"/>
+        <testcase name="atip_canoncursor_13_the_changelog_states_the_upgrade" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:37:11.881+09:00" time="0.040"/>
+        <testcase name="atip_canoncursor_09_limit_cursor_all_and_fields_are_flag_only_in_every_command_document" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="16.996"/>
+        <testcase name="atip_canoncursor_10_a_flag_only_key_of_a_document_is_flag_only_key_at_its_pointer" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="17.055"/>
+        <testcase name="atip_canoncursor_04_all_in_place_of_limit_reads_the_rest_without_refusal" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="17.656"/>
+        <testcase name="atip_canoncursor_01_the_next_call_holds_the_explicit_arguments_and_the_cursor_and_nothing_else" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="19.687"/>
+        <testcase name="atip_canoncursor_02_the_environment_and_an_explicit_default_bind_the_cursor_and_the_page_size_does_not" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="22.714"/>
+        <testcase name="atip_canoncursor_03_the_cursor_is_one_ascii_word_and_a_changed_character_is_foreign" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="24.782"/>
+        <testcase name="atip_canoncursor_12_a_cursor_of_0_34_is_foreign" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:37:11.239+09:00" time="9.494"/>
+        <testcase name="atip_canoncursor_11_the_flag_only_set_is_the_crates_and_repo_and_as_and_no_source_lists_the_contracts_options" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:37:10.619+09:00" time="10.352"/>
+        <testcase name="atip_canoncursor_14_a_call_given_by_input_is_carried_as_argv_options" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:37:11.921+09:00" time="9.255"/>
+        <testcase name="atip_canoncursor_06_other_arguments_are_arguments_changed_another_command_is_foreign_and_a_gone_record_is_expired" classname="canon-cli::atip_canoncursor" timestamp="2026-11-03T05:36:54.953+09:00" time="26.539"/>
+    </testsuite>
+</testsuites>
