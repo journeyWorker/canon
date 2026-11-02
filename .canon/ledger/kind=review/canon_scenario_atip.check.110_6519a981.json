@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev"
   },
-  "at": "2026-11-02T12:30:48.094040Z",
-  "code_tree": "a76cb7672a4fb537ba11c68f7b7ab34f74fed4bb",
+  "at": "2026-11-02T14:38:38.697342Z",
+  "code_tree": "976f3a45b6aed75e3d64e6c7923672e7f6fdb93e",
   "kind": "review",
-  "pin": "9f6003921f49d3309b8869ea265ed4c1100e573e",
+  "pin": "ad8e49c2898579dff063631a44ae8157f4789ec5",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_check_103_each_1_2_violation_fails_the_row_that_owns_it_and_no_other_row_at_a_claim_of_1_2"
+          "junit:atip_check_110_every_stage_pair_a_command_can_have_is_run_and_a_pair_that_needs_a_third_fault_is_not"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "8c589d84a15961d7ed4dc2830e4ba0363eaabbbc701347fdf8733a679a36c6cc",
+    "scenario_digest": "07a317d08897ed07c29b2b8a6ff0fd194ed5252a38476ca8db14f500f56c648c",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-1-2/brief.md"
   },
-  "review_id": "01M6E3V98YDCK7ZES2P6EMQJXZ",
+  "review_id": "01M6EB5C39CJSVGVCXQV2HHA21",
   "reviewer": "rev-check-0-35",
-  "scenario_id": "atip.check.103",
+  "scenario_id": "atip.check.110",
   "schema": 2,
   "worktree_dirty": false
 }
