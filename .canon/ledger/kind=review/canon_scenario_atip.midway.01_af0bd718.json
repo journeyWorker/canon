@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T16:00:01.363421Z",
+  "code_tree": "98df3ad748c58d9d22ec1a24455ce4b899422fe6",
+  "kind": "review",
+  "pin": "d7ba1b76f682837ca5310d437d746f8d2b4c2ffa",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_midway_01_stopped_midway_is_registered_with_its_reasons_and_both_schema_views_agree"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "8b250e779a8e3f3dc0d1dd28765db09bcd9d9e8321850089df200fdc73d66a53",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-canon-stopped-midway/brief.md"
+  },
+  "review_id": "01M6EFTCAK68SY6TPADN37JSAP",
+  "reviewer": "rev-canon-0-35",
+  "scenario_id": "atip.midway.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T15:59:30.597580Z",
+  "change_id": "canon-0-35-skills-show",
+  "code_tree": "b8a48c4b4956ea1c0592ba6b9d6f6080ddb8852b",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "314ab1f10bd7c2a17f2bad4d387c1aa76ba4c969",
+  "kind": "finding",
+  "resolution_code_tree": "eb390035522bf0f250331f0eb54da38ba7da24e3",
+  "resolution_sha": "98a1f558177d3cabcc89caa36cf6ecb3894d6c82",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "c8b373e15621138f77bf3954acea54a3d404ba62",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards (CHANGELOG.md line 58): a stray merge-conflict marker line, '||||||| parent of 57823a46 (feat(0.35 skills-show): ...)', was committed in 314ab1f1 between the last row of the batch-pointers table and the skills show entry (grep for ^|||||||: only this hit in the repo). In the rendered CHANGELOG it is a table row of the batch table, glued onto the skills show paragraph (no blank line), and it ships in the 0.35 release notes. Remove the line and put a blank line between the table and the entry. Blast radius: documentation only; no test reads CHANGELOG.md for conflict markers.",
+  "worktree_dirty": false
+}
