@@ -1,12 +1,12 @@
 //! `atip check` against canon (0.34, `canon-0-34-atip-check-1-1` F6; 0.33 `canon-0-33-atip-check`).
 //!
-//! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: it claims 1.1; `setup` is `init` and two
-//! subjects (so a listing has a second page); `probe` is `status`; `globalOptions` is `--repo .`; `commands` holds a paging call
+//! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: it claims 1.2 (0.35: `canon-0-35-claim-l2`); `setup` is `init`, two
+//! subjects (so a listing has a second page) and what the findings, scenarios and divergences of the entries need; `probe` is `status`; `globalOptions` is `--repo .`; `commands` holds a paging call
 //! that also emits a next step (`query`) and the refusal of a missing value (`finding close` without `--seq`); `registry`
 //! and `warnings` are generated from `canon schema --errors --json` and `--warnings --json`, never written by hand.
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
-//! committed file differs from what the binary says. The CI job `atip-l0` and `just atip` run the same
-//! `atip check` on the same binary and fixture.
+//! committed file differs from what the binary says. The CI jobs `atip-l0`, `atip-l1`, `atip-l2` and `just atip` run the same
+//! `atip check --contract 1.2` on the same binary and fixture. The L2 claim is `atip_claiml2.rs`'s.
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -19,9 +19,9 @@ use serde_json::{json, Value};
 const CANON: &str = env!("CARGO_BIN_EXE_canon");
 
 /// The command line the CI job and the just recipe run, with the binaries' directory spelled `target/debug`.
-const COMMAND: &str = "atip check --bin target/debug/canon --level L0 --fixture crates/canon-cli/tests/atip/canon.fixture.json";
+const COMMAND: &str = "atip check --bin target/debug/canon --level L0 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json";
 /// The same for the checker on itself.
-const SELF_COMMAND: &str = "atip check --bin target/debug/atip --level L0 --fixture crates/atip-check/atip.fixture.json";
+const SELF_COMMAND: &str = "atip check --bin target/debug/atip --level L0 --contract 1.2 --fixture crates/atip-check/atip.fixture.json";
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -97,10 +97,10 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     let committed = std::fs::read_to_string(fixture_path()).expect("tests/atip/canon.fixture.json");
     assert_eq!(drift(&committed, &generated), None, "run CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check and commit the fixture");
     let fixture: Value = serde_json::from_str(&committed).expect("the fixture is JSON");
-    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.1"), json!("status"), json!([["--repo", "."]])));
+    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.2"), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
-    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "notRun", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L0 and L1 keys only");
+    assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "notRun", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L2 keys are `commands` members (`preview`, `batchFailsAt`, `batchFailsFirst`, `allowedEffects`), not top-level ones");
     for row in fixture["registry"].as_array().expect("registry") {
         let mut members: Vec<&str> = row.as_object().expect("row").keys().map(String::as_str).collect();
         members.sort_unstable();
@@ -149,7 +149,7 @@ fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_
     assert!(report.passed, "{}", report.text());
     // The 28 L0 checks and `L2.effects`, which every level reports (a SHOULD below L2).
     assert_eq!(report.checks.len(), 28 + 1);
-    assert_eq!(report.contract_version, "1.1");
+    assert_eq!(report.contract_version, "1.2");
     // The fixture has a paging call and a next-step call, so these two are judged, and only `L0.contract` (a 1.0 rule) does not apply.
     for id in ["L0.next", "L0.page"] {
         assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
@@ -163,18 +163,17 @@ fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_
 }
 
 #[test]
-fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l1() {
+fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l2_which_a_run_at_l1_accepts() {
     let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
     let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
     assert!(report.passed, "{}", report.text());
-    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.1", 28 + 31 + 1));
+    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.2", 28 + 31 + 1 + 1));
     let failing: Vec<&str> = report.checks.iter().filter(|check| matches!(check.result, atip_check::report::CheckResult::Fail | atip_check::report::CheckResult::Unprovided)).map(|check| check.id).collect();
     // The one advisory canon does not meet: `--kind` names the set of ledger kinds on `gate promote` and the kinds `gate purge` can delete, which share no value (L1.one-meaning-values, a SHOULD).
-    // The other is `L2.effects`, a SHOULD below L2: `query` writes its access line to `.canon/audit/access.jsonl`, which the fixture does not list under
-    // `allowedEffects` until `canon-0-35-claim-l2` (canon declares `effectNote` and the path in `canon-0-35-read-writes`).
-    assert_eq!(failing, ["L1.one-meaning-values", "L2.effects"], "no MUST check fails or is unprovided for canon, and the two advisories are the known ones:\n{}", report.text());
-    assert_eq!(report.advisories(), 2);
-    // The tree says the level the claim is (L1.tree), and the fixture names every step it made outside canon.
+    // `L2.effects`, a SHOULD below L2, passes: `query` writes its access line to `.canon/audit/access.jsonl`, and the fixture lists it under `allowedEffects` (`canon-0-35-claim-l2`).
+    assert_eq!(failing, ["L1.one-meaning-values"], "no MUST check fails or is unprovided for canon, and the one advisory is the known one:\n{}", report.text());
+    assert_eq!(report.advisories(), 1);
+    // The tree says L2, the level canon claims; a run at L1 takes a level above the claim (L1.tree), and the fixture names every step it made outside canon.
     assert_eq!(report.find("L1.tree").map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{}", report.text());
     // Two `git` steps and the stub app that `canon dashboard` (under `notRun`: it serves until it is signalled) needs in the sandbox repo.
     assert!(report.prepare.iter().all(|step| step.first().is_some_and(|program| matches!(program.as_str(), "git" | "sh"))), "{:?}", report.prepare);

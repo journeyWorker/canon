@@ -370,7 +370,7 @@ canon schema --errors --json      # every stable error code, its meaning and its
 canon schema --warnings --json    # every warning code (meta.warnings) and its meaning
 ```
 
-`data.kind` says which document came back. The `tree` has `level` (`L1`) and
+`data.kind` says which document came back. The `tree` has `level` (`L2`) and
 `commands`: every group and command once, a group before its commands, each with
 `command`, `path`, `kind` (`group` or `command`), `summary` and, for a command,
 `effect` and `x-canon.roles`. A `group` has `command`, `path`, `summary` and its
@@ -401,7 +401,7 @@ stderr: `{"ok": true, "data": …, "meta": …}` on success and
 `{"ok": false, "error": …, "meta": …}` on failure (an exit 1 partial report
 also carries `data`). The envelope follows atip/1. `meta` carries
 `schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`),
-`contractVersion` (`1.1`, on every envelope) and the
+`contractVersion` (`1.2`, on every envelope) and the
 resolved `command`, plus `output` (the report name, for a command that
 declares several), `context` (`{repo}`), `next`, `warnings`, `coverage`, `page`
 and `x-canon` (canon-only extras) where they apply. A member with no value is
@@ -421,7 +421,7 @@ members, and a value of a closed set it has not seen is one item to leave out.
     "tool": "canon",
     "toolVersion": "0.34.0",
     "contract": "atip/1",
-    "contractVersion": "1.1",
+    "contractVersion": "1.2",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [

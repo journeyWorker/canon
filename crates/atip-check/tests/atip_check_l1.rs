@@ -602,7 +602,7 @@ fn atip_checkl1_29_the_checker_run_on_itself_at_l0_with_its_own_fixture_passes()
 }
 
 #[test]
-fn atip_checkl1_30_canons_fixture_claims_l1_and_the_ci_job_and_the_just_recipe_run_it_and_a_broken_example_turns_the_job_red() {
+fn atip_checkl1_30_canons_fixture_is_read_by_the_checker_and_the_ci_job_and_the_just_recipe_run_it_at_l2_and_a_broken_example_turns_the_job_red() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let fixture: Value = serde_json::from_str(&std::fs::read_to_string(root.join("crates/canon-cli/tests/atip/canon.fixture.json")).expect("canon fixture")).expect("JSON");
     let parsed = atip_check::fixture::parse(&fixture).expect("canon's fixture is one the checker reads");
@@ -612,9 +612,9 @@ fn atip_checkl1_30_canons_fixture_claims_l1_and_the_ci_job_and_the_just_recipe_r
     assert_eq!(paged, ["divergence list", "export", "finding list", "query"]);
     assert!(commands.values().any(|entry| !entry.fields.is_empty()));
     let workflow = std::fs::read_to_string(root.join(".github/workflows/test.yml")).expect("workflow");
-    assert!(workflow.contains("atip-l1:") && workflow.contains("--level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "the CI job runs canon at L1");
+    assert!(workflow.contains("atip-l2:") && workflow.contains("--level L2 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "the CI job runs canon at L2, whose report holds the L1 rows");
     let just = std::fs::read_to_string(root.join("justfile")).expect("justfile");
-    assert!(just.contains("--level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "just atip runs canon at L1");
+    assert!(just.contains("--level L2 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "just atip runs canon at L2");
     // The red path: an example that does not parse fails `L1.examples`, so the job fails.
     let case = l1_cases().into_iter().find(|case| case.condition == "examples/grammar").expect("case");
     let output = run_case(&case);

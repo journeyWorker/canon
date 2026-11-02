@@ -342,7 +342,12 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             crate::say!(json, "{CMD}: the artifact store is already local; nothing to move");
             let report = ArtifactsMoveReport { backend: "local".into(), blobs: 0, uploaded: 0, already_in_store: 0, removed_local: 0, config_written: false, gitignore_added: false, skipped: Vec::new(), plan: if commit { plan.committed() } else { plan.preview() } };
             if json {
-                crate::json_out::data("artifacts move", &report);
+                if commit {
+                    crate::json_out::data("artifacts move", &report);
+                } else {
+                    // The empty plan still takes the handshake: the preview's `meta.next[0]` is the commit (spec 12.5).
+                    crate::json_out::data_with_next("artifacts move", &report, &plan.next_step("the store is already local, so the plan is empty; committing it takes its planDigest"));
+                }
             }
             return 0;
         }

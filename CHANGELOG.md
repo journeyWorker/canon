@@ -6,6 +6,39 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ### Breaking
 
+**canon declares atip/1 1.2 and claims level L2** (`canon-0-35-claim-l2`, scenarios `atip.claiml2.01-16`). This is the one entry to read for the release: the other entries below are the changes that make the claim true, and the upgrade notes of each stand with it.
+
+| | 0.34 | 0.35 |
+|---|---|---|
+| `meta.contractVersion` of every envelope, a failure and the `schema` answers included | `"1.1"` | `"1.2"` |
+| `meta.schemaVersion` of the `schema` answers | `"1.1"` | `"1.2"` |
+| `data.level` of the `schema` tree | `L1` | `L2` |
+| `INPUT_TOO_LARGE` (a source over 8 MiB, a batch over 10000 elements) | no `field` | `field` `--input`, as every failure of reading the `--input` value |
+| `effectNote` of `export` | `writes the --output file (mode 0600) and one audit line` | `writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on every run` (the path is what the fixture's `allowedEffects` lists, and the checker's `L2.idempotency` leaves out only a path the note names) |
+| `data` of a batch whose elements are all `unchanged` (`canon finding close --input '[…]'` repeating closed findings) | `{"items": […], "unchanged": true}`: the contract's batch report is closed, so this broke `batch-report.schema.json` | `{"items": […]}`; each element's `status` is `unchanged`. **Upgrade note:** read `data.items[].status`, not `data.unchanged`, to learn that a batch changed nothing |
+| `canon artifacts move --tier local` on a store that is already local, without `--commit` | no `meta.next` | `meta.next[0]` is the commit call with the plan digest, as for every destructive preview (spec 12.5) |
+
+A caller that matched `"contractVersion":"1.1"` reads `"1.2"`; the members it knows are unchanged. The skills, the website pages (`cli`, in both languages) and the eval script that name the declaration say `1.2` and `L2`, and `atip.claiml2.02` fails when one spells canon's declaration `1.1` again. The checker (`atip check`) declares `1.2` too, by a constant of its own.
+
+**CI proves the claim.** `just atip` builds the two binaries and runs `atip check --level L0 --contract 1.2` and `atip check --level L2 --contract 1.2` on canon with `crates/canon-cli/tests/atip/canon.fixture.json`, then `atip check --level L0 --contract 1.2` on the checker with its own fixture. The workflow has the jobs `atip-l0` (canon and the checker at L0) and `atip-l2` (canon at L2); `just ci` runs the recipe. The 0.34 job `atip-l1` is gone: the L2 report holds every L0 and L1 row, so a second job would judge the same rows again. A change that makes canon print something the contract forbids turns the job red on the row that fails: `--json` names it in `findings[]`. A claim of `L2` that the job does not pass cannot go out.
+
+The fixture lists what the L2 rows run: `export` and `finding close` (writes), the `batchFailsAt` and `batchFailsFirst` of both, the `preview` of the five destructive commands (`purge`, `artifacts move`, `migrate`, `ledger compact`, `tier age`) and the `allowedEffects` (`.canon/audit/access.jsonl`) of `export` and `query`, besides `prepare`, `notRun` (`dashboard`) and the generated registry. `finding close` is listed as the replay of a close the `setup` already made, so that its answer is the same in every run. A write the fixture does not list is not run; the report names it, and the rules of its arguments are held by `arg_rules.rs` (the `constraints_hold` of the contract's table). `L2.stream`, `L2.async`, `L2.operation-key` and `L2.search` are `unsupported`: canon has no stream, no asynchronous command and no `schema --search`; `L2.input-env` is `unsupported` too, since the only option of a write that declares `env` and has a value the checker can refuse is `role`, whose variable `CANON_ROLE` is also the `env` of `--as`.
+
+**Evidence of contract 17.2** (the obligations a green checker run does not prove; `approaches/checker.md` §8). Each row names the tests of canon that prove it; `atip_claiml2.rs` reads this table, finds every test in the sources and fails when a row or a test is missing.
+
+| Obligation | Tests |
+|---|---|
+| tree complete | `canon-cli/tests/cli_spec.rs::every_node_of_the_clap_tree_is_in_the_spec_and_the_reverse`; `canon-cli/tests/cli_spec.rs::the_checked_in_spec_is_the_generated_one` |
+| exit codes registered | `canon-cli/tests/grammar_t5_errors.rs::every_code_a_source_builds_is_registered`; `canon-cli/tests/grammar_t5_errors.rs::a_leaf_lists_only_registered_codes_and_the_exits_of_the_table`; `canon-cli/tests/schema_codes.rs::the_schema_error_codes_are_the_codes_the_sources_emit` |
+| write constraints | `canon-cli/tests/arg_rules.rs::atip_constraints_03_every_declared_rule_is_refused_when_broken_and_not_when_met`; `canon-cli/tests/arg_rules.rs::atip_constraints_05_every_declared_domain_agrees_with_the_parser_just_inside_and_outside`; `canon-cli/tests/arg_rules.rs::atip_constraints_07_every_validator_refuses_every_call_it_rejects` |
+| preview equals commit | `canon-cli/tests/atip_planjcs.rs::atip_planjcs_01_the_preview_digest_is_prefixed_and_stable_and_its_next_call_commits`; `canon-cli/tests/atip_planjcs.rs::atip_planjcs_09_the_purge_preview_lists_the_audit_line_the_commit_writes`; `canon-cli/tests/atip_planjcs.rs::atip_planjcs_10_a_purge_preview_and_a_refused_commit_leave_the_tree_as_it_was` |
+| secrets | `canon-cli/tests/atip_contract11.rs::atip_contract11_08_an_empty_value_the_caller_sent_is_received_empty_and_a_value_never_sent_has_no_received`; `atip/src/error.rs::a_received_value_is_redacted_when_it_looks_like_a_secret` |
+| examples and guides parse | `canon-cli/tests/atip_skills_show.rs::atip_skillsshow_07_guide_commands_parse`; `canon-cli/tests/arg_rules.rs::atip_constraints_12_every_example_meets_the_declared_constraints_and_domains` |
+| next syntax | `canon-cli/tests/atip_canoncursor.rs::atip_canoncursor_01_the_next_call_holds_the_explicit_arguments_and_the_cursor_and_nothing_else`; `canon-cli/tests/atip_canoncursor.rs::atip_canoncursor_14_a_call_given_by_input_is_carried_as_argv_options` |
+| warnings and stopped midway | `canon-cli/tests/warning_codes.rs::atip_l0_13_every_warning_site_names_a_registered_code`; `canon-cli/tests/stopped_midway.rs::atip_midway_07_the_first_next_step_of_a_stopped_command_reads_what_was_done` |
+
+Not covered by a test of canon: that a known secret never reaches any output (canon's commands take no secret as an argument; the `received` of an error is redacted by the `atip` crate, the test above). The contract's remote-effect and operation-key obligations do not apply: canon has no remote reads, no asynchronous command and no `--operation`.
+
 **The stateless checks of every command answer in the order of atip/1 1.2** (`canon-0-35-canon-check-order`; spec 11.7 step 6, 10.8.1, 10.8.3). A call that breaks two things at once is answered by the earlier one, with its code and `field`, the same for every tool that declares 1.2: a failure to parse (an unknown option or command word, a missing option value, a value that is no integer or not one of the `possibleValues`; the earliest on the command line) → a missing `required` argument (the operands in their order, then the options in their declaration order) → the domains (the same order) → the constraints (in the order `canon schema` lists them) → the validators (in the order it lists them). The order is the same with `--input` and without it. Codes, exits, the `constraints`, `domain` and `validators` of every document in `canon schema` and what a command does with a call that breaks one thing are unchanged; only the answer to a call that breaks several differs.
 
 | Call (everything else valid) | 0.34 answers | 0.35 answers |

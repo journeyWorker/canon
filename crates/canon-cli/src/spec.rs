@@ -99,9 +99,9 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 }
 
 
-/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it once `atip check --level L1` passes on the
-/// build: the check runs in CI beside the tests that build these documents.
-pub const LEVEL: &str = "L1";
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.2`
+/// passes on the build: the check runs in CI beside the tests that build these documents (`just atip`, the `atip-l2` job).
+pub const LEVEL: &str = "L2";
 
 /// The first line of every `--help` (spec 4.7, 4.8): it points at the self-description and at the guide, so an agent that read nothing else
 /// knows both entrances exist.

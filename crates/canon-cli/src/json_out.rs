@@ -9,7 +9,7 @@
 //!
 //! `meta` holds only the members the contract defines and canon's own
 //! `x-canon` ([`Meta`]): `schemaVersion`, `tool`, `toolVersion`, `contract`,
-//! `contractVersion` (`"1.1"`, on every envelope),
+//! `contractVersion` (`"1.2"`, on every envelope),
 //! `command` (the resolved command id; absent when not even the first word
 //! resolved), `output` (the report's name, when the command declares several),
 //! `context` (the context options a command took: `repo`), `next` (runnable
@@ -75,7 +75,7 @@ pub const CONTRACT: &str = atip::CONTRACT;
 /// `meta.contractVersion`: the minor of the contract canon declares on every envelope (spec 15.7). It is canon's own
 /// constant: the `atip` crate's `CONTRACT_VERSION` is the newest minor the crate implements, which canon adopts by
 /// changing this value, not by updating the crate.
-pub const DECLARED_MINOR: &str = "1.1";
+pub const DECLARED_MINOR: &str = "1.2";
 
 /// `meta.context`: the context options a command took, with the value it used.
 /// canon's only context option is `--repo`.

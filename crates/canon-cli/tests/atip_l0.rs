@@ -84,7 +84,7 @@ fn atip_l0_01_status_json_names_the_tool_its_version_and_the_contract() {
     let meta = &document["meta"];
     assert_eq!(meta["tool"], "canon");
     assert_eq!(meta["contract"], "atip/1");
-    assert_eq!(meta["contractVersion"], "1.1", "every envelope declares the contract minor it follows");
+    assert_eq!(meta["contractVersion"], "1.2", "every envelope declares the contract minor it follows");
     assert_eq!(version.trim(), format!("canon {}", meta["toolVersion"].as_str().unwrap()), "toolVersion is the version `canon --version` prints");
     assert!(meta.get("canonVersion").is_none(), "canonVersion is gone");
     assert_eq!(meta["command"], "status");
@@ -595,7 +595,7 @@ fn atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract() {
         let meta = &document["meta"];
         assert_eq!(meta["tool"], "canon", "{args:?}");
         assert_eq!(meta["contract"], "atip/1");
-        assert_eq!(meta["contractVersion"], "1.1", "{args:?}");
+        assert_eq!(meta["contractVersion"], "1.2", "{args:?}");
         assert_eq!(format!("canon {}", meta["toolVersion"].as_str().unwrap()), version.trim());
         assert!(meta["schemaVersion"].is_string());
         assert!(document["error"]["retryable"].is_boolean());
@@ -682,7 +682,7 @@ fn atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reaso
     let many = json(&canon(repo.path(), &["scenario", "new", "--input", &items, "--json"]));
     assert_eq!((many["error"]["code"].as_str(), many["error"]["reason"].as_str()), (Some("INPUT_TOO_LARGE"), Some("TOO_MANY_ITEMS")), "{many}");
     for document in [&bytes, &many] {
-        assert_eq!(document["meta"]["contractVersion"], "1.1");
+        assert_eq!(document["meta"]["contractVersion"], "1.2");
         assert!(document["error"].get("x-canon").is_none(), "{document}");
         assert!(atip::envelope_problems(document).is_empty(), "{document}");
     }

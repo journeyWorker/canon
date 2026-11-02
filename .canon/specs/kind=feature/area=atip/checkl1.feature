@@ -326,10 +326,10 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @case:happy
   @flow:canon-0-34-atip-check-l1.F7
   @atip.checkl1.30
-  Scenario: canon's fixture reads at L1, the CI job atip-l1 and just atip run canon at L1, and a canon example that does not parse turns the job red
+  Scenario: canon's fixture reads at L1, the CI job atip-l2 and just atip run canon at L2 with --contract 1.2, and a canon example that does not parse turns the job red
     Given canon's fixture with prepare, setup, paged, fields and domainRejects, the workflow and the justfile
     When the fixture is parsed, the job and the recipe are read, and the planted examples violation is run
-    Then the fixture parses with a git prepare and three paged commands, the job and the recipe run --level L1, and the violation fails L1.examples with exit 1
+    Then the fixture parses with a git prepare and four paged commands, the job and the recipe run --level L2 --contract 1.2, and the violation fails L1.examples with exit 1
 
   # canon: {"schema":1,"at":"2026-11-01T12:51:18Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
   @subject:atip-check
@@ -337,10 +337,10 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @case:happy
   @flow:canon-0-34-atip-check-l1.F7
   @atip.checkl1.31
-  Scenario: canon passes every applicable L1 check of the CI job and its tree's level is L1
+  Scenario: canon passes every applicable L1 check and the tree's level is L2, which a run at L1 accepts as at least the claim
     Given the built canon with the constraints and paging-fields changes merged, and its fixture
-    When atip check --bin canon --level L1 --fixture canon.fixture.json runs in CI
-    Then it exits 0 with the applicable L0 and L1 checks passing; this scenario is bound once atip-constraints and atip-paging-fields are on main
+    When atip check --bin canon --level L1 --contract 1.2 --fixture canon.fixture.json runs
+    Then it exits 0 with the applicable L0 and L1 checks passing and L1.tree passing with the tree's level L2; the L2 job of CI runs the same rows and the L2 ones besides
 
   # canon: {"schema":1,"at":"2026-11-01T12:51:23Z","actor":{"agent_id":"impl-check-l1","role":"implementer","session_id":"s-0-34-check-l1"}}
   @subject:atip-check
@@ -370,7 +370,7 @@ Feature: atip check: the L1 checks of contract 1.1.1
   @case:failure
   @flow:canon-0-34-atip-check-l1.F7
   @atip.checkl1.34
-  Scenario: A canon command whose example does not parse fails only L1.examples, so the CI job that runs canon at L1 turns red on it
+  Scenario: A canon command whose example does not parse fails only L1.examples, so the CI job that runs canon at L2 (its report holds the L1 rows) turns red on it
     Given the built canon, its fixture, and a wrapper that rewrites the documented example of status so that it names another tool
     When atip check --level L1 runs on the wrapper with the committed canon fixture
     Then the level is not met, L1.examples fails naming the example, and no other MUST check fails

@@ -109,7 +109,7 @@ pub const META: &[CommandMeta] = &[
     row("evidence audit", Write, &[I]).note("refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing"),
     row("evidence approval-payload", Read, &[I, O]),
     row("artifacts store", Write, &[O]).note("refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing"),
-    row("export", Write, &[O]).note("writes the --output file (mode 0600) and one audit line"),
+    row("export", Write, &[O]).note("writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on every run"),
     row("feature new", Write, &[P, I]),
     row("finding add", Write, &[R]),
     row("finding close", Write, &[R]),

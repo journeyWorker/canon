@@ -1,5 +1,16 @@
 {
   "commands": {
+    "artifacts move": {
+      "preview": [
+        [
+          "artifacts",
+          "move",
+          "--tier",
+          "local",
+          "--json"
+        ]
+      ]
+    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -117,6 +128,34 @@
       }
     },
     "export": {
+      "allowedEffects": [
+        ".canon/audit/access.jsonl"
+      ],
+      "batchFailsAt": [
+        {
+          "index": 1,
+          "input": [
+            {
+              "kind": "subject"
+            },
+            {
+              "kind": "subject",
+              "output": "no-such-directory/out.json"
+            }
+          ]
+        }
+      ],
+      "batchFailsFirst": [
+        {
+          "index": 0,
+          "input": [
+            {
+              "kind": "subject",
+              "output": "no-such-directory/out.json"
+            }
+          ]
+        }
+      ],
       "domainRejects": {
         "after": [
           "Core",
@@ -153,6 +192,62 @@
       ]
     },
     "finding close": {
+      "batchFailsAt": [
+        {
+          "index": 1,
+          "input": [
+            {
+              "disposition": "fixed",
+              "operands": [
+                "add-login"
+              ],
+              "round": 1,
+              "seq": 1
+            },
+            {
+              "disposition": "fixed",
+              "operands": [
+                "add-login"
+              ],
+              "round": 1,
+              "seq": 9
+            }
+          ]
+        }
+      ],
+      "batchFailsFirst": [
+        {
+          "index": 0,
+          "input": [
+            {
+              "disposition": "fixed",
+              "operands": [
+                "add-login"
+              ],
+              "round": 1,
+              "seq": 9
+            }
+          ]
+        }
+      ],
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ],
+        "reason": [
+          "",
+          " "
+        ],
+        "role": [
+          "Core",
+          "-core"
+        ],
+        "session": [
+          "",
+          " x"
+        ]
+      },
       "missingValue": [
         [
           "finding",
@@ -160,6 +255,34 @@
           "add-login",
           "--round",
           "1",
+          "--disposition",
+          "fixed",
+          "--json"
+        ]
+      ],
+      "ok": [
+        [
+          "finding",
+          "close",
+          "add-login",
+          "--round",
+          "1",
+          "--seq",
+          "1",
+          "--disposition",
+          "fixed",
+          "--json"
+        ]
+      ],
+      "refused": [
+        [
+          "finding",
+          "close",
+          "add-login",
+          "--round",
+          "1",
+          "--seq",
+          "9",
           "--disposition",
           "fixed",
           "--json"
@@ -200,6 +323,23 @@
         ]
       ]
     },
+    "ledger compact": {
+      "preview": [
+        [
+          "ledger",
+          "compact",
+          "--json"
+        ]
+      ]
+    },
+    "migrate": {
+      "preview": [
+        [
+          "migrate",
+          "--json"
+        ]
+      ]
+    },
     "prompt show": {
       "domainRejects": {
         "bundle": [
@@ -208,7 +348,22 @@
         ]
       }
     },
+    "purge": {
+      "preview": [
+        [
+          "purge",
+          "--kind",
+          "session",
+          "--before",
+          "2030-01-01",
+          "--json"
+        ]
+      ]
+    },
     "query": {
+      "allowedEffects": [
+        ".canon/audit/access.jsonl"
+      ],
       "domainRejects": {
         "change": [
           "Core",
@@ -344,6 +499,15 @@
         ]
       }
     },
+    "tier age": {
+      "preview": [
+        [
+          "tier",
+          "age",
+          "--json"
+        ]
+      ]
+    },
     "trace": {
       "domainRejects": {
         "id": [
@@ -353,7 +517,7 @@
       }
     }
   },
-  "contractVersion": "1.1",
+  "contractVersion": "1.2",
   "globalOptions": [
     [
       "--repo",
@@ -1414,6 +1578,17 @@
       "fixture",
       "--role",
       "reviewer"
+    ],
+    [
+      "finding",
+      "close",
+      "add-login",
+      "--round",
+      "1",
+      "--seq",
+      "1",
+      "--disposition",
+      "fixed"
     ]
   ],
   "timeoutSeconds": 120,

@@ -221,7 +221,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in
   `data`). `meta` carries `tool`, `toolVersion`, `contract` (`atip/1`),
-  `contractVersion` (`1.1`), `schemaVersion`,
+  `contractVersion` (`1.2`), `schemaVersion`,
   `command`, and when present `next`, `warnings` (`[{code, message}]`) and
   `page`; a repeated write that changed nothing reports `data.unchanged: true`.
   Absent members are omitted, never `null` or `[]` (a value you sent empty comes back as `received: ""`).

@@ -14042,7 +14042,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "writes the --output file (mode 0600) and one audit line",
+      "effectNote": "writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on every run",
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_MISSING",
@@ -30726,7 +30726,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/SchemaReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -40105,7 +40105,7 @@
     }
   ],
   "contract": "atip/1",
-  "contractVersion": "1.1",
+  "contractVersion": "1.2",
   "envVars": [
     {
       "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
@@ -44114,7 +44114,7 @@
       }
     ],
     "kind": "tree",
-    "level": "L1"
+    "level": "L2"
   },
   "warnings": [
     {

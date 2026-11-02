@@ -31,20 +31,20 @@ fn atip_contract11_01_every_envelope_declares_the_contract_and_its_version_and_a
     for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["finding", "nosuch", "--json"], vec!["--json"], vec!["schema", "--json"], vec!["schema", "status", "--json"], vec!["schema", "--errors", "--json"], vec!["schema", "--warnings", "--json"], vec!["gate", "check", "--json"]] {
         let document = json(&canon(dir.path(), &args));
         assert_eq!(document["meta"]["contract"], "atip/1", "{args:?}: {document}");
-        assert_eq!(document["meta"]["contractVersion"], "1.1", "{args:?}: the same build says the same version everywhere: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.2", "{args:?}: the same build says the same version everywhere: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     for (flag, kind) in [("--errors", "errors"), ("--warnings", "warnings")] {
         let document = json(&canon(dir.path(), &["schema", flag, "--json"]));
         assert_eq!(document["data"]["kind"], kind);
-        assert_eq!(document["meta"]["schemaVersion"], "1.1", "{document}");
+        assert_eq!(document["meta"]["schemaVersion"], "1.2", "{document}");
         assert_eq!(document["meta"]["command"], "schema");
     }
     for (flag, code, kind) in [("--error", "USAGE", "error"), ("--warning", "OLD_LAYOUT_FOUND", "warning")] {
         let document = json(&canon(dir.path(), &["schema", flag, code, "--json"]));
-        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.1")), "{document}");
+        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.2")), "{document}");
     }
-    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.1.
+    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.2.
     assert_eq!(json(&canon(dir.path(), &["nosuch", "--json"]))["meta"]["schemaVersion"], "1.0");
 }
 

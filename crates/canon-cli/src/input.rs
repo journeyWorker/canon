@@ -511,9 +511,10 @@ enum Document {
     Batch(Vec<Item>),
 }
 
-/// `INPUT_TOO_LARGE`: `reason` is `TOO_MANY_BYTES` (the source) or `TOO_MANY_ITEMS` (a batch).
+/// `INPUT_TOO_LARGE`: `reason` is `TOO_MANY_BYTES` (the source) or `TOO_MANY_ITEMS` (a batch); `field` is `--input` in both, as for every
+/// failure of reading and framing the value (spec 11.7 step 1).
 fn too_large(reason: &'static str, what: &str) -> CliError {
-    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit").reason(reason)
+    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit").reason(reason).field("--input")
 }
 
 /// Reads at most [`MAX_BYTES`] from `reader`; one byte more is `INPUT_TOO_LARGE`.
@@ -1176,15 +1177,12 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
             }
         }
     }
-    let all_unchanged = !report.is_empty() && report.iter().all(|item| item.status == ItemStatus::Unchanged);
     if json {
         let data = BatchReport { items: report };
         return Expanded::Exit(ExitCode::from(match &failure {
             Some(error) => error.emit_with_data(&command_name, true, &data),
+            // The contract's batch report is closed (`items` and nothing else): a batch whose elements are all `unchanged` says so by their statuses, not by a member of `data`.
             None => {
-                if all_unchanged {
-                    crate::json_out::mark_unchanged();
-                }
                 crate::json_out::data(&command_name, &data);
                 0
             }
