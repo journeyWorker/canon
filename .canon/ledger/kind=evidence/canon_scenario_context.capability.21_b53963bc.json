@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T09:51:34.848592Z",
+  "attachments": [
+    {
+      "case": "context_capability_21_a_batch_element_with_a_removed_key_name_refuses_the_batch",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-validate-junit.xml",
+      "sha256": "27048186e59d7eeda463139e1605ebf913ab6edd352c99bec5c8fb159248827d"
+    }
+  ],
+  "code_tree": "4da947c38830e13a481447a3106a8a55f60dde50",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-validate-junit.xml"
+  },
+  "evidence_sha": "91d497ab42c64922473498f3c94e98a0d77e742e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 469,
+  "scenario_id": "context.capability.21",
+  "schema": 1,
+  "staging_id": "d41bdcd9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

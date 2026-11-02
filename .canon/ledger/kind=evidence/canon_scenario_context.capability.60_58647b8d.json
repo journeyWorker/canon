@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T09:55:58.009528Z",
+  "attachments": [
+    {
+      "case": "context_capability_60_a_rewritten_scenario_without_a_new_review_is_reported_by_gate_check_as_stale",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-validate-junit.xml",
+      "sha256": "27048186e59d7eeda463139e1605ebf913ab6edd352c99bec5c8fb159248827d"
+    }
+  ],
+  "code_tree": "4da947c38830e13a481447a3106a8a55f60dde50",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-validate-junit.xml"
+  },
+  "evidence_sha": "91d497ab42c64922473498f3c94e98a0d77e742e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 498,
+  "scenario_id": "context.capability.60",
+  "schema": 1,
+  "staging_id": "dae5abc7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
