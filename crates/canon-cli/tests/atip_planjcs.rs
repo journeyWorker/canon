@@ -50,7 +50,8 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir).unwrap().flatten() {
             let path = entry.path();
-            if path.file_name().is_some_and(|name| name == ".git") {
+            // The lock file is process state a call that locked leaves behind, refused or not, and no plan reads it: not part of the tree.
+            if path.file_name().is_some_and(|name| name == ".git") || path.ends_with(LOCK) {
                 continue;
             }
             if path.is_dir() {
@@ -83,7 +84,6 @@ fn init_repo(dir: &Path, with_git: bool) {
     }
     let out = canon_in(dir, &words(&["init", "--providers", "none", "--no-agents-md", "--no-policy"]), &[]);
     assert!(out.status.success(), "{}", text(&out));
-    assert!(dir.join(LOCK).is_file(), "`canon init` makes the lock file");
     if with_git {
         git(dir, &["add", "-A"]);
         git(dir, &["commit", "-q", "-m", "init"]);
@@ -129,10 +129,6 @@ impl Case {
     }
 }
 
-fn with_lock(fixture: &Fixture) {
-    canon_cli::write_lock::create_file(fixture.root.path()).unwrap();
-}
-
 fn old_trajectories(fixture: &Fixture) {
     fixture.plant_trajectory_in_git(Utc::now() - chrono::Duration::days(5), 0.1);
     fixture.plant_trajectory_in_git(Utc::now() - chrono::Duration::days(4), 0.2);
@@ -142,7 +138,6 @@ fn purge_case() -> Case {
     let fixture = Fixture::new(ROUTING, AGING);
     std::fs::create_dir_all(fixture.root.path().join(".canon/learn")).unwrap();
     old_trajectories(&fixture);
-    with_lock(&fixture);
     let root = fixture.root.path().to_path_buf();
     let cutoff = (Utc::now() - chrono::Duration::days(1)).to_rfc3339();
     let env = vec![("CANON_R2_LOCAL_ROOT".to_string(), fixture.r2_root().display().to_string())];
@@ -159,7 +154,6 @@ fn tier_case() -> Case {
     let fixture = Fixture::new(ROUTING, AGING);
     old_trajectories(&fixture);
     fixture.plant_trajectory_in_git(Utc::now(), 0.9);
-    with_lock(&fixture);
     let root = fixture.root.path().to_path_buf();
     let env = vec![("CANON_R2_LOCAL_ROOT".to_string(), fixture.r2_root().display().to_string())];
     let change_root = root.clone();
@@ -194,7 +188,6 @@ fn compact_case() -> Case {
             }
         }
     }
-    with_lock(&fixture);
     let root = fixture.root.path().to_path_buf();
     let change_root = root.clone();
     // A trajectory is not a kind the archive keeps one file for: a new one changes what the pass read, and no effect.
@@ -415,14 +408,19 @@ fn lock_file(root: &Path) -> PathBuf {
     root.join(LOCK)
 }
 
-fn wait_until_held(root: &Path) {
+/// Waits until `child` holds the repository write lock: the lock file is there and another process cannot take it. A child that
+/// ends first never held it, and the test fails (a commit that does not take the lock is the failure this proves).
+fn wait_until_held(root: &Path, child: &mut Child) {
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
-        match FileLock::acquire_existing(&lock_file(root), Duration::ZERO) {
-            Err(_) => return,
-            Ok(_) if Instant::now() > deadline => panic!("nobody took the lock"),
-            Ok(_) => std::thread::sleep(Duration::from_millis(20)),
+        if lock_file(root).exists() && FileLock::acquire(&lock_file(root), Duration::ZERO).is_err() {
+            return;
         }
+        if let Some(status) = child.try_wait().unwrap() {
+            panic!("the run ended ({status}) without the repository write lock ever being held");
+        }
+        assert!(Instant::now() < deadline, "nobody took the lock");
+        std::thread::sleep(Duration::from_millis(20));
     }
 }
 
@@ -460,7 +458,7 @@ fn atip_planjcs_06_a_writer_waits_for_a_commit_and_a_preview_does_not() {
     let root = dir.path();
     // The commit keeps the lock for 3s after its last effect (a seam of the debug build), as a long commit would.
     let mut commit = spawn(root, &commit_args(&args, &digest), &[("CANON_TEST_HOLD_AFTER_RUN_MS", "3000")]);
-    wait_until_held(root);
+    wait_until_held(root, &mut commit);
 
     let started = Instant::now();
     let mut preview = args.clone();
@@ -493,7 +491,7 @@ fn atip_planjcs_07_a_wait_that_runs_out_refuses_and_a_killed_holder_releases_the
 
     // A holder that dies without releasing: the next commit proceeds, and the lock file is still there.
     let mut holder = spawn(root, &commit_args(&args, &digest), &[("CANON_TEST_HOLD_AFTER_RUN_MS", "120000")]);
-    wait_until_held(root);
+    wait_until_held(root, &mut holder);
     holder.kill().unwrap();
     holder.wait().unwrap();
     assert!(lock_file(root).is_file(), "the lock file is never deleted");
@@ -538,6 +536,62 @@ fn atip_planjcs_08_only_a_run_that_writes_takes_the_lock() {
 
 fn audit_lines(root: &Path) -> Vec<Value> {
     std::fs::read_to_string(root.join(".canon/audit/access.jsonl")).unwrap_or_default().lines().map(|line| serde_json::from_str(line).unwrap()).collect()
+}
+
+/// A commit that pauses between the check of its digest and its first effect, with another writer let in at the start of that
+/// span: whether the writer is served before the commit ends tells whether the lock covers the span. Returns the commit's exit
+/// status and whether it had ended when the writer was answered.
+fn writer_during_the_span(root: &Path, args: &[String], digest: &str) -> (std::process::ExitStatus, bool, Output) {
+    let mut commit = spawn(root, &commit_args(args, digest), &[("CANON_TEST_PAUSE_AFTER_GATE_MS", "3000")]);
+    wait_until_held(root, &mut commit);
+    let writer = canon_in(root, &words(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]), &[]);
+    let ended = commit.try_wait().unwrap();
+    let status = ended.unwrap_or_else(|| commit.wait().unwrap());
+    (status, ended.is_some(), writer)
+}
+
+/// atip.planjcs.14: the lock covers the span from the check of the digest to the first effect: a writer that arrives while a
+/// commit sits between them waits for it.
+#[test]
+fn atip_planjcs_14_the_lock_covers_the_span_between_the_check_and_the_first_effect() {
+    let (dir, args, digest) = lock_repo();
+    let root = dir.path();
+    let (status, ended, writer) = writer_during_the_span(root, &args, &digest);
+    assert!(status.success(), "the commit committed");
+    assert_eq!(writer.status.code(), Some(0), "{}", text(&writer));
+    assert!(ended, "the writer was served only after the commit had ended: it did not enter the span between the check and the effects");
+    assert!(root.join(".canon/ledger/kind=subject").is_dir(), "and then wrote");
+}
+
+/// atip.planjcs.15: a repository with no lock file (set up by 0.34, or never initialised by this canon) is locked from its first
+/// call: the file is made, kept out of git without a tracked file edited, and a writer waits.
+#[test]
+fn atip_planjcs_15_a_repository_without_the_lock_file_is_locked_from_its_first_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    init_repo(root, true);
+    // A 0.34 repository: no lock file, no line for it in .gitignore.
+    let _ = std::fs::remove_file(root.join(LOCK));
+    let ignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
+    let ignore: String = ignore.lines().filter(|line| !line.contains("repo-write.lock")).map(|line| format!("{line}\n")).collect();
+    std::fs::write(root.join(".gitignore"), &ignore).unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-q", "-m", "a 0.34 repository"]);
+    let args = words(&["purge", "--kind", "session", "--before", "2020-01-01"]);
+    let mut preview = args.clone();
+    preview.push("--json".to_string());
+    let digest = json_of(&canon_in(root, &preview, &[]))["data"]["planDigest"].as_str().unwrap().to_string();
+    assert!(!root.join(LOCK).exists(), "a preview takes no lock and makes no file");
+
+    let (status, ended, writer) = writer_during_the_span(root, &args, &digest);
+    assert!(status.success());
+    assert_eq!(writer.status.code(), Some(0), "{}", text(&writer));
+    assert!(ended, "the first commit of a repository with no lock file held the lock: the writer waited for it");
+    assert!(root.join(LOCK).is_file(), "the first call made the lock file");
+    let status = Command::new("git").args(["status", "--porcelain", "--", ".canon/repo-write.lock"]).current_dir(root).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&status.stdout), "", "and kept it out of git status");
+    assert!(std::fs::read_to_string(root.join(".git/info/exclude")).unwrap().contains("/.canon/repo-write.lock"), "by the exclude file of the checkout");
+    assert_eq!(std::fs::read_to_string(root.join(".gitignore")).unwrap(), ignore, "without editing a tracked file");
 }
 
 /// atip.planjcs.09: the purge preview lists its audit line, the commit writes that file and that line; nothing to delete, neither.

@@ -288,7 +288,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         if will_match > 0 {
             effects.extend(audit_effect(repo, kind, will_match));
         }
-        let plan = Plan::new(root, "purge", effects, reads).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        let plan = Plan::new("purge", effects, reads).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
         let commit = plan.gate(mode).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
         // Deleting touches every rung the kind lives in, and a committed run appends an audit line: each must take the change before the first removal. A plan that removes nothing writes nothing and is not refused.
         if commit && (preflight.rungs.iter().any(|rung| rung.matched > 0) || learn_preflight.unwrap_or(0) > 0) {
@@ -301,10 +301,6 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             for target in &targets {
                 crate::write_mode::check_writable(target).map_err(|cause| RetentionError::Refusal(Box::new(crate::write_mode::unavailable(target, &cause))))?;
             }
-        }
-        // Past every refusal: the repository write lock from here to the end of the run (`main` held it already when its file was there).
-        if commit {
-            plan.hold().map_err(|e| RetentionError::Refusal(Box::new(e)))?;
         }
         deleting.set(commit);
         // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
@@ -665,7 +661,7 @@ mod tests {
             rungs: vec![],
             unavailable: vec![],
         };
-        let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new(Path::new("."), "purge", Vec::new(), Reads::new()).unwrap().preview())).unwrap();
+        let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new("purge", Vec::new(), Reads::new()).unwrap().preview())).unwrap();
         assert_eq!(value["learnStore"]["backend"], "parquet");
         assert_eq!(value["learnStore"]["matched"], 3);
         assert_eq!(value["learnStore"]["deleted"], 2);

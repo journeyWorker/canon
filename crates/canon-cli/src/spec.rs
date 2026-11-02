@@ -76,7 +76,8 @@ const ENV_VARS: &[EnvVar] = &[
 /// where a debug build records which (command, report) pairs it emitted, for the T9 witness; `CANON_TEST_PANIC`:
 /// a debug build panics at start, for the test of the `INTERNAL` error; `CANON_TEST_REPO_LOCK_WAIT_MS`: how long a debug
 /// build waits for the repository write lock, in milliseconds; `CANON_TEST_HOLD_AFTER_RUN_MS`: how long a debug build keeps
-/// the lock after its run: the two seams of the test of the lock).
+/// the lock after its run; `CANON_TEST_PAUSE_AFTER_GATE_MS`: how long a debug build pauses between the check of a plan's
+/// digest and its first effect: the three seams of the test of the lock).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -87,6 +88,7 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_R2_ROOT",
     "CANON_TEST_HOLD_AFTER_RUN_MS",
     "CANON_TEST_PANIC",
+    "CANON_TEST_PAUSE_AFTER_GATE_MS",
     "CANON_TEST_REPO_LOCK_WAIT_MS",
     "CANON_WITNESS_DIR",
 ];

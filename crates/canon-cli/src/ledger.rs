@@ -176,7 +176,7 @@ pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
             reads = reads.digest("archive", path_digest(&repo_dir, &archive));
         }
     }
-    let plan = match Plan::new(&repo_dir, "ledger compact", effects(&repo_dir, &preview), reads) {
+    let plan = match Plan::new("ledger compact", effects(&repo_dir, &preview), reads) {
         Ok(plan) => plan,
         Err(e) => return e.emit(CMD, json),
     };
@@ -204,10 +204,6 @@ pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         if let Some(code) = crate::write_mode::refuse_unwritable(&targets, CMD, json) {
             return code;
         }
-    }
-    // Past every refusal: the repository write lock from here to the end of the run (`main` held it already when its file was there).
-    if let Err(e) = plan.hold() {
-        return e.emit(CMD, json);
     }
     let kinds = match compact(&repo_dir, false) {
         Ok(kinds) => kinds,

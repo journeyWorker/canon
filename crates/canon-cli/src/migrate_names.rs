@@ -1338,7 +1338,7 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
         .path(&repo, &format!("{relative}/{SEALED}"))
         .path(&repo, &format!("{relative}/{JOURNAL}"))
         .effect_paths(&repo, &effects);
-    let safe_plan = match safety::Plan::new(&repo, "migrate", effects, reads) {
+    let safe_plan = match safety::Plan::new("migrate", effects, reads) {
         Ok(plan) => plan,
         Err(e) => return e.emit("canon migrate", json),
     };
@@ -1369,10 +1369,6 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
         if let Some(error) = crate::migrate_briefs::human_only("canon migrate --revert", &safe_plan.commit_command()) {
             return error.emit("canon migrate", json);
         }
-    }
-    // Past every refusal: the repository write lock from here to the end of the run (`main` held it already when its file was there).
-    if let Err(e) = safe_plan.hold() {
-        return e.emit("canon migrate", json);
     }
     let committed = safe_plan.committed();
     if let Err(e) = revert_apply(&repo, &plan) {

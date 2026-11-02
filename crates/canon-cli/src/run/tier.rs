@@ -26,7 +26,7 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
     };
     let root = canon_yaml_path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
     let reads = Reads::new().digest("canon.yaml", path_digest(root, &canon_yaml_path)).set("records", &scanned);
-    let plan = match Plan::new(root, "tier age", effects, reads) {
+    let plan = match Plan::new("tier age", effects, reads) {
         Ok(plan) => plan,
         Err(err) => return ExitCode::from(err.emit("canon tier age", json)),
     };
@@ -54,10 +54,6 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
     let targets: Vec<&std::path::Path> = targets.iter().map(std::path::PathBuf::as_path).collect();
     if let Some(code) = crate::write_mode::refuse_unwritable(&targets, "canon tier age", json) {
         return ExitCode::from(code);
-    }
-    // Past every refusal: the repository write lock from here to the end of the run (`main` held it already when its file was there).
-    if let Err(err) = plan.hold() {
-        return ExitCode::from(err.emit("canon tier age", json));
     }
     // Moving writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
     let loaded = match crate::tiers::build_tiers(&canon_yaml_path) {

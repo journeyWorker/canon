@@ -328,7 +328,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     if to == "local" {
         if matches!(current.backend, ArtifactsBackend::Local) {
             // Nothing to move: the empty plan still takes the digest handshake.
-            let plan = match Plan::new(&repo, "artifacts move", Vec::new(), Reads::new().path(&repo, "canon.yaml")) {
+            let plan = match Plan::new("artifacts move", Vec::new(), Reads::new().path(&repo, "canon.yaml")) {
                 Ok(plan) => plan,
                 Err(e) => return e.emit("canon artifacts move", json),
             };
@@ -434,7 +434,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
         .path(&repo, ".gitignore")
         .set("blobs", blobs.iter().map(|blob| blob.digest.as_str()))
         .set("not-blobs", skipped.iter().map(String::as_str));
-    let plan = match Plan::new(&repo, "artifacts move", std::mem::take(&mut moving.effects), reads) {
+    let plan = match Plan::new("artifacts move", std::mem::take(&mut moving.effects), reads) {
         Ok(plan) => plan,
         Err(e) => return e.emit("canon artifacts move", json),
     };
@@ -444,12 +444,9 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     };
     let (verified, already) = (moving.verified, moving.already);
 
-    // A commit holds the repository write lock from here (`main` held it already when its file was there), so no writer adds a
-    // local blob between the plan and the removal, and the local store for the whole move. A preview writes nothing and takes no lock.
+    // A commit holds the local store for the whole move, so no writer adds a local blob between the plan and the removal
+    // (`main` holds the repository write lock for the whole run). A preview writes nothing and takes no lock.
     let _lock = if commit {
-        if let Err(e) = plan.hold() {
-            return e.emit("canon artifacts move", json);
-        }
         match StoreLock::acquire(&repo) {
             Ok(lock) => Some(lock),
             Err(e) => return refuse(e.to_string(), e.hint()),

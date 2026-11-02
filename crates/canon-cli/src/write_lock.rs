@@ -14,14 +14,13 @@
 //! [`crate::dashboard_briefs`] takes it for the one brief the page approves. A holder that needs the lock again (the refresh of
 //! a writer) finds it held: the lock is re-entrant in its thread.
 //!
-//! **The lock file.** A call that is refused writes nothing (spec 8.2), the lock file included, and a refusal of its own
-//! (`WRITE_UNAVAILABLE`, `HOOKS_INSTALL_REFUSED`, …) is not preempted by a lock: so [`hold_for_call`] locks the file only
-//! where it already is ([`canon_store::file_lock::FileLock::acquire_existing`]), and the file is created by the writes that
-//! need it: `canon init` ([`create_file`]) and a committed destructive command that is past its gate and every
-//! refusal of its own, about to make its first effect ([`hold_through_commit`], which holds the lock from there to the end of the
-//! run, and recomputes nothing). In a repository
-//! that has never had the file, nothing holds a lock for a commit to wait for, so the only plan a commit can see change under
-//! it is one a writer already running when the file appeared is still writing; every call after that takes the lock first.
+//! **The lock file** is made by `canon init` ([`create_file`]) and, in any other repository, by the first call that needs to lock it
+//! ([`hold_within`]: opened with create, never truncated, never deleted), so a repository set up by an older canon, or one that
+//! never ran `canon init`, is locked from its first call and no call runs unlocked for want of the file. The call that makes it also keeps it out of git: a line in `.git/info/exclude` unless
+//! `.gitignore` already names it (`init` and `migrate` write that line to `.gitignore`), so the first lock never edits a tracked
+//! file, and no plan reads it (`safety::path_digest` skips it). A repository with no `canon.yaml` has no plan to protect and
+//! nothing locks for it. The lock file is process state, not a state of the repository: a call that is refused after it took the lock
+//! (a stale digest, a read-only store) leaves the file behind, as it leaves any lock file of a refused writer.
 //!
 //! **Order.** This lock is the outermost one: taken before the scenario-index lock and the artifact-store lock, never while
 //! holding either, so two processes cannot wait for each other. A wait that runs out is `REPO_WRITE_BUSY` (exit 2, retryable):
@@ -189,13 +188,16 @@ fn lock_file(repo: &Path) -> PathBuf {
 }
 
 /// The lock for one pass of a polling run (`ingest --watch`): held until the returned guard is dropped, which the loop does before
-/// it sleeps. A dry run writes nothing and holds nothing, and so does a repository with no lock file yet: a pass whose write is
-/// refused leaves the tree as it was, the lock file included (see the module doc). `Err` is the refusal the run answers with.
+/// it sleeps. A dry run writes nothing and holds nothing. `Err` is the refusal the run answers with.
 pub fn hold_pass(repo: &Path, dry_run: bool) -> Result<Option<Hold>, CliError> {
     if dry_run {
         return Ok(None);
     }
-    hold_existing_within(&crate::context::resolve_repo_root(repo), wait()).map_err(|refused| refused.error())
+    match hold_within(&crate::context::resolve_repo_root(repo), wait()) {
+        Ok(hold) => Ok(Some(hold)),
+        Err(Refused::Io(..)) => Ok(None),
+        Err(busy) => Err(busy.error()),
+    }
 }
 
 /// A guard for the lock this thread already holds, if it does.
@@ -220,23 +222,44 @@ pub fn hold_within(repo: &Path, wait: Duration) -> Result<Hold, Refused> {
     if let Some(hold) = reenter(&file) {
         return Ok(hold);
     }
+    let made = !file.exists();
     match FileLock::acquire(&file, wait) {
-        Ok(lock) => Ok(remember(file, lock)),
+        Ok(lock) => {
+            if made {
+                keep_out_of_git(repo);
+            }
+            Ok(remember(file, lock))
+        }
         Err(FileLockError::Busy(waited)) => Err(Refused::Busy(waited)),
         Err(FileLockError::Io(cause)) => Err(Refused::Io(file, cause)),
     }
 }
 
-/// [`hold_within`] for a file that is already there: `Ok(None)` when it is not, and nothing is created.
-pub fn hold_existing_within(repo: &Path, wait: Duration) -> Result<Option<Hold>, Refused> {
-    let file = lock_file(repo);
-    if let Some(hold) = reenter(&file) {
-        return Ok(Some(hold));
+/// Creates the lock file of the repository rooted at `repo` when it is not there, without holding it: `canon init` makes it beside
+/// the `.gitignore` line that names it.
+pub fn create_file(repo: &Path) -> std::io::Result<()> {
+    let file = repo.join(REPO_WRITE_LOCK_FILE);
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)?;
     }
-    match FileLock::acquire_existing(&file, wait) {
-        Ok(lock) => Ok(lock.map(|lock| remember(file, lock))),
-        Err(FileLockError::Busy(waited)) => Err(Refused::Busy(waited)),
-        Err(FileLockError::Io(cause)) => Err(Refused::Io(file, cause)),
+    std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(file).map(drop)
+}
+
+/// Keeps the lock file the call just made out of `git status`: its line in `.git/info/exclude`, unless `.gitignore` names it
+/// already or the repository has no `.git` directory (a worktree's `.git` is a file; its checkout is ignored by the `.gitignore`
+/// line `init` writes). Local state the call owns, so no tracked file is edited; a failure leaves the file untracked and is not
+/// an error.
+fn keep_out_of_git(repo: &Path) {
+    let root = std::fs::canonicalize(repo).unwrap_or_else(|_| repo.to_path_buf());
+    let named = |file: &Path| std::fs::read_to_string(file).is_ok_and(|text| text.lines().any(|line| line.trim().trim_start_matches('/') == REPO_WRITE_LOCK_FILE));
+    let info = root.join(".git/info");
+    if named(&root.join(".gitignore")) || !root.join(".git").is_dir() || named(&info.join("exclude")) {
+        return;
+    }
+    let _ = std::fs::create_dir_all(&info);
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(info.join("exclude")) {
+        use std::io::Write as _;
+        let _ = writeln!(file, "/{REPO_WRITE_LOCK_FILE}");
     }
 }
 
@@ -245,29 +268,8 @@ pub fn hold(repo: &Path) -> Result<Hold, CliError> {
     hold_within(repo, wait()).map_err(|refused| refused.error())
 }
 
-thread_local! {
-    /// The lock a committed destructive command took once its digest passed the gate: held until the thread ends, which is the
-    /// end of the run.
-    static COMMIT: RefCell<Option<Hold>> = const { RefCell::new(None) };
-}
-
-/// Holds the lock from here to the end of the run, for a committed destructive command that is past its gate and every refusal of
-/// its own (`Plan::hold` in `crate::safety`): the lock `main` took for the call (the file was there), or one taken now, creating the
-/// file (it was not).
-pub fn hold_through_commit(repo: &Path) -> Result<(), CliError> {
-    let hold = hold(repo)?;
-    COMMIT.with(|commit| *commit.borrow_mut() = Some(hold));
-    Ok(())
-}
-
-/// Creates the lock file of the repository rooted at `repo` when it is not there, without holding it: `canon init` makes it,
-/// so every call after it finds a file to lock.
-pub fn create_file(repo: &Path) -> std::io::Result<()> {
-    let file = repo.join(REPO_WRITE_LOCK_FILE);
-    if let Some(parent) = file.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(file).map(drop)
+fn policy_of(command: &str) -> Option<Holds> {
+    POLICY.iter().find(|(path, ..)| *path == command).map(|(_, holds, _)| *holds)
 }
 
 /// Whether the run of `command` holds the lock, given whether it gave `--commit` or `--dry-run` or the option a row asks for.
@@ -286,7 +288,7 @@ pub fn holds(command: &str, has: impl Fn(&str) -> bool) -> Option<bool> {
 
 /// The lock for the leaf `parsed` names, taken by `main` once every refusal that needs no state is behind it and before the
 /// leaf runs, and released when the run ends. `Ok(None)` for a leaf that does not hold it, a run that writes nothing and a
-/// repository with no lock file yet (see the module doc); the refusal is the exit code of the answer already printed.
+/// directory with no `canon.yaml` (nothing there for a plan to read); the refusal is the exit code of the answer already printed.
 pub fn hold_for_call(command_tree: &clap::Command, parsed: &clap::ArgMatches) -> Result<Option<Hold>, ExitCode> {
     let mut names = Vec::new();
     let mut leaf = parsed;
@@ -302,7 +304,16 @@ pub fn hold_for_call(command_tree: &clap::Command, parsed: &clap::ArgMatches) ->
     let repo = leaf.get_one::<PathBuf>("repo").map_or_else(|| Path::new("."), PathBuf::as_path);
     let root = crate::context::resolve_repo_root(repo);
     let json = leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false);
-    hold_existing_within(&root, wait()).map_err(|refused| ExitCode::from(refused.error().emit(&format!("canon {command}"), json)))
+    if !root.join("canon.yaml").is_file() {
+        return Ok(None);
+    }
+    match hold_within(&root, wait()) {
+        Ok(hold) => Ok(Some(hold)),
+        // A lock file that cannot be made (a read-only `.canon`, a volume without locks) is a refusal for a commit, which must not
+        // act unlocked, and nothing for any other leaf: the write it was going to make is the refusal it would have answered with.
+        Err(Refused::Io(..)) if !matches!(policy_of(&command), Some(Holds::OnCommit)) => Ok(None),
+        Err(refused) => Err(ExitCode::from(refused.error().emit(&format!("canon {command}"), json))),
+    }
 }
 
 #[cfg(test)]
@@ -344,9 +355,8 @@ mod tests {
         let outer = hold_within(&dir.path().join("sub/.."), Duration::ZERO).unwrap();
         // A refresh given the root another way does not wait for the writer that holds it.
         let inner = hold_within(dir.path(), Duration::ZERO).unwrap();
-        let existing = hold_existing_within(&dir.path().join("./sub/.."), Duration::ZERO).unwrap();
-        assert!(existing.is_some());
-        drop((outer, inner, existing));
+        let again = hold_within(&dir.path().join("./sub/.."), Duration::ZERO).unwrap();
+        drop((outer, inner, again));
     }
 
     #[test]

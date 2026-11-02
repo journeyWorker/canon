@@ -269,8 +269,8 @@ fn gitignore_step(repo: &Path, dry_run: bool) -> std::io::Result<Vec<&'static st
         return Ok(missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect());
     }
     let added = scaffold_gitignore(repo)?;
-    // The file the repository write lock locks is made where its `.gitignore` line is, so every later call finds it to lock
-    // (`write_lock`): a call that is refused writes nothing, and so never makes it.
+    // The repository write lock's file is made with the `.gitignore` line that names it, so a repository set up by this canon is
+    // locked from its first call without a refused call ever having to make it (`write_lock`).
     let _ = crate::write_lock::create_file(repo);
     Ok(added)
 }

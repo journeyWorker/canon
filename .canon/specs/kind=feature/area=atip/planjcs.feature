@@ -143,3 +143,25 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
     Given canon schema of purge, artifacts move, migrate, ledger compact and tier age
     When their report schemas are read
     Then each holds planDigest, effects and committed as the contract's Effect and preview give them, and the minor of schemaVersion is above that of 0.34
+
+  # canon: {"schema":1,"at":"2026-11-02T20:37:04Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-plan-jcs.F2
+  @atip.planjcs.14
+  Scenario: The lock covers the span from the check of the digest to the first effect: a writer that arrives while a commit sits between them waits for it
+    Given a purge commit paused for three seconds between the check of its digest and its first effect (a seam of the debug build)
+    When a writer (subject new) is run while it is paused
+    Then the writer is answered only after the commit has ended and then writes; a commit that does not hold the lock from before the check lets it in, and the test fails
+
+  # canon: {"schema":1,"at":"2026-11-02T20:37:25Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-plan-jcs.F2
+  @atip.planjcs.15
+  Scenario: A repository with no lock file is locked from its first call: the file is made and kept out of git without editing a tracked file, and a writer waits
+    Given a repository set up by 0.34: no .canon/repo-write.lock, no line for it in .gitignore
+    When a purge preview is run, then its commit with a writer beside it
+    Then the preview makes no file; the commit makes the lock file, holds it so the writer waits, `git status` does not list it, it is named in .git/info/exclude and no tracked file was edited

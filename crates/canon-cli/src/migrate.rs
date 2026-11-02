@@ -380,7 +380,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     // What the plan read: canon.yaml and every path it moves, rewrites, renames or removes, by content (the files and the
     // trees under the directories it moves).
     let reads = safety::Reads::new().path(&repo, "canon.yaml").effect_paths(&repo, &listed);
-    let safe_plan = match safety::Plan::new(&repo, "migrate", listed, reads) {
+    let safe_plan = match safety::Plan::new("migrate", listed, reads) {
         Ok(plan) => plan,
         Err(e) => return e.emit("canon migrate", json),
     };
@@ -441,10 +441,6 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     }
     if let Some(code) = crate::write_mode::refuse_unwritable(&writes, "canon migrate", json) {
         return code;
-    }
-    // Past every refusal: the repository write lock from here to the end of the run (`main` held it already when its file was there).
-    if let Err(e) = safe_plan.hold() {
-        return e.emit("canon migrate", json);
     }
     if let Err(e) = migrate_names::prepare_backup(&names) {
         return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that the database file is readable, then run `canon migrate` again").emit("canon migrate", json);

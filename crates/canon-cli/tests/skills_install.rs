@@ -18,6 +18,12 @@ use canon_cli::skills::{self, Lock};
 
 /// `key: value` pairs of a `SKILL.md` frontmatter block, or `None` when the
 /// content does not open with a closed `---` block.
+/// `.canon` holds nothing a call wrote: it is absent, or holds only the repository write lock file, which any call that locked leaves
+/// behind (`write_lock`), refused or not.
+fn no_state_under_canon(target: &Path) -> bool {
+    fs::read_dir(target.join(".canon")).map_or(true, |entries| entries.flatten().all(|entry| entry.file_name() == "repo-write.lock"))
+}
+
 fn frontmatter(content: &str) -> Option<BTreeMap<String, String>> {
     let rest = content.strip_prefix("---\n")?;
     let end = rest.find("\n---\n")?;
@@ -628,7 +634,7 @@ fn skills_install_55_a_missing_skills_source_is_refused_with_exit_two() {
         assert_eq!(doc["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{command}: {doc}");
         assert_eq!(doc["error"]["field"], "--skills-source", "{command}: {doc}");
     }
-    assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "nothing is written");
+    assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "nothing is written");
 }
 
 /// skills.install.40
@@ -929,7 +935,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
             let output = canon(&["skills", command, "--providers", "gemini"], &source, &target);
             assert_eq!(output.status.code(), Some(2), "{command} --providers gemini: {}", String::from_utf8_lossy(&output.stderr));
         }
-        assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "{section:?}: nothing is written");
+        assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
 
         let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check", "--repo"]).arg(&target).output().unwrap();

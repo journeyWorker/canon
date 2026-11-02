@@ -44,22 +44,6 @@ impl FileLock {
             std::fs::create_dir_all(parent)?;
         }
         let file = OpenOptions::new().create(true).truncate(false).write(true).open(path)?;
-        Self::lock(file, wait)
-    }
-
-    /// Take the exclusive lock of `path` only if the file is already there: `Ok(None)` when it (or a directory above it)
-    /// does not exist, and nothing is created. For a caller that must leave a tree as it found it when it ends up
-    /// writing nothing: a lock file that is not there has no holder to wait for. The file is opened to read, which is
-    /// all a lock needs, so a read-only file is locked too.
-    pub fn acquire_existing(path: &Path, wait: Duration) -> Result<Option<FileLock>, FileLockError> {
-        match OpenOptions::new().read(true).open(path) {
-            Ok(file) => Self::lock(file, wait).map(Some),
-            Err(e) if matches!(e.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    fn lock(file: File, wait: Duration) -> Result<FileLock, FileLockError> {
         let deadline = Instant::now() + wait;
         loop {
             match file.try_lock() {
@@ -89,17 +73,5 @@ mod tests {
         // within a bound, as every caller does.
         let _second = FileLock::acquire(&path, Duration::from_secs(5)).unwrap();
         assert!(path.is_file(), "the lock file is never deleted");
-    }
-
-    #[test]
-    fn acquire_existing_creates_nothing_and_locks_a_file_that_is_there() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let path = dir.path().join("nested/writer.lock");
-        assert!(FileLock::acquire_existing(&path, Duration::ZERO).unwrap().is_none());
-        assert!(!dir.path().join("nested").exists(), "nothing was created");
-        let first = FileLock::acquire(&path, Duration::ZERO).unwrap();
-        assert!(matches!(FileLock::acquire_existing(&path, Duration::from_millis(100)), Err(FileLockError::Busy(_))));
-        drop(first);
-        assert!(FileLock::acquire_existing(&path, Duration::from_secs(5)).unwrap().is_some());
     }
 }

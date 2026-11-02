@@ -315,7 +315,8 @@ pub fn tree(root: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
             let entry = entry.unwrap();
             let path = entry.path();
             let relative = path.strip_prefix(root).unwrap().to_path_buf();
-            if relative == Path::new(".git") {
+            // The repository write lock file is process state a call that locked leaves behind, refused or not (`write_lock`).
+            if relative == Path::new(".git") || relative == Path::new(".canon/repo-write.lock") {
                 continue;
             }
             if entry.file_type().unwrap().is_dir() {

@@ -187,8 +187,6 @@ pub struct Plan {
     path: Vec<String>,
     /// The call's arguments, normalised, as the preview's commit call is written from them.
     given: Vec<Given>,
-    /// The root of the repository the plan is for: where the lock a commit holds is.
-    repo: std::path::PathBuf,
 }
 
 /// The leaf `leaf` (`ledger compact`) of this run: its words and arguments as `main` recorded them. A handler run without `main`
@@ -221,17 +219,16 @@ fn arguments_of(leaf: &str, given: &[Given]) -> Map<String, Value> {
 }
 
 impl Plan {
-    /// The plan of `leaf` (`purge`, `ledger compact`, `migrate`, …) in the repository rooted at `repo`, with `effects` and what it
-    /// `reads`, in the call of this run.
+    /// The plan of `leaf` (`purge`, `ledger compact`, `migrate`, …) with `effects` and what it `reads`, in the call of this run.
     /// A number a digest cannot hold is `INTERNAL` (no argument of these leaves is one).
-    pub fn new(repo: &Path, leaf: &str, effects: Vec<Effect>, reads: Reads) -> Result<Self, CliError> {
+    pub fn new(leaf: &str, effects: Vec<Effect>, reads: Reads) -> Result<Self, CliError> {
         let (path, given) = call_of(leaf);
         let mut inputs = Map::new();
         inputs.insert("arguments".to_string(), Value::Object(arguments_of(leaf, &given)));
         inputs.insert("reads".to_string(), Value::Object(reads.into_map()));
         let plan = contract::Plan::new(effects, inputs);
         let digest = plan.digest().map_err(|error| CliError::failed("INTERNAL", format!("canon could not compute the digest of the plan: {error}")).hint("report it with the command line you ran"))?;
-        Ok(Self { plan, digest, path, given, repo: repo.to_path_buf() })
+        Ok(Self { plan, digest, path, given })
     }
 
     pub fn digest(&self) -> &str {
@@ -268,7 +265,22 @@ impl Plan {
 
     /// Whether the run acts: `Ok(false)` for a preview, `Ok(true)` when `mode` commits this very plan, `PLAN_STALE` (exit 2,
     /// nothing written) when it commits another, with the preview as the first `meta.next` entry and a hint that says to run it.
+    ///
+    /// A commit that passes is under the repository write lock `main` took before the plan was computed ([`crate::write_lock`]), so
+    /// nothing changes the plan between this check and the effects. A debug build pauses here for the milliseconds of
+    /// `CANON_TEST_PAUSE_AFTER_GATE_MS`: the tests' way to keep a commit inside that window while another writer tries to enter it.
     pub fn gate(&self, mode: &Mode) -> Result<bool, CliError> {
+        let commit = self.check(mode)?;
+        #[cfg(debug_assertions)]
+        if commit {
+            if let Some(millis) = std::env::var("CANON_TEST_PAUSE_AFTER_GATE_MS").ok().and_then(|text| text.parse::<u64>().ok()) {
+                std::thread::sleep(std::time::Duration::from_millis(millis));
+            }
+        }
+        Ok(commit)
+    }
+
+    fn check(&self, mode: &Mode) -> Result<bool, CliError> {
         contract::gate(mode, self.digest(), self.preview_call("the plan changed or the digest is not this command's; plan it again, review it, then commit the digest it prints")).map_err(|stale| {
             // The crate's refusal is canon's registered code: the row of `all_codes` has its meaning, exit and fix.
             debug_assert!(stale.error.code == "PLAN_STALE" && crate::cli_error::code_info("PLAN_STALE").is_some_and(|row| row.exit == stale.error.exit));
@@ -277,13 +289,6 @@ impl Plan {
             }
             stale.error
         })
-    }
-
-    /// Holds the repository write lock from here to the end of the run, for a commit that is past every refusal that needs no
-    /// change and about to make its first effect: `main` took the lock before the plan was computed when the lock file was there, and
-    /// a repository that has none gets it now (see [`crate::write_lock`]). `REPO_WRITE_BUSY` when the lock is not free in time.
-    pub fn hold(&self) -> Result<(), CliError> {
-        crate::write_lock::hold_through_commit(&self.repo)
     }
 
     /// The step after a preview: the exact command that commits this plan.
@@ -343,7 +348,7 @@ mod tests {
     use super::*;
 
     fn plan(effects: Vec<Effect>, reads: Reads) -> Plan {
-        Plan::new(Path::new("."), "purge", effects, reads).unwrap()
+        Plan::new("purge", effects, reads).unwrap()
     }
 
     #[test]
@@ -361,14 +366,9 @@ mod tests {
 
     #[test]
     fn a_stale_digest_is_plan_stale_and_the_right_one_commits() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let plan = Plan::new(dir.path(), "purge", vec![Effect::path("delete", "a")], Reads::new()).unwrap();
+        let plan = plan(vec![Effect::path("delete", "a")], Reads::new());
         assert!(!plan.gate(&Mode::Preview).unwrap());
-        assert!(!dir.path().join(canon_model::paths::REPO_WRITE_LOCK_FILE).exists(), "a preview takes no lock");
         assert!(plan.gate(&Mode::Commit(plan.digest().to_string())).unwrap());
-        assert!(!dir.path().join(canon_model::paths::REPO_WRITE_LOCK_FILE).exists(), "the gate holds nothing: a refusal after it writes nothing");
-        plan.hold().unwrap();
-        assert!(dir.path().join(canon_model::paths::REPO_WRITE_LOCK_FILE).is_file(), "a commit that is about to write holds the lock, creating the file");
         let error = plan.gate(&Mode::Commit("0".into())).unwrap_err();
         assert_eq!((error.code, error.exit), ("PLAN_STALE", 2));
         let unprefixed = plan.digest().trim_start_matches("sha256:").to_string();
