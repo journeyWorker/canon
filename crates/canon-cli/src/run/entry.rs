@@ -205,12 +205,42 @@ pub fn hoist_tool_wide_options(root: &clap::Command, args: Vec<std::ffi::OsStrin
     }
     let leaf_follows = !node.get_subcommands().any(|sub| sub.get_name() != "help");
     let mut out = kept;
+    if !leaf_follows {
+        // Where no leaf follows the options do nothing, but a value that is no role is a failure to parse at the place it was written, which is
+        // ahead of the unknown or missing command word that follows: it stays there for the parser to refuse.
+        out.extend(unknown_role_option(&hoisted));
+    }
     out.extend(args[at..end].iter().cloned());
     if leaf_follows {
         out.extend(hoisted);
     }
     out.extend(args[end..].iter().cloned());
     out
+}
+
+/// The first `--as` among the hoisted options whose value is no role, with its value (`--as zzz`, or `--as=zzz`); none when every `--as` names a role.
+fn unknown_role_option(hoisted: &[std::ffi::OsString]) -> Vec<std::ffi::OsString> {
+    let mut at = 0;
+    while at < hoisted.len() {
+        let word = hoisted[at].to_string_lossy();
+        match word.as_ref() {
+            "--as" => {
+                let value = hoisted.get(at + 1);
+                if value.is_some_and(|value| crate::role::Role::parse(&value.to_string_lossy()).is_none()) {
+                    return hoisted[at..at + 2].to_vec();
+                }
+                at += 2;
+            }
+            "--repo" => at += 2,
+            _ => {
+                if word.strip_prefix("--as=").is_some_and(|value| crate::role::Role::parse(value).is_none()) {
+                    return vec![hoisted[at].clone()];
+                }
+                at += 1;
+            }
+        }
+    }
+    Vec::new()
 }
 
 /// Whether `args` give the option `field` an empty value (`--change ""`, `--change=`). An operand (`field` not

@@ -703,12 +703,25 @@ fn atip_checkorder_15_the_document_lists_the_rules_the_stateless_stage_enforces(
 
 // ------------------------------------------------------------------------------------------ a tool-wide option before the command
 
-/// atip.checkorder.17: a `--as` that is no role, written before the command words, is a failure to parse at the place it was written: it
-/// answers ahead of an unknown command word, a missing command or a group without a command, whatever follows; an unknown option written
-/// before it still answers first. And the refusal of two options that exclude each other names the closed set of the one at fault.
+/// atip.checkorder.17: a `--as` that is no role, written before the command words or after a group word, is a failure to parse at the place it
+/// was written: it answers ahead of an unknown command word, a missing command or a group without a command that follows it; an unknown option
+/// or an unknown command word written before it still answers first. And the refusal of two options that exclude each other names the closed
+/// set of the one at fault.
 #[test]
 fn atip_checkorder_17_a_leading_unknown_role_answers_before_an_unknown_or_missing_command() {
-    for line in ["canon --as zzz nosuch", "canon --as zzz", "canon --as=zzz finding nosuch", "canon --as zzz finding", "canon --json --as zzz nosuch", "canon --repo . --as zzz status"] {
+    for line in [
+        "canon --as zzz nosuch",
+        "canon --as zzz",
+        "canon --as=zzz finding nosuch",
+        "canon --as zzz finding",
+        "canon --json --as zzz nosuch",
+        "canon --repo . --as zzz status",
+        "canon finding --as zzz nosuch",
+        "canon finding --as=zzz nosuch",
+        "canon finding --repo . --as zzz nosuch",
+        "canon finding --as zzz",
+        "canon finding --json --as zzz nosuch",
+    ] {
         let outcome = empty(line, &[]);
         assert_eq!((outcome.code.as_deref(), outcome.field.as_deref()), (Some("USAGE"), Some("--as")), "`{line}`: {outcome:?}");
         assert_eq!(outcome.exit, 2, "`{line}`");
@@ -717,6 +730,11 @@ fn atip_checkorder_17_a_leading_unknown_role_answers_before_an_unknown_or_missin
     // Written the same way after a leaf it was always answered where it stood; an unknown option before it answers first.
     assert_answer(&empty("canon status --as zzz", &[]), "USAGE", "--as");
     assert_answer(&empty("canon --bogus --as zzz nosuch", &[]), "USAGE", "--bogus");
+    // An unknown command word written before the `--as` answers first, and a `--as` that names a role is not a failure.
+    for line in ["canon finding nosuch --as zzz", "canon finding --as reviewer nosuch", "canon finding --as=reviewer nosuch"] {
+        let word = empty(line, &[]);
+        assert_eq!((word.code.as_deref(), word.field.as_deref()), (Some("UNKNOWN_COMMAND"), Some("command")), "`{line}`: {word:?}");
+    }
     let word = empty("canon nosuch", &[]);
     assert_eq!((word.code.as_deref(), word.field.as_deref()), (Some("UNKNOWN_COMMAND"), Some("command")), "{word:?}");
     let bare = empty("canon finding", &[]);

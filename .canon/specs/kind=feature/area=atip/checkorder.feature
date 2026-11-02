@@ -166,7 +166,7 @@ Feature: ATIP: the order of the stateless checks
   @case:failure
   @flow:canon-0-35-canon-check-order.F1
   @atip.checkorder.17
-  Scenario: A leading --as that is no role answers before an unknown or missing command, and an excluding pair names the closed set at fault
+  Scenario: A --as that is no role, written before the command words or after a group word, answers before an unknown or missing command, and an excluding pair names the closed set at fault
     Given a built canon
-    When canon runs with --as zzz before an unknown command word, before nothing, before a group, and after an unknown option, and init runs with --policy and --no-policy
-    Then --as answers USAGE first, an earlier unknown option still answers first, and the excluding pair names light, standard and strict as expected
+    When canon runs with --as zzz before an unknown command word, before nothing, before a group, after a group word and before an unknown word, after an unknown option, and after an unknown word; and init runs with --policy and --no-policy
+    Then --as answers USAGE first, an earlier unknown option or unknown command word still answers first, and the excluding pair names light, standard and strict as expected

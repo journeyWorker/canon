@@ -1028,7 +1028,7 @@ fn hex_encode(text: &str) -> String {
 }
 
 /// ledger.naming.19: a cursor `canon query` issued in 0.29 names a record by its 0.29 id and 12-hex
-/// digest; it is refused CURSOR_INVALID (`FOREIGN`, since 0.34 binds a cursor to its call's arguments), and the hint says to drop `--cursor` and start from the first page.
+/// digest; it is refused CURSOR_INVALID (`FOREIGN`: no cursor of the `atip` crate), and the hint says to restart without `--cursor`.
 #[test]
 fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     let dir = repo30(1);
@@ -1045,7 +1045,7 @@ fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     assert_eq!(doc["error"]["code"], "CURSOR_INVALID", "{doc}");
     assert_eq!(doc["error"]["reason"], "FOREIGN", "a cursor of an older release carries no binding to the arguments, so it is not one this canon issued: {doc}");
     let hint = doc["error"]["hint"].as_str().unwrap();
-    assert!(hint.contains("drop --cursor") && hint.contains("first page"), "{hint}");
+    assert!(hint.contains("restart without --cursor"), "{hint}");
     // Starting over works, and the cursor 0.30 issues is accepted.
     let first = json_of(&canon_in(repo, &["query", "--kind", "finding", "--json", "--limit", "1"], &[]));
     let next = first["meta"]["page"]["nextCursor"].as_str().unwrap();
