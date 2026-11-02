@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev-b"
+  },
+  "at": "2026-11-02T20:42:46.397270Z",
+  "change_id": "canon-0-35-canon-cursor-1-2",
+  "code_tree": "276e9a2237949d440c74791e0fc4d5450c7b4b92",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "4c646bd8827a5468f97c524171bcd12021729d8f",
+  "kind": "finding",
+  "reason": "Verified at 53fff00f: the CHANGELOG row now says the cursor is one ASCII word, not encrypted and not secret, position = base64url of the record key, callers never read it; spec 6.9 asks for no opacity. Scenario atip.canoncursor.03 and its test assert only one ASCII word and that a changed character is FOREIGN on all four commands, and promise nothing about decodability, so claim, scenario and test agree. atip_canoncursor 14/14 pass (run here).",
+  "resolution_code_tree": "2d51f2a2c609519039aed75ae1bf813242d310e0",
+  "resolution_sha": "0a537118bee68f7ece7e67576568d711112f82ee",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "792712dc344fb492b687e823fed87af2df55c2ea",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity + Standards (brief F1 'cursor 문자열은 불투명하다. 기록 키가 보이지 않는다', CHANGELOG entry 'no record key is readable in it'; scenario atip.canoncursor.03): the claim is not true of the real binary. The cursor is atip.<base64url scope>.<binding>.<base64url position>.<check>, and the position is base64url of the record's whole key: canon query --kind finding --limit 1 gives a cursor whose 4th word MjAyNi0xMC0xMFQxNDoyOTo0Mi4xNDgyNDArMDA6MDB8Y2Fub24tMC0xMy0xLWNvZGV4LXNraWxsc18xXzF8N2QzM2M0NjQjMQ decodes with base64 -d to '2026-10-10T14:29:42.148240+00:00|canon-0-13-1-codex-skills_1_1|7d33c464#1' (time, id, digest); the scope word cXVlcnk is 'query'. 0.34's complaint (the key in hex, in the clear) is only re-encoded, not removed. Test 03 passes because it checks only the literal key, its digest and its hex (an encoding the brief did not name), so it cannot fail on base64; it is also the one check that backs the CHANGELOG sentence. The contract (6.9) asks for no opacity, so the format is conforming; the fault is the claim and the brief's wording. Fix either way: reword the CHANGELOG/brief ('not the key in hex; the position is the key in base64 and is not secret') and make 03 assert that the position decodes to the key, or make the position opaque in the crate (a cursor that names a record by an index or a keyed hash). Related, already noted as crate-cursor 1_2: the check is an unkeyed hash, so a cursor is also forgeable. Blast radius: a cursor discloses the key of its last record (time, id, digest; an evidence key carries its task or scenario id, e.g. '-_task_s10-vocab-pilot'), and no check in this change (nextest 3942, atip check L1) looks at what a cursor discloses.",
+  "worktree_dirty": false
+}
