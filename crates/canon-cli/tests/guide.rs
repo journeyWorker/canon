@@ -53,17 +53,18 @@ fn skills_show_full_appends_every_reference_and_is_a_no_op_elsewhere() {
     assert_eq!(canon(empty.path(), &["skills", "show", "role-planner", "--full"]).stdout, source("reference/role-planner.md"));
 }
 
-/// `--json` envelopes `{name, version, markdown}`.
+/// `--json` envelopes `{name, text, guides, full, x-canon: {version}}` (0.35, the contract's guide schema).
 #[test]
-fn skills_show_json_carries_name_version_and_markdown() {
+fn skills_show_json_carries_name_text_guides_and_the_version_under_x_canon() {
     let empty = tempfile::tempdir().unwrap();
     let out = canon(empty.path(), &["skills", "show", "canon", "--json"]);
     assert_eq!(out.status.code(), Some(0));
     let document = json(&out);
     assert_eq!(document["ok"], true);
     assert_eq!(document["data"]["name"], "canon");
-    assert_eq!(document["data"]["version"], env!("CARGO_PKG_VERSION"));
-    assert_eq!(document["data"]["markdown"].as_str().unwrap().as_bytes(), source("SKILL.src.md"));
+    assert_eq!(document["data"]["x-canon"]["version"], env!("CARGO_PKG_VERSION"));
+    assert!(document["data"].get("version").is_none() && document["data"].get("markdown").is_none());
+    assert_eq!(document["data"]["text"].as_str().unwrap().as_bytes(), source("SKILL.src.md"));
     assert_eq!(document["meta"]["command"], "skills show");
 }
 

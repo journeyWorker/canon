@@ -33254,6 +33254,7 @@
       "operands": [
         {
           "default": null,
+          "defaultNote": "the default guide, `canon`",
           "help": "A guide built into the binary: `canon`, or the stem of a reference file such as `role-implementer`",
           "name": "name",
           "possibleValues": [
@@ -33285,7 +33286,7 @@
             "role-planner",
             "role-reviewer"
           ],
-          "required": true,
+          "required": false,
           "valueName": "NAME",
           "valueType": "enum",
           "variadic": false
@@ -33332,7 +33333,7 @@
           "kind": "artifact",
           "mediaType": "text/markdown",
           "schemaRef": "#/schemas/SkillsShowReport",
-          "schemaVersion": "1.0"
+          "schemaVersion": "2.0"
         }
       ],
       "path": [
@@ -33341,27 +33342,8 @@
       ],
       "schemas": {
         "SkillsShowReport": {
-          "description": "`--json` of `canon skills show`: the guide `name` names, as this canon embeds it.",
-          "properties": {
-            "markdown": {
-              "description": "The guide's markdown, as `canon skills show` prints it.",
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "version": {
-              "description": "The canon version the guide is embedded in.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name",
-            "version",
-            "markdown"
-          ],
-          "title": "SkillsShowReport",
-          "type": "object"
+          "$ref": "https://atip.dev/1/guide.schema.json",
+          "title": "SkillsShowReport"
         }
       },
       "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",

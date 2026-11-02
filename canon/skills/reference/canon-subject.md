@@ -40,7 +40,8 @@ Write (or update) the Subject before touching anything else, so every
 downstream artifact has a `subject_id` to pin to.
 
 ```bash
-canon context --repo .            # record kinds, enum domains, policy requirements
+# record kinds, enum domains, policy requirements
+canon context --repo .
 canon subject new subject-domain-loop \
   --domain dev --title "Subject domain loop" \
   --summary "The durable product unit + its per-domain loop" \
@@ -130,7 +131,8 @@ from anywhere). Any other transition is rejected by failure class, exits
 canon subject move subject-domain-loop --to specced
 canon subject move subject-domain-loop --to building
 canon subject move subject-domain-loop --to verifying
-canon subject move subject-domain-loop --to shipped   # gated — see below
+# gated — see below
+canon subject move subject-domain-loop --to shipped
 ```
 
 On success the status updates in place; `--json` prints the updated
@@ -182,8 +184,8 @@ a policy. The refusal is an `unreviewed-promotion` naming the subject, and
 says what to do:
 
 ```output
-canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
-canon subject move: refused — get the human's answer to the brief and record it with `canon brief approve`, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
+output: canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
+output: canon subject move: refused — get the human's answer to the brief and record it with `canon brief approve`, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
 ```
 
 For an external change with no canon brief yet, the reason reads
@@ -259,7 +261,7 @@ When `.canon/policy.yaml` sets `spec_coverage.require_review` (see
 prints on stderr which it ran or skipped:
 
 ```output
-canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+output: canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
   ran unreviewed-promotion — every owned scenario needs a review by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```
@@ -316,8 +318,8 @@ canon subject move demo-subject --to verifying \
 ```
 
 ```output
-canon subject move: reopened `demo-subject` from shipped, recorded by `impl`: follow-up: the retry path leaks a file handle; keep the follow-up in its approved change `c-demo`, then scenario, evidence and review; shipping again runs every guard
-canon subject move: demo-subject → verifying — written directly; nothing to promote
+output: canon subject move: reopened `demo-subject` from shipped, recorded by `impl`: follow-up: the retry path leaks a file handle; keep the follow-up in its approved change `c-demo`, then scenario, evidence and review; shipping again runs every guard
+output: canon subject move: demo-subject → verifying — written directly; nothing to promote
 ```
 
 - `--reason "<one line>"` is required for `shipped → verifying` (exit 2
@@ -353,9 +355,11 @@ Planning docs written outside canon become change/task records via
 `canon subject adopt` lifts an imported change into a managed Subject:
 
 ```bash
-canon ingest plans --repo .                          # import → change/task rows
+# import → change/task rows
+canon ingest plans --repo .
+# link change → subject
 canon subject adopt subject-domain-loop \
-  --change subject-domain-loop-plan                      # link change → subject
+  --change subject-domain-loop-plan
 ```
 
 A change made with `canon change new` (below) is recorded and adopted
@@ -377,7 +381,7 @@ second subject adds that subject, never re-points the change, and says
 so:
 
 ```output
-canon subject adopt: linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` — written directly; nothing to promote
+output: canon subject adopt: linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` — written directly; nothing to promote
 ```
 
 Every reader joins a subject to its changes from both sides (the
@@ -434,8 +438,8 @@ canon change new add-login --subject auth --title "Add login"
 ```
 
 ```output
-canon change new: wrote .canon/changes/add-login/brief.md
-canon change new: recorded change `add-login` adopted into subject `auth` — written directly; nothing to promote
+output: canon change new: wrote .canon/changes/add-login/brief.md
+output: canon change new: recorded change `add-login` adopted into subject `auth` — written directly; nothing to promote
 ```
 
 - **Writes** canon's own change dir, `.canon/changes/<slug>/`, holding
@@ -493,8 +497,10 @@ brief (`data.next`, `meta.next`).
 ### The brief: `canon brief show`, `canon brief check`, `canon brief approve`
 
 ```text
-canon brief show [<slug>]                       # state and the next one to three steps; never edits
-canon brief check [<slug>] [--json]            # findings; exit 0 clean, 2 blockers, 1 error
+# state and the next one to three steps; never edits
+canon brief show [<slug>]
+# findings; exit 0 clean, 2 blockers, 1 error
+canon brief check [<slug>] [--json]
 canon brief approve <slug> <slug> --approver <the human> --note "<their words>"
 ```
 
@@ -567,8 +573,10 @@ step that writes it.
 ## Where are we: `canon status`
 
 ```bash
-canon status                 # subjects by status, their gaps, next commands
-canon status --json          # the same report, stable shape
+# subjects by status, their gaps, next commands
+canon status
+# the same report, stable shape
+canon status --json
 canon status --repo ../other
 ```
 
@@ -818,7 +826,8 @@ and `canon gate check` exits `0`; read `data.subjects[]` for the counts and
 
 ```bash
 canon query --kind subject --domain dev --status building
-canon report build --repo .  # renders the "Subjects" panel
+# renders the "Subjects" panel
+canon report build --repo .
 ```
 
 - `canon query --kind subject [--domain <d>] [--status <s>]` — the

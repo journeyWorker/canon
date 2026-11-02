@@ -62,7 +62,7 @@ pub use given::{write_argv, Given};
 pub use minor::{Minor, UnknownMinor};
 pub use project::{flag_only_options, flag_only_problems};
 pub use reserved::{registration_problem, reserved_code, ReservedCode, RESERVED_CODES};
-pub use schema::{BATCH_REPORT_SCHEMA, CONTRACT, CONTRACT_VERSION, ENVELOPE_SCHEMA, ERROR_SCHEMA, INPUT_DOCUMENT_SCHEMA, REGISTRY_ENTRY_SCHEMA, SCHEMA_DOC_SCHEMA, STREAM_LINE_SCHEMA, WARNING_ENTRY_SCHEMA};
+pub use schema::{BATCH_REPORT_SCHEMA, CONTRACT, CONTRACT_VERSION, ENVELOPE_SCHEMA, ERROR_SCHEMA, GUIDE_SCHEMA, INPUT_DOCUMENT_SCHEMA, REGISTRY_ENTRY_SCHEMA, SCHEMA_DOC_SCHEMA, STREAM_LINE_SCHEMA, WARNING_ENTRY_SCHEMA};
 #[cfg(feature = "validate")]
-pub use schema::{envelope_problems, error_problems, registry_entry_problems, schema_doc_problems, warning_entry_problems};
+pub use schema::{envelope_problems, error_problems, guide_problems, registry_entry_problems, schema_doc_problems, warning_entry_problems};
 pub use shell::{has_placeholder, quote, split_argv};

@@ -181,7 +181,7 @@ fn report_of(output: &Value) -> String {
 /// A validator of the schema `name` of the command document `doc`: its `$ref`s resolve inside the document.
 fn schema_validator(doc: &Value, name: &str) -> jsonschema::Validator {
     use jsonschema::{Registry, Resource};
-    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(doc.clone())).expect("the document registers").prepare().expect("the registry prepares");
+    let registry = Registry::new().add("https://atip.dev/1/guide.schema.json", Resource::from_contents(serde_json::from_str(atip::GUIDE_SCHEMA).expect("the guide schema is JSON"))).expect("the contract schema registers").add("urn:canon:doc", Resource::from_contents(doc.clone())).expect("the document registers").prepare().expect("the registry prepares");
     jsonschema::options().with_registry(&registry).build(&serde_json::json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).unwrap_or_else(|e| panic!("`{name}` does not compile: {e}"))
 }
 

@@ -33,6 +33,9 @@ pub const INPUT_DOCUMENT_SCHEMA: &str = include_str!("../schema/input-document.s
 /// `schema/batch-report.schema.json`: the shape every batch output's `data` shares (spec 11.11).
 pub const BATCH_REPORT_SCHEMA: &str = include_str!("../schema/batch-report.schema.json");
 
+/// `schema/guide.schema.json`: the `data` of `skills show --json` (spec 14.3; since 1.2).
+pub const GUIDE_SCHEMA: &str = include_str!("../schema/guide.schema.json");
+
 /// `meta.contract`: the contract every document follows.
 pub const CONTRACT: &str = "atip/1";
 /// `meta.contractVersion`: the newest minor of the contract this crate implements ([`crate::Minor::LATEST`]), which is
@@ -52,7 +55,7 @@ fn parse(text: &str) -> Value {
 /// Every vendored schema by its `$id`, so a `$ref` between them resolves (`error.schema.json` from the envelope,
 /// `envelope.schema.json` from the self-description's own schema).
 #[cfg(feature = "validate")]
-const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
+const CONTRACT_SCHEMAS: [(&str, &str); 8] = [
     (ERROR_ID, ERROR_SCHEMA),
     ("https://atip.dev/1/envelope.schema.json", ENVELOPE_SCHEMA),
     ("https://atip.dev/1/registry-entry.schema.json", REGISTRY_ENTRY_SCHEMA),
@@ -60,6 +63,7 @@ const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
     ("https://atip.dev/1/input-document.schema.json", INPUT_DOCUMENT_SCHEMA),
     ("https://atip.dev/1/batch-report.schema.json", BATCH_REPORT_SCHEMA),
     ("https://atip.dev/1/stream-line.schema.json", STREAM_LINE_SCHEMA),
+    ("https://atip.dev/1/guide.schema.json", GUIDE_SCHEMA),
 ];
 
 /// The registry of the contract's schemas, for a validator of this crate or of a tool's own schemas that `$ref` them by `$id`.
@@ -87,6 +91,9 @@ static REGISTRY_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(REGISTRY_E
 static WARNING_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(WARNING_ENTRY_SCHEMA));
 #[cfg(feature = "validate")]
 static SCHEMA_DOC: LazyLock<Validator> = LazyLock::new(|| compile(SCHEMA_DOC_SCHEMA));
+
+#[cfg(feature = "validate")]
+static GUIDE: LazyLock<Validator> = LazyLock::new(|| compile(GUIDE_SCHEMA));
 
 #[cfg(feature = "validate")]
 fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
@@ -127,6 +134,13 @@ pub fn schema_doc_problems(document: &Value) -> Vec<String> {
     problems_of(&SCHEMA_DOC, document)
 }
 
+/// What breaks the contract's guide schema (`schema/guide.schema.json`) in `data`, the `data` of a `skills show --json` answer: one line
+/// per violation, empty when it conforms.
+#[cfg(feature = "validate")]
+pub fn guide_problems(data: &Value) -> Vec<String> {
+    problems_of(&GUIDE, data)
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -149,6 +163,7 @@ mod tests {
     const SCHEMA_DOC_DIGEST: &str = "ffa4a5e3a4605136f51a6c7767416e25a8e5919e2c2bd152f79a882ebd35f57b";
     const INPUT_DOCUMENT_DIGEST: &str = "a3e194a8f5b2d232bd46f84dc664a8a7d3bb38c2b7658a0edbfd4767d58c97a7";
     const BATCH_REPORT_DIGEST: &str = "74ed7e2a5a0f234d447da186f313500756850313e752d500711401d41498944e";
+    const GUIDE_DIGEST: &str = "43229f3cfbd518307b1e6071b9e12adad114c0da4f8fdba695c06d2e16c47d3f";
 
     #[test]
     fn atip_l0_07_the_vendored_schemas_are_the_published_bytes() {
@@ -160,6 +175,7 @@ mod tests {
         assert_eq!(digest(SCHEMA_DOC_SCHEMA), SCHEMA_DOC_DIGEST);
         assert_eq!(digest(INPUT_DOCUMENT_SCHEMA), INPUT_DOCUMENT_DIGEST);
         assert_eq!(digest(BATCH_REPORT_SCHEMA), BATCH_REPORT_DIGEST);
+        assert_eq!(digest(GUIDE_SCHEMA), GUIDE_DIGEST);
     }
 
     /// A copy with one character changed no longer matches the pin: the pin test above would fail on it.

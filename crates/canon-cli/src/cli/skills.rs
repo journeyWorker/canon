@@ -70,9 +70,9 @@ pub struct SkillsDoctorArgs {
 
 #[derive(Debug, Args)]
 pub struct SkillsShowArgs {
-    /// The guide to print: `canon` (the core guide) or a reference such as `role-implementer`.
+    /// The guide to print: `canon` (the core guide) or a reference such as `role-implementer`. Omitted: the default guide, `canon`.
     #[arg(value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::guide::names()))]
-    pub name: String,
+    pub name: Option<String>,
     /// With `canon`: append every reference after the core guide. Any other name is a complete guide already, so the flag changes nothing there.
     #[arg(long)]
     pub full: bool,

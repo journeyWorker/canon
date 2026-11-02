@@ -692,7 +692,7 @@ fn validate<R: Report>(command: &str, text: &str) {
             if R::STATE_IN_DATA && carries_state(command) {
                 schema = with_state_properties(schema);
             }
-            (schema != Value::Bool(true)).then(|| std::sync::Arc::new(jsonschema::validator_for(&schema).unwrap_or_else(|e| panic!("the schema of {} does not compile: {e}", std::any::type_name::<R>()))))
+            (schema != Value::Bool(true)).then(|| std::sync::Arc::new(jsonschema::options().with_registry(&atip::schema::contract_registry()).build(&schema).unwrap_or_else(|e| panic!("the schema of {} does not compile: {e}", std::any::type_name::<R>()))))
         })
         .clone();
     if let Some(validator) = validator {

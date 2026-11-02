@@ -64,9 +64,12 @@ canon ingest plans --dialect openspec --plan-source ../other-repo
 ## 2. Run the import
 
 ```bash
-canon ingest plans                 # .canon/changes/ + every configured source
-canon ingest plans --json          # machine-readable outcome
-canon ingest plans --repo ../svc   # a specific repo root
+# .canon/changes/ + every configured source
+canon ingest plans
+# machine-readable outcome
+canon ingest plans --json
+# a specific repo root
+canon ingest plans --repo ../svc
 ```
 
 Per source the summary reports `changes_parsed`/`tasks_parsed`,

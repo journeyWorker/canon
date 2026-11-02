@@ -66,7 +66,7 @@ fn camel(name: &str) -> String {
 
 /// A validator of the schema `name` of the command document `doc`, whose `schemas` the `$ref`s of the members resolve in.
 fn member_validator(doc: &Value, name: &str) -> Result<jsonschema::Validator, String> {
-    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(doc.clone())).map_err(|e| e.to_string())?.prepare().map_err(|e| e.to_string())?;
+    let registry = Registry::new().add("https://atip.dev/1/guide.schema.json", Resource::from_contents(serde_json::from_str(atip::GUIDE_SCHEMA).expect("the guide schema is JSON"))).expect("the contract schema registers").add("urn:canon:doc", Resource::from_contents(doc.clone())).map_err(|e| e.to_string())?.prepare().map_err(|e| e.to_string())?;
     jsonschema::options().with_registry(&registry).build(&json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).map_err(|e| format!("`{name}` does not compile: {e}"))
 }
 
@@ -798,7 +798,7 @@ fn first_line(args: &[&str]) -> String {
 #[test]
 fn atip_schemadoc_11_every_help_starts_with_the_line_that_points_at_schema() {
     let line = canon_cli::spec::HELP_POINTER;
-    assert_eq!(line, "Agents: \"canon schema --json\" describes every command as JSON.");
+    assert_eq!(line, "Agents: \"canon schema --json\" describes every command; \"canon skills show\" prints the guide.");
     for args in [&["--help"][..], &["finding", "--help"], &["finding", "close", "--help"], &["help", "finding"], &["finding", "close", "-h"], &["schema", "--help"]] {
         assert_eq!(first_line(args), line, "{args:?}");
     }

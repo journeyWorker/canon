@@ -9,7 +9,7 @@ pub fn run(cmd: SkillsCommand) -> ExitCode {
         SkillsCommand::Install(SkillsInstallArgs { skills_source, repo, providers, dry_run, json, .. }) => run_skills_install(skills_source.as_deref(), &repo, providers.as_deref(), dry_run.dry_run, json),
         SkillsCommand::Check(SkillsCheckArgs { skills_source, repo, providers, json }) => run_skills_check(skills_source.as_deref(), &repo, providers.as_deref(), json),
         SkillsCommand::Doctor(SkillsDoctorArgs { skills_source, repo, providers, json }) => run_skills_doctor(skills_source.as_deref(), &repo, providers.as_deref(), json),
-        SkillsCommand::Show(SkillsShowArgs { name, full, json }) => run_skills_show(&name, full, json),
+        SkillsCommand::Show(SkillsShowArgs { name, full, json }) => run_skills_show(name.as_deref().unwrap_or(crate::guide::CORE), full, json),
     }
 }
 
@@ -151,18 +151,20 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
     }
 }
 
-/// `canon skills show <NAME> [--full]`: the guide built into the binary, as markdown on stdout, or enveloped under `--json`.
+/// `canon skills show [NAME] [--full]`: the guide built into the binary (the default guide, `canon`, without a `NAME`), as markdown on stdout, or
+/// enveloped under `--json` in the shape of the contract's guide schema (spec 14.3). It reads nothing and writes nothing.
 fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
-    let markdown: std::borrow::Cow<'static, str> = if full && name == crate::guide::CORE {
+    let full = full && name == crate::guide::CORE;
+    let text: std::borrow::Cow<'static, str> = if full {
         crate::guide::full().into()
     } else {
         // clap admits only the embedded names (`possibleValues`).
         crate::guide::guide(name).expect("clap admits only embedded guide names").into()
     };
     if json {
-        crate::json_out::data("skills show", &crate::skills::SkillsShowReport { name: name.to_string(), version: crate::skills::CANON_VERSION, markdown });
+        crate::json_out::data("skills show", &crate::skills::SkillsShowReport { name: name.to_string(), text, guides: crate::guide::names(), full, x_canon: crate::skills::GuideCanon { version: crate::skills::CANON_VERSION } });
     } else {
-        print!("{markdown}");
+        print!("{text}");
     }
     ExitCode::SUCCESS
 }

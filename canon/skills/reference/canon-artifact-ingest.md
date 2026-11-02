@@ -9,9 +9,12 @@ verdicts, and writes idempotently.
 ## `canon ingest records [--repo <dir>] [--watch]`
 
 ```bash
-canon ingest records                # one pass over the repo's artifacts
-canon ingest records --repo ../svc  # a specific repo
-canon ingest records --watch        # poll loop
+# one pass over the repo's artifacts
+canon ingest records
+# a specific repo
+canon ingest records --repo ../svc
+# poll loop
+canon ingest records --watch
 ```
 
 Source roots resolve from `canon.yaml`'s `artifacts.sources` config

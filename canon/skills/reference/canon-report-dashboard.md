@@ -40,7 +40,8 @@ Renders the current ten-panel report to `<repo>/.canon/REPORT.md`.
 subcommand uses — omit it (or pass `.`) to run from any subdirectory.
 
 ```bash
-canon report build           # writes .canon/REPORT.md
+# writes .canon/REPORT.md
+canon report build
 canon report build --repo /path/to/repo
 ```
 
@@ -67,7 +68,8 @@ committed `.canon/REPORT.md`:
   `canon report build`).
 
 ```bash
-canon report check   # wire into CI exactly like canon format / canon gate check
+# wire into CI exactly like canon format / canon gate check
+canon report check
 ```
 
 Wire it as a CI step or pre-push hook the same way `canon gate
@@ -126,7 +128,8 @@ canon report snapshot /tmp/canon-snap
 Serves the dashboard web app locally, pointed at a real snapshot:
 
 ```bash
-canon dashboard                       # regenerates a fresh snapshot every run, serves it
+# regenerates a fresh snapshot every run, serves it
+canon dashboard
 canon dashboard --snapshot /tmp/canon-snap --port 8080
 ```
 

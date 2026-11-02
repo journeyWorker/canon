@@ -330,12 +330,18 @@ and `canon context` warn when the repo holds 0.27-era state and put
 ## Setup and provider projection
 
 ```bash
-canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
-canon init --providers=claude,codex          # harnesses for the canon skill; without it init asks on a terminal, else takes the detected .claude/.codex/.omp/.pi
-canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
-canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
-canon skills check                           # read-only drift check; exit 1 (SKILLS_DRIFT) names each orphan, a projected file the bundle no longer ships
-canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
+# canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
+canon init
+# harnesses for the canon skill; without it init asks on a terminal, else takes the detected .claude/.codex/.omp/.pi
+canon init --providers=claude,codex
+# follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
+canon skills install
+# any subset or none; rewrites skills.providers
+canon skills install --providers=claude,codex,omp,pi
+# read-only drift check; exit 1 (SKILLS_DRIFT) names each orphan, a projected file the bundle no longer ships
+canon skills check
+# diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
+canon skills doctor
 ```
 
 `install` writes, per selected harness, a short `SKILL.md` stub (this file's

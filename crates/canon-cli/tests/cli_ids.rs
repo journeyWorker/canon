@@ -144,7 +144,8 @@ fn options_by_name() -> BTreeMap<String, Vec<String>> {
     out
 }
 
-/// Masks times, ULIDs and digests, the values that differ between two runs of one fixture.
+/// Masks times, ULIDs and digests, the values that differ between two runs of one fixture. A digest is 8 (a short one) or 40 and more lower-case
+/// hex characters as a whole word, with or without a digit: one that happens to be all letters (`cfcaaadc`) is masked too.
 fn masked(text: &str) -> String {
     let mut out = String::new();
     let mut word = String::new();
@@ -155,7 +156,7 @@ fn masked(text: &str) -> String {
         let digits = word.len();
         let timestamp = digits >= 20 && word.as_bytes()[4] == b'-' && word.contains('T') && word.ends_with('Z');
         let ulid = digits == 26 && word.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
-        let digest = (digits >= 40 || digits == 8) && word.chars().all(|c| c.is_ascii_hexdigit()) && word.chars().any(|c| c.is_ascii_digit());
+        let digest = (digits >= 40 || digits == 8) && word.chars().all(|c| c.is_ascii_digit() || matches!(c, 'a'..='f'));
         out.push_str(&if timestamp {
             format!("<time>{suffix}")
         } else if ulid {

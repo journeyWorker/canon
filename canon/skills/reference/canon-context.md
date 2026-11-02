@@ -13,9 +13,12 @@ deterministic authoring surface.
 ## `canon context [--repo <dir>] [--json]`
 
 ```bash
-canon context                 # compact human outline (prompt-injectable)
-canon context --json          # the full machine-readable surface
-canon context --repo ../other # resolve a specific repo's surface
+# compact human outline (prompt-injectable)
+canon context
+# the full machine-readable surface
+canon context --json
+# resolve a specific repo's surface
+canon context --repo ../other
 ```
 
 The outline opens with a short header, then a blank line, then the

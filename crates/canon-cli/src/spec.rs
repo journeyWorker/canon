@@ -97,8 +97,9 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 /// build: the check runs in CI beside the tests that build these documents.
 pub const LEVEL: &str = "L1";
 
-/// The first line of every `--help` (spec 4.7): it points at the self-description, so an agent that read nothing else knows it exists.
-pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every command as JSON.";
+/// The first line of every `--help` (spec 4.7, 4.8): it points at the self-description and at the guide, so an agent that read nothing else
+/// knows both entrances exist.
+pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every command; \"canon skills show\" prints the guide.";
 
 /// The value type of every parser canon wrote itself, by the value name of the argument that uses it (approaches/rust.md
 /// 4.1). clap cannot read a type out of a function, and a guessed `string` is how canon once published none: an argument
@@ -154,6 +155,7 @@ const DEFAULT_NOTES: &[(&str, &str, &str)] = &[
     ("skills install", "providers", "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories"),
     ("skills check", "providers", "the providers `skills install` would use"),
     ("skills doctor", "providers", "the providers `skills install` would use"),
+    ("skills show", "name", "the default guide, `canon`"),
 ];
 
 /// The environment variable a command reads to fill an option that clap does not give an `env` (spec 16.3: a variable may

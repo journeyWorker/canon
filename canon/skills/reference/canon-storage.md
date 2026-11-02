@@ -122,9 +122,12 @@ file names, tracked in git. `status`, the gate, the guards and `canon query`
 read the ledger only.
 
 ```bash
-canon query --kind evidence --history   # every version, archive included
-canon ledger compact                           # preview; writes nothing
-canon ledger compact --commit --plan-digest "$PLAN_DIGEST"   # pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
+# every version, archive included
+canon query --kind evidence --history
+# preview; writes nothing
+canon ledger compact
+# pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
+canon ledger compact --commit --plan-digest "$PLAN_DIGEST"
 ```
 
 A crash between the write and the move leaves a readable ledger that the next
@@ -316,7 +319,7 @@ run `canon inventory sync`'s code on the changed files (validation still
 covers the whole root) and print one stderr line:
 
 ```stderr
-canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+stderr: canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 The commands that only read (`canon gate check`, `canon status`) write
@@ -332,7 +335,7 @@ a live generation that supersedes the tombstone. A root that fails to
 sync writes no tombstone either.
 
 ```stderr
-canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
+stderr: canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
 ```
 
 `canon inventory sync` and every refresh hold an OS file lock on
@@ -350,7 +353,7 @@ the `verifying → shipped` guard refuses, and `canon status` lists only
 `canon inventory sync`:
 
 ```stderr
-canon artifacts store: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
+stderr: canon artifacts store: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
 ```
 
 Nothing is written in a directory without `canon.yaml`. `canon inventory

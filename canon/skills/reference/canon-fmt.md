@@ -9,7 +9,8 @@ rewrites or mutates the corpus — it only validates and reports.
 ## Running
 
 ```bash
-canon format spec   # e.g. a consumer repo's spec/
+# e.g. a consumer repo's spec/
+canon format spec
 ```
 
 With no operand, `canon format` validates every `specs.roots[]` entry of
