@@ -384,7 +384,9 @@ impl Tool {
 
     /// A refusal with a code, a field and the hint a seeded violation may change.
     fn refuse(&self, code: &str, message: &str, command: &str, extras: &[(&str, Value)]) -> ExitCode {
-        self.fail("usage", code, message, Some(command), extras, Self::registered_exit(code))
+        // Seeded: INPUT_INVALID exits 1 where the registry says 2 (the code and the envelope are right).
+        let exit = if code == "INPUT_INVALID" && self.flag("inputInvalidExit1") { 1 } else { Self::registered_exit(code) };
+        self.fail("usage", code, message, Some(command), extras, exit)
     }
 
     fn success(&self, command: &str, data: Value) -> ExitCode {
@@ -912,6 +914,11 @@ fn serve(tool: &Tool) -> ExitCode {
     }
     match mode.as_str() {
         "exitBefore" => return ExitCode::SUCCESS,
+        // Refused at the start with exit 2 and the code `serveRefuseCode` (a precondition when it is `CURSOR_INVALID`, a usage error as `USAGE`).
+        "refuseStart" => {
+            let code = tool.text("serveRefuseCode", "CURSOR_INVALID");
+            return tool.fail("usage", &code, "serve cannot start here", Some("serve"), &[], 2);
+        }
         "silent" => {}
         _ => {
             tool.success("serve", json!({"serving": true}));

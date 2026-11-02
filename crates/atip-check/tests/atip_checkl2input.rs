@@ -247,3 +247,79 @@ fn atip_checkl2input_22_the_conforming_fake_and_the_checker_itself_pass() {
     let output = support::atip_in(&work, &tmp, &["check", "--bin", support::ATIP, "--level", "L0", "--fixture", fixture.to_str().expect("utf8"), "--json"]);
     assert_eq!((output.code, output.envelope()["data"]["passed"].as_bool()), (Some(0), Some(true)), "{}", output.stdout);
 }
+
+#[test]
+fn atip_checkl2input_15_a_rule_on_flag_only_arguments_is_never_broken_by_a_batch_item() {
+    // `member tag` has --keep and --drop, flag-only, at most one: a document cannot carry either, so no item breaks the rule, and the
+    // batch is not asked to refuse what the item does not break (canon's `export` with --limit and --all).
+    let config = l2_config(&json!({"tagFlagOnlyRule": true}));
+    let output = run_config(&config);
+    let document = output.envelope();
+    assert_eq!((output.code, document["ok"].as_bool()), (Some(0), Some(true)), "{}\n{}", not_passing(&document["data"]), output.stdout);
+    let check = check_of(&document["data"], "L2.batch-preflight");
+    assert_eq!(check["result"], "pass", "{check}");
+    let calls: Vec<String> = check["observed"].as_array().into_iter().flatten().map(|call| call["argv"].to_string()).collect();
+    assert!(calls.iter().all(|argv| !argv.contains("--keep") && !argv.contains("--drop")), "{calls:?}");
+}
+
+#[test]
+fn atip_checkl2input_20_an_unlisted_write_never_decides_unsupported_and_leaves_the_batch_rows_unprovided() {
+    let config = l2_standard_config();
+    let harness = Harness::new();
+    let mut fixture = harness.l2_fixture(&config);
+    fixture["commands"].as_object_mut().expect("commands").remove("member tag");
+    let output = harness.check_l2(&config, &fixture);
+    let data = &output.envelope()["data"];
+    assert_eq!(output.code, Some(1), "{}", output.stdout);
+    for row in ["L2.batch-preflight", "L2.batch-incomplete", "L2.batch-ok"] {
+        let check = check_of(data, row);
+        assert_eq!(check["result"], "unprovided", "{row}: {check}");
+        assert!(check.to_string().contains("member tag"), "{row} names the write: {check}");
+    }
+    // The same fixture for a tool with no batch at all: nothing to probe, and that is `unsupported`.
+    let none = l2_config(&json!({"noBatch": true}));
+    let mut fixture = harness.l2_fixture(&none);
+    fixture["commands"].as_object_mut().expect("commands").remove("member tag");
+    let output = harness.check_l2(&none, &fixture);
+    for row in ["L2.batch-preflight", "L2.batch-incomplete", "L2.batch-ok"] {
+        assert_eq!(check_of(&output.envelope()["data"], row)["result"], "unsupported", "{row}");
+    }
+    // A row whose commands are all unlisted is `unprovided`, as an input row: every write command with `input` but `init` is left out.
+    let mut fixture = harness.l2_fixture(&config);
+    let kept = ["items", "status", "schema", "member list", "member search", "reject", "init"];
+    fixture["commands"].as_object_mut().expect("commands").retain(|id, _| kept.contains(&id.as_str()));
+    let output = harness.check_l2(&config, &fixture);
+    for row in ["L2.input-normalise", "L2.batch-ok"] {
+        let document = output.envelope();
+        let check = check_of(&document["data"], row);
+        assert_ne!(check["result"], "unsupported", "{row}: {check}");
+    }
+}
+
+#[test]
+fn atip_checkl2input_04_the_exit_number_of_an_input_refusal_is_l0_ok_exits_alone() {
+    // INPUT_INVALID answered with exit 1 where the registry says 2, the envelope right: only the owner of the exit fails.
+    let output = run_config(&l2_config(&json!({"inputInvalidExit1": true})));
+    let data = &output.envelope()["data"];
+    support::l2::verdict(data, "L0.ok-exit").unwrap_or_else(|why| panic!("{why}\n{}", not_passing(data)));
+}
+
+#[test]
+fn atip_checkl2input_04_input_too_large_is_refused_on_input_and_a_pointer_fails_only_l2_input_refusals() {
+    let output = run_case(&Case { condition: "input-refusals/field", config: l2_config(&json!({"tooLargeField": "/0"})), tweak: None }, "L2");
+    let data = &output.envelope()["data"];
+    support::l2::verdict(data, "L2.input-refusals").unwrap_or_else(|why| panic!("{why}\n{}", not_passing(data)));
+    assert!(check_of(data, "L2.input-refusals")["reason"].as_str().unwrap_or_default().contains("INPUT_TOO_LARGE") || check_of(data, "L2.input-refusals")["reason"].as_str().unwrap_or_default().contains("maxBytes"), "{}", check_of(data, "L2.input-refusals"));
+}
+
+#[test]
+fn atip_checkl2input_07_a_finer_replacement_of_usage_names_an_argument_and_a_field_that_names_none_fails_l2_input_usage() {
+    let output = run_config(&l2_config(&json!({"inputUsageCode": "PLAN_STALE"})));
+    let document = output.envelope();
+    assert_eq!(check_of(&document["data"], "L2.input-usage")["result"], "pass", "{}", not_passing(&document["data"]));
+    let output = run_case(&Case { condition: "input-usage/usage", config: l2_config(&json!({"inputUsageCode": "PLAN_STALE", "inputUsageField": "stdin"})), tweak: None }, "L2");
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.input-usage");
+    assert_eq!(check["result"], "fail", "{check}");
+    assert!(check["reason"].as_str().unwrap_or_default().contains("registered finer replacement"), "{check}");
+}

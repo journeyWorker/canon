@@ -53,6 +53,9 @@ fn refuse(tool: &Tool, command: &str, code: &str, reason: &'static str, message:
     let seeded_field = tool.text("inputField", "");
     let in_batch_item = field.chars().nth(1).is_some_and(|character| character.is_ascii_digit());
     let field = if !seeded_field.is_empty() && code != "INPUT_CONFLICT" && reason != "STDIN_TTY" && !in_batch_item { seeded_field.as_str() } else { field };
+    // Seeded: the size of the document is refused on a pointer into it, not on `--input`.
+    let too_large_field = tool.text("tooLargeField", "");
+    let field = if code == "INPUT_TOO_LARGE" && !too_large_field.is_empty() { too_large_field.as_str() } else { field };
     let mut extras: Vec<(&str, Value)> = vec![("field", json!(field))];
     let reason_value = (!tool.flag("inputNoReason") && tool.is_1_1() && code.starts_with("INPUT_")).then_some(reason);
     if let Some(reason) = reason_value.filter(|reason| !reason.is_empty()) {
@@ -69,7 +72,9 @@ fn refuse(tool: &Tool, command: &str, code: &str, reason: &'static str, message:
 }
 
 fn usage(tool: &Tool, command: &str, message: &str, code_knob: &str) -> ExitCode {
-    let code = if tool.flag(code_knob) { "INPUT_INVALID" } else { "USAGE" };
+    // Seeded: a registered code of exit 2 that is not USAGE answers (a finer replacement of USAGE, spec 7.2.2).
+    let replacement = tool.text("inputUsageCode", "USAGE");
+    let code = if tool.flag(code_knob) { "INPUT_INVALID" } else { replacement.as_str() };
     let field = tool.text("inputUsageField", "--input");
     tool.refuse(code, message, command, &[("field", json!(field))])
 }

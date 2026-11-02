@@ -108,19 +108,33 @@ impl<'a> Judge<'a> {
         }
     }
 
-    /// How a row with nothing exercised ends: `unprovided` when a command lacked the `ok` invocation the probes start from, else `unsupported` for `why`.
+    /// How a row with nothing exercised ends: `unprovided` when a command lacked the `ok` invocation the probes start from or a write command is
+    /// not listed in the fixture (which is never run, and `unsupported` is never decided from the fixture), else `unsupported` for `why`.
     fn nothing_probed(&self, c: Conditions<'a>, why: &str) -> Finding {
+        self.nothing_probed_in(c, why, false)
+    }
+
+    /// `nothing_probed`; with `batch`, only the unlisted writes that take a batch count.
+    fn nothing_probed_in(&self, c: Conditions<'a>, why: &str, batch: bool) -> Finding {
         if self.fixture.commands.is_none() {
             return c.finish(false);
         }
         let missing: Vec<&InputCommand> = self.input_commands().iter().filter(|command| !command.has_ok).collect();
-        if missing.is_empty() {
+        let unlisted: Vec<&String> = self
+            .l2()
+            .input
+            .unlisted
+            .iter()
+            .filter(|id| !batch || self.docs().command(id).is_some_and(|doc| doc.input.as_ref().is_some_and(|input| input.batch)))
+            .collect();
+        if missing.is_empty() && unlisted.is_empty() {
             return c.finish_as(End::Unsupported(why.to_string()));
         }
-        c.finish_as(End::missing_all(
-            missing.iter().map(|command| format!("{}: the fixture lists no `ok` invocation of it to build the probes from", command.command)).collect(),
-            missing.iter().map(|command| format!("commands.{}.ok", command.command)).collect(),
-        ))
+        let mut whys: Vec<String> = missing.iter().map(|command| format!("{}: the fixture lists no `ok` invocation of it to build the probes from", command.command)).collect();
+        let mut entries: Vec<String> = missing.iter().map(|command| format!("commands.{}.ok", command.command)).collect();
+        whys.extend(unlisted.iter().map(|id| format!("{id}: a write the fixture does not list, and the checker never runs one")));
+        entries.extend(unlisted.iter().map(|id| format!("commands.{id}")));
+        c.finish_as(End::missing_all(whys, entries))
     }
 
     /// The findings of the 15 rows, in table order.
@@ -203,15 +217,17 @@ impl<'a> Judge<'a> {
                 c.own(run.call);
                 let document = self.envelope(run.call).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
                 let (code, field) = document.map_or((None, None), refusal_of);
-                let refused = self.at(run.call).exit == Exit::Code(2) && code == Some(run.code);
+                let refused = code == Some(run.code);
                 c.holds_at(run.call, "refused", refused, || {
-                    format!("{}: {} was not refused with {} (exit 2): {}", command.command, run.label, run.code, super::super::l1::refusal_text(self.envelope(run.call), self.at(run.call).exit))
+                    format!("{}: {} was not refused with {}: {}", command.command, run.label, run.code, super::super::l1::refusal_text(self.envelope(run.call), self.at(run.call).exit))
                 });
                 if !refused {
                     continue;
                 }
-                c.holds_at(run.call, "field", field.is_some_and(is_pointer_or_input), || {
-                    format!("{}: {} was refused on {}, not a JSON pointer or --input", command.command, run.label, field.unwrap_or("no field"))
+                // The size of the document is checked before it is read: INPUT_TOO_LARGE points at `--input`, not into the document.
+                let on_field = if run.code == "INPUT_TOO_LARGE" { field == Some("--input") } else { field.is_some_and(is_pointer_or_input) };
+                c.holds_at(run.call, "field", on_field, || {
+                    format!("{}: {} was refused on {}, not {}", command.command, run.label, field.unwrap_or("no field"), if run.code == "INPUT_TOO_LARGE" { "--input" } else { "a JSON pointer or --input" })
                 });
                 if let Some(count) = run.details {
                     let found = document.and_then(|document| document.pointer("/error/details")).and_then(Value::as_array).map_or(0, Vec::len);
@@ -238,19 +254,16 @@ impl<'a> Judge<'a> {
             }
             let document = self.envelope(call).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
             let (code, field) = document.map_or((None, None), refusal_of);
-            let refused = self.at(call).exit == Exit::Code(2) && code == Some("INPUT_INVALID");
+            let refused = code == Some("INPUT_INVALID");
             c.holds_at(call, "refused", refused, || {
-                format!("{}: `--input -` with a terminal on stdin was not refused with INPUT_INVALID (exit 2): {}", command.command, super::super::l1::refusal_text(self.envelope(call), self.at(call).exit))
+                format!("{}: `--input -` with a terminal on stdin was not refused with INPUT_INVALID: {}", command.command, super::super::l1::refusal_text(self.envelope(call), self.at(call).exit))
             });
             if refused {
                 c.holds_at(call, "field", field == Some("--input"), || format!("{}: `--input -` on a terminal was refused on {}, not on --input", command.command, field.unwrap_or("no field")));
             }
         }
         if commands.is_empty() {
-            if self.fixture.commands.is_none() || self.l2().input.unlisted.is_empty() {
-                return c.finish_as(End::Unsupported("no command takes --input".to_string()));
-            }
-            return c.finish_as(End::missing("commands", "every command with `input` is a write the fixture does not list, and the checker never runs one"));
+            return self.nothing_probed(c, "no command takes --input");
         }
         c.finish(true)
     }
@@ -267,8 +280,9 @@ impl<'a> Judge<'a> {
                 c.own(*call);
                 let document = self.envelope(*call).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
                 let (code, field) = document.map_or((None, None), refusal_of);
+                // A finer replacement of USAGE is any registered exit-2 code whose field names an argument (not a document's code).
                 let is_usage = self.at(*call).exit == Exit::Code(2)
-                    && code.is_some_and(|code| self.is_usage(Some(code)) || (!code.starts_with("INPUT_") && self.row(code).is_some_and(|row| row.exit == 2)));
+                    && code.is_some_and(|code| self.is_usage(Some(code)) || (!code.starts_with("INPUT_") && field.is_some_and(|field| field.starts_with("--")) && self.row(code).is_some_and(|row| row.exit == 2)));
                 c.holds_at(*call, "usage", is_usage, || {
                     format!("{}: {label} was not refused with USAGE or its registered finer replacement (exit 2): {}", command.command, super::super::l1::refusal_text(self.envelope(*call), self.at(*call).exit))
                 });
@@ -356,9 +370,9 @@ impl<'a> Judge<'a> {
                     ConflictExpect::Conflict { pointer } => {
                         let failure = document.filter(|document| document.get("ok") == Some(&Value::Bool(false))).map(refusal_of);
                         let (code, field) = failure.unwrap_or((None, None));
-                        let refused = self.at(run.call).exit == Exit::Code(2) && code == Some("INPUT_CONFLICT");
+                        let refused = code == Some("INPUT_CONFLICT");
                         c.holds_at(run.call, "different-value-conflicts", refused, || {
-                            format!("{}: {} was not refused with INPUT_CONFLICT (exit 2): {}", command.command, run.label, super::super::l1::refusal_text(document, self.at(run.call).exit))
+                            format!("{}: {} was not refused with INPUT_CONFLICT: {}", command.command, run.label, super::super::l1::refusal_text(document, self.at(run.call).exit))
                         });
                         if refused {
                             c.holds_at(run.call, "conflict-pointer", field.is_some_and(|field| at_pointer(field, pointer)), || {
@@ -433,9 +447,9 @@ impl<'a> Judge<'a> {
                 let (code, field) = failure.unwrap_or((None, None));
                 match &run.expect {
                     PointerExpect::Constraint { codes } => {
-                        let answered = self.at(run.call).exit == Exit::Code(2) && code.is_some_and(|code| codes.iter().any(|expected| expected == code) || (codes.iter().any(|expected| expected == "USAGE") && self.is_usage(Some(code))));
+                        let answered = code.is_some_and(|code| codes.iter().any(|expected| expected == code) || (codes.iter().any(|expected| expected == "USAGE") && self.is_usage(Some(code))));
                         c.holds_at(run.call, "constraint-code", answered, || {
-                            format!("{}: {} was not refused with {} (exit 2): {}", command.command, run.label, codes.join(" or "), super::super::l1::refusal_text(document, self.at(run.call).exit))
+                            format!("{}: {} was not refused with {}: {}", command.command, run.label, codes.join(" or "), super::super::l1::refusal_text(document, self.at(run.call).exit))
                         });
                         if answered {
                             c.holds_at(run.call, "document-pointer", field.is_some_and(|field| field.starts_with('/')), || {
@@ -445,9 +459,9 @@ impl<'a> Judge<'a> {
                     }
                     PointerExpect::Required { pointer } => {
                         let declared: Vec<&str> = doc.map(|doc| doc.constraints.iter().filter_map(|constraint| constraint.code.as_deref()).collect()).unwrap_or_default();
-                        let answered = self.at(run.call).exit == Exit::Code(2) && code.is_some_and(|code| self.is_usage(Some(code)) || declared.contains(&code));
+                        let answered = code.is_some_and(|code| self.is_usage(Some(code)) || declared.contains(&code));
                         c.holds_at(run.call, "required-code", answered, || {
-                            format!("{}: {} was not refused with USAGE (exit 2): {}", command.command, run.label, super::super::l1::refusal_text(document, self.at(run.call).exit))
+                            format!("{}: {} was not refused with USAGE: {}", command.command, run.label, super::super::l1::refusal_text(document, self.at(run.call).exit))
                         });
                         if answered {
                             c.holds_at(run.call, "required-pointer", field.is_some_and(|field| at_pointer(field, pointer)), || {
@@ -510,9 +524,9 @@ impl<'a> Judge<'a> {
                 let document = self.envelope(run.call);
                 let failure = document.filter(|document| document.get("ok") == Some(&Value::Bool(false))).map(refusal_of);
                 let (code, field) = failure.unwrap_or((None, None));
-                let answered = self.at(run.call).exit == Exit::Code(2) && code.is_some_and(|code| run.codes.iter().any(|expected| expected == code) || self.is_usage(Some(code)) && run.codes.iter().any(|expected| expected == "USAGE"));
+                let answered = code.is_some_and(|code| run.codes.iter().any(|expected| expected == code) || self.is_usage(Some(code)) && run.codes.iter().any(|expected| expected == "USAGE"));
                 c.holds_at(run.call, "item-code", answered, || {
-                    format!("{}: {} was not refused with {} (exit 2): {}", command.command, run.label, run.codes.join(" or "), super::super::l1::refusal_text(document, self.at(run.call).exit))
+                    format!("{}: {} was not refused with {}: {}", command.command, run.label, run.codes.join(" or "), super::super::l1::refusal_text(document, self.at(run.call).exit))
                 });
                 if !answered {
                     continue;
@@ -521,6 +535,11 @@ impl<'a> Judge<'a> {
                     format!("{}: {} was refused on {}, the pointer starts with /{}/ (spec 11.8)", command.command, run.label, field.unwrap_or("no field"), run.index)
                 });
             }
+        }
+        let unbuildable: Vec<String> = self.batch_commands().filter_map(|command| command.batch.as_ref()).flat_map(|plan| plan.unbuildable.iter().cloned()).collect();
+        if !judged && !unbuildable.is_empty() && self.fixture.commands.is_some() {
+            let why = format!("every rule an item could break is on flag-only arguments alone, which an item cannot carry: {}", unbuildable.join(", "));
+            return self.nothing_probed_in(c, &why, true);
         }
         self.batch_end(c, judged)
     }
@@ -534,9 +553,9 @@ impl<'a> Judge<'a> {
             return c.finish(false);
         }
         if self.batch_commands().next().is_none() {
-            return c.finish_as(End::Unsupported("no command takes a batch (`input.batch`)".to_string()));
+            return self.nothing_probed_in(c, "no command takes a batch (`input.batch`)", true);
         }
-        self.nothing_probed(c, "no batch could be built from the fixture's `ok` invocations")
+        self.nothing_probed_in(c, "no batch could be built from the fixture's `ok` invocations", true)
     }
 
     fn l2_batch_incomplete(&'a self) -> Finding {
@@ -665,7 +684,7 @@ impl<'a> Judge<'a> {
             c.own(run.call);
             let document = self.envelope(run.call).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
             let code = document.and_then(|document| document.pointer("/error/code")).and_then(Value::as_str);
-            let refused = self.at(run.call).exit == Exit::Code(2) && code == Some("INPUT_INVALID");
+            let refused = code == Some("INPUT_INVALID");
             c.holds_at(run.call, "beyond-safe-range-refused-in-a-document", refused, || {
                 format!(
                     "{}: {} given as the {} {} in a document is one beyond the safe integers and was not refused with INPUT_INVALID: {}",
