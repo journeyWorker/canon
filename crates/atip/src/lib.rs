@@ -33,6 +33,11 @@
 //! - [`reserved`]: the table of the thirteen reserved error codes (name, exit,
 //!   retryability, the minor that introduced it) and the check that a tool
 //!   registers one as the contract reserves it.
+//! - [`plan`]: the plan of a destructive command (its effects and inputs), its digest (`sha256:` and the SHA-256 of the RFC 8785
+//!   text of the plan, [`jcs`]), the preview report and its JSON Schema, the commit gate (`PLAN_STALE`, the two options that
+//!   require each other) and the commit call a preview's `meta.next` leads with.
+//! - [`cursor`]: paging cursors bound to the call that issued them, by the minor a tool declares, and the call that
+//!   continues a page.
 //! - [`shell`]: quoting a word for a `command` string, splitting that string
 //!   back into an argv, and telling a runnable one from one that still has a
 //!   `<placeholder>`.
@@ -49,6 +54,7 @@ pub mod given;
 pub mod jcs;
 mod judge;
 pub mod minor;
+pub mod plan;
 pub mod project;
 pub mod reserved;
 pub mod schema;
@@ -60,6 +66,7 @@ pub use cursor::{next_page_argv, Binding, CursorInvalid, Cursors, CURSOR_INVALID
 pub use error::{count_with_exit, find_code, find_warning, reason_of_code, reasons_with_exit, redact, with_row, CliError, CodeInfo, ErrorBody, ReasonInfo, WarningInfo, EXIT_FAILED, EXIT_REFUSED};
 pub use given::{write_argv, Given};
 pub use minor::{Minor, UnknownMinor};
+pub use plan::{Effect, Plan, PlanDigest, Preview};
 pub use project::{flag_only_options, flag_only_problems};
 pub use reserved::{registration_problem, reserved_code, ReservedCode, RESERVED_CODES};
 pub use schema::{BATCH_REPORT_SCHEMA, CONTRACT, CONTRACT_VERSION, ENVELOPE_SCHEMA, ERROR_SCHEMA, GUIDE_SCHEMA, INPUT_DOCUMENT_SCHEMA, REGISTRY_ENTRY_SCHEMA, SCHEMA_DOC_SCHEMA, STREAM_LINE_SCHEMA, WARNING_ENTRY_SCHEMA};

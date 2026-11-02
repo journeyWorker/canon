@@ -19,7 +19,6 @@
 use std::fmt;
 
 use serde_json::{json, Map};
-use sha2::{Digest, Sha256};
 
 use crate::error::{CliError, ReasonInfo};
 use crate::given::{write_argv, Given, Source};
@@ -97,7 +96,7 @@ impl Cursors {
             }
         }
         let document = json!({ "rules": self.rules.as_str(), "arguments": arguments, "flagOnly": flag_only, "environment": environment });
-        Ok(Binding(hex(&Sha256::digest(jcs::to_string(&document)?.as_bytes()))))
+        Ok(Binding(jcs::sha256_hex(jcs::to_string(&document)?.as_bytes())))
     }
 
     /// The cursor of the position `position` that `scope` (the command id) reached in a call bound as `binding`: one ASCII
@@ -225,13 +224,9 @@ pub const CURSOR_INVALID_REASONS: [ReasonInfo; 3] = [
     ReasonInfo { reason: "FOREIGN", meaning: "the cursor is not one this command issued, or is not a cursor", fix: "Pass the nextCursor this same command returned, or restart without --cursor." },
 ];
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
 /// The first 16 hex digits of the SHA-256 of `body`: any change to a cursor is found before it is read.
 fn checksum(body: &str) -> String {
-    hex(&Sha256::digest(body.as_bytes())).chars().take(16).collect()
+    jcs::sha256_hex(body.as_bytes()).chars().take(16).collect()
 }
 
 const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -321,7 +316,7 @@ mod tests {
         }
         // The binding is the SHA-256 of the RFC 8785 text, so another tool computes the same one: pin one value.
         let document = r#"{"arguments":{"status":"active"},"environment":{},"flagOnly":{},"rules":"1.2"}"#;
-        let expected = hex(&Sha256::digest(document.as_bytes()));
+        let expected = jcs::sha256_hex(document.as_bytes());
         assert_eq!(bind("1.2", &list()).as_str(), expected);
     }
 

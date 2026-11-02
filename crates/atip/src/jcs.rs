@@ -14,6 +14,7 @@
 use std::fmt;
 
 use serde_json::{Number, Value};
+use sha2::{Digest, Sha256};
 
 /// Largest integer a JSON reader holds exactly (spec 10.7.5).
 const SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -34,6 +35,11 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// The SHA-256 of `bytes` as 64 lower-case hex digits: what a binding or a digest is made of.
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
+}
 
 /// `value` as its RFC 8785 canonical JSON text.
 pub fn to_string(value: &Value) -> Result<String, Error> {
