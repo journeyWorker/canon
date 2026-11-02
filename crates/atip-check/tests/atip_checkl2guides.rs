@@ -112,17 +112,17 @@ fn atip_checkl2guides_10_a_tool_without_a_stream_command_has_l2_stream_unsupport
     let document = output.envelope();
     assert_eq!(check_of(&document["data"], "L2.stream")["result"], "unsupported", "{}", check_of(&document["data"], "L2.stream"));
     assert_eq!(check_of(&document["data"], "L2.search")["result"], "unsupported");
-    // A command the fixture leaves out with `notRun` is never run by the row.
-    let config = l2_standard_config();
+    // A command the fixture names under `notRun` (it says in its document that it does not end on its own) is run once by the L0 part, and never by an L2 row.
+    let config = l2_config(&json!({"serveMode": "serve"}));
     let harness = Harness::new();
     let mut fixture = harness.l2_fixture(&config);
-    let build = fixture["commands"].as_object_mut().expect("commands").remove("build").expect("build");
-    drop(build);
-    fixture["notRun"] = json!(["build"]);
+    fixture["notRun"] = json!(["serve"]);
     let output = harness.check_l2(&config, &fixture);
     let document = output.envelope();
-    let stream = check_of(&document["data"], "L2.stream");
-    assert!(!argvs(stream).iter().any(|argv| argv.starts_with("build")), "{stream}");
+    assert_eq!(output.code, Some(0), "{}\n{}", not_passing(&document["data"]), output.stdout);
+    for row in ["L2.stream", "L2.effects", "L2.skills", "L2.guide-commands", "L2.idempotency", "L2.operation-key"] {
+        assert!(!argvs(check_of(&document["data"], row)).iter().any(|argv| argv.starts_with("serve")), "{row} never runs a notRun command");
+    }
 }
 
 #[test]
