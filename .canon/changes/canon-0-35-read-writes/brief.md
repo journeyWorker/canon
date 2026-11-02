@@ -119,3 +119,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 8.2, 12.1, 12.2, 
 - 읽기 명령의 접근 감사 줄(`query`, `export`)이나 `search` 색인. `effectNote`와 `allowedEffects`로 선언한다.
 - 색인의 형식이나 새로 쓰는 시점의 최적화.
 - `--dry-run`을 가지지 않은 명령에 새로 `--dry-run`을 더하는 일.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:a08442b74e45f1f6f845d855854e0dc9631f31dfc226e11186be045af06799f4)

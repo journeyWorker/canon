@@ -128,3 +128,5 @@ canon의 파괴적 명령 6곳(`purge`, `artifacts move`, `migrate`, `migrate --
 - 효과마다 계획을 다시 확인하는 방식. 이 변경은 잠금 방식을 택한다.
 - 파괴적 명령의 효과를 바꾸는 일. 읽는 입력을 효과 목록에 더하는 것 말고는 하지 않는다.
 - `STOPPED_MIDWAY`의 `PLAN_STALE` 이유(`canon-0-35-canon-stopped-midway`). canon에는 그 경로가 없다.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:f8422b84f4164201579e87b4ce002f5b0c4efca315ae68578947009d7d30a085)

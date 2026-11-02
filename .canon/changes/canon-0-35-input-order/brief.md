@@ -130,3 +130,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.2-11.9, approa
 - 6단계의 순서(`canon-0-35-canon-check-order`)와 `limit`, `cursor`, `all`의 flag-only(`canon-0-35-canon-cursor-1-2`).
 - `number`와 `json` 값 타입 인수를 더하는 일.
 - 입력 문서의 새 키와 조각 스키마의 모양 변경.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:e40e0408aa14f6f99ca2d5c21aca112072157163d85b3740329db23c36c23f70)

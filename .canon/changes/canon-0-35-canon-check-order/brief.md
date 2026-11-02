@@ -121,3 +121,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.7 6단계, 10.
 - 입력 문서의 처리 순서(`canon-0-35-input-order`)와 배치(`canon-0-35-batch-pointers`).
 - 상태를 읽는 선행 조건의 순서. 이것들은 6단계 뒤이다.
 - 1.2 선언(`canon-0-35-claim-l2`).
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:bc34ab27236f8438ab5710b4edebd2a50eb6d2e3278bde0cabea7a9b058b351a)

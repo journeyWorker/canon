@@ -116,3 +116,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 11.8, 11.11, appr
 - 배치를 지원하지 않는 명령(파괴적 명령)의 배치 거절 규칙.
 - 항목의 `status` 이름과 `schemaVersion` 올리기. 배치 보고서의 모양이 바뀌는 만큼 minor를 올릴지는 구현자가 기록한다.
 - 새 배치 명령을 더하는 일.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:212d6e46df563112db9e240b78e5341e38e1e0e9db7c2e4640536474f91d6593)

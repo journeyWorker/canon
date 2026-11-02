@@ -151,3 +151,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
 - 스트림, 안내, 검색, 도움말 첫 줄(`canon-0-35-check-l2-guides`).
 - canon이 L2를 통과하게 만드는 일(`canon-0-35-input-order`, `canon-0-35-batch-pointers`, `canon-0-35-claim-l2`).
 - 1.2 주장의 L1 행(`canon-0-35-check-1-2`)과 발견의 구조화, fixture 거절 처리.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:d9367541d8acb6caa3256b0c76f91714428feecdbd726cc70e80337f4fa0be64)

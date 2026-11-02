@@ -116,3 +116,5 @@ L2의 나머지 행 다섯 개는 에이전트가 도구를 쓰는 입구를 다
 - 스트림 프로토콜의 도구 쪽 구현. canon은 스트림 명령이 없다.
 - `schema --search`를 canon에 더하는 일. 지금 0.34 계획에서 SHOULD 공백으로 남아 있다.
 - 서버 명령을 위한 새 fixture 키. `notRun`은 `canon-0-35-check-fixture`가 정한다.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:57a973b296fe6dd022d3fd0eaaf37f2b45bc37fdd0652fbab98ed7d21ca099a0)

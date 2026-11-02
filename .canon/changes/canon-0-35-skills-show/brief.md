@@ -111,3 +111,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 4.8, 14, schema/g
 - 설치한 스킬 파일의 형식과 `skills install`, `skills check`의 동작.
 - `schema --search`.
 - 1.2 선언과 L2 CI(`canon-0-35-claim-l2`).
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:7d3ea6c9a1f57816cf495c66d076bafd95ff2fdd29a2374cd9644b1cc4cd7464)

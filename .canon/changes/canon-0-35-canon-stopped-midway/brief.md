@@ -110,3 +110,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 7.2.1, 7.2.3, 8.2
 - 확정 중 효과마다 계획을 확인하는 일(`canon-0-35-plan-jcs`).
 - 읽기 명령이 거절 전에 쓰는 문제(`canon-0-35-read-writes`).
 - 1.2 선언과 L2(`canon-0-35-claim-l2`).
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:916d9ebb766766d4e40db12ca0184e7425bcbf3b979058aebdaef8f1401e3e4b)

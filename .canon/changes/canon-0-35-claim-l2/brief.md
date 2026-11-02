@@ -131,3 +131,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 15.7, 17, approac
 - L2 행을 구현하는 일(`canon-0-35-check-l2-*`)과 canon의 각 동작 변경(`canon-0-35-canon-*`, `canon-0-35-input-order`, `canon-0-35-batch-pointers`, `canon-0-35-plan-jcs`, `canon-0-35-skills-show`, `canon-0-35-read-writes`).
 - `schema --search`, 비동기 명령, 스트림 명령을 canon에 더하는 일.
 - 0.36 이후의 계약 판(1.3)과 서버 명령의 기계 판독 선언.
+
+Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:ad09608c18a5619dc09e9cb129a2a220a1ea33099fb795468e199d77f1aa0e59)
