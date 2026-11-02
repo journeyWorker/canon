@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:24.055161Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/l2/glob.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2safety.07",
+    "atip.checkl2safety.09"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (brief questions: 'the implementer decides which glob syntax to use and records it'; CHANGELOG 1.2.0 of the crate says 'atip check --help names every key'): the glob syntax of allowedEffects (* any run but /, ** any run, ? one character but /, no classes or braces, ./ optional, ~/ for HOME, whole-path match) is written only in the doc comment of crates/atip-check/src/l2/glob.rs, which also says 'the report of a change names it'. The report message ('a successful read changed X (outside its allowedEffects)'), the CHANGELOG ('allowedEffects (glob list)') and `atip check --help` (cli.rs:64 lists batchFailsAt and batchFailsFirst but not preview, async, allowedEffects or the top-level search) do not. A fixture author cannot learn the syntax or the ~/ prefix without reading source. Blast radius: every fixture that uses the L2 keys.",
+  "worktree_dirty": true
+}

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:31:24.546682Z",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "kind": "review",
+  "pin": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2safety_11_the_same_operation_key_returns_the_same_work_and_another_payload_is_operation_reused"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "317af7110a57bb0f47671596669ba86df8e4e514e405074523c054df45084db3",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-safety/brief.md"
+  },
+  "review_id": "01M6EVXE82KQGYEGNSHRE0R1PE",
+  "reviewer": "rev-check-0-35b",
+  "scenario_id": "atip.checkl2safety.11",
+  "schema": 2,
+  "worktree_dirty": true
+}

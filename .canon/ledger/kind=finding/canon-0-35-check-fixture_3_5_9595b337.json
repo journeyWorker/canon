@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:04.933579Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/exec.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.116"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Spec ambiguity worth an ATIP question, not a code defect: a notRun command whose one run is refused at start (exit 2 with an envelope: a precondition code such as missing credentials, or a stateless USAGE from a wrong ok argv) is FIXTURE_INVALID 'ended on its own' (execute_served ended_alone). checker.md section 5 'A refused fixture invocation' would make the checks that run it unprovided (precondition) or fail (stateless), and the notRun paragraph says 'exits on its own ... is a fixture error'. The code follows the notRun sentence literally, which matches atip.check.116, but the author of a fixture then gets 'fixture error' for a missing environment instead of unprovided naming the code. Blast radius: CI runs of a server command without its backend.",
+  "worktree_dirty": true
+}

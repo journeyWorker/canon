@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:30.292796Z",
+  "change_id": "canon-0-35-check-l2-guides",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/effects_plan.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2guides.02",
+    "atip.checkl2safety.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (checker.md section 2 one owner per pass condition; section 4/6: 'schema writing anything is a MUST failure of L1.no-state', skills show nothing written is L2.skills's): L2.effects runs every successful read command of the fixture except schema (effects_plan.rs:79), so a skills show that the fixture lists under commands.ok and that writes a file is failed by L2.skills ('nothing written', measured in an empty directory) and again by L2.effects (read-changes-only-allowed). Probe on the conforming L2 fake with skills show listed and skillsPutsFile set both in the config and the executable name (the empty-state runs do not see the fixture env, which is why the implementer's case uses the alias): L2.skills fail and L2.effects fail for the one write. atip.checkl2guides.02 does not list skills show in the fixture, so it cannot see the second owner. Blast radius: any tool that lists skills show; fix is the same exclusion schema has.",
+  "worktree_dirty": true
+}

@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:16.663040Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=atip/check.feature",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.check.32",
+    "atip.checkl1.02"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (brief F1 acceptance: --level L2 is no longer LEVEL_UNSUPPORTED; CHANGELOG: the code is removed): two scenarios still say the opposite. atip.check.32 (check.feature:351, 'Scenario: --level L1 and L2 exit 2 with LEVEL_UNSUPPORTED naming 0.34 and 0.35 ... Then L1 and L2 exit 2 with LEVEL_UNSUPPORTED, field --level, expected [L0] and a hint naming 0.34 or 0.35') and atip.checkl1.02 (checkl1.feature:21, '--level L2 is LEVEL_UNSUPPORTED with the hint that L2 arrives in 0.35 ... expected [L0, L1]'). Their bound tests were rewritten (atip_check_32_level_l2_runs_the_checks_and_is_never_unsupported_and_l9_is_usage; atip_checkl1_02_level_l2_runs_and_an_unknown_level_is_usage assert LEVEL_NOT_MET and USAGE), so the scenario text is the spec and the test proves something else. Nothing else in the tree (grep LEVEL_UNSUPPORTED) names the code outside the CHANGELOG history and the briefs of 0.33 and 0.34. Blast radius: two scenarios whose text a reader would implement; the gate does not see it because their digests did not change. Not signed by me.",
+  "worktree_dirty": true
+}

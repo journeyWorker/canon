@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:28.368637Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/safety.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2safety.03",
+    "atip.checkl2safety.04"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Spec fidelity: two leniencies in rows that decide a MUST. L2.destructive-half (safety.rs:313-325) accepts the code of any requires, forbids, atLeastOne or exactlyOne constraint of the command, where checker.md says 'the code of the requires rule that states the relation' (10.8.1): a code declared for an unrelated rule passes. L2.destructive-stale (safety.rs:300) tests next[0] for the word '--plan-digest=' by equality, which no argv word equals, so a next[0] that still carries '--plan-digest=<digest>' passes as the preview. Blast radius: a stale or half-given commit answered with the wrong rule's code, or a PLAN_STALE whose next repeats the commit, is accepted; atip.checkl2safety.04 seeds the accepted-digest and accepted-half cases only.",
+  "worktree_dirty": true
+}

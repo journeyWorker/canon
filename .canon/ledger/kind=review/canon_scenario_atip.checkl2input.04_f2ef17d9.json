@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:31:15.044016Z",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "kind": "review",
+  "pin": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2input_04_every_refusal_document_is_refused_with_exit_2_and_a_pointer_the_two_key_document_with_two_details"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "cdb43699c75bedd2e132fe57d4691d0358a4280fcd90255056e82abc7895342f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
+  },
+  "review_id": "01M6EVX4Z40Q7SY8PS2KSJJSAS",
+  "reviewer": "rev-check-0-35b",
+  "scenario_id": "atip.checkl2input.04",
+  "schema": 2,
+  "worktree_dirty": true
+}

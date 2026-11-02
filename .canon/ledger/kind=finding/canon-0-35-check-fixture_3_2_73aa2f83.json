@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:29:59.130615Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/mod.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.95",
+    "atip.check.114"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Spec fidelity (brief F4 acceptance and checker.md 1.2.1 section 5: 'its other fixture entries (further ok invocations, paged, fields, preview)' are reported as skipped with the reason notRun): skipped[] names only further ok and paged entries and, at L1, generic lines for L1.example-runs, L1.output-data, L1.domains, L1.paging, L1.fields and L1.next. A fixture `fields` entry or a `preview` entry of a notRun command is dropped without a line (probe: serve with ok, fields and preview entries, L1: no skipped line mentions fields or preview; plan_safety/plan_input/plan_guides/effects_plan skip notRun commands with `continue` and no skip record, so the successful run it skips in L2.effects is not named either). The command id is still in notRun, so nothing disappears from the report, but the entries do. Blast radius: L2.destructive-*, L2.effects and L1.fields reports for a notRun command; no result changes.",
+  "worktree_dirty": true
+}

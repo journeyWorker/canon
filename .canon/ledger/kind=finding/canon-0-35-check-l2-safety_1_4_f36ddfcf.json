@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:26.521852Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/safety.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2safety.10"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity [INFERENCE from the code, the seeded startNoWait case proves only the missing-wait direction]: L2.async 'start-next-waits' (safety.rs:399) requires the literal word --wait in meta.next[0].argv. Spec 13.2 says next leads with 'the command that reads or waits for the outcome' and 13.3 only says a waiting command SHOULD take --wait, so a tool whose next[0] is a status read (or a wait written another way) is failed by a MUST row for a SHOULD convention. checker.md says 'next[0] waits' and does not say how a wait is recognised: ATIP question. Same family: the timeout run adds --timeout 1s only when the command document has a timeout option (safety_plan.rs:247).",
+  "worktree_dirty": true
+}

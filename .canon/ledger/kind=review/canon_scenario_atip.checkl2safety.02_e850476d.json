@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:31:24.546682Z",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "kind": "review",
+  "pin": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2safety_02_a_preview_that_writes_fails_only_l2_destructive_preview_and_a_commit_that_is_not_flag_only_fails_l2_destructive_safety"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "2f5390a4249b9a9f13c5d4fef9c16fd7bb7c657404890e32520fe1fb7738e4d0",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-safety/brief.md"
+  },
+  "review_id": "01M6EVXE82KQGYEGNSHRE0R1PE",
+  "reviewer": "rev-check-0-35b",
+  "scenario_id": "atip.checkl2safety.02",
+  "schema": 2,
+  "worktree_dirty": true
+}

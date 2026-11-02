@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:07.609501Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/input.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2input.09",
+    "atip.checkl2input.15",
+    "atip.checkl2input.17",
+    "atip.checkl2input.18",
+    "atip.checkl2input.20"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (checker.md section 2: 'leaving a command out of the fixture never makes a check unsupported'; section 5: a command with no fixture entry makes its stateful checks unprovided; brief F5: no entry and no observed violation is unprovided and the level does not pass): the input and batch rows end unsupported when the only commands they apply to are writes the fixture does not list. Helper nothing_probed (input.rs:112) counts only runnable commands that lack an ok, so unlisted writes (InputRun.unlisted, which the report names) never make a row unprovided, and batch_end (input.rs:536) says 'no command takes a batch' when every batch command is unlisted. Probe on the conforming L2 fake with member tag, record put, team add, init, build, seal, stamp, log and deploy start left out of the fixture: L2.input-normalise, L2.input-env, L2.input-pointer, L2.batch-preflight, L2.batch-incomplete and L2.batch-ok are all unsupported (member tag is batch: true with an integer operand) and the exit is 0 for those rows. Real tool: canon L2 run, L2.input-normalise is unsupported ('no fixture invocation of a command with input gives an integer argument') while the same report lists finding close, whose schema has input.batch true and integer --round and --seq, under unlisted (45 writes). A tool passes six MUST rows by listing no writes. Blast radius: every tool at L2, including canon-0-35-claim-l2; atip.checkl2input.20 only asserts the name is in unlisted, atip.checkl2input.17 only the no-batch-command case, so no test sees it.",
+  "worktree_dirty": true
+}

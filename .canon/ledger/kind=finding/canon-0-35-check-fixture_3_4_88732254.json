@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:03.194136Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/mod.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.96"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity (checker.md section 5: a notRun command that is not in schema or has no effectNote 'is a fixture error, as for a failing prepare step'; the checker stops and reports no check): at L1 both validations run in invoke_l1 (l1_plan.rs:271 and 345), after invoke_all has already run every notRun command that has an ok entry once (mod.rs:368-374, invoke_served). A fixture that names a write command (for example notRun [init] with commands.init.ok) is FIXTURE_INVALID only after that command ran once in a sandbox copy and was killed. No state outside the sandbox is touched, so the effect is limited to the sandbox. Blast radius: L1 and L2 runs of a mis-written notRun.",
+  "worktree_dirty": true
+}

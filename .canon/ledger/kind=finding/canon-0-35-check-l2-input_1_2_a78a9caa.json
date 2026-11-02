@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:10.260649Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/input_plan.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2input.15",
+    "atip.checkl2input.16"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "Standards (the test passes without proving the real path): L2.batch-preflight builds a last item that breaks a constraint on arguments a document cannot carry, so a conforming tool is failed. plan_batch (input_plan.rs:628-637) splits the broken invocation with Spec{operands:true}, which keeps flag-only options on argv; the item the batch carries lacks them and breaks nothing. plan_pointers has the guard for exactly this (input_plan.rs:526-531, on_flag_only) and plan_batch does not. Real run: canon L2, 'L2.batch-preflight fail: export: a last item that breaks atMostOne [limit, all] was not refused with USAGE (exit 2): answered ok (exit 0)'; canon schema export shows limit and all flagOnly true, constraints atMostOne [limit, all] and input.batch true, so the false failure is already there and stays after canon-0-35-claim-l2 flips the claim. Probe on the conforming fake with clear-note made flagOnly in member tag (a batch command with atMostOne [note, clear-note]): L2.batch-preflight fails with the same message. Blast radius: any batch command with a constraint on a flag-only argument (every 1.2 tool with limit/all/cursor/fields on a command that takes a batch; tool-added flag-only options); blocks the L2 claim of canon. Fix is the plan_pointers guard in plan_batch.",
+  "worktree_dirty": true
+}

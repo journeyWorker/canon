@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:14.638735Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/input.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2input.07"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity: L2.input-usage (input.rs:270-271) accepts, besides USAGE and the registered finer replacements the checker knows (UNKNOWN_OPTION, OPTION_REQUIRED), any code that is registered with exit 2 and does not start with INPUT_. --input given twice answered with PLAN_STALE, UNKNOWN_COMMAND or a tool's own precondition code passes. checker.md says 'USAGE or its registered finer replacement (spec 7.2.2)'; the set of finer replacements is not named, so the code widened it rather than guess. Weakens the one MUST that tells a malformed command line from a bad document. Blast radius: atip.checkl2input.07 seeds only INPUT_INVALID and a wrong field.",
+  "worktree_dirty": true
+}

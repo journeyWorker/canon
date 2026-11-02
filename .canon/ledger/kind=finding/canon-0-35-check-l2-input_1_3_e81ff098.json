@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:12.661507Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/input.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2input.04",
+    "atip.checkl2input.06",
+    "atip.checkl2input.14"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (checker.md section 2: 'One owner per pass condition ... L0.ok-exit owns the exit equals the code's registered exit'; the section's own reading of the tables: an exit 2 in a row is shorthand for refused with a code whose registered exit is 2, the row asserts the code): L2.input-refusals (input.rs:206), L2.input-tty (241), L2.input-conflict (359), L2.input-pointer (436, 448), L2.batch-preflight (513) and the document numbers of L1.numbers (668) test the literal exit 2 as well as the code. Probe: a wrapper that answers every INPUT_INVALID of an --input call with exit 1 and leaves the envelope as it is fails L0.ok-exit (the owner: 'failed with INPUT_INVALID and exited 1, the registry says 2') and also L2.input-refusals, L2.input-tty and L1.numbers; the wrapper also dirtied L0.unknown-command-text and L1.fields through its own $() capture, which is the wrapper's doing and not counted here. The L1 rows have the same habit (Judge::refused, l1.rs:171), so this is a continuation of an existing convention, not a new one, but the 7.2 table wants one owner. Blast radius: one exit-number mistake fails four to six checks and the report no longer says which one owns it.",
+  "worktree_dirty": true
+}

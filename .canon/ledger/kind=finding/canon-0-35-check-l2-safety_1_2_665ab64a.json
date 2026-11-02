@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:22.094892Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/snapshot.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2safety.07",
+    "atip.checkl2safety.09"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (checker.md section 4/5: the contract's own example allowedEffects ['.canon/audit/access.jsonl']; snapshots list 'path, size, SHA-256 of every file'): the snapshot also lists directories (snapshot.rs Entry::Dir), so a read that creates .canon/audit and appends to access.jsonl changes two paths and a pattern that names the file allows only one. Real run: canon fixture copy with commands.query.allowedEffects ['.canon/audit/access.jsonl'], atip check --level L1: 'L2.effects fail SHOULD query: a successful read changed ./.canon/audit (outside its allowedEffects)'. The author must also list '.canon/audit' or use '.canon/**', which the contract does not say. The fake's peek writes '.peek-access.log' in the working directory, so no test creates a directory. Blast radius: every read command that creates the directory of its allowed file (the first read in a fresh state, the case the fixture always is); an L2 MUST. Fix options: an ancestor directory of an allowed file that did not exist before is not a change, or compare files only as checker.md says.",
+  "worktree_dirty": true
+}
