@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-canon-input",
+    "role": "implementer",
+    "session_id": "s-0-35-canon-input"
+  },
+  "at": "2026-11-02T11:57:06.196879Z",
+  "attachments": [
+    {
+      "case": "atip_batchpointers_02_a_batch_of_good_items_is_exit_zero_with_one_report_per_item_in_order",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-batch-pointers-red-junit.xml",
+      "sha256": "672faa01259f23c5afaad83bbd4ac458d1d72809f12b6a6958e561fb067836fa"
+    }
+  ],
+  "code_tree": "a7273e9d613129dd3526455fb7f9eb9fc98a9e82",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-batch-pointers-red-junit.xml"
+  },
+  "evidence_sha": "fb40075881281c9bfc62fc53e3db0635fcbee8f1",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "atip.batchpointers.02",
+  "schema": 1,
+  "staging_id": "f6050a30",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

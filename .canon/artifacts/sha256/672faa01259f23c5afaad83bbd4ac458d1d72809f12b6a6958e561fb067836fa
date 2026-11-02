@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="7" skipped="0" failures="5" errors="0" uuid="6a843f65-2db9-418a-ae2f-082fa9306d62" timestamp="2026-11-02T20:19:35.772+09:00" time="21.792">
+    <testsuite name="canon-cli::atip_batchpointers" tests="7" skipped="0" errors="0" failures="5">
+        <testcase name="atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="17.190">
+            <failure message="thread &apos;atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index&apos; (119336061) panicked at crates/canon-cli/tests/atip_batchpointers.rs:163:5" type="test failure with exit code 101">thread &apos;atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index&apos; (119336061) panicked at crates/canon-cli/tests/atip_batchpointers.rs:163:5:
+assertion `left == right` failed: {&quot;data&quot;:{&quot;items&quot;:[{&quot;data&quot;:{&quot;changeId&quot;:&quot;add-login&quot;,&quot;committed&quot;:&quot;kind=finding/add-login_1_1_7de43375.json&quot;,&quot;disposition&quot;:&quot;deferred&quot;,&quot;from&quot;:&quot;open&quot;,&quot;round&quot;:1,&quot;seq&quot;:1,&quot;staged&quot;:&quot;kind=finding/add-login_1_1_7de43375.json&quot;},&quot;index&quot;:0,&quot;status&quot;:&quot;written&quot;},{&quot;error&quot;:{&quot;code&quot;:&quot;FINDING_NOT_FOUND&quot;,&quot;field&quot;:&quot;/items/1&quot;,&quot;hint&quot;:&quot;`canon finding list` shows the committed findings; author a new one with `canon finding add`&quot;,&quot;message&quot;:&quot;no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.&quot;,&quot;retryable&quot;:false},&quot;index&quot;:1,&quot;status&quot;:&quot;failed&quot;},{&quot;index&quot;:2,&quot;status&quot;:&quot;skipped&quot;}]},&quot;error&quot;:{&quot;code&quot;:&quot;BATCH_INCOMPLETE&quot;,&quot;field&quot;:&quot;/items/1&quot;,&quot;hint&quot;:&quot;`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)&quot;,&quot;message&quot;:&quot;the batch stopped at element 1: FINDING_NOT_FOUND: no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.; the elements before it were applied and the ones after it were skipped&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchFindingCloseReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(false), Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/items/1&quot;))
+ right: (Some(false), Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/1&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index ... FAILED
+
+failures:
+
+failures:
+    atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 17.17s
+
+</system-out>
+            <system-err>
+thread &apos;atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index&apos; (119336061) panicked at crates/canon-cli/tests/atip_batchpointers.rs:163:5:
+assertion `left == right` failed: {&quot;data&quot;:{&quot;items&quot;:[{&quot;data&quot;:{&quot;changeId&quot;:&quot;add-login&quot;,&quot;committed&quot;:&quot;kind=finding/add-login_1_1_7de43375.json&quot;,&quot;disposition&quot;:&quot;deferred&quot;,&quot;from&quot;:&quot;open&quot;,&quot;round&quot;:1,&quot;seq&quot;:1,&quot;staged&quot;:&quot;kind=finding/add-login_1_1_7de43375.json&quot;},&quot;index&quot;:0,&quot;status&quot;:&quot;written&quot;},{&quot;error&quot;:{&quot;code&quot;:&quot;FINDING_NOT_FOUND&quot;,&quot;field&quot;:&quot;/items/1&quot;,&quot;hint&quot;:&quot;`canon finding list` shows the committed findings; author a new one with `canon finding add`&quot;,&quot;message&quot;:&quot;no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.&quot;,&quot;retryable&quot;:false},&quot;index&quot;:1,&quot;status&quot;:&quot;failed&quot;},{&quot;index&quot;:2,&quot;status&quot;:&quot;skipped&quot;}]},&quot;error&quot;:{&quot;code&quot;:&quot;BATCH_INCOMPLETE&quot;,&quot;field&quot;:&quot;/items/1&quot;,&quot;hint&quot;:&quot;`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)&quot;,&quot;message&quot;:&quot;the batch stopped at element 1: FINDING_NOT_FOUND: no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.; the elements before it were applied and the ones after it were skipped&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchFindingCloseReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(false), Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/items/1&quot;))
+ right: (Some(false), Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/1&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="17.598">
+            <failure message="thread &apos;atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch&apos; (119336056) panicked at crates/canon-cli/tests/atip_batchpointers.rs:206:5" type="test failure with exit code 101">thread &apos;atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch&apos; (119336056) panicked at crates/canon-cli/tests/atip_batchpointers.rs:206:5:
+assertion `left == right` failed: was exit 2 when preflight ran each item&apos;s --dry-run: {&quot;error&quot;:{&quot;code&quot;:&quot;SUBJECT_ADOPT_REFUSED&quot;,&quot;field&quot;:&quot;/items/1&quot;,&quot;hint&quot;:&quot;fix what the message names, then run `canon subject adopt` again&quot;,&quot;message&quot;:&quot;change `no-such-change` does not exist (import it with `canon ingest plans` first)&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;subject adopt&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: Some(2)
+ right: Some(1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch ... FAILED
+
+failures:
+
+failures:
+    atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 17.58s
+
+</system-out>
+            <system-err>
+thread &apos;atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch&apos; (119336056) panicked at crates/canon-cli/tests/atip_batchpointers.rs:206:5:
+assertion `left == right` failed: was exit 2 when preflight ran each item&apos;s --dry-run: {&quot;error&quot;:{&quot;code&quot;:&quot;SUBJECT_ADOPT_REFUSED&quot;,&quot;field&quot;:&quot;/items/1&quot;,&quot;hint&quot;:&quot;fix what the message names, then run `canon subject adopt` again&quot;,&quot;message&quot;:&quot;change `no-such-change` does not exist (import it with `canon ingest plans` first)&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;subject adopt&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: Some(2)
+ right: Some(1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_batchpointers_07_a_failed_item_has_its_error_and_no_data_and_a_skipped_item_has_neither" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="17.599"/>
+        <testcase name="atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="17.971">
+            <failure message="thread &apos;atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index&apos; (119336077) panicked at crates/canon-cli/tests/atip_batchpointers.rs:179:5" type="test failure with exit code 101">thread &apos;atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index&apos; (119336077) panicked at crates/canon-cli/tests/atip_batchpointers.rs:179:5:
+assertion `left == right` failed: {&quot;data&quot;:{&quot;items&quot;:[{&quot;error&quot;:{&quot;code&quot;:&quot;FINDING_NOT_FOUND&quot;,&quot;field&quot;:&quot;/items/0&quot;,&quot;hint&quot;:&quot;`canon finding list` shows the committed findings; author a new one with `canon finding add`&quot;,&quot;message&quot;:&quot;no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.&quot;,&quot;retryable&quot;:false},&quot;index&quot;:0,&quot;status&quot;:&quot;failed&quot;},{&quot;index&quot;:1,&quot;status&quot;:&quot;skipped&quot;}]},&quot;error&quot;:{&quot;code&quot;:&quot;BATCH_INCOMPLETE&quot;,&quot;field&quot;:&quot;/items/0&quot;,&quot;hint&quot;:&quot;`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)&quot;,&quot;message&quot;:&quot;the batch stopped at element 0: FINDING_NOT_FOUND: no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.; the elements before it were applied and the ones after it were skipped&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchFindingCloseReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/items/0&quot;))
+ right: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/0&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index ... FAILED
+
+failures:
+
+failures:
+    atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 17.94s
+
+</system-out>
+            <system-err>
+thread &apos;atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index&apos; (119336077) panicked at crates/canon-cli/tests/atip_batchpointers.rs:179:5:
+assertion `left == right` failed: {&quot;data&quot;:{&quot;items&quot;:[{&quot;error&quot;:{&quot;code&quot;:&quot;FINDING_NOT_FOUND&quot;,&quot;field&quot;:&quot;/items/0&quot;,&quot;hint&quot;:&quot;`canon finding list` shows the committed findings; author a new one with `canon finding add`&quot;,&quot;message&quot;:&quot;no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.&quot;,&quot;retryable&quot;:false},&quot;index&quot;:0,&quot;status&quot;:&quot;failed&quot;},{&quot;index&quot;:1,&quot;status&quot;:&quot;skipped&quot;}]},&quot;error&quot;:{&quot;code&quot;:&quot;BATCH_INCOMPLETE&quot;,&quot;field&quot;:&quot;/items/0&quot;,&quot;hint&quot;:&quot;`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)&quot;,&quot;message&quot;:&quot;the batch stopped at element 0: FINDING_NOT_FOUND: no committed finding at (`add-login`, round 1, seq 9). `close` moves an EXISTING finding&apos;s disposition; authoring a new one is `canon finding add`.; the elements before it were applied and the ones after it were skipped&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchFindingCloseReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/items/0&quot;))
+ right: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/0&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="18.366">
+            <failure message="thread &apos;atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran&apos; (119336076) panicked at crates/canon-cli/tests/atip_batchpointers.rs:110:9" type="test failure with exit code 101">thread &apos;atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran&apos; (119336076) panicked at crates/canon-cli/tests/atip_batchpointers.rs:110:9:
+{&quot;disposition&quot;:&quot;open&quot;,&quot;operands&quot;:[&quot;add-login&quot;],&quot;round&quot;:&quot;x&quot;,&quot;seq&quot;:1}: field /items/1/round, wanted /1/round: {&quot;error&quot;:{&quot;code&quot;:&quot;INPUT_INVALID&quot;,&quot;field&quot;:&quot;/items/1/round&quot;,&quot;hint&quot;:&quot;write the integer as 12, -3 or \&quot;12\&quot; (no `+`, no exponent, no spaces, no `.0`)&quot;,&quot;message&quot;:&quot;`/items/1/round` must be an integer: a JSON integer or a string of digits written -?(0|[1-9][0-9]*), not `x`&quot;,&quot;reason&quot;:&quot;INVALID_VALUE&quot;,&quot;received&quot;:&quot;x&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran ... FAILED
+
+failures:
+
+failures:
+    atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 18.34s
+
+</system-out>
+            <system-err>
+thread &apos;atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran&apos; (119336076) panicked at crates/canon-cli/tests/atip_batchpointers.rs:110:9:
+{&quot;disposition&quot;:&quot;open&quot;,&quot;operands&quot;:[&quot;add-login&quot;],&quot;round&quot;:&quot;x&quot;,&quot;seq&quot;:1}: field /items/1/round, wanted /1/round: {&quot;error&quot;:{&quot;code&quot;:&quot;INPUT_INVALID&quot;,&quot;field&quot;:&quot;/items/1/round&quot;,&quot;hint&quot;:&quot;write the integer as 12, -3 or \&quot;12\&quot; (no `+`, no exponent, no spaces, no `.0`)&quot;,&quot;message&quot;:&quot;`/items/1/round` must be an integer: a JSON integer or a string of digits written -?(0|[1-9][0-9]*), not `x`&quot;,&quot;reason&quot;:&quot;INVALID_VALUE&quot;,&quot;received&quot;:&quot;x&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_batchpointers_02_a_batch_of_good_items_is_exit_zero_with_one_report_per_item_in_order" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="18.697"/>
+        <testcase name="atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order" classname="canon-cli::atip_batchpointers" timestamp="2026-11-02T20:19:35.786+09:00" time="21.778">
+            <failure message="thread &apos;atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order&apos; (119336055) panicked at crates/canon-cli/tests/atip_batchpointers.rs:235:5" type="test failure with exit code 101">thread &apos;atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order&apos; (119336055) panicked at crates/canon-cli/tests/atip_batchpointers.rs:235:5:
+assertion `left == right` failed: {&quot;data&quot;:{&quot;items&quot;:[{&quot;error&quot;:{&quot;code&quot;:&quot;SUBJECT_INVALID_TRANSITION&quot;,&quot;expected&quot;:[&quot;specced&quot;,&quot;retired&quot;],&quot;field&quot;:&quot;/items/0/to&quot;,&quot;hint&quot;:&quot;follow the chain proposed → specced → building → verifying → shipped; `canon subject move &lt;id&gt;` shows where the subject stands&quot;,&quot;message&quot;:&quot;invalid transition proposed → building (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)&quot;,&quot;retryable&quot;:false},&quot;index&quot;:0,&quot;status&quot;:&quot;failed&quot;},{&quot;index&quot;:1,&quot;status&quot;:&quot;skipped&quot;}]},&quot;error&quot;:{&quot;code&quot;:&quot;BATCH_INCOMPLETE&quot;,&quot;field&quot;:&quot;/items/0/to&quot;,&quot;hint&quot;:&quot;`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)&quot;,&quot;message&quot;:&quot;the batch stopped at element 0: SUBJECT_INVALID_TRANSITION: invalid transition proposed → building (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired); the elements before it were applied and the ones after it were skipped&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;subject move&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchSubjectMoveReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/items/0/to&quot;))
+ right: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/0&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order ... FAILED
+
+failures:
+
+failures:
+    atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 21.76s
+
+</system-out>
+            <system-err>
+thread &apos;atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order&apos; (119336055) panicked at crates/canon-cli/tests/atip_batchpointers.rs:235:5:
+assertion `left == right` failed: {&quot;data&quot;:{&quot;items&quot;:[{&quot;error&quot;:{&quot;code&quot;:&quot;SUBJECT_INVALID_TRANSITION&quot;,&quot;expected&quot;:[&quot;specced&quot;,&quot;retired&quot;],&quot;field&quot;:&quot;/items/0/to&quot;,&quot;hint&quot;:&quot;follow the chain proposed → specced → building → verifying → shipped; `canon subject move &lt;id&gt;` shows where the subject stands&quot;,&quot;message&quot;:&quot;invalid transition proposed → building (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired)&quot;,&quot;retryable&quot;:false},&quot;index&quot;:0,&quot;status&quot;:&quot;failed&quot;},{&quot;index&quot;:1,&quot;status&quot;:&quot;skipped&quot;}]},&quot;error&quot;:{&quot;code&quot;:&quot;BATCH_INCOMPLETE&quot;,&quot;field&quot;:&quot;/items/0/to&quot;,&quot;hint&quot;:&quot;`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)&quot;,&quot;message&quot;:&quot;the batch stopped at element 0: SUBJECT_INVALID_TRANSITION: invalid transition proposed → building (allowed: the chain proposed → specced → building → verifying → shipped, shipped → verifying to reopen with --reason, or any non-retired state → retired); the elements before it were applied and the ones after it were skipped&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;subject move&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchSubjectMoveReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/items/0/to&quot;))
+ right: (Some(&quot;BATCH_INCOMPLETE&quot;), Some(&quot;/0&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>
