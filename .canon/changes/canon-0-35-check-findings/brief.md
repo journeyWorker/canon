@@ -87,3 +87,5 @@ Source: https://github.com/journeyWorker/canon/issues/134 (저자 두 번째 댓
 - 검사 결과, 판정 규칙, 종료 코드의 변경. `canon-0-35-check-fixture`가 거절된 fixture 호출과 도움말 줄 읽기를 바꾼다.
 - 텍스트 보고에 발견 전체를 싣는 일.
 - 1.2 주장과 새 검사 행(`canon-0-35-check-1-2`), L2 검사(`canon-0-35-check-l2-*`).
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:b112c095546ee65a61d7dbfd1043721bae43190c38ff26985ce1897695c72443)

@@ -119,3 +119,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 6.9와 15.10, app
 - canon의 `paging.rs`와 `json_out.rs`의 다음 쪽 항목 구성을 새 모듈로 옮기는 일(`canon-0-35-canon-cursor-1-2`).
 - `meta.page` 구성, `--all`의 실행, `--limit`의 도메인.
 - `jsonschema` 기능 분리(`canon-0-35-crate-validate`)와 계획 digest(`canon-0-35-crate-plan`).
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:99bc160ef27a576ce001af99f33d4c24d31219b0ba99a17094d1f473258673b4)

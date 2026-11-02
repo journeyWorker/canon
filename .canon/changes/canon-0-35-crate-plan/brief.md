@@ -123,3 +123,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 12.2-12.8과 8.3.
 - 파괴적 명령이 효과를 내는 일, 확정 중 효과마다 계획을 확인하는 일, 잠금.
 - `--dry-run`, 비동기 명령, `--operation`(canon에 없다).
 - JCS 구현이 부동소수 수 표현을 다루는 일. 안전한 정수만 받는다.
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:ac664f5116e44013441e85fa859d0fda7d28f43c032cae3b888914ad3b83d430)

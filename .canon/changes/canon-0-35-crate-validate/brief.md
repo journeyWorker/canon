@@ -43,3 +43,5 @@ dependency
 - `jsonschema` 버전 올리기와 다른 검증 라이브러리로의 교체.
 - `schemars`와 `regex` 등 다른 의존성의 정리.
 - 도메인 키워드 지원 범위를 넓히는 일.
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:7a23decaee66fa44ea0a8f755b854b11e8ea7f4c2db93fa9158eb7f0144e4982)

@@ -80,3 +80,5 @@ Source: https://github.com/journeyWorker/canon/issues/134 (첫 댓글 2번), spe
 - `quote`의 출력 형식 바꾸기. 큰따옴표 인용으로 바꾸지 않는다.
 - 셸 확장, 파이프, 연산자 해석. 계약 14.5가 그 줄을 대상 밖으로 둔다.
 - 다음 단계의 `command` 문자열 형식이나 `argv` 구성(canon-0-35-crate-cursor, canon-0-35-crate-plan).
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:10e798d50c5344d106218f10f2fa3ccc17a340553681bb29e8a053bb87d87968)

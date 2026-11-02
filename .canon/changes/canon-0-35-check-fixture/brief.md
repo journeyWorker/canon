@@ -111,3 +111,5 @@ Source: https://github.com/journeyWorker/canon/issues/133, issue 134의 검사�
 - `unprovided`로 바뀌는 결과가 레벨 판정을 바꾸는 일. `unprovided`는 지금도 MUST 검사의 레벨을 떨어뜨린다.
 - L2 검사와 L2 전용 fixture 키(`canon-0-35-check-l2-*`).
 - `dashboard`를 canon의 `ok` 호출로 돌리는 일. 이 변경은 canon의 fixture에 `notRun`을 쓰는 일만 한다.
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:11b3f0beab3a9501691557f39ccd8ecd9d34e3f21fedbc68de734ab051665b71)

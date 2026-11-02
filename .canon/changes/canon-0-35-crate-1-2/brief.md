@@ -115,3 +115,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 7.2.1, 8.3.2, 10.
 - canon이 1.2를 선언하는 일과 canon의 레지스트리에 `STOPPED_MIDWAY`를 등록하는 일(`canon-0-35-canon-stopped-midway`, `canon-0-35-claim-l2`).
 - 쪽 나누기 cursor(`canon-0-35-crate-cursor`), 계획 digest(`canon-0-35-crate-plan`), `jsonschema` 기능 분리(`canon-0-35-crate-validate`).
 - 계약 스키마 사본의 갱신(`canon-0-35-check-1-2`).
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:2f87d3b8b7b52a8b27e68fb3ca70d19a4b8f8ac45d3ac07414cd5419b2da424f)

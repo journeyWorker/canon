@@ -152,3 +152,5 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, approaches/checker.md 
 - 발견의 구조화(`canon-0-35-check-findings`)와 거절된 fixture 호출, 도움말 줄, `notRun`(`canon-0-35-check-fixture`).
 - canon 자신이 1.2를 선언하는 일(`canon-0-35-claim-l2`). 이 변경은 canon의 fixture를 1.2로 바꾸지 않는다.
 - 계약 문서, 스키마, 예시의 수정. 사본을 읽기만 한다.
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:f478563c2a7f6910caafdf75fa50e927db01549c5dc52801ed4e2b5576dc2a57)

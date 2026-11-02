@@ -42,3 +42,5 @@ ci
 - 0.35.0 정식 릴리스와 CHANGELOG 항목의 작성, 버전 올리기.
 - crate의 crates.io 게시와 launcher의 다른 개선.
 - 사전 릴리스를 소비하는 쪽(npm launcher)의 동작 변경.
+
+Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:8fc7e24d4c524adbe9b11dc0d5f5ab49c5dc48939e676ef212a337d7f3e6ea69)

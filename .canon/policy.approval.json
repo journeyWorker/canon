@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-01T15:52:06Z",
-  "note": "휴가 중 승인 위임(2026-11-01 대화): check-l1 리뷰 1라운드 반영분",
+  "approved_at": "2026-11-02T06:38:09Z",
+  "note": "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",
