@@ -280,7 +280,7 @@ from a file or stdin) is a batch, run in order and answered with
 before anything is written: an invalid element writes nothing and exits 2,
 `error.field` pointing at `/items/<i>/<key>`; a write that fails stops there
 (exit 1, `BATCH_INCOMPLETE`) and re-running the same batch reports the finished elements
-`unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped.
+`unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped; a document with several problems reports them all, the first as the error and every one in `error.details` in the order the document wrote its keys, and a value outside a closed set is `INPUT_INVALID` too (`reason` `INVALID_VALUE`, `field` the key), not `USAGE`. Every non-empty line of an NDJSON file is a document (a `#` line is not a comment). Integers compare by number: `1`, `"1"` and `--round +1` are one value, and `"+1"`, `"0x1"` and `1.0` in a document are `INVALID_VALUE`.
 `canon schema <command> --json` shows the leaf's `input`: the schema of one document and a complete `example`.
 
 ```text

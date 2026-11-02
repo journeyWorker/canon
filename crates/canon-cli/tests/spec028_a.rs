@@ -189,7 +189,7 @@ fn evidence_add_106_an_object_is_one_report_and_an_array_or_ndjson_is_a_batch() 
     let single = f.ok(&["evidence", "add", "--input", &json!([evidence_doc("auth.login.02", "a third run")]).to_string(), "--json"]);
     assert_eq!(statuses(&json_of(&single)), ["written"]);
     assert_eq!(refs(r), ["npm test again", "a third run"]);
-    std::fs::write(r.join("batch.ndjson"), format!("# the suite\n\n{}\n{}\n", evidence_doc("auth.login.01", "run a"), evidence_doc("auth.login.02", "run b"))).unwrap();
+    std::fs::write(r.join("batch.ndjson"), format!("\n{}\n\n{}\n", evidence_doc("auth.login.01", "run a"), evidence_doc("auth.login.02", "run b"))).unwrap();
     let nd = f.ok(&["evidence", "add", "--input", "batch.ndjson", "--json"]);
     assert_eq!(statuses(&json_of(&nd)), ["written", "written"]);
     assert_eq!(refs(r), ["run a", "run b"]);

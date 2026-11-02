@@ -421,8 +421,8 @@ fn an_object_is_one_invocation_and_an_array_or_ndjson_is_a_batch() {
     assert_eq!(body["meta"]["command"], "subject new", "the batch keeps the leaf id");
     validates(&spec_command("subject new"), "BatchSubjectNewReport", &body["data"]);
 
-    // NDJSON in a file: comments and blank lines skipped
-    std::fs::write(repo.join("batch.ndjson"), "# subjects\n\n{\"operands\":[\"gamma\"],\"domain\":\"dev\",\"title\":\"Gamma\"}\n\n# more\n{\"operands\":[\"delta\"],\"domain\":\"dev\",\"title\":\"Delta\"}\n").unwrap();
+    // NDJSON in a file: blank lines skipped (a `#` line is not a comment: see atip_inputorder_02)
+    std::fs::write(repo.join("batch.ndjson"), "\n{\"operands\":[\"gamma\"],\"domain\":\"dev\",\"title\":\"Gamma\"}\n\n{\"operands\":[\"delta\"],\"domain\":\"dev\",\"title\":\"Delta\"}\n").unwrap();
     let out = canon(repo, home.path(), &["subject", "new", "--input", "batch.ndjson", "--json"], None);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
     let body = json_of(&out);
@@ -447,7 +447,7 @@ fn text_that_is_neither_one_json_value_nor_ndjson_is_input_invalid() {
     let repo = dir.path();
     std::fs::write(repo.join("bad.txt"), "this is not json\n").unwrap();
     std::fs::write(repo.join("half.ndjson"), "{\"operands\":[\"a\"],\"domain\":\"dev\",\"title\":\"A\"}\nnot json\n").unwrap();
-    std::fs::write(repo.join("empty.ndjson"), "# only a comment\n\n").unwrap();
+    std::fs::write(repo.join("empty.ndjson"), "\n  \n\n").unwrap();
     let before = tree(repo);
     for (what, args, stdin, expected, fragment) in [
         ("inline text that is not JSON", vec!["--input", "{not json"], None, "INPUT_INVALID", "not valid JSON"),
@@ -535,7 +535,7 @@ fn unknown_keys_null_conflicts_and_the_flags_only_options_are_refused() {
     // and so does a value set
     let out = canon(repo, home.path(), &["finding", "add", "--input", r#"{"change":"add-login","round":1,"seq":1,"severity":"urgent","actor":"a","summary":"s"}"#, "--json"], None);
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("/severity")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some("INVALID_VALUE"), Some("/severity")), "{body}");
     assert!(body["error"]["expected"].as_array().is_some_and(|e| e.iter().any(|v| v == "blocker")), "{body}");
 }
 
@@ -671,7 +671,7 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     let (_batch_scratch, batch) = scratch_copy(base.path());
     let (_single_scratch, single) = scratch_copy(base.path());
 
-    let ndjson = "# the login scenarios\n\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
+    let ndjson = "\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
     let out = canon(&batch, home.path(), &["scenario", "new", "--input", "-", "--json"], Some(ndjson));
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(0), "{body}");

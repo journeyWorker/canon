@@ -1,0 +1,19 @@
+description: "atip/1 1.2 (0.35): an `--input` document is processed in the order of spec 11.7: a `#` line of NDJSON is NOT_JSON, every problem of a document is reported in its key order (`details`), an enumeration violation is INPUT_INVALID at the key, the command line's own parse failure answers before a conflict, differently written integers are one value, and an integer spelling the contract does not know is INVALID_VALUE"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [scenario, new, --input, comment.ndjson, --json]
+    exit: 2
+  - args: [finding, close, --input, "{\"roundd\":1,\"seq\":\"x\"}", --json]
+    exit: 2
+  - args: [finding, close, --input, "{\"disposition\":\"nope\"}", --json]
+    exit: 2
+  - args: [finding, close, add-login, --round, abc, --input, "{\"round\":1}", --json]
+    exit: 2
+  - args: [finding, close, add-login, --round, "1", --seq, "1", --disposition, open, --input, "{\"round\":2}", --json]
+    exit: 2
+  - args: [finding, close, add-login, --round, "+1", --seq, "1", --disposition, open, --input, "{\"round\":\"1\"}", --json]
+    exit: 2
+  - args: [finding, close, --input, "{\"round\":\"+1\"}", --json]
+    exit: 2
