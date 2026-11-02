@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev-b"
+  },
+  "at": "2026-11-02T20:27:59.974917Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "8e3278d006c012d2e1f6e196b0a7775609cda73f",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_planjcs.rs",
+  "introduced_by": "5d50c7d27fc8e9f6493c9f88e0bac17f3899f433",
+  "kind": "finding",
+  "reviewed_sha": "ea7d15afb1916d3b75e6f3f3195e4aa2baed3c42",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Standards (scenarios atip.planjcs.06 and .07; brief F2 'the lock is taken first, the plan is recomputed under it, released after the last effect'; spec 12.7 MUST: the plan cannot change between the check and the effects): no check proves that the lock is held from before the recompute. The only seam is CANON_TEST_HOLD_AFTER_RUN_MS, which sleeps after the last effect, so 06 shows a writer waits for a commit that is over its effects, and 07 shows a busy wait refuses. Mutation, run in a scratch worktree at ea7d15af and reverted: write_lock::holds, line 'Holds::OnCommit => has(\"commit\")' changed to '... && false', i.e. main no longer takes the lock for a destructive commit, so the plan is recomputed and gated with no lock and only Plan::hold takes it after the gate; atip_planjcs_06 and _07 both stay green (the commit still holds from the gate to the end of the run, including the seam). So the span the contract makes a MUST (check to first effect) is the part nothing exercises. A faithful check needs a seam between the recompute and the gate (a writer started there must wait, and must not change the plan the gate then judges). Blast radius: every writer's behaviour was checked only for the span after the commit, not the gap between the plan and the gate.",
+  "worktree_dirty": false
+}

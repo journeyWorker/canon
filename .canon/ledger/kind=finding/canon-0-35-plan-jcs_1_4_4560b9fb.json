@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev-b"
+  },
+  "at": "2026-11-02T20:27:54.046788Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "8e3278d006c012d2e1f6e196b0a7775609cda73f",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "ea7d15afb1916d3b75e6f3f3195e4aa2baed3c42",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Blast radius / spec fidelity: (1) a read that refreshes the scenario index between the preview and the commit makes the commit PLAN_STALE when the plan read the ledger: in a copy of this repository, ledger compact previewed, then subject show (declared to refresh kind=scenario records) changed the digest, and the commit answered PLAN_STALE; status, query and gate check did not. This follows the rule (the plan read the ledger), only a caller who reads between the two calls should know. (2) inputs.arguments leaves out --repo and --as, so a digest is the same for two repositories whose read state is equal; harmless, the commit is applied where it is run, but the plan does not name where. (3) The PLAN_STALE message still prints the digest of the plan as it is now (crate-plan 1_1), so a caller can commit it at once without the preview. (4) Verified independently: the purge digest of an empty kind equals sha256: + SHA-256 of the JCS of {effects:[],inputs:{arguments:{before,kind},reads:{canon.yaml,records,learn-records}}} computed outside canon; purge preview effects end with the audit append whose line equals the line the commit wrote but for actor and at; commit_next is --name=value (--kind=run --before=... --commit --plan-digest=sha256:<hex> --json), and an unprefixed, one-character-changed and foreign digest are PLAN_STALE with the preview as meta.next[0]; REPO_WRITE_BUSY is registered exit 2 retryable; a SIGKILLed holder released the lock and the file stayed.",
+  "worktree_dirty": false
+}

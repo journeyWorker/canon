@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev-b"
+  },
+  "at": "2026-11-02T20:27:51.686934Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "0c1886b3a6ef259101c971798a65aab9d33fe445",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/write_lock.rs",
+  "introduced_by": "5d50c7d27fc8e9f6493c9f88e0bac17f3899f433",
+  "kind": "finding",
+  "resolution_code_tree": "8e3278d006c012d2e1f6e196b0a7775609cda73f",
+  "resolution_sha": "ea7d15afb1916d3b75e6f3f3195e4aa2baed3c42",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "5d50c7d27fc8e9f6493c9f88e0bac17f3899f433",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "Standards / blast radius (brief F2, spec 12.7), found on the first tip 5d50c7d2 and fixed before it landed: ingest records --watch and ingest sessions --watch were Holds::Always, so a watcher held .canon/repo-write.lock for its whole polling run. Real binary: ingest records --watch --interval-secs 2 running, then finding add and purge --commit both answered REPO_WRITE_BUSY after the wait, so one poller blocked every writer and every destructive commit for as long as it ran (the audit judged the dashboard for this and missed the two pollers). Fixed at ea7d15af (Holds::Unless(watch), write_lock::hold_pass per pass, drop before the sleep); re-run on that build: with the watcher running, three finding adds took 0-1 s each and purge --commit answered PLAN_STALE (it was not blocked). atip_planjcs_08 now runs a watcher beside a writer. Blast radius: any other leaf that loops or serves is covered only by the unit test that every writing leaf has a row, not by a check that none of them holds the lock for longer than a pass; I found none besides dashboard (Never).",
+  "worktree_dirty": false
+}
