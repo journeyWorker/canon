@@ -36,10 +36,10 @@ Feature: atip crate: cursor binding by minor, JCS, argv writing
   @case:failure
   @flow:canon-0-35-crate-cursor.F1
   @atip.cratecursor.04
-  Scenario: An unknown minor and a number a digest cannot hold are refused
-    Given the minors 1.3, 2.0 and the empty text, and the numbers 1.5 and 9007199254740993 as argument values
+  Scenario: An unknown minor and an integer a digest cannot hold are refused
+    Given the minors 1.3, 2.0 and the empty text, and the integers 9007199254740993 and 18446744073709551615 as argument values
     When Cursors::for_declared and binding read them
-    Then the minors are refused and the numbers are errors, while 9007199254740991 is accepted
+    Then the minors and the integers are refused, while 9007199254740991 and the fraction 1.5 are accepted
 
   # canon: {"schema":1,"at":"2026-11-02T10:08:43Z","actor":{"agent_id":"impl-crate-0-35","role":"implementer","session_id":"s-0-35-crate"}}
   @subject:atip-contract
@@ -116,7 +116,7 @@ Feature: atip crate: cursor binding by minor, JCS, argv writing
   @case:failure
   @flow:canon-0-35-crate-cursor.F1
   @atip.cratecursor.12
-  Scenario: atip::jcs writes RFC 8785 text and refuses a number a digest cannot hold
-    Given the values 1.5, 1e300, 9007199254740993 and an RFC 8785 test document with unsorted members, control characters and an emoji key
+  Scenario: atip::jcs writes RFC 8785 text and refuses an integer a digest cannot hold
+    Given RFC 8785's appendix B number forms, a test document with unsorted members, control characters and an emoji key, and 64-bit integers beyond 2^53-1
     When atip::jcs writes each of them
-    Then the document is the RFC's canonical text with members sorted by UTF-16 code units, and a number that is not a whole number within 2^53-1 is an error, never a digest
+    Then the numbers are the ECMAScript form of their doubles, the document is the RFC's canonical text with members sorted by UTF-16 code units, and an integer beyond 2^53-1 is an error, never a digest

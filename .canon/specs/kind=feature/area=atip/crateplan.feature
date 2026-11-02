@@ -26,10 +26,10 @@ Feature: atip crate: plan, JCS digest, commit gate, commit argv
   @case:failure
   @flow:canon-0-35-crate-plan.F1
   @atip.crateplan.03
-  Scenario: A number a digest cannot hold is an error
-    Given the numbers 1.5, 9007199254740993, 1e300 and -0.1 in inputs or in an effect, and the largest safe integer
+  Scenario: An integer a digest cannot hold is an error and a fraction is a double
+    Given the integers 9007199254740993 and 18446744073709551615 in inputs or in an effect, the same value as a string, and the fraction 1.5
     When the plan's digest is made
-    Then each unsafe number is an error and the largest safe integer is accepted
+    Then each integer beyond 2^53-1 is an error, its string and the fraction are held, and the largest safe integer is accepted
 
   # canon: {"schema":1,"at":"2026-11-02T12:41:26Z","actor":{"agent_id":"impl-crate-0-35","role":"implementer","session_id":"s-0-35-crate"}}
   @subject:atip-contract
@@ -110,3 +110,13 @@ Feature: atip crate: plan, JCS digest, commit gate, commit argv
     Given a commit that made 2 of 5 effects and then met a changed plan, and the command that reads what was done
     When stopped_by_stale builds the stop
     Then the error is STOPPED_MIDWAY exit 1, not retryable, with the reason PLAN_STALE, and the next leads with the command that reads what was done, never a retry
+
+  # canon: {"schema":1,"at":"2026-11-02T14:51:51Z","actor":{"agent_id":"impl-crate-0-35","role":"implementer","session_id":"s-0-35-crate"}}
+  @subject:atip-contract
+  @case:edge
+  @flow:canon-0-35-crate-plan.F1
+  @atip.crateplan.12
+  Scenario: The plan digest vectors of the contract at v1.2.1 give their canonical text and digest, and an integer beyond the safe range is refused
+    Given the nine plan digest vectors of atip v1.2.1 vendored byte for byte and pinned, and the same plan with its large integers written as numbers
+    When atip::jcs and atip::plan canonicalize and digest each vector's plan, as a document and as a Plan
+    Then every vector gives its canonical text and its sha256: digest, a changed or missing vector fails the pin, and an integer beyond 2^53-1 written as a number is refused

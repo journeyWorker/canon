@@ -1,0 +1,19 @@
+{
+  "description": "A plan shaped like a destructive preview's: two deletes and the audit line the commit appends (spec 12.4), with the arguments and the digests of the files read as inputs (spec 12.6).",
+  "plan": {
+    "effects": [
+      {"action": "delete", "path": ".canon/sessions/2026-09-30.jsonl"},
+      {"action": "delete", "path": ".canon/sessions/2026-10-01.jsonl"},
+      {"action": "append", "path": ".canon/audit/log.jsonl", "detail": "purge: 2 session files before 2030-01-01"}
+    ],
+    "inputs": {
+      "arguments": {"kind": "session", "before": "2030-01-01"},
+      "read": {
+        ".canon/sessions/2026-09-30.jsonl": "sha256:5f7a0c1e9b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a",
+        ".canon/sessions/2026-10-01.jsonl": "sha256:0a2c4e6b8d0f2a4c6e8b0d2f4a5f7a0c1e9b2d4f6a8c0e2b4d6f8a0c2e4b6d8f"
+      }
+    }
+  },
+  "canonical": "{\"effects\":[{\"action\":\"delete\",\"path\":\".canon/sessions/2026-09-30.jsonl\"},{\"action\":\"delete\",\"path\":\".canon/sessions/2026-10-01.jsonl\"},{\"action\":\"append\",\"detail\":\"purge: 2 session files before 2030-01-01\",\"path\":\".canon/audit/log.jsonl\"}],\"inputs\":{\"arguments\":{\"before\":\"2030-01-01\",\"kind\":\"session\"},\"read\":{\".canon/sessions/2026-09-30.jsonl\":\"sha256:5f7a0c1e9b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a\",\".canon/sessions/2026-10-01.jsonl\":\"sha256:0a2c4e6b8d0f2a4c6e8b0d2f4a5f7a0c1e9b2d4f6a8c0e2b4d6f8a0c2e4b6d8f\"}}}",
+  "digest": "sha256:e76894b75ddf67e73c8f342e3765c416b4e9731a73eb65d87db1e5a3182816d4"
+}

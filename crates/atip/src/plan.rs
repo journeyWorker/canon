@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::constraint::Rule;
@@ -43,7 +43,7 @@ pub const COMMIT_REQUIRES: [Rule; 2] = [Rule::requires(COMMIT, &[PLAN_DIGEST]), 
 /// One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the
 /// effects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or
 /// why. A tool may add members of its own ([`Effect::with`]); they are part of the digest.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Effect {
     /// What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...
@@ -52,8 +52,9 @@ pub struct Effect {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub record: Option<String>,
+    /// Where it goes, or why: a sentence, or a JSON value the tool structures (`{"from": 1, "to": 2}`).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
+    pub detail: Option<Value>,
     /// The tool's own members, written after the contract's.
     #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(skip)]
@@ -78,7 +79,7 @@ impl Effect {
 
     /// Where it goes, or why, when the action alone does not say.
     #[must_use]
-    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+    pub fn detail(mut self, detail: impl Into<Value>) -> Self {
         self.detail = Some(detail.into());
         self
     }
@@ -95,7 +96,7 @@ impl Effect {
 }
 
 /// What a commit would do and what it rests on: the thing the digest covers (spec 12.6).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Plan {
     /// Every effect the commit would make, in the order it makes them (the order is part of the digest).
     pub effects: Vec<Effect>,
@@ -111,14 +112,21 @@ impl Plan {
 
     /// The digest of the plan, or the number it holds that a digest cannot (see [`crate::jcs`]).
     pub fn digest(&self) -> Result<PlanDigest, jcs::Error> {
-        let document = serde_json::to_value(self).expect("a plan serializes");
-        Ok(PlanDigest(format!("{DIGEST_PREFIX}{}", jcs::sha256_hex(jcs::to_string(&document)?.as_bytes()))))
+        digest_of(&serde_json::to_value(self).expect("a plan serializes"))
     }
 
     /// The report of a preview of this plan.
     pub fn preview(&self) -> Result<Preview, jcs::Error> {
         Ok(Preview { plan_digest: self.digest()?.0, effects: self.effects.clone(), committed: false })
     }
+}
+
+/// The digest of a plan written as a JSON document: `sha256:` and the lower-case hex SHA-256 of its RFC 8785 text (spec 12.6). For a
+/// plan whose shape is the tool's own (the digest covers whatever document a tool builds), and what [`Plan::digest`] is made of. The
+/// document holds only what JCS writes the same everywhere: an integer beyond ±(2^53-1) goes in as a string (an [`jcs::Error`]
+/// otherwise), and a string holds valid Unicode, which a Rust `str` is.
+pub fn digest_of(plan: &Value) -> Result<PlanDigest, jcs::Error> {
+    Ok(PlanDigest(format!("{DIGEST_PREFIX}{}", jcs::sha256_hex(jcs::to_string(plan)?.as_bytes()))))
 }
 
 /// A digest as `sha256:` and 64 lower-case hex digits.
@@ -390,8 +398,8 @@ mod tests {
     }
 
     #[test]
-    fn atip_crateplan_03_a_number_a_digest_cannot_hold_is_an_error() {
-        for number in [json!(1.5), json!(9_007_199_254_740_993_u64), json!(1e300), json!(-0.1)] {
+    fn atip_crateplan_03_an_integer_a_digest_cannot_hold_is_an_error_and_a_fraction_is_a_double() {
+        for number in [json!(9_007_199_254_740_993_u64), json!(-9_007_199_254_740_993_i64), json!(18_446_744_073_709_551_615_u64)] {
             let in_inputs = Plan::new(vec![], inputs(&json!({ "n": number })));
             assert!(matches!(in_inputs.digest(), Err(jcs::Error::NumberNotSafe(_))), "{number}");
             assert!(in_inputs.preview().is_err(), "{number}");
@@ -399,6 +407,11 @@ mod tests {
             assert!(in_effect.digest().is_err(), "{number}");
         }
         Plan::new(vec![], inputs(&json!({ "n": 9_007_199_254_740_991_i64 }))).digest().expect("the largest safe integer is held");
+        // As a string it is held, digits unchanged; a fraction is the double RFC 8785 writes.
+        let as_string = Plan::new(vec![], inputs(&json!({ "n": "9007199254740993" }))).digest().expect("a string is held");
+        assert_eq!(as_string.as_str(), format!("sha256:{}", jcs::sha256_hex(br#"{"effects":[],"inputs":{"n":"9007199254740993"}}"#)));
+        let fraction = Plan::new(vec![], inputs(&json!({ "n": 1.5 }))).digest().expect("a fraction is held");
+        assert_eq!(fraction.as_str(), format!("sha256:{}", jcs::sha256_hex(br#"{"effects":[],"inputs":{"n":1.5}}"#)));
     }
 
     #[test]

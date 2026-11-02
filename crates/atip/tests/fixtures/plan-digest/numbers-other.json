@@ -1,0 +1,9 @@
+{
+  "description": "Non-integral and very large or small numbers take the ECMAScript Number-to-String form RFC 8785 requires: shortest round-trip digits, exponent from 1e21 and below 1e-6.",
+  "plan": {
+    "effects": [],
+    "inputs": {"fractions": [4.50, 2e-3, 0.1, 333333333.33333329, -0.0000033333333333333333], "small": [0.000001, 1e-7, 1E-27, 5e-324], "large": [1e21, 1E30, 9.999999999999997e+22, 1.7976931348623157e308, 295147905179352830000]}
+  },
+  "canonical": "{\"effects\":[],\"inputs\":{\"fractions\":[4.5,0.002,0.1,333333333.3333333,-0.0000033333333333333333],\"large\":[1e+21,1e+30,9.999999999999997e+22,1.7976931348623157e+308,295147905179352830000],\"small\":[0.000001,1e-7,1e-27,5e-324]}}",
+  "digest": "sha256:fc8fb0928960e8ba96f4cb840ac22ad3efd27232865f358b2cbd78d28549e310"
+}

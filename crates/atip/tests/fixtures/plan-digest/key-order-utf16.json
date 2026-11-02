@@ -1,0 +1,9 @@
+{
+  "description": "Keys sorted by UTF-16 code units, not by code points: U+1F600 (a surrogate pair starting D83D) sorts before U+FB33. The keys are those of RFC 8785 section 3.2.3.",
+  "plan": {
+    "effects": [],
+    "inputs": {"\u20ac": "Euro Sign", "\r": "Carriage Return", "\ufb33": "Hebrew Letter Dalet With Dagesh", "1": "One", "\ud83d\ude00": "Emoji: Grinning Face", "\u0080": "Control", "\u00f6": "Latin Small Letter O With Diaeresis"}
+  },
+  "canonical": "{\"effects\":[],\"inputs\":{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}}",
+  "digest": "sha256:b29a92e2a6d79a2507bdb21358438541374712d52c7bbc6606a39386828c2450"
+}

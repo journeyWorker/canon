@@ -1,0 +1,9 @@
+{
+  "description": "Integral values in several spellings serialize the same: 1.0 and 1e0 as 1, 1e2 and 100.000 as 100, negative zero as 0; the safe-integer bounds stay exact.",
+  "plan": {
+    "effects": [{"action": "update", "record": "counter", "detail": {"from": 1, "to": 1.0, "also": 1e0}}],
+    "inputs": {"hundred": [100, 1e2, 100.000, 1E+2], "zero": [0, -0, 0.0, -0.0, 0e5], "safe": [9007199254740991, -9007199254740991], "big": 1e20}
+  },
+  "canonical": "{\"effects\":[{\"action\":\"update\",\"detail\":{\"also\":1,\"from\":1,\"to\":1},\"record\":\"counter\"}],\"inputs\":{\"big\":100000000000000000000,\"hundred\":[100,100,100,100],\"safe\":[9007199254740991,-9007199254740991],\"zero\":[0,0,0,0,0]}}",
+  "digest": "sha256:da66c31610c006fde027ce46e8288395a59584fbcdbe80956105d33736de6157"
+}

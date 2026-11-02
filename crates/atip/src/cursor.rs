@@ -373,17 +373,18 @@ mod tests {
     }
 
     #[test]
-    fn atip_cratecursor_04_an_unknown_minor_and_a_number_a_digest_cannot_hold_are_refused() {
+    fn atip_cratecursor_04_an_unknown_minor_and_an_integer_a_digest_cannot_hold_are_refused() {
         for text in ["1.3", "2.0", "1", "", "1.2.0"] {
             assert_eq!(Cursors::for_declared(text), Err(UnknownMinor(text.to_string())), "{text:?}");
         }
-        for number in [json!(9_007_199_254_740_993_u64), json!(-9_007_199_254_740_993_i64), json!(1.5), json!(1e300), json!(18_446_744_073_709_551_615_u64)] {
+        for number in [json!(9_007_199_254_740_993_u64), json!(-9_007_199_254_740_993_i64), json!(18_446_744_073_709_551_615_u64)] {
             let given = vec![Given::option("n", number.clone())];
             for minor in ["1.1", "1.2"] {
                 assert!(matches!(cursors(minor).binding(&given), Err(jcs::Error::NumberNotSafe(_))), "{minor}: {number}");
             }
         }
-        // The largest safe integer is fine.
+        // The largest safe integer is fine, and a number written with a fraction is a double (RFC 8785), so it binds.
+        cursors("1.2").binding(&[Given::option("n", 1.5)]).expect("a fraction binds");
         cursors("1.2").binding(&[Given::option("n", 9_007_199_254_740_991_i64)]).expect("the largest safe integer binds");
     }
 

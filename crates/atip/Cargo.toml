@@ -12,7 +12,9 @@ path = "src/lib.rs"
 [dependencies]
 clap = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+# `float_roundtrip`: a number written with digits is read as the nearest double, so a digest of it is the same as every other
+# implementation's (spec 12.6, the plan digest vectors). The feature is additive and applies to every crate of the workspace.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 schemars = "1.2.1"
 # A JSON Schema validator, only with the feature `validate`: the checks of the contract's schemas (`schema::envelope_problems`
 # and the other `*_problems`), the validation of a projected answer (`fields::projected_problems`) and the compiled domain
