@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-02T22:35:38.764312Z",
+  "attachments": [
+    {
+      "case": "atip_check_69_l0_registry_fails_when_the_tools_registries_or_what_it_emitted_disagree_with_the_contract_and_the_fixture",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    }
+  ],
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2c.xml"
+  },
+  "evidence_sha": "44b242705daf17dd8a56656eef0f24b5109f5501",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 650,
+  "scenario_id": "atip.check.69",
+  "schema": 1,
+  "staging_id": "d93db173",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

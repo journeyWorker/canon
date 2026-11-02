@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-02T22:35:38.764312Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_25_regex_a_pattern_outside_the_form_that_the_engines_read_differently_is_not_a_version_difference",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_checkl1_25_regex_the_ecmascript_engine_answers_every_recorded_case_as_the_record_says",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_checkl1_25_regex_the_form_of_every_recorded_pattern_is_the_one_the_record_says",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_checkl1_25_the_unicode_versions_the_report_names_belong_to_the_engines_that_are_locked",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_checkl1_25_regex_a_pattern_of_the_form_that_both_engines_compile_agrees_unless_the_record_names_a_unicode_version_difference",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_checkl1_25_regex_the_rust_engine_answers_every_recorded_case_as_the_record_says",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    }
+  ],
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2c.xml"
+  },
+  "evidence_sha": "44b242705daf17dd8a56656eef0f24b5109f5501",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 93,
+  "scenario_id": "atip.checkl1.25",
+  "schema": 1,
+  "staging_id": "80abc86f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

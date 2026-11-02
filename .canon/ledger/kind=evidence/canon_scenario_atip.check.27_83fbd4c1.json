@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-02T22:35:38.764312Z",
+  "attachments": [
+    {
+      "case": "exec::tests::atip_check_27_a_failing_setup_command_is_reported_by_name",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "fixture::tests::atip_check_27_a_fixture_of_the_wrong_shape_names_the_member",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_check_27_an_unreadable_or_wrongly_shaped_fixture_or_a_failing_setup_command_exits_2_with_fixture_invalid",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    }
+  ],
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2c.xml"
+  },
+  "evidence_sha": "44b242705daf17dd8a56656eef0f24b5109f5501",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 613,
+  "scenario_id": "atip.check.27",
+  "schema": 1,
+  "staging_id": "dba5c949",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
