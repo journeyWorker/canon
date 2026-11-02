@@ -360,6 +360,7 @@ dependencies = [
 name = "atip"
 version = "0.34.0"
 dependencies = [
+ "atip",
  "clap",
  "jsonschema",
  "regex",
@@ -384,6 +385,14 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
+]
+
+[[package]]
+name = "atip-probe"
+version = "0.34.0"
+dependencies = [
+ "atip",
+ "serde_json",
 ]
 
 [[package]]

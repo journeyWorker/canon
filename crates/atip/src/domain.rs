@@ -16,10 +16,12 @@
 //! The I-Regexp scanner is a port of `iregexpProblem` in the contract's `scripts/check.ts`: the two must give the
 //! same answer, and the contract's `scripts/regex-cases.json` is the record both are held to.
 
+#[cfg(feature = "validate")]
 use jsonschema::Validator;
 use serde_json::{json, Map, Value};
 
 use crate::doc::ValueType;
+use crate::judge::{Node, Refused};
 
 /// Largest integer a JSON parser, JavaScript and a Rust `i64` all read the same (spec 10.7.5).
 pub const SAFE_INTEGER: i64 = 9_007_199_254_740_991;
@@ -387,21 +389,43 @@ impl Scan {
 // ---------------------------------------------------------------- evaluation
 
 /// Whether `value` is inside `domain`. `value` is the argument's value after normalisation (an integer as a JSON
-/// number, a string as it is). A domain outside the profile, or one that does not compile, is an error.
+/// number, a string as it is). A domain that does not compile is an error.
+///
+/// The domain is judged by the crate itself (the module `judge`): every keyword of the profile (spec 10.7.4) is read
+/// there, a `pattern` with the `regex` crate, and the answer is the one `compile` gives. A keyword of JSON Schema outside
+/// the profile (`anyOf`, `$ref`, `minItems`, ...) is judged only with the feature `validate`; without it the domain is
+/// an error that names the keyword.
 pub fn admits(domain: &Value, value: &Value) -> Result<bool, String> {
-    let validator: Validator = jsonschema::validator_for(domain).map_err(|error| format!("the domain {domain} does not compile: {error}"))?;
-    Ok(validator.is_valid(value))
+    match Node::compile(domain) {
+        Ok(node) => Ok(node.is_valid(value)),
+        Err(Refused::Invalid(why)) => Err(format!("the domain {domain} does not compile: {why}")),
+        Err(Refused::Unsupported(keyword)) => beyond_the_profile(domain, value, &keyword),
+    }
 }
 
-/// A domain compiled once, for a caller that asks it of many values.
+#[cfg(feature = "validate")]
+fn beyond_the_profile(domain: &Value, value: &Value, _keyword: &str) -> Result<bool, String> {
+    compile(domain).map(|compiled| compiled.admits(value))
+}
+
+#[cfg(not(feature = "validate"))]
+fn beyond_the_profile(domain: &Value, _value: &Value, keyword: &str) -> Result<bool, String> {
+    Err(format!("the domain {domain} uses `{keyword}`, which is outside the domain profile and is judged only with the feature `validate`"))
+}
+
+/// A domain compiled by the JSON Schema validator, once, for a caller that asks it of many values. The reference
+/// [`admits`] is held to; it needs the feature `validate`.
+#[cfg(feature = "validate")]
 pub struct Compiled(Validator);
 
+#[cfg(feature = "validate")]
 impl std::fmt::Debug for Compiled {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Compiled(..)")
     }
 }
 
+#[cfg(feature = "validate")]
 impl Compiled {
     /// Whether `value` is inside the domain.
     pub fn admits(&self, value: &Value) -> bool {
@@ -409,7 +433,9 @@ impl Compiled {
     }
 }
 
-/// Compiles `domain` so that many values can be asked of it without compiling it each time.
+/// Compiles `domain` with the JSON Schema validator so that many values can be asked of it without compiling it each
+/// time. Needs the feature `validate`.
+#[cfg(feature = "validate")]
 pub fn compile(domain: &Value) -> Result<Compiled, String> {
     jsonschema::validator_for(domain).map(Compiled).map_err(|error| format!("the domain {domain} does not compile: {error}"))
 }

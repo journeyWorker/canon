@@ -3,12 +3,17 @@
 //! The crate starts inside the canon workspace and moves to the atip
 //! repository, so it names no canon type and depends on no canon crate.
 //!
+//! **Features.** `validate` (off by default) adds the JSON Schema validation of documents and links `jsonschema`: the
+//! validators of [`schema`], `fields::projected_problems` and `domain::compile`. A tool that only builds documents and
+//! refuses arguments leaves it off; the checker and every test turn it on. `domain::admits` judges a domain without it.
+//!
 //! - [`error`]: [`CliError`], its builder, [`ErrorBody`], [`redact`], the
 //!   error-code row type [`CodeInfo`] and the exit values [`EXIT_FAILED`] and
 //!   [`EXIT_REFUSED`]. A tool owns its table of rows; the crate owns the shape.
 //! - [`schema`]: the contract's envelope, error and registry-entry JSON
-//!   Schemas, vendored verbatim and pinned by digest, and the validators that
-//!   use them ([`envelope_problems`], [`registry_entry_problems`]).
+//!   Schemas, vendored verbatim and pinned by digest, and, with the feature
+//!   `validate`, the validators that use them (`envelope_problems`,
+//!   `registry_entry_problems`).
 //! - [`doc`]: the documents `schema --json` answers with (tree, group, command,
 //!   option, operand, output, input), typed and deriving `JsonSchema`.
 //! - [`fields`]: field paths and projection (spec 6.10): the path grammar, the
@@ -39,6 +44,7 @@ pub mod domain;
 pub mod envelope;
 pub mod error;
 pub mod fields;
+mod judge;
 pub mod minor;
 pub mod project;
 pub mod reserved;
@@ -51,5 +57,7 @@ pub use error::{count_with_exit, find_code, find_warning, reason_of_code, reason
 pub use minor::{Minor, UnknownMinor};
 pub use project::{flag_only_options, flag_only_problems};
 pub use reserved::{registration_problem, reserved_code, ReservedCode, RESERVED_CODES};
-pub use schema::{envelope_problems, error_problems, registry_entry_problems, schema_doc_problems, warning_entry_problems, BATCH_REPORT_SCHEMA, CONTRACT, CONTRACT_VERSION, ENVELOPE_SCHEMA, ERROR_SCHEMA, INPUT_DOCUMENT_SCHEMA, REGISTRY_ENTRY_SCHEMA, SCHEMA_DOC_SCHEMA, STREAM_LINE_SCHEMA, WARNING_ENTRY_SCHEMA};
+pub use schema::{BATCH_REPORT_SCHEMA, CONTRACT, CONTRACT_VERSION, ENVELOPE_SCHEMA, ERROR_SCHEMA, INPUT_DOCUMENT_SCHEMA, REGISTRY_ENTRY_SCHEMA, SCHEMA_DOC_SCHEMA, STREAM_LINE_SCHEMA, WARNING_ENTRY_SCHEMA};
+#[cfg(feature = "validate")]
+pub use schema::{envelope_problems, error_problems, registry_entry_problems, schema_doc_problems, warning_entry_problems};
 pub use shell::{has_placeholder, quote, split_argv};

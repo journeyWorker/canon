@@ -3,13 +3,16 @@
 //! `crates/atip/schema/` holds the envelope, the error object and the registry
 //! entry exactly as the atip repository publishes them (spec sections 6, 7.1
 //! and 7.3). A test pins each copy by digest, so an edit is a deliberate
-//! re-vendoring and never an accident. [`envelope_problems`] checks a document
+//! re-vendoring and never an accident. With the feature `validate`, `envelope_problems` checks a document
 //! against them; a tool's debug build and its tests call it on every envelope
 //! they print, so a document that breaks the contract fails where it is made.
 
+#[cfg(feature = "validate")]
 use std::sync::LazyLock;
 
+#[cfg(feature = "validate")]
 use jsonschema::{Registry, Resource, Validator};
+#[cfg(feature = "validate")]
 use serde_json::Value;
 
 /// `schema/envelope.schema.json`: the one document `--json` prints.
@@ -38,14 +41,17 @@ pub const CONTRACT: &str = "atip/1";
 pub const CONTRACT_VERSION: &str = "1.2";
 
 /// `$id` of the error schema, which the envelope and the registry entry `$ref`.
+#[cfg(feature = "validate")]
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
 
+#[cfg(feature = "validate")]
 fn parse(text: &str) -> Value {
     serde_json::from_str(text).expect("a vendored contract schema is JSON")
 }
 
 /// Every vendored schema by its `$id`, so a `$ref` between them resolves (`error.schema.json` from the envelope,
 /// `envelope.schema.json` from the self-description's own schema).
+#[cfg(feature = "validate")]
 const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
     (ERROR_ID, ERROR_SCHEMA),
     ("https://atip.dev/1/envelope.schema.json", ENVELOPE_SCHEMA),
@@ -57,6 +63,7 @@ const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
 ];
 
 /// The registry of the contract's schemas, for a validator of this crate or of a tool's own schemas that `$ref` them by `$id`.
+#[cfg(feature = "validate")]
 pub fn contract_registry() -> Registry<'static> {
     CONTRACT_SCHEMAS
         .iter()
@@ -65,16 +72,23 @@ pub fn contract_registry() -> Registry<'static> {
         .expect("the registry prepares")
 }
 
+#[cfg(feature = "validate")]
 fn compile(text: &str) -> Validator {
     jsonschema::options().with_registry(&contract_registry()).build(&parse(text)).expect("a vendored contract schema compiles")
 }
 
+#[cfg(feature = "validate")]
 static ENVELOPE: LazyLock<Validator> = LazyLock::new(|| compile(ENVELOPE_SCHEMA));
+#[cfg(feature = "validate")]
 static ERROR: LazyLock<Validator> = LazyLock::new(|| compile(ERROR_SCHEMA));
+#[cfg(feature = "validate")]
 static REGISTRY_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(REGISTRY_ENTRY_SCHEMA));
+#[cfg(feature = "validate")]
 static WARNING_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(WARNING_ENTRY_SCHEMA));
+#[cfg(feature = "validate")]
 static SCHEMA_DOC: LazyLock<Validator> = LazyLock::new(|| compile(SCHEMA_DOC_SCHEMA));
 
+#[cfg(feature = "validate")]
 fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
     validator.iter_errors(document).map(|error| format!("{error} at {}", error.instance_path())).collect()
 }
@@ -82,21 +96,25 @@ fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
 /// What breaks the envelope schema in `document`: one line per violation,
 /// empty when the document is a conforming envelope. The schema alone judges it, `meta.contractVersion` never
 /// `"1.0"` written out included (its pattern starts at minor 1, since 1.1.1).
+#[cfg(feature = "validate")]
 pub fn envelope_problems(document: &Value) -> Vec<String> {
     problems_of(&ENVELOPE, document)
 }
 
 /// What breaks the error-object schema in `error` (the `error` member of a failure envelope), empty when it conforms.
+#[cfg(feature = "validate")]
 pub fn error_problems(error: &Value) -> Vec<String> {
     problems_of(&ERROR, error)
 }
 
 /// What breaks the registry-entry schema in `row`, empty when it conforms.
+#[cfg(feature = "validate")]
 pub fn registry_entry_problems(row: &Value) -> Vec<String> {
     problems_of(&REGISTRY_ENTRY, row)
 }
 
 /// What breaks the warning-entry schema in `row` (one row of the warning registry, since 1.1), empty when it conforms.
+#[cfg(feature = "validate")]
 pub fn warning_entry_problems(row: &Value) -> Vec<String> {
     problems_of(&WARNING_ENTRY, row)
 }
@@ -104,6 +122,7 @@ pub fn warning_entry_problems(row: &Value) -> Vec<String> {
 /// What breaks the contract's schema for a `schema --json` answer (`schema/schema-doc.schema.json`) in `document`, the
 /// whole envelope: one line per violation, empty when it conforms. The rules of spec 10.13 that JSON Schema cannot
 /// express are not checked here.
+#[cfg(feature = "validate")]
 pub fn schema_doc_problems(document: &Value) -> Vec<String> {
     problems_of(&SCHEMA_DOC, document)
 }

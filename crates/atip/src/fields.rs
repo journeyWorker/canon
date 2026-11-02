@@ -8,7 +8,7 @@
 //!
 //! The projection ([`project`]) keeps the kept paths and what covers or leads to them. [`check_declaration`] holds a
 //! declaration and the schemas it points at to the contract: every cut node is projectable, every path names a member
-//! of the record schema and goes through arrays only with `[]`. [`projected_problems`] validates a projected value
+//! of the record schema and goes through arrays only with `[]`. `projected_problems` (feature `validate`) validates a projected value
 //! against the output's schema with `required` reduced to the members that are present, which is the claim spec 6.10
 //! makes: a tool's tests hold its real answers to it.
 //!
@@ -723,7 +723,7 @@ pub fn declared_maps(doc: &Value, root: &Value, records: &str, paths: &[String])
 
 /// `root` with `required` reduced to the members present, in every object cut node at or below the record (spec 6.10,
 /// "Projected schema"). The result is self-contained apart from the references it keeps to leaves and members kept
-/// whole; [`projected_problems`] puts the document back around it.
+/// whole; `projected_problems` (feature `validate`) puts the document back around it.
 pub fn reduced(doc: &Value, root: &Value, records: &str, kept: &[FieldPath]) -> Value {
     let kept: Vec<Vec<String>> = kept.iter().map(|path| path.names().into_iter().map(str::to_string).collect()).collect();
     let tokens = pointer_tokens(records).unwrap_or_default();
@@ -841,6 +841,7 @@ fn reduce_at(doc: &Value, node: &Value, rel: &mut Vec<String>, kept: &[Vec<Strin
 
 /// The problems of `data` against the output's schema with `required` reduced for `kept` (spec 6.10): empty when the
 /// projected value is one the contract allows. The schema is `root`, its `$ref`s read in `doc`.
+#[cfg(feature = "validate")]
 pub fn projected_problems(doc: &Value, root: &Value, records: &str, kept: &[FieldPath], data: &Value) -> Vec<String> {
     let mut schema = reduced(doc, root, records, kept);
     if !schema.is_object() {

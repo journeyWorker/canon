@@ -23,7 +23,9 @@ name = "canon"
 path = "src/main.rs"
 
 [dependencies]
-atip.workspace = true
+# canon validates every JSON document a debug build prints against the contract's schemas (`json_out::validate`), and its
+# tests do the same: both need the validators of `atip`. canon links `jsonschema` anyway, through `canon-fmt`.
+atip = { workspace = true, features = ["validate"] }
 canon-fmt.workspace = true
 canon-gate.workspace = true
 canon-ingest.workspace = true

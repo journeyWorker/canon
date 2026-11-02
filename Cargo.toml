@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/atip",
     "crates/atip-check",
+    "crates/atip-probe",
     "crates/canon-model",
     "crates/canon-store",
     "crates/canon-ingest",

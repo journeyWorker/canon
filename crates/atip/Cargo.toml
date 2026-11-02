@@ -14,13 +14,23 @@ clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = "1.2.1"
-# Checks an envelope against the vendored contract schemas (`schema::envelope_problems`).
-jsonschema = { version = "0.47.0", default-features = false }
-# The Rust reading of a domain `pattern` (spec 10.7.4): a pattern must compile with the crate's default limits.
+# A JSON Schema validator, only with the feature `validate`: the checks of the contract's schemas (`schema::envelope_problems`
+# and the other `*_problems`), the validation of a projected answer (`fields::projected_problems`) and the compiled domain
+# (`domain::compile`). A tool that only builds documents and refuses arguments does not link it.
+jsonschema = { version = "0.47.0", default-features = false, optional = true }
+# The Rust reading of a domain `pattern` (spec 10.7.4): a pattern must compile with the crate's default limits, and
+# `domain::admits` judges a `pattern` with it.
 regex = "1"
+
+[features]
+default = []
+# The JSON Schema validation of documents (see `jsonschema` above). The checker and every test turn it on.
+validate = ["dep:jsonschema"]
 
 [dev-dependencies]
 sha2 = { workspace = true }
+# The crate's own `validate` feature, for its tests (`cargo test -p atip` tests the validators too).
+atip = { path = ".", features = ["validate"] }
 
 [lints]
 workspace = true
