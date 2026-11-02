@@ -1,0 +1,23 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T16:03:12.038238Z",
+  "change_id": "canon-0-35-canon-stopped-midway",
+  "code_tree": "98df3ad748c58d9d22ec1a24455ce4b899422fe6",
+  "disposition": "rejected",
+  "file_ref": "crates/canon-cli/tests/stopped_midway.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reason": "ATIP author ruling (relayed by Main): STOPPED_MIDWAY means work stopped partway with later steps not done; PROMOTE_REFUSED, INVENTORY_ABORTED and PLUGIN_SYNC_ERRORS process every record, put per-record refusals in data and finish, so they are ordinary exit-1 results (spec 5.3). Keep all three.",
+  "reviewed_sha": "d7ba1b76f682837ca5310d437d746f8d2b4c2ffa",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity (brief F3, ATIP ruling spec 8.3.2/D33): the audit table puts PROMOTE_REFUSED, INVENTORY_ABORTED and PLUGIN_SYNC_ERRORS among the kept codes ('the answer is negative or incomplete' / I/O). Read at the source: gate promote moves staged records one at a time and answers exit 1 with data.promoted and data.refused, so earlier records have landed when a later one is refused by a gate rule; that is the shape 8.3.2 describes (effects made, then a refusal of the kind the command would have given before its work) even though the refusal is per record and the answer is a report. The implementer's rule ('a later step meets what the command refuses before its work and that refusal has no code of its own') can be read either way for these three; the author's ruling text is not in the tree beyond the brief, so I record it, not a defect: the brief allows a subset this release, and the CHANGELOG lists each kept code with its reason, which is what makes a later move cheap. Blast radius: none for this release; the three keep their 0.34 names, exits and registry rows (atip.midway.10 pins the I/O ones).",
+  "worktree_dirty": false
+}
