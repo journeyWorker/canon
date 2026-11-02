@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T06:44:26.253029Z",
+  "attachments": [
+    {
+      "case": "atip_crateshell_06_a_command_that_does_not_split_to_its_argv_still_fails",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-shell-red-junit.xml",
+      "sha256": "3d09d38c55d3fcad4bd7217045db276856b852eb322b3704cabe6597b9f28039"
+    },
+    {
+      "case": "atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next",
+      "format": "junit",
+      "outcome": "failed",
+      "path": "target/0-35-crate-shell-red-junit.xml",
+      "sha256": "3d09d38c55d3fcad4bd7217045db276856b852eb322b3704cabe6597b9f28039"
+    }
+  ],
+  "code_tree": "406d9d069985aadb2824d52c58d678cc7d82e701",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-shell-red-junit.xml"
+  },
+  "evidence_sha": "9ee27a23c442bfd0359ce27757ef71996a2b726c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "atip.crateshell.06",
+  "schema": 1,
+  "staging_id": "78f0be14",
+  "verdict": "divergent",
+  "worktree_dirty": true
+}

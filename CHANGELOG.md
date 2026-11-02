@@ -246,6 +246,10 @@ The relations declared in 0.34 (every command with a rule or a validator; a doma
 - Fix the calls now refused: `export --after` later than `--before`, integer options above 2^53-1.
 - An `atip check` fixture written for 0.33: replace `registry` and `warnings` prose rows by names (or `"registry": "from-schema"`), add `contractVersion`, and expect `FIXTURE_INVALID` for a row with `meaning` or `fix`.
 
+### Fixed
+
+- `atip::split_argv` reads a backslash outside quotes the way a POSIX shell does, so it reads back what `atip::quote` writes: `split_argv(join(words.map(quote)))` is `words` for every list of words. Before, `quote("it's")` (`'it'\''s'`) split back to `it\s`, and the checker's `L0.next` reported a correct tool whose next step held a word with a single quote. A backslash makes the next character literal, a backslash and a newline join the line, and a backslash at the end of the input stays one backslash; inside single quotes a backslash is a character, and inside double quotes only `\"` and `\\` are escapes, as before. `quote`'s output does not change, so canon's `command` strings are the same bytes (`canon-0-35-crate-shell`, `atip.crateshell.01-06`).
+
 ## 0.33.0 — 2026-11-01
 
 ### Breaking

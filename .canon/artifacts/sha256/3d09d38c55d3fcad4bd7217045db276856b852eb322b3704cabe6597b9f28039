@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="7" skipped="0" failures="4" errors="0" uuid="7b78de67-31c9-49a2-9130-16767ca91b16" timestamp="2026-11-02T15:43:39.951+09:00" time="0.075">
+    <testsuite name="atip" tests="5" skipped="0" errors="0" failures="3">
+        <testcase name="shell::tests::atip_crateshell_01_a_word_with_a_single_quote_is_written_and_read_back" classname="atip" timestamp="2026-11-02T15:43:39.953+09:00" time="0.015">
+            <failure message="thread &apos;shell::tests::atip_crateshell_01_a_word_with_a_single_quote_is_written_and_read_back&apos; (92546717) panicked at crates/atip/src/shell.rs:161:9" type="test failure with exit code 101">thread &apos;shell::tests::atip_crateshell_01_a_word_with_a_single_quote_is_written_and_read_back&apos; (92546717) panicked at crates/atip/src/shell.rs:161:9:
+assertion `left == right` failed
+  left: [&quot;it\\s&quot;]
+ right: [&quot;it&apos;s&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test shell::tests::atip_crateshell_01_a_word_with_a_single_quote_is_written_and_read_back ... FAILED
+
+failures:
+
+failures:
+    shell::tests::atip_crateshell_01_a_word_with_a_single_quote_is_written_and_read_back
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err>
+thread &apos;shell::tests::atip_crateshell_01_a_word_with_a_single_quote_is_written_and_read_back&apos; (92546717) panicked at crates/atip/src/shell.rs:161:9:
+assertion `left == right` failed
+  left: [&quot;it\\s&quot;]
+ right: [&quot;it&apos;s&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="shell::tests::atip_crateshell_03_a_backslash_outside_quotes_is_the_posix_one" classname="atip" timestamp="2026-11-02T15:43:39.953+09:00" time="0.015">
+            <failure message="thread &apos;shell::tests::atip_crateshell_03_a_backslash_outside_quotes_is_the_posix_one&apos; (92546719) panicked at crates/atip/src/shell.rs:194:9" type="test failure with exit code 101">thread &apos;shell::tests::atip_crateshell_03_a_backslash_outside_quotes_is_the_posix_one&apos; (92546719) panicked at crates/atip/src/shell.rs:194:9:
+assertion `left == right` failed
+  left: [&quot;a\\&quot;, &quot;b&quot;]
+ right: [&quot;a b&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test shell::tests::atip_crateshell_03_a_backslash_outside_quotes_is_the_posix_one ... FAILED
+
+failures:
+
+failures:
+    shell::tests::atip_crateshell_03_a_backslash_outside_quotes_is_the_posix_one
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err>
+thread &apos;shell::tests::atip_crateshell_03_a_backslash_outside_quotes_is_the_posix_one&apos; (92546719) panicked at crates/atip/src/shell.rs:194:9:
+assertion `left == right` failed
+  left: [&quot;a\\&quot;, &quot;b&quot;]
+ right: [&quot;a b&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="shell::tests::atip_crateshell_05_quote_writes_the_strings_canon_already_prints" classname="atip" timestamp="2026-11-02T15:43:39.953+09:00" time="0.016"/>
+        <testcase name="shell::tests::atip_crateshell_02_every_short_word_list_over_the_awkward_characters_round_trips" classname="atip" timestamp="2026-11-02T15:43:39.953+09:00" time="0.017">
+            <failure message="thread &apos;shell::tests::atip_crateshell_02_every_short_word_list_over_the_awkward_characters_round_trips&apos; (92546720) panicked at crates/atip/src/shell.rs:174:13" type="test failure with exit code 101">thread &apos;shell::tests::atip_crateshell_02_every_short_word_list_over_the_awkward_characters_round_trips&apos; (92546720) panicked at crates/atip/src/shell.rs:174:13:
+assertion `left == right` failed: &quot;&apos;&quot;
+  left: [&quot;\\&quot;]
+ right: [&quot;&apos;&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test shell::tests::atip_crateshell_02_every_short_word_list_over_the_awkward_characters_round_trips ... FAILED
+
+failures:
+
+failures:
+    shell::tests::atip_crateshell_02_every_short_word_list_over_the_awkward_characters_round_trips
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.00s
+
+</system-out>
+            <system-err>
+thread &apos;shell::tests::atip_crateshell_02_every_short_word_list_over_the_awkward_characters_round_trips&apos; (92546720) panicked at crates/atip/src/shell.rs:174:13:
+assertion `left == right` failed: &quot;&apos;&quot;
+  left: [&quot;\\&quot;]
+ right: [&quot;&apos;&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="shell::tests::atip_crateshell_04_a_backslash_inside_quotes_is_unchanged_and_an_unclosed_quote_does_not_panic" classname="atip" timestamp="2026-11-02T15:43:39.953+09:00" time="0.039"/>
+    </testsuite>
+    <testsuite name="atip-check::atip_crateshell" tests="2" skipped="0" errors="0" failures="1">
+        <testcase name="atip_crateshell_06_a_command_that_does_not_split_to_its_argv_still_fails" classname="atip-check::atip_crateshell" timestamp="2026-11-02T15:43:39.953+09:00" time="0.072"/>
+        <testcase name="atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next" classname="atip-check::atip_crateshell" timestamp="2026-11-02T15:43:39.953+09:00" time="0.072">
+            <failure message="thread &apos;atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next&apos; (92546722) panicked at crates/atip-check/tests/atip_crateshell.rs:29:9" type="test failure with exit code 101">thread &apos;atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next&apos; (92546722) panicked at crates/atip-check/tests/atip_crateshell.rs:29:9:
+&quot;it&apos;s&quot;: [&quot;next command \&quot;acme member tag --name &apos;it&apos;\\\\&apos;&apos;s&apos; --json\&quot; splits to [\&quot;acme\&quot;, \&quot;member\&quot;, \&quot;tag\&quot;, \&quot;--name\&quot;, \&quot;it\\\\s --json\&quot;], not [\&quot;acme\&quot;, \&quot;member\&quot;, \&quot;tag\&quot;, \&quot;--name\&quot;, \&quot;it&apos;s\&quot;, \&quot;--json\&quot;]&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next ... FAILED
+
+failures:
+
+failures:
+    atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.06s
+
+</system-out>
+            <system-err>
+thread &apos;atip_crateshell_06_a_single_quoted_value_in_meta_next_passes_l0_next&apos; (92546722) panicked at crates/atip-check/tests/atip_crateshell.rs:29:9:
+&quot;it&apos;s&quot;: [&quot;next command \&quot;acme member tag --name &apos;it&apos;\\\\&apos;&apos;s&apos; --json\&quot; splits to [\&quot;acme\&quot;, \&quot;member\&quot;, \&quot;tag\&quot;, \&quot;--name\&quot;, \&quot;it\\\\s --json\&quot;], not [\&quot;acme\&quot;, \&quot;member\&quot;, \&quot;tag\&quot;, \&quot;--name\&quot;, \&quot;it&apos;s\&quot;, \&quot;--json\&quot;]&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>
