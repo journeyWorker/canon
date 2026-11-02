@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev"
+  },
+  "at": "2026-11-02T12:30:48.094040Z",
+  "code_tree": "a76cb7672a4fb537ba11c68f7b7ab34f74fed4bb",
+  "kind": "review",
+  "pin": "9f6003921f49d3309b8869ea265ed4c1100e573e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_99_contract_1_2_from_the_option_or_the_fixture_is_a_claim_of_1_2_and_the_report_carries_it"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "d2adc43cf4ab305ca8dc2f7e75fe5a426c9dcc409210ea9e5811d8290e8a9230",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-1-2/brief.md"
+  },
+  "review_id": "01M6E3V98YDCK7ZES2P6EMQJXZ",
+  "reviewer": "rev-check-0-35",
+  "scenario_id": "atip.check.99",
+  "schema": 2,
+  "worktree_dirty": false
+}
