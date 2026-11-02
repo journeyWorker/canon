@@ -4,15 +4,16 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev-b"
   },
-  "at": "2026-11-02T19:31:15.044016Z",
-  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "at": "2026-11-02T23:34:25.879391Z",
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
   "kind": "review",
-  "pin": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "pin": "9cbcf88b15cbfb802f99b62f4850dff6c4c4036c",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_checkl2input_11_an_env_value_applies_after_the_merge_only"
+          "junit:atip_checkl2input_11_an_env_value_applies_after_the_merge_only",
+          "junit:atip_checkl2input_11_only_an_option_that_is_the_sole_declarer_of_its_env_variable_is_probed_and_with_none_the_row_is_unsupported"
         ],
         "role": "implementer",
         "verdict": "faithful"
@@ -25,9 +26,9 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
   },
-  "review_id": "01M6EVX4Z40Q7SY8PS2KSJJSAS",
+  "review_id": "01M6F9TDTQPYM5QTKKEA8N57F1",
   "reviewer": "rev-check-0-35b",
   "scenario_id": "atip.checkl2input.11",
   "schema": 2,
-  "worktree_dirty": true
+  "worktree_dirty": false
 }

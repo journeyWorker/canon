@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T23:33:48.429640Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/l1/rules.rs",
+  "introduced_by": "24b2608dbf2ad70789cb16db7f623e05d49849b7",
+  "kind": "finding",
+  "reviewed_sha": "9cbcf88b15cbfb802f99b62f4850dff6c4c4036c",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.checkl2input.02"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Contract text (for the author, not a code defect): L1.tree now passes a tree whose level is at or above the claim (level_meets, rules.rs; message 'is below the claimed level'); checker.md section 1 still reads 'the checker also reads data.level from schema --json and fails when the two differ'. Canon at --level L2 fails L1.tree as before (tree L1 is below L2). A tool that declares L2 and is checked at L1 now passes where the text says differ. Needs the sentence in checker.md to say 'below'. Unknown levels still fail (declared == claimed). Blast radius: none until claim-l2 flips canon.",
+  "worktree_dirty": false
+}

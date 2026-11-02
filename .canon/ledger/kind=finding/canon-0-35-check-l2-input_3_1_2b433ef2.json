@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T23:33:44.935861Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/input.rs",
+  "introduced_by": "4b456b6fb59ace76c649e1ccb2083feb31417fc1",
+  "kind": "finding",
+  "reviewed_sha": "9cbcf88b15cbfb802f99b62f4850dff6c4c4036c",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.checkl2input.13"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity + mutation probe (checker.md L2.input-dash-values: 'accepted as values (no option, file or inline-JSON misreading)'; spec 11.9): read_as_value (input.rs) counts ANY refusal whose field names the argument or /operands and whose error.received equals the value as 'read as a value', whatever the code. A tool that reads a document value {x, [x or -x as inline JSON or an option and refuses it as INPUT_INVALID, reason INVALID_VALUE, field /operands/0, received <the value> passes the MUST row. Probe: a wrapper over the conforming L2 fake answering exactly that for those three values: with received set, L2.input-dash-values pass and atip check exits 0 (level met); the control with received left out fails L2.input-dash-values only (plus L0.no-null for the null the wrapper printed). The ruling's own cases are domain and precondition refusals of a value that was read as a value; an INPUT_* code means the document was rejected, which is the misreading itself. Blast radius: every tool at L2; the seeded case dashValuesAsOptions refuses with USAGE and no received, so atip.checkl2input.13 cannot see it. Fix: accept a refusal as a value only when its code is not INPUT_INVALID/INPUT_CONFLICT/INPUT_TOO_LARGE (or the reason is not framing) and the value is quoted as received; keep the precondition fall-through.",
+  "worktree_dirty": false
+}
