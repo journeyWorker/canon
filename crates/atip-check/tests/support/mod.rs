@@ -514,3 +514,73 @@ pub fn case_verdict(data: &Value, owner: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// What `reason` says of `messages` (approaches/checker.md 2): the first three, each cut at 240 characters, and how many more.
+pub fn reason_of_messages(messages: &[String]) -> String {
+    let cut = |message: &String| {
+        let mut kept: String = message.chars().take(240).collect();
+        if message.chars().count() > 240 {
+            kept.push('…');
+        }
+        kept
+    };
+    let mut reason = messages.iter().take(3).map(cut).collect::<Vec<_>>().join("; ");
+    if messages.len() > 3 {
+        reason.push_str(&format!("; and {} more", messages.len() - 3));
+    }
+    reason
+}
+
+/// The `findings[]` of the report (approaches/checker.md 2): only a failed or unprovided check has them; each has `kind` and
+/// `message` and no member but `argv` and `code` besides; a failed check's `reason` is the first three messages; a `code`
+/// belongs to a refused fixture call; and the owner of the violated condition has a finding of kind `kind`.
+pub fn kind_verdict(data: &Value, owner: &str, kind: &str) -> Result<(), String> {
+    let checks = data["checks"].as_array().ok_or("data.checks is missing")?;
+    for check in checks {
+        let id = check["id"].as_str().unwrap_or_default();
+        let result = check["result"].as_str().unwrap_or_default();
+        let findings = check.get("findings");
+        if !matches!(result, "fail" | "unprovided") {
+            if findings.is_some() {
+                return Err(format!("{id} is {result} and has findings"));
+            }
+            continue;
+        }
+        let findings = findings.and_then(Value::as_array).ok_or(format!("{id} is {result} without findings"))?;
+        if findings.is_empty() {
+            return Err(format!("{id} has an empty findings"));
+        }
+        for finding in findings {
+            let object = finding.as_object().ok_or(format!("{id}: a finding is not an object"))?;
+            if let Some(member) = object.keys().find(|key| !matches!(key.as_str(), "kind" | "message" | "argv" | "code")) {
+                return Err(format!("{id}: a finding has the member {member}"));
+            }
+            if finding["kind"].as_str().is_none_or(str::is_empty) || finding["message"].as_str().is_none_or(str::is_empty) {
+                return Err(format!("{id}: a finding without kind or message: {finding}"));
+            }
+            if object.contains_key("argv") && !finding["argv"].as_array().is_some_and(|argv| !argv.is_empty() && argv.iter().all(Value::is_string)) {
+                return Err(format!("{id}: argv is not a list of words: {finding}"));
+            }
+            if object.contains_key("code") && finding["kind"] != "refused-precondition" {
+                return Err(format!("{id}: a code on {}", finding["kind"]));
+            }
+        }
+        if result == "fail" {
+            let messages: Vec<String> = findings.iter().map(|finding| finding["message"].as_str().unwrap_or_default().to_string()).collect();
+            let reason = check["reason"].as_str().unwrap_or_default();
+            if reason != reason_of_messages(&messages) {
+                return Err(format!("{id}: reason {reason:?} is not the first three messages of {messages:?}"));
+            }
+        }
+    }
+    let found = checks
+        .iter()
+        .find(|check| check["id"] == owner)
+        .and_then(|check| check["findings"].as_array())
+        .ok_or(format!("{owner} has no findings"))?;
+    if !found.iter().any(|finding| finding["kind"] == kind) {
+        let kinds: Vec<&str> = found.iter().filter_map(|finding| finding["kind"].as_str()).collect();
+        return Err(format!("{owner} has no finding of kind {kind}: {kinds:?}"));
+    }
+    Ok(())
+}

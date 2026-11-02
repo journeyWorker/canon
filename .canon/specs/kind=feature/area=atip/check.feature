@@ -836,3 +836,102 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given a fake tool with one planted violation of a check that 1.1 added: a missing contractVersion, an error on stderr, an unknown meta member or an unregistered reason
     When the tool author reads the result of atip check, as data.checks and as text
     Then the check that owns the violation is fail with its rule numbers, the reason that says what broke and the invocation that decided it, the error names that check, and every other check passes or does not apply
+
+  # canon: {"schema":1,"at":"2026-11-02T06:47:29Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-findings.F1
+  @atip.check.77
+  Scenario: Each finding of a failed check carries its kind, its message and the argv of the call
+    Given a fake tool whose probe answers carry a wrong contractVersion in several calls
+    When the wrapper author reads atip check --json for L0.contract-version
+    Then data.checks[].findings[] of that check has one entry per finding, each with kind (the condition's name), message (the sentence reason is made of) and the argv of the call, equal to the argv in observed
+
+  # canon: {"schema":1,"at":"2026-11-02T06:47:46Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-findings.F1
+  @atip.check.78
+  Scenario: A finding that no single call decided has no argv, and no finding of a check carries a code of its own
+    Given a fake tool whose violation is decided by the whole registry document, and the seeded violations of every check
+    When atip check runs with --json
+    Then that finding has kind and message and no argv, and no finding has a code
+
+  # canon: {"schema":1,"at":"2026-11-02T06:47:51Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-findings.F1
+  @atip.check.79
+  Scenario: A check that lacks a fixture entry lists it as a missing-fixture-entry finding, and a passing check has no findings
+    Given a fixture without the entries a check needs, and a conforming tool
+    When atip check runs
+    Then every unprovided check has findings of kind missing-fixture-entry whose message is the entry name, and no check that passes has a findings member
+
+  # canon: {"schema":1,"at":"2026-11-02T06:47:56Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-findings.F2
+  @atip.check.80
+  Scenario: Every finding is listed, and the and-N-more of the reason counts the rest of the list
+    Given a fake tool that plants more than five violations of one check
+    When the wrapper author counts data.checks[].findings[]
+    Then the list has one entry for each violation and the and N more of the reason is the count of the entries after the third
+
+  # canon: {"schema":1,"at":"2026-11-02T06:48:00Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-findings.F2
+  @atip.check.81
+  Scenario: A message longer than 240 characters is whole in findings and cut only in the reason
+    Given a fake tool whose violation message is longer than 240 characters
+    When atip check runs with --json
+    Then findings[] holds the whole message and reason holds it cut at 240 characters
+
+  # canon: {"schema":1,"at":"2026-11-02T06:48:04Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-findings.F3
+  @atip.check.82
+  Scenario: The text report carries no findings, and a cut reason says where the rest is
+    Given a failed check whose reason is cut, and one whose reason is whole
+    When the text report is read
+    Then the cut line ends with (all in --json findings), the whole one does not, and the text has no findings
+
+  # canon: {"schema":1,"at":"2026-11-02T06:48:09Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:happy
+  @flow:canon-0-35-check-findings.F4
+  @atip.check.83
+  Scenario: Every seeded violation is found by its kind in the findings of its owner
+    Given every seeded violation of the L0 and L1 checks
+    When atip check runs with --json
+    Then the owner's findings[] has an entry of the violated condition's kind, members are only kind, message, argv and code, and the report passes the envelope schema
+
+  # canon: {"schema":1,"at":"2026-11-02T06:48:12Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-findings.F4
+  @atip.check.84
+  Scenario: A renamed condition with the test expectation unchanged fails the test
+    Given a seeded-violation test whose expected kind is not the condition's name
+    When the verdict of the case is read
+    Then it is refused, so renaming a condition with the test unchanged fails the test
+
+  # canon: {"schema":1,"at":"2026-11-02T06:48:16Z","actor":{"agent_id":"impl-check-0-35","role":"implementer","session_id":"s-0-35-check"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:edge
+  @flow:canon-0-35-check-findings.F4
+  @atip.check.85
+  Scenario: The results, the level and the exit code are the same with findings as without
+    Given the seeded-violation tests of 0.34
+    When they run on the checker with findings
+    Then every result, level and exit code is what it was

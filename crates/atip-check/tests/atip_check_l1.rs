@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use atip_check::app::check_binary_mutated;
 use atip_check::cli::{CheckArgs, Level};
 use support::l1::{l1_bin, l1_cases, l1_config, l1_engine_difference_case, l1_standard_config};
-use support::{atip_in, Case, Harness, Output};
+use support::{atip_in, kind_verdict, Case, Harness, Output};
 
 /// The L0 checks of a run and the L1 ones that apply to a 1.1 claim.
 const L0_CHECKS: usize = 28;
@@ -126,6 +126,7 @@ fn proves(ids: &[&str]) {
                 let output = run_case(&case);
                 let document = output.envelope();
                 verdict(&document["data"], &owner).map_err(|why| format!("{}: {why}\n{}", case.condition, output.stdout.chars().take(600).collect::<String>()))?;
+                kind_verdict(&document["data"], &owner, case.condition.split('/').nth(1).unwrap_or_default()).map_err(|why| format!("{}: {why}", case.condition))?;
                 let must = check_of(&document["data"], &owner)["strength"] == "MUST";
                 let expected = if must { (Some(1), Some(false)) } else { (Some(0), Some(true)) };
                 let got = (output.code, document["ok"].as_bool());

@@ -23,7 +23,7 @@ use crate::claim::Claim;
 use crate::cli::Level;
 use crate::exec::{Call, Exit, Outcome, RunError, Runner};
 use crate::fixture::{Fixture, RegistryRow};
-use crate::report::{Check, CheckResult, Report, Strength};
+use crate::report::{Check, CheckResult, Detail, Report, Strength};
 use crate::schema::schemas;
 
 pub mod documents;
@@ -160,6 +160,10 @@ const RESERVED: [(&str, i64); 4] = [
 struct Finding {
     result: CheckResult,
     reason: Option<String>,
+    /// Everything the check found, whole (`fail` and `unprovided`); `reason` is its first messages, cut.
+    details: Vec<Detail>,
+    /// Whether `reason` leaves part of `details` out.
+    cut: bool,
     advisories: Vec<String>,
     observed: Vec<usize>,
     /// Facts the check found that do not change its result.
@@ -170,8 +174,8 @@ struct Finding {
 const REASON_PROBLEMS: usize = 3;
 const PROBLEM_CHARS: usize = 240;
 
-/// The reason of a failed check: the first problems, each cut short, and how many more there are.
-fn reason_of(problems: &[String]) -> String {
+/// The reason of a failed check: the first problems, each cut short, and how many more there are. Whether it left something out.
+fn reason_and_cut(problems: &[String]) -> (String, bool) {
     let cut = |problem: &String| {
         let mut kept: String = problem.chars().take(PROBLEM_CHARS).collect();
         if problem.chars().count() > PROBLEM_CHARS {
@@ -188,7 +192,8 @@ fn reason_of(problems: &[String]) -> String {
     if problems.len() > REASON_PROBLEMS {
         reason.push_str(&format!("; and {} more", problems.len() - REASON_PROBLEMS));
     }
-    reason
+    let left_out = problems.len() > REASON_PROBLEMS || problems.iter().take(REASON_PROBLEMS).any(|problem| problem.chars().count() > PROBLEM_CHARS);
+    (reason, left_out)
 }
 
 /// `argv` in JSON mode: with `--json` before any `--`.
@@ -568,6 +573,8 @@ pub(crate) fn run_checks(
                 Finding {
                     result: CheckResult::Pass,
                     reason: None,
+                    details: Vec::new(),
+                    cut: false,
                     ..finding
                 }
             } else {
@@ -580,6 +587,8 @@ pub(crate) fn run_checks(
                 rules: entry.rules.to_vec(),
                 reason: finding.reason,
                 advisories: finding.advisories,
+                findings: finding.details,
+                cut: finding.cut,
                 notes: finding.notes,
                 unlisted: if matches!(entry.id, "L1.constraints" | "L1.domains" | "L1.validators") { l1.as_ref().map(|l1| l1.unprobed_writes.clone()).unwrap_or_default() } else { Vec::new() },
                 observed: finding
@@ -601,8 +610,8 @@ pub(crate) fn run_checks(
 enum End {
     /// The check exercised its subject (`true`), or saw nothing of it (`false`: it does not apply). A missing fixture entry it needs makes it `unprovided`.
     Exercised(bool),
-    /// The check cannot tell without something the fixture lacks.
-    Unprovided(String),
+    /// The check cannot tell without something the fixture lacks: the reason (cut as `reason_and_cut` cuts, or whole), and the fixture entries that would give it.
+    Unprovided { reason: String, cut: bool, entries: Vec<String> },
     /// The check does not apply, for this reason.
     Unsupported(String),
     /// The check observed its subject, so it needs no fixture entry to say so: nothing it judged failed.
@@ -611,12 +620,29 @@ enum End {
     Entailed(Vec<String>),
 }
 
+impl End {
+    /// The check lacks one fixture entry, named `entry` as the fixture spells it (`commands`, `commands.<id>.paged`).
+    fn missing(entry: impl Into<String>, why: impl Into<String>) -> Self {
+        Self::Unprovided {
+            reason: why.into(),
+            cut: false,
+            entries: vec![entry.into()],
+        }
+    }
+
+    /// The check lacks several, each with its `why`: the reason is those, cut as every reason is.
+    fn missing_all(whys: Vec<String>, entries: Vec<String>) -> Self {
+        let (reason, cut) = reason_and_cut(&whys);
+        Self::Unprovided { reason, cut, entries }
+    }
+}
+
 /// The conditions of one check being judged: what fails, what was looked at, what is only recommended.
 struct Conditions<'j> {
     judge: &'j Judge<'j>,
     entry: &'static Entry,
     name: &'static str,
-    problems: Vec<String>,
+    problems: Vec<Detail>,
     advisories: Vec<String>,
     observed: Vec<usize>,
     /// Facts found that do not change the result.
@@ -626,17 +652,57 @@ struct Conditions<'j> {
 }
 
 impl<'j> Conditions<'j> {
-    /// Judges condition `condition`: `holds` says whether it did, `why` says what is wrong when it did not.
+    /// Judges condition `condition`: `holds` says whether it did, `why` says what is wrong when it did not. The finding has no `argv`:
+    /// no one invocation decided it.
     fn holds(&mut self, condition: &'static str, holds: bool, why: impl FnOnce() -> String) {
-        let id = format!("{}/{condition}", self.name);
-        let skipped = self
-            .judge
-            .mutation
-            .skipped_conditions
-            .contains(&id.as_str());
-        self.judge.seen.borrow_mut().insert(id);
+        self.holds_in(None, condition, holds, why);
+    }
+
+    /// Like [`Conditions::holds`], for a condition the invocation `index` of the log decided: the finding carries its argv.
+    fn holds_at(&mut self, index: usize, condition: &'static str, holds: bool, why: impl FnOnce() -> String) {
+        self.holds_in(Some(index), condition, holds, why);
+    }
+
+    /// Judges condition `condition` that fails once for each of `problems` (none: it holds): one finding each, whole.
+    /// `index` is the invocation that decided them, when one did.
+    fn holds_each(&mut self, index: Option<usize>, condition: &'static str, problems: Vec<String>) {
+        self.holds_each_at(condition, problems.into_iter().map(|problem| (index, problem)).collect());
+    }
+
+    /// Like [`Conditions::holds_each`], each problem with the invocation that decided it.
+    fn holds_each_at(&mut self, condition: &'static str, problems: Vec<(Option<usize>, String)>) {
+        let id = self.see(condition);
+        if self.judge.mutation.skipped_conditions.contains(&id.as_str()) {
+            return;
+        }
+        for (index, problem) in problems {
+            let detail = self.detail(index, condition, problem);
+            self.problems.push(detail);
+        }
+    }
+
+    /// Like [`Conditions::holds`], for a condition decided by the invocation `index` of the log, when one decided it.
+    fn holds_in(&mut self, index: Option<usize>, condition: &'static str, holds: bool, why: impl FnOnce() -> String) {
+        let id = self.see(condition);
+        let skipped = self.judge.mutation.skipped_conditions.contains(&id.as_str());
         if !holds && !skipped {
-            self.problems.push(why());
+            let detail = self.detail(index, condition, why());
+            self.problems.push(detail);
+        }
+    }
+
+    /// Records that the check judged `condition`, and its id.
+    fn see(&self, condition: &'static str) -> String {
+        let id = format!("{}/{condition}", self.name);
+        self.judge.seen.borrow_mut().insert(id.clone());
+        id
+    }
+
+    fn detail(&self, index: Option<usize>, kind: &'static str, message: String) -> Detail {
+        let detail = Detail::new(kind, message);
+        match index {
+            Some(index) => detail.with_argv(&self.judge.at(index).call.argv),
+            None => detail,
         }
     }
 
@@ -671,64 +737,60 @@ impl<'j> Conditions<'j> {
                 self.judge.at(*index).call.argv.join(" "),
                 self.judge.limit(*index).as_secs_f64()
             );
+            let (cut_reason, cut) = reason_and_cut(std::slice::from_ref(&reason));
             return Finding {
                 result: CheckResult::Fail,
-                reason: Some(reason),
+                details: vec![Detail::new("ran-over-time-limit", reason).with_argv(&self.judge.at(*index).call.argv)],
+                reason: Some(cut_reason),
+                cut,
                 advisories: self.advisories,
                 observed: self.observed,
                 notes: self.notes,
             };
         }
         if !self.problems.is_empty() {
+            let messages: Vec<String> = self.problems.iter().map(|problem| problem.message.clone()).collect();
+            let (reason, cut) = reason_and_cut(&messages);
             return Finding {
                 result: CheckResult::Fail,
-                reason: Some(reason_of(&self.problems)),
+                reason: Some(reason),
+                details: self.problems,
+                cut,
                 advisories: self.advisories,
                 observed: self.observed,
                 notes: self.notes,
             };
         }
-        let unprovided = |reason: String, advisories: Vec<String>, notes: Vec<String>| Finding {
+        let unprovided = |reason: String, cut: bool, entries: Vec<String>, advisories: Vec<String>, notes: Vec<String>| Finding {
             result: CheckResult::Unprovided,
             reason: Some(reason),
+            details: entries.into_iter().map(|entry| Detail::new("missing-fixture-entry", entry)).collect(),
+            cut,
             advisories,
             observed: Vec::new(),
             notes,
         };
+        let quiet = |result, reason, observed, advisories, notes| Finding {
+            result,
+            reason,
+            details: Vec::new(),
+            cut: false,
+            advisories,
+            observed,
+            notes,
+        };
         match end {
-            End::Unprovided(reason) => return unprovided(reason, self.advisories, self.notes),
-            End::Unsupported(reason) => {
-                return Finding {
-                    result: CheckResult::Unsupported,
-                    reason: Some(reason),
-                    advisories: self.advisories,
-                    observed: self.observed,
-                    notes: self.notes,
-                }
-            }
-            End::Observed => {
-                return Finding {
-                    result: CheckResult::Pass,
-                    reason: None,
-                    advisories: self.advisories,
-                    observed: self.observed,
-                    notes: self.notes,
-                }
-            }
+            End::Unprovided { reason, cut, entries } => return unprovided(reason, cut, entries, self.advisories, self.notes),
+            End::Unsupported(reason) => return quiet(CheckResult::Unsupported, Some(reason), self.observed, self.advisories, self.notes),
+            End::Observed => return quiet(CheckResult::Pass, None, self.observed, self.advisories, self.notes),
             End::Entailed(rules) => {
                 let mut notes = self.notes;
                 notes.extend(rules);
-                return Finding {
-                    result: CheckResult::Entailed,
-                    reason: None,
-                    advisories: self.advisories,
-                    observed: self.observed,
-                    notes,
-                };
+                return quiet(CheckResult::Entailed, None, self.observed, self.advisories, notes);
             }
             End::Exercised(_) => {}
         }
-        let missing: Vec<&str> = self
+        let missing: Vec<(&str, &str)> = self
             .entry
             .needs
             .iter()
@@ -738,28 +800,29 @@ impl<'j> Conditions<'j> {
                 Commands => self.judge.fixture.commands.is_none(),
             })
             .map(|need| match need {
-                Probe => "`probe` (the id of a command that runs without state)",
-                Registry => "`registry` (the tool's error codes)",
-                Commands => "`commands` (invocations of the tool's commands)",
+                Probe => ("probe", "`probe` (the id of a command that runs without state)"),
+                Registry => ("registry", "`registry` (the tool's error codes)"),
+                Commands => ("commands", "`commands` (invocations of the tool's commands)"),
             })
             .collect();
         if !missing.is_empty() {
-            return unprovided(format!("the fixture has no {}", missing.join(" and ")), self.advisories, self.notes);
+            let why = format!("the fixture has no {}", missing.iter().map(|(_, text)| *text).collect::<Vec<_>>().join(" and "));
+            return unprovided(why, false, missing.iter().map(|(name, _)| (*name).to_string()).collect(), self.advisories, self.notes);
         }
         let exercised = matches!(end, End::Exercised(true));
         let reason = (!exercised)
             .then(|| "no envelope the run saw carries what this check judges".to_string());
-        Finding {
-            result: if exercised {
+        quiet(
+            if exercised {
                 CheckResult::Pass
             } else {
                 CheckResult::Unsupported
             },
             reason,
-            advisories: self.advisories,
-            observed: self.observed,
-            notes: self.notes,
-        }
+            self.observed,
+            self.advisories,
+            self.notes,
+        )
     }
 }
 
@@ -917,13 +980,13 @@ impl<'a> Judge<'a> {
         let outcome = self.at(calls.version);
         let mut c = self.check("L0.version");
         c.own(calls.version);
-        c.holds("exit-0", outcome.exit == Exit::Code(0), || {
+        c.holds_at(calls.version, "exit-0", outcome.exit == Exit::Code(0), || {
             format!("exit is {}, expected 0", exit_text(outcome.exit))
         });
-        c.holds("stdout-non-empty", !outcome.stdout.is_empty(), || {
+        c.holds_at(calls.version, "stdout-non-empty", !outcome.stdout.is_empty(), || {
             "stdout is empty".to_string()
         });
-        c.holds("stderr-empty", outcome.stderr.is_empty(), || {
+        c.holds_at(calls.version, "stderr-empty", outcome.stderr.is_empty(), || {
             format!("stderr is {:?}, expected it empty", excerpt(&outcome.stderr))
         });
         c.finish(true)
@@ -942,7 +1005,7 @@ impl<'a> Judge<'a> {
                 && line
                     .strip_prefix(&format!("{} ", self.tool))
                     .is_some_and(|version| !version.trim().is_empty());
-            c.holds("tool-version-line", ok, || {
+            c.holds_at(calls.version, "tool-version-line", ok, || {
                 format!(
                     "stdout is {line:?}, expected one line `{} <version>`",
                     self.tool
@@ -957,12 +1020,12 @@ impl<'a> Judge<'a> {
         let mut c = self.check("L0.unknown-command");
         c.own(calls.unknown_command);
         let document = self.envelope(calls.unknown_command);
-        c.holds("envelope", document.is_some(), || {
+        c.holds_at(calls.unknown_command, "envelope", document.is_some(), || {
             "stdout is not an envelope".to_string()
         });
         if let Some(document) = document {
             for (condition, holds, why) in unknown_command_conditions(document) {
-                c.holds(condition, holds, || why);
+                c.holds_at(calls.unknown_command, condition, holds, || why);
             }
         }
         c.finish(true)
@@ -973,13 +1036,13 @@ impl<'a> Judge<'a> {
         let outcome = self.at(calls.unknown_command_text);
         let mut c = self.check("L0.unknown-command-text");
         c.own(calls.unknown_command_text);
-        c.holds("exit-2", outcome.exit == Exit::Code(2), || {
+        c.holds_at(calls.unknown_command_text, "exit-2", outcome.exit == Exit::Code(2), || {
             format!("exit is {}, expected 2", exit_text(outcome.exit))
         });
-        c.holds("stdout-empty", outcome.stdout.is_empty(), || {
+        c.holds_at(calls.unknown_command_text, "stdout-empty", outcome.stdout.is_empty(), || {
             "stdout is not empty: a refusal in text mode prints nothing on stdout".to_string()
         });
-        c.holds("stderr-non-empty", !outcome.stderr.is_empty(), || {
+        c.holds_at(calls.unknown_command_text, "stderr-non-empty", !outcome.stderr.is_empty(), || {
             "stderr is empty".to_string()
         });
         c.finish(true)
@@ -994,7 +1057,7 @@ impl<'a> Judge<'a> {
             c.observe(calls.unknown_command_text);
             let prefix = format!("{}: UNKNOWN_COMMAND: ", self.tool);
             let stderr = String::from_utf8_lossy(&outcome.stderr);
-            c.holds("prefix", stderr.starts_with(&prefix), || {
+            c.holds_at(calls.unknown_command_text, "prefix", stderr.starts_with(&prefix), || {
                 format!(
                     "stderr starts {:?}, expected {prefix:?}",
                     first_line(&stderr)
@@ -1009,12 +1072,12 @@ impl<'a> Judge<'a> {
         let mut c = self.check("L0.bare");
         c.own(calls.bare);
         let document = self.envelope(calls.bare);
-        c.holds("envelope", document.is_some(), || {
+        c.holds_at(calls.bare, "envelope", document.is_some(), || {
             "stdout is not an envelope".to_string()
         });
         if let Some(document) = document {
             let code = document.pointer("/error/code").and_then(Value::as_str);
-            c.holds("code", code == Some("COMMAND_REQUIRED"), || {
+            c.holds_at(calls.bare, "code", code == Some("COMMAND_REQUIRED"), || {
                 format!(
                     "error.code is {}, expected COMMAND_REQUIRED",
                     code.unwrap_or("missing")
@@ -1035,7 +1098,8 @@ impl<'a> Judge<'a> {
             let code = document.pointer("/error/code").and_then(Value::as_str);
             // A code the registry lacks is `L0.registry`'s; a registered one must be a refusal.
             let row = code.and_then(|code| self.row(code));
-            c.holds(
+            c.holds_at(
+                probe.unknown_option,
                 "code-is-a-refusal",
                 row.is_none_or(|row| row.exit == 2),
                 || {
@@ -1047,7 +1111,7 @@ impl<'a> Judge<'a> {
                 },
             );
             let field = document.pointer("/error/field").and_then(Value::as_str);
-            c.holds("field", field == Some(NO_SUCH_OPTION), || {
+            c.holds_at(probe.unknown_option, "field", field == Some(NO_SUCH_OPTION), || {
                 format!(
                     "error.field is {}, expected {NO_SUCH_OPTION:?}",
                     show(document.pointer("/error/field"))
@@ -1055,7 +1119,7 @@ impl<'a> Judge<'a> {
             });
             let id = self.fixture.probe_id().unwrap_or_default();
             let command = document.pointer("/meta/command").and_then(Value::as_str);
-            c.holds("meta-command", command == Some(id.as_str()), || {
+            c.holds_at(probe.unknown_option, "meta-command", command == Some(id.as_str()), || {
                 format!(
                     "meta.command is {}, expected {id:?}",
                     show(document.pointer("/meta/command"))
@@ -1082,7 +1146,7 @@ impl<'a> Judge<'a> {
             let failure = self
                 .envelope(index)
                 .is_some_and(|document| document.get("ok") == Some(&Value::Bool(false)));
-            c.holds(condition, failure, || {
+            c.holds_at(index, condition, failure, || {
                 format!(
                     "{} did not print a failure envelope on stdout",
                     self.label(index)
@@ -1098,7 +1162,8 @@ impl<'a> Judge<'a> {
             return c.finish(false);
         };
         c.own(probe.after_dashdash);
-        c.holds(
+        c.holds_at(
+            probe.after_dashdash,
             "not-an-envelope",
             self.envelope(probe.after_dashdash).is_none(),
             || "`--json` after `--` still selected JSON mode".to_string(),
@@ -1117,14 +1182,14 @@ impl<'a> Judge<'a> {
             }
             let before = c.problems.len();
             let label = self.label(index);
-            c.holds("exit-range", exit_is_allowed(outcome.exit), || {
+            c.holds_at(index, "exit-range", exit_is_allowed(outcome.exit), || {
                 format!(
                     "{label} exited {}, outside 0, 1 and 2 and not a signal exit",
                     exit_text(outcome.exit)
                 )
             });
             if let (true, Some(document)) = (outcome.call.json_mode(), self.envelope(index)) {
-                self.envelope_exit(&mut c, &label, outcome.exit, document);
+                self.envelope_exit(&mut c, index, &label, outcome.exit, document);
             }
             if c.problems.len() > before {
                 c.observe(index);
@@ -1146,12 +1211,12 @@ impl<'a> Judge<'a> {
                         })
                 })
                 .collect();
-            c.holds("reserved-codes", wrong.is_empty(), || wrong.join(", "));
+            c.holds_each(None, "reserved-codes", wrong);
         }
         c.finish(true)
     }
 
-    fn envelope_exit(&self, c: &mut Conditions<'_>, label: &str, exit: Exit, document: &Value) {
+    fn envelope_exit(&self, c: &mut Conditions<'_>, index: usize, label: &str, exit: Exit, document: &Value) {
         let Some(ok) = document.get("ok").and_then(Value::as_bool) else {
             return;
         };
@@ -1160,14 +1225,15 @@ impl<'a> Judge<'a> {
             _ => None,
         };
         if let Some(code) = code {
-            c.holds("ok-iff-exit-0", ok == (code == 0), || {
+            c.holds_at(index, "ok-iff-exit-0", ok == (code == 0), || {
                 format!("{label} exited {code} with `ok` {ok}")
             });
         }
         if ok {
             return;
         }
-        c.holds(
+        c.holds_at(
+            index,
             "no-data-on-refusal",
             !(code == Some(2) && document.get("data").is_some()),
             || format!("{label} was refused (exit 2) and carries `data`"),
@@ -1180,7 +1246,7 @@ impl<'a> Judge<'a> {
             return;
         };
         if let Some(code) = code {
-            c.holds("exit-is-registered", i64::from(code) == row.exit, || {
+            c.holds_at(index, "exit-is-registered", i64::from(code) == row.exit, || {
                 format!(
                     "{label} failed with {error_code} and exited {code}, the registry says {}",
                     row.exit
@@ -1191,7 +1257,7 @@ impl<'a> Judge<'a> {
             .pointer("/error/retryable")
             .and_then(Value::as_bool)
         {
-            c.holds("retryable-is-registered", retryable == row.retryable, || format!("{label} failed with {error_code} and `retryable` {retryable}, the registry says {}", row.retryable));
+            c.holds_at(index, "retryable-is-registered", retryable == row.retryable, || format!("{label} failed with {error_code} and `retryable` {retryable}, the registry says {}", row.retryable));
         }
     }
 
@@ -1200,7 +1266,7 @@ impl<'a> Judge<'a> {
         let mut c = self.check("L0.no-null");
         for (index, document) in self.documents_of_json_runs() {
             let found = rules::null_problems(document);
-            c.holds("no-null", found.is_empty(), || {
+            c.holds_at(index, "no-null", found.is_empty(), || {
                 format!(
                     "{} printed {}",
                     self.label(index),
@@ -1224,7 +1290,7 @@ impl<'a> Judge<'a> {
             } else {
                 rules::envelope_problems(document, self.claim)
             };
-            c.holds("valid-envelope", found.is_empty(), || {
+            c.holds_at(index, "valid-envelope", found.is_empty(), || {
                 format!(
                     "{} printed a document the envelope schema rejects: {}",
                     self.label(index),
@@ -1243,7 +1309,7 @@ impl<'a> Judge<'a> {
         for (index, _) in self.envelopes() {
             let text = String::from_utf8_lossy(&self.at(index).stdout);
             let indented = first_document_text(&text).contains('\n');
-            c.holds("no-indentation", !indented, || {
+            c.holds_at(index, "no-indentation", !indented, || {
                 format!("{} printed an indented document", self.label(index))
             });
             if indented {
@@ -1279,7 +1345,7 @@ impl<'a> Judge<'a> {
             }
             c.observe(index);
             let problem = one_document(&self.at(index).stdout).err();
-            c.holds("one-document-one-newline", problem.is_none(), || {
+            c.holds_at(index, "one-document-one-newline", problem.is_none(), || {
                 format!(
                     "{}: {}",
                     self.label(index),
@@ -1299,7 +1365,7 @@ impl<'a> Judge<'a> {
         let plain_index = &probe.json_variations[0].1;
         c.own(*plain_index);
         let plain = self.envelope(*plain_index);
-        c.holds("baseline-is-envelope", plain.is_some(), || {
+        c.holds_at(*plain_index, "baseline-is-envelope", plain.is_some(), || {
             format!(
                 "{} without a variation did not print an envelope",
                 self.label(*plain_index)
@@ -1309,16 +1375,16 @@ impl<'a> Judge<'a> {
             for (label, index) in &probe.json_variations[1..] {
                 c.own(*index);
                 let Some(varied) = self.envelope(*index) else {
-                    c.holds("same-envelope-kind", false, || {
+                    c.holds_at(*index, "same-envelope-kind", false, || {
                         format!(
                             "with {label} the output is not an envelope, without it an envelope"
                         )
                     });
                     continue;
                 };
-                c.holds("same-envelope-kind", true, String::new);
+                c.holds_at(*index, "same-envelope-kind", true, String::new);
                 let same = |pointer: &str| plain.pointer(pointer) == varied.pointer(pointer);
-                c.holds("same-result", same("/ok") && same("/error/code"), || {
+                c.holds_at(*index, "same-result", same("/ok") && same("/error/code"), || {
                     format!(
                         "with {label} ok is {} and error.code {}, without it {} and {}",
                         show(varied.get("ok")),
@@ -1327,21 +1393,22 @@ impl<'a> Judge<'a> {
                         show(plain.pointer("/error/code"))
                     )
                 });
-                c.holds("same-command", same("/meta/command"), || {
+                c.holds_at(*index, "same-command", same("/meta/command"), || {
                     format!(
                         "with {label} meta.command is {}, without it {}",
                         show(varied.pointer("/meta/command")),
                         show(plain.pointer("/meta/command"))
                     )
                 });
-                c.holds("same-schema-version", same("/meta/schemaVersion"), || {
+                c.holds_at(*index, "same-schema-version", same("/meta/schemaVersion"), || {
                     format!(
                         "with {label} meta.schemaVersion is {}, without it {}",
                         show(varied.pointer("/meta/schemaVersion")),
                         show(plain.pointer("/meta/schemaVersion"))
                     )
                 });
-                c.holds(
+                c.holds_at(
+                    *index,
                     "same-data-keys",
                     data_keys(plain) == data_keys(varied),
                     || {
@@ -1375,7 +1442,7 @@ impl<'a> Judge<'a> {
                     "not an envelope"
                 }
             };
-            c.holds("same-envelope-kind", seen == plain, || {
+            c.holds_at(*index, "same-envelope-kind", seen == plain, || {
                 format!(
                     "with {label} the output is {}, without it {}",
                     name(seen),
@@ -1396,7 +1463,7 @@ impl<'a> Judge<'a> {
         }
         for (index, document) in self.envelopes() {
             let present = document.pointer("/meta/contract").is_some();
-            c.holds("meta-contract", present, || {
+            c.holds_at(index, "meta-contract", present, || {
                 format!(
                     "{} printed an envelope without meta.contract",
                     self.label(index)
@@ -1414,7 +1481,7 @@ impl<'a> Judge<'a> {
         let mut c = self.check("L0.contract-version");
         for (index, document) in self.envelopes() {
             for (condition, problem) in rules::contract_version_findings(document, self.claim) {
-                c.holds(condition, problem.is_none(), || {
+                c.holds_at(index, condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())
                 });
                 if problem.is_some() {
@@ -1433,7 +1500,7 @@ impl<'a> Judge<'a> {
                 .into_iter()
                 .chain(end.filter(|result| is_envelope(result)).map(|result| rules::contract_version_findings(result, self.claim)).into_iter().flatten());
             for (condition, problem) in findings {
-                c.holds(condition, problem.is_none(), || {
+                c.holds_at(index, condition, problem.is_none(), || {
                     format!("{} (a stream): {}", self.label(index), problem.clone().unwrap_or_default())
                 });
                 if problem.is_some() {
@@ -1450,7 +1517,7 @@ impl<'a> Judge<'a> {
         for index in self.json_runs() {
             let outcome = self.at(index);
             let carries = carries_error_or_result(&outcome.stderr, self.documents[index].as_ref());
-            c.holds("stderr-carries-no-result", !carries, || {
+            c.holds_at(index, "stderr-carries-no-result", !carries, || {
                 format!("{} also printed its error or result on stderr", self.label(index))
             });
             if carries {
@@ -1472,7 +1539,7 @@ impl<'a> Judge<'a> {
             {
                 continue;
             }
-            c.holds("stderr-empty", outcome.stderr.is_empty(), || {
+            c.holds_at(index, "stderr-empty", outcome.stderr.is_empty(), || {
                 format!(
                     "{} printed {:?} on stderr in JSON mode",
                     self.label(index),
@@ -1498,7 +1565,7 @@ impl<'a> Judge<'a> {
             c.observe(index);
             let json_mode = self.at(index).call.json_mode();
             for (condition, problem) in rules::next_findings(document, self.claim, json_mode, &self.tool) {
-                c.holds(condition, problem.is_none(), || {
+                c.holds_at(index, condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())
                 });
             }
@@ -1518,7 +1585,7 @@ impl<'a> Judge<'a> {
             exercised = true;
             c.observe(index);
             for (condition, problem) in rules::page_findings(document, self.claim) {
-                c.holds(condition, problem.is_none(), || {
+                c.holds_at(index, condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())
                 });
             }
@@ -1531,7 +1598,7 @@ impl<'a> Judge<'a> {
                     .envelope(*index)
                     .and_then(|document| document.pointer("/meta/page/nextCursor"))
                     .is_some_and(Value::is_string);
-                c.holds("paged-next-cursor", carries, || {
+                c.holds_at(*index, "paged-next-cursor", carries, || {
                     format!("{} is listed as `paged` for {id} and its answer has no meta.page.nextCursor", self.label(*index))
                 });
                 exercised |= carries;
@@ -1546,18 +1613,22 @@ impl<'a> Judge<'a> {
             return c.finish_as(if pages.is_empty() {
                 End::Unsupported("no command document declares --cursor".to_string())
             } else {
-                End::Unprovided(format!(
-                    "{} declare{} --cursor and no run saw a meta.page.nextCursor: list an invocation that pages under `paged` in the fixture",
-                    pages.join(", "),
-                    if pages.len() == 1 { "s" } else { "" }
-                ))
+                End::Unprovided {
+                    reason: format!(
+                        "{} declare{} --cursor and no run saw a meta.page.nextCursor: list an invocation that pages under `paged` in the fixture",
+                        pages.join(", "),
+                        if pages.len() == 1 { "s" } else { "" }
+                    ),
+                    cut: false,
+                    entries: pages.iter().map(|id| format!("commands.{id}.paged")).collect(),
+                }
             });
         }
         let Some(commands) = &self.fixture.commands else {
-            return c.finish_as(End::Unprovided("the fixture has no `commands`".to_string()));
+            return c.finish_as(End::missing("commands", "the fixture has no `commands`"));
         };
         if commands.is_empty() {
-            return c.finish_as(End::Unprovided("the fixture's `commands` is empty".to_string()));
+            return c.finish_as(End::missing("commands", "the fixture's `commands` is empty"));
         }
         // At L0 a command that refuses `--cursor x` as an unknown option does not page; one that refuses it as a cursor does.
         let verdicts: Vec<CursorVerdict> = self
@@ -1567,9 +1638,12 @@ impl<'a> Judge<'a> {
             .map(|command| self.cursor_verdict(command.cursor))
             .collect();
         if verdicts.is_empty() || verdicts.iter().any(|verdict| *verdict != CursorVerdict::NoPaging) {
-            return c.finish_as(End::Unprovided(
-                "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (CURSOR_INVALID shows a command pages; an inconclusive answer counts as one that might): list an invocation that pages under `paged`".to_string(),
-            ));
+            let entries: Vec<String> = commands.iter().zip(&verdicts).filter(|(_, verdict)| **verdict != CursorVerdict::NoPaging).map(|((id, _), _)| format!("commands.{id}.paged")).collect();
+            return c.finish_as(End::Unprovided {
+                reason: "no answer the run saw carried meta.page, and not every listed command definitely refuses --cursor as an option it does not have (CURSOR_INVALID shows a command pages; an inconclusive answer counts as one that might): list an invocation that pages under `paged`".to_string(),
+                cut: false,
+                entries: if entries.is_empty() { vec!["commands".to_string()] } else { entries },
+            });
         }
         c.finish_as(End::Unsupported(
             "no command of the fixture pages: each refuses --cursor as an option it does not have".to_string(),
@@ -1596,7 +1670,8 @@ impl<'a> Judge<'a> {
             if outcome.exit != Exit::Code(2) {
                 continue;
             }
-            c.holds(
+            c.holds_at(
+                index,
                 "refusal-changes-nothing",
                 outcome.changes.is_empty(),
                 || {
@@ -1616,7 +1691,7 @@ impl<'a> Judge<'a> {
                     .and_then(|document| document.get("data").cloned());
                 if let Some(state) = state {
                     let same = &state == baseline;
-                    c.holds("refusal-changes-no-remote-state", same, || {
+                    c.holds_at(index, "refusal-changes-no-remote-state", same, || {
                         format!(
                             "{} was refused (exit 2) and the probe then reports {state}, not {baseline}",
                             self.label(index)
@@ -1635,7 +1710,7 @@ impl<'a> Judge<'a> {
     fn no_prompt(&'a self) -> Finding {
         let mut c = self.check("L0.no-prompt");
         if self.fixture.commands.is_none() {
-            return c.finish_as(End::Unprovided("the fixture has no `commands`".to_string()));
+            return c.finish_as(End::missing("commands", "the fixture has no `commands`"));
         }
         let missing: Vec<&MissingCalls> = self
             .calls
@@ -1644,9 +1719,7 @@ impl<'a> Judge<'a> {
             .flat_map(|command| command.missing.iter())
             .collect();
         if missing.is_empty() {
-            return c.finish_as(End::Unprovided(
-                "no command of the fixture has a `missingValue` invocation".to_string(),
-            ));
+            return c.finish_as(End::missing("commands.<id>.missingValue", "no command of the fixture has a `missingValue` invocation"));
         }
         let mut unclear: Vec<String> = Vec::new();
         let mut judged = false;
@@ -1672,12 +1745,12 @@ impl<'a> Judge<'a> {
                 );
                 if at.reacted_to_eof {
                     judged = true;
-                    c.holds("refuses-on-a-terminal", false, || {
+                    c.holds_at(terminal_index, "refuses-on-a-terminal", false, || {
                         format!("{waited}, and it ended or printed within two seconds of the end-of-file character: it waits for input")
                     });
                 } else if !at.output.is_empty() {
                     judged = true;
-                    c.holds("refuses-on-a-terminal", false, || {
+                    c.holds_at(terminal_index, "refuses-on-a-terminal", false, || {
                         format!("{waited}, after printing {:?}: it asks for a value", excerpt(printed.as_bytes()))
                     });
                 } else {
@@ -1697,7 +1770,7 @@ impl<'a> Judge<'a> {
             let printed_nothing_else = envelope.is_none() && terminal.stdout.iter().all(u8::is_ascii_whitespace)
                 || rest.as_deref().is_some_and(str::is_empty);
             let refuses = terminal.exit == control.exit && printed_nothing_else;
-            c.holds("refuses-on-a-terminal", refuses, || {
+            c.holds_at(terminal_index, "refuses-on-a-terminal", refuses, || {
                 format!(
                     "{} on a terminal ended with {} and printed {:?}, but the control run refused with exit {} and nothing else should be on the terminal",
                     self.label(terminal_index),
@@ -1710,7 +1783,16 @@ impl<'a> Judge<'a> {
         if judged {
             return c.finish(true);
         }
-        c.finish_as(End::Unprovided(unclear.join("; ")))
+        let entries: Vec<String> = self
+            .fixture
+            .commands
+            .iter()
+            .flatten()
+            .zip(&self.calls.commands)
+            .filter(|(_, calls)| !calls.missing.is_empty())
+            .map(|((id, _), _)| format!("commands.{id}.missingValue"))
+            .collect();
+        c.finish_as(End::Unprovided { reason: unclear.join("; "), cut: false, entries })
     }
 
     /// The registries the tool prints against the schemas and the fixture, and every code, reason and warning the run emitted against them (spec 7.3.4, 7.5, 7.6, 17.3).
@@ -1724,7 +1806,8 @@ impl<'a> Judge<'a> {
                 .envelope(calls.schema_errors)
                 .and_then(|document| document.pointer("/data/kind"))
                 .and_then(Value::as_str);
-            c.holds(
+            c.holds_at(
+                calls.schema_errors,
                 "kind",
                 if self.claim.is_1_1() {
                     kind == Some("errors")
@@ -1745,23 +1828,25 @@ impl<'a> Judge<'a> {
                         .map(|problem| format!("the entry {} is invalid: {problem}", entry.get("code").map_or("?".to_string(), Value::to_string)))
                 })
                 .collect();
-            c.holds("entries-valid", invalid.is_empty(), || reason_of(&invalid));
-            let wrong: Vec<String> = calls
+            c.holds_each(Some(calls.schema_errors), "entries-valid", invalid);
+            let wrong: Vec<(Option<usize>, String)> = calls
                 .error_entries
                 .iter()
                 .filter_map(|(code, index)| {
                     let listed = entries.iter().find(|entry| entry.get("code").and_then(Value::as_str) == Some(code));
                     self.entry_answer("error", self.envelope(*index), listed)
-                        .map(|problem| format!("`schema --error {code} --json` {problem}"))
+                        .map(|problem| (Some(*index), format!("`schema --error {code} --json` {problem}")))
                 })
                 .collect();
-            c.holds("error-answers", wrong.is_empty(), || reason_of(&wrong));
+            c.holds_each_at("error-answers", wrong);
             if let Some(registry) = &self.fixture.registry {
                 let tool_rows: Vec<RegistryRow> = self.rows.clone().unwrap_or_default();
                 let drift = registry_drift(registry, &tool_rows);
-                c.holds("registry-is-the-fixtures", drift.is_empty(), || {
-                    format!("`schema --errors --json` and the fixture's registry differ: {}", drift.join(", "))
-                });
+                c.holds_each(
+                    Some(calls.schema_errors),
+                    "registry-is-the-fixtures",
+                    drift.iter().map(|difference| format!("`schema --errors --json` and the fixture's registry differ: {difference}")).collect(),
+                );
             }
         }
         if let Some(entries) = &self.tool_warnings {
@@ -1770,7 +1855,7 @@ impl<'a> Judge<'a> {
                 .envelope(calls.schema_warnings)
                 .and_then(|document| document.pointer("/data/kind"))
                 .and_then(Value::as_str);
-            c.holds("warnings-kind", kind == Some("warnings"), || {
+            c.holds_at(calls.schema_warnings, "warnings-kind", kind == Some("warnings"), || {
                 format!("`schema --warnings --json` has data.kind {}, expected \"warnings\"", kind.map_or("missing".to_string(), |kind| format!("{kind:?}")))
             });
             let invalid: Vec<String> = entries
@@ -1781,24 +1866,24 @@ impl<'a> Judge<'a> {
                     })
                 })
                 .collect();
-            c.holds("warning-entries-valid", invalid.is_empty(), || reason_of(&invalid));
-            let wrong: Vec<String> = calls
+            c.holds_each(Some(calls.schema_warnings), "warning-entries-valid", invalid);
+            let wrong: Vec<(Option<usize>, String)> = calls
                 .warning_entries
                 .iter()
                 .filter_map(|(code, index)| {
                     let listed = entries.iter().find(|entry| entry.get("code").and_then(Value::as_str) == Some(code));
                     self.entry_answer("warning", self.envelope(*index), listed)
-                        .map(|problem| format!("`schema --warning {code} --json` {problem}"))
+                        .map(|problem| (Some(*index), format!("`schema --warning {code} --json` {problem}")))
                 })
                 .collect();
-            c.holds("warning-answers", wrong.is_empty(), || reason_of(&wrong));
+            c.holds_each_at("warning-answers", wrong);
             for (code, index) in &calls.warning_only {
                 c.observe(*index);
                 let Some(document) = self.documents[*index].as_ref().filter(|document| is_envelope(document)) else {
                     continue;
                 };
                 for (condition, problem) in rules::warning_only_findings(document, &self.tool, code) {
-                    c.holds(condition, problem.is_none(), || format!("`schema --error {code} --json`: {}", problem.clone().unwrap_or_default()));
+                    c.holds_at(*index, condition, problem.is_none(), || format!("`schema --error {code} --json`: {}", problem.clone().unwrap_or_default()));
                 }
             }
             if let Some(listed) = &self.fixture.warnings {
@@ -1807,7 +1892,7 @@ impl<'a> Judge<'a> {
                 let mut only_tool: Vec<&str> = tool.iter().copied().filter(|code| !listed.iter().any(|known| known == code)).collect();
                 only_fixture.sort_unstable();
                 only_tool.sort_unstable();
-                c.holds("warnings-are-the-fixtures", only_fixture.is_empty() && only_tool.is_empty(), || {
+                c.holds_at(calls.schema_warnings, "warnings-are-the-fixtures", only_fixture.is_empty() && only_tool.is_empty(), || {
                     format!("`schema --warnings --json` and the fixture's warnings differ: only in the fixture {only_fixture:?}, only in the tool {only_tool:?}")
                 });
             }
@@ -1818,9 +1903,9 @@ impl<'a> Judge<'a> {
         } else if self.fixture.registry_from_schema {
             End::Exercised(true)
         } else if self.fixture.registry.is_none() {
-            End::Unprovided("the fixture has no `registry` to compare the tool's with".to_string())
+            End::missing("registry", "the fixture has no `registry` to compare the tool's with")
         } else if self.tool_warnings.is_some() && self.fixture.warnings.is_none() {
-            End::Unprovided("the fixture has no `warnings` to compare the tool's warning registry with".to_string())
+            End::missing("warnings", "the fixture has no `warnings` to compare the tool's warning registry with")
         } else {
             End::Exercised(true)
         };
@@ -1859,7 +1944,7 @@ impl<'a> Judge<'a> {
         };
         for (index, document) in self.envelopes() {
             for (condition, problem) in rules::registry_findings(document, rows, &warning_codes, self.claim) {
-                c.holds(condition, problem.is_none(), || {
+                c.holds_at(index, condition, problem.is_none(), || {
                     format!("{}: {}", self.label(index), problem.clone().unwrap_or_default())
                 });
                 if problem.is_some() {
@@ -1900,7 +1985,7 @@ impl<'a> Judge<'a> {
             };
             wanted.push(quoted);
             let given = hint.map(atip::split_argv);
-            c.holds("hint-names-the-schema", given.as_ref().is_some_and(|given| wanted.contains(given)), || {
+            c.holds_at(index, "hint-names-the-schema", given.as_ref().is_some_and(|given| wanted.contains(given)), || {
                 format!(
                     "{} refused with USAGE and no field, and the hint is {}, expected `{}`",
                     self.label(index),
@@ -1922,7 +2007,7 @@ impl<'a> Judge<'a> {
         }
         for (index, document) in self.envelopes() {
             let found = rules::hint_problems(document, &self.tool);
-            c.holds("hint-is-one-command-line", found.is_empty(), || {
+            c.holds_at(index, "hint-is-one-command-line", found.is_empty(), || {
                 format!("{}: {}", self.label(index), found.join("; "))
             });
             if !found.is_empty() {
@@ -1936,13 +2021,13 @@ impl<'a> Judge<'a> {
     fn global_on_group(&'a self) -> Finding {
         let mut c = self.check("L0.global-on-group");
         let Some(commands) = &self.fixture.commands else {
-            return c.finish_as(End::Unprovided("the fixture has no `commands`".to_string()));
+            return c.finish_as(End::missing("commands", "the fixture has no `commands`"));
         };
         if commands.is_empty() {
-            return c.finish_as(End::Unprovided("the fixture's `commands` is empty".to_string()));
+            return c.finish_as(End::missing("commands", "the fixture's `commands` is empty"));
         }
         let Some(options) = &self.fixture.global_options else {
-            return c.finish_as(End::Unprovided("the fixture has no `globalOptions`".to_string()));
+            return c.finish_as(End::missing("globalOptions", "the fixture has no `globalOptions`"));
         };
         if options.is_empty() {
             return c.finish_as(End::Unsupported("the fixture lists no tool-wide option".to_string()));
@@ -1963,8 +2048,8 @@ impl<'a> Judge<'a> {
             });
             return c.finish_as(match groups {
                 Some(0) => End::Unsupported("the tool's schema lists no group".to_string()),
-                Some(_) => End::Unprovided("no command of the fixture has a group word (a command id of two words), and the tool's schema lists groups".to_string()),
-                None => End::Unprovided("no command of the fixture has a group word (a command id of two words), and the tool's schema shows no list of groups to rule them out".to_string()),
+                Some(_) => End::missing("commands", "no command of the fixture has a group word (a command id of two words), and the tool's schema lists groups"),
+                None => End::missing("commands", "no command of the fixture has a group word (a command id of two words), and the tool's schema shows no list of groups to rule them out"),
             });
         };
         let answers = |index: usize| {
@@ -1979,13 +2064,13 @@ impl<'a> Judge<'a> {
         if self.l1.is_some() && code.as_deref() != Some("COMMAND_REQUIRED") {
             return c.finish_as(End::Unsupported("the group is not refused with COMMAND_REQUIRED: L1.groups-not-runnable reports it".to_string()));
         }
-        c.holds("group-is-not-runnable", code.as_deref() == Some("COMMAND_REQUIRED"), || {
+        c.holds_at(group.bare, "group-is-not-runnable", code.as_deref() == Some("COMMAND_REQUIRED"), || {
             format!("{} answered {}, expected COMMAND_REQUIRED", self.label(group.bare), code.clone().unwrap_or_else(|| "no failure envelope".to_string()))
         });
         for (option, index) in &group.with_option {
             c.own(*index);
             let code = answers(*index);
-            c.holds("option-after-group-is-no-error", code.as_deref() == Some("COMMAND_REQUIRED"), || {
+            c.holds_at(*index, "option-after-group-is-no-error", code.as_deref() == Some("COMMAND_REQUIRED"), || {
                 format!(
                     "{} answered {} for `{}`, expected COMMAND_REQUIRED",
                     self.label(*index),
