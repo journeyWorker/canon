@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T12:40:13.774817Z",
+  "code_tree": "81d0990ad7fd4f00b832f676413269da9750c02a",
+  "kind": "review",
+  "pin": "30d3ae0f1bcfda139d4d5a33a34a12939f171635",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:cursor::tests::atip_cratecursor_07_another_command_is_foreign_other_arguments_are_changed_and_the_error_is_curs_or_invalid"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "7939f4aabf81acef6b70a524f681f58a1cd37050ca9325ae4ab4066856bed301",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-cursor/brief.md"
+  },
+  "review_id": "01M6E4CHPE8YE8GVA6SJYJQJT7",
+  "reviewer": "rev-crate-0-35",
+  "scenario_id": "atip.cratecursor.07",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T12:42:59.729988Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "81d0990ad7fd4f00b832f676413269da9750c02a",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/cursor.rs",
+  "introduced_by": "87159df68f13f92a07ec7eed05e35a84b4f58e78",
+  "kind": "finding",
+  "reviewed_sha": "30d3ae0f1bcfda139d4d5a33a34a12939f171635",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.cratecursor.01",
+    "atip.cratecursor.02",
+    "atip.cratecursor.03"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Spec fidelity: (1) brief F1 and contract 6.9 (1.2: 'the exceptions are exactly' json, limit, all, cursor, fields) leave out five names; the crate leaves out a sixth, input (LEFT_OUT_11 and _12), because the --input document's keys are already in the list. Sensible and stated in the CHANGELOG, but it is a rule the brief does not list and a tool in another language reading 6.9 literally would bind --input. (2) The brief binds 'the argument object'; the crate digests {arguments, flagOnly, environment, rules}, so equal bindings across tools hold only for tools using this crate until that shape is written down for the atip repo. (3) Scenario 01 pins the shape by hashing a document typed in the test (computed expected value), not a literal hex digest, so a change of hex() or of the shape together with the test would pass. Blast radius: cursors issued before canon moves onto this crate are ARGUMENTS_CHANGED/FOREIGN, as the brief accepts.",
+  "worktree_dirty": false
+}
