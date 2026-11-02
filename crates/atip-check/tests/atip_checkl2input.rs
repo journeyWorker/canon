@@ -349,3 +349,20 @@ fn atip_checkl2input_11_only_an_option_that_is_the_sole_declarer_of_its_env_vari
     let output = run_config(&l2_standard_config());
     assert_eq!(check_of(&output.envelope()["data"], "L2.input-env")["result"], "pass");
 }
+
+#[test]
+fn atip_checkl2input_13_a_candidate_refused_by_a_precondition_cannot_tell_and_the_next_is_tried_and_a_refusal_naming_the_value_is_a_pass() {
+    // `record put --label` refuses a dash value by a precondition (ALREADY_SEALED, exit 2): the first candidate cannot tell, `--note` decides.
+    let output = run_config(&l2_config(&json!({"dashPrecondition": true})));
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.input-dash-values");
+    assert_eq!(check["result"], "pass", "{check}");
+    let argvs: Vec<String> = check["observed"].as_array().into_iter().flatten().map(|call| call["argv"].to_string()).collect();
+    assert!(argvs.iter().any(|argv| argv.contains("record") && argv.contains("note")), "the next candidate was run: {argvs:?}");
+    // Refused with the argument as `field` and the value as `received`: the value was read as a value, a pass for that candidate.
+    let output = run_config(&l2_config(&json!({"dashPrecondition": true, "dashPreconditionNamed": true})));
+    assert_eq!(check_of(&output.envelope()["data"], "L2.input-dash-values")["result"], "pass");
+    // A value read as an option is still found.
+    let output = run_case(&case_of("input-dash-values/value-is-a-value"), "L2");
+    support::l2::verdict(&output.envelope()["data"], "L2.input-dash-values").unwrap_or_else(|why| panic!("{why}"));
+}

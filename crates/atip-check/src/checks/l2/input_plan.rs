@@ -104,6 +104,10 @@ pub(crate) struct PointerRun {
 pub(crate) struct DashRun {
     pub label: String,
     pub call: usize,
+    /// The candidate string argument (by its position in the candidates, in declaration order) and its name, and the value it was given.
+    pub group: usize,
+    pub argument: String,
+    pub value: String,
 }
 
 /// A batch whose last item breaks a rule that reads no state.
@@ -597,40 +601,37 @@ impl Run<'_> {
         let mut candidates: Vec<&Arg> = doc.options.iter().filter(|arg| !arg.flag_only && !arg.repeatable && arg.value_type == "string").collect();
         candidates.sort_by_key(|arg| arg.required);
         candidates.extend(doc.operands.iter().filter(|arg| arg.value_type == "string" && !arg.variadic));
-        let Some(arg) = candidates.into_iter().find(|arg| DASH_VALUES.iter().any(|value| invocation::value_problem(arg, &Value::String((*value).to_string())).is_none())) else {
-            return Ok(());
-        };
-        for value in DASH_VALUES {
-            if invocation::value_problem(arg, &Value::String(value.to_string())).is_some() {
-                continue;
-            }
-            let mut extra: Vec<(String, Value)> = Vec::new();
-            let key = if arg.is_option {
-                camel(&arg.name)
-            } else {
-                "operands".to_string()
-            };
-            if arg.is_option {
-                extra.push((key, Value::String(value.to_string())));
-            } else {
-                let Some(index) = doc.operands.iter().position(|operand| operand.name == arg.name) else { continue };
-                let args = invocation::args(doc, base);
-                let mut operands: Vec<Value> = args.operands.clone();
-                while operands.len() <= index {
-                    let Some(filler) = doc.operands.get(operands.len()).and_then(|operand| witness::generate(operand, &[])) else { break };
-                    operands.push(Value::String(filler));
-                }
-                if operands.len() <= index {
+        // Every candidate that admits a dash value, in order (at most four): one whose probe is refused by a precondition cannot tell, and the next is tried.
+        let candidates: Vec<&Arg> = candidates.into_iter().filter(|arg| DASH_VALUES.iter().any(|value| invocation::value_problem(arg, &Value::String((*value).to_string())).is_none())).take(4).collect();
+        for (group, arg) in candidates.into_iter().enumerate() {
+            for value in DASH_VALUES {
+                if invocation::value_problem(arg, &Value::String(value.to_string())).is_some() {
                     continue;
                 }
-                operands[index] = Value::String(value.to_string());
-                extra.push((key, Value::Array(operands)));
+                let mut extra: Vec<(String, Value)> = Vec::new();
+                let key = if arg.is_option { camel(&arg.name) } else { "operands".to_string() };
+                if arg.is_option {
+                    extra.push((key, Value::String(value.to_string())));
+                } else {
+                    let Some(index) = doc.operands.iter().position(|operand| operand.name == arg.name) else { continue };
+                    let args = invocation::args(doc, base);
+                    let mut operands: Vec<Value> = args.operands.clone();
+                    while operands.len() <= index {
+                        let Some(filler) = doc.operands.get(operands.len()).and_then(|operand| witness::generate(operand, &[])) else { break };
+                        operands.push(Value::String(filler));
+                    }
+                    if operands.len() <= index {
+                        continue;
+                    }
+                    operands[index] = Value::String(value.to_string());
+                    extra.push((key, Value::Array(operands)));
+                }
+                // The other arguments stay on argv; the value under test is the only one the document carries.
+                let spec = Spec { operands: !arg.is_option, options: Which::Nothing, omit: vec![arg.name.clone()], extra, ..Spec::default() };
+                let Some(split) = document::split(doc, base, &spec) else { continue };
+                let call = self.invoke(Call::new(split.argv()))?;
+                command.dashes.push(DashRun { label: format!("{} given the value {value}", arg.name), call, group, argument: arg.name.clone(), value: value.to_string() });
             }
-            // The other arguments stay on argv; the value under test is the only one the document carries.
-            let spec = Spec { operands: !arg.is_option, options: Which::Nothing, omit: vec![arg.name.clone()], extra, ..Spec::default() };
-            let Some(split) = document::split(doc, base, &spec) else { continue };
-            let call = self.invoke(Call::new(split.argv()))?;
-            command.dashes.push(DashRun { label: format!("{} given the value {value}", arg.name), call });
         }
         Ok(())
     }

@@ -1086,7 +1086,7 @@ fn record_put() -> Command {
             Arg::option("clear-note", "switch", "Remove the note kept with the record"),
         ])
         .rule(Rule::at_most_one(&["note", "clear-note"]).code("NOTE_CONFLICT"))
-        .errors(&["NOTE_CONFLICT", "USAGE"])
+        .errors(&["ALREADY_SEALED", "NOTE_CONFLICT", "USAGE"])
         .output(
             "RecordPutReport",
             json!({

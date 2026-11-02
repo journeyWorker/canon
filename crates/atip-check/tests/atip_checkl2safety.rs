@@ -262,3 +262,15 @@ fn atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against
     assert_eq!(check["result"], "fail", "{check}");
     assert!(check["reason"].as_str().unwrap_or_default().contains(".stamp-audit.log"), "{check}");
 }
+
+#[test]
+fn atip_checkl2safety_03_a_next_that_writes_the_digest_as_one_word_commits_the_plan_and_the_stale_probe_alters_it_there() {
+    // next[0] is `... --commit --plan-digest=sha256:<hex> --json`, the form of spec 9.12.1.
+    let output = run_config(&l2_config(&json!({"digestOneWord": true})));
+    let document = output.envelope();
+    for row in ["L2.destructive-preview", "L2.destructive-stale", "L2.destructive-half", "L2.destructive-commit"] {
+        assert_eq!(check_of(&document["data"], row)["result"], "pass", "{row}: {}", not_passing(&document["data"]));
+    }
+    let stale = check_of(&document["data"], "L2.destructive-stale");
+    assert!(argvs(stale).iter().any(|argv| argv.contains("--plan-digest=")), "the stale probe keeps the one-word form: {stale}");
+}

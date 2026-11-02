@@ -113,6 +113,8 @@ fn proves(ids: &[&str]) {
     let cases: Vec<Case> = l1_cases()
         .into_iter()
         .filter(|case| ids.contains(&case.condition.split('/').next().unwrap_or_default()))
+        // `tree/level` needs an L2 claim over an L1 tree, where the L2 rows fail too: `atip_checkl1_03` and the case loop of `atip_checkl1_28` prove it.
+        .filter(|case| case.condition != "tree/level")
         .collect();
     for id in ids {
         assert!(
@@ -197,9 +199,11 @@ fn atip_checkl1_02_level_l2_runs_and_an_unknown_level_is_usage() {
 #[test]
 fn atip_checkl1_03_a_tree_whose_level_is_not_the_claim_and_a_tool_without_schema_fail_l1_tree() {
     let mismatched = l1_cases().into_iter().find(|case| case.condition == "tree/level").expect("case");
-    let output = run_case(&mismatched);
-    verdict(&output.envelope()["data"], "L1.tree").unwrap_or_else(|why| panic!("{why}\n{}", output.stdout));
-    assert!(check_of(&output.envelope()["data"], "L1.tree")["reason"].as_str().unwrap_or_default().contains("level"), "{}", output.stdout);
+    // The tree says L1 and the claim is L2.
+    let harness = Harness::new();
+    let output = harness.check_l2_at(&mismatched.config, &harness.l1_fixture(&mismatched.config), "L2");
+    assert_eq!(check_of(&output.envelope()["data"], "L1.tree")["result"], "fail", "{}", output.stdout);
+    assert!(check_of(&output.envelope()["data"], "L1.tree")["reason"].as_str().unwrap_or_default().contains("below the claimed level"), "{}", output.stdout);
     // A tool with no `schema` at all, claiming L1: `L1.tree` is `answered`'s failure; the other checks that need the tree do not each fail for it.
     let answered = l1_cases().into_iter().find(|case| case.condition == "tree/answered").expect("case");
     let output = run_case(&answered);
@@ -559,7 +563,7 @@ fn atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_c
                 }
                 let args = CheckArgs {
                     bin: l1_bin(&harness, &case.config).into(),
-                    level: Level::L1,
+                    level: if case.condition == "tree/level" { Level::L2 } else { Level::L1 },
                     fixture: harness.write("fixture.json", &fixture).into(),
                     contract: None,
                 };

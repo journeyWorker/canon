@@ -118,10 +118,13 @@ pub(crate) fn next_argv(stdout: &[u8]) -> Option<Vec<String>> {
         .collect()
 }
 
-/// The value after `--plan-digest` in `argv`.
+/// The value of `--plan-digest` in `argv`, written as two words (`--plan-digest <v>`) or one (`--plan-digest=<v>`, the form of spec 9.12.1).
 pub(crate) fn digest_of(argv: &[String]) -> Option<&str> {
-    let at = argv.iter().position(|word| word == "--plan-digest")?;
-    argv.get(at + 1).map(String::as_str)
+    argv.iter().enumerate().find_map(|(at, word)| match word.strip_prefix("--plan-digest=") {
+        Some(value) => Some(value),
+        None if word == "--plan-digest" => argv.get(at + 1).map(String::as_str),
+        None => None,
+    })
 }
 
 /// The digest with one character changed: another character of the same kind, so that it is still well-formed.
@@ -191,7 +194,10 @@ impl Run<'_> {
         if let Some(next) = next_argv(&self.log[stale_preview].stdout) {
             if let Some(digest) = digest_of(&next).map(altered) {
                 let mut changed = next.clone();
-                if let Some(at) = changed.iter().position(|word| word == "--plan-digest") {
+                // The digest is altered in the form next[0] has it: one word, or the word after `--plan-digest`.
+                if let Some(at) = changed.iter().position(|word| word.starts_with("--plan-digest=")) {
+                    changed[at] = format!("--plan-digest={digest}");
+                } else if let Some(at) = changed.iter().position(|word| word == "--plan-digest") {
                     changed[at + 1] = digest;
                 }
                 let sequence = self.log[stale_preview].sequence;

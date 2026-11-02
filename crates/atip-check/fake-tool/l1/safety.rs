@@ -278,7 +278,12 @@ fn purge_run(tool: &Tool, _args: &[String], parsed: &Parsed) -> ExitCode {
     } else {
         commit_argv.extend(["--kind", &kind, "--before", &before].map(String::from));
     }
-    commit_argv.extend(["--commit", "--plan-digest", &digest, "--json"].map(String::from));
+    if tool.flag("digestOneWord") {
+        // The form of spec 9.12.1: every valued option as `--name=value`.
+        commit_argv.extend(["--commit".to_string(), format!("--plan-digest={digest}"), "--json".to_string()]);
+    } else {
+        commit_argv.extend(["--commit", "--plan-digest", &digest, "--json"].map(String::from));
+    }
     let data = |committed: bool| json!({"kind": kind, "before": before, "planDigest": digest, "effects": effects, "committed": committed});
     if !parsed.has("commit") {
         if tool.flag("previewFails") && std::env::var_os("FAKE_INPUT_FROM_STDIN").is_none() {

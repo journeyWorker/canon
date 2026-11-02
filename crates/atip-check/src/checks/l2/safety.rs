@@ -299,7 +299,7 @@ impl<'a> Judge<'a> {
             });
             if refused {
                 let next = next_argv(&outcome.stdout);
-                let is_preview = next.as_ref().is_some_and(|argv| !argv.iter().any(|word| word == "--commit" || word == "--plan-digest" || word == "--plan-digest=") && argv.first() == self.at(stale.call).call.argv.first());
+                let is_preview = next.as_ref().is_some_and(|argv| !argv.iter().any(|word| word == "--commit" || word == "--plan-digest" || word.starts_with("--plan-digest=")) && argv.first() == self.at(stale.call).call.argv.first());
                 c.holds_at(stale.call, "stale-next-is-the-preview", is_preview, || {
                     format!("{}: `meta.next[0]` of PLAN_STALE ({}) is not the preview: it must lead with the command that plans again, without --commit", run.command, next.as_ref().map_or("absent".to_string(), |argv| argv.join(" ")))
                 });

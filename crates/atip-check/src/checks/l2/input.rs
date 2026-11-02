@@ -5,6 +5,8 @@
 //! of the tool say so (no command takes `--input`, none takes a batch) and `unprovided` when only the fixture lacks an
 //! `ok` invocation to build the probe from; a probe is never made of a write the fixture does not list.
 
+use std::collections::BTreeSet;
+
 use serde_json::Value;
 
 use super::input_plan::{ConflictExpect, InputCommand, PointerExpect, SameRun};
@@ -498,6 +500,17 @@ impl<'a> Judge<'a> {
         }
     }
 
+    /// A refusal whose `field` is the argument and whose `received` is the value given shows that the value was read as a value (a revision that
+    /// does not exist, a name that is not there), whatever the code.
+    fn read_as_value(&self, run: &super::input_plan::DashRun) -> bool {
+        let Some(document) = self.envelope(run.call).filter(|document| document.get("ok") == Some(&Value::Bool(false))) else { return false };
+        let named = document.pointer("/error/field").and_then(Value::as_str).is_some_and(|field| {
+            let bare = field.trim_start_matches('/').trim_start_matches("--");
+            bare == run.argument || bare == crate::l1::model::camel(&run.argument) || field == "/operands" || field.starts_with("/operands/")
+        });
+        named && document.pointer("/error/received").and_then(Value::as_str) == Some(run.value.as_str())
+    }
+
     fn l2_input_dash_values(&'a self) -> Finding {
         let mut c = self.check("L2.input-dash-values");
         let mut judged = false;
@@ -505,14 +518,22 @@ impl<'a> Judge<'a> {
             if self.gate(&mut c, &command.command) {
                 continue;
             }
-            for run in &command.dashes {
-                judged = true;
-                if c.skips_refused(&command.command, run.call) {
+            // The first candidate that gives a verdict is judged; a candidate whose probes are all refused by a precondition (the state, not the value)
+            // cannot tell, and the next is tried. Unprovided only when no candidate decides.
+            let groups: BTreeSet<usize> = command.dashes.iter().map(|run| run.group).collect();
+            let precondition = |run: &super::input_plan::DashRun| match self.fixture_refusal(&command.command, run.call) {
+                Some(super::super::Refusal::Precondition(_)) => !self.read_as_value(run),
+                _ => false,
+            };
+            let decided = groups.iter().copied().find(|group| command.dashes.iter().any(|run| run.group == *group && !precondition(run)));
+            judged |= !groups.is_empty();
+            for run in command.dashes.iter().filter(|run| Some(run.group) == decided.or(groups.first().copied())) {
+                if !self.read_as_value(run) && c.skips_refused(&command.command, run.call) {
                     continue;
                 }
                 c.own(run.call);
                 let document = self.envelope(run.call);
-                let ok = self.at(run.call).exit == Exit::Code(0) && document.is_some_and(|document| document.get("ok") == Some(&Value::Bool(true)));
+                let ok = (self.at(run.call).exit == Exit::Code(0) && document.is_some_and(|document| document.get("ok") == Some(&Value::Bool(true)))) || self.read_as_value(run);
                 c.holds_at(run.call, "value-is-a-value", ok, || {
                     format!("{}: {} in a document was not accepted as a value: {}", command.command, run.label, super::super::l1::refusal_text(document, self.at(run.call).exit))
                 });
