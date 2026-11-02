@@ -454,6 +454,7 @@
         "INTERNAL",
         "PLAN_STALE",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -556,7 +557,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/ArtifactsMoveReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -609,14 +610,14 @@
               "type": "integer"
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "configWritten": {
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -631,7 +632,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "removedLocal": {
@@ -683,28 +684,22 @@
           "type": "object"
         },
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -740,8 +735,10 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon artifacts store --json"
@@ -1433,6 +1430,7 @@
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
         "RELAY_DIGEST_MISMATCH",
+        "REPO_WRITE_BUSY",
         "SPEC_ROOTS_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -2805,6 +2803,7 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SUBJECT_NOT_FOUND",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -4458,9 +4457,11 @@
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon context-pack add --manifest .canon/context-manifest.json --json"
@@ -5792,8 +5793,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon dashboard --json"
@@ -6834,6 +6837,7 @@
         "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
         "UNKNOWN_ROLE",
@@ -7860,6 +7864,7 @@
         "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
         "UNKNOWN_ROLE",
@@ -8408,6 +8413,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -9147,6 +9153,7 @@
         "NO_COMMIT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -9866,10 +9873,12 @@
         "INTERNAL",
         "NO_COMMIT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon divergence defer auth.login.01 --actor alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer --json"
@@ -10774,10 +10783,12 @@
         "INTERNAL",
         "NO_COMMIT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon divergence resolve auth.login.01 --actor alice --role reviewer --json"
@@ -11507,6 +11518,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "TYPED_ATOMS_INVALID",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -12973,6 +12985,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "TYPED_ATOMS_INVALID",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -15026,6 +15039,7 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "SPEC_ROOT_UNRESOLVED",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -15602,6 +15616,7 @@
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -16578,6 +16593,7 @@
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -17862,6 +17878,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -18376,8 +18393,10 @@
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon gate promote --kind evidence --json"
@@ -18922,8 +18941,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ingest plans --json"
@@ -19822,8 +19843,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ingest records --json"
@@ -20548,8 +20571,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ingest sessions --json"
@@ -21557,6 +21582,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
         "STOPPED_MIDWAY",
@@ -22183,8 +22209,10 @@
         "INVENTORY_FAILED",
         "INVENTORY_REFUSED",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon inventory sync --json"
@@ -22749,8 +22777,10 @@
         "LEDGER_COMPACT_FAILED",
         "OLD_LAYOUT",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ledger compact --json"
@@ -22838,7 +22868,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/LedgerCompactReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -22847,28 +22877,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -22905,11 +22929,11 @@
               "type": "integer"
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -22942,7 +22966,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "superseded": {
@@ -23121,6 +23145,7 @@
         "MIGRATE_STOPPED",
         "MIGRATE_UNCOMMITTED",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -23268,7 +23293,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/MigrateReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -23276,28 +23301,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -23472,11 +23491,11 @@
               ]
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -23507,7 +23526,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "steps": {
@@ -23618,8 +23637,10 @@
         "OLD_LAYOUT",
         "PLUGIN_SYNC_ERRORS",
         "PLUGIN_SYNC_FAILED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon plugin sync my-plugin --json"
@@ -24202,6 +24223,7 @@
         "INTERNAL",
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -25010,9 +25032,11 @@
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json --json"
@@ -25789,10 +25813,12 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "RETENTION_PURGE_FAILED",
         "RETENTION_PURGE_REFUSED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon purge --kind session --before 2020-01-01T00:00:00Z --json"
@@ -25910,7 +25936,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/PurgeReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -25918,28 +25944,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -26026,11 +26046,11 @@
               "type": "string"
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -26055,7 +26075,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "rungs": {
@@ -28336,6 +28356,7 @@
         "NO_COMMIT",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -29149,6 +29170,7 @@
         "INTERNAL",
         "NO_COMMIT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -29962,6 +29984,7 @@
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SCAFFOLD_INVALID_ARGUMENT",
         "SCENARIO_TAG_EXISTS",
         "SPEC_ROOT_UNRESOLVED",
@@ -32661,10 +32684,12 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "REPO_WRITE_BUSY",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon skills install --json"
@@ -34394,8 +34419,10 @@
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json"
@@ -34932,8 +34959,10 @@
         "LEARN_TRAJECTORY_NOT_FOUND",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json"
@@ -35548,10 +35577,12 @@
         "INTERNAL",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject adopt demo --change add-login --json"
@@ -36263,6 +36294,7 @@
         "POLICY_APPROVAL_UNREADABLE",
         "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_INVALID_ARGUMENT",
@@ -36271,7 +36303,8 @@
         "SUBJECT_REASON_REQUIRED",
         "UNKNOWN_ROLE",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject move demo --to specced --json"
@@ -37188,13 +37221,15 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_EXISTS",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_INVALID_ARGUMENT",
         "UNKNOWN_ROLE",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject new payments --domain dev --title Payments --json"
@@ -38346,11 +38381,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_UNADOPT_REFUSED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject unadopt demo --change add-login --json"
@@ -39062,6 +39099,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "TASK_NOT_FOUND",
         "TASK_ROW_NOT_FOUND",
         "TYPED_ATOMS_INVALID",
@@ -39541,9 +39579,11 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "TIER_FAILED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon tier age --json"
@@ -39631,7 +39671,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/TierAgeReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -39640,28 +39680,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -39689,11 +39723,11 @@
           "description": "`canon tier age`'s `data`: the plan and one entry per `aging:` rule.",
           "properties": {
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -39705,7 +39739,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "rules": {
@@ -41161,6 +41195,13 @@
       "fix": "Check that --repo points at a readable repository and that the named input file exists.",
       "meaning": "the repository, its ledger or an input file could not be read",
       "retryable": false
+    },
+    {
+      "code": "REPO_WRITE_BUSY",
+      "exit": 2,
+      "fix": "A canon command that writes or commits is still running in this repository: run the same command again in a moment.",
+      "meaning": "another canon process held the repository write lock for the whole wait, so this command, which writes or commits, started nothing",
+      "retryable": true
     },
     {
       "code": "RETENTION_EXPORT_FAILED",

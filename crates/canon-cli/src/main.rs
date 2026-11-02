@@ -122,5 +122,18 @@ fn run() -> ExitCode {
     if let Some(code) = canon_cli::old_layout::refuse_write(&command, &parsed) {
         return code;
     }
-    canon_cli::run::run(cli)
+    // The repository write lock (atip/1 12.7): a committed destructive command holds it from before it recomputes its plan to its
+    // last effect, and every other leaf that writes what a plan reads holds it while it writes (`write_lock::POLICY`). It is
+    // released when the run ends, so the plan cannot change between the check of its digest and the effects.
+    let _write_lock = match canon_cli::write_lock::hold_for_call(&command, &parsed) {
+        Ok(hold) => hold,
+        Err(code) => return code,
+    };
+    let code = canon_cli::run::run(cli);
+    // The tests' way to keep the lock held past the last effect, to see another writer wait for it and a killed holder release it.
+    #[cfg(debug_assertions)]
+    if let Some(millis) = std::env::var("CANON_TEST_HOLD_AFTER_RUN_MS").ok().and_then(|text| text.parse::<u64>().ok()) {
+        std::thread::sleep(std::time::Duration::from_millis(millis));
+    }
+    code
 }

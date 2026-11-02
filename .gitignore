@@ -77,6 +77,9 @@ man-pages/
 .canon/scenario-index.lock
 # The lock every artifact-store write holds (0.16): local process state.
 .canon/artifact-store.lock
+# The lock a committed destructive command and every writer of what its
+# plan reads hold (0.35): local process state.
+.canon/repo-write.lock
 .canon/REPORT.md
 .env
 .env.*

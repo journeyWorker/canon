@@ -1098,6 +1098,11 @@
       "retryable": false
     },
     {
+      "code": "REPO_WRITE_BUSY",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "RETENTION_EXPORT_FAILED",
       "exit": 1,
       "retryable": false

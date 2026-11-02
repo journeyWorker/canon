@@ -74,7 +74,9 @@ const ENV_VARS: &[EnvVar] = &[
 /// Variables canon reads or sets that are not a user's to set: a build input,
 /// the roots canon points its own DuckDB views at, and debug-build test seams (`CANON_WITNESS_DIR`:
 /// where a debug build records which (command, report) pairs it emitted, for the T9 witness; `CANON_TEST_PANIC`:
-/// a debug build panics at start, for the test of the `INTERNAL` error).
+/// a debug build panics at start, for the test of the `INTERNAL` error; `CANON_TEST_REPO_LOCK_WAIT_MS`: how long a debug
+/// build waits for the repository write lock, in milliseconds; `CANON_TEST_HOLD_AFTER_RUN_MS`: how long a debug build keeps
+/// the lock after its run: the two seams of the test of the lock).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -83,7 +85,9 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_LEARN_ROOT",
     "CANON_R2_LOCAL_ROOT",
     "CANON_R2_ROOT",
+    "CANON_TEST_HOLD_AFTER_RUN_MS",
     "CANON_TEST_PANIC",
+    "CANON_TEST_REPO_LOCK_WAIT_MS",
     "CANON_WITNESS_DIR",
 ];
 

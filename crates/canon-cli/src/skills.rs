@@ -957,6 +957,7 @@ pub fn owned_path_globs(providers: &[Provider]) -> Vec<String> {
         paths::PRE_COMMIT_SCRIPT,
         paths::SCENARIO_INDEX_LOCK_FILE,
         paths::ARTIFACT_STORE_LOCK_FILE,
+        paths::REPO_WRITE_LOCK_FILE,
     ];
     let mut canon: Vec<String> = dirs.into_iter().map(dir_glob).chain(files.into_iter().map(str::to_string)).collect();
     canon.sort();

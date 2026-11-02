@@ -1212,6 +1212,14 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
         Some((stale, _)) if !stale.is_empty() => {}
         _ => return,
     }
+    // The repository write lock first (it is the outermost one; a writer already holds it), then the index's own.
+    let _repo_lock = match crate::write_lock::hold(&ctx.repo) {
+        Ok(lock) => lock,
+        Err(e) => {
+            crate::warn_err!("SCENARIO_INDEX_NOT_REFRESHED", "{command}: the scenario index is stale but was not refreshed: {}", e.message);
+            return;
+        }
+    };
     let _lock = match lock_index(&ctx.repo) {
         Ok(lock) => lock,
         Err(e) => {

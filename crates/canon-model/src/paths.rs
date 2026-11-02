@@ -145,6 +145,14 @@ pub const SCENARIO_INDEX_LOCK_FILE: &str = ".canon/scenario-index.lock";
 /// state, so `canon init` ignores it.
 pub const ARTIFACT_STORE_LOCK_FILE: &str = ".canon/artifact-store.lock";
 
+/// The advisory lock every committed destructive command (`purge`, `artifacts move`, `migrate`, `ledger compact`, `tier age`)
+/// holds from the moment it recomputes its plan to its last effect, and every other command that writes what such a plan reads
+/// holds while it writes, so the plan cannot change between the check of its digest and the effects it makes (atip/1 12.7). An
+/// OS file lock (`flock`/`LockFileEx`), released when the holder exits — even when it is killed — so the file never goes stale
+/// and is never deleted. Local state, so `canon init` ignores it. It is taken before the scenario-index lock and the
+/// artifact-store lock, never after them.
+pub const REPO_WRITE_LOCK_FILE: &str = ".canon/repo-write.lock";
+
 /// The directory of the derived search index (`canon search`, `canon trace`): rebuilt from the records,
 /// the briefs and the `.feature` files whenever one of them changed, so it is never committed. The first
 /// build also writes a `.gitignore` of `*` in it, so the index stays out of git before `canon init` has
@@ -193,6 +201,7 @@ mod tests {
             SCENARIO_ARCHIVE_GITIGNORE,
             SCENARIO_INDEX_LOCK_FILE,
             ARTIFACT_STORE_LOCK_FILE,
+            REPO_WRITE_LOCK_FILE,
             INDEX_DIR,
             INDEX_FILE,
             INDEX_GITIGNORE,

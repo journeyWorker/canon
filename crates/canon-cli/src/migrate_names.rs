@@ -1067,6 +1067,7 @@ fn derived(relative: &str) -> bool {
     under(&format!("{}/", canon_model::paths::INDEX_DIR))
         || under(canon_model::paths::SCENARIO_INDEX_GITIGNORE)
         || relative == canon_model::paths::SCENARIO_INDEX_LOCK_FILE
+        || relative == canon_model::paths::REPO_WRITE_LOCK_FILE
         || relative.starts_with(canon_model::paths::HOT_DB_FILE)
 }
 
@@ -1319,10 +1320,6 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
     use crate::cli_error::{CliError, CliErrorExt as _};
     use crate::migrate::MigrateReport;
     use crate::safety;
-    let mut base = format!("{} --revert", safety::command("migrate", &[], repo_args));
-    if let Some(dir) = backup {
-        base.push_str(&format!(" --backup {}", atip::quote(&dir.display().to_string())));
-    }
     let repo = crate::context::resolve_repo_root(repo_args);
     let refused = |message: String| CliError::refused("MIGRATE_REFUSED", message).hint("run `canon migrate --revert` in a repo `canon migrate --commit` ran in, or name its backup with `--backup .canon/migrate-backup/<timestamp>`").emit("canon migrate", json);
     let dir = match find_backup(&repo, backup) {
@@ -1334,42 +1331,56 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
         Err(e) => return refused(e),
     };
     let relative = rel(&repo, plan.backup());
-    let safe_plan = safety::Plan::new(plan.effects());
-    let commit = match safe_plan.gate(mode, &base) {
+    // What the plan read: the backup's manifest, its seal and its journal, and the repo as it is now at every path it restores or removes.
+    let effects = plan.effects();
+    let reads = safety::Reads::new()
+        .path(&repo, &format!("{relative}/{MANIFEST}"))
+        .path(&repo, &format!("{relative}/{SEALED}"))
+        .path(&repo, &format!("{relative}/{JOURNAL}"))
+        .effect_paths(&repo, &effects);
+    let safe_plan = match safety::Plan::new(&repo, "migrate", effects, reads) {
+        Ok(plan) => plan,
+        Err(e) => return e.emit("canon migrate", json),
+    };
+    let commit = match safe_plan.gate(mode) {
         Ok(commit) => commit,
         Err(e) => return e.emit("canon migrate", json),
     };
     let mut log = crate::json_out::Log::new(json);
     if !commit {
         log.line(format!("canon migrate --revert: restores the repo to the state {relative}/ recorded before `canon migrate --commit`; anything written under those paths since is discarded"));
-        for effect in safe_plan.effects.iter().take(50) {
+        for effect in safe_plan.effects().iter().take(50) {
             log.line(safety::effect_line(effect));
         }
-        if safe_plan.effects.len() > 50 {
-            log.line(format!("  ... and {} more (`--json` lists every effect)", safe_plan.effects.len() - 50));
+        if safe_plan.effects().len() > 50 {
+            log.line(format!("  ... and {} more (`--json` lists every effect)", safe_plan.effects().len() - 50));
         }
         if plan.is_empty() {
             log.line("canon migrate --revert: the repo already is as the backup recorded it; nothing to restore");
         }
-        log.line(safe_plan.commit_hint(&base));
-        let report = MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: safe_plan };
+        log.line(safe_plan.commit_hint());
+        let report = MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: safe_plan.preview() };
         if json {
-            crate::json_out::data_with_next("migrate", &report, &report.plan.next_step(&base, "the plan only lists what the revert would restore; applying it takes its planDigest"));
+            crate::json_out::data_with_next("migrate", &report, &safe_plan.next_step("the plan only lists what the revert would restore; applying it takes its planDigest"));
         }
         return 0;
     }
     if plan.rebinds() {
-        if let Some(error) = crate::migrate_briefs::human_only("canon migrate --revert", &format!("{base} --commit --plan-digest {}", safe_plan.plan_digest)) {
+        if let Some(error) = crate::migrate_briefs::human_only("canon migrate --revert", &safe_plan.commit_command()) {
             return error.emit("canon migrate", json);
         }
     }
-    let safe_plan = safe_plan.committed();
+    // Past every refusal: the repository write lock from here to the end of the run (`main` held it already when its file was there).
+    if let Err(e) = safe_plan.hold() {
+        return e.emit("canon migrate", json);
+    }
+    let committed = safe_plan.committed();
     if let Err(e) = revert_apply(&repo, &plan) {
         return CliError::refused("MIGRATE_STOPPED", e).hint("the backup is intact: fix what the message names, then run `canon migrate --revert` again").emit("canon migrate", json);
     }
-    log.line(format!("canon migrate --revert: restored {} path(s) and removed {} from {relative}/", safe_plan.effects.iter().filter(|e| e.action == "restore").count(), safe_plan.effects.iter().filter(|e| e.action == "remove").count()));
+    log.line(format!("canon migrate --revert: restored {} path(s) and removed {} from {relative}/", committed.effects.iter().filter(|e| e.action == "restore").count(), committed.effects.iter().filter(|e| e.action == "remove").count()));
     if json {
-        crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: safe_plan });
+        crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: committed });
     }
     0
 }

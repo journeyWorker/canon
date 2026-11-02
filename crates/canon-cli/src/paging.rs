@@ -103,6 +103,13 @@ pub fn next_page_argv(cursor: &str) -> Option<Vec<String>> {
     Some(atip::next_page_argv(&path, &call.given, cursor, atip::json_mode()))
 }
 
+/// The leaf's command words and the arguments of this call, normalised ([`bind_arguments`] recorded them): what a destructive
+/// command computes its plan's `inputs` from and writes its commit call from (`crate::safety`). `None` before `main` recorded the call
+/// (a test that runs a handler directly).
+pub fn call() -> Option<(&'static [String], &'static [Given])> {
+    CALL.get().map(|call| (call.path.as_slice(), call.given.as_slice()))
+}
+
 /// The arguments the call gave, normalised: an integer option as a JSON integer, a switch as `true`, a repeated option as
 /// an array, the operands as one list. A value filled in from a default is not among them; one filled in by an environment
 /// variable is, marked as such. `--repo` and `--as` are marked as canon's own flag-only options.

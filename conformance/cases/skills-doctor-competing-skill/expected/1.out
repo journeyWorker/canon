@@ -14,6 +14,7 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/plugins/**
   .canon/policy.approval.json
   .canon/r2/**
+  .canon/repo-write.lock
   .canon/scenario-index.lock
   .canon/scripts/canon-gate-pre-commit.sh
   .canon/skills/**

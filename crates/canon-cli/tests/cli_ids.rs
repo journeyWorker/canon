@@ -266,12 +266,12 @@ fn parity_transcript(binary: &Path, old_spelling: bool) -> String {
         out.push_str(&format!("--- stdout\n{}\n--- stderr\n{}\n", normalize(&stdout(&result)), normalize(&stderr(&result))));
     }
     // The stored records: every text file canon keeps under `.canon/`, by path. The briefs are the brief-format
-    // change's (0.31 writes the template without comments), not this one's; the access log is no record.
+    // change's (0.31 writes the template without comments), not this one's; the access log and the repository write lock (0.35, which 0.30 did not have) are no record.
     out.push_str("=== stored\n");
     let mut stored: Vec<(String, String)> = harness::tree(&repo.join(".canon"))
         .into_iter()
         .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes?).ok()?)))
-        .filter(|(path, _)| !path.ends_with("brief.md") && !path.starts_with("audit"))
+        .filter(|(path, _)| !path.ends_with("brief.md") && !path.starts_with("audit") && !path.ends_with("repo-write.lock"))
         .map(|(path, text)| (normalize(&path.to_string_lossy()), normalize(&text)))
         .collect();
     stored.sort();

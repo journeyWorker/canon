@@ -378,6 +378,24 @@ released when its holder exits, however it exits, so it never goes stale;
 a writer gives up after 30 s with a message naming the file and saying to
 retry (the command exits `2` and writes no record).
 
+## The repository write lock
+
+A committed destructive command (`canon purge`, `canon tier age`, `canon ledger
+compact`, `canon artifacts move`, `canon migrate`) recomputes its plan, checks
+its digest and then makes the effects, and nothing may change the plan in
+between. It holds an OS file lock on `.canon/repo-write.lock` for the whole
+span, from before it recomputes the plan to after its last effect; a preview
+holds nothing. Every other command that writes what a plan reads (ledger
+appends, the artifact store, briefs, specs, hooks, skill files, `canon.yaml`)
+holds the same lock while it writes, so it waits for a commit and a commit
+waits for it; reads, `--dry-run` runs and previews hold nothing. The lock is
+the outermost one: it is taken before the scenario-index lock and the
+artifact-store lock. It is released when its holder exits, however it exits,
+so a killed commit never leaves it held, and the file is never deleted. A
+command that waited 30 s for it starts nothing: it exits `2` with
+`REPO_WRITE_BUSY` (retryable; run it again in a moment). `canon init` makes
+the file; a repository that has none gets it from its first commit.
+
 ## What `canon init` keeps out of git
 
 A fresh `canon init` writes these lines to `.gitignore` (each under a
@@ -392,6 +410,8 @@ comment, only the missing ones):
 - `.canon/scenario-index.lock` — the lock serializing index rebuilds.
 - `.canon/artifact-store.lock` — the lock serializing artifact store
   writes.
+- `.canon/repo-write.lock` — the lock a committed destructive command and
+  every writer of what its plan reads hold.
 - `.canon/dashboard-snapshot/` — the snapshot `canon dashboard`
   regenerates on every run.
 - `.canon/learn/` and `.canon/r2/` — local learn scratch and the local

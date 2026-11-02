@@ -41,7 +41,7 @@ fn the_bare_run_previews_the_candidates_and_performs_no_writes() {
     assert_eq!(data["rules"][0]["candidates"], 1, "{body}");
     assert_eq!(data["rules"][0]["moved"], 0, "{body}");
     let digest = data["planDigest"].as_str().expect("a preview carries a planDigest");
-    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["tier", "age", "--repo", fixture.root.path().display().to_string(), "--commit", "--plan-digest", digest, "--json"]), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["tier", "age", format!("--repo={}", fixture.root.path().display()), "--commit", format!("--plan-digest={digest}"), "--json"]), "{body}");
 
     // A preview must never write or delete anything.
     assert_eq!(fixture.git_file_count(), 2, "the preview moved a file out of the git tier");

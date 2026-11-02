@@ -171,11 +171,12 @@ fn purge_preview_then_commit_deletes_and_a_stale_digest_deletes_nothing() {
     let preview_body = json(&preview);
     let digest = preview_body["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
     assert_eq!(preview_body["data"]["committed"], false, "{preview_body}");
-    assert_eq!(preview_body["data"]["effects"].as_array().unwrap().len(), 2, "one effect per record the plan removes: {preview_body}");
+    assert_eq!(preview_body["data"]["effects"].as_array().unwrap().len(), 3, "one effect per record the plan removes, and the audit line the commit appends: {preview_body}");
     // The one step after a preview is the exact commit, digest filled in.
     assert_eq!(preview_body["meta"]["command"], "purge", "{preview_body}");
     let repo = fixture.root.path().display().to_string();
-    let expected = ["purge", "--kind", "trajectory", "--before", before.as_str(), "--repo", repo.as_str(), "--commit", "--plan-digest", digest.as_str(), "--json"];
+    let (kind, before_arg, repo_arg, digest_arg) = ("--kind=trajectory".to_string(), format!("--before={before}"), format!("--repo={repo}"), format!("--plan-digest={digest}"));
+    let expected = ["purge", kind.as_str(), before_arg.as_str(), repo_arg.as_str(), "--commit", digest_arg.as_str(), "--json"];
     assert_eq!(preview_body["meta"]["next"][0]["argv"], serde_json::json!(expected), "{preview_body}");
     assert_eq!(fixture.git_file_count(), 2, "a preview deletes nothing");
     assert!(!fixture.root.path().join(canon_model::paths::ACCESS_AUDIT_FILE).exists(), "a preview writes no audit line");

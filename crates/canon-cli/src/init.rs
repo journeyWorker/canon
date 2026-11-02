@@ -85,13 +85,14 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// object-store stand-in), which would otherwise be untracked after the
 /// first run (#105, #107); and the archive of superseded scenario index
 /// versions, which every rewrite of the derived index fills.
-const GITIGNORE_LINES: [(&str, &str); 11] = [
+const GITIGNORE_LINES: [(&str, &str); 12] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
     ("# the archive of superseded scenario index versions -- derived like the index, never committed.", paths::SCENARIO_ARCHIVE_GITIGNORE),
     ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
     ("# the lock that serializes artifact store writes -- local process state.", paths::ARTIFACT_STORE_LOCK_FILE),
+    ("# the lock a committed destructive command and every writer of what its plan reads hold -- local process state.", paths::REPO_WRITE_LOCK_FILE),
     ("# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
     ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
     ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
@@ -267,7 +268,11 @@ fn gitignore_step(repo: &Path, dry_run: bool) -> std::io::Result<Vec<&'static st
     if dry_run {
         return Ok(missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect());
     }
-    scaffold_gitignore(repo)
+    let added = scaffold_gitignore(repo)?;
+    // The file the repository write lock locks is made where its `.gitignore` line is, so every later call finds it to lock
+    // (`write_lock`): a call that is refused writes nothing, and so never makes it.
+    let _ = crate::write_lock::create_file(repo);
+    Ok(added)
 }
 
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.

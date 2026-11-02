@@ -101,6 +101,16 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `open_index` builds the refusals of the index for both leaves; every other code is next to its emit.
     ("search/mod.rs", &["search", "trace"]),
     ("safety.rs", &["purge", "artifacts move", "migrate", "ledger compact", "tier age"]),
+    // `Refused::error`: the refusal of the repository write lock, made for every leaf that holds it (`write_lock::POLICY`), and for the dashboard's approval.
+    (
+        "write_lock.rs",
+        &[
+            "artifacts move", "artifacts store", "brief approve", "change new", "context-pack add", "dashboard", "dispatch begin", "dispatch end", "divergence accept", "divergence add", "divergence defer",
+            "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "gate install-hooks", "gate promote", "ingest plans", "ingest records", "ingest sessions", "init",
+            "inventory sync", "ledger compact", "migrate", "plugin sync", "policy approve", "prompt add", "purge", "review change", "review scenario", "scenario new", "skills install", "strategy promote",
+            "strategy rollback", "subject adopt", "subject move", "subject new", "subject unadopt", "task done", "tier age",
+        ],
+    ),
     ("selftest.rs", &[]),
     // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.
     ("scaffold.rs", &["scenario new"]),

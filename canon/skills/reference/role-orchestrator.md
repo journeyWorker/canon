@@ -624,9 +624,14 @@ move` and `canon migrate` delete or rewrite existing data. A bare run only
 previews: exit 0, nothing written, a report with `planDigest` and
 `effects[]`. Read the effects, then act with `--commit --plan-digest
 <planDigest>`; it refuses (`PLAN_STALE`, exit 2) when the plan recomputed
-now differs from the one you previewed. A document passed with `--input`
-never carries `--commit` or `--plan-digest`, and these five leaves take one
-object only (`INPUT_INVALID`).
+now differs from the one you previewed. The digest is `sha256:` and 64 hex
+digits, over the effects and what the plan read, so a file or record the plan
+read that changed since is `PLAN_STALE` too, and `meta.next[0]` is the preview
+to run again. A commit holds the repository write lock for its whole run:
+another command that writes waits for it, and one that waited 30 seconds
+answers `REPO_WRITE_BUSY` (exit 2, retryable): run it again. A document passed
+with `--input` never carries `--commit` or `--plan-digest`, and these five
+leaves take one object only (`INPUT_INVALID`).
 
 ```bash
 canon purge --kind session --before 2026-01-01

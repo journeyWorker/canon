@@ -83,10 +83,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Search(args) => crate::search::run_search(args),
         Command::Trace(args) => crate::search::run_trace(args),
         Command::Export(args) => ExitCode::from(crate::retention::run_export(args)),
-        Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => {
-            let base = crate::safety::command("purge", &[("--kind", kind.as_str().to_string()), ("--before", before.to_rfc3339())], &repo);
-            ExitCode::from(crate::retention::run_purge(&repo, kind, before, &safety.mode(), &base, json))
-        }
+        Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => ExitCode::from(crate::retention::run_purge(&repo, kind, before, &safety.mode(), json)),
         Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),
         Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields, declared_role),
         Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref())),
