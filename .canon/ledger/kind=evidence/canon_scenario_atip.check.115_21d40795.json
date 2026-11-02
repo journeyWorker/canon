@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T17:30:02.802712Z",
+  "attachments": [
+    {
+      "case": "atip_check_115_a_command_that_ignores_sigterm_is_killed_after_the_grace_period_and_the_checker_does_not_hang",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-notrun-junit.xml",
+      "sha256": "5e06fc4077fde4a1948763b8d67f54c90939d5dcecade9263f7d42f8fc900853"
+    }
+  ],
+  "code_tree": "be4231bc4799917b48d6961c07b9ca13ccf18ba1",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-notrun-junit.xml"
+  },
+  "evidence_sha": "37263f4a71a5b72e92279a5a11e37cbd694666a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 541,
+  "scenario_id": "atip.check.115",
+  "schema": 1,
+  "staging_id": "08e8154f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

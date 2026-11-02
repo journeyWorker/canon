@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T17:29:18.232560Z",
+  "attachments": [
+    {
+      "case": "atip_check_98_canon_lists_dashboard_under_not_run_and_passes_its_own_level_with_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-notrun-junit.xml",
+      "sha256": "5e06fc4077fde4a1948763b8d67f54c90939d5dcecade9263f7d42f8fc900853"
+    }
+  ],
+  "code_tree": "be4231bc4799917b48d6961c07b9ca13ccf18ba1",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-notrun-junit.xml"
+  },
+  "evidence_sha": "37263f4a71a5b72e92279a5a11e37cbd694666a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 551,
+  "scenario_id": "atip.check.98",
+  "schema": 1,
+  "staging_id": "cf94a1da",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
