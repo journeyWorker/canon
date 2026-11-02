@@ -127,4 +127,4 @@ Source: https://github.com/journeyWorker/canon/issues/133, issue 134의 검사�
 - L2 검사와 L2 전용 fixture 키(`canon-0-35-check-l2-*`).
 - `dashboard`를 서버로 계속 돌려 두는 일. 이 변경은 canon의 fixture에 `notRun`을 쓰는 일만 한다.
 
-Approved: Journey Hwang 2026-11-02T06:38:09Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:11b3f0beab3a9501691557f39ccd8ecd9d34e3f21fedbc68de734ab051665b71)
+Approved: Journey Hwang 2026-11-02T14:45:08Z — "휴가 중 승인 위임(2026-11-01 대화): atip/1 1.2.1 반영분" (relayed by orchestrator orchestrator-main via chat) (brief sha256:3234bdd58a728fc195a46f37d605ee5747c62e0db76af21f589b9be9f3e7eb01)

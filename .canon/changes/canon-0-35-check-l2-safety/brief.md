@@ -133,4 +133,4 @@ Source: https://github.com/journeyWorker/atip tag v1.2.1, approaches/checker.md 
 - canon의 미리보기와 확정을 계약에 맞추는 일(`canon-0-35-plan-jcs`)과 읽기 명령의 숨은 쓰기를 없애는 일(`canon-0-35-read-writes`).
 - 계획 digest 형식 검증. 검사기는 digest를 불투명하게 다룬다.
 
-Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:9c71a037b45b09cf020c3591fe4db9aa29dd22ea3f3dadfb11bb13b8c950dd4d)
+Approved: Journey Hwang 2026-11-02T14:45:08Z — "휴가 중 승인 위임(2026-11-01 대화): atip/1 1.2.1 반영분" (relayed by orchestrator orchestrator-main via chat) (brief sha256:c389db36dac6f9d7523aba63701e332a5ccb4d78ec4438db94d1d4f318966e32)
