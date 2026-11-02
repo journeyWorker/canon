@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev"
   },
-  "at": "2026-11-02T10:28:51.349685Z",
-  "code_tree": "270bae3f4c4f512bcf367a5df596b50ab839b177",
+  "at": "2026-11-02T18:07:18.343932Z",
+  "code_tree": "9c40336d27f4c0f2ec481820b37dbe6526a97cc3",
   "kind": "review",
-  "pin": "180496f738748c6fbe0d4f2a563a60a7409aa669",
+  "pin": "adf05245c6b8ad2be47dcf0b36fc7ffaa43c97ed",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_check_98_canon_lists_dashboard_under_not_run_and_passes_its_own_level_with_it"
+          "junit:atip_check_115_a_command_that_ignores_sigterm_is_killed_after_the_grace_period_and_the_checker_does_not_hang"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "05b8a87470c481379255103f73cef2c3a86b4437bd0b7f897c70d7cf1644a4fa",
+    "scenario_digest": "602170dbe006068cdc610298bb396082dd69b7e73a387316efcac9f6518a7abc",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-fixture/brief.md"
   },
-  "review_id": "01M6DWW00NMENYS9ZY5ST3G7KR",
+  "review_id": "01M6EQ3EA7ZR915P2M2M1NAFVN",
   "reviewer": "rev-check-0-35",
-  "scenario_id": "atip.check.98",
+  "scenario_id": "atip.check.115",
   "schema": 2,
   "worktree_dirty": false
 }
