@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T12:42:52.201668Z",
+  "change_id": "canon-0-35-input-order",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/input.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "cd851b393160cc556f69277a9079f026e004d6ec",
+  "resolution_sha": "9886b0661814b5ab6833e5501f25c42129e13c37",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (brief F2/F4, spec 11.7 steps 2 and 3; scenario atip.inputorder.06): a document's fragment problem answers before malformed argv for most argv failures but not all, so two failures of the same kind answer in opposite orders. Real binary, 'finding close <argv> --input {\"roundd\":1}': '--round abc', '--disposition zz', '--seq 1 --seq 2', '--as zzz', 'x y' and '--json=1' answer INPUT_INVALID UNKNOWN_KEY /roundd (step 2 first, as the contract says), but '--bogus' answers USAGE --bogus and a missing option value ('--round' last) answers USAGE --round (step 3 first). Same on 0.34, so not a regression, but the brief takes both into step 3 ('mal-formed argv: an unknown option, a value of the wrong type') after the fragment. The test pins the wrong half: 06 asserts 'an unknown option answers first as well' only against a valid document (conflict), and the INPUT_INVALID-before-argv assertion uses a wrong-typed --round, never --bogus. Cause: the unknown-option and missing-value failures are met while the command line is lexed, before the document is read. Blast radius: only a call that has both an unknown option or valueless option and a bad document; L2.input-refusals does not add argv, so the checker does not probe it.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T12:43:03.666015Z",
+  "change_id": "canon-0-35-batch-pointers",
+  "code_tree": "a7273e9d613129dd3526455fb7f9eb9fc98a9e82",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "20d8c4ba2d101e71cbe66170e4c56ebb46e7e84a",
+  "kind": "finding",
+  "reviewed_sha": "83b83fe805cb57eaad740d4b07c870868b914afd",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Blast radius: removing the per-element --dry-run from preflight means 14 commands (artifacts store, export, gate install-hooks, gate promote, ingest plans/records/sessions, init, inventory sync, plugin sync, skills install, strategy promote, subject adopt, subject unadopt) now run the earlier elements before a state fault stops the batch (verified: subject adopt [valid, missing change, valid] -> exit 1 BATCH_INCOMPLETE /1, item 0 executed, item 2 skipped; 0.34 refused whole with exit 2). That is the brief's decided behaviour and the CHANGELOG lists it as an upgrade note; the checks do not exercise it for the other 13 commands (05 uses subject adopt only), and a failed element's own error.field is /<index> for most codes (FINDING_NOT_FOUND, SUBJECT_ADOPT_REFUSED), deeper (/1/operands) only where the child's error carried a document pointer.",
+  "worktree_dirty": false
+}
