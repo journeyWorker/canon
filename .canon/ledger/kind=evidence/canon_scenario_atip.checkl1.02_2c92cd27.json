@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-02T20:59:02.269671Z",
+  "attachments": [
+    {
+      "case": "atip_checkl1_02_level_l2_runs_and_an_unknown_level_is_usage",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2b.xml",
+      "sha256": "0474b61edd76c1a02fe258e23714470da9fa4aff0e4cf4633e6002e9dfc175bf"
+    }
+  ],
+  "code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2b.xml"
+  },
+  "evidence_sha": "aa6ca67b67d6b4d1795fb533fc25d1c7993a3ba7",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 68,
+  "scenario_id": "atip.checkl1.02",
+  "schema": 1,
+  "staging_id": "13d7fc16",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
