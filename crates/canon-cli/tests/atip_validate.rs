@@ -40,7 +40,7 @@ fn candidates(domain: &Value, seed: &mut Seed) -> Vec<Value> {
         let alphabets = ["abz019-- #.", "abz019-..#_", "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefilou", "ab1 -\t\n\u{a0}\u{2003}\u{7}\u{200b}", "a-z0-9._/:@+ \\"];
         for alphabet in alphabets {
             let alphabet: Vec<char> = alphabet.chars().collect();
-            for _ in 0..120 {
+            for _ in 0..400 {
                 let length = seed.next(30);
                 values.push(json!((0..length).map(|_| alphabet[seed.next(alphabet.len())]).collect::<String>()));
             }
@@ -75,7 +75,7 @@ fn admits_answers_as_the_validator_does_for_every_domain_canon_declares() {
         }
     }
     assert!(domains > 40 && patterns > 10, "canon declares {domains} domains, {patterns} of them patterns");
-    assert!(pairs > 5_000, "{pairs} values asked");
+    assert!(pairs > 10_000, "{pairs} values asked");
 }
 
 #[test]
