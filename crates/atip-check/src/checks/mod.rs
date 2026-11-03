@@ -449,7 +449,7 @@ impl Run<'_> {
             if self.fixture.not_run.contains(id) {
                 // A command that does not end on its own: its first `ok` invocation runs once, up to its first document; the rest would succeed and never end.
                 if let Some(argv) = entry.ok.first() {
-                    let call = self.invoke_served(id, argv)?;
+                    let call = self.invoke_served(id, argv, None)?;
                     self.served.push(ServedRun { command: id.clone(), call: Some(call) });
                 }
                 for argv in entry.ok.iter().skip(1) {
@@ -496,10 +496,10 @@ impl Run<'_> {
     }
 
     /// The one run of the `notRun` command `id`: `argv` with `--json`, until its first JSON document, then ended by a signal. A command that ends on its
-    /// own, before or after that document, is a fixture error.
-    fn invoke_served(&mut self, id: &str, argv: &[String]) -> Result<usize, RunError> {
+    /// own, before or after that document, is a fixture error; with its document `doc`, so is a refusal with a code it declares on a constraint or a validator.
+    fn invoke_served(&mut self, id: &str, argv: &[String], doc: Option<&crate::l1::model::CommandDoc>) -> Result<usize, RunError> {
         let index = self.invoke(Call::new(in_json_mode(argv)).until_first_document())?;
-        if self.log[index].ended_alone && served_precondition(&self.log[index], self.fixture.registry.as_deref(), None).is_none() {
+        if self.log[index].ended_alone && served_precondition(&self.log[index], self.fixture.registry.as_deref(), doc).is_none() {
             return Err(RunError::Fixture(format!(
                 "`notRun` names {id}, and `{}` ended on its own ({}) within the time limit: a command that ends belongs in no `notRun`",
                 self.log[index].call.argv.join(" "),

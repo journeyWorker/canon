@@ -373,7 +373,7 @@ impl Run<'_> {
                 doc.examples.iter().find_map(|line| invocation::split_line(line).ok().filter(|words| words.first().is_some_and(|word| *word == tool)).map(|words| (line.clone(), words)))
             });
             if let Some((_, words)) = first {
-                let call = self.invoke_served(&id, &words[1..])?;
+                let call = self.invoke_served(&id, &words[1..], run.docs.commands.get(&id))?;
                 self.served[position].call = Some(call);
             }
         }

@@ -944,7 +944,9 @@ fn serve(tool: &Tool) -> ExitCode {
             let code = tool.text("serveRefuseCode", "CURSOR_INVALID");
             let field = tool.text("serveRefuseField", "");
             let extras: Vec<(&str, Value)> = if field.is_empty() { Vec::new() } else { vec![("field", json!(field))] };
-            return tool.fail("usage", &code, "serve cannot start here", Some("serve"), &extras, 2);
+            // `serveRefuseExit` seeds the exit of the refusal (default 2): with 1 it is not a refusal of the kind the contract knows.
+            let exit = tool.number("serveRefuseExit").map_or(2, |exit| u8::try_from(exit).unwrap_or(2));
+            return tool.fail("usage", &code, "serve cannot start here", Some("serve"), &extras, exit);
         }
         "silent" => {}
         _ => {

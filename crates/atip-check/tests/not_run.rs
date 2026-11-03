@@ -343,3 +343,74 @@ fn atip_check_116_a_not_run_refusal_naming_an_argument_or_an_unregistered_code_i
         assert_eq!((output.code, document["error"]["code"].as_str()), (Some(2), Some("FIXTURE_INVALID")), "{key}: {}", output.stdout);
     }
 }
+
+/// The run ended as a fixture error: exit 2, `FIXTURE_INVALID` on `--fixture`, no check reported; its message.
+fn fixture_error(output: &Output, what: &str) -> String {
+    let document = output.envelope();
+    assert_eq!((output.code, document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some(2), Some("FIXTURE_INVALID"), Some("--fixture")), "{what}: {}", output.stdout);
+    assert!(document.get("data").is_none(), "{what}: no check reports: {}", output.stdout);
+    document["error"]["message"].as_str().unwrap_or_default().to_string()
+}
+
+#[test]
+fn atip_check_116_a_refusal_of_a_step_that_reads_no_state_is_a_fixture_error_whatever_its_code_when_the_code_is_registered() {
+    // Registered with exit 2 and refused with no `field`: only the class of the code says the step read no state (checker.md 1.3.1 section 5).
+    let extra = json!([{"code": "UNKNOWN_OPTION", "exit": 2}, {"code": "OPTION_REQUIRED", "exit": 2}, {"code": "OPTION_INVALID", "exit": 2}]);
+    for code in ["UNKNOWN_COMMAND", "COMMAND_REQUIRED", "INPUT_INVALID", "UNKNOWN_OPTION", "OPTION_REQUIRED", "OPTION_INVALID"] {
+        let harness = Harness::new();
+        let config = json!({"serveMode": "refuseStart", "serveRefuseCode": code, "extraCodes": extra});
+        let fixture = l0_fixture(&harness, &config, &[&["serve", "--json"]]);
+        let output = harness.check(&fixture, true);
+        let message = fixture_error(&output, code);
+        assert!(message.contains("serve") && message.contains("ended on its own"), "{code}: {message}");
+    }
+    // The control: a registered code of no such class, refused the same way, is unprovided with its code and the level is not met.
+    let harness = Harness::new();
+    let config = json!({"serveMode": "refuseStart", "serveRefuseCode": "CURSOR_INVALID", "extraCodes": extra});
+    let fixture = l0_fixture(&harness, &config, &[&["serve", "--json"]]);
+    let output = harness.check(&fixture, true);
+    assert_eq!((output.code, output.envelope()["error"]["code"].as_str(), result_of(&output, "L0.envelope").as_str()), (Some(1), Some("LEVEL_NOT_MET"), "unprovided"), "{}", output.stdout);
+}
+
+#[test]
+fn atip_check_116_a_not_run_command_that_exits_1_with_a_registered_code_has_ended_on_its_own_and_is_a_fixture_error() {
+    // Exit 1 is not a refusal before the work (spec 8.3): the registered precondition code does not make it unprovided.
+    let harness = Harness::new();
+    let config = json!({"serveMode": "refuseStart", "serveRefuseExit": 1});
+    let fixture = l0_fixture(&harness, &config, &[&["serve", "--json"]]);
+    let output = harness.check(&fixture, true);
+    let message = fixture_error(&output, "exit 1");
+    assert!(message.contains("serve") && message.contains("ended on its own"), "{message}");
+}
+
+#[test]
+fn atip_check_116_a_not_run_refusal_with_a_code_the_command_document_declares_is_a_fixture_error_at_l1_and_unprovided_without_the_document() {
+    // `CURSOR_INVALID` is a precondition code for `serve` (the control); declared on a constraint or on a validator of its document it is a refusal
+    // of a step that reads no state: the fixture invocation is wrong.
+    let declared = [
+        ("constraint", json!([{"op": "set", "path": "/constraints", "value": [{"rule": "atLeastOne", "names": ["port"], "code": "CURSOR_INVALID"}]}])),
+        ("validator", json!([{"op": "set", "path": "/validators", "value": [{"arguments": ["port"], "code": "CURSOR_INVALID", "description": "The port is free", "rejects": ["{tool} serve --port 1 --json"]}]}])),
+    ];
+    let harness = Harness::new();
+    let config = l1_config(&json!({"serveMode": "refuseStart"}));
+    let output = harness.check_l1(&config, &l1_fixture(&harness, &config));
+    assert_eq!((output.code, output.envelope()["error"]["code"].as_str()), (Some(1), Some("LEVEL_NOT_MET")), "the control: {}", output.stdout.chars().take(400).collect::<String>());
+    for (name, ops) in declared {
+        let harness = Harness::new();
+        let config = l1_config(&json!({"serveMode": "refuseStart", "docPatch": {"serve": ops}}));
+        let output = harness.check_l1(&config, &l1_fixture(&harness, &config));
+        let message = fixture_error(&output, name);
+        assert!(message.contains("serve") && message.contains("ended on its own"), "{name}: {message}");
+    }
+}
+
+#[test]
+fn atip_check_116_a_not_run_command_whose_effect_note_is_empty_or_blank_is_a_fixture_error_at_l1() {
+    for (name, note) in [("empty", ""), ("blank", "  \t ")] {
+        let harness = Harness::new();
+        let config = l1_config(&json!({"serveMode": "serve", "docPatch": {"serve": [{"op": "set", "path": "/effectNote", "value": note}]}}));
+        let output = harness.check_l1(&config, &l1_fixture(&harness, &config));
+        let message = fixture_error(&output, name);
+        assert!(message.contains("serve") && message.contains("effectNote"), "{name}: {message}");
+    }
+}
