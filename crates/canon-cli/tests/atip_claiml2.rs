@@ -593,7 +593,7 @@ fn atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_fi
 }
 
 #[test]
-fn atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_prompts() {
+fn atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_a_prompt_library_and_the_one_prompt_it_has_is_named() {
     fn sources(dir: &Path, out: &mut Vec<(PathBuf, String)>) {
         for entry in std::fs::read_dir(dir).expect("a directory") {
             let path = entry.expect("an entry").path();
@@ -621,8 +621,20 @@ fn atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_prom
             }
         }
     }
-    assert_eq!(offenders, Vec::<String>::new(), "a source opens the controlling terminal or asks for a value");
-    // The only read of stdin is `--input -`, which refuses a terminal (`STDIN_TTY`) instead of waiting for a prompt.
+    assert_eq!(offenders, Vec::<String>::new(), "a source opens the controlling terminal or uses a prompt library");
+    // Every read of stdin: `--input -` (which refuses a terminal, `STDIN_TTY`, instead of waiting) and the one prompt canon has, which the CHANGELOG
+    // row states as a gap: `canon init` without `--providers` on a terminal. A new reader of stdin is a new prompt until it is named here.
+    let mut readers: Vec<String> = found
+        .iter()
+        .filter(|(path, text)| !path.components().any(|part| part.as_os_str() == "atip-check") && text.lines().any(|line| line.contains("stdin()") && !line.trim_start().starts_with("//")))
+        .map(|(path, _)| path.strip_prefix(repo_root().join("crates")).unwrap_or(path).display().to_string().replace("/../", "/"))
+        .collect();
+    readers.sort();
+    assert_eq!(readers, ["canon-cli/src/init.rs", "canon-cli/src/input.rs"], "a read of stdin that is neither `--input -` nor the named `canon init` prompt");
     let input = read(&repo_root().join("crates/canon-cli/src/input.rs"));
     assert!(input.contains("STDIN_TTY") && input.contains("is_terminal()"), "`--input -` on a terminal is a refusal");
+    let init = read(&repo_root().join("crates/canon-cli/src/init.rs"));
+    assert!(init.contains("fn prompt_providers"), "the init prompt is gone: drop the Gap of the `no /dev/tty prompt` row and this allowance");
+    let changelog = read(&repo_root().join("CHANGELOG.md"));
+    assert!(release_section(&changelog).contains("`canon init` without `--providers` asks"), "the CHANGELOG states the init prompt as a gap while it exists");
 }
