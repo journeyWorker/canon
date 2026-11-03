@@ -32,7 +32,7 @@ Source: https://github.com/journeyWorker/atip tag v1.2.0, spec 6.9, 6.10, 9.8, 1
 
 ## Intent
 
-canon의 cursor는 0.34에서 이미 명시한 인수에 묶이고 `--limit`, `--all`, `--cursor`, `--fields`, `--json`을 뺀다. 그러나 묶는 값이 인수 원문 글자의 8바이트 해시이고, 환경 변수 값은 묶이지 않으며(`CANON_ROLE`을 바꿔도 이어진다), cursor 안에 기록 키가 16진으로 그대로 들어 있다. 다음 쪽 항목은 호출의 argv에서 만들어 원문을 그대로 쓴다. `limit`, `cursor`, `all`이 flag-only로 표시되지 않아 `export --input '{"limit":5}'`가 받아들여진다. 계약 1.2는 이 모두를 규칙으로 만들고 canon의 현재 동작을 상당 부분 그대로 규칙으로 삼는다.
+canon의 cursor는 0.34에서 이미 명시한 인수에 묶이고 `--limit`, `--all`, `--cursor`, `--fields`, `--json`을 뺀다. 그러나 묶는 값은 인수 원문 글자의 8바이트 해시다. 환경 변수 값은 묶이지 않아 `CANON_ROLE`을 바꿔도 이어진다. 다음 쪽 항목은 호출의 argv에서 만들어 원문을 그대로 쓴다. `limit`, `cursor`, `all`이 flag-only로 표시되지 않아 `export --input '{"limit":5}'`가 받아들여진다. 계약 1.2는 이 모두를 규칙으로 만들고 canon의 현재 동작을 상당 부분 그대로 규칙으로 삼는다.
 
 ## Desired outcome
 
@@ -59,7 +59,7 @@ canon의 cursor는 0.34에서 이미 명시한 인수에 묶이고 `--limit`, `-
 - `--limit`, `--all`, `--cursor`, `--fields`, `--json`은 묶이지 않는다. 다른 모든 명시 인수는 묶인다. 기본값을 명시한 인수는 준 것이다.
 - 환경 변수 값은 묶인다. canon에서 `env`를 가진 옵션은 `--as`의 `CANON_ROLE`이다. 그 값을 바꾸거나 지우거나 옵션으로 명시하면 cursor가 거절된다. 다른 환경 변수가 옵션을 채우는 쪽 나누기 명령이 있으면 같다.
 - 다음 쪽 항목은 호출이 명시한 인수를 정규화해 argv 옵션으로 쓰고 `--cursor <값>`을 붙인다. 기본값과 환경 변수 값을 싣지 않는다. `--input -`나 파일로 온 인수는 argv 옵션이나 인라인 `--input` 단어 하나로 쓰고 `--input -`는 싣지 않는다.
-- cursor 문자열은 불투명하다. 기록 키가 보이지 않는다.
+- cursor는 호출에 묶인 ASCII 낱말 하나이다. 암호화하지 않으므로 위치가 읽힐 수 있다. 호출자는 그것을 바꾸지 않고 그대로 돌려주고 해석하지 않는다. 한 글자라도 바뀌면 `FOREIGN`이다.
 
 ### F2 --all
 
@@ -93,7 +93,7 @@ canon의 cursor는 0.34에서 이미 명시한 인수에 묶이고 `--limit`, `-
   - `canon query --kind subject --limit 1 --json`의 `meta.next[0].argv`가 명시한 인수와 `--cursor <값>`만 가진다. 기본값을 명시하지 않은 호출에는 기본값이 없다.
   - ==**`--as reviewer`를 명시하지 않은 호출에서 `CANON_ROLE`을 바꾸면 그 cursor는 `ARGUMENTS_CHANGED`로 거절된다.**==
   - 기본값을 명시한 인수를 더하거나 빼면 `ARGUMENTS_CHANGED`이다. `--limit`, `--fields`, `--json`만 바꾸면 이어진다.
-  - 실패 경로: cursor 문자열에 기록 키가 글자 그대로 들어 있지 않다. 문자열 한 글자를 바꾸면 `FOREIGN`이다.
+  - 실패 경로: cursor는 공백과 따옴표가 없는 ASCII 낱말 하나이다. 문자열 한 글자를 바꾸면 `FOREIGN`이다. 암호화나 가림은 요구하지 않는다.
 - F2:
   - `--limit`을 `--all`로 바꿔 이어 가면 남은 모두를 읽고 거절되지 않는다. 네 명령에서 시험한다.
   - 실패 경로: `--limit`과 `--all`을 함께 주면 exit 2, `USAGE`, `field`가 앞선 이름이다.
