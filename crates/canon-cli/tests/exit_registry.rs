@@ -208,7 +208,7 @@ fn listing(dir: &Path) -> Vec<String> {
     fn walk(root: &Path, dir: &Path, found: &mut Vec<String>) {
         for entry in fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
-            if path.file_name().is_some_and(|name| name == ".git") || path.ends_with(".canon/repo-write.lock") {
+            if path.file_name().is_some_and(|name| name == ".git") {
                 continue;
             }
             found.push(path.strip_prefix(root).unwrap().display().to_string());

@@ -47,8 +47,7 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir).unwrap().flatten() {
             let path = entry.path();
-            // The repository write lock file is process state a call that locked leaves behind, refused or not.
-            if path.file_name().is_some_and(|name| name == ".git") || path.ends_with(".canon/repo-write.lock") {
+            if path.file_name().is_some_and(|name| name == ".git") {
                 continue;
             }
             if path.is_dir() {

@@ -39,7 +39,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn git(dir: &Path, args: &[&str]) {
-    let out = Command::new("git").args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]).args(args).current_dir(dir).output().expect("spawn git");
+    let out = Command::new("git").args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "-c", "maintenance.auto=false", "-c", "gc.auto=0"]).args(args).current_dir(dir).output().expect("spawn git");
     assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
 }
 
@@ -50,8 +50,7 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir).unwrap().flatten() {
             let path = entry.path();
-            // The lock file is process state a call that locked leaves behind, refused or not, and no plan reads it: not part of the tree.
-            if path.file_name().is_some_and(|name| name == ".git") || path.ends_with(LOCK) {
+            if path.file_name().is_some_and(|name| name == ".git") {
                 continue;
             }
             if path.is_dir() {
@@ -592,6 +591,69 @@ fn atip_planjcs_15_a_repository_without_the_lock_file_is_locked_from_its_first_c
     assert_eq!(String::from_utf8_lossy(&status.stdout), "", "and kept it out of git status");
     assert!(std::fs::read_to_string(root.join(".git/info/exclude")).unwrap().contains("/.canon/repo-write.lock"), "by the exclude file of the checkout");
     assert_eq!(std::fs::read_to_string(root.join(".gitignore")).unwrap(), ignore, "without editing a tracked file");
+}
+
+/// Every file and directory under `root`, `.git` included: path to bytes (`None` for a directory).
+fn whole_tree(root: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
+    let mut out = BTreeMap::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap().to_string_lossy().into_owned();
+            if path.is_dir() {
+                out.insert(relative, None);
+                stack.push(path);
+            } else {
+                out.insert(relative, Some(std::fs::read(&path).unwrap()));
+            }
+        }
+    }
+    out
+}
+
+/// A git repository set up the way 0.34 did: no lock file and no line for it in `.gitignore`.
+fn repo_of_0_34() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    init_repo(root, true);
+    std::fs::remove_file(root.join(LOCK)).unwrap();
+    let ignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
+    let ignore: String = ignore.lines().filter(|line| !line.contains("repo-write.lock")).map(|line| format!("{line}\n")).collect();
+    std::fs::write(root.join(".gitignore"), ignore).unwrap();
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-q", "-m", "a 0.34 repository"]);
+    dir
+}
+
+/// atip.planjcs.02 and .10, spec 8.2: a refused commit in a repository that has no lock file makes no file and edits none: the
+/// tree, `.git/info/exclude` and the rest of `.git` included, is byte for byte what it was.
+#[test]
+fn atip_planjcs_10_a_refused_commit_without_the_lock_file_leaves_the_tree_byte_identical() {
+    let stale = words(&["purge", "--kind", "session", "--before", "2020-01-01", "--commit", "--plan-digest=sha256:00", "--json"]);
+    // The exclude file as the checkout has it, with no final line break, and with the directory `.canon` gone.
+    for (what, exclude, canon_dir) in [("an exclude file with a final line break", None, true), ("an exclude file without one", Some("# local\n*.swp"), true), ("no exclude file", Some(""), true), ("no .canon directory", None, false)] {
+        let dir = repo_of_0_34();
+        let root = dir.path();
+        match exclude {
+            Some("") => std::fs::remove_file(root.join(".git/info/exclude")).unwrap(),
+            Some(text) => std::fs::write(root.join(".git/info/exclude"), text).unwrap(),
+            None => {}
+        }
+        if !canon_dir {
+            std::fs::remove_dir_all(root.join(".canon")).unwrap();
+        }
+        let before = whole_tree(root);
+        assert!(!root.join(LOCK).exists(), "{what}: the repository has no lock file");
+        let out = canon_in(root, &stale, &[]);
+        assert_eq!(out.status.code(), Some(2), "{what}: {}", text(&out));
+        assert_eq!(json_of(&out)["error"]["code"], "PLAN_STALE", "{what}: {}", text(&out));
+        let after = whole_tree(root);
+        let differing: Vec<&String> = before.keys().chain(after.keys()).collect::<std::collections::BTreeSet<_>>().into_iter().filter(|path| before.get(*path) != after.get(*path)).collect();
+        assert_eq!(differing, Vec::<&String>::new(), "{what}: the refused commit made no file and changed none");
+        assert!(!root.join(LOCK).exists(), "{what}: no lock file");
+        assert!(!std::fs::read_to_string(root.join(".git/info/exclude")).unwrap_or_default().contains("repo-write.lock"), "{what}: no exclude line");
+    }
 }
 
 /// atip.planjcs.09: the purge preview lists its audit line, the commit writes that file and that line; nothing to delete, neither.

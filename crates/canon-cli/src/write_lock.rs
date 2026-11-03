@@ -15,12 +15,19 @@
 //! a writer) finds it held: the lock is re-entrant in its thread.
 //!
 //! **The lock file** is made by `canon init` ([`create_file`]) and, in any other repository, by the first call that needs to lock it
-//! ([`hold_within`]: opened with create, never truncated, never deleted), so a repository set up by an older canon, or one that
-//! never ran `canon init`, is locked from its first call and no call runs unlocked for want of the file. The call that makes it also keeps it out of git: a line in `.git/info/exclude` unless
-//! `.gitignore` already names it (`init` and `migrate` write that line to `.gitignore`), so the first lock never edits a tracked
-//! file, and no plan reads it (`safety::path_digest` skips it). A repository with no `canon.yaml` has no plan to protect and
-//! nothing locks for it. The lock file is process state, not a state of the repository: a call that is refused after it took the lock
-//! (a stale digest, a read-only store) leaves the file behind, as it leaves any lock file of a refused writer.
+//! ([`hold_within`]: opened with create, never truncated), so a repository set up by an older canon, or one that never ran
+//! `canon init`, is locked from its first call and no call runs unlocked for want of the file. The call that makes it also keeps it
+//! out of git: a line in `.git/info/exclude` unless `.gitignore` already names it (`init` and `migrate` write that line to
+//! `.gitignore`), so the first lock never edits a tracked file, and no plan reads it (`safety::path_digest` skips it). A repository
+//! with no `canon.yaml` has no plan to protect and nothing locks for it.
+//!
+//! **A refusal leaves no trace** (spec 8.2, 11.2). The lock has to be held before the plan is recomputed, so a call that finds
+//! the file missing makes it first; when that call then ends with a non-zero exit (a stale digest, a refusal inside the leaf, a
+//! store that cannot be written) `main` calls [`Hold::leave_no_trace`]: while it still holds the lock it unlinks the file it made,
+//! takes back the exclude line it added (to the byte: the file it appended to is cut back to its length, a file it created is
+//! removed) and removes the `.canon` directory it made when that is empty. A waiter that got the lock of the unlinked file locks
+//! the file that is there instead ([`FileLock::acquire`] checks the path still names what it locked), so the lock still excludes.
+//! A file the repository already had is never touched, and a call that succeeds keeps what it made: it was a writer.
 //!
 //! **Order.** This lock is the outermost one: taken before the scenario-index lock and the artifact-store lock, never while
 //! holding either, so two processes cannot wait for each other. A wait that runs out is `REPO_WRITE_BUSY` (exit 2, retryable):
@@ -121,10 +128,57 @@ pub fn unjudged() -> Vec<&'static str> {
     META.iter().filter(|row| row.effect != Effect::Read && !POLICY.iter().any(|(path, ..)| *path == row.path)).map(|row| row.path).collect()
 }
 
+/// A lock this thread holds.
+struct Held {
+    /// How many guards stand for it.
+    guards: usize,
+    _lock: FileLock,
+    /// What the call that took it made, to take back when that call is refused.
+    made: Option<Made>,
+}
+
 thread_local! {
-    /// The locks this thread holds, by lock file, with how many guards stand for each: a second guard of the same lock
-    /// (a writer's index refresh) does not wait for the thread that holds it.
-    static HELD: RefCell<HashMap<PathBuf, (usize, FileLock)>> = RefCell::new(HashMap::new());
+    /// The locks this thread holds, by lock file: a second guard of the same lock (a writer's index refresh) does not wait for the
+    /// thread that holds it.
+    static HELD: RefCell<HashMap<PathBuf, Held>> = RefCell::new(HashMap::new());
+}
+
+/// What the call that took the lock made, and so what it takes back when it is refused ([`Hold::leave_no_trace`]).
+struct Made {
+    /// The `.canon` directory, when the call made it.
+    canon_dir: Option<PathBuf>,
+    /// The `.git/info/exclude` change, when the call made one.
+    exclude: Option<ExcludeChange>,
+}
+
+/// The change [`keep_out_of_git`] made to `.git/info/exclude`.
+struct ExcludeChange {
+    exclude: PathBuf,
+    /// The bytes it appended (a line break first when the file did not end with one).
+    added: String,
+    /// `.git/info`, when the call made it.
+    info_dir: Option<PathBuf>,
+    /// Whether the file did not exist.
+    created: bool,
+}
+
+impl ExcludeChange {
+    /// Gives the file back as it was: removed when this call made it, cut back to its length otherwise (only when it still ends with
+    /// what was appended).
+    fn undo(&self) {
+        if self.created {
+            let _ = std::fs::remove_file(&self.exclude);
+        } else if let Ok(text) = std::fs::read_to_string(&self.exclude) {
+            if let Some(before) = text.strip_suffix(&self.added) {
+                if let Ok(file) = std::fs::OpenOptions::new().write(true).open(&self.exclude) {
+                    let _ = file.set_len(before.len() as u64);
+                }
+            }
+        }
+        if let Some(dir) = &self.info_dir {
+            let _ = std::fs::remove_dir(dir);
+        }
+    }
 }
 
 /// The lock, held until this guard and every guard of the same lock in this thread are dropped.
@@ -137,13 +191,30 @@ impl Drop for Hold {
     fn drop(&mut self) {
         HELD.with(|held| {
             let mut held = held.borrow_mut();
-            if let Some((guards, _)) = held.get_mut(&self.file) {
-                *guards -= 1;
-                if *guards == 0 {
+            if let Some(entry) = held.get_mut(&self.file) {
+                entry.guards -= 1;
+                if entry.guards == 0 {
                     held.remove(&self.file);
                 }
             }
         });
+    }
+}
+
+impl Hold {
+    /// For a call that ended refused: takes back what the call made to take this lock (the lock file, its line in
+    /// `.git/info/exclude`, a `.canon` directory) while the lock is still held, so that the repository is as the call found it.
+    /// Nothing happens when the file was there before the call or another guard of the lock is still alive.
+    pub fn leave_no_trace(self) {
+        let made = HELD.with(|held| held.borrow_mut().get_mut(&self.file).filter(|entry| entry.guards == 1).and_then(|entry| entry.made.take()));
+        let Some(made) = made else { return };
+        let _ = std::fs::remove_file(&self.file);
+        if let Some(change) = &made.exclude {
+            change.undo();
+        }
+        if let Some(dir) = &made.canon_dir {
+            let _ = std::fs::remove_dir(dir);
+        }
     }
 }
 
@@ -184,7 +255,11 @@ fn wait() -> Duration {
 /// The lock file of the repository rooted at `repo`, under the root as the file system names it (`.`, `..` and links resolved), so
 /// that the lock a writer holds and the one its index refresh asks for are one lock whichever way each was given the root.
 fn lock_file(repo: &Path) -> PathBuf {
-    std::fs::canonicalize(repo).unwrap_or_else(|_| repo.to_path_buf()).join(REPO_WRITE_LOCK_FILE)
+    canonical_root(repo).join(REPO_WRITE_LOCK_FILE)
+}
+
+fn canonical_root(repo: &Path) -> PathBuf {
+    std::fs::canonicalize(repo).unwrap_or_else(|_| repo.to_path_buf())
 }
 
 /// The lock for one pass of a polling run (`ingest --watch`): held until the returned guard is dropped, which the loop does before
@@ -203,15 +278,15 @@ pub fn hold_pass(repo: &Path, dry_run: bool) -> Result<Option<Hold>, CliError> {
 /// A guard for the lock this thread already holds, if it does.
 fn reenter(file: &Path) -> Option<Hold> {
     HELD.with(|held| {
-        held.borrow_mut().get_mut(file).map(|(guards, _)| {
-            *guards += 1;
+        held.borrow_mut().get_mut(file).map(|entry| {
+            entry.guards += 1;
             Hold { file: file.to_path_buf() }
         })
     })
 }
 
-fn remember(file: PathBuf, lock: FileLock) -> Hold {
-    HELD.with(|held| held.borrow_mut().insert(file.clone(), (1, lock)));
+fn remember(file: PathBuf, lock: FileLock, made: Option<Made>) -> Hold {
+    HELD.with(|held| held.borrow_mut().insert(file.clone(), Held { guards: 1, _lock: lock, made }));
     Hold { file }
 }
 
@@ -222,13 +297,12 @@ pub fn hold_within(repo: &Path, wait: Duration) -> Result<Hold, Refused> {
     if let Some(hold) = reenter(&file) {
         return Ok(hold);
     }
-    let made = !file.exists();
+    let canon_dir = file.parent().filter(|dir| !dir.exists()).map(Path::to_path_buf);
+    let made_file = !file.exists();
     match FileLock::acquire(&file, wait) {
         Ok(lock) => {
-            if made {
-                keep_out_of_git(repo);
-            }
-            Ok(remember(file, lock))
+            let made = made_file.then(|| Made { exclude: keep_out_of_git(&canonical_root(repo)), canon_dir });
+            Ok(remember(file, lock, made))
         }
         Err(FileLockError::Busy(waited)) => Err(Refused::Busy(waited)),
         Err(FileLockError::Io(cause)) => Err(Refused::Io(file, cause)),
@@ -248,19 +322,23 @@ pub fn create_file(repo: &Path) -> std::io::Result<()> {
 /// Keeps the lock file the call just made out of `git status`: its line in `.git/info/exclude`, unless `.gitignore` names it
 /// already or the repository has no `.git` directory (a worktree's `.git` is a file; its checkout is ignored by the `.gitignore`
 /// line `init` writes). Local state the call owns, so no tracked file is edited; a failure leaves the file untracked and is not
-/// an error.
-fn keep_out_of_git(repo: &Path) {
-    let root = std::fs::canonicalize(repo).unwrap_or_else(|_| repo.to_path_buf());
+/// an error. Returns what it changed, for [`Hold::leave_no_trace`].
+fn keep_out_of_git(root: &Path) -> Option<ExcludeChange> {
     let named = |file: &Path| std::fs::read_to_string(file).is_ok_and(|text| text.lines().any(|line| line.trim().trim_start_matches('/') == REPO_WRITE_LOCK_FILE));
     let info = root.join(".git/info");
-    if named(&root.join(".gitignore")) || !root.join(".git").is_dir() || named(&info.join("exclude")) {
-        return;
+    let exclude = info.join("exclude");
+    if named(&root.join(".gitignore")) || !root.join(".git").is_dir() || named(&exclude) {
+        return None;
     }
+    let info_dir = (!info.exists()).then(|| info.clone());
+    let existing = std::fs::read_to_string(&exclude).ok();
+    let created = existing.is_none() && !exclude.exists();
+    let added = format!("{}/{REPO_WRITE_LOCK_FILE}\n", if existing.as_deref().is_some_and(|text| !text.is_empty() && !text.ends_with('\n')) { "\n" } else { "" });
     let _ = std::fs::create_dir_all(&info);
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(info.join("exclude")) {
-        use std::io::Write as _;
-        let _ = writeln!(file, "/{REPO_WRITE_LOCK_FILE}");
-    }
+    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&exclude).ok()?;
+    use std::io::Write as _;
+    file.write_all(added.as_bytes()).ok()?;
+    Some(ExcludeChange { exclude, added, info_dir, created })
 }
 
 /// [`hold_within`] for the wait a command makes, as the refusal it answers with.
@@ -357,6 +435,48 @@ mod tests {
         let inner = hold_within(dir.path(), Duration::ZERO).unwrap();
         let again = hold_within(&dir.path().join("./sub/.."), Duration::ZERO).unwrap();
         drop((outer, inner, again));
+    }
+
+    fn git_dir(root: &Path, exclude: Option<&str>) {
+        std::fs::create_dir_all(root.join(".git/info")).unwrap();
+        if let Some(text) = exclude {
+            std::fs::write(root.join(".git/info/exclude"), text).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_refused_call_takes_back_the_lock_file_the_exclude_line_and_the_directory_it_made() {
+        for exclude in [Some("# local\n"), Some("# no final line break"), Some(""), None] {
+            let dir = tempfile::TempDir::new().unwrap();
+            git_dir(dir.path(), exclude);
+            let before = exclude.map(str::to_string);
+            let hold = hold_within(dir.path(), Duration::ZERO).unwrap();
+            assert!(dir.path().join(REPO_WRITE_LOCK_FILE).is_file());
+            assert!(std::fs::read_to_string(dir.path().join(".git/info/exclude")).unwrap().ends_with("/.canon/repo-write.lock\n"));
+            hold.leave_no_trace();
+            assert!(!dir.path().join(".canon").exists(), "the file and the directory it made are gone");
+            assert_eq!(std::fs::read_to_string(dir.path().join(".git/info/exclude")).ok(), before, "the exclude file is as it was");
+            // The lock is free again, and a later call makes the file once more.
+            drop(hold_within(dir.path(), Duration::ZERO).unwrap());
+        }
+    }
+
+    #[test]
+    fn a_call_that_found_the_lock_file_leaves_it_and_a_second_guard_keeps_what_the_first_made() {
+        let dir = tempfile::TempDir::new().unwrap();
+        git_dir(dir.path(), Some(""));
+        drop(hold_within(dir.path(), Duration::ZERO).unwrap());
+        let exclude = std::fs::read_to_string(dir.path().join(".git/info/exclude")).unwrap();
+        hold_within(dir.path(), Duration::ZERO).unwrap().leave_no_trace();
+        assert!(dir.path().join(REPO_WRITE_LOCK_FILE).is_file(), "a file that was there is never removed");
+        assert_eq!(std::fs::read_to_string(dir.path().join(".git/info/exclude")).unwrap(), exclude);
+
+        let fresh = tempfile::TempDir::new().unwrap();
+        let outer = hold_within(fresh.path(), Duration::ZERO).unwrap();
+        let inner = hold_within(fresh.path(), Duration::ZERO).unwrap();
+        inner.leave_no_trace();
+        assert!(fresh.path().join(REPO_WRITE_LOCK_FILE).is_file(), "another guard of the lock is alive");
+        drop(outer);
     }
 
     #[test]

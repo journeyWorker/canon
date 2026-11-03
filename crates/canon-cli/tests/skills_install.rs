@@ -18,10 +18,9 @@ use canon_cli::skills::{self, Lock};
 
 /// `key: value` pairs of a `SKILL.md` frontmatter block, or `None` when the
 /// content does not open with a closed `---` block.
-/// `.canon` holds nothing a call wrote: it is absent, or holds only the repository write lock file, which any call that locked leaves
-/// behind (`write_lock`), refused or not.
+/// `.canon` holds nothing a call wrote: it is absent or empty.
 fn no_state_under_canon(target: &Path) -> bool {
-    fs::read_dir(target.join(".canon")).map_or(true, |entries| entries.flatten().all(|entry| entry.file_name() == "repo-write.lock"))
+    fs::read_dir(target.join(".canon")).map_or(true, |mut entries| entries.next().is_none())
 }
 
 fn frontmatter(content: &str) -> Option<BTreeMap<String, String>> {

@@ -114,8 +114,7 @@ fn listing(root: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
         for entry in fs::read_dir(dir).unwrap_or_else(|e| panic!("read {}: {e}", dir.display())) {
             let path = entry.unwrap().path();
             let relative = path.strip_prefix(root).unwrap().display().to_string();
-            // The repository write lock file is process state a call that locked leaves behind, refused or not (`write_lock`).
-            if relative == ".git" || relative == ".canon/repo-write.lock" {
+            if relative == ".git" {
                 continue;
             }
             if path.is_dir() {

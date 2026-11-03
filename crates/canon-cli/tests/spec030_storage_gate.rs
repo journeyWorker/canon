@@ -37,8 +37,7 @@ fn snapshot(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     fn walk(root: &Path, dir: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
         for entry in std::fs::read_dir(dir).unwrap().flatten() {
             let path = entry.path();
-            // The repository write lock file is process state a call that locked leaves behind, refused or not (`write_lock`).
-            if path.file_name().is_some_and(|n| n == ".git") || path.ends_with(".canon/repo-write.lock") {
+            if path.file_name().is_some_and(|n| n == ".git") {
                 continue;
             }
             if path.is_dir() {
