@@ -300,6 +300,26 @@ fn atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against
 }
 
 #[test]
+fn atip_checkl2safety_05_an_effect_note_that_does_not_name_the_allowed_file_hides_nothing_from_a_repeat() {
+    // checker.md 1.3.1 section 7.2: the same allowance, with an `effectNote` that exists and does not name the file, fails L2.idempotency.
+    // `stamp` appends to `.stamp-audit.log` on every run and the fixture allows that path; only the note decides.
+    let unnamed = Case { condition: "idempotency/second-run-no-new-effect", config: l2_config(&json!({"stampAudit": true, "docPatch": {"stamp": [support::l2::set("/effectNote", json!("writes one stamp file under stamps/"))]}})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["stamp"]["allowedEffects"] = json!([".stamp-audit.log"]);
+    });
+    let output = run_case(&unnamed, "L2");
+    let document = output.envelope();
+    let check = check_of(&document["data"], "L2.idempotency");
+    assert_eq!(check["result"], "fail", "{check}");
+    assert!(check["reason"].as_str().unwrap_or_default().contains(".stamp-audit.log"), "{check}");
+    // The same fixture with a note that names the file passes: the note, not the glob, is what lets the path out.
+    let named = Case { condition: "idempotency/second-run-no-new-effect", config: l2_config(&json!({"stampAudit": true})), tweak: None }.with_tweak(|fixture| {
+        fixture["commands"]["stamp"]["allowedEffects"] = json!([".stamp-audit.log"]);
+    });
+    let output = run_case(&named, "L2");
+    assert_eq!(check_of(&output.envelope()["data"], "L2.idempotency")["result"], "pass", "{}", not_passing(&output.envelope()["data"]));
+}
+
+#[test]
 fn atip_checkl2safety_05_a_directory_a_repeat_makes_and_leaves_empty_is_not_an_effect_and_a_file_in_it_is() {
     // checker.md 1.3.1 section 4: snapshots count files only. `stamp` makes a new empty directory on every run, the repeat included.
     let output = run_config(&l2_config(&json!({"stampBareDir": true})));
