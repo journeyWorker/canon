@@ -80,12 +80,17 @@ are code contracts, not merely labels:
   through `canon-store`'s view layer and renders reports/snapshots. It is a
   reporting surface, not a second source of truth or a second mart
   implementation.
-- [`atip`](crates/atip/src/lib.rs) holds the pieces of the atip/1 contract a
-  command-line tool shares: the error value and its redaction, the error-code
-  row type, JSON-mode detection and the one-line envelope output, and the shell
-  quoting and splitting of next-step commands. It depends on no `canon-*`
-  crate, so it can move to the atip repository unchanged; `canon-cli` keeps its
-  code table, the envelope `Meta` and the rendering that needs them.
+- [`atip`](https://github.com/journeyWorker/atip/tree/atip-crate-v0.1.0/crates/atip) is not a crate of this
+  workspace: it lives in the atip repository, and `canon-cli` takes it as a git
+  dependency at the tag `atip-crate-v0.1.0` (the feature `validate` on). It holds
+  the pieces of the atip/1 contract a command-line tool shares: the error value
+  and its redaction, the error-code row type, JSON-mode detection and the
+  one-line envelope output, the shell quoting and splitting of next-step
+  commands, and, per contract minor, the cursor, the plan digest and the
+  self-description documents. It depends on no `canon-*` crate; `canon-cli`
+  keeps its code table, the envelope `Meta` and the rendering that needs them.
+  The checker (`atip check`) is the atip repository's too, installed from the tag
+  `atip-check-v0.1.0` by the CI job `atip` and by `just atip-install`.
 - [`canon-cli`](crates/canon-cli/src/main.rs) is composition and user-facing
   command wiring. Provider-specific skill materialization lives in
   `crates/canon-cli/src/skills.rs`; it does not change the canonical source.
