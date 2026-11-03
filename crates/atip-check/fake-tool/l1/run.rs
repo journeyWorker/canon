@@ -874,8 +874,8 @@ fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
     // that is not in the repository is). With `dashPreconditionNamed` the refusal names the argument and the value it received.
     if tool.flag("dashPrecondition") {
         let both = tool.flag("dashPreconditionBoth");
-        let given = parsed.text("label").map(|label| ("/label", label)).into_iter().chain(parsed.text("note").filter(|_| both).map(|note| ("/note", note)));
-        if let Some((pointer, text)) = given.filter(|(_, text)| text.starts_with(['-', '{', '['])).next() {
+        let mut given = parsed.text("label").map(|label| ("/label", label)).into_iter().chain(parsed.text("note").filter(|_| both).map(|note| ("/note", note)));
+        if let Some((pointer, text)) = given.find(|(_, text)| text.starts_with(['-', '{', '['])) {
             let field = tool.text("dashPreconditionField", pointer);
             let extras: Vec<(&str, Value)> = if tool.flag("dashPreconditionNamed") { vec![("field", json!(field)), ("received", json!(text))] } else { Vec::new() };
             let code = tool.text("dashPreconditionCode", "ALREADY_SEALED");
