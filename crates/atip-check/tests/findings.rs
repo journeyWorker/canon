@@ -156,6 +156,27 @@ fn atip_check_82_the_text_report_carries_no_findings_and_a_cut_reason_says_where
     assert!(whole.stderr.contains("L0.version "), "{}", whole.stderr);
 }
 
+#[test]
+fn atip_check_123_an_unprovided_check_in_the_text_report_keeps_its_line_and_lists_no_findings() {
+    let harness = Harness::new();
+    let mut fixture = harness.fixture(&json!({}));
+    fixture.as_object_mut().expect("object").remove("commands");
+    fixture.as_object_mut().expect("object").remove("probe");
+    let json = harness.check(&fixture, true);
+    let check = json.check("L0.page");
+    assert_eq!(check["result"], "unprovided", "{}", json.stdout);
+    let reason = check["reason"].as_str().expect("reason").to_string();
+    // The text report: one line for the check, led by its verdict, with the reason the JSON report has and no pointer to a list that is cut.
+    let text = harness.check(&fixture, false);
+    let line = text.stderr.lines().find(|line| line.trim_start().starts_with("unprovided") && line.contains("L0.page")).unwrap_or_else(|| panic!("{}", text.stderr));
+    assert!(line.ends_with(&reason), "the line carries the reason of the JSON report: {line} / {reason}");
+    assert!(!line.contains("all in --json findings"), "{line}");
+    assert!(reason.contains("commands"), "the reason names the entry the fixture lacks: {reason}");
+    assert!(!text.stderr.contains("missing-fixture-entry") && !text.stderr.contains("\"kind\""), "the text carries no findings: {}", text.stderr);
+    // The text and the JSON report give the same exit code.
+    assert_eq!(text.code, json.code);
+}
+
 /// Runs `jobs` on six threads.
 fn in_parallel(jobs: Vec<Box<dyn FnOnce() -> Result<(), String> + Send>>) -> Vec<String> {
     let queue = std::sync::Mutex::new(jobs);

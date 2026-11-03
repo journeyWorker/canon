@@ -237,6 +237,24 @@ fn world_stale_text() -> String {
     String::from_utf8_lossy(&world.canon(&["subject", "show", "demo"]).stderr).to_string()
 }
 
+/// atip.readwrites.08 (the failure path of F2): `subject show` of a subject that does not exist is exit 2 `SUBJECT_NOT_FOUND` with one
+/// envelope on stdout and nothing on stderr in JSON mode, and it neither refreshes the stale scenario index nor writes anything.
+#[test]
+fn atip_readwrites_08_subject_show_of_a_missing_subject_is_refused_quietly_and_writes_nothing() {
+    let world = world();
+    let before = world.snapshot();
+    let out = world.canon(&["subject", "show", "nosuch", "--json"]);
+    assert_eq!(code_of(&out), (Some(2), "SUBJECT_NOT_FOUND".to_string()), "{}", String::from_utf8_lossy(&out.stdout));
+    assert!(out.stderr.is_empty(), "a refusal in JSON mode says nothing on stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let body = json_of(&out);
+    assert!(body["meta"]["warnings"].as_array().is_none_or(|all| all.iter().all(|w| w["code"] != "SCENARIO_INDEX_REFRESHED")), "{body}");
+    assert_eq!(world.snapshot(), before, "a refused call wrote");
+    assert!(!world.indexed(), "a refused call refreshed the scenario index");
+    // The subject that exists is not refused by the same stale repository: the refusal is about the subject, not the index.
+    let found = world.canon(&["subject", "show", "demo", "--json"]);
+    assert_eq!(found.status.code(), Some(0), "{}", String::from_utf8_lossy(&found.stdout));
+}
+
 #[test]
 fn atip_readwrites_04_every_dry_run_help_version_schema_and_skills_show_writes_nothing() {
     let world = world();
@@ -348,6 +366,22 @@ fn atip_readwrites_06_dashboard_is_declared_a_server_that_serves_until_signalled
     let outputs = schema["data"]["outputs"].as_array().expect("outputs");
     assert_eq!(outputs.len(), 1, "one output, no stream lines: {outputs:?}");
     assert_eq!((outputs[0]["kind"].as_str(), outputs[0]["schemaRef"].as_str()), (Some("report"), Some("#/schemas/DashboardReport")), "{outputs:?}");
+}
+
+/// atip.readwrites.09 (the failure path of F5): a `dashboard` call that is refused (a port that is no integer, an option it does not
+/// have) is one error envelope with exit 2 on stdout, comes back at once instead of serving, and writes nothing.
+#[test]
+fn atip_readwrites_09_a_refused_dashboard_call_is_one_envelope_and_serves_nothing() {
+    let world = world();
+    let before = world.snapshot();
+    for (argv, field) in [(&["dashboard", "--port", "notaport", "--json"][..], "--port"), (&["dashboard", "--bogus", "--json"][..], "--bogus")] {
+        let out = world.canon(argv);
+        assert_eq!(code_of(&out), (Some(2), "USAGE".to_string()), "{argv:?}: {}", String::from_utf8_lossy(&out.stdout));
+        let body = json_of(&out);
+        assert_eq!(body["error"]["field"], field, "{argv:?}: {body}");
+        assert!(out.stderr.is_empty(), "{argv:?}: {}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(world.snapshot(), before, "{argv:?}: a refused call wrote (the dashboard snapshot is written only when it serves)");
+    }
 }
 
 #[test]

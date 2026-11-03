@@ -252,4 +252,31 @@ mod tests {
             assert_eq!(quote(word), written, "{word:?}");
         }
     }
+
+    #[test]
+    fn atip_crateshell_07_a_word_that_would_break_unquoted_is_never_written_bare() {
+        // Every word of 0 to 3 characters over the awkward ones: a word with a character outside the safe set, or the empty word, is quoted.
+        let safe = |word: &str| !word.is_empty() && word.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_./:=@,+".contains(&b));
+        let mut bare = 0;
+        for word in strings_up_to(&AWKWARD, 3) {
+            let written = quote(&word);
+            if safe(&word) {
+                assert_eq!(written, word, "{word:?} is safe and stays bare");
+                bare += 1;
+                continue;
+            }
+            assert!(written.starts_with('\'') && written.ends_with('\''), "{word:?} is written {written:?}, not as a quoted word");
+            assert_eq!(split_argv(&written), std::slice::from_ref(&word), "{word:?}");
+            // Written raw, a word with white space, a quote or nothing in it does not come back as itself: the quote is what keeps it whole.
+            if word.is_empty() || word.contains(|c: char| c.is_whitespace() || c == '\'' || c == '"') {
+                assert_ne!(split_argv(&word), std::slice::from_ref(&word), "{word:?} would survive unquoted, so quoting it is not needed");
+            }
+        }
+        assert!(bare > 0, "the sweep holds words that need no quote");
+        // The words that carry a shell's meaning are quoted and read back whole.
+        for word in ["$HOME", "`date`", "a;b", "a|b", "a&b", "<id>", "*", "~", "a#b", "(x)"] {
+            assert_ne!(quote(word), word, "{word}");
+            assert_eq!(split_argv(&quote(word)), [word], "{word}");
+        }
+    }
 }

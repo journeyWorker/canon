@@ -528,6 +528,38 @@ fn atip_check_112_the_tally_examples_fail_no_1_2_rule_and_a_1_2_document_with_a_
 }
 
 #[test]
+fn atip_check_122_a_1_2_document_whose_cursor_all_or_fields_is_not_flag_only_and_a_retryable_stopped_midway_fail_at_1_2_only() {
+    use atip_check::checks::documents::{grammar_findings, minor_of, registry_findings};
+    use atip_check::claim::Claim;
+    use atip_check::l1::model::CommandDoc;
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/schema-docs");
+    let read = |path: &str| -> Value { serde_json::from_str(&std::fs::read_to_string(dir.join(path)).expect("example")).expect("json") };
+    let problems = |findings: Vec<(&'static str, Option<String>)>| -> Vec<String> { findings.into_iter().filter_map(|(_, problem)| problem).collect() };
+    // L1.grammar: each of the four options, unmarked in turn, is named at 1.2 and judged at 1.1 not at all.
+    let acme = read("schema-command-acme-member-list.json");
+    for name in ["limit", "cursor", "all", "fields"] {
+        let mut data = acme["data"].clone();
+        let option = data["options"].as_array_mut().expect("options").iter_mut().find(|option| option["name"] == name).unwrap_or_else(|| panic!("acme member list has --{name}"));
+        option["flagOnly"] = json!(false);
+        let doc = CommandDoc::parse(&data).expect("a command document");
+        let at_1_2 = problems(grammar_findings(&[], Some(&doc), minor_of(Claim::V1_2)));
+        assert_eq!(at_1_2.len(), 1, "--{name}: {at_1_2:?}");
+        assert!(at_1_2[0].contains(&format!("--{name} is not flagOnly")), "{}", at_1_2[0]);
+        assert!(problems(grammar_findings(&[], Some(&doc), minor_of(Claim::V1_1))).is_empty(), "--{name} is the tool's own at 1.1");
+    }
+    // L1.registry: the row the contract fixes is exit 1 and not retryable since 1.2; retryable at exit 1 fails at 1.2 and is the tool's own at 1.1.
+    let errors = read("schema-errors-acme.json");
+    let mut entries: Vec<Value> = errors["data"]["errors"].as_array().cloned().expect("errors");
+    assert!(problems(registry_findings(&entries, minor_of(Claim::V1_2))).is_empty(), "acme's row is the reserved one");
+    let row = entries.iter_mut().find(|entry| entry["code"] == "STOPPED_MIDWAY").expect("acme registers STOPPED_MIDWAY");
+    row["retryable"] = json!(true);
+    let at_1_2 = problems(registry_findings(&entries, minor_of(Claim::V1_2)));
+    assert_eq!(at_1_2.len(), 1, "{at_1_2:?}");
+    assert!(at_1_2[0].contains("STOPPED_MIDWAY is exit 1 retryable true"), "{}", at_1_2[0]);
+    assert!(problems(registry_findings(&entries, minor_of(Claim::V1_1))).is_empty());
+}
+
+#[test]
 fn atip_check_113_an_output_schema_that_marks_an_optional_field_required_is_caught_by_l1_output_data_when_a_run_returns_the_record_without_it() {
     // `nickname` is optional in the data of `member list`: a member may have none. The schema of the output says every member has one.
     for claim in ["1.1", "1.2"] {

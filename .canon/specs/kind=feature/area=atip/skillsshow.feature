@@ -90,3 +90,23 @@ Feature: ATIP: skills show, the guides and their command lines
     Given the guides, scripts, hooks, website pages and docs of the repository
     When they are searched for readers of the output of skills show
     Then none reads markdown or a top-level version of it
+
+  # canon: {"schema":1,"at":"2026-11-03T05:10:07Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-35-skills-show.F4
+  @atip.skillsshow.10
+  Scenario: A help line that names only schema, only skills show or neither is not the pointer
+    Given the first lines of help that name schema only, skills show only, neither and nothing, and the first line of every real help
+    When each is judged as the pointer to both entrances
+    Then the four are refused, every real help has the pointer on its first line, and the line below it is the introduction and not a second pointer
+
+  # canon: {"schema":1,"at":"2026-11-03T05:11:40Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-35-skills-show.F6
+  @atip.skillsshow.11
+  Scenario: The scan for readers of the old skills show members finds a markdown or a top-level version read and passes a read of a current member
+    Given texts that read markdown or a top-level version of skills show output as a member, an index, a jq path or a brace list, and texts that read a current member or sit outside the three-line window
+    When the scan for readers of the old members runs on each
+    Then each reader is found once at the line of the command, and the current members and the distant read are not

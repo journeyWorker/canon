@@ -170,3 +170,23 @@ Feature: ATIP: the order of the stateless checks
     Given a built canon
     When canon runs with --as zzz before an unknown command word, before nothing, before a group, after a group word and before an unknown word, after an unknown option, and after an unknown word; and init runs with --policy and --no-policy
     Then --as answers USAGE first, an earlier unknown option or unknown command word still answers first, and the excluding pair names light, standard and strict as expected
+
+  # canon: {"schema":1,"at":"2026-11-03T04:57:16Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-35-canon-check-order.F4
+  @atip.checkorder.18
+  Scenario: A constraint broken beside a validator's fault is the constraint's, each alone keeps its own code
+    Given a built canon and no role in the environment
+    When canon brief approve and canon policy approve run with a blank approver alone, with --actor and no --relayed-via alone, and with both written in either order
+    Then the validator alone answers APPROVAL_INCOMPLETE or POLICY_APPROVAL_REFUSED on --approver, the constraint alone and both together answer USAGE on --relayed-via
+
+  # canon: {"schema":1,"at":"2026-11-03T04:58:31Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-35-canon-check-order.F6
+  @atip.checkorder.19
+  Scenario: A call that satisfies the rules next to a violated one is not answered with that rule's field, for each of the five rule kinds
+    Given a built canon and, for each rule kind, a call that satisfies the rule and its twin that breaks it
+    When requires, forbids, atMostOne, exactlyOne and atLeastOne are each given the satisfying call and the broken one
+    Then the broken call is refused naming the rule's field, and the satisfying call is not answered with that field and writes nothing

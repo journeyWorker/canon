@@ -577,4 +577,38 @@ mod tests {
         assert_eq!(bound(&eleven, &[]), bound(&eleven, &fields));
         assert_eq!(bound(&twelve, &[]), bound(&twelve, &fields));
     }
+
+    #[test]
+    fn atip_cratecursor_13_what_only_one_minor_binds_is_refused_between_pages_by_that_minor_only() {
+        let first = vec![Given::option("status", "active"), Given::option("limit", 5)];
+        let then = |extra: Given| {
+            let mut given = first.clone();
+            given.push(extra);
+            given
+        };
+        // (what the second page adds, the minor that binds it, the minor that does not)
+        let cases = [
+            ("--all", Given::switch("all", true), "1.1", "1.2"),
+            ("--json", Given::switch("json", true), "1.1", "1.2"),
+            ("an environment value", Given::option("org", "eng").from_env(), "1.2", "1.1"),
+        ];
+        for (what, extra, binds, ignores) in cases {
+            let second = then(extra);
+            // The minor that binds it: the cursor of the first page is refused on the second.
+            let codec = cursors(binds);
+            let issued = codec.encode("member list", &bind(binds, &first), "key-1");
+            assert_eq!(codec.decode(&issued, "member list", &bind(binds, &second)), Err(CursorInvalid::arguments_changed()), "{binds} refuses {what} added between pages");
+            assert_eq!(codec.decode(&issued, "member list", &bind(binds, &first)), Ok("key-1".to_string()), "{binds} takes the same call");
+            // The minor that leaves it out: the same cursor goes on.
+            let codec = cursors(ignores);
+            let issued = codec.encode("member list", &bind(ignores, &first), "key-1");
+            assert_eq!(codec.decode(&issued, "member list", &bind(ignores, &second)), Ok("key-1".to_string()), "{ignores} does not bind {what}");
+        }
+        // An argument both bind, changed between pages, is refused by both.
+        for minor in ["1.1", "1.2"] {
+            let codec = cursors(minor);
+            let issued = codec.encode("member list", &bind(minor, &first), "key-1");
+            assert_eq!(codec.decode(&issued, "member list", &bind(minor, &then(Given::option("role", "member")))), Err(CursorInvalid::arguments_changed()), "{minor}");
+        }
+    }
 }

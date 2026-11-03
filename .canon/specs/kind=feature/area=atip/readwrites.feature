@@ -70,3 +70,23 @@ Feature: atip read writes: a refusal and a read command write only what they dec
     Given an evidence record that binds a file whose blob is gone, a stale index, and a store directory that is not writable
     When artifacts store runs
     Then it is refused with exit 2, the files are byte for byte the same and the scenario index is not refreshed
+
+  # canon: {"schema":1,"at":"2026-11-03T05:07:06Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:query-reads
+  @case:failure
+  @flow:canon-0-35-read-writes.F2
+  @atip.readwrites.08
+  Scenario: subject show of a subject that does not exist is exit 2 SUBJECT_NOT_FOUND with an empty stderr in JSON mode and writes nothing
+    Given a stale repository and a subject that does not exist
+    When subject show nosuch runs in JSON mode
+    Then it exits 2 with SUBJECT_NOT_FOUND, stderr is empty, no refresh warning is given, nothing is written and the stale scenario index stays unwritten, while the subject that exists is shown
+
+  # canon: {"schema":1,"at":"2026-11-03T05:08:42Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-read-writes.F5
+  @atip.readwrites.09
+  Scenario: A dashboard call that is refused is one error envelope and exit 2, serves nothing and writes nothing
+    Given a repository and a port that is no integer, then an option dashboard does not have
+    When canon dashboard runs with each in JSON mode
+    Then each exits 2 with USAGE naming the argument, as one envelope with nothing on stderr, returns at once without serving, and the repository, HOME and temp dir are as they were

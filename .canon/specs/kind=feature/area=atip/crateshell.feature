@@ -60,3 +60,13 @@ Feature: atip crate: split_argv reads what quote writes
     Given a fake tool whose meta.next carries a command built with quote from an argv with a single-quoted value
     When the checker's L0.next judges the envelope
     Then command-matches-argv holds and no other L0.next condition finds a problem
+
+  # canon: {"schema":1,"at":"2026-11-03T05:05:26Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-crate-shell.F1
+  @atip.crateshell.07
+  Scenario: A word that would break unquoted is never written bare, and written raw it does not split back to itself
+    Given every word of up to three characters over the awkward characters, and the words that carry a shell's meaning
+    When quote writes each one and split_argv reads it back, and split_argv reads the raw word
+    Then only a word of safe characters stays bare, every other word is single-quoted and comes back whole, and a raw word with white space, a quote or nothing in it does not

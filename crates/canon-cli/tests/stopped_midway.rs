@@ -514,31 +514,52 @@ fn atip_midway_09_the_audit_covers_every_exit_1_code_and_each_code_exists_where_
 
 // ------------------------------------------------------------------ F4: the I/O failure codes
 
+/// The real I/O failure codes as 0.34 registers them: the code and whether it is retryable.
+const IO_CODES: [(&str, bool); 12] = [
+    ("ARTIFACTS_STORE_FAILED", true),
+    ("BRIEF_WRITE_FAILED", false),
+    ("EVIDENCE_STORE_FAILED", true),
+    ("HOOKS_INSTALL_FAILED", false),
+    ("INVENTORY_FAILED", false),
+    ("LEDGER_COMPACT_FAILED", false),
+    ("POLICY_APPROVAL_FAILED", false),
+    ("RETENTION_EXPORT_FAILED", false),
+    ("RETENTION_PURGE_FAILED", false),
+    ("TIER_FAILED", false),
+    ("WRITE_FAILED", false),
+    ("MIGRATE_PINS_FAILED", false),
+];
+
+/// What is wrong with the I/O failure codes of `rows`: each is registered at exit 1 with the retryability 0.34 gave it, has no reason of
+/// its own, and is no reason of `STOPPED_MIDWAY` (an I/O failure is a failure of the work, not the name of a refusal).
+fn io_problems(rows: &[CodeInfo]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let stopped = rows.iter().find(|row| row.code == "STOPPED_MIDWAY");
+    for (code, retryable) in IO_CODES {
+        let Some(row) = rows.iter().find(|row| row.code == code) else {
+            problems.push(format!("{code} is not registered"));
+            continue;
+        };
+        if (row.exit, row.retryable) != (EXIT_FAILED, retryable) {
+            problems.push(format!("{code} is exit {} retryable {}, not exit 1 retryable {retryable}", row.exit, row.retryable));
+        }
+        if !row.reasons.is_empty() {
+            problems.push(format!("{code} has a reason of its own"));
+        }
+        if stopped.is_some_and(|stopped| stopped.find_reason(code).is_some()) {
+            problems.push(format!("{code} is a reason of STOPPED_MIDWAY"));
+        }
+    }
+    problems
+}
+
 /// atip.midway.10: the real I/O failure codes keep their names, their exit 1 and their retryability, none is a reason of
 /// `STOPPED_MIDWAY`, and none has a reason of its own that stands for a refusal.
 #[test]
 fn atip_midway_10_the_io_failure_codes_keep_their_names_exits_and_retryability() {
-    // (code, retryable) as 0.34 registers them.
-    let expected: [(&str, bool); 12] = [
-        ("ARTIFACTS_STORE_FAILED", true),
-        ("BRIEF_WRITE_FAILED", false),
-        ("EVIDENCE_STORE_FAILED", true),
-        ("HOOKS_INSTALL_FAILED", false),
-        ("INVENTORY_FAILED", false),
-        ("LEDGER_COMPACT_FAILED", false),
-        ("POLICY_APPROVAL_FAILED", false),
-        ("RETENTION_EXPORT_FAILED", false),
-        ("RETENTION_PURGE_FAILED", false),
-        ("TIER_FAILED", false),
-        ("WRITE_FAILED", false),
-        ("MIGRATE_PINS_FAILED", false),
-    ];
-    let stopped = code_info("STOPPED_MIDWAY").expect("registered");
-    for (code, retryable) in expected {
-        let row = code_info(code).unwrap_or_else(|| panic!("{code} is still registered"));
-        assert_eq!((row.exit, row.retryable), (1, retryable), "{code}");
-        assert!(row.reasons.is_empty(), "{code}");
-        assert!(stopped.find_reason(code).is_none(), "{code} is a failure of the work, not the name of a refusal");
+    let problems = io_problems(all_codes());
+    assert!(problems.is_empty(), "{problems:?}");
+    for (code, _) in IO_CODES {
         assert!(AUDIT.iter().any(|(audited, class, _)| *audited == code && *class == Class::Keep(Why::Io)), "{code} is kept as an I/O failure in the audit");
     }
     // The Io codes of the audit are exactly the codes whose names or situations are failures of the work: none is exit 2.
@@ -547,6 +568,30 @@ fn atip_midway_10_the_io_failure_codes_keep_their_names_exits_and_retryability()
             assert_eq!(code_info(code).expect("registered").exit, 1, "{code}");
         }
     }
+}
+
+/// atip.midway.13 (the failure path of F4): an I/O failure code that is renamed away, moved to a refusal's exit, made retryable or
+/// not, given a reason, or made a reason of `STOPPED_MIDWAY` fails the check of the I/O codes, each with its own message; and a
+/// registry that holds them as 0.34 did passes it.
+#[test]
+fn atip_midway_13_an_io_failure_code_that_moves_or_is_absorbed_fails_the_check() {
+    static A_REASON: [ReasonInfo; 1] = [ReasonInfo { reason: "SKILLS_INVALID_ARGUMENT", meaning: "m", fix: "f" }];
+    static WRITE_FAILED_AS_REASON: [ReasonInfo; 1] = [ReasonInfo { reason: "WRITE_FAILED", meaning: "m", fix: "f" }];
+    let changed = |code: &str, with: &dyn Fn(&CodeInfo) -> CodeInfo| -> Vec<CodeInfo> { all_codes().iter().map(|row| if row.code == code { with(row) } else { *row }).collect() };
+    assert!(io_problems(all_codes()).is_empty(), "the registry as it stands holds the I/O codes as 0.34 did");
+
+    let absent: Vec<CodeInfo> = all_codes().iter().filter(|row| row.code != "WRITE_FAILED").copied().collect();
+    assert_eq!(io_problems(&absent), ["WRITE_FAILED is not registered"]);
+    let refusal = changed("TIER_FAILED", &|row| CodeInfo { exit: EXIT_REFUSED, ..*row });
+    assert_eq!(io_problems(&refusal), ["TIER_FAILED is exit 2 retryable false, not exit 1 retryable false"]);
+    let retryable = changed("WRITE_FAILED", &|row| CodeInfo { retryable: true, ..*row });
+    assert_eq!(io_problems(&retryable), ["WRITE_FAILED is exit 1 retryable true, not exit 1 retryable false"]);
+    let not_retryable = changed("EVIDENCE_STORE_FAILED", &|row| CodeInfo { retryable: false, ..*row });
+    assert_eq!(io_problems(&not_retryable), ["EVIDENCE_STORE_FAILED is exit 1 retryable false, not exit 1 retryable true"]);
+    let reasoned = changed("INVENTORY_FAILED", &|row| CodeInfo { reasons: &A_REASON, ..*row });
+    assert_eq!(io_problems(&reasoned), ["INVENTORY_FAILED has a reason of its own"]);
+    let absorbed = changed("STOPPED_MIDWAY", &|row| CodeInfo { reasons: &WRITE_FAILED_AS_REASON, ..*row });
+    assert_eq!(io_problems(&absorbed), ["WRITE_FAILED is a reason of STOPPED_MIDWAY"]);
 }
 
 /// atip.midway.12: the adoption writes the subject record, then the change record. When the second store write fails (the change store

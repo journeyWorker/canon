@@ -207,6 +207,30 @@ fn atip_skillsshow_06_the_first_line_of_every_help_points_at_schema_and_skills_s
     assert!(!old.contains("skills show"));
 }
 
+/// Whether a first line of help points at both entrances, `schema` and `skills show`.
+fn points_at_both(line: &str) -> bool {
+    line.contains("schema") && line.contains("skills show")
+}
+
+/// atip.skillsshow.10 (the failure path of F4): a first line that names only `schema` (as 0.34 had it), only `skills show`, or neither is
+/// not the pointer; and a help whose pointer line is cut is read from the line below it, which is not the pointer either.
+#[test]
+fn atip_skillsshow_10_a_first_line_that_names_one_entrance_or_none_is_not_the_pointer() {
+    for line in ["Agents: \"canon schema --json\" describes every command as JSON.", "Agents: \"canon skills show\" prints the guides.", "", "Usage: canon [OPTIONS] <COMMAND>"] {
+        assert!(!points_at_both(line), "{line:?}");
+    }
+    assert!(points_at_both(canon_cli::spec::HELP_POINTER), "{}", canon_cli::spec::HELP_POINTER);
+    let mut root = canon_cli::cli::command();
+    root.build();
+    for node in atip::project::nodes(&root) {
+        let help = node.cmd.clone().render_long_help().to_string();
+        let mut lines = help.lines();
+        assert!(points_at_both(lines.next().unwrap_or_default()), "`{}`: the first line is the pointer", node.command);
+        let below = lines.find(|line| !line.trim().is_empty()).unwrap_or_default();
+        assert!(!points_at_both(below), "`{}`: the line below the pointer is the introduction, not a second pointer: {below}", node.command);
+    }
+}
+
 // ----------------------------------------------------------------------------------------------------------------- F5
 
 /// A command line of a guide: the guide, the 1-based line of its first physical line, and the text with its continuations joined.
@@ -516,6 +540,22 @@ fn atip_skillsshow_08_a_wrong_line_in_a_guide_is_found() {
 
 // ----------------------------------------------------------------------------------------------------------------- F6
 
+/// The lines of `text` that read an old member of the output of `skills show` (`markdown`, a top-level `version`) within three lines of
+/// the command's name: the 1-based line number and the line with `skills show`.
+fn old_member_readers(text: &str) -> Vec<(usize, String)> {
+    let mut found = Vec::new();
+    for (at, line) in text.lines().enumerate() {
+        if !line.contains("skills show") {
+            continue;
+        }
+        let window: String = text.lines().skip(at).take(3).collect::<Vec<_>>().join(" ");
+        if window.contains(".markdown") || window.contains("['markdown']") || window.contains("[\"markdown\"]") || window.contains("data.version") || window.contains(".data.version") || window.contains("{name, version, markdown}") {
+            found.push((at + 1, line.to_string()));
+        }
+    }
+    found
+}
+
 /// atip.skillsshow.09: nothing reads the old names (`markdown`, a top-level `version`) of the output of `skills show`: no guide, no
 /// script, no hook and no page of the website names them as a member of it, and the installed skill is still the stub that points here.
 #[test]
@@ -528,14 +568,8 @@ fn atip_skillsshow_09_no_consumer_reads_the_old_names() {
     let mut problems = Vec::new();
     for file in &files {
         let Ok(text) = std::fs::read_to_string(file) else { continue };
-        for (at, line) in text.lines().enumerate() {
-            if !line.contains("skills show") {
-                continue;
-            }
-            let window: String = text.lines().skip(at).take(3).collect::<Vec<_>>().join(" ");
-            if window.contains(".markdown") || window.contains("['markdown']") || window.contains("[\"markdown\"]") || window.contains("data.version") || window.contains(".data.version") || window.contains("{name, version, markdown}") {
-                problems.push(format!("{} line {}: reads an old member of the output: {line}", file.display(), at + 1));
-            }
+        for (at, line) in old_member_readers(&text) {
+            problems.push(format!("{} line {at}: reads an old member of the output: {line}", file.display()));
         }
     }
     assert!(!files.is_empty());
@@ -543,6 +577,28 @@ fn atip_skillsshow_09_no_consumer_reads_the_old_names() {
     // The installed skill stays the stub 0.28 made it: it points at `skills show` and holds none of the output.
     let stub = canon_cli::guide::guide("canon").expect("guide");
     assert!(stub.contains("canon skills show"));
+}
+
+/// atip.skillsshow.11 (the failure path of F6): the scan finds a reader of `markdown` or of a top-level `version` of the output however it
+/// is written, and passes a read of a member the output has now, so a reader that comes back fails `atip.skillsshow.09`.
+#[test]
+fn atip_skillsshow_11_the_scan_finds_a_reader_of_an_old_member_and_passes_a_current_one() {
+    for text in [
+        "canon skills show canon --json | jq -r .data.markdown",
+        "canon skills show canon --json | jq .data.version",
+        "const out = JSON.parse(run('canon skills show canon --json'));\nconst text = out['markdown'];",
+        "const out = JSON.parse(run('canon skills show canon --json'));\nconst text = out[\"markdown\"];",
+        "`canon skills show` prints {name, version, markdown}.",
+    ] {
+        assert_eq!(old_member_readers(text).len(), 1, "{text}");
+    }
+    for text in ["canon skills show canon --json | jq -r .data.text", "canon skills show canon --json | jq .data.guides", "the markdown of a guide is plain text", "canon schema --json | jq .data.version"] {
+        assert!(old_member_readers(text).is_empty(), "{text}");
+    }
+    // A reader four lines below the command is out of the window, and the line of the command is what is reported.
+    let far = "canon skills show canon --json\n\n\n\njq .data.markdown";
+    assert!(old_member_readers(far).is_empty());
+    assert_eq!(old_member_readers("a\ncanon skills show canon --json | jq .data.markdown"), [(2, "canon skills show canon --json | jq .data.markdown".to_string())]);
 }
 
 fn collect(dir: &Path, files: &mut Vec<std::path::PathBuf>) {

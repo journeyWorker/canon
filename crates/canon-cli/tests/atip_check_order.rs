@@ -527,6 +527,26 @@ fn atip_checkorder_08_a_constraint_is_answered_before_a_validator() {
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
 }
 
+/// atip.checkorder.18 (the failure path of F4): a constraint broken beside a validator's fault is answered by the constraint, and each of
+/// the two alone keeps its own code: the constraint's call is not swallowed by the validator, nor the validator's by the constraint.
+#[test]
+fn atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_alone_keeps_its_code() {
+    // brief approve: `--actor` needs `--relayed-via` (a constraint, USAGE); a blank `--approver` is a validator (APPROVAL_INCOMPLETE).
+    let validator = empty("canon brief approve add-login --approver \" \" --note ok", &[]);
+    assert_answer(&validator, "APPROVAL_INCOMPLETE", "--approver");
+    let constraint = empty("canon brief approve add-login --approver alice --note ok --actor impl", &[]);
+    assert_answer(&constraint, "USAGE", "--relayed-via");
+    let both = empty("canon brief approve add-login --approver \" \" --note ok --actor impl", &[]);
+    assert_answer(&both, "USAGE", "--relayed-via");
+    let flipped = empty("canon brief approve add-login --actor impl --note ok --approver \" \"", &[]);
+    assert_answer(&flipped, "USAGE", "--relayed-via");
+    // policy approve: the same shape with the validator POLICY_APPROVAL_REFUSED.
+    let validator = empty("canon policy approve --approver \" \"", &[]);
+    assert_answer(&validator, "POLICY_APPROVAL_REFUSED", "--approver");
+    let both = empty("canon policy approve --approver \" \" --actor impl", &[]);
+    assert_answer(&both, "USAGE", "--relayed-via");
+}
+
 // ----------------------------------------------------------------------------------------------------------------- F5
 
 /// atip.checkorder.09: an unknown `CANON_ROLE` is a check that depends on an environment value, so it is a validator and answers
@@ -622,6 +642,28 @@ fn atip_checkorder_12_every_rule_is_answered_with_the_field_of_the_first_argumen
     });
     assert!(*count.lock().expect("count") > 50, "the sweep is not empty");
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
+}
+
+/// atip.checkorder.19 (the failure path of F6): a call that satisfies a rule is not answered with that rule's `field`, for each of the
+/// five kinds; its twin that breaks the rule is. The near miss is the case a table that names a field for every call would get wrong.
+#[test]
+fn atip_checkorder_19_a_call_that_satisfies_a_rule_is_not_answered_with_the_rules_field() {
+    let implementer = [("CANON_ROLE", "implementer")];
+    // (rule kind, the call that satisfies the rule, the call that breaks it, the field the broken call names)
+    let pairs: [(&str, &str, &str, &str); 5] = [
+        ("requires", "canon ingest plans --dialect openspec --plan-source plans", "canon ingest plans --dialect openspec", "--plan-source"),
+        ("forbids", "canon evidence add --all-scenarios --report junit:r.xml --class test-run --ref r", "canon evidence add --all-scenarios --report junit:r.xml --scenario auth.login.01 --class test-run --ref r", "--scenario"),
+        ("atMostOne", "canon schema --error CHANGE_EXISTS", "canon schema --error CHANGE_EXISTS --errors", "--errors"),
+        ("exactlyOne", "canon retrieve --for-role reviewer --regime reviewer/canon/join-spine/9c93d024b1a2", "canon retrieve --for-role reviewer", "--regime"),
+        ("atLeastOne", "canon evidence add --scenario auth.login.01 --class test-run --ref r", "canon evidence add --scenario auth.login.01", "--class"),
+    ];
+    for (kind, satisfied, broken, field) in pairs {
+        let outcome = empty(broken, &implementer);
+        assert!(refused(&outcome) && outcome.field.as_deref() == Some(field), "{kind}: `{broken}` names {field}: {outcome:?}");
+        let outcome = empty(satisfied, &implementer);
+        assert_ne!(outcome.field.as_deref(), Some(field), "{kind}: `{satisfied}` satisfies the rule and is not answered with {field}: {outcome:?}");
+        assert!(outcome.changed.is_empty(), "{kind}: a call the stateless stage lets through wrote {:?}", outcome.changed);
+    }
 }
 
 // ------------------------------------------------------------------------------------------------------------- --input

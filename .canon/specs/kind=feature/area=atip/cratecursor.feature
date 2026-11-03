@@ -120,3 +120,13 @@ Feature: atip crate: cursor binding by minor, JCS, argv writing
     Given RFC 8785's appendix B number forms, a test document with unsorted members, control characters and an emoji key, and 64-bit integers beyond 2^53-1
     When atip::jcs writes each of them
     Then the numbers are the ECMAScript form of their doubles, the document is the RFC's canonical text with members sorted by UTF-16 code units, and an integer beyond 2^53-1 is an error, never a digest
+
+  # canon: {"schema":1,"at":"2026-11-03T05:03:44Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-crate-cursor.F5
+  @atip.cratecursor.13
+  Scenario: What only one minor binds, added between two pages, is refused by that minor and accepted by the other
+    Given acme member list --status active --limit 5 and a cursor issued for it at 1.1 and at 1.2
+    When the second page adds --all, --json, an environment value or a changed default, and each cursor is decoded
+    Then the minor that binds the addition answers ARGUMENTS_CHANGED, the minor that leaves it out takes the cursor on, and a changed default is refused by both

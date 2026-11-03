@@ -1331,3 +1331,25 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given a fake tool whose only command with examples is serve, under notRun, with two examples
     When atip check runs at L1
     Then L1.example-runs is unprovided with a finding of kind all-runs-not-run, and the level is not met
+
+  # canon: {"schema":1,"at":"2026-11-03T05:00:40Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-1-2.F5
+  @atip.check.122
+  Scenario: A 1.2 document whose cursor, all or fields is not flag-only fails the grammar rule at 1.2 only, and a STOPPED_MIDWAY that is retryable at exit 1 fails the registry rule at 1.2 only
+    Given a 1.2 command document whose cursor, all or fields is unmarked in turn, and a registry whose STOPPED_MIDWAY is exit 1 and retryable
+    When the grammar and registry rules are judged at a claim of 1.2 and of 1.1
+    Then at 1.2 each unmarked option is named once as not flagOnly and the retryable row is named as not the reserved one, and at 1.1 neither is a problem
+
+  # canon: {"schema":1,"at":"2026-11-03T05:02:12Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-check
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-check-findings.F3
+  @atip.check.123
+  Scenario: An unprovided check in the text report keeps its one line with the missing entry named and lists no findings
+    Given a fixture without the commands and the probe entries
+    When atip check runs with --json and in text
+    Then the text line of the unprovided L0.page check carries the reason of the JSON report, names the missing entry, has no pointer to a cut list and no findings, and the exit code is the same

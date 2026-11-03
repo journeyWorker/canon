@@ -120,3 +120,13 @@ Feature: atip: STOPPED_MIDWAY, the code of a command that stopped after its earl
     Given a change store that cannot be written after the subject record was written
     When canon subject adopt runs, then its repair runs
     Then the first exits 1 with CHANGE_ADOPTION_INCOMPLETE, no reason, never STOPPED_MIDWAY, naming the repair, and the repair completes the link and a third run writes nothing
+
+  # canon: {"schema":1,"at":"2026-11-03T04:59:34Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:tier-storage
+  @case:failure
+  @flow:canon-0-35-canon-stopped-midway.F4
+  @atip.midway.13
+  Scenario: An I/O failure code that is made a reason of STOPPED_MIDWAY, given a reason, a refusal's exit or another retryability fails the check of the I/O codes
+    Given the registry with an I/O failure code removed, moved to exit 2, made retryable or not, given a reason, or named as a reason of STOPPED_MIDWAY
+    When the check of the I/O failure codes runs on each
+    Then each fault is named with its own message, and the registry as it stands passes
