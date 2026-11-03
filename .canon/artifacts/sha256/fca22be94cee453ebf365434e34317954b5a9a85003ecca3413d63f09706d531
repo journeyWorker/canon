@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="2" skipped="0" failures="0" errors="0" uuid="e9c49d65-11ef-4e04-9cb4-55f87762f055" timestamp="2026-11-03T15:30:33.867+09:00" time="0.093">
+    <testsuite name="canon-cli::atip_planjcs" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fail_the_check" classname="canon-cli::atip_planjcs" timestamp="2026-11-03T15:30:33.873+09:00" time="0.039"/>
+        <testcase name="atip_planjcs_12_the_changelog_has_the_upgrade_note_and_no_source_makes_the_old_digest" classname="canon-cli::atip_planjcs" timestamp="2026-11-03T15:30:33.873+09:00" time="0.087"/>
+    </testsuite>
+</testsuites>

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-flow-failures",
+    "role": "implementer",
+    "session_id": "s-0-35-flow-failures"
+  },
+  "at": "2026-11-03T06:31:14.178195Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fail_the_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "fca22be94cee453ebf365434e34317954b5a9a85003ecca3413d63f09706d531"
+    }
+  ],
+  "code_tree": "02ecdca32e4149f07ccb403bb9fdf9f6a6979527",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "cdf36869e6fc68d1512aeeec367797163c4ef613",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 29,
+  "scenario_id": "atip.planjcs.16",
+  "schema": 1,
+  "staging_id": "289a22cf",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
