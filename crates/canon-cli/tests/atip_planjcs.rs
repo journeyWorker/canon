@@ -685,25 +685,63 @@ fn atip_planjcs_11_a_digest_of_0_34_is_plan_stale_on_the_six_commands() {
     }
 }
 
+/// What the upgrade note of this change must name: the change, the digest form, JCS, the stale 0.34 previews, the lock and its refusal, the inputs
+/// and the scenarios.
+const NOTE_NEEDLES: [&str; 9] = ["canon-0-35-plan-jcs", "sha256:", "JCS", "PLAN_STALE", "REPO_WRITE_BUSY", ".canon/repo-write.lock", "0.34", "inputs", "atip.planjcs.01"];
+
+/// What the Unreleased section `unreleased` of the CHANGELOG lacks of the upgrade note.
+fn note_problems(unreleased: &str) -> Vec<String> {
+    NOTE_NEEDLES.iter().filter(|needle| !unreleased.contains(**needle)).map(|needle| format!("the note of this change names `{needle}`")).collect()
+}
+
+/// What is wrong with `code`, the non-test source of `safety.rs`: a digest of the effects alone, or no prefix the crate names.
+fn digest_code_problems(code: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if code.contains("fn digest(effects") || code.contains("to_vec(effects") || code.contains("to_vec(&effects") {
+        problems.push("code hashes the effects alone".to_string());
+    }
+    if !code.contains("DIGEST_PREFIX") {
+        problems.push("a digest does not carry the prefix the crate names".to_string());
+    }
+    problems
+}
+
 /// atip.planjcs.12: the CHANGELOG has the upgrade note, and no source makes a digest without the prefix.
 #[test]
 fn atip_planjcs_12_the_changelog_has_the_upgrade_note_and_no_source_makes_the_old_digest() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
     let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
-    for needle in ["canon-0-35-plan-jcs", "sha256:", "JCS", "PLAN_STALE", "REPO_WRITE_BUSY", ".canon/repo-write.lock", "0.34", "inputs", "atip.planjcs.01"] {
-        assert!(unreleased.contains(needle), "the note of this change names `{needle}`");
-    }
+    assert_eq!(note_problems(unreleased), Vec::<String>::new());
     let safety = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/safety.rs")).unwrap();
     let code = safety.split("#[cfg(test)]").next().unwrap();
-    assert!(!code.contains("fn digest(effects") && !code.contains("to_vec(effects") && !code.contains("to_vec(&effects"), "no code hashes the effects alone");
-    assert!(code.contains("DIGEST_PREFIX"), "every digest carries the prefix the crate names");
+    assert_eq!(digest_code_problems(code), Vec::<String>::new());
     for entry in std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("src")).unwrap().flatten() {
         if entry.path().extension().is_some_and(|ext| ext == "rs") && entry.file_name() != "safety.rs" {
             let source = std::fs::read_to_string(entry.path()).unwrap();
             assert!(!source.contains("fn digest(effects"), "{}", entry.path().display());
         }
     }
+}
+
+/// atip.planjcs.16 (the failure path of F5): an upgrade note that lacks a part of the digest form, the stale 0.34 previews or the lock fails the
+/// check, each part by its own name; and code that hashes the effects alone, or makes a digest without the prefix, fails it as well.
+#[test]
+fn atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fail_the_check() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
+    let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
+    assert!(note_problems(unreleased).is_empty(), "the note as it stands has every part");
+    for needle in NOTE_NEEDLES {
+        let cut = unreleased.replace(needle, "");
+        assert!(note_problems(&cut).contains(&format!("the note of this change names `{needle}`")), "a note without `{needle}` is refused");
+    }
+    assert_eq!(note_problems("").len(), NOTE_NEEDLES.len(), "an empty note names nothing");
+    let hashed_alone = "fn digest(effects: &Value) -> String { sha256(to_vec(effects)) } const DIGEST_PREFIX: &str = \"sha256:\";";
+    assert_eq!(digest_code_problems(hashed_alone), ["code hashes the effects alone"]);
+    assert_eq!(digest_code_problems("let bytes = serde_json::to_vec(&effects);  const DIGEST_PREFIX: &str = \"sha256:\";"), ["code hashes the effects alone"]);
+    assert_eq!(digest_code_problems("fn plan_digest(plan: &Plan) -> String { hex(sha256(jcs(plan))) }"), ["a digest does not carry the prefix the crate names"]);
+    assert_eq!(digest_code_problems("fn digest(effects: &Value) -> String { hex(sha256(to_vec(effects))) }").len(), 2);
 }
 
 /// atip.planjcs.13: the report schemas take their preview members from the contract's Effect and raise the minor.

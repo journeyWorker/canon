@@ -165,3 +165,14 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
     Given a repository set up by 0.34: no .canon/repo-write.lock, no line for it in .gitignore
     When a purge preview is run, then its commit with a writer beside it
     Then the preview makes no file; the commit makes the lock file, holds it so the writer waits, `git status` does not list it, it is named in .git/info/exclude and no tracked file was edited
+
+  # canon: {"schema":1,"at":"2026-11-03T06:13:43Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-plan-jcs.F5
+  @atip.planjcs.16
+  Scenario: An upgrade note that lacks a part of the digest form or of the lock, or code that hashes the effects alone or leaves the prefix out, fails the check
+    Given the CHANGELOG entry of this version with each named part cut out in turn, an empty entry, and sources that hash the effects alone or make a digest without the prefix
+    When the check of the upgrade note and of the digest code runs on each
+    Then each missing part is named by its own name, the empty entry names every part, each faulty source is named, and the entry and source as they stand pass
