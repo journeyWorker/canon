@@ -493,23 +493,36 @@ fn atip_midway_09_the_audit_covers_every_exit_1_code_and_each_code_exists_where_
     for candidate in ["MIGRATE_STOPPED", "CHANGE_ADOPTION_INCOMPLETE", "EVIDENCE_BATCH_REFUSED", "DISPATCH_END_IN_PROGRESS", "PROMOTE_FAILED"] {
         assert!(AUDIT.iter().any(|(code, _, why)| *code == candidate && why.starts_with("judged: ")), "{candidate} is judged in the table");
     }
+    assert_audit_faults_are_named(&sources);
+}
 
+/// atip.midway.14 (the failure path of F3): an exit-1 code the table lacks, a kept code no source builds, a moved code that comes back
+/// in the registry or in a source, and a kept code the registry moved to exit 2 each fail the audit check with their own message.
+#[test]
+fn atip_midway_14_an_audit_that_misses_a_code_or_a_source_or_a_moved_code_comes_back_fails_the_check() {
+    assert_audit_faults_are_named(&source_text());
+}
+
+/// The faults the audit check must name, each with its own message; the audit as it stands passes (atip.midway.09 and .14).
+fn assert_audit_faults_are_named(sources: &str) {
     // An exit-1 code the table lacks fails.
     let extra = CodeInfo { code: "SOMETHING_NEW_FAILED", meaning: "m", exit: 1, retryable: false, fix: "f", reasons: &[] };
     let mut grown: Vec<CodeInfo> = all_codes().to_vec();
     grown.push(extra);
-    assert!(audit_problems(&grown, AUDIT, &sources).iter().any(|problem| problem.contains("SOMETHING_NEW_FAILED") && problem.contains("not in the audit")));
+    assert!(audit_problems(&grown, AUDIT, sources).iter().any(|problem| problem.contains("SOMETHING_NEW_FAILED") && problem.contains("not in the audit")));
     // A kept code that no source builds fails.
     assert!(audit_problems(all_codes(), AUDIT, "").iter().any(|problem| problem.contains("no source builds it")));
     // A moved code that comes back, in the registry or in a source, fails.
     let mut back: Vec<CodeInfo> = all_codes().to_vec();
     back.push(CodeInfo { code: "INIT_SKILL_INSTALL_FAILED", meaning: "m", exit: 1, retryable: false, fix: "f", reasons: &[] });
-    assert!(audit_problems(&back, AUDIT, &sources).iter().any(|problem| problem.contains("still in the registry")));
+    assert!(audit_problems(&back, AUDIT, sources).iter().any(|problem| problem.contains("still in the registry")));
     let revived = format!("{sources}\nCliError::refused(\"INIT_SKILL_INSTALL_FAILED\", message)");
     assert!(audit_problems(all_codes(), AUDIT, &revived).iter().any(|problem| problem.contains("a source still builds it")));
     // A kept code that the registry moved to exit 2 fails.
     let moved_to_refusal: Vec<CodeInfo> = all_codes().iter().map(|row| if row.code == "WRITE_FAILED" { CodeInfo { exit: 2, ..*row } } else { *row }).collect();
-    assert!(audit_problems(&moved_to_refusal, AUDIT, &sources).iter().any(|problem| problem.contains("WRITE_FAILED") && problem.contains("exit 2")));
+    assert!(audit_problems(&moved_to_refusal, AUDIT, sources).iter().any(|problem| problem.contains("WRITE_FAILED") && problem.contains("exit 2")));
+    // The audit as it stands passes.
+    assert_eq!(audit_problems(all_codes(), AUDIT, sources), Vec::<String>::new());
 }
 
 // ------------------------------------------------------------------ F4: the I/O failure codes

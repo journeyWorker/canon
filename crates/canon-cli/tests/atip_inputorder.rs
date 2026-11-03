@@ -372,3 +372,20 @@ fn atip_inputorder_10_the_environment_never_touches_a_key_the_document_gives() {
     let out = canon_with(repo, &["scenario", "new", "auth.login.05", "--title", "Five", "--feature", feature, "--actor", "dave", "--input", r#"{"actor":"dave"}"#, "--json"], None, &[("CANON_ACTOR", "carol")]);
     assert_eq!(out.status.code(), Some(0), "{}", json_of(&out));
 }
+
+#[test]
+fn atip_inputorder_11_an_environment_value_the_document_cannot_give_still_refuses_the_call() {
+    let dir = fixture();
+    let repo = dir.path();
+    let feature = ".canon/specs/kind=feature/area=auth/login.feature";
+    // the document gives every key `scenario new` accepts; CANON_ROLE has no key a document can give (`as` is flag-only)
+    let document = json!({"operands": ["auth.login.02"], "title": "Two", "feature": feature, "actor": "alice", "session": "s1"}).to_string();
+    let before = tree(repo);
+    let out = canon_with(repo, &["scenario", "new", "--input", &document, "--json"], None, &[("CANON_ROLE", "bogus")]);
+    let (exit, code, _, field, body) = refusal(&out);
+    assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "UNKNOWN_ROLE", Some("CANON_ROLE")), "{body}");
+    assert_eq!(tree(repo), before, "nothing is written");
+    // the same document with a role in the environment is exit 0
+    let out = canon_with(repo, &["scenario", "new", "--input", &document, "--json"], None, &[("CANON_ROLE", "implementer")]);
+    assert_eq!(out.status.code(), Some(0), "{}", json_of(&out));
+}

@@ -70,3 +70,23 @@ Feature: atip batch pointers: /<index> pointers, BATCH_INCOMPLETE at the index, 
     Given a batch with a failed item followed by two skipped ones
     When the batch runs
     Then the failed item has error (with its code's retryable) and no data, each skipped item has no error and no data, and the report has one entry per submitted item
+
+  # canon: {"schema":1,"at":"2026-11-03T18:11:21Z","actor":{"agent_id":"impl-shipfix","role":"implementer","session_id":"s-0-35-shipfix"}}
+  @subject:atip-input
+  @case:failure
+  @flow:canon-0-35-batch-pointers.F2
+  @atip.batchpointers.08
+  Scenario: A batch with an item that fails when it runs is never exit 0 and reports no written or unchanged for the failed and the later items
+    Given a finding close batch of two items where the first is good and the second names a finding no ledger holds, and a third item follows
+    When the batch runs
+    Then it is exit 1, not exit 0, with ok false and the BATCH_INCOMPLETE error, the first item is written, and the failed and the later items report no written or unchanged and carry no data
+
+  # canon: {"schema":1,"at":"2026-11-03T18:11:29Z","actor":{"agent_id":"impl-shipfix","role":"implementer","session_id":"s-0-35-shipfix"}}
+  @subject:atip-input
+  @case:failure
+  @flow:canon-0-35-batch-pointers.F5
+  @atip.batchpointers.09
+  Scenario: A failed item carries its own error at the field that names what to fix, no data, and the items after it carry nothing
+    Given a scenario new batch whose second item repeats an existing id, with an item before it and one after it
+    When the batch runs
+    Then the second item is failed with its own error SCENARIO_TAG_EXISTS at the field /1/operands, which names what to fix, and no data, and the third item is skipped with no error and no data

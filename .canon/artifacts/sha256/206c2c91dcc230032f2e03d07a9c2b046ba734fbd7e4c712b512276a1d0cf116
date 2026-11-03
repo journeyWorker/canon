@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="33" skipped="0" failures="0" errors="0" uuid="9b07702c-4d8a-4ccd-996e-59aeb0a3fc69" timestamp="2026-11-04T03:13:32.364+09:00" time="8.053">
+    <testsuite name="canon-cli::atip_batchpointers" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="atip_batchpointers_09_a_failed_item_points_at_what_to_fix_in_its_own_error_and_the_items_after_it_carry_nothing" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="3.399"/>
+        <testcase name="atip_batchpointers_08_a_batch_with_an_item_that_fails_is_never_exit_zero_and_the_failed_and_later_items_report_no_success" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="3.497"/>
+        <testcase name="atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_its_index" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="4.391"/>
+        <testcase name="atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with_no_data_and_nothing_ran" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="4.485"/>
+        <testcase name="atip_batchpointers_07_a_failed_item_has_its_error_and_no_data_and_a_skipped_item_has_neither" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="4.610"/>
+        <testcase name="atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="4.675"/>
+        <testcase name="atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="4.734"/>
+        <testcase name="atip_batchpointers_02_a_batch_of_good_items_is_exit_zero_with_one_report_per_item_in_order" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="5.030"/>
+        <testcase name="atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_preflight_and_runs_in_order" classname="canon-cli::atip_batchpointers" timestamp="2026-11-04T03:13:32.366+09:00" time="5.231"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_inputorder" tests="11" skipped="0" errors="0" failures="0">
+        <testcase name="atip_inputorder_01_the_non_empty_lines_of_an_ndjson_file_are_all_documents" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:32.366+09:00" time="4.651"/>
+        <testcase name="atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:35.864+09:00" time="1.313"/>
+        <testcase name="atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:35.768+09:00" time="1.425"/>
+        <testcase name="atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:36.758+09:00" time="1.100"/>
+        <testcase name="atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:36.851+09:00" time="1.195"/>
+        <testcase name="atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:36.977+09:00" time="1.623"/>
+        <testcase name="atip_inputorder_07_a_value_given_two_ways_that_differ_is_a_conflict_at_the_document_pointer" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:37.018+09:00" time="1.718"/>
+        <testcase name="atip_inputorder_11_an_environment_value_the_document_cannot_give_still_refuses_the_call" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:37.194+09:00" time="1.583"/>
+        <testcase name="atip_inputorder_10_the_environment_never_touches_a_key_the_document_gives" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:37.178+09:00" time="1.756"/>
+        <testcase name="atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:37.101+09:00" time="2.059"/>
+        <testcase name="atip_inputorder_08_integers_are_compared_by_the_number_they_denote" classname="canon-cli::atip_inputorder" timestamp="2026-11-04T03:13:37.042+09:00" time="3.375"/>
+    </testsuite>
+    <testsuite name="canon-cli::stopped_midway" tests="13" skipped="0" errors="0" failures="0">
+        <testcase name="atip_midway_01_stopped_midway_is_registered_with_its_reasons_and_both_schema_views_agree" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.396+09:00" time="0.106"/>
+        <testcase name="atip_midway_02_a_reason_that_is_not_a_registered_exit_2_code_fails" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.503+09:00" time="0.013"/>
+        <testcase name="atip_midway_03_init_stops_midway_when_the_skill_install_meets_a_refusal_after_the_writes" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.515+09:00" time="0.099"/>
+        <testcase name="atip_midway_04_a_skill_directory_that_cannot_be_written_after_the_writes_is_write_failed" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.597+09:00" time="0.135"/>
+        <testcase name="atip_midway_05_a_skill_install_failure_that_is_not_a_refusal_keeps_the_skills_failure_code" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.614+09:00" time="0.125"/>
+        <testcase name="atip_midway_06_a_refusal_with_no_effect_is_exit_2_with_the_refusals_own_code" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.732+09:00" time="0.162"/>
+        <testcase name="atip_midway_08_a_batch_element_that_stops_midway_is_failed_with_its_reason_and_the_batch_is_incomplete" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.857+09:00" time="0.106"/>
+        <testcase name="atip_midway_10_the_io_failure_codes_keep_their_names_exits_and_retryability" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.963+09:00" time="0.015"/>
+        <testcase name="atip_midway_13_an_io_failure_code_that_moves_or_is_absorbed_fails_the_check" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:38.046+09:00" time="0.016"/>
+        <testcase name="atip_midway_07_the_first_next_step_of_a_stopped_command_reads_what_was_done" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.739+09:00" time="0.351"/>
+        <testcase name="atip_midway_12_a_half_written_adoption_keeps_change_adoption_incomplete_and_its_repair_completes_the_link" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.978+09:00" time="0.630"/>
+        <testcase name="atip_midway_14_an_audit_that_misses_a_code_or_a_source_or_a_moved_code_comes_back_fails_the_check" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:38.062+09:00" time="0.886"/>
+        <testcase name="atip_midway_09_the_audit_covers_every_exit_1_code_and_each_code_exists_where_the_table_says" classname="canon-cli::stopped_midway" timestamp="2026-11-04T03:13:37.895+09:00" time="1.128"/>
+    </testsuite>
+</testsuites>

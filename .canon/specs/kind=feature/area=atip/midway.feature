@@ -130,3 +130,13 @@ Feature: atip: STOPPED_MIDWAY, the code of a command that stopped after its earl
     Given the registry with an I/O failure code removed, moved to exit 2, made retryable or not, given a reason, or named as a reason of STOPPED_MIDWAY
     When the check of the I/O failure codes runs on each
     Then each fault is named with its own message, and the registry as it stands passes
+
+  # canon: {"schema":1,"at":"2026-11-03T18:11:39Z","actor":{"agent_id":"impl-shipfix","role":"implementer","session_id":"s-0-35-shipfix"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-35-canon-stopped-midway.F3
+  @atip.midway.14
+  Scenario: An exit-1 code the audit table lacks, a kept code no source builds and a moved code that returns each fail the audit check
+    Given the audit table of the exit-1 codes with a code the registry holds but the table lacks, a source text no source builds a kept code in, and a moved code put back in the registry or in a source
+    When the audit check runs on each
+    Then each fault is named with its own message (not in the audit, no source builds it, still in the registry, a source still builds it), and the audit as it stands passes

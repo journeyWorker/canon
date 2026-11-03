@@ -100,3 +100,13 @@ Feature: atip input order: the --input document is processed in the order of spe
     Given CANON_ACTOR set in the environment and a document that gives actor, another document that does not
     When scenario new runs with each
     Then the given actor is the document's and the environment neither conflicts nor is read for that key, and the other document's actor is the environment's
+
+  # canon: {"schema":1,"at":"2026-11-03T18:11:34Z","actor":{"agent_id":"impl-shipfix","role":"implementer","session_id":"s-0-35-shipfix"}}
+  @subject:atip-input
+  @case:failure
+  @flow:canon-0-35-input-order.F6
+  @atip.inputorder.11
+  Scenario: An environment value the document cannot give, an unknown CANON_ROLE, still refuses the call although the document gives every key it can
+    Given CANON_ROLE set to a value that is no role and a document that gives every key scenario new accepts
+    When scenario new runs with the document
+    Then it is exit 2 UNKNOWN_ROLE at the field CANON_ROLE and nothing is written, and the same document with a valid CANON_ROLE is exit 0
