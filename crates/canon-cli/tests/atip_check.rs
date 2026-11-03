@@ -5,7 +5,7 @@
 //! that also emits a next step (`query`) and the refusal of a missing value (`finding close` without `--seq`); `registry`
 //! and `warnings` are generated from `canon schema --errors --json` and `--warnings --json`, never written by hand.
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
-//! committed file differs from what the binary says. The CI jobs `atip-l0`, `atip-l1`, `atip-l2` and `just atip` run the same
+//! committed file differs from what the binary says. The CI jobs `atip-l0` and `atip-l2` (which holds the L1 rows) and `just atip` run the same
 //! `atip check --contract 1.2` on the same binary and fixture. The L2 claim is `atip_claiml2.rs`'s.
 
 use std::os::unix::fs::PermissionsExt;

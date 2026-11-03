@@ -176,3 +176,25 @@ Feature: atip canon claim l2: canon declares atip/1 1.2 and L2, and the CI jobs 
     Given a repo with canon init, whose artifact store is local
     When artifacts move --tier local runs without --commit, then the call in meta.next[0] runs
     Then the preview has data.committed false and meta.next[0] holds --commit, --plan-digest=<its planDigest> and --json, and the commit exits 0 with committed true
+
+  # canon: {"schema":1,"at":"2026-11-03T07:27:50Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2-fix"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-claim-l2.F5
+  @atip.claiml2.17
+  Scenario: A known secret of the environment (a Postgres DSN password and the s3 keys) reaches no stdout, no stderr and no file of the repository, for the commands that reach the tiers
+    Given a repo whose canon.yaml routes kinds to a Postgres and an s3 tier, and an environment with a marker as the DSN password and as the s3 keys
+    When fourteen commands that reach the tiers run with and without --json
+    Then the marker is in no stdout and no stderr, nor in any file of the repository, and the answers name the remote tiers, so the secret was in play
+
+  # canon: {"schema":1,"at":"2026-11-03T07:28:38Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2-fix"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-claim-l2.F5
+  @atip.claiml2.18
+  Scenario: No source of canon opens /dev/tty or prompts for a missing value, and --input - on a terminal is a refusal
+    Given the sources of every crate of the workspace
+    When they are scanned for /dev/tty, for a prompt library and for a terminal-mode call
+    Then none is found, and the read of --input - refuses a terminal with STDIN_TTY instead of waiting

@@ -246,7 +246,7 @@ jobs:
   # shared checker holds it to that: `atip check --level L2 --contract 1.2` runs the 28 L0, the 31 L1 and the L2 checks against the built binary, so its report
   # contains every row the `atip-l1` job of 0.34 judged and that job is gone. The same fixture as `atip-l0`, with `prepare` (a git repository with one commit,
   # which findings and divergences need), more `setup`, the `paged`, `fields` and `domainRejects` entries the L1 checks read, `commands` that list the writes it runs
-  # (`export`, `finding add`, `finding close`, `subject new`) with `batchFailsAt` and `batchFailsFirst`, the `preview` of the five destructive commands and the
+  # (`export` and `finding close`) with `batchFailsAt` and `batchFailsFirst`, the `preview` of the five destructive commands and the
   # `allowedEffects` of the commands that write an audit line. The rows of a feature canon does not offer (`L2.stream`, `L2.async`, `L2.operation-key`, `L2.search`)
   # are `unsupported`; every other MUST row passes, or the job is red and `--json` names the row in `findings[]`. The tree's `level` is `L2` and `meta.contractVersion`
   # is `1.2` from `canon-0-35-claim-l2`; this job is what proves that claim, and it is green only with the other `canon-0-35-*` changes in the binary.

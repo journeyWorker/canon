@@ -14042,7 +14042,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on every run",
+      "effectNote": "writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on each run that succeeds; a refused run writes neither",
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_MISSING",

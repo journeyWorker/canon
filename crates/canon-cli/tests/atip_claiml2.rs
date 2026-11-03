@@ -27,9 +27,15 @@ fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
 }
 
-fn canon_in(dir: &Path, args: &[&str]) -> Value {
+/// The exit status and the one JSON document of `canon <args>` run in `dir`.
+fn canon_out(dir: &Path, args: &[&str]) -> (Option<i32>, Value) {
     let output = Command::new(CANON).args(args).current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon");
-    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{args:?}: {error}: {}", String::from_utf8_lossy(&output.stdout)))
+    let document = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{args:?}: {error}: {}", String::from_utf8_lossy(&output.stdout)));
+    (output.status.code(), document)
+}
+
+fn canon_in(dir: &Path, args: &[&str]) -> Value {
+    canon_out(dir, args).1
 }
 
 fn run(bin: &Path, level: Level, fixture: &Path) -> Report {
@@ -164,10 +170,11 @@ fn atip_claiml2_06_input_too_large_names_the_field_input() {
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let big = dir.path().join("big.json");
     std::fs::write(&big, vec![b' '; 8 * 1024 * 1024 + 1]).expect("write");
-    let bytes = canon_in(dir.path(), &["scenario", "new", "--input", big.to_str().expect("utf8"), "--json"]);
+    let (bytes_exit, bytes) = canon_out(dir.path(), &["scenario", "new", "--input", big.to_str().expect("utf8"), "--json"]);
     let items = format!("[{}]", vec!["{}"; 10_001].join(","));
-    let many = canon_in(dir.path(), &["scenario", "new", "--input", &items, "--json"]);
-    for (document, reason) in [(&bytes, "TOO_MANY_BYTES"), (&many, "TOO_MANY_ITEMS")] {
+    let (many_exit, many) = canon_out(dir.path(), &["scenario", "new", "--input", &items, "--json"]);
+    for (exit, document, reason) in [(bytes_exit, &bytes, "TOO_MANY_BYTES"), (many_exit, &many, "TOO_MANY_ITEMS")] {
+        assert_eq!(exit, Some(2), "a refusal: {document}");
         assert_eq!((document["error"]["code"].as_str(), document["error"]["reason"].as_str(), document["error"]["field"].as_str()), (Some("INPUT_TOO_LARGE"), Some(reason), Some("--input")), "{document}");
     }
 }
@@ -275,10 +282,53 @@ fn release_section(changelog: &str) -> &str {
     &rest[..end]
 }
 
-/// The obligations of contract 17.2 canon's tests stand for, and the one word each row of the evidence list is found by.
-const OBLIGATIONS: [&str; 8] = ["tree complete", "exit codes registered", "write constraints", "preview equals commit", "secrets", "examples and guides parse", "next syntax", "warnings and stopped midway"];
+/// The obligations of `approaches/checker.md` section 8 (atip/1 1.2.1 and 1.3.1: 18 rows), each by the words its row of the CHANGELOG list opens with.
+const OBLIGATIONS: [&str; 18] = [
+    "tree complete",
+    "exit codes registered",
+    "write constraints",
+    "preview equals commit",
+    "remote effects of reads and refusals",
+    "secrets",
+    "commit atomicity",
+    "operation keys",
+    "streams cut off",
+    "examples and guides parse",
+    "no /dev/tty prompt",
+    "next syntax",
+    "L0 paging",
+    "domains and validators",
+    "conservative staging",
+    "reasons registered",
+    "stopped midway",
+    "warning codes",
+];
 
-/// What is wrong with the evidence list of `section`: an obligation without a row or without a test, a test that is not a `fn` of the sources.
+/// What is wrong with the test `name` of the source file `file` (a path under `crates`): the file is missing, the function is not there, it is not a
+/// `#[test]`, or it is `#[ignore]`d, which keeps it out of the workspace run. The attributes and doc comments directly above the function are read.
+fn test_problem(crates: &Path, file: &str, name: &str) -> Option<String> {
+    let Ok(source) = std::fs::read_to_string(crates.join(file)) else { return Some(format!("{file} does not exist")) };
+    let lines: Vec<&str> = source.lines().collect();
+    let Some(at) = lines.iter().position(|line| line.trim_start().starts_with(&format!("fn {name}(")) || line.trim_start().starts_with(&format!("pub fn {name}("))) else {
+        return Some(format!("{file} has no function `{name}`"));
+    };
+    let mut attributes: Vec<&str> = Vec::new();
+    for line in lines[..at].iter().rev() {
+        let line = line.trim();
+        if line.starts_with("#[") {
+            attributes.push(line);
+        } else if !line.starts_with("///") {
+            break;
+        }
+    }
+    if !attributes.contains(&"#[test]") {
+        return Some(format!("`{name}` in {file} is not a #[test]"));
+    }
+    attributes.iter().find(|attribute| attribute.starts_with("#[ignore")).map(|_| format!("`{name}` in {file} is #[ignore]d: it is not in the workspace run"))
+}
+
+/// What is wrong with the evidence list of `section`: an obligation without a row, a row with neither a test nor a stated `N/A:` or `Gap:`, a test that is
+/// not a live `#[test]` of the sources.
 fn evidence_problems(section: &str, crates: &Path) -> Vec<String> {
     let Some(start) = section.find("**Evidence of contract 17.2**") else { return vec!["the section has no evidence list".to_string()] };
     let table: Vec<&str> = section[start..].lines().skip_while(|line| !line.starts_with('|')).take_while(|line| line.starts_with('|')).collect();
@@ -288,19 +338,14 @@ fn evidence_problems(section: &str, crates: &Path) -> Vec<String> {
             problems.push(format!("no row for `{obligation}`"));
             continue;
         };
-        let tests: Vec<&str> = row.split('`').skip(1).step_by(2).collect();
-        if tests.is_empty() {
-            problems.push(format!("`{obligation}` names no test"));
+        let tests: Vec<&str> = row.split('`').skip(1).step_by(2).filter(|word| word.contains("::")).collect();
+        if tests.is_empty() && !row.contains("N/A: ") && !row.contains("Gap: ") {
+            problems.push(format!("`{obligation}` names no test, no `N/A:` and no `Gap:`"));
         }
         for test in tests {
-            let Some((file, name)) = test.split_once("::") else {
-                problems.push(format!("`{test}` is not `path::fn`"));
-                continue;
-            };
-            match std::fs::read_to_string(crates.join(file)) {
-                Ok(source) if source.contains(&format!("fn {name}(")) => {}
-                Ok(_) => problems.push(format!("`{obligation}`: {file} has no test `{name}`")),
-                Err(_) => problems.push(format!("`{obligation}`: {file} does not exist")),
+            let Some((file, name)) = test.split_once("::") else { continue };
+            if let Some(problem) = test_problem(crates, file, name) {
+                problems.push(format!("`{obligation}`: {problem}"));
             }
         }
     }
@@ -308,14 +353,14 @@ fn evidence_problems(section: &str, crates: &Path) -> Vec<String> {
 }
 
 #[test]
-fn atip_claiml2_11_every_obligation_of_contract_17_2_has_a_row_with_tests_that_exist() {
+fn atip_claiml2_11_every_obligation_of_contract_17_2_has_a_row_with_live_tests_or_a_stated_reason() {
     let root = repo_root();
     let changelog = read(&root.join("CHANGELOG.md"));
     assert_eq!(evidence_problems(release_section(&changelog), &root.join("crates")), Vec::<String>::new());
 }
 
 #[test]
-fn atip_claiml2_12_a_row_taken_out_of_the_list_or_a_test_that_does_not_exist_fails_the_check() {
+fn atip_claiml2_12_a_row_taken_out_of_the_list_or_a_test_that_is_not_live_fails_the_check() {
     let root = repo_root();
     let changelog = read(&root.join("CHANGELOG.md"));
     let section = release_section(&changelog);
@@ -328,32 +373,57 @@ fn atip_claiml2_12_a_row_taken_out_of_the_list_or_a_test_that_does_not_exist_fai
     let problems = evidence_problems(&renamed, &root.join("crates"));
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(problems[0].contains("a_test_nobody_wrote"), "{problems:?}");
+    // A row that gives neither a test nor a reason fails, and so does a test that is ignored, not a #[test], or in a file that is not there.
+    let bare: String = section.lines().map(|line| if line.starts_with("| operation keys |") { "| operation keys | nothing |".to_string() } else { line.to_string() }).map(|line| format!("{line}\n")).collect();
+    assert_eq!(evidence_problems(&bare, &root.join("crates")), ["`operation keys` names no test, no `N/A:` and no `Gap:`"]);
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("t.rs"), "#[test]\n#[ignore]\nfn ignored() {}\n\n/// doc\n#[test]\nfn live() {}\n\nfn plain() {}\n").expect("write");
+    assert_eq!(test_problem(dir.path(), "t.rs", "live"), None);
+    assert!(test_problem(dir.path(), "t.rs", "ignored").is_some_and(|problem| problem.contains("#[ignore]")));
+    assert!(test_problem(dir.path(), "t.rs", "plain").is_some_and(|problem| problem.contains("not a #[test]")));
+    assert!(test_problem(dir.path(), "t.rs", "absent").is_some_and(|problem| problem.contains("no function")));
+    assert!(test_problem(dir.path(), "nofile.rs", "live").is_some_and(|problem| problem.contains("does not exist")));
 }
 
-/// The entries the 0.35.0 section carries for the breaking changes of the release: a name, and a spelling the entry has.
-const RELEASE_ENTRIES: [(&str, &str); 14] = [
-    ("the declaration 1.2 and level L2", "claims level L2"),
-    ("a cursor of 0.34 is refused", "`FOREIGN`"),
-    ("limit, cursor, all and fields are flag-only", "flag-only"),
-    ("the plan digest is sha256: and the JCS of effects and inputs", "`sha256:`"),
-    ("PLAN_STALE and the preview before a move", "`PLAN_STALE`"),
-    ("a # line of an NDJSON file", "NDJSON"),
-    ("INPUT_INVALID with INVALID_VALUE for a value outside a set", "`INVALID_VALUE`"),
-    ("+1 on argv", "`+1`"),
-    ("the pointers of a batch", "`BATCH_INCOMPLETE`"),
-    ("the --dry-run of the preflight is gone", "`--dry-run`"),
-    ("the JSON shape of skills show", "`data.text`"),
-    ("the first line of the help", "\"canon skills show\" prints the guide"),
-    ("the codes that moved to STOPPED_MIDWAY", "`STOPPED_MIDWAY`"),
-    ("the checker declares 1.2 and runs L2", "`atip check --level L2"),
+/// The entries the 0.35.0 section carries for the changes of the release: a name, and the opening words of the entry, which only that entry has.
+const RELEASE_ENTRIES: [(&str, &str); 22] = [
+    ("the declaration 1.2 and level L2", "**canon declares atip/1 1.2 and claims level L2**"),
+    ("the CI jobs that prove the claim", "**CI proves the claim.**"),
+    ("the evidence list of contract 17.2", "**Evidence of contract 17.2**"),
+    ("the answer order of the stateless checks", "**The stateless checks of every command answer in the order of atip/1 1.2**"),
+    ("--input in the order of spec 11.7", "**`--input` follows the order of spec 11.7**"),
+    ("a # line of an NDJSON file is NOT_JSON", "a `#` line of an NDJSON file was skipped as a comment"),
+    ("a value outside a set in a document is INVALID_VALUE", "a value outside a closed set in a document was `USAGE`"),
+    ("+1 on argv is the integer 1", "`--round +1` against `1`"),
+    ("the pointers and outcomes of a batch", "**Batches follow spec 11.8 and 11.11**"),
+    ("the preflight of a batch runs no --dry-run", "the 14 commands that have `--dry-run`"),
+    ("the guide command skills show", "**`canon skills show` is the contract's guide command**"),
+    ("NAME of skills show is optional", "`NAME` is optional: without it the command prints the default guide"),
+    ("the first line of --help names skills show", "first line of `--help`: `Agents"),
+    ("STOPPED_MIDWAY and the moved codes", "**canon registers `STOPPED_MIDWAY`"),
+    ("the cursor and the flag-only options", "**The cursor is `atip::cursor`'s"),
+    ("a cursor of 0.34 is refused", "Upgrade note: **a cursor 0.34 issued is refused"),
+    ("the plan digest is sha256: and the JCS of effects and inputs", "**The digest of a destructive plan is `sha256:`"),
+    ("a preview of 0.34 is PLAN_STALE", "**Upgrade note.** A preview made by 0.34 is `PLAN_STALE`"),
+    ("a read and a refusal write nothing", "- **A refused call writes nothing, whatever the scenario index**"),
+    ("INPUT_TOO_LARGE names --input", "| `INPUT_TOO_LARGE` (a source over 8 MiB"),
+    ("an all-unchanged batch has only items", "**Upgrade note:** read `data.items[].status`"),
+    ("the checker declares 1.2 and runs L2", "- **`atip check --level L2` runs, and `LEVEL_UNSUPPORTED` is gone.**"),
 ];
 
 fn release_problems(section: &str) -> Vec<String> {
-    RELEASE_ENTRIES.iter().filter(|(_, spelling)| !section.contains(spelling)).map(|(name, _)| format!("the release section has no entry for: {name}")).collect()
+    RELEASE_ENTRIES
+        .iter()
+        .filter_map(|(name, opening)| match section.matches(opening).count() {
+            1 => None,
+            0 => Some(format!("the release section has no entry for: {name}")),
+            _ => Some(format!("the release section says the opening of the entry more than once for: {name}")),
+        })
+        .collect()
 }
 
 #[test]
-fn atip_claiml2_13_the_release_section_carries_every_breaking_change_and_the_evidence_list() {
+fn atip_claiml2_13_the_release_section_carries_every_change_of_the_release_once_and_the_evidence_list() {
     let changelog = read(&repo_root().join("CHANGELOG.md"));
     let section = release_section(&changelog);
     assert_eq!(release_problems(section), Vec::<String>::new());
@@ -365,10 +435,13 @@ fn atip_claiml2_13_the_release_section_carries_every_breaking_change_and_the_evi
 fn atip_claiml2_14_an_entry_taken_out_of_the_release_section_fails_the_check() {
     let changelog = read(&repo_root().join("CHANGELOG.md"));
     let section = release_section(&changelog);
-    for (name, spelling) in RELEASE_ENTRIES {
-        let problems = release_problems(&section.replace(spelling, "(taken out)"));
-        assert!(problems.iter().any(|problem| problem.ends_with(name)), "{name}: {problems:?}");
+    for (name, opening) in RELEASE_ENTRIES {
+        let problems = release_problems(&section.replace(opening, "(taken out)"));
+        assert_eq!(problems, [format!("the release section has no entry for: {name}")], "{name}");
     }
+    // An opening that another text repeats does not pin its entry.
+    let doubled = format!("{section}\n{}", RELEASE_ENTRIES[0].1);
+    assert_eq!(release_problems(&doubled).len(), 1);
 }
 
 /// A repository with one commit, canon initialised, and a finding `add-login` 1/1 that is open.
@@ -393,11 +466,12 @@ fn repo_with_a_finding() -> tempfile::TempDir {
 fn atip_claiml2_15_a_batch_of_unchanged_elements_has_only_items_in_data() {
     let dir = repo_with_a_finding();
     let close = json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "fixed"});
-    let first = canon_in(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--json"]);
-    assert_eq!(first["ok"], true, "{first}");
+    let (first_exit, first) = canon_out(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--json"]);
+    assert_eq!((first_exit, first["ok"].clone()), (Some(0), json!(true)), "{first}");
     for count in [1, 2] {
         let batch = Value::Array(vec![close.clone(); count]).to_string();
-        let document = canon_in(dir.path(), &["finding", "close", "--input", &batch, "--json"]);
+        let (exit, document) = canon_out(dir.path(), &["finding", "close", "--input", &batch, "--json"]);
+        assert_eq!(exit, Some(0), "{document}");
         assert_eq!(document["ok"], true, "{document}");
         let data = document["data"].as_object().expect("data is an object");
         assert_eq!(data.keys().collect::<Vec<_>>(), ["items"], "the batch report is closed: {document}");
@@ -414,12 +488,141 @@ fn atip_claiml2_15_a_batch_of_unchanged_elements_has_only_items_in_data() {
 #[test]
 fn atip_claiml2_16_the_preview_of_a_move_to_the_local_store_leads_with_the_commit_call() {
     let dir = repo_with_a_finding();
-    let preview = canon_in(dir.path(), &["artifacts", "move", "--tier", "local", "--json"]);
+    let (preview_exit, preview) = canon_out(dir.path(), &["artifacts", "move", "--tier", "local", "--json"]);
+    assert_eq!(preview_exit, Some(0), "a preview exits 0: {preview}");
     assert_eq!((preview["ok"].clone(), preview["data"]["committed"].clone()), (json!(true), json!(false)), "{preview}");
     let digest = preview["data"]["planDigest"].as_str().expect("a digest");
     let argv: Vec<&str> = preview["meta"]["next"][0]["argv"].as_array().expect("meta.next[0].argv").iter().map(|word| word.as_str().expect("a word")).collect();
     assert_eq!(argv.first(), Some(&"artifacts"), "{preview}");
     assert!(argv.contains(&"--commit") && argv.contains(&"--json") && argv.contains(&format!("--plan-digest={digest}").as_str()), "{argv:?}");
-    let commit = canon_in(dir.path(), &argv);
+    let (commit_exit, commit) = canon_out(dir.path(), &argv);
+    assert_eq!(commit_exit, Some(0), "{commit}");
     assert_eq!((commit["ok"].clone(), commit["data"]["committed"].clone()), (json!(true), json!(true)), "{commit}");
+}
+
+/// The secret every output and file is searched for in `atip_claiml2_17`: the password of a Postgres DSN, the secret key of the s3 tier.
+const SECRET: &str = "s3cr3t-Marker-9f2c41";
+
+/// Every file under `dir`, as text where it is UTF-8, bytes searched where it is not.
+fn files_holding(dir: &Path, needle: &str, found: &mut Vec<PathBuf>) {
+    for entry in std::fs::read_dir(dir).expect("a directory") {
+        let path = entry.expect("an entry").path();
+        if path.is_dir() {
+            files_holding(&path, needle, found);
+        } else if std::fs::read(&path).is_ok_and(|bytes| bytes.windows(needle.len()).any(|window| window == needle.as_bytes())) {
+            found.push(path);
+        }
+    }
+}
+
+#[test]
+fn atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_file() {
+    // The tiers canon.yaml can route to, named by the environment variables that carry their credentials: Postgres (a DSN with a password) and s3.
+    const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n  session: hot\n  trajectory: cold\n";
+    // The search sees a marker where one is: a file that holds it is found.
+    let planted = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(planted.path().join("sub")).expect("mkdir");
+    std::fs::write(planted.path().join("sub/leak"), format!("x{SECRET}y")).expect("write");
+    let mut seen = Vec::new();
+    files_holding(planted.path(), SECRET, &mut seen);
+    assert_eq!(seen, [planted.path().join("sub/leak")]);
+    let dsn = format!("postgres://canon:{SECRET}@127.0.0.1:1/canon_v1");
+    let environment = [
+        ("CANON_PG_DSN", dsn.as_str()),
+        ("DATABASE_URL", dsn.as_str()),
+        ("CANON_R2_BUCKET", "canon-bucket"),
+        ("CANON_S3_ENDPOINT", "http://127.0.0.1:1"),
+        ("CANON_S3_ACCESS_KEY", "AKIA-access-s3cr3t-Marker-9f2c41"),
+        ("CANON_S3_SECRET_KEY", SECRET),
+    ];
+    let calls: [&[&str]; 14] = [
+        &["query", "--kind", "task"],
+        &["query", "--kind", "trajectory"],
+        &["query", "--kind", "change"],
+        &["status"],
+        &["gate", "check"],
+        &["search", "x"],
+        &["export", "--kind", "task"],
+        &["purge", "--kind", "session", "--before", "2030-01-01"],
+        &["purge", "--kind", "session", "--before", "2030-01-01", "--commit", "--plan-digest", "sha256:0000000000000000000000000000000000000000000000000000000000000000"],
+        &["tier", "age"],
+        &["artifacts", "move", "--tier", "cold"],
+        &["artifacts", "verify"],
+        &["ledger", "compact"],
+        &["migrate"],
+    ];
+    // A call that reaches Postgres waits out the connection (30 seconds), so the calls run side by side, each in a repository of its own.
+    let results: Vec<(String, bool, Vec<PathBuf>)> = std::thread::scope(|scope| {
+        let mut running = Vec::new();
+        for call in calls {
+            for json_mode in [false, true] {
+                let environment = &environment;
+                running.push(scope.spawn(move || {
+                    let dir = tempfile::tempdir().expect("tempdir");
+                    let git = |args: &[&str]| assert!(Command::new("git").args(args).current_dir(dir.path()).output().expect("git").status.success(), "git {args:?}");
+                    git(&["init", "-q"]);
+                    git(&["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-qm", "fixture"]);
+                    std::fs::write(dir.path().join("canon.yaml"), CANON_YAML).expect("write canon.yaml");
+                    let mut command = Command::new(CANON);
+                    command.args(call).current_dir(dir.path()).env_remove("CANON_ROLE").env_remove("CANON_R2_LOCAL_ROOT");
+                    if json_mode {
+                        command.arg("--json");
+                    }
+                    for (name, value) in environment {
+                        command.env(name, value);
+                    }
+                    let output = command.output().expect("spawn canon");
+                    let (out, err) = (String::from_utf8_lossy(&output.stdout).into_owned(), String::from_utf8_lossy(&output.stderr).into_owned());
+                    let leaked = out.contains(SECRET) || err.contains(SECRET);
+                    let named_a_tier = ["postgres", "s3"].iter().any(|tier| out.contains(tier) || err.contains(tier));
+                    let mut found = Vec::new();
+                    files_holding(dir.path(), SECRET, &mut found);
+                    (format!("{call:?} json={json_mode}{}", if leaked { " printed the secret" } else { "" }), named_a_tier, found)
+                }));
+            }
+        }
+        running.into_iter().map(|handle| handle.join().expect("a probe")).collect()
+    });
+    let leaks: Vec<&str> = results.iter().filter(|(label, _, _)| label.ends_with("printed the secret")).map(|(label, _, _)| label.as_str()).collect();
+    assert_eq!(leaks, Vec::<&str>::new(), "answers that print the secret");
+    // The calls reached the tiers (probes that never connect would prove nothing), and nothing they wrote holds the secret either.
+    let named = results.iter().filter(|(_, named_a_tier, _)| *named_a_tier).count();
+    assert!(named >= 6, "{named} of {} answers name a remote tier: the secret was never in play", results.len());
+    let holders: Vec<&PathBuf> = results.iter().flat_map(|(_, _, found)| found).collect();
+    assert_eq!(holders, Vec::<&PathBuf>::new(), "files that hold the secret");
+}
+
+#[test]
+fn atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_prompts() {
+    fn sources(dir: &Path, out: &mut Vec<(PathBuf, String)>) {
+        for entry in std::fs::read_dir(dir).expect("a directory") {
+            let path = entry.expect("an entry").path();
+            if path.is_dir() {
+                sources(&path, out);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                out.push((path.clone(), read(&path)));
+            }
+        }
+    }
+    let mut found = Vec::new();
+    for krate in std::fs::read_dir(repo_root().join("crates")).expect("crates") {
+        let src = krate.expect("a crate").path().join("src");
+        if src.is_dir() {
+            sources(&src, &mut found);
+        }
+    }
+    assert!(found.len() > 100, "the scan found canon's sources: {}", found.len());
+    let mut offenders: Vec<String> = Vec::new();
+    for (path, text) in &found {
+        for needle in ["/dev/tty", "rpassword", "dialoguer", "inquire::", "read_password", "termios"] {
+            // The checker's own pty harness and its fake tool name the file in order to refuse it; the scan is for the tool that is checked.
+            if text.lines().any(|line| line.contains(needle) && !line.trim_start().starts_with("//")) && !path.components().any(|part| part.as_os_str() == "atip-check") {
+                offenders.push(format!("{}: {needle}", path.display()));
+            }
+        }
+    }
+    assert_eq!(offenders, Vec::<String>::new(), "a source opens the controlling terminal or asks for a value");
+    // The only read of stdin is `--input -`, which refuses a terminal (`STDIN_TTY`) instead of waiting for a prompt.
+    let input = read(&repo_root().join("crates/canon-cli/src/input.rs"));
+    assert!(input.contains("STDIN_TTY") && input.contains("is_terminal()"), "`--input -` on a terminal is a refusal");
 }
