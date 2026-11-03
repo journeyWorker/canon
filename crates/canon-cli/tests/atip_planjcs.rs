@@ -747,13 +747,32 @@ fn atip_planjcs_11_a_digest_of_0_34_is_plan_stale_on_the_six_commands() {
     }
 }
 
-/// What the upgrade note of this change must name: the change, the digest form, JCS, the stale 0.34 previews, the lock and its refusal, the inputs
-/// and the scenarios.
-const NOTE_NEEDLES: [&str; 9] = ["canon-0-35-plan-jcs", "sha256:", "JCS", "PLAN_STALE", "REPO_WRITE_BUSY", ".canon/repo-write.lock", "0.34", "inputs", "atip.planjcs.01"];
+/// What the 0.35 CHANGELOG must say about the digest and the lock, as two paragraphs each read on its own: a label, the words the paragraph opens
+/// with (none of the words it must name), and the words it must name. Another entry that happens to say `sha256:` or `0.34` does not make a part present.
+const NOTE_PARTS: [(&str, &str, [&str; 6]); 2] = [
+    ("the entry", "**The digest of a destructive plan is", ["canon-0-35-plan-jcs", "sha256:", "JCS", "PLAN_STALE", "inputs", "atip.planjcs.01"]),
+    ("the upgrade note", "**Upgrade note.** A preview made by", ["sha256:", "PLAN_STALE", "REPO_WRITE_BUSY", ".canon/repo-write.lock", "0.34", "inputs"]),
+];
 
-/// What the Unreleased section `unreleased` of the CHANGELOG lacks of the upgrade note.
+/// The paragraph of `section` that opens with `opening`, up to the next blank line, when exactly one does.
+fn paragraph_of<'a>(section: &'a str, opening: &str) -> Option<&'a str> {
+    let mut starts = section.match_indices(opening).map(|(at, _)| at);
+    let (at, None) = (starts.next()?, starts.next()) else { return None };
+    let rest = &section[at..];
+    Some(&rest[..rest.find("\n\n").unwrap_or(rest.len())])
+}
+
+/// What the Unreleased section `unreleased` of the CHANGELOG lacks of the entry and of the upgrade note, each read in its own paragraph.
 fn note_problems(unreleased: &str) -> Vec<String> {
-    NOTE_NEEDLES.iter().filter(|needle| !unreleased.contains(**needle)).map(|needle| format!("the note of this change names `{needle}`")).collect()
+    let mut problems = Vec::new();
+    for (label, opening, needles) in NOTE_PARTS {
+        let Some(paragraph) = paragraph_of(unreleased, opening) else {
+            problems.push(format!("no paragraph opens `{opening}`: the {label} is not in the CHANGELOG"));
+            continue;
+        };
+        problems.extend(needles.iter().filter(|needle| !paragraph.contains(**needle)).map(|needle| format!("{label} names `{needle}`")));
+    }
+    problems
 }
 
 /// What is wrong with `code`, the non-test source of `safety.rs`: a digest of the effects alone, or no prefix the crate names.
@@ -775,6 +794,9 @@ fn atip_planjcs_12_the_changelog_has_the_upgrade_note_and_no_source_makes_the_ol
     let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
     let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
     assert_eq!(note_problems(unreleased), Vec::<String>::new());
+    // Each part is read where it stands: deleting the note's paragraph fails the check though the section still has its words elsewhere.
+    let note = paragraph_of(unreleased, NOTE_PARTS[1].1).expect("the upgrade note");
+    assert_eq!(note_problems(&unreleased.replace(&format!("{note}\n\n"), "")).len(), 1, "a CHANGELOG without the upgrade note fails the check");
     let safety = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/safety.rs")).unwrap();
     let code = safety.split("#[cfg(test)]").next().unwrap();
     assert_eq!(digest_code_problems(code), Vec::<String>::new());
@@ -794,11 +816,23 @@ fn atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fa
     let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
     let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
     assert!(note_problems(unreleased).is_empty(), "the note as it stands has every part");
-    for needle in NOTE_NEEDLES {
-        let cut = unreleased.replace(needle, "");
-        assert!(note_problems(&cut).contains(&format!("the note of this change names `{needle}`")), "a note without `{needle}` is refused");
+    let mut masked = 0;
+    for (label, opening, needles) in NOTE_PARTS {
+        let paragraph = paragraph_of(unreleased, opening).unwrap_or_else(|| panic!("the paragraph that opens `{opening}`"));
+        for needle in needles {
+            // The word is cut from its paragraph only: the rest of the section still has it, as the real text does, and the check must not be satisfied by that.
+            let cut = unreleased.replace(paragraph, &paragraph.replace(needle, ""));
+            masked += usize::from(unreleased.replacen(paragraph, "", 1).contains(needle));
+            assert!(note_problems(&cut).contains(&format!("{label} names `{needle}`")), "{label} without `{needle}` is refused");
+        }
+        // The whole paragraph deleted from the real text: the other paragraph and every other entry still carry the words, and the check fails all the same.
+        let deleted = unreleased.replace(&format!("{paragraph}\n\n"), "");
+        assert!(!deleted.contains(paragraph), "the paragraph is gone from the text");
+        assert_eq!(note_problems(&deleted), [format!("no paragraph opens `{opening}`: the {label} is not in the CHANGELOG")], "{label}");
     }
-    assert_eq!(note_problems("").len(), NOTE_NEEDLES.len(), "an empty note names nothing");
+    // The words the old check looked for in the whole section are mostly said by other entries too: it was satisfied by them, this one is not.
+    assert!(masked >= 6, "{masked} of the words are also said outside their paragraph");
+    assert_eq!(note_problems("").len(), NOTE_PARTS.len(), "an empty note has neither paragraph");
     let hashed_alone = "fn digest(effects: &Value) -> String { sha256(to_vec(effects)) } const DIGEST_PREFIX: &str = \"sha256:\";";
     assert_eq!(digest_code_problems(hashed_alone), ["code hashes the effects alone"]);
     assert_eq!(digest_code_problems("let bytes = serde_json::to_vec(&effects);  const DIGEST_PREFIX: &str = \"sha256:\";"), ["code hashes the effects alone"]);

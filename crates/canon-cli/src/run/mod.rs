@@ -91,7 +91,7 @@ pub fn run(cli: Cli) -> ExitCode {
             let policy = (!no_policy).then(|| policy.unwrap_or(crate::policy_level::PolicyLevel::Strict));
             let skills = match providers {
                 Some(list) => crate::init::SkillsChoice::Providers(list),
-                None => crate::init::SkillsChoice::Ask,
+                None => crate::init::SkillsChoice::Detected,
             };
             run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language, dry_run: dry_run.dry_run }, json)
         }

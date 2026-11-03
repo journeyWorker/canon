@@ -20,10 +20,10 @@ canon format spec                # validate a spec corpus
 canon gate check                 # run the evidence gate
 ```
 
-Run `canon <command> --help` for any explicit CLI command. `canon init` asks
-which harnesses get the provider-neutral companion skill (on a terminal; the
-detected ones are checked), records the answer in `canon.yaml`, and installs
-it. Afterwards:
+Run `canon <command> --help` for any explicit CLI command. `canon init` never
+asks: it installs the provider-neutral companion skill for the detected
+harnesses (or the `--providers` list), records the choice in `canon.yaml`, and
+installs it. Afterwards:
 
 ```bash
 canon skills install                         # follows canon.yaml skills.providers

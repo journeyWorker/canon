@@ -72,8 +72,8 @@ with neither, each provider whose marker directory (`.claude`, `.codex`,
 it too. With nothing detected, nothing is installed and the command names
 `canon skills install --providers=<list>`. An explicit `--providers` on
 install rewrites `skills.providers` in an existing `canon.yaml`, keeping
-every other byte. `canon init` asks for the list on a terminal (the detected
-ones checked), or takes `--providers`, records it and installs.
+every other byte. `canon init` never asks: it takes `--providers`, or the
+detected harnesses, records the list and installs.
 
 The source checkout is never modified by a canonical install. The target owns
 a timestamp-free content-addressed manifest at

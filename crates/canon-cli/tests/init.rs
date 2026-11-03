@@ -609,6 +609,37 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
     assert_eq!(stdout(&doctor), format!("providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp]).join("\n")));
 }
 
+/// authoring.init.96: with a terminal on stdin and stderr (a pty from `script`) and no `--providers`, init prints no question, waits for no answer
+/// and takes the detected harnesses, as it does off a terminal (spec 5.5: a tool never prompts).
+#[cfg(unix)]
+#[test]
+fn authoring_init_96_on_a_terminal_init_asks_nothing_and_takes_the_detected_harnesses() {
+    use std::process::Stdio;
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".claude")).unwrap();
+    std::fs::create_dir_all(repo.join(".omp")).unwrap();
+    let exe = env!("CARGO_BIN_EXE_canon");
+    let mut command = Command::new("script");
+    if cfg!(target_os = "macos") {
+        command.args(["-q", "/dev/null", exe, "init"]);
+    } else {
+        command.args(["-qec", &format!("{} init", atip::quote(exe)), "/dev/null"]);
+    }
+    // `script` copies its own stdin to the pty: with a pipe that stays open, a prompt would wait for an answer, and the test would time out, not pass.
+    let mut child = command.current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).env_remove("CANON_ROLE").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("`script` gives canon a terminal; install it to run this case");
+    let _held_open = child.stdin.take();
+    let out = child.wait_with_output().unwrap();
+    let shown = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(out.status.success(), "{shown}");
+    assert!(!shown.contains("which harnesses") && !shown.contains("Enter for the checked ones") && !shown.contains("Comma-separated list"), "init asked on a terminal: {shown}");
+    assert!(shown.contains("installed the canon skill for claude,omp"), "{shown}");
+    assert_eq!(projected(&repo), vec![".claude/skills/canon", ".omp/skills/canon"]);
+    let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    assert!(config.ends_with("skills:\n  providers: [claude, omp]\n"), "{config}");
+}
+
 /// authoring.init.91: `--providers codex` answers without a prompt and
 /// installs only `.agents/skills/canon`, whatever markers exist.
 #[test]

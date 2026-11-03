@@ -332,7 +332,7 @@ and `canon context` warn when the repo holds 0.27-era state and put
 ```bash
 # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
 canon init
-# harnesses for the canon skill; without it init asks on a terminal, else takes the detected .claude/.codex/.omp/.pi
+# harnesses for the canon skill; without it init takes the detected .claude/.codex/.omp/.pi (it never asks)
 canon init --providers=claude,codex
 # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
 canon skills install

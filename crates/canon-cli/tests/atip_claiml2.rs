@@ -386,8 +386,9 @@ fn atip_claiml2_12_a_row_taken_out_of_the_list_or_a_test_that_is_not_live_fails_
 }
 
 /// The entries the 0.35.0 section carries for the changes of the release: a name, and the opening words of the entry, which only that entry has.
-const RELEASE_ENTRIES: [(&str, &str); 22] = [
+const RELEASE_ENTRIES: [(&str, &str); 23] = [
     ("the declaration 1.2 and level L2", "**canon declares atip/1 1.2 and claims level L2**"),
+    ("canon init never asks", "**`canon init` never asks**"),
     ("the CI jobs that prove the claim", "**CI proves the claim.**"),
     ("the evidence list of contract 17.2", "**Evidence of contract 17.2**"),
     ("the answer order of the stateless checks", "**The stateless checks of every command answer in the order of atip/1 1.2**"),
@@ -593,7 +594,7 @@ fn atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_fi
 }
 
 #[test]
-fn atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_a_prompt_library_and_the_one_prompt_it_has_is_named() {
+fn atip_claiml2_18_no_command_of_canon_reads_a_terminal_for_input_and_init_asks_nothing_on_one() {
     fn sources(dir: &Path, out: &mut Vec<(PathBuf, String)>) {
         for entry in std::fs::read_dir(dir).expect("a directory") {
             let path = entry.expect("an entry").path();
@@ -622,19 +623,38 @@ fn atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_a_pr
         }
     }
     assert_eq!(offenders, Vec::<String>::new(), "a source opens the controlling terminal or uses a prompt library");
-    // Every read of stdin: `--input -` (which refuses a terminal, `STDIN_TTY`, instead of waiting) and the one prompt canon has, which the CHANGELOG
-    // row states as a gap: `canon init` without `--providers` on a terminal. A new reader of stdin is a new prompt until it is named here.
+    // Every read of the process's stdin, a path to it and every inherited stdio of a child: `--input -` alone, which refuses a terminal (`STDIN_TTY`)
+    // instead of waiting. A new reader is a new prompt until the contract's 5.5 is met by it and it is named here.
     let mut readers: Vec<String> = found
         .iter()
-        .filter(|(path, text)| !path.components().any(|part| part.as_os_str() == "atip-check") && text.lines().any(|line| line.contains("stdin()") && !line.trim_start().starts_with("//")))
+        .filter(|(path, text)| {
+            !path.components().any(|part| part.as_os_str() == "atip-check")
+                && text.lines().any(|line| !line.trim_start().starts_with("//") && (line.contains("io::stdin()") || line.contains("/dev/stdin") || line.contains("Stdio::inherit")))
+        })
         .map(|(path, _)| path.strip_prefix(repo_root().join("crates")).unwrap_or(path).display().to_string().replace("/../", "/"))
         .collect();
     readers.sort();
-    assert_eq!(readers, ["canon-cli/src/init.rs", "canon-cli/src/input.rs"], "a read of stdin that is neither `--input -` nor the named `canon init` prompt");
+    assert_eq!(readers, ["canon-cli/src/input.rs"], "a read of stdin that is not `--input -`");
     let input = read(&repo_root().join("crates/canon-cli/src/input.rs"));
     assert!(input.contains("STDIN_TTY") && input.contains("is_terminal()"), "`--input -` on a terminal is a refusal");
+    // And running it: `canon init`, the one command that once asked, run with a terminal on stdin and stderr (a pty from `script`) prints no question and
+    // installs for the detected harness. `init.rs` holds no prompt and nothing else reads a line.
     let init = read(&repo_root().join("crates/canon-cli/src/init.rs"));
-    assert!(init.contains("fn prompt_providers"), "the init prompt is gone: drop the Gap of the `no /dev/tty prompt` row and this allowance");
-    let changelog = read(&repo_root().join("CHANGELOG.md"));
-    assert!(release_section(&changelog).contains("`canon init` without `--providers` asks"), "the CHANGELOG states the init prompt as a gap while it exists");
+    assert!(!init.contains("read_line") && !init.contains("prompt_providers"), "init asks nothing");
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(dir.path().join(".claude")).expect("mkdir");
+    let mut command = Command::new("script");
+    if cfg!(target_os = "macos") {
+        command.args(["-q", "/dev/null", CANON, "init"]);
+    } else {
+        command.args(["-qec", &format!("{} init", atip::quote(CANON)), "/dev/null"]);
+    }
+    // The pipe stays open while canon runs: a prompt would wait on it, and this test would not end.
+    let mut child = command.current_dir(dir.path()).env_remove("CANON_ROLE").stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn().expect("`script` gives canon a terminal; install it to run this case");
+    let _held_open = child.stdin.take();
+    let output = child.wait_with_output().expect("canon init on a terminal");
+    let shown = String::from_utf8_lossy(&output.stdout).into_owned();
+    assert!(output.status.success(), "{shown}");
+    assert!(!shown.contains("Enter for") && !shown.contains("which harnesses") && !shown.contains("Comma-separated"), "init asked on a terminal: {shown}");
+    assert!(read(&dir.path().join("canon.yaml")).ends_with("skills:\n  providers: [claude]\n"), "init took the detected harness");
 }

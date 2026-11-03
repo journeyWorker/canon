@@ -4,8 +4,8 @@
 //! Spec 12.7 makes it a MUST that the plan cannot change between the comparison and the effects, so a commit holds one lock
 //! over the whole span, from before it recomputes the plan to after its last effect: [`PLAN_LOCK`], an OS advisory lock on
 //! [`canon_model::paths::REPO_WRITE_LOCK_FILE`] taken through [`canon_store::file_lock::FileLock`], the base of the scenario-index
-//! lock and the artifact-store lock (`flock`/`LockFileEx`, a bounded wait, released when the holder exits however it exits, the
-//! file never deleted). A preview holds nothing.
+//! lock and the artifact-store lock (`flock`/`LockFileEx`, a bounded wait, released when the holder exits however it exits; the
+//! file is never truncated, and one the repository already had is never deleted: see "A refusal leaves no trace"). A preview holds nothing.
 //!
 //! Every other writer of what a plan reads takes the same lock while it writes, so the span cannot be entered by a writer
 //! half way: [`POLICY`] lists every leaf that writes and says which hold, with the reason for each that does not. `main` takes

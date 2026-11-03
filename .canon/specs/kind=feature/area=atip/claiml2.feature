@@ -194,7 +194,7 @@ Feature: atip canon claim l2: canon declares atip/1 1.2 and L2, and the CI jobs 
   @case:failure
   @flow:canon-0-35-claim-l2.F5
   @atip.claiml2.18
-  Scenario: No source of canon opens /dev/tty or uses a prompt library, and the one prompt it has, canon init without --providers on a terminal, is named
-    Given the sources of every crate of the workspace and the 0.35 CHANGELOG
-    When they are scanned for /dev/tty, for a prompt library, for a terminal-mode call and for every read of stdin
-    Then none of the first three is found, the reads of stdin are --input - (a terminal is refused with STDIN_TTY) and the init prompt, and the CHANGELOG states that prompt as a known violation of spec 5.5 while it exists
+  Scenario: No command of canon reads a terminal for input, and canon init, which used to ask, asks nothing on one
+    Given the sources of every crate of the workspace, and canon init run with a terminal on stdin and stderr in a repo with a .claude directory
+    When the sources are scanned for /dev/tty, a prompt library, a terminal-mode call and every read of stdin, and init runs
+    Then none of the first three is found, the only read of stdin is --input - (a terminal is refused with STDIN_TTY), init prints no question, and it installs for claude and records it
