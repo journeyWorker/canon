@@ -128,7 +128,10 @@ pub fn l1_bin(harness: &Harness, config: &Value) -> PathBuf {
     let dir = harness.path("bin");
     std::fs::create_dir_all(&dir).expect("bin directory");
     let path = dir.join(alias);
-    std::fs::copy(FAKE_TOOL, &path).expect("copy the fake tool");
+    // A hard link, not a copy: a file another thread has open for writing while it forks cannot be executed (`ETXTBSY`), and the cases run in parallel.
+    if std::fs::hard_link(FAKE_TOOL, &path).is_err() {
+        std::fs::copy(FAKE_TOOL, &path).expect("copy the fake tool");
+    }
     path
 }
 
