@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-claim-l2"
+  },
+  "at": "2026-11-03T04:05:51.928480Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_09_the_fixture_claims_1_2_and_lists_what_the_l2_rows_need",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "1493b1d6c075d470757a84b52e6b9f0645c92e1bb56a282c880ca27e3630681f"
+    }
+  ],
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "atip.claiml2.09",
+  "schema": 1,
+  "staging_id": "49001d6d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
