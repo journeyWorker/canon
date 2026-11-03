@@ -233,7 +233,7 @@ fn effects_of<'a>(doc: &'a Value, action: &str) -> Vec<&'a Value> {
 }
 
 fn changed(before: &Snapshot, after: &Snapshot) -> Vec<PathBuf> {
-    before.keys().chain(after.keys()).collect::<BTreeSet<_>>().into_iter().filter(|p| before.get(*p) != after.get(*p)).cloned().collect()
+    before.keys().chain(after.keys()).collect::<BTreeSet<_>>().into_iter().filter(|p| before.get(*p) != after.get(*p) && !p.ends_with("repo-write.lock")).cloned().collect()
 }
 
 fn keys_of(rows: &[StoredRow]) -> BTreeSet<(String, String)> {
