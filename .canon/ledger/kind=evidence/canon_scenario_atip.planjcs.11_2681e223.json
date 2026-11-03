@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-plan-jcs",
+    "role": "implementer",
+    "session_id": "s-0-35-plan-jcs"
+  },
+  "at": "2026-11-03T00:31:10.170862Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_11_a_digest_of_0_34_is_plan_stale_on_the_six_commands",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci3/junit.xml",
+      "sha256": "dc9fef94820695b5503d7346c9f1311fc48f987cc92313a6401cd568dd0c9a97"
+    }
+  ],
+  "code_tree": "812ec3d8d7607dfcfdf68275146f54c568c445a2",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace (4054 passed, in three partitions)"
+  },
+  "evidence_sha": "7ddc01ac440a825d014e8cf2c633ad40dd617c19",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 24,
+  "scenario_id": "atip.planjcs.11",
+  "schema": 1,
+  "staging_id": "fa3513a4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
