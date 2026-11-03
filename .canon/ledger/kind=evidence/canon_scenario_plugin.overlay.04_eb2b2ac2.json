@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T14:22:04.749529Z",
+  "attachments": [
+    {
+      "case": "plugin_sync::tests::a_covered_scenario_projects_covered_true_with_its_surface_ref",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "76ee50abdd55b5c003a0ff251ce2cbd353b9df70f13438feb73a58c6ca57f8e1"
+    },
+    {
+      "case": "a_covered_scenario_projects_covered_true_with_its_surface_ref",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "76ee50abdd55b5c003a0ff251ce2cbd353b9df70f13438feb73a58c6ca57f8e1"
+    }
+  ],
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: the same cases re-run on the current tree: cargo nextest run --workspace (default profile, 3732 tests)"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 49,
+  "scenario_id": "plugin.overlay.04",
+  "schema": 1,
+  "staging_id": "d77b80e4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

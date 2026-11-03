@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T14:46:06.180426Z",
+  "attachments": [
+    {
+      "case": "shipped_is_blocked_until_each_owned_surface_specifies_a_required_case",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "76ee50abdd55b5c003a0ff251ce2cbd353b9df70f13438feb73a58c6ca57f8e1"
+    }
+  ],
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: the same cases re-run on the current tree: cargo nextest run --workspace (default profile, 3732 tests)"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 447,
+  "scenario_id": "subject.lifecycle.11",
+  "schema": 1,
+  "staging_id": "7fc53107",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

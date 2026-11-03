@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T15:00:36.524899Z",
+  "attachments": [
+    {
+      "case": "platformer.movement.01: Left world edge clamps the player",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "7472467d76a224b4f4dd86ec9695dc3034179a688f5c57fb8b01fa9e5135242c"
+    }
+  ],
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: the platformer suite re-run on the current tree: bun run test:junit in examples/platformer (19 tests passed; NODE_OPTIONS=--no-experimental-webstorage on Node 26)"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "platformer",
+  "run_seq": 27,
+  "scenario_id": "platformer.movement.01",
+  "schema": 1,
+  "staging_id": "8670a577",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

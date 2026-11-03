@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T15:01:18.404322Z",
+  "attachments": [
+    {
+      "case": "report.dashboard.12: the page total counts advisories across briefs and says when there are none",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/gateclean/dashboard-junit.xml",
+      "sha256": "0799272fea6c8330094b442e28763f8012b13ccc9ca41f513d6770858dd0ec4d"
+    }
+  ],
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/gateclean/dashboard-junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: bun test packages/dashboard/test/briefs-render.test.ts re-run on the current tree (26 passed)"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 148,
+  "scenario_id": "report.dashboard.12",
+  "schema": 1,
+  "staging_id": "c2c5095f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

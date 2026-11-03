@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T13:43:15.527289Z",
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test schema enum_options_list_their_values_and_defaults"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: command re-run on the current tree: cargo nextest run --workspace (default profile, 3732 tests; the test of this record passed), from the clean worktree"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 550,
+  "scenario_id": "context.capability.25",
+  "schema": 1,
+  "staging_id": "54536d02",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T15:01:38.106898Z",
+  "attachments": [
+    {
+      "path": "target/gateclean/0-35-gateclean-contract11-12.txt",
+      "sha256": "615f095c542a1eeadbc503f014eadb12583c681834eadad506944df34e6d733f"
+    }
+  ],
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "bun test packages/dashboard/test/envelope-tolerance.test.ts; bun test packages/cli/test/launcher.test.ts; python3 -m unittest evals.dogfood.test_trace_check"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: the three sources of the scenario re-run on the current tree (4 + 5 bun tests and 36 unittest cases passed), after the approvals of canon-0-35-crate-validate and canon-0-35-release-rc"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 67,
+  "scenario_id": "atip.contract11.12",
+  "schema": 1,
+  "staging_id": "8824d261",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
