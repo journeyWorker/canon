@@ -4,14 +4,15 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev-b"
   },
-  "at": "2026-11-02T23:34:25.879391Z",
-  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "at": "2026-11-03T01:05:41.284521Z",
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
   "kind": "review",
-  "pin": "9cbcf88b15cbfb802f99b62f4850dff6c4c4036c",
+  "pin": "dc4c93c7d181e184cc5d1cc03eef12b1ccfb2e33",
   "pins": {
     "checks": [
       {
         "checks": [
+          "junit:atip_checkl1_03_a_tree_above_the_checked_level_says_the_higher_claim_was_not_checked",
           "junit:atip_checkl1_03_a_tree_that_declares_a_higher_level_than_the_claim_meets_it",
           "junit:atip_checkl1_03_a_tree_whose_level_is_not_the_claim_and_a_tool_without_schema_fail_l1_tree"
         ],
@@ -26,7 +27,7 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
   },
-  "review_id": "01M6F9TDTQPYM5QTKKEA8N57F1",
+  "review_id": "01M6FF1GX4YH5GBCTA3FHW4WCG",
   "reviewer": "rev-check-0-35b",
   "scenario_id": "atip.checkl1.03",
   "schema": 2,

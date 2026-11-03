@@ -4,15 +4,15 @@
     "role": "reviewer",
     "session_id": "s-0-35-check-rev-b"
   },
-  "at": "2026-11-02T21:45:44.905679Z",
-  "code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
+  "at": "2026-11-03T01:06:17.810900Z",
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
   "kind": "review",
-  "pin": "916a0bf65ffd8358552dd3111813f2400a898997",
+  "pin": "dc4c93c7d181e184cc5d1cc03eef12b1ccfb2e33",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_tool_without_wait_has_the_row_unsupported",
+          "junit:atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_next_that_only_reads_has_the_outcomes_unchecked",
           "junit:atip_checkl2safety_10_the_worker_is_driven_to_done_failed_and_timeout_and_the_wait_exits_as_the_contract_says"
         ],
         "role": "implementer",
@@ -26,7 +26,7 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-check-l2-safety/brief.md"
   },
-  "review_id": "01M6F3KDP93ZH5B284V9A0N6DQ",
+  "review_id": "01M6FF2MJJ7SEPCQF2H57EB28S",
   "reviewer": "rev-check-0-35b",
   "scenario_id": "atip.checkl2safety.10",
   "schema": 2,
