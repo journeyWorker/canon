@@ -29,8 +29,8 @@ impl Output {
     pub fn envelope(&self) -> Value {
         assert!(
             self.stdout.ends_with('\n') && self.stdout.matches('\n').count() == 1,
-            "stdout is not one line: {:?}",
-            self.stdout
+            "stdout is not one line: {:?} (code {:?}, stderr {:?})",
+            self.stdout, self.code, self.stderr
         );
         serde_json::from_str(&self.stdout)
             .unwrap_or_else(|error| panic!("stdout is not JSON ({error}): {:?}", self.stdout))
