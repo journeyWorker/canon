@@ -904,6 +904,11 @@ fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
         record["status"] = json!("written");
         record["label"] = json!(format!("run-{}", std::process::id()));
     }
+    if tool.flag("dataFormDiffers") && std::env::var_os("FAKE_FROM_DOCUMENT").is_some() {
+        // Seeded: the document form prints another label than the argv form, in `data` alone: the same exit, `ok` and code, and a value that is the same
+        // on every run of the argv form (so it is not a varying path).
+        record["label"] = json!(format!("{}-from-document", record["label"].as_str().unwrap_or("")));
+    }
     if tool.flag("dataStamp") {
         // Seeded: a value that differs on every run, as a timestamp does (the label carries the nanoseconds of the run).
         let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_nanos());

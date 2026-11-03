@@ -980,6 +980,8 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
             l1::Prepared::Unchanged => args,
             l1::Prepared::Done(code) => return code,
             l1::Prepared::Argv(words) => {
+                // What a handler that answers differently for a document needs to know: the arguments came from `--input`.
+                std::env::set_var("FAKE_FROM_DOCUMENT", "1");
                 synthesized = words;
                 &synthesized
             }

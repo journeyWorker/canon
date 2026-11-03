@@ -338,6 +338,17 @@ fn atip_checkl2input_09_a_value_that_varies_between_two_runs_of_the_reference_is
     // A real difference between the forms is still found.
     let output = run_case(&case_of("input-fragment/same-as-argv"), "L2");
     support::l2::verdict(&output.envelope()["data"], "L2.input-fragment").unwrap_or_else(|why| panic!("{why}"));
+    // A difference in `data` alone, in a member that does not vary between two runs of the argv form (the label of the document form), fails the rows that
+    // compare as L2.input-fragment does, on `/data`: the exit, `ok` and the code are the same, so only the comparison of `data` finds it, and removing
+    // `/data` from the compared members lets it pass.
+    let output = run_config(&l2_config(&json!({"dataFormDiffers": true})));
+    let document = output.envelope();
+    for row in ["L2.input-fragment", "L2.input-normalise"] {
+        let check = check_of(&document["data"], row);
+        assert_eq!(check["result"], "fail", "{row}: {check}");
+        let reason = check["reason"].as_str().unwrap_or_default();
+        assert!(reason.contains("/data:") && reason.contains("-from-document") && !reason.contains("exit ") && !reason.contains("/ok:") && !reason.contains("/error/code:"), "{row}: {reason}");
+    }
 }
 
 #[test]
