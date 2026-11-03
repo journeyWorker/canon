@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-claim-l2-fix"
+  },
+  "at": "2026-11-03T10:21:34.359382Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_14_an_entry_taken_out_of_the_release_section_fails_the_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "fd2e17a51b29d71052d5b6aa824242c8d86a1c1936bcc47e67af8888a831618a"
+    }
+  ],
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "fd55f5a569f7d2791414f56b606da713cf06f028",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "atip.claiml2.14",
+  "schema": 1,
+  "staging_id": "ac7362a3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
