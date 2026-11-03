@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T07:13:04.844683Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_claiml2.rs",
+  "introduced_by": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "kind": "finding",
+  "reviewed_sha": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "reviewer": "rev-claim-l2",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.11",
+    "atip.claiml2.12"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] evidence_problems accepts a test when the source contains 'fn name(' : it does not require #[test], no #[ignore], or that the test is in the workspace run, which scenario .11 states as a Then. I checked by hand: all 15 named tests carry #[test] and ran green here. The 'preview equals commit' row names purge-only and digest tests (atip_planjcs_01, _09, _10); artifacts move, migrate, ledger compact and tier age have their commit-equals-preview tests elsewhere (migrate.rs, tier_age.rs, paging.rs) and are not listed. Blast radius: a renamed-to-ignored or deleted #[test] over a kept fn keeps .11 green.",
+  "worktree_dirty": false
+}

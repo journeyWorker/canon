@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T07:16:13.544609Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claiml2_06_input_too_large_names_the_field_input"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0141e4c6b9df8d8848184b198ea82ece7b8688e5f2f7a7f67a25a3bb9fd7325e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
+  },
+  "review_id": "01M6G48038FYEXWXATB9EJTQY1",
+  "reviewer": "rev-claim-l2",
+  "scenario_id": "atip.claiml2.06",
+  "schema": 2,
+  "worktree_dirty": false
+}

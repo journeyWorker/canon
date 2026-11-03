@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T07:12:58.243720Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "kind": "finding",
+  "reviewed_sha": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "reviewer": "rev-claim-l2",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.11"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[standards] The secrets row lists tests that do not prove the obligation, and the gap note understates it. The row (atip_contract11_08 empty value received empty; atip error.rs a_received_value_is_redacted) is in the table of evidence, yet section 8 asks for a test that injects a known secret and greps every output, which canon does not have; the note below it says 'canon commands take no secret as an argument', but canon takes secrets by environment: CANON_PG_DSN or DATABASE_URL (pg_tier.rs resolve_pg_dsn, the dsn carries a password) and the s3 credentials of the cold tier, and they reach error text paths such as 'could not re-key postgres rows: {e}'. I probed query and status with an unreachable DSN holding a marker: no leak seen, but the hot tier was not attached, so the probe is inconclusive; the claim is only that nothing proves it. Fix: take the row out of the table into the not-covered list, name the environment path, and either add the inject-and-grep test or state the gap.",
+  "worktree_dirty": false
+}
