@@ -61,9 +61,9 @@ Contributors: run `just` to list the recipes for the build, the tests, the lint,
 canon's own gate and the other CI checks (`just ci` runs every check that needs
 no docker). `just test` leaves the tests of the checker crate `atip-check` out: canon proves
 its own conformance with `just atip` (the checker run on the canon binary), and the checker's
-tests are `just test-atip`, a separate CI job. `cargo nextest run` skips them too
-(`.config/nextest.toml`; `--profile atip` runs only them), and plain `cargo test --workspace`
-needs `--exclude atip-check` to do the same.
+tests are `just test-atip` (cargo-nextest), a separate CI job. `cargo nextest run` skips them too
+(`.config/nextest.toml`; `--profile atip` runs only them). A bare `cargo test --workspace` still
+runs them, until the crate moves to the atip repo (0.36); add `--exclude atip-check` to leave them out.
 
 ## Safety boundaries
 

@@ -22,13 +22,13 @@ build:
 install:
     cargo install --path crates/canon-cli
 
-# The workspace tests without the checker crate's own (test.yml `offline`, without the network ban). `--workspace` ignores `default-members`, so the checker crate is left out by name.
+# The workspace tests without the checker crate's own (test.yml `offline`, without the network ban). The checker crate is left out by name: a bare `cargo test --workspace` still runs its tests, until the crate moves to the atip repo (0.36).
 test:
     cargo test --workspace --exclude atip-check --locked
 
-# The checker crate's own tests: its fake tool and one full `atip check` run per violation it must notice (test.yml `atip-check-tests`). Canon's own conformance is `just atip`.
+# The checker crate's own tests: its fake tool and one full `atip check` run per violation it must notice (test.yml `atip-check-tests`). Needs cargo-nextest: `cargo test -p atip-check` runs every test of a binary at once and a few of them miss their time limit under that load. Canon's own conformance is `just atip`.
 test-atip:
-    cargo test -p atip-check --locked
+    cargo nextest run -p atip-check --profile atip --locked
 
 # The three clippy runs of test.yml `clippy`.
 lint:

@@ -7,6 +7,8 @@
 # recorded with the spec's `outputs`. What the suite cannot reach is listed, with a reason, in
 # that file's UNWITNESSED allowlist, which only shrinks.
 #
+# The checker crate `atip-check` is left out, as in the CI job `offline` (its tests run a fake tool, never canon, so they record nothing).
+#
 # Usage: scripts/check-witness.sh [extra `cargo test --workspace` arguments]
 # CANON_WITNESS_DIR may be set to keep the recording; by default a temporary directory is used.
 set -euo pipefail
@@ -20,5 +22,5 @@ else
 fi
 export CANON_WITNESS_DIR
 
-cargo test --workspace --no-fail-fast "$@"
+cargo test --workspace --exclude atip-check --no-fail-fast "$@"
 cargo test -p canon-cli --test grammar_t9_witness -- --ignored

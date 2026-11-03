@@ -134,7 +134,7 @@ jobs:
 
       # `CANON_WITNESS_DIR`: a debug `canon` records each JSON document it prints there (T9),
       # and the next step holds the recording against the outputs the spec declares.
-      # The checker crate `atip-check` is left out of `cargo test --workspace` by name (`--workspace` ignores `default-members`): its own tests run in the job `atip-check-tests`.
+      # The checker crate `atip-check` is left out of `cargo test --workspace` by name: its own tests run in the job `atip-check-tests`. A bare `cargo test --workspace` still runs them, until the crate moves to the atip repo (0.36).
       - name: cargo test --workspace --exclude atip-check
         env:
           CANON_WITNESS_DIR: ${{ runner.temp }}/canon-witness
@@ -281,9 +281,11 @@ jobs:
 
   # canon and atip are two things: canon proves its conformance with `atip check` (the jobs `atip-l0` and `atip-l2`, once each), and the tests of the checker
   # itself (its fake tool, one full `atip check` run per violation it must notice) run here and nowhere else, so `offline` and `just test` stay canon's.
-  # With `offline`, this job runs every test of the workspace.
+  # With `offline`, this job runs every test of the workspace. It runs them with cargo-nextest, one process per test: `cargo test -p atip-check` starts every
+  # test of a binary at once, and a few of them (each runs the checker against a fake tool under a time limit) miss that limit on a loaded runner.
+  # The pinned release is checked against its sha256 before it is unpacked, as the duckdb CLI of `offline` is.
   atip-check-tests:
-    name: cargo test -p atip-check (the checker's own tests)
+    name: cargo nextest run -p atip-check (the checker's own tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -304,8 +306,17 @@ jobs:
       - name: cargo fetch --locked
         run: cargo fetch --locked
 
-      - name: cargo test -p atip-check
-        run: cargo test -p atip-check --locked --offline
+      - name: Install cargo-nextest
+        run: |
+          set -euo pipefail
+          NEXTEST_SHA256=682c21b777c333e96fd532e114d3a5a894e0729ab88d94c0a9f20f8419695428
+          curl -fsSL -o "$RUNNER_TEMP/nextest.tgz" https://get.nexte.st/0.9.146/linux
+          printf '%s  %s\n' "$NEXTEST_SHA256" "$RUNNER_TEMP/nextest.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/nextest.tgz" -C "$HOME/.cargo/bin"
+          cargo nextest --version
+
+      - name: cargo nextest run -p atip-check --profile atip
+        run: cargo nextest run -p atip-check --profile atip --locked --offline
 
   # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
   # it builds a copy of the workspace, which would double the time of the job above.
