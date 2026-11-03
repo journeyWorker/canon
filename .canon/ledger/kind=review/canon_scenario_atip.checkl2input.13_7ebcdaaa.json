@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:32:56.349382Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2input_13_a_candidate_refused_by_a_precondition_cannot_tell_and_the_next_is_tried_and_a_refusal_naming_the_value_is_a_pass",
+          "junit:atip_checkl2input_13_a_framing_refusal_naming_the_value_is_not_a_value_read_as_a_value",
+          "junit:atip_checkl2input_13_a_pointer_into_operands_names_an_operand_candidate_only",
+          "junit:atip_checkl2input_13_a_value_that_starts_with_a_dash_a_brace_or_a_bracket_is_a_value"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "764b4bf71ad153d05bba73701896a0420873078336099afcf0e10ade8b0d0590",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
+  },
+  "review_id": "01M6FTX0GXFZF3DP90HEB3M6QV",
+  "reviewer": "rev-0-35-fixes",
+  "scenario_id": "atip.checkl2input.13",
+  "schema": 2,
+  "worktree_dirty": false
+}

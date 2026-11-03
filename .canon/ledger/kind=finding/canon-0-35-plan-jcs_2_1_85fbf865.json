@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:23:15.794930Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/write_lock.rs",
+  "introduced_by": "38f175397b32087a42bcddf4ab94c9a99a722607",
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 2,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Companion to 1_5 (should-fix, still open; I re-ran it independently on the real binary at 5d6b68fd and it holds): `canon purge --kind session --before 2020-01-01 --commit --plan-digest sha256:00` on a repo with canon.yaml and a 0.34 .gitignore and no .canon/repo-write.lock answers PLAN_STALE exit 2 and leaves an empty .canon/repo-write.lock and a '/.canon/repo-write.lock' line appended to .git/info/exclude (atip 1.2.1 12.2 / 1.3.1 11.2: a refusal makes no file, whatever its exit; checker.md section 4 makes a refusal's change a MUST fail). write_lock.rs's module doc now states the opposite ('a call that is refused after it took the lock leaves the file behind') and four test helpers were relaxed to hide it: atip_planjcs.rs tree() and harness::tree() skip .canon/repo-write.lock, exit_registry.rs listing() skips it, skills_install.rs no_state_under_canon() allows it. So scenarios atip.planjcs.02 and .10 ('the tree of the repository is the same' after a refused commit) hold only in repos that already have the file, and no test or atip check can see the defect (canon init makes the file, so every fixture repo has it). I did not sign .02 and .10 for that reason; signed the other thirteen. When 1_5 is fixed, drop the four exclusions. A way that needs no file for a refusal: take the lock on a directory handle (flock on the .canon directory, which exists) or take it after the gate's refusals; or make the file only where a commit passes its refusals and keep the first-lock-covers-the-span guarantee of atip.planjcs.14 with the pause seam moved accordingly. Mutants run in my worktree: OnCommit => has(commit) && false fails atip_planjcs 06, 07, 14, 15 (4 failed, 11 passed); hold_for_call returning Ok(None) when the lock file does not exist fails 15 only; unmutated 15 of 15 pass.",
+  "worktree_dirty": false
+}

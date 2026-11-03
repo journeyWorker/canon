@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:26:22.336626Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/input_plan.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 4,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Test gap: nothing pins that L2.input-pointer skips a rule that names a flag-only argument (input_plan.rs:581 on_flag_only); a mutant that does not skip it survived atip_checkl2input_12 and was killed only incidentally by the batch case under tagFlagOnlyRule (…15). Assert L2.input-pointer does not fail under tagFlagOnlyRule.",
+  "worktree_dirty": false
+}

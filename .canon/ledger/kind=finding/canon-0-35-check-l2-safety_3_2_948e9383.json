@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:26:35.842239Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/snapshot.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 3,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Differs from checker.md 1.3.1 section 4 (ATIP feedback): 'Snapshots count files only: a directory created to hold an allowed file is not an effect'. snapshot.rs records Entry::Dir and changed() reports directories (atip_check_30 asserts that an empty ~/.cache counts); only the read branch of L2.effects (safety.rs:560-566) drops a directory that holds a changed file, and its comment says a directory with nothing under it is an effect. So an empty directory made by a refusal, --dry-run, --help, a preview, schema or skills show fails where checker.md, read literally, passes it. Canon is the stricter, defensible reading (an empty directory is a cache); checker.md should say so or canon should count files only. Two reviewers found it independently.",
+  "worktree_dirty": false
+}

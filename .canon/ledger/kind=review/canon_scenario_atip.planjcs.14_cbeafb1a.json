@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:32:41.073335Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_planjcs_14_the_lock_covers_the_span_between_the_check_and_the_first_effect"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "696971db5df51d202b43dc14a00284ac013bc2f6b759bb79a691835a7c51b23b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-plan-jcs/brief.md"
+  },
+  "review_id": "01M6FTWHKH7BYT2ZDVCN7FZQ93",
+  "reviewer": "rev-0-35-fixes",
+  "scenario_id": "atip.planjcs.14",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:26:50.054093Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/mod.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 4,
+  "scenario_ids": [
+    "atip.check.116"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards (mutation probe of the new owner; checker.md 1.3.1 section 5: a notRun command refused at its start with a registered precondition code is unprovided, 'any other refusal is a fixture error'; commit e0b0845b, served_precondition in checks/mod.rs:2576 and l1_plan.rs:344-365): the branches of 'any other refusal' are not pinned. Mutants that SURVIVE the not_run, atip_check_run and seeded_violations binaries: dropping the INPUT_/UNKNOWN_COMMAND/COMMAND_REQUIRED/OPTION_* set (only USAGE stays), dropping INPUT_ alone, dropping the doc-declared-code rule, accepting exit 1 as a refusal, and accepting an empty or whitespace effectNote. atip_check_116 kills 'ignore registered' and 'drop names_argument' only. A black-box probe of the fake serve shows the behaviour is right today: a registered precondition code is unprovided naming the code; USAGE, UNKNOWN_COMMAND, INPUT_INVALID, an unregistered code, a field --port, exit 2 with no document, exit 1 with a registered code and exit 0 before or after the document are FIXTURE_INVALID. Fix: extend the serveRefuseCode knob and add one case per class. Scenario text: check.feature atip.check.116 describes only 'ends on its own'; ruling 8's split (unprovided for a precondition code) has no scenario step.",
+  "worktree_dirty": false
+}

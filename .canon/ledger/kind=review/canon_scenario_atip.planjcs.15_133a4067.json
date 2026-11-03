@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:32:41.073335Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_planjcs_15_a_repository_without_the_lock_file_is_locked_from_its_first_call"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "99748674a3492bca6903120d88f52415ef71f53b27931457ec03cc2725f560b0",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-plan-jcs/brief.md"
+  },
+  "review_id": "01M6FTWHKH7BYT2ZDVCN7FZQ93",
+  "reviewer": "rev-0-35-fixes",
+  "scenario_id": "atip.planjcs.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

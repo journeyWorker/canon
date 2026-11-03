@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:26:32.436749Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l2/safety.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 3,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards (mutation probe of the new owner; checker.md 1.3.1 L2.idempotency: a path matching allowedEffects is left out only when the effectNote NAMES that side effect; section 7.2 row 'the same, with an effectNote that does not name the file' fails L2.idempotency): the condition is `run.note.contains(path)` (safety.rs:139). Replacing it with `!note.is_empty()` SURVIVES all 18 atip_checkl2safety tests: no case has an effectNote that exists but does not name the file (the `**` case has no note at all), so the seeded row 4 of 7.2 is not seeded. I probed it black-box with stampAudit: a note that names the file passes and lists the path, a note that does not name it fails, no allowedEffects fails; so the behaviour is right and unproven. Fix: a docPatch case on `stamp` that sets /effectNote to a sentence without the file and asserts L2.idempotency fails alone. Also say in `atip check --help` what 'names' means (substring of the path as the checker records it; a note that says 'an audit line' without the path fails).",
+  "worktree_dirty": false
+}

@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:32:56.349382Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2input_04_every_refusal_document_is_refused_with_exit_2_and_a_pointer_the_two_key_document_with_two_details",
+          "junit:atip_checkl2input_04_input_too_large_is_refused_on_input_and_a_pointer_fails_only_l2_input_refusals",
+          "junit:atip_checkl2input_04_the_exit_number_of_an_input_refusal_is_l0_ok_exits_alone"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "cdb43699c75bedd2e132fe57d4691d0358a4280fcd90255056e82abc7895342f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
+  },
+  "review_id": "01M6FTX0GXFZF3DP90HEB3M6QV",
+  "reviewer": "rev-0-35-fixes",
+  "scenario_id": "atip.checkl2input.04",
+  "schema": 2,
+  "worktree_dirty": false
+}
