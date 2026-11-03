@@ -19,8 +19,8 @@ build
 
 ## Invariants
 
-- ==**canon의 기본 테스트 실행에는 체커 크레이트의 테스트가 들어가지 않는다.**== 기본 실행은 `cargo test --workspace`, nextest 기본 프로필, `just test`를 말한다. 체커 크레이트 테스트는 별도 레시피 `just test-atip`과 별도 CI job에서만 돈다.
-- ==**canon-cli 테스트 안에서 `atip check` 전체 실행은 테스트 바이너리마다 많아야 한 번이다.**== L1/L2 준수를 보는 테스트들은 그 한 번의 보고서를 나눠 읽는다. 시나리오 id와 그 의미는 그대로 둔다.
+- ==**canon의 기본 테스트 실행에는 체커 크레이트의 테스트가 들어가지 않는다.**== 기본 실행은 nextest 기본 프로필, `just test`, CI의 canon 테스트 job을 말한다. 체커 크레이트 테스트는 별도 레시피 `just test-atip`과 별도 CI job에서만 돈다. 아무 옵션 없는 `cargo test --workspace`는 여전히 체커 크레이트를 포함한다. 이 문제는 0.36에서 체커 크레이트를 atip 레포로 옮기면서 없어지므로, 이 변경에서는 문서에 그렇게 적기만 한다.
+- canon-cli 테스트 안에서 canon의 L1/L2 준수를 보는 `atip check` 전체 실행은 테스트 바이너리마다 많아야 한 번이다. 준수 테스트들은 그 한 번의 보고서를 나눠 읽는다. 일부러 깨뜨린 canon이나 fixture로 검사기를 돌리는 테스트는 각자 따로 실행한다. 시나리오 id와 그 의미는 그대로 둔다.
 - CI는 canon에 대해 `atip check`를 L0과 L2로 한 번씩만 돌린다. 판정 결과는 지금과 같다.
 - canon과 체커의 동작, 출력, 레지스트리는 바뀌지 않는다. 바뀌는 것은 테스트 구성, CI, justfile, 문서뿐이다.
 - 체커의 무거운 검사(선언과 동작의 일치)를 `--deep` 같은 옵션 뒤로 옮기는 일은 이 변경에 들어가지 않는다.
@@ -42,4 +42,4 @@ build
 
 - 사용자 결정(2026-11-03 대화): canon 준수는 `atip check` 한 번으로 확인하고, 체커와 canon 테스트는 분리한다.
 
-Approved: Journey Hwang 2026-11-03T10:11:37Z — "분리좀 하자 (2026-11-03 대화)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:987a4cb77aed953377499ca479a430e8c3181b7b426e2a95bd848ac5892dee91)
+Approved: Journey Hwang 2026-11-03T13:46:00Z — "휴가 중 승인 위임(2026-11-01 대화): 리뷰 1_1·1_4 반영 — cargo test --workspace는 0.36 레포 이동에서 해소" (relayed by orchestrator orchestrator-main via chat) (brief sha256:9f8d30f75f93ce8f6557bcc110dd358ead1254027f776117b849a32bf87f19a0)
