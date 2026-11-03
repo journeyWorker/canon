@@ -75,10 +75,7 @@ pub fn atip_in(cwd: &Path, tmp: &Path, args: &[&str]) -> Output {
     Output {
         code: output.status.code(),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: {
-            use std::os::unix::process::ExitStatusExt;
-            format!("{}{}", String::from_utf8_lossy(&output.stderr), output.status.signal().map_or(String::new(), |signal| format!("[killed by signal {signal}]")))
-        },
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
 }
 
