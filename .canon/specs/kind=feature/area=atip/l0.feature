@@ -58,18 +58,8 @@ Feature: ATIP L0 output contract
   @atip.l0.06
   Scenario: Every envelope the suite prints passes the vendored contract schemas
     Given the conformance cases and the unit tests that print envelopes
-    When each envelope is checked against the vendored envelope schema in crates/atip
+    When each envelope is checked against the contract's envelope schema that the atip crate (a dependency from the atip repository) carries
     Then every envelope passes
-
-  # canon: {"schema":1,"at":"2026-10-31T11:35:30Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-33-atip-l0.F2
-  @atip.l0.07
-  Scenario: A changed schema copy fails the digest test and an envelope with a null meta is rejected
-    Given the three vendored contract schemas and their pinned digests
-    When one character of a copy changes, and an envelope whose meta is null is validated
-    Then the digest test fails for the copy and the envelope is rejected
 
   # canon: {"schema":1,"at":"2026-10-31T11:35:33Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract

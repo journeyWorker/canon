@@ -11,16 +11,6 @@ Feature: ATIP 1.1 contract
     When canon status --json, canon nosuch --json, canon schema --errors --json and canon schema --json run
     Then every meta holds contract atip/1 and contractVersion 1.2 and passes the contract envelope schema; the errors answer has data.kind errors and meta.schemaVersion 1.2
 
-  # canon: {"schema":1,"at":"2026-11-01T07:33:52Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-34-atip-1-1.F1
-  @atip.contract11.02
-  Scenario: An envelope with contractVersion 1.0, or with contractVersion and no contract, fails the contract envelope schema
-    Given envelopes with contractVersion 1.0, with contractVersion and no contract, and with contractVersion 2.0
-    When each is checked against the vendored v1.1.0 envelope schema
-    Then every one is refused, and an envelope with contract atip/1 and contractVersion 1.1 passes
-
   # canon: {"schema":1,"at":"2026-11-01T07:33:57Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract
   @case:happy
