@@ -1,0 +1,62 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split"
+  },
+  "at": "2026-11-03T11:54:25.283065Z",
+  "attachments": [
+    {
+      "case": "claim::tests::atip_check_58_a_hint_that_starts_with_the_tool_is_one_command_line_or_it_is_not",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "claim::tests::atip_check_58_a_one_zero_claim_finds_each_member_of_a_later_minor",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "claim::tests::atip_check_58_nulls_inside_meta_and_error_are_found_and_dropped_for_the_schema",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "claim::tests::atip_check_58_the_schemas_mark_exactly_what_this_module_knows_as_later_than_1_0",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_58_a_tool_that_claims_1_0_is_held_to_no_member_of_1_1_and_to_no_hint_form",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    }
+  ],
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check: cargo nextest run --workspace (default profile, atip-check left out by default-filter, 3732 passed) and --profile atip (the checker crate's own 369 passed), from the clean worktree at the commit of the change"
+  },
+  "evidence_sha": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 878,
+  "scenario_id": "atip.check.58",
+  "schema": 1,
+  "staging_id": "b54db9b2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

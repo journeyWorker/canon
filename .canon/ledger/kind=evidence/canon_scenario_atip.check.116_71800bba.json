@@ -1,0 +1,76 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split"
+  },
+  "at": "2026-11-03T11:54:25.283065Z",
+  "attachments": [
+    {
+      "case": "atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_unprovided_with_its_code_and_any_other_refusal_is_a_fixture_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_116_a_not_run_command_that_exits_1_with_a_registered_code_has_ended_on_its_own_and_is_a_fixture_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_116_a_command_that_ends_on_its_own_before_or_after_its_first_document_is_a_fixture_error_and_no_check_runs",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_116_a_not_run_refusal_naming_an_argument_or_an_unregistered_code_is_a_fixture_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_116_a_not_run_command_whose_effect_note_is_empty_or_blank_is_a_fixture_error_at_l1",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_116_a_refusal_of_a_step_that_reads_no_state_is_a_fixture_error_whatever_its_code_when_the_code_is_registered",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_116_a_not_run_refusal_with_a_code_the_command_document_declares_is_a_fixture_error_at_l1_and_unprovided_without_the_document",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    }
+  ],
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check: cargo nextest run --workspace (default profile, atip-check left out by default-filter, 3732 passed) and --profile atip (the checker crate's own 369 passed), from the clean worktree at the commit of the change"
+  },
+  "evidence_sha": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 824,
+  "scenario_id": "atip.check.116",
+  "schema": 1,
+  "staging_id": "c101b3ea",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

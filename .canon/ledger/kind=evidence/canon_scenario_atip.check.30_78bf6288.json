@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split"
+  },
+  "at": "2026-11-03T11:54:25.283065Z",
+  "attachments": [
+    {
+      "case": "exec::tests::atip_check_30_a_refusal_that_changes_the_directory_or_home_names_the_paths",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "snapshot::tests::atip_check_30_a_snapshot_names_what_was_created_changed_and_removed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_30_l0_refusal_effects_fails_when_a_refusal_writes_in_the_working_directory_home_or_a_remote_the_probe_reports",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    }
+  ],
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check: cargo nextest run --workspace (default profile, atip-check left out by default-filter, 3732 passed) and --profile atip (the checker crate's own 369 passed), from the clean worktree at the commit of the change"
+  },
+  "evidence_sha": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 850,
+  "scenario_id": "atip.check.30",
+  "schema": 1,
+  "staging_id": "3834c087",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

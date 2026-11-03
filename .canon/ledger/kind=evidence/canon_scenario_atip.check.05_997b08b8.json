@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split"
+  },
+  "at": "2026-11-03T11:54:25.283065Z",
+  "attachments": [
+    {
+      "case": "output::tests::atip_check_05_the_text_form_is_code_message_then_the_members_that_exist",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "report::tests::atip_check_05_the_text_has_a_line_per_check_and_one_summary",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_05_text_mode_prints_a_line_per_check_and_a_summary_and_a_failed_level_prints_on_stderr_with_stdout_empty",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    }
+  ],
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check: cargo nextest run --workspace (default profile, atip-check left out by default-filter, 3732 passed) and --profile atip (the checker crate's own 369 passed), from the clean worktree at the commit of the change"
+  },
+  "evidence_sha": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 801,
+  "scenario_id": "atip.check.05",
+  "schema": 1,
+  "staging_id": "ecdc104d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
