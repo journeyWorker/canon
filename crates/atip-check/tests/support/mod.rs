@@ -5,6 +5,7 @@
 pub mod l1;
 pub mod l2;
 
+use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -20,6 +21,8 @@ pub const CHECKS: usize = 29;
 #[derive(Debug)]
 pub struct Output {
     pub code: Option<i32>,
+    /// The signal that ended the run, when it ended by one (then `code` is `None`).
+    pub signal: Option<i32>,
     pub stdout: String,
     pub stderr: String,
 }
@@ -29,8 +32,11 @@ impl Output {
     pub fn envelope(&self) -> Value {
         assert!(
             self.stdout.ends_with('\n') && self.stdout.matches('\n').count() == 1,
-            "stdout is not one line: {:?}",
-            self.stdout
+            "stdout is not one line: {:?} (exit {:?}, signal {:?}, stderr {:?})",
+            self.stdout,
+            self.code,
+            self.signal,
+            self.stderr
         );
         serde_json::from_str(&self.stdout)
             .unwrap_or_else(|error| panic!("stdout is not JSON ({error}): {:?}", self.stdout))
@@ -74,6 +80,7 @@ pub fn atip_in(cwd: &Path, tmp: &Path, args: &[&str]) -> Output {
         .expect("run atip");
     Output {
         code: output.status.code(),
+        signal: output.status.signal(),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
