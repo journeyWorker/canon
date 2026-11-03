@@ -47,9 +47,9 @@ dependency
 
 ## Questions and assumptions
 
-- 선행 조건: atip PR #3이 병합되고 태그 `atip-crate-v0.1.0`과 `atip-check-v0.1.0`이 있어야 시작한다. 태그가 PR #3의 병합 커밋을 가리키는지는 계약 저자에게 물었다. 이 변경은 태그가 없으면 시작하지 않는다.
-- 가정: `atip-probe`(기본 기능의 도구가 `jsonschema`를 링크하지 않음을 `cargo tree`로 증명)는 크레이트의 속성을 시험하므로 atip 레포로 간다. atip 레포에는 아직 없어서 저자에게 물었다. 그때까지 canon에서는 없앤다.
-- 가정: 검사기는 `cargo install --git … --tag atip-check-v0.1.0 atip-check --locked`로 설치하고 캐시한다. 미리 빌드된 바이너리가 있으면 그쪽으로 바꾼다. 저자에게 물었다.
+- 선행 조건 충족: atip PR #3이 병합되었고 태그 `atip-crate-v0.1.0`과 `atip-check-v0.1.0`이 있다. 태그는 atip 레포의 커밋 b274d8d에 있다.
+- 계약 저자의 답: `atip-probe`는 atip 레포의 `crates/atip-probe`(게시하지 않음)로 옮겨 가고, 기본 기능이 `jsonschema`를 링크하지 않음을 CI의 `cargo tree`로 확인한다. 별도 atip PR이다. 이 변경은 canon에서 `atip-probe`를 없앤다. canon이 그 크레이트를 계속 써야 하면 atip 레포에서 의존으로 받는다.
+- 계약 저자의 답: 검사기는 `cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked`로 설치하고 캐시한다. 미리 빌드된 바이너리는 없다.
 - 가정: L0 job과 L2 job을 L2 job 하나로 합친다. L2 보고서가 L0과 L1 행을 모두 담기 때문이다. 판정은 지금과 같다.
 - 가정: 태그의 크레이트는 1.3 이하를 선언하는 문서를 이전 버전과 같게 쓴다(PR #3의 보장). 이 가정이 틀려 출력이 바뀌면 이 변경은 chore가 아니다. 그 차이를 evidence에 적고 사람에게 알린다.
 - 정책 질문: 검사기 시나리오 약 207개와 크레이트 시나리오 약 43개가 canon의 스펙에서 없어진다. 게이트가 평가하는 시나리오 집합이 줄어든다. 사람이 감사표를 보고 승인한다. 주제 `atip-check`를 이후에 `retired`로 옮길지는 오케스트레이터와 사람이 정한다.

@@ -64,7 +64,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3,
   - 사람이 쓰거나 고치는 파일의 내용이 틀리면 `<대상>_INVALID`이다.
   - 도구가 쓴 상태가 해석되지 않거나 서로 맞지 않으면 `<대상>_CORRUPT`이다.
 - 사람이 쓰거나 고치는 파일은 canon.yaml, 정책, 브리프, 플랜 문서, 스펙 파일, 전략 평가와 서명 파일이다. 도구가 쓰는 상태는 dispatch 매니페스트, 컨텍스트 팩, 정책 승인 파일, 장부 기록, 블롭, 색인이다.
-- 그 밖의 운영체제 오류(EIO, 디렉터리를 파일로 읽기 등)는 `<대상>_UNAVAILABLE`이고 재시도 값이 예이다. 이 판단은 계약 저자에게 물었다.
+- `<대상>_UNAVAILABLE`은 다시 하면 풀릴 수 있는 운영체제 오류(EIO 등)에만 쓰고 재시도 값이 예이다. 호출자가 준 경로가 틀린 경우(디렉터리 자리의 파일, 파일 자리의 디렉터리: EISDIR, ENOTDIR)는 `<대상>_INVALID`이다. 작업이 시작된 뒤의 실패는 효과가 있으므로 종료 값 1의 `FAILED`나 `INCOMPLETE`이다. 계약 저자의 규칙이다.
 - 표의 이름 하나는 한 대상의 여러 원인을 이렇게 가른다. 예를 들어 `BRIEF_UNREADABLE`은 `BRIEF_NOT_FOUND`(이미 있다), `BRIEF_DENIED`, `BRIEF_INVALID`가 된다. `BRIEF_INVALID`의 이유는 `canon-0-36-code-reasons`가 정한다.
 - 경고 코드(`CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE`, `POLICY_APPROVAL_UNREADABLE`)는 이름이 그대로이다. 오류만 새 코드가 된다.
 
@@ -113,7 +113,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3,
 
 - F1:
   - 읽기 권한을 뺀 브리프는 `BRIEF_DENIED`, 내용이 깨진 브리프는 `BRIEF_INVALID`, 이름을 준 변경에 브리프가 없으면 `BRIEF_NOT_FOUND`이다. 모두 종료 값 2, 재시도 불가이고 아무것도 쓰지 않는다.
-  - 실패 경로: 권한 시험은 비루트로 돌고 루트면 건너뛰며 그 사실을 말한다. 디렉터리를 파일 자리에 둔 호출은 `_UNAVAILABLE`과 재시도 값 예이다.
+  - 실패 경로: 권한 시험은 비루트로 돌고 루트면 건너뛰며 그 사실을 말한다. 디렉터리를 파일 자리에 둔 호출은 `_INVALID`이고 재시도 값 아니오이다.
 - F2:
   - ==**깨진 dispatch 매니페스트는 `DISPATCH_MANIFEST_CORRUPT`이고 종료 값 2이다.**== 깨진 정책 승인 파일은 출고와 재개를 종료 값 2의 `POLICY_APPROVAL_CORRUPT`로 거절하고 `--override-reason`이 넘기지 못한다.
   - 실패 경로: 같은 매니페스트를 고치면 다음 호출이 성공한다. 경고로 같은 상황을 알리는 호출은 지금 이름의 경고를 그대로 낸다.
@@ -129,7 +129,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3,
 
 ## Questions and assumptions
 
-- 계약 저자에게 보낸 질문: 파일이 없음, 권한 없음, 내용 문제가 아닌 운영체제 오류는 어떤 조건인가. 기본값은 `_UNAVAILABLE`, 재시도 값 예이다. `FAILED`(종료 값 1)가 맞다면 이 변경이 바꾼다.
+- 계약 저자의 답: 다시 하면 풀릴 수 있는 운영체제 오류만 `_UNAVAILABLE`이고, 호출자의 잘못된 경로는 `_INVALID`, 작업이 시작된 뒤의 실패는 `_FAILED`나 `_INCOMPLETE`이다.
 - 가정: 사람이 고치는 파일과 도구가 쓰는 상태의 구분은 F1의 두 목록이다. 구현자가 다른 파일을 만나면 목록에 더하고 감사표에 적는다.
 - 가정: `CONFIG_INVALID`의 이유 이름은 `canon-0-36-code-reasons`가 정한다. 이 변경은 `ARTIFACT_STORE`를 필요한 이유로 등록한다.
 - 가정: 시나리오 문장 6개를 고치면 그 리뷰가 stale이 된다. 리뷰어가 차이표를 보고 다시 리뷰한다. 이 가정이 맞지 않으면 사람이 정책을 정해야 한다.

@@ -44,7 +44,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.4.2, 7.6, 15.3, 
 1. F1 에이전트는 오류의 `reason`을 읽는다 → 그 코드 아래 등록된 이유이다 → ==**이유의 `fix`대로 행동한다.**==
 2. F2 에이전트는 레지스트리 항목을 읽는다 → 상황이 여럿인 코드가 이유 목록을 가졌다 → 이유별 해결을 본다.
 3. F3 에이전트는 설정이 틀렸다는 오류를 만난다 → `CONFIG_INVALID`의 이유가 틀린 파일이나 절을 가리킨다 → 그 파일을 연다.
-4. F4 에이전트는 게이트 거절의 `details`를 읽는다 → 항목의 이유가 게이트의 위반 종류이다 → 종류별로 고친다.
+4. F4 에이전트는 게이트 거절의 `details`를 읽는다 → 항목마다 조건에 맞는 자기 코드가 있고 이유는 다음 행동이 다를 때만 있다 → 항목별로 고친다.
 5. F5 canon 기여자는 새 상황을 더한다 → 규칙이 이유와 새 코드를 가른다 → 시험이 그 규칙을 지킨다.
 6. F6 사람은 CHANGELOG를 읽는다 → 바뀐 이유와 없어진 이유가 있다 → 스크립트를 고친다.
 
@@ -64,7 +64,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.4.2, 7.6, 15.3, 
 | 코드 | 이유 | 이유를 보탠 변경 |
 |---|---|---|
 | `CONFIG_INVALID` | `CANON_YAML`, `POLICY`, `DASHBOARD`, `SPECS`, `SKILLS`, `ARTIFACT_STORE` | rename, refusals, stored |
-| `SUBJECT_CONFLICT` | `TRANSITION`, `GATE`, 채택 거절의 원인, `UNADOPT_APPROVED_BRIEF`, `UNADOPT_FLOW_TAGGED` | rename, exit, refusals |
+| `SUBJECT_CONFLICT` | `TRANSITION`, 채택 거절의 원인, `UNADOPT_APPROVED_BRIEF`, `UNADOPT_FLOW_TAGGED` | rename, exit, refusals |
 | `BRIEF_INVALID` | `UNAPPROVABLE`, `BLOCKERS`, 읽은 내용의 원인 | rename, refusals, stored |
 | `BRIEF_CHECK_FAILED` | `BLOCKERS` | rename |
 | `CONTEXT_INPUT_INVALID` | `SECRET` | rename |
@@ -83,10 +83,11 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.4.2, 7.6, 15.3, 
 
 - `CONFIG_INVALID`의 이유가 틀린 파일이나 절을 가리킨다: canon.yaml, 정책, 대시보드, `specs:`, `skills:`, `artifact_store:`. `.canon/policy.yaml`은 canon.yaml이 아니므로 `POLICY`이다. `hint`가 그 파일을 고치는 방법을 말한다.
 
-### F4 게이트의 위반 종류
+### F4 게이트의 거절
 
-- 게이트가 거절한 항목의 `reason`은 위반 종류이다. 종류는 게이트의 11개이다: `UNCOVERED_CELL`, `UNREVIEWED_PROMOTION`, `TRUST_BELOW_REQUIRED`, `STALE_EVIDENCE`, `MALFORMED_EVIDENCE`, `FLAGGED`, `UNEVIDENCED_FLIP`, `FABRICATED_EVIDENCE`, `OPEN_BLOCKER`, `FALSE_SUCCESS`, `OLD_LAYOUT`. 게이트가 쓰는 소문자와 하이픈 이름은 대문자와 밑줄로 옮긴다.
-- 이 이유는 게이트 위반을 싣는 코드의 이유로 등록한다. 그 코드는 `PROMOTION_INVALID`, `STRATEGY_PROMOTION_INVALID`, `DIVERGENCE_INVALID`, `SUBJECT_CONFLICT`이다. 각 코드는 자기가 실제로 내는 종류만 등록한다.
+- 게이트 거절은 조건마다 다른 코드이다. 승인이 없으면 `<대상>_APPROVAL_REQUIRED`, 근거가 낡았으면 `EVIDENCE_STALE`, 그 밖의 위반은 `<대상>_INVALID`이다. 이 코드들은 `canon-0-36-codes-exit`가 정한다. 계약 저자의 규칙이다.
+- 게이트의 위반 종류는 같은 조건 안에서 다음 행동이 다를 때만 이유가 된다. 11개 종류(`uncovered-cell`, `unreviewed-promotion`, `trust-below-required`, `stale-evidence`, `malformed-evidence`, `flagged`, `unevidenced-flip`, `fabricated-evidence`, `open-blocker`, `false-success`, `old-layout`)를 모두 이유로 옮기지 않는다. 같은 `*_INVALID` 아래에서 고칠 일이 다른 종류만 대문자와 밑줄의 이유로 등록한다.
+- `details`의 항목은 자기 코드를 갖는다. 이유는 그 코드 아래 등록된 것만 싣는다.
 
 ### F5 이유와 코드를 가르는 규칙
 
@@ -110,8 +111,8 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.4.2, 7.6, 15.3, 
   - ==**틀린 `specs:` 절, 틀린 정책, 틀린 canon.yaml이 각각 `CONFIG_INVALID`의 서로 다른 이유로 온다.**==
   - 실패 경로: 같은 파일의 같은 오류는 매번 같은 이유이다. 이유가 종료 값이나 재시도 값을 바꾸는 방출은 시험이 거절한다.
 - F4:
-  - 게이트에 거절된 `gate promote`의 `details` 항목마다 `reason`이 위반 종류의 대문자 이름이다. 그 이름이 코드의 레지스트리에 있다.
-  - 실패 경로: 게이트에 없는 종류를 이유로 내면 시험이 실패한다.
+  - 게이트에 거절된 `gate promote`의 `details` 항목마다 조건에 맞는 코드가 있고, 이유가 있으면 그 코드 아래 등록되어 있다.
+  - 실패 경로: 다음 행동이 같은 두 종류가 서로 다른 이유로 등록되어 있으면 감사표가 이를 설명하지 못해 시험이 실패한다. 게이트에 없는 종류를 이유로 내면 실패한다.
 - F5:
   - `ARTIFACTS_STORE_UNAVAILABLE`과 `ARTIFACTS_STORE_REQUIRED`가 별개 코드이고 재시도 값이 다르다. 이유 하나가 두 값을 오가는 방출이 있으면 시험이 실패한다.
 - F6:
@@ -121,7 +122,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.4.2, 7.6, 15.3, 
 ## Questions and assumptions
 
 - 가정: issue #135 5절의 겹침은 계약 7.6의 이름공간 규칙으로 풀렸다. `EXPIRED`, `STALE`, `UNREADABLE`은 이름을 바꾸지 않는다. 계약 저자의 1.3.0 최종 규칙 댓글이 근거이다.
-- 가정: 위반 종류의 이름을 대문자와 밑줄로 옮겨 이유로 쓴다. 게이트 종류의 철자가 이유의 철자를 정하므로 게이트가 새 종류를 더하면 이유도 더한다.
+- 가정: 이유로 등록하는 위반 종류는 구현자가 호출 지점과 `hint`의 다음 행동으로 정한다. 이름은 게이트의 이름을 대문자와 밑줄로 옮긴 것이다.
 - 가정: 표의 이유는 시작점이고 구현자가 호출 지점에 맞춰 확정한다. 확정 목록이 표와 다르면 감사표에 이유를 적는다.
 - 정책 질문은 이 변경에 새로 없다.
 

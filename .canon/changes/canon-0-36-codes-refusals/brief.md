@@ -67,7 +67,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 ### F2 대상의 상태
 
 - 발산 승인은 승인자가 리뷰어가 아니거나 스스로 증명한 증거이면 `DIVERGENCE_DENIED`(이유 `NOT_REVIEWER`, `SELF_ATTESTED`), 증거가 발산이 아니면 `DIVERGENCE_CONFLICT`(이유 `NOT_DIVERGENT`)이다. 해결할 사람이 다르다.
-- 이미 끝난 dispatch run과 진행 중이 아닌 run은 `DISPATCH_CONFLICT`의 이유 `ALREADY_ENDED`와 `NOT_RUNNING`이다. 끝난 run을 다시 끝내는 호출이 성공(`unchanged`)해야 하는지는 계약 저자에게 물었다. 기본값은 지금처럼 거절이다.
+- 이미 끝난 dispatch run과 진행 중이 아닌 run은 `DISPATCH_CONFLICT`의 이유 `ALREADY_ENDED`와 `NOT_RUNNING`이다. 끝난 run을 다시 끝내는 호출은 지금처럼 거절한다.
 - 채택과 채택 취소의 거절은 둘 다 `SUBJECT_CONFLICT`이고 원인마다 이유가 있다. 채택 취소가 승인된 브리프나 `@flow` 태그 시나리오 때문에 거절되면 이유로 구별한다. 지금 `subject unadopt`가 `SUBJECT_ADOPT_REFUSED`를 내는 곳이 있으면 고친다.
 - `trace`가 앞자리 sha로 커밋 여럿을 만나면 `TRACE_CONFLICT`이고 `expected`에 후보를 싣는다. 아무 기록도 없으면 `TRACE_NOT_FOUND`이다.
 - 전략 롤백은 서명이 맞지 않으면 종료 값 2의 `STRATEGY_SIGNATURE_INVALID`이고 아무것도 기록하지 않는다. 롤백을 기록하지 못하면 종료 값 1의 `STRATEGY_ROLLBACK_FAILED`이다.
@@ -152,8 +152,8 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 
 ## Questions and assumptions
 
-- 계약 저자에게 보낸 질문: 끝난 dispatch run을 다시 끝내는 호출은 거절인가, 변경 없음의 성공인가. 기본값은 거절이다.
-- 계약 저자에게 보낸 질문: 읽는 동안 파일이 없음, 권한 없음, 내용 문제가 아닌 운영체제 오류(EIO, EISDIR)는 어떤 조건인가. 기본값은 `_UNAVAILABLE`, 재시도 값 예이다.
+- 가정: 끝난 dispatch run을 다시 끝내는 호출은 지금처럼 거절하고 변경 없음의 성공으로 바꾸지 않는다. 저자에게 묻지 않았다. 사람이 성공으로 보면 이 변경이 바꾼다.
+- 계약 저자의 답: 운영체제 오류의 조건은 `canon-0-36-codes-stored`가 정한다. 이 변경의 코드는 모두 종료 값 2이다. 호출자가 준 경로가 디렉터리 자리에 파일이거나 그 반대이면 `INVALID`이다.
 - 가정: 표의 새 이름은 issue #135의 제안과 최종 규칙에서 나왔다. 호출 지점을 읽어 원인이 표에 없는 경우 구현자가 코드를 더하고 감사표에 적는다. 같은 조건 안의 상황은 이유로 더하고 코드를 더하지 않는다.
 - 가정: 아직 쓰지 않는 원인(예를 들어 `SUBJECT_CONFLICT`의 채택 쪽 이유)은 호출 지점이 실제로 내는 것만 등록한다.
 - 가정: 시나리오 문장 37개를 고치면 그 리뷰가 stale이 된다. 리뷰어가 차이표를 보고 다시 리뷰한다. 이 가정이 맞지 않으면 사람이 정책을 정해야 한다.
