@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-checker-tests",
+    "role": "implementer",
+    "session_id": "s-0-35-checker-tests"
+  },
+  "at": "2026-11-03T09:22:54.236286Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2input_09_a_document_and_argv_split_three_ways_and_numeric_strings_give_the_argv_result",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    },
+    {
+      "case": "atip_checkl2input_09_a_value_that_varies_between_two_runs_of_the_reference_is_not_compared_and_the_rest_of_data_still_is",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    }
+  ],
+  "code_tree": "381681fa4b1fa2b9c0cf357c5512f6607c7107bb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check (369 passed)"
+  },
+  "evidence_sha": "581567ce30b187c876b0d67d838cd58c6f8ad8e8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 112,
+  "scenario_id": "atip.checkl2input.09",
+  "schema": 1,
+  "staging_id": "f40f0e0c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

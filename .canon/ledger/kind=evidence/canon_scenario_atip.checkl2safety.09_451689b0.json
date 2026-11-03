@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-checker-tests",
+    "role": "implementer",
+    "session_id": "s-0-35-checker-tests"
+  },
+  "at": "2026-11-03T09:23:01.835448Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2safety_09_a_directory_a_read_leaves_empty_is_not_an_effect",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    },
+    {
+      "case": "atip_checkl2safety_09_a_directory_made_to_hold_an_allowed_file_is_not_an_effect_and_an_unallowed_file_is_named",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    },
+    {
+      "case": "atip_checkl2safety_09_a_read_change_outside_allowed_effects_fails_and_the_report_names_the_path",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    }
+  ],
+  "code_tree": "381681fa4b1fa2b9c0cf357c5512f6607c7107bb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check (369 passed)"
+  },
+  "evidence_sha": "581567ce30b187c876b0d67d838cd58c6f8ad8e8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 73,
+  "scenario_id": "atip.checkl2safety.09",
+  "schema": 1,
+  "staging_id": "3a44d405",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
