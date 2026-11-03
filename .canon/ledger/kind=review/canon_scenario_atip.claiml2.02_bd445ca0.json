@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-35-claim-l2-rev"
   },
-  "at": "2026-11-03T07:16:13.544609Z",
-  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "at": "2026-11-03T10:53:48.942916Z",
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
   "kind": "review",
-  "pin": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "pin": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_claiml2_07_just_atip_and_the_jobs_run_canon_at_l0_and_l2_and_the_checker_at_l0_at_1_2"
+          "junit:atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "25beeb3c7261ae8b9cbc734edd8e129558bced7f8c202ee610d0808dc9e98ad8",
+    "scenario_digest": "e2f7db6947bfa843b6008428d1948e98d502385640471c62c4cf8c3a29313e9d",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
   },
-  "review_id": "01M6G48038FYEXWXATB9EJTQY1",
+  "review_id": "01M6GGPDGE7BKT9WR46CG2N0KG",
   "reviewer": "rev-claim-l2",
-  "scenario_id": "atip.claiml2.07",
+  "scenario_id": "atip.claiml2.02",
   "schema": 2,
   "worktree_dirty": false
 }

@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-35-claim-l2-rev"
   },
-  "at": "2026-11-03T07:16:13.544609Z",
-  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "at": "2026-11-03T10:53:48.942916Z",
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
   "kind": "review",
-  "pin": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "pin": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_claiml2_03_a_canon_that_declares_l2_and_breaks_one_rule_of_l2_is_red_on_that_row"
+          "junit:atip_claiml2_08_a_canon_whose_plain_answer_says_1_1_fails_l0_contract_version_alone"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "e4ffc6133227c4b9149139428364d3e5a82fe3079015b2731c439695dba733c8",
+    "scenario_digest": "a19828a183c7f78d09117ebde3cb15ddb7088cb86087c069020e2043d4ed8625",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
   },
-  "review_id": "01M6G48038FYEXWXATB9EJTQY1",
+  "review_id": "01M6GGPDGE7BKT9WR46CG2N0KG",
   "reviewer": "rev-claim-l2",
-  "scenario_id": "atip.claiml2.03",
+  "scenario_id": "atip.claiml2.08",
   "schema": 2,
   "worktree_dirty": false
 }

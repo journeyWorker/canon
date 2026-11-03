@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T10:53:31.514572Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/init.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
+  "reviewer": "rev-claim-l2",
+  "round": 2,
+  "scenario_ids": [
+    "atip.claiml2.11",
+    "atip.claiml2.18"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, standards] The 'no /dev/tty prompt' row and scenario atip.claiml2.18 say canon never prompts, and it does. canon init without --providers prompts on a terminal: init.rs SkillsChoice::Ask reads stdin when stdin and stderr are terminals (prompt_providers, 'which harnesses should get the canon skill?'). I ran canon init and canon init --json under a pty: both print the question and wait. Contract 1.2.1 spec 5.5: 'A tool MUST NOT prompt. If a value is missing the command refuses. Nothing reads stdin except --input - and options that declare - as a value.' The scan in atip_claiml2_18 looks for /dev/tty, rpassword, dialoguer, inquire::, read_password and termios, so it cannot see a prompt through std::io::stdin(); its title says 'or prompts for a missing value' and passes. The atip checker does not see it either (L0.no-prompt passes). Fix: either remove the interactive branch (Ask resolves like the non-terminal case: detected providers, no prompt), or state a Gap in the row and the scenario: init prompts on a terminal, which is a known MUST violation of 5.5 that canon claims L2 with, and tell the ATIP owner. Not new in this change; the evidence list is what claims coverage. Blast radius: every caller that runs init from a terminal; agents run it without a terminal and are unaffected.",
+  "worktree_dirty": false
+}

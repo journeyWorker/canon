@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-35-claim-l2-rev"
   },
-  "at": "2026-11-03T07:16:13.544609Z",
-  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "at": "2026-11-03T10:53:48.942916Z",
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
   "kind": "review",
-  "pin": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "pin": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_claiml2_06_input_too_large_names_the_field_input"
+          "junit:atip_claiml2_16_the_preview_of_a_move_to_the_local_store_leads_with_the_commit_call"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "0141e4c6b9df8d8848184b198ea82ece7b8688e5f2f7a7f67a25a3bb9fd7325e",
+    "scenario_digest": "d2512ef4371ab5400de6a0a00bc292e61861e4d03f3da92deb94d315cfb7b6e5",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
   },
-  "review_id": "01M6G48038FYEXWXATB9EJTQY1",
+  "review_id": "01M6GGPDGE7BKT9WR46CG2N0KG",
   "reviewer": "rev-claim-l2",
-  "scenario_id": "atip.claiml2.06",
+  "scenario_id": "atip.claiml2.16",
   "schema": 2,
   "worktree_dirty": false
 }
