@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-03T00:27:13.951240Z",
+  "attachments": [
+    {
+      "case": "atip_check_09_l0_unknown_command_fails_on_each_part_of_the_unknown_command_envelope",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    }
+  ],
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2d.xml"
+  },
+  "evidence_sha": "7508143a2ff26f33539c6da3c94fd1a9f683c0e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 687,
+  "scenario_id": "atip.check.09",
+  "schema": 1,
+  "staging_id": "3157f315",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
