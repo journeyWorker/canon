@@ -314,10 +314,13 @@ fn atip_checkl2input_04_input_too_large_is_refused_on_input_and_a_pointer_fails_
 
 #[test]
 fn atip_checkl2input_07_a_finer_replacement_of_usage_names_an_argument_and_a_field_that_names_none_fails_l2_input_usage() {
-    let output = run_config(&l2_config(&json!({"inputUsageCode": "PLAN_STALE"})));
+    // Any registered exit-2 code of the tool's own whose field names an argument stands for `USAGE`; a reserved code (`PLAN_STALE`) has a situation of its own.
+    let output = run_config(&l2_config(&json!({"inputUsageCode": "DEPLOYMENT_NOT_FOUND"})));
     let document = output.envelope();
     assert_eq!(check_of(&document["data"], "L2.input-usage")["result"], "pass", "{}", not_passing(&document["data"]));
-    let output = run_case(&Case { condition: "input-usage/usage", config: l2_config(&json!({"inputUsageCode": "PLAN_STALE", "inputUsageField": "stdin"})), tweak: None }, "L2");
+    let output = run_case(&Case { condition: "input-usage/usage", config: l2_config(&json!({"inputUsageCode": "PLAN_STALE"})), tweak: None }, "L2");
+    assert_eq!(check_of(&output.envelope()["data"], "L2.input-usage")["result"], "fail", "{}", not_passing(&output.envelope()["data"]));
+    let output = run_case(&Case { condition: "input-usage/usage", config: l2_config(&json!({"inputUsageCode": "DEPLOYMENT_NOT_FOUND", "inputUsageField": "stdin"})), tweak: None }, "L2");
     let document = output.envelope();
     let check = check_of(&document["data"], "L2.input-usage");
     assert_eq!(check["result"], "fail", "{check}");

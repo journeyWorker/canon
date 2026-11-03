@@ -300,9 +300,8 @@ impl<'a> Judge<'a> {
                 c.own(*call);
                 let document = self.envelope(*call).filter(|document| document.get("ok") == Some(&Value::Bool(false)));
                 let (code, field) = document.map_or((None, None), refusal_of);
-                // A finer replacement of USAGE is any registered exit-2 code whose field names an argument (not a document's code).
-                let is_usage = self.at(*call).exit == Exit::Code(2)
-                    && code.is_some_and(|code| self.is_usage(Some(code)) || (!code.starts_with("INPUT_") && field.is_some_and(|field| field.starts_with("--")) && self.row(code).is_some_and(|row| row.exit == 2)));
+                // A finer replacement of USAGE is any registered exit-2 code whose field names an argument (not a document's code): the shared rule.
+                let is_usage = self.at(*call).exit == Exit::Code(2) && self.is_usage(code, field);
                 c.holds_at(*call, "usage", is_usage, || {
                     format!("{}: {label} was not refused with USAGE or its registered finer replacement (exit 2): {}", command.command, super::super::l1::refusal_text(self.envelope(*call), self.at(*call).exit))
                 });
@@ -468,7 +467,7 @@ impl<'a> Judge<'a> {
                 let (code, field) = failure.unwrap_or((None, None));
                 match &run.expect {
                     PointerExpect::Constraint { codes } => {
-                        let answered = code.is_some_and(|code| codes.iter().any(|expected| expected == code) || (codes.iter().any(|expected| expected == "USAGE") && self.is_usage(Some(code))));
+                        let answered = code.is_some_and(|code| codes.iter().any(|expected| expected == code) || (codes.iter().any(|expected| expected == "USAGE") && self.is_usage(Some(code), field)));
                         c.holds_at(run.call, "constraint-code", answered, || {
                             format!("{}: {} was not refused with {}: {}", command.command, run.label, codes.join(" or "), super::super::l1::refusal_text(document, self.at(run.call).exit))
                         });
@@ -480,7 +479,7 @@ impl<'a> Judge<'a> {
                     }
                     PointerExpect::Required { pointer } => {
                         let declared: Vec<&str> = doc.map(|doc| doc.constraints.iter().filter_map(|constraint| constraint.code.as_deref()).collect()).unwrap_or_default();
-                        let answered = code.is_some_and(|code| self.is_usage(Some(code)) || declared.contains(&code));
+                        let answered = code.is_some_and(|code| self.is_usage(Some(code), field) || declared.contains(&code));
                         c.holds_at(run.call, "required-code", answered, || {
                             format!("{}: {} was not refused with USAGE: {}", command.command, run.label, super::super::l1::refusal_text(document, self.at(run.call).exit))
                         });
@@ -566,7 +565,7 @@ impl<'a> Judge<'a> {
                 let document = self.envelope(run.call);
                 let failure = document.filter(|document| document.get("ok") == Some(&Value::Bool(false))).map(refusal_of);
                 let (code, field) = failure.unwrap_or((None, None));
-                let answered = code.is_some_and(|code| run.codes.iter().any(|expected| expected == code) || self.is_usage(Some(code)) && run.codes.iter().any(|expected| expected == "USAGE"));
+                let answered = code.is_some_and(|code| run.codes.iter().any(|expected| expected == code) || self.is_usage(Some(code), field) && run.codes.iter().any(|expected| expected == "USAGE"));
                 c.holds_at(run.call, "item-code", answered, || {
                     format!("{}: {} was not refused with {}: {}", command.command, run.label, run.codes.join(" or "), super::super::l1::refusal_text(document, self.at(run.call).exit))
                 });

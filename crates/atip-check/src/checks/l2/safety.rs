@@ -332,8 +332,8 @@ impl<'a> Judge<'a> {
                 let outcome = self.at(*call);
                 let document = self.envelope(*call);
                 let failure = document.filter(|document| document.get("ok") == Some(&Value::Bool(false))).map(refusal_of);
-                let (code, _) = failure.unwrap_or((None, None));
-                let answered = outcome.exit == Exit::Code(2) && code.is_some_and(|code| self.is_usage(Some(code)) || declared.contains(&code));
+                let (code, field) = failure.unwrap_or((None, None));
+                let answered = outcome.exit == Exit::Code(2) && code.is_some_and(|code| self.is_usage(Some(code), field) || declared.contains(&code));
                 c.holds_at(*call, "half-refused", answered, || {
                     format!("{}: {label} was not refused with USAGE, its registered finer code or the code of the `requires` rule (exit 2): {}", run.command, refusal_text(document, outcome.exit))
                 });

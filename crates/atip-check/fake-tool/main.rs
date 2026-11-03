@@ -121,6 +121,19 @@ impl Tool {
         commands
     }
 
+    /// The code the tool answers for `code`: with `usageRenamed` the tool has no `USAGE` and answers `usageReplacement` (default `OPTION_INVALID`).
+    fn usage_name(&self) -> String {
+        self.text("usageReplacement", "OPTION_INVALID")
+    }
+
+    fn renamed<'a>(&self, code: &'a str) -> std::borrow::Cow<'a, str> {
+        if code == "USAGE" && self.flag("usageRenamed") {
+            std::borrow::Cow::Owned(self.usage_name())
+        } else {
+            std::borrow::Cow::Borrowed(code)
+        }
+    }
+
     fn registered_exit(code: &str) -> u8 {
         REGISTRY
             .iter()
@@ -224,6 +237,8 @@ impl Tool {
         extras: &[(&str, Value)],
         exit: u8,
     ) -> ExitCode {
+        let usage = code == "USAGE";
+        let code = &*self.renamed(code);
         if self.flag("refusalWrites") {
             std::fs::write("refused.txt", "written by a refusal").unwrap_or_default();
         }
@@ -252,6 +267,10 @@ impl Tool {
             error.insert("hint".into(), Value::Null);
         }
         for (key, value) in extras {
+            // Seeded (`usageNoField`): a refusal that is a usage problem does not say which argument.
+            if *key == "field" && usage && self.flag("usageNoField") {
+                continue;
+            }
             error.insert((*key).to_string(), value.clone());
         }
         let mut document = json!({"ok": false, "error": error, "meta": self.meta(command)});
@@ -684,6 +703,12 @@ impl Tool {
                 "m".to_string(),
                 "f".to_string(),
             ));
+        }
+        if self.flag("usageRenamed") {
+            let replacement = self.usage_name();
+            for row in table.iter_mut().filter(|row| row.0 == "USAGE") {
+                row.0 = replacement.clone();
+            }
         }
         table.sort_by(|left, right| left.0.cmp(&right.0));
         table

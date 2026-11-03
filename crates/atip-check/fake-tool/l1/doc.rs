@@ -338,5 +338,33 @@ pub fn patched(tool: &Tool, key: &str, mut document: Value) -> Value {
             .map_or(0, |elapsed| elapsed.as_nanos());
         document["x-fake"] = json!({"run": nanos.to_string()});
     }
+    if tool.flag("usageRenamed") {
+        rename_usage(&mut document, &tool.usage_name());
+    }
     document
+}
+
+/// Seeded (`usageRenamed`): the tool has no `USAGE`; every `errors` list of a document names `replacement` in its place.
+fn rename_usage(document: &mut Value, replacement: &str) {
+    match document {
+        Value::Object(members) => {
+            for (key, value) in members.iter_mut() {
+                if key == "errors" {
+                    if let Value::Array(items) = value {
+                        for item in items.iter_mut().filter(|item| item.as_str() == Some("USAGE")) {
+                            *item = json!(replacement);
+                        }
+                        items.sort_by_key(|item| item.as_str().map(str::to_string));
+                    }
+                }
+                rename_usage(value, replacement);
+            }
+        }
+        Value::Array(items) => {
+            for item in items.iter_mut() {
+                rename_usage(item, replacement);
+            }
+        }
+        _ => {}
+    }
 }

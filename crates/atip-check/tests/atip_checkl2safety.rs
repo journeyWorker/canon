@@ -79,6 +79,28 @@ fn atip_checkl2safety_04_a_stale_digest_accepted_or_a_commit_alone_that_commits_
 }
 
 #[test]
+fn atip_checkl2safety_04_a_registered_exit_2_code_whose_field_names_an_argument_stands_for_usage_in_the_registry_and_in_the_halves() {
+    // checker.md 1.3.1 section 2: a tool that registers `OPTION_INVALID` and never emits `USAGE` passes. The fake has no `USAGE` and answers every usage problem
+    // with it. Other rows may not judge it as a whole (an operand is named by its value name, which no `--` or pointer says); the rows of the rule do.
+    let output = run_config(&l2_config(&json!({"usageRenamed": true})));
+    let document = output.envelope();
+    for row in ["L1.registry", "L2.destructive-half", "L2.input-usage"] {
+        assert_eq!(check_of(&document["data"], row)["result"], "pass", "{row}: {}", not_passing(&document["data"]));
+    }
+    let halves = argvs(check_of(&document["data"], "L2.destructive-half"));
+    assert!(halves.iter().any(|argv| argv.starts_with("purge") && argv.contains("--commit")), "the half is run: {halves:?}");
+    // The same code without a field that names an argument is no replacement of `USAGE`.
+    let output = run_config(&l2_config(&json!({"usageRenamed": true, "usageNoField": true})));
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L2.destructive-half")["result"], "fail", "{}", not_passing(data));
+    // A code registered with another exit than 2 is none either: the registry has no `USAGE` and the half is not refused with one.
+    let output = run_config(&l2_config(&json!({"usageRenamed": true, "reservedExit": {"OPTION_INVALID": 1}})));
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L2.destructive-half")["result"], "fail", "{}", not_passing(data));
+    assert_eq!(check_of(data, "L1.registry")["result"], "fail", "{}", not_passing(data));
+}
+
+#[test]
 fn atip_checkl2safety_05_the_three_idempotency_values_pass_and_a_second_run_with_a_new_effect_or_an_accepted_once_fails() {
     proves(safety_cases(), &["idempotency"]);
     let output = run_config(&l2_standard_config());

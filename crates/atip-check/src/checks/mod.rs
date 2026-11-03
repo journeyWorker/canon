@@ -1126,7 +1126,8 @@ impl<'a> Judge<'a> {
         }
         let document = self.envelope(index).filter(|document| document.get("ok") == Some(&Value::Bool(false)))?;
         let code = document.pointer("/error/code").and_then(Value::as_str)?;
-        Some(if self.is_stateless(command, code) {
+        let field = document.pointer("/error/field").and_then(Value::as_str);
+        Some(if self.is_stateless(command, code, field) {
             Refusal::Stateless(code.to_string())
         } else {
             Refusal::Precondition(code.to_string())
@@ -1135,11 +1136,12 @@ impl<'a> Judge<'a> {
 
     /// Whether a refusal with `code` of `command` is made before any state is read: `USAGE` and its registered finer replacements, `UNKNOWN_COMMAND`,
     /// `COMMAND_REQUIRED`, every `INPUT_*` code; from L1 also a code the command document declares on a constraint or a validator and a code the run
-    /// saw refuse an argument's domain. At L0 there is no command document, so any other exit 2 code is a precondition, registered or not.
-    fn is_stateless(&self, command: &str, code: &str) -> bool {
+    /// saw refuse an argument's domain. At L0 there is no command document, so any other exit 2 code is a precondition, registered or not. The finer replacement
+    /// of `USAGE` counts here when it names an option (`--name`): a registered code at a document pointer may be the lookup of a value, a precondition.
+    fn is_stateless(&self, command: &str, code: &str, field: Option<&str>) -> bool {
         matches!(code, "USAGE" | "UNKNOWN_COMMAND" | "COMMAND_REQUIRED")
             || code.starts_with("INPUT_")
-            || self.is_usage(Some(code))
+            || self.is_usage(Some(code), field.filter(|field| field.starts_with("--")))
             || (self.l1.is_some() && self.declared_before_state(command, code))
     }
 
