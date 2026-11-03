@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-02T14:45:08Z",
-  "note": "휴가 중 승인 위임(2026-11-01 대화): atip/1 1.2.1 반영분",
+  "approved_at": "2026-11-03T04:35:22Z",
+  "note": "휴가 중 승인 위임(2026-11-01 대화): 리뷰 cursor 2_1 반영(묶임, 불투명 아님)",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",

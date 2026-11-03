@@ -124,4 +124,4 @@ canon의 cursor는 0.34에서 이미 명시한 인수에 묶이고 `--limit`, `-
 - 1.2 선언과 CI(`canon-0-35-claim-l2`).
 - 새 쪽 나누기 명령을 더하는 일과 `retrieve`나 `search`의 `--limit` 의미를 바꾸는 일.
 
-Approved: Journey Hwang 2026-11-02T06:53:19Z — "휴가 중 승인 위임(2026-11-01 대화); 0.35 즉시 시작은 사용자 결정(ATIP 세션 경유 2026-11-02)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:9d1ff29741e921b73d5627a75fed7d37ba4ee07fd4b70d6fe99c5dbd62f8f936)
+Approved: Journey Hwang 2026-11-03T04:35:22Z — "휴가 중 승인 위임(2026-11-01 대화): 리뷰 cursor 2_1 반영(묶임, 불투명 아님)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:e63e04ed4b0c72a4a0a2029976b7a280bf26f359d3aae79346f6dfecaa4f181c)
