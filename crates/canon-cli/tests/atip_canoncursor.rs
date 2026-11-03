@@ -531,3 +531,40 @@ fn atip_canoncursor_14_a_call_given_by_input_is_carried_as_argv_options() {
         assert_eq!(cursor_of(&spelled), cursor_of(&next), "{what}: a document and the line say the same");
     }
 }
+
+#[test]
+fn atip_canoncursor_15_a_fields_value_that_cannot_be_read_is_the_same_usage_in_text_mode_and_in_json_mode() {
+    let repo = fixture();
+    // A path the command always keeps (`round`) or another output's (`summary`) cannot be selected: it is refused like an unknown one.
+    let bad: Vec<(&str, Vec<&str>, &str)> = vec![
+        ("an unknown path", vec!["query", "--kind", "subject"], "nosuch"),
+        ("the empty value", vec!["query", "--kind", "subject"], ""),
+        ("a trailing comma", vec!["query", "--kind", "subject"], "subject_id,"),
+        ("an array path on a scalar", vec!["query", "--kind", "subject"], "subject_id[]"),
+        ("an unclosed bracketed key", vec!["query", "--kind", "subject"], "a[\"b"),
+        ("an unknown path", vec!["finding", "list", "--change", "add-login"], "nosuch"),
+        ("a kept path", vec!["finding", "list", "--change", "add-login"], "round"),
+        ("an unclosed bracketed key", vec!["finding", "list", "--change", "add-login"], "a[\"b"),
+        ("an unknown path", vec!["divergence", "list"], "nosuch"),
+        ("the empty value", vec!["divergence", "list"], ""),
+        ("a path of another output", vec!["divergence", "list"], "summary"),
+        ("an unknown path", vec!["export", "--kind", "subject"], "nosuch"),
+        ("a trailing comma", vec!["export", "--kind", "subject"], "kind,"),
+        ("a dotted path into a leaf", vec!["export", "--kind", "subject"], "digest.value"),
+    ];
+    let before = snapshot(repo.path());
+    for (what, args, value) in bad {
+        let json_call: Vec<&str> = args.iter().copied().chain(["--fields", value, "--json"]).collect();
+        let text_call: Vec<&str> = args.iter().copied().chain(["--fields", value]).collect();
+        let in_json = canon(repo.path(), &json_call);
+        let error = json(&in_json)["error"].clone();
+        assert_eq!((in_json.status.code(), error["code"].as_str(), error["field"].as_str()), (Some(2), Some("USAGE"), Some("--fields")), "{args:?} {what}: {error}");
+        assert!(error["expected"].as_array().is_some_and(|paths| !paths.is_empty()), "{args:?} {what}: the declared paths: {error}");
+        let in_text = canon(repo.path(), &text_call);
+        assert_eq!(in_text.status.code(), Some(2), "{args:?} {what}");
+        assert!(in_text.stdout.is_empty(), "{args:?} {what}: a refusal prints no report");
+        let stderr = String::from_utf8_lossy(&in_text.stderr);
+        assert!(stderr.starts_with("canon: USAGE:") && stderr.contains("field: --fields"), "{args:?} {what}: {stderr}");
+        assert_eq!(snapshot(repo.path()), before, "{args:?} {what}: a refusal writes nothing");
+    }
+}

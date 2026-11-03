@@ -140,3 +140,13 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
     Given export documents given as --input inline and on stdin
     When export runs with --limit 1 --json and the entry of meta.next is run
     Then the entry holds the document's keys as --name=value options and no --input, and the next page is read
+
+  # canon: {"schema":1,"at":"2026-11-03T04:43:46Z","actor":{"agent_id":"impl-canon-cursor","role":"implementer","session_id":"s-0-35-canon-cursor"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-canon-cursor-1-2.F4
+  @atip.canoncursor.15
+  Scenario: A --fields value the command does not declare or cannot read (unknown, empty, trailing comma, array on a scalar, unclosed key, a kept path) is the same USAGE in text mode as in JSON mode, on the four paged commands, and nothing is written
+    Given a repo with three subjects, a change with three findings and two divergent scenarios
+    When query, finding list, divergence list and export run with --fields nosuch, with an empty value, with subject_id[], with a trailing comma, with an unclosed bracketed key and with a path the command always keeps, each with --json and without
+    Then every call is exit 2 USAGE with field --fields; the JSON mode lists the declared paths as expected and the text mode prints the same refusal on stderr with nothing on stdout, and the repository is byte-identical afterwards
