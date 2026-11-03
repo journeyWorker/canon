@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="11" skipped="0" failures="0" errors="0" uuid="84856867-06b6-4823-8f4e-6410ccefdc4a" timestamp="2026-11-03T14:56:49.493+09:00" time="16.515">
+    <testsuite name="atip-check::claim12" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_122_a_1_2_document_whose_cursor_all_or_fields_is_not_flag_only_and_a_retryable_stopped_midway_fail_at_1_2_only" classname="atip-check::claim12" timestamp="2026-11-03T14:56:49.509+09:00" time="0.035"/>
+    </testsuite>
+    <testsuite name="canon-cli::stopped_midway" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_midway_13_an_io_failure_code_that_moves_or_is_absorbed_fails_the_check" classname="canon-cli::stopped_midway" timestamp="2026-11-03T14:56:49.546+09:00" time="0.063"/>
+    </testsuite>
+    <testsuite name="atip" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="cursor::tests::atip_cratecursor_13_what_only_one_minor_binds_is_refused_between_pages_by_that_minor_only" classname="atip" timestamp="2026-11-03T14:56:49.509+09:00" time="0.190"/>
+        <testcase name="shell::tests::atip_crateshell_07_a_word_that_would_break_unquoted_is_never_written_bare" classname="atip" timestamp="2026-11-03T14:56:49.509+09:00" time="0.287"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_skills_show" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="atip_skillsshow_11_the_scan_finds_a_reader_of_an_old_member_and_passes_a_current_one" classname="canon-cli::atip_skills_show" timestamp="2026-11-03T14:56:49.509+09:00" time="0.241"/>
+        <testcase name="atip_skillsshow_10_a_first_line_that_names_one_entrance_or_none_is_not_the_pointer" classname="canon-cli::atip_skills_show" timestamp="2026-11-03T14:56:49.509+09:00" time="1.882"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_readwrites" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="atip_readwrites_09_a_refused_dashboard_call_is_one_envelope_and_serves_nothing" classname="canon-cli::atip_readwrites" timestamp="2026-11-03T14:56:49.509+09:00" time="8.197"/>
+        <testcase name="atip_readwrites_08_subject_show_of_a_missing_subject_is_refused_quietly_and_writes_nothing" classname="canon-cli::atip_readwrites" timestamp="2026-11-03T14:56:49.509+09:00" time="8.836"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_check_order" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_alone_keeps_its_code" classname="canon-cli::atip_check_order" timestamp="2026-11-03T14:56:49.510+09:00" time="8.473"/>
+        <testcase name="atip_checkorder_19_a_call_that_satisfies_a_rule_is_not_answered_with_the_rules_field" classname="canon-cli::atip_check_order" timestamp="2026-11-03T14:56:49.509+09:00" time="11.520"/>
+    </testsuite>
+    <testsuite name="atip-check::findings" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_123_an_unprovided_check_in_the_text_report_keeps_its_line_and_lists_no_findings" classname="atip-check::findings" timestamp="2026-11-03T14:56:49.509+09:00" time="16.497"/>
+    </testsuite>
+</testsuites>

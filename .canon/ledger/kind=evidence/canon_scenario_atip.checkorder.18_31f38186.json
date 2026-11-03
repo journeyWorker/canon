@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-flow-failures",
+    "role": "implementer",
+    "session_id": "s-0-35-flow-failures"
+  },
+  "at": "2026-11-03T06:00:10.779657Z",
+  "attachments": [
+    {
+      "case": "atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_alone_keeps_its_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "d1a8ba81fabe22de80a814533bb0371b9872d5dccac77fba3708cbfe02ad1240"
+    }
+  ],
+  "code_tree": "8444191ae7a3e24d96f507ac398ebaa3ed0cef11",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "12224ee2d6e7c7e549293a610d4f790d09c04632",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 19,
+  "scenario_id": "atip.checkorder.18",
+  "schema": 1,
+  "staging_id": "d26a05f7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-flow-failures",
+    "role": "implementer",
+    "session_id": "s-0-35-flow-failures"
+  },
+  "at": "2026-11-03T06:04:06.822459Z",
+  "attachments": [
+    {
+      "case": "atip_check_123_an_unprovided_check_in_the_text_report_keeps_its_line_and_lists_no_findings",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "d1a8ba81fabe22de80a814533bb0371b9872d5dccac77fba3708cbfe02ad1240"
+    }
+  ],
+  "code_tree": "8444191ae7a3e24d96f507ac398ebaa3ed0cef11",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit.xml"
+  },
+  "evidence_sha": "12224ee2d6e7c7e549293a610d4f790d09c04632",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 794,
+  "scenario_id": "atip.check.123",
+  "schema": 1,
+  "staging_id": "4148620d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
