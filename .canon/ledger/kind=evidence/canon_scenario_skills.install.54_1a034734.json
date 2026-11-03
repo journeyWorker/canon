@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split-fix"
+  },
+  "at": "2026-11-03T14:27:04.951678Z",
+  "attachments": [
+    {
+      "case": "skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "002dca60d5ccae597493ca5afd865b715a80797cace5e2c7308f87122d380827"
+    }
+  ],
+  "code_tree": "8fa758de852cbe6f3744b7b1073879eb02b2430a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check after review 1_1-1_5: cargo nextest run --workspace (default profile, 3732 passed) and just test-atip = cargo nextest run -p atip-check --profile atip (369 passed), from the clean worktree at the fix commit, under the load of parallel agents"
+  },
+  "evidence_sha": "70cf7b30fbb3c0367850aefa7bdd051325458a83",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 385,
+  "scenario_id": "skills.install.54",
+  "schema": 1,
+  "staging_id": "fd4098fc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
