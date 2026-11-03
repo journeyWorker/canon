@@ -3,7 +3,7 @@
     "agent_id": "canon",
     "role": "planner"
   },
-  "at": "2026-11-02T06:42:08.568841Z",
+  "at": "2026-11-03T10:10:52.123870Z",
   "change_ids": [
     "canon-0-33-atip-check",
     "canon-0-34-atip-check-1-1",
@@ -14,7 +14,8 @@
     "canon-0-35-check-l2-input",
     "canon-0-35-check-l2-safety",
     "canon-0-35-check-l2-guides",
-    "canon-0-35-claim-l2"
+    "canon-0-35-claim-l2",
+    "canon-0-35-split-atip-check"
   ],
   "domain": "dev",
   "kind": "subject",
