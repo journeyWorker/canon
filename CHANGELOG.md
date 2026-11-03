@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.35.0 — 2026-11-04
+
+canon adopts atip/1 1.2 and meets its L2: the batch, plan, cursor and check-order rules of the contract, `atip check` runs the L2 checks, and the `atip` crate gains `cursor`, `plan`, `given`, `jcs` and `validate`.
+
 ### Breaking
 
 **canon declares atip/1 1.2 and claims level L2** (`canon-0-35-claim-l2`, scenarios `atip.claiml2.01-18`). This is the one entry to read for the release: the other entries below are the changes that make the claim true, and the upgrade notes of each stand with it.
@@ -244,6 +248,14 @@ Upgrade note: **a cursor 0.34 issued is refused after the upgrade** (`CURSOR_INV
 - **`subject show` declares what it writes.** It stays a `read` command and refreshes the stale scenario-index cache once the subject is found (spec 12.1); its `effectNote` says so. In JSON mode nothing is written to stderr (the refresh is a `SCENARIO_INDEX_REFRESHED` entry of `meta.warnings`); the text mode keeps its progress line.
 
 - `atip::split_argv` reads a backslash outside quotes the way a POSIX shell does, so it reads back what `atip::quote` writes: `split_argv(join(words.map(quote)))` is `words` for every list of words. Before, `quote("it's")` (`'it'\''s'`) split back to `it\s`, and the checker's `L0.next` reported a correct tool whose next step held a word with a single quote. A backslash makes the next character literal, a backslash and a newline join the line, and a backslash at the end of the input stays one backslash; inside single quotes a backslash is a character, and inside double quotes only `\"` and `\\` are escapes, as before. `quote`'s output does not change, so canon's `command` strings are the same bytes (`canon-0-35-crate-shell`, `atip.crateshell.01-06`).
+
+### Upgrading
+- Read `meta.contractVersion` as `"1.2"` and `data.level` as `L2`; the members you know are unchanged.
+- Read `data.items[].status`, not `data.unchanged`, to learn that a batch changed nothing.
+- Start a listing again without `--cursor` if you upgraded between two pages: a cursor 0.34 issued is `CURSOR_INVALID` (`FOREIGN`).
+- Run a destructive preview again after the upgrade and commit the digest it prints: a 0.34 preview is `PLAN_STALE`; `planDigest` is `sha256:` and 64 hex digits.
+- Pass `--providers=<list>` to `canon init` when no harness directory is detected; it never asks.
+- An `atip check` fixture for 1.2 may use `notRun`, `preview`, `async` and the batch keys; `LEVEL_UNSUPPORTED` is gone.
 
 ## 0.34.0 — 2026-11-02
 
