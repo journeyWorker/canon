@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "atip_checkorder_05_a_broken_domain_is_answered_before_a_constraint_and_before_a_later_domain",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6775a15d0ff4615f437c8641b3263d41d73cf4566c6e10c68d3a8951e515d25"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 63,
+  "scenario_id": "atip.checkorder.05",
+  "schema": 1,
+  "staging_id": "b10cb340",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

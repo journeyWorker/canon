@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "checks::rules::tests::atip_check_59_every_code_reason_and_warning_a_document_emits_is_listed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_the_markers_and_the_version_are_the_claims",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_a_hint_that_starts_with_the_tool_name_is_judged_as_one_command_line",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_a_finding_belongs_to_one_rule_and_the_envelope_schema_leaves_the_others_theirs",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1125,
+  "scenario_id": "atip.check.59",
+  "schema": 1,
+  "staging_id": "6b1dd6cb",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

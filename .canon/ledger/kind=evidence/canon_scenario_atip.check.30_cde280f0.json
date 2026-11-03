@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "exec::tests::atip_check_30_a_refusal_that_changes_the_directory_or_home_names_the_paths",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "snapshot::tests::atip_check_30_a_snapshot_names_what_was_created_changed_and_removed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_30_l0_refusal_effects_fails_when_a_refusal_writes_in_the_working_directory_home_or_a_remote_the_probe_reports",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1096,
+  "scenario_id": "atip.check.30",
+  "schema": 1,
+  "staging_id": "bedff76e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

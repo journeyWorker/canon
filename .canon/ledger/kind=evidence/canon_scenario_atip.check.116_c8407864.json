@@ -1,0 +1,73 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_unprovided_with_its_code_and_any_other_refusal_is_a_fixture_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_116_a_not_run_command_that_exits_1_with_a_registered_code_has_ended_on_its_own_and_is_a_fixture_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_116_a_command_that_ends_on_its_own_before_or_after_its_first_document_is_a_fixture_error_and_no_check_runs",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_116_a_not_run_refusal_naming_an_argument_or_an_unregistered_code_is_a_fixture_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_116_a_not_run_command_whose_effect_note_is_empty_or_blank_is_a_fixture_error_at_l1",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_116_a_refusal_of_a_step_that_reads_no_state_is_a_fixture_error_whatever_its_code_when_the_code_is_registered",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_116_a_not_run_refusal_with_a_code_the_command_document_declares_is_a_fixture_error_at_l1_and_unprovided_without_the_document",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1070,
+  "scenario_id": "atip.check.116",
+  "schema": 1,
+  "staging_id": "cc9e88af",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
