@@ -73,7 +73,7 @@ Fixture keys of L2:
   commands.<id>.allowedEffects glob list of the files a successful read may change (a read with an effectNote)
   search                       [{query, expect}]: a question for schema --search and the command it must find among the first five
 
-allowedEffects glob: a path is relative to the working directory (a leading ./ is optional) or to HOME with a ~/ prefix; * matches any run of characters within one path segment (not /), ** matches across segments, ? one character but /, nothing else is special (no classes or braces); the whole path must match. A directory made to hold a changed file is not judged on its own (the file is).
+allowedEffects glob: a path is relative to the working directory (a leading ./ is optional) or to HOME with a ~/ prefix; * matches any run of characters within one path segment (not /), ** matches across segments, ? one character but /, nothing else is special (no classes or braces); the whole path must match. Snapshots count files only: a directory, made to hold a changed file or left empty, is no effect (the file is judged).
 
 Every MUST check passing exits 0, a failed level exits 1 (LEVEL_NOT_MET), a refusal exits 2.";
 

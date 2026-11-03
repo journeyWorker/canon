@@ -557,12 +557,11 @@ impl<'a> Judge<'a> {
             }
             c.own(read.call);
             let outcome = self.at(read.call);
-            // Files only: a directory made to hold a changed file is no effect of its own (the file is judged), so `.canon/audit/access.jsonl`
-            // is all a read that creates `.canon/audit` has to allow. A directory with nothing under it is an effect.
+            // The snapshot counts files only (checker.md 1.3.1 section 4): a directory, made to hold an allowed file or left empty, is no change to judge,
+            // so `.canon/audit/access.jsonl` is all a read that creates `.canon/audit` has to allow.
             let stray: Vec<&String> = outcome
                 .changes
                 .iter()
-                .filter(|path| !outcome.changes.iter().any(|other| other.strip_prefix(path.as_str()).is_some_and(|rest| rest.starts_with('/'))))
                 .filter(|path| !(read.has_note && read.patterns.iter().any(|pattern| glob::matches(pattern, path))))
                 .collect();
             c.holds_at(read.call, "read-changes-only-allowed", stray.is_empty(), || {

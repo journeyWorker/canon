@@ -250,6 +250,19 @@ fn atip_checkl2safety_09_a_directory_made_to_hold_an_allowed_file_is_not_an_effe
 }
 
 #[test]
+fn atip_checkl2safety_09_a_directory_a_read_leaves_empty_is_not_an_effect() {
+    // checker.md 1.3.1 section 4: snapshots count files only. The read makes `.peek-empty` and nothing under it: the only change is the allowed `.peek-access.log`.
+    let output = run_config(&l2_config(&json!({"peekBareDir": true})));
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L2.effects")["result"], "pass", "{}\n{}", check_of(data, "L2.effects"), not_passing(data));
+    // A file the read writes outside its allowance is still named, and the empty directory is not.
+    let output = run_config(&l2_config(&json!({"peekBareDir": true, "peekWritesOther": true})));
+    let check = check_of(&output.envelope()["data"], "L2.effects").clone();
+    let reason = check["reason"].as_str().unwrap_or_default();
+    assert!(check["result"] == "fail" && reason.contains("peek-cache.txt") && !reason.contains(".peek-empty"), "{check}");
+}
+
+#[test]
 fn atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_next_that_only_reads_has_the_outcomes_unchecked() {
     let case = Case { condition: "async/outcomes", config: l2_standard_config(), tweak: None }.with_tweak(|fixture| {
         fixture["commands"]["deploy start"]["async"]["outcomes"] = json!(["done"]);

@@ -392,6 +392,10 @@ fn peek_run(tool: &Tool, _args: &[String], _parsed: &Parsed) -> ExitCode {
     } else {
         ".peek-access.log"
     };
+    // Seeded: the read also makes a directory that holds nothing: a directory is no effect.
+    if tool.flag("peekBareDir") {
+        std::fs::create_dir_all(".peek-empty").unwrap_or_else(|_| std::process::exit(70));
+    }
     let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path).unwrap_or_else(|_| std::process::exit(70));
     writeln!(file, "peeked").unwrap_or_default();
     if tool.flag("peekWritesOther") {
