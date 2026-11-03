@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:23:37.384017Z",
+  "change_id": "canon-0-35-canon-cursor-1-2",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 2,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Decision for the human, not a code defect: the approved brief still says F1 'cursor 문자열은 불투명하다. 기록 키가 보이지 않는다' and the F1 failure path 'cursor 문자열에 기록 키가 글자 그대로 들어 있지 않다', and the brief was not amended. Commit 0a537118 closed 1_3 by changing the claim (CHANGELOG, scenario atip.canoncursor.03, its test) from 'no record key is readable' to 'one ASCII word, a changed character is FOREIGN, not encrypted', because the position is the base64url text of the record's key and the crate (atip::cursor) writes it. I agree the new claim is true (checked on the real binary: query --kind subject and export --kind subject cursors, every one of 155 and 156 characters changed in turn gives exit 2 CURSOR_INVALID, 0 survivors; the four-command test samples every 5th character plus the last), and atip 1.2.1 6.9 asks for no opacity, so I closed 1_3 fixed and signed atip.canoncursor.03. The human should accept that the approved brief's opacity sentence is not delivered (an accepted divergence, or an amended brief): `canon divergence accept` and `brief approve` are HUMAN_ONLY.",
+  "worktree_dirty": false
+}

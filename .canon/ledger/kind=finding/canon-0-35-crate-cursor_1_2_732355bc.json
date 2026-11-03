@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T12:42:53.805187Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "81d0990ad7fd4f00b832f676413269da9750c02a",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/cursor.rs",
+  "introduced_by": "87159df68f13f92a07ec7eed05e35a84b4f58e78",
+  "kind": "finding",
+  "reviewed_sha": "30d3ae0f1bcfda139d4d5a33a34a12939f171635",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.cratecursor.05",
+    "atip.cratecursor.06"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards: the cursor's 16-hex check is an unkeyed truncated SHA-256 of its own body, so it finds a damaged or foreign string (scenario 06) but not a forged one: anyone can write a valid cursor with any position. Nothing in the module docs or the CHANGELOG says so; a tool must treat the decoded position as caller input (a key to validate, never a path or a query), not as something only it could have issued. Blast radius: canon-0-35-canon-cursor-1-2 moves canon's position strings onto it, and any third tool reading the position.",
+  "worktree_dirty": false
+}

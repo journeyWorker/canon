@@ -17,10 +17,34 @@ impl Model {
     pub fn of(tool: &Tool) -> Self {
         let shape = Shape {
             is_1_1: tool.is_1_1(),
+            is_1_2: tool.is_1_2(),
+            limit_not_flag_only: tool.flag("limitNotFlagOnly"),
+            repeatable_default: tool.flag("repeatableDefault"),
+            serve: tool.config.contains_key("serveMode"),
+            serve_without_note: tool.flag("serveNoEffectNote"),
             deep: tool.flag("deepTree"),
+            l2: tool.flag("l2"),
+            pair_code: tool.flag("pairCode"),
+            batch: !tool.flag("noBatch"),
+            tag_flag_only_rule: tool.flag("tagFlagOnlyRule"),
         };
+        let mut commands = super::spec::commands(shape, !tool.flag("noSchema"));
+        if tool.flag("sharedEnv") {
+            // Seeded: every option that reads the environment reads the same variable, so none is the sole declarer of its own.
+            for command in &mut commands {
+                for arg in command.args.iter_mut().filter(|arg| arg.env.is_some()) {
+                    arg.env = Some("FAKE_SHARED");
+                }
+            }
+        }
+        if tool.flag("stampAudit") {
+            // Seeded: the audit line `stamp` appends is declared by its effectNote, as the contract asks of a named side effect.
+            if let Some(stamp) = commands.iter_mut().find(|command| command.id == "stamp") {
+                stamp.effect_note = Some("appends one line to .stamp-audit.log");
+            }
+        }
         Self {
-            commands: super::spec::commands(shape, !tool.flag("noSchema")),
+            commands,
             groups: super::spec::groups(shape),
         }
     }
@@ -57,7 +81,7 @@ impl Model {
             .unwrap_or_default()
     }
 
-    fn entry(&self, id: &str, is_group: bool) -> Value {
+    pub fn entry(&self, id: &str, is_group: bool) -> Value {
         let mut entry = json!({
             "command": id,
             "path": id.split(' ').collect::<Vec<_>>(),
@@ -113,6 +137,9 @@ fn option_doc(arg: &Arg) -> Value {
     if arg.flag_only {
         doc.insert("flagOnly".into(), json!(true));
     }
+    if let Some(env) = arg.env {
+        doc.insert("env".into(), json!(env));
+    }
     extras(arg, &mut doc);
     Value::Object(doc)
 }
@@ -126,6 +153,9 @@ fn extras(arg: &Arg, doc: &mut Map<String, Value>) {
     }
     if let Some(domain) = &arg.domain {
         doc.insert("domain".into(), domain.clone());
+    }
+    if let Some(env) = arg.env {
+        doc.insert("env".into(), json!(env));
     }
 }
 
@@ -169,6 +199,9 @@ pub fn command_doc(tool_name: &str, command: &Command) -> Value {
     if let Some(idempotency) = command.idempotency {
         doc.insert("idempotency".into(), json!(idempotency));
     }
+    if command.is_async {
+        doc.insert("async".into(), json!(true));
+    }
     if let Some(note) = command.effect_note {
         doc.insert("effectNote".into(), json!(note));
     }
@@ -210,10 +243,14 @@ pub fn command_doc(tool_name: &str, command: &Command) -> Value {
                 .iter()
                 .map(|output| {
                     let mut entry = json!({
-                        "kind": "report",
+                        "kind": if output.event.is_some() { "stream" } else { "report" },
                         "schemaRef": format!("#/schemas/{}", output.schema),
                         "schemaVersion": output.version,
                     });
+                    if let Some(event) = output.event {
+                        entry["mediaType"] = json!("application/x-ndjson");
+                        entry["eventRef"] = json!(format!("#/schemas/{event}"));
+                    }
                     if let Some(when) = output.when {
                         entry["when"] = json!(when);
                     }
@@ -264,14 +301,14 @@ pub fn group_doc(model: &Model, id: &str) -> Value {
 }
 
 /// The tree document, before any seeded patch.
-pub fn tree_doc(model: &Model, groups_last: bool) -> Value {
+pub fn tree_doc(model: &Model, groups_last: bool, level: &str) -> Value {
     let mut ids = model.all_ids();
     if groups_last {
         ids.sort_by_key(|(_, is_group)| *is_group);
     }
     json!({
         "kind": "tree",
-        "level": "L1",
+        "level": level,
         "commands": ids.iter().map(|(id, is_group)| model.entry(id, *is_group)).collect::<Vec<_>>(),
     })
 }
@@ -301,5 +338,33 @@ pub fn patched(tool: &Tool, key: &str, mut document: Value) -> Value {
             .map_or(0, |elapsed| elapsed.as_nanos());
         document["x-fake"] = json!({"run": nanos.to_string()});
     }
+    if tool.flag("usageRenamed") {
+        rename_usage(&mut document, &tool.usage_name());
+    }
     document
+}
+
+/// Seeded (`usageRenamed`): the tool has no `USAGE`; every `errors` list of a document names `replacement` in its place.
+fn rename_usage(document: &mut Value, replacement: &str) {
+    match document {
+        Value::Object(members) => {
+            for (key, value) in members.iter_mut() {
+                if key == "errors" {
+                    if let Value::Array(items) = value {
+                        for item in items.iter_mut().filter(|item| item.as_str() == Some("USAGE")) {
+                            *item = json!(replacement);
+                        }
+                        items.sort_by_key(|item| item.as_str().map(str::to_string));
+                    }
+                }
+                rename_usage(value, replacement);
+            }
+        }
+        Value::Array(items) => {
+            for item in items.iter_mut() {
+                rename_usage(item, replacement);
+            }
+        }
+        _ => {}
+    }
 }

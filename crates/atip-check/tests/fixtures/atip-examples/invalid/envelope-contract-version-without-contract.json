@@ -25,7 +25,7 @@
   },
   "meta": {
     "command": "member list",
-    "contractVersion": "1.1",
+    "contractVersion": "1.2",
     "schemaVersion": "1.0",
     "tool": "acme",
     "toolVersion": "1.0.0",

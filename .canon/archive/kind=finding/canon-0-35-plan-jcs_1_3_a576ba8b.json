@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev-b"
+  },
+  "at": "2026-11-02T20:27:53.584247Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "8e3278d006c012d2e1f6e196b0a7775609cda73f",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/write_lock.rs",
+  "introduced_by": "5d50c7d27fc8e9f6493c9f88e0bac17f3899f433",
+  "kind": "finding",
+  "reviewed_sha": "ea7d15afb1916d3b75e6f3f3195e4aa2baed3c42",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (brief F2 'the commit takes the write lock first, recomputes the plan under it'; spec 12.7 MUST): in a repository that has no .canon/repo-write.lock (every repository set up by 0.34 until canon init is run again or a lock-taking write happens), the MUST is not met. Real binary on a copy of a repo with the file deleted: a refused commit (PLAN_STALE) and a preview create nothing, finding add and dispatch begin run with no lock and create no file (hold_existing_within returns None), and a destructive commit computes and gates its plan with no lock, then creates the file in Plan::hold and takes it only from the gate on. So for the first commit the plan is not recomputed under the lock and a writer that does not lock (all of them, there being no file) can change what the plan read between the recompute and the gate. The CHANGELOG states it ('re-run canon init once in a repository set up by 0.34'; init does make the file and the .gitignore line, checked) but the contract has no exception for that, and the fix is small: take the lock on a file that always exists (canon.yaml, or the .canon directory) or create the lock file for a destructive commit before the recompute and accept that a refused commit leaves one empty gitignored file. Blast radius: the first destructive commit after an upgrade; scenario 08 and the unit tests build their repos with the file in place.",
+  "worktree_dirty": false
+}

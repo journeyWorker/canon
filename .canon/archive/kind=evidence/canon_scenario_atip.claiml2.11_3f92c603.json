@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-claim-l2-fix2"
+  },
+  "at": "2026-11-03T11:19:17.372403Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_11_every_obligation_of_contract_17_2_has_a_row_with_live_tests_or_a_stated_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "fe82ba937cf29445476ea25d0ba07f45e3e8a538abece7bb1f30c83303590add"
+    }
+  ],
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "a8a3483eb22b7eb2c270ca5d2182d1b98454eddc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 35,
+  "scenario_id": "atip.claiml2.11",
+  "schema": 1,
+  "staging_id": "39e288e0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

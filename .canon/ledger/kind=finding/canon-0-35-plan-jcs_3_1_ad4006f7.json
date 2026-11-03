@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T13:00:50.176768Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_planjcs.rs",
+  "introduced_by": "cdf36869e6fc68d1512aeeec367797163c4ef613",
+  "kind": "finding",
+  "reason": "re-verified at af11ec7e: mutant deleting the whole 'Upgrade note.' paragraph from CHANGELOG.md now fails atip_planjcs_12 and _16 (it passed both at 54c771cb); atip_planjcs 17 passed, atip_claiml2 18 passed",
+  "resolution_code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "resolution_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 3,
+  "scenario_ids": [
+    "atip.planjcs.16"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards (mutation probe; brief F5 'the note names the digest form and the fate of the 0.34 previews', scenario atip.planjcs.16 'an upgrade note that lacks a part fails the check'): note_problems() looks for its nine needles anywhere in the whole Unreleased section, so a note that loses a part cannot fail it while another entry still has the word. Counted in CHANGELOG.md: sha256: 10 other occurrences, PLAN_STALE 9, 0.34 21, inputs 11, REPO_WRITE_BUSY 4, .canon/repo-write.lock 3, canon-0-35-plan-jcs 1; only JCS and atip.planjcs.01 occur once. Mutant, run in a scratch worktree at dc2ac5b8 and reverted: delete the whole 'Upgrade note.' paragraph (the fate of a 0.34 preview and the script advice) from CHANGELOG.md: atip_planjcs_12 and atip_planjcs_16 both PASS. atip_planjcs_16 only feeds the helper strings it has cut the needle out of everywhere, so it proves the helper, not that the note is there. The same blind spot is in atip.planjcs.12 (signed before). One-line fix: read the paragraph that starts '**Upgrade note.**' (and the entry that opens '**The digest of a destructive plan') and look for the needles in those two, not in the section; add a case to 16 that deletes that paragraph from the real CHANGELOG text.",
+  "worktree_dirty": false
+}

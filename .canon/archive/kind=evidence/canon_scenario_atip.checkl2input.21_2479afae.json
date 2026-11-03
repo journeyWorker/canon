@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2"
+  },
+  "at": "2026-11-02T17:51:07.116881Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2input_21_every_condition_of_the_input_and_batch_rows_has_a_case_and_the_conforming_tool_judges_each",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-l2-junit.xml",
+      "sha256": "11ffba0659d600a334f167d9fa0af2e986db3ab264a1a978ebe4dc9b7ec7c16a"
+    }
+  ],
+  "code_tree": "f58a11eb422eccd72e33d8ffaac677b9e8f286ca",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-l2-junit.xml"
+  },
+  "evidence_sha": "b54f24a82299706b9d7ad8d0f334fd4ca35d6ad5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "atip.checkl2input.21",
+  "schema": 1,
+  "staging_id": "252e89b5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

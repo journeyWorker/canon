@@ -365,7 +365,7 @@ pub fn report_of(output: &Value) -> String {
 /// reader of `canon schema <command>` resolves them.
 pub fn schema_validator(node: &Value, name: &str) -> jsonschema::Validator {
     use jsonschema::{Registry, Resource};
-    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(node.clone())).expect("the document registers").prepare().expect("the registry prepares");
+    let registry = Registry::new().add("https://atip.dev/1/guide.schema.json", Resource::from_contents(serde_json::from_str(atip::GUIDE_SCHEMA).expect("the guide schema is JSON"))).expect("the contract schema registers").add("urn:canon:doc", Resource::from_contents(node.clone())).expect("the document registers").prepare().expect("the registry prepares");
     jsonschema::options().with_registry(&registry).build(&serde_json::json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).unwrap_or_else(|e| panic!("`{}`: the schema `{name}` does not compile: {e}", node["command"]))
 }
 
@@ -385,8 +385,8 @@ pub fn default_strings(argument: &Value) -> Vec<String> {
     }
 }
 
-/// What clap declares about how the options of the command `path` go together: the rules `atip::constraint::clap_rules`
-/// reads from its public getters (the rules of the tables are in the command's document).
+/// How the options of the command `path` go together: the rules `canon_cli::arg_rules::rules_of` lists (the tool declares no relation to clap,
+/// which would enforce it while it parses, ahead of the domains; spec 11.7 step 6).
 pub fn relations_of(path: &str) -> atip::project::Relations {
     static ROOT: LazyLock<clap::Command> = LazyLock::new(|| {
         let mut root = canon_cli::cli::command();
@@ -397,7 +397,8 @@ pub fn relations_of(path: &str) -> atip::project::Relations {
     for word in path.split(' ') {
         node = node.find_subcommand(word).unwrap_or_else(|| panic!("`{path}` is not a command of the tree"));
     }
-    atip::project::Relations::from_constraints(&atip::constraint::clap_rules(node))
+    let rules: Vec<atip::doc::ConstraintDoc> = canon_cli::arg_rules::rules_of(node, path).iter().map(atip::constraint::Rule::doc).collect();
+    atip::project::Relations::from_constraints(&rules)
 }
 
 /// What `canon --json` printed must be: an atip/1 envelope (`atip::envelope_problems`, the vendored contract

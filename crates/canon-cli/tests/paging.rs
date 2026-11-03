@@ -57,10 +57,9 @@ fn paging_with_next_cursor_yields_exactly_the_all_set_in_order() {
         match page["meta"]["page"]["nextCursor"].as_str() {
             Some(next) => {
                 // The next page is the same call plus `--cursor <nextCursor>`.
-                let step = page["meta"]["next"].as_array().and_then(|steps| steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w == "--cursor")))).unwrap_or_else(|| panic!("a next page is a next step: {page}"));
+                let step = page["meta"]["next"].as_array().and_then(|steps| steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w.as_str().is_some_and(|w| w.starts_with("--cursor=")))))).unwrap_or_else(|| panic!("a next page is a next step: {page}"));
                 let argv: Vec<&str> = step["argv"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
-                let at = argv.iter().position(|w| *w == "--cursor").unwrap();
-                assert_eq!(argv[at + 1], next, "{step}");
+                assert_eq!(argv.iter().find_map(|w| w.strip_prefix("--cursor=")), Some(next), "{step}");
                 assert_eq!(argv[0], "query", "{step}");
                 cursor = Some(next.to_string());
             }
@@ -172,11 +171,12 @@ fn purge_preview_then_commit_deletes_and_a_stale_digest_deletes_nothing() {
     let preview_body = json(&preview);
     let digest = preview_body["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
     assert_eq!(preview_body["data"]["committed"], false, "{preview_body}");
-    assert_eq!(preview_body["data"]["effects"].as_array().unwrap().len(), 2, "one effect per record the plan removes: {preview_body}");
+    assert_eq!(preview_body["data"]["effects"].as_array().unwrap().len(), 3, "one effect per record the plan removes, and the audit line the commit appends: {preview_body}");
     // The one step after a preview is the exact commit, digest filled in.
     assert_eq!(preview_body["meta"]["command"], "purge", "{preview_body}");
     let repo = fixture.root.path().display().to_string();
-    let expected = ["purge", "--kind", "trajectory", "--before", before.as_str(), "--repo", repo.as_str(), "--commit", "--plan-digest", digest.as_str(), "--json"];
+    let (kind, before_arg, repo_arg, digest_arg) = ("--kind=trajectory".to_string(), format!("--before={before}"), format!("--repo={repo}"), format!("--plan-digest={digest}"));
+    let expected = ["purge", kind.as_str(), before_arg.as_str(), repo_arg.as_str(), "--commit", digest_arg.as_str(), "--json"];
     assert_eq!(preview_body["meta"]["next"][0]["argv"], serde_json::json!(expected), "{preview_body}");
     assert_eq!(fixture.git_file_count(), 2, "a preview deletes nothing");
     assert!(!fixture.root.path().join(canon_model::paths::ACCESS_AUDIT_FILE).exists(), "a preview writes no audit line");

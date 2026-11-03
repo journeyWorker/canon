@@ -1,0 +1,17 @@
+description: "atip/1 1.2 (0.35): a batch follows spec 11.8 and 11.11: a preflight refusal is the element's own code at /<index>/... with no data, an element that fails when it runs (the object it names is missing, which preflight does not read, even for a command with --dry-run, and at index 0 too) is BATCH_INCOMPLETE at /<index> with the earlier elements done, and a failed element has its error and no data"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [subject, new, --input, "[{\"operands\":[\"alpha\"],\"domain\":\"dev\",\"title\":\"Alpha\"},{\"operands\":[\"beta\"],\"domain\":\"dev\",\"title\":3}]", --json]
+    exit: 2
+  - args: [subject, new, --input, "[{\"operands\":[\"alpha\"],\"domain\":\"dev\",\"title\":\"Alpha\"},{\"operands\":[\"beta\"],\"domain\":\"dev\",\"title\":\"Beta\"}]", --json]
+    exit: 0
+  - args: [subject, new, --input, "[{\"operands\":[\"alpha\"],\"domain\":\"dev\",\"title\":\"Alpha\"},{\"operands\":[\"beta\"],\"domain\":\"dev\",\"title\":\"Beta\"}]", --json]
+    exit: 1
+  - args: [subject, move, --input, "[{\"operands\":[\"nosuch\"],\"to\":\"specced\"},{\"operands\":[\"alpha\"],\"to\":\"specced\"}]", --json]
+    exit: 1
+  - args: [subject, adopt, --input, "[{\"operands\":[\"alpha\"],\"change\":\"nosuch\"}]", --json]
+    exit: 1
+  - args: [subject, move, --input, "[{\"operands\":[\"alpha\"],\"to\":\"specced\"},{\"operands\":[\"alpha\"],\"to\":\"shipped\"},{\"operands\":[\"beta\"],\"to\":\"specced\"}]", --json]
+    exit: 1

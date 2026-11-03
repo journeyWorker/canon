@@ -1,0 +1,89 @@
+<testsuites name="nextest-run" tests="73" skipped="0" failures="0" errors="0" uuid="db11ad1d-e5a6-4edd-b7e3-288e5d0d5668" timestamp="2026-11-03T05:42:08.502+09:00" time="974.712">
+    <testsuite name="atip-check::atip_check_l1" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_checkl1_02_level_l2_runs_and_an_unknown_level_is_usage" classname="atip-check::atip_check_l1" timestamp="2026-11-03T05:42:09.296+09:00" time="40.560" />
+        </testsuite>
+    <testsuite name="atip-check::atip_check_run" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_32_level_l2_runs_the_checks_and_is_never_unsupported_and_l9_is_usage" classname="atip-check::atip_check_run" timestamp="2026-11-03T05:43:25.623+09:00" time="11.544" />
+        </testsuite>
+    <testsuite name="atip-check::atip_checkl2guides" tests="15" skipped="0" errors="0" failures="0">
+        <testcase name="atip_checkl2guides_01_a_conforming_tool_passes_skills_show_each_guide_and_an_unknown_name" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:36.464+09:00" time="30.076" />
+        <testcase name="atip_checkl2guides_01_a_skills_show_that_writes_fails_l2_skills_alone_and_l2_effects_leaves_it_to_it" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:36.619+09:00" time="30.307" />
+        <testcase name="atip_checkl2guides_06_only_lines_that_start_with_the_tool_name_are_targets" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:41.285+09:00" time="30.779" />
+        <testcase name="atip_checkl2guides_05_a_line_with_a_pipe_is_skipped_and_reported_and_a_placeholder_is_replaced_by_a_valid_value" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:41.204+09:00" time="31.036" />
+        <testcase name="atip_checkl2guides_07_a_root_help_first_line_without_skills_show_fails_only_l2_help_guide" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:47.252+09:00" time="31.054" />
+        <testcase name="atip_checkl2guides_08_a_conforming_stream_passes_for_every_declared_output_and_names_the_output_on_both_lines" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:54.402+09:00" time="34.591" />
+        <testcase name="atip_checkl2guides_03_an_unknown_guide_name_is_refused_with_the_guide_names_and_without_them_it_fails" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:37.167+09:00" time="68.142" />
+        <testcase name="atip_checkl2guides_02_a_guide_name_left_out_of_the_list_and_a_skills_show_that_needs_state_or_writes_fail_only_l2_skills" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:37.166+09:00" time="69.359" />
+        <testcase name="atip_checkl2guides_04_a_guide_line_with_a_wrong_option_fails_only_l2_guide_commands_naming_the_guide_and_the_line" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:43:38.985+09:00" time="70.025" />
+        <testcase name="atip_checkl2guides_10_a_tool_without_a_stream_command_has_l2_stream_unsupported_and_a_server_command_is_left_out" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:44:06.926+09:00" time="49.394" />
+        <testcase name="atip_checkl2guides_12_a_tool_without_schema_search_has_l2_search_unsupported_and_one_with_it_and_no_question_is_unprovided" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:44:12.240+09:00" time="49.329" />
+        <testcase name="atip_checkl2guides_14_the_conforming_fake_and_the_checker_itself_pass" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:44:28.994+09:00" time="40.926" />
+        <testcase name="atip_checkl2guides_09_a_stream_without_an_end_line_an_event_that_breaks_its_schema_and_a_start_before_the_usage_error_fail_only_l2_stream" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:44:06.540+09:00" time="78.967" />
+        <testcase name="atip_checkl2guides_11_the_question_of_the_fixture_finds_the_expected_command_in_the_first_five_and_the_sixth_is_an_advisory" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:44:12.065+09:00" time="119.313" />
+        <testcase name="atip_checkl2guides_13_every_condition_of_the_guide_rows_has_a_case_and_the_conforming_tool_judges_each" classname="atip-check::atip_checkl2guides" timestamp="2026-11-03T05:44:18.306+09:00" time="410.498" />
+    </testsuite>
+    <testsuite name="atip-check::atip_checkl2input" tests="27" skipped="0" errors="0" failures="0">
+        <testcase name="atip_checkl2input_01_level_l2_runs_the_input_and_batch_rows_and_a_conforming_tool_meets_the_level" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:44:45.309+09:00" time="40.313" />
+        <testcase name="atip_checkl2input_03_input_present_and_input_example_judge_the_documents_alone_and_each_condition_fails_only_its_owner" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:44:49.011+09:00" time="44.484" />
+        <testcase name="atip_checkl2input_02_a_tree_whose_level_is_l1_fails_l1_tree_at_l2_and_a_write_without_input_fails_l2_input_present" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:44:46.526+09:00" time="52.880" />
+        <testcase name="atip_checkl2input_04_input_too_large_is_refused_on_input_and_a_pointer_fails_only_l2_input_refusals" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:01.569+09:00" time="45.028" />
+        <testcase name="atip_checkl2input_04_the_exit_number_of_an_input_refusal_is_l0_ok_exits_alone" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:09.920+09:00" time="41.916" />
+        <testcase name="atip_checkl2input_06_stdin_on_a_terminal_is_refused_on_input_and_each_condition_of_input_tty_fails_only_it" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:25.623+09:00" time="43.025" />
+        <testcase name="atip_checkl2input_07_input_usage_is_a_must_for_a_1_1_claim_and_a_malformed_command_line_is_never_input_invalid" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:39.406+09:00" time="41.906" />
+        <testcase name="atip_checkl2input_04_every_refusal_document_is_refused_with_exit_2_and_a_pointer_the_two_key_document_with_two_details" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:44:56.320+09:00" time="86.795" />
+        <testcase name="atip_checkl2input_09_a_document_and_argv_split_three_ways_and_numeric_strings_give_the_argv_result" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:51.837+09:00" time="38.559" />
+        <testcase name="atip_checkl2input_10_a_different_value_conflicts_with_the_pointer_and_the_same_value_written_another_way_succeeds" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:08.648+09:00" time="39.921" />
+        <testcase name="atip_checkl2input_05_a_tool_that_accepts_a_flag_only_key_in_a_document_fails_only_l2_input_refusals" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:25.507+09:00" time="83.577" />
+        <testcase name="atip_checkl2input_11_an_env_value_applies_after_the_merge_only" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:11.379+09:00" time="39.789" />
+        <testcase name="atip_checkl2input_07_a_finer_replacement_of_usage_names_an_argument_and_a_field_that_names_none_fails_l2_input_usage" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:33.496+09:00" time="79.816" />
+        <testcase name="atip_checkl2input_12_a_broken_constraint_or_a_missing_key_is_refused_with_the_right_code_and_a_document_pointer" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:21.311+09:00" time="36.602" />
+        <testcase name="atip_checkl2input_19_a_malformed_batch_fails_at_or_first_is_fixture_invalid_with_exit_2" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:57.914+09:00" time="0.284" />
+        <testcase name="atip_checkl2input_13_a_value_that_starts_with_a_dash_a_brace_or_a_bracket_is_a_value" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:23.116+09:00" time="36.407" />
+        <testcase name="atip_checkl2input_08_input_reasons_is_advisory_and_the_level_is_met" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:45:46.598+09:00" time="73.562" />
+        <testcase name="atip_checkl2input_14_a_number_beyond_the_safe_range_in_a_document_is_refused_and_l1_numbers_owns_it" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:30.397+09:00" time="33.585" />
+        <testcase name="atip_checkl2input_15_a_conforming_batch_tool_passes_the_three_batch_rows_with_the_counts_order_and_statuses" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:46.591+09:00" time="39.542" />
+        <testcase name="atip_checkl2input_15_a_rule_on_flag_only_arguments_is_never_broken_by_a_batch_item" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:48.569+09:00" time="44.904" />
+        <testcase name="atip_checkl2input_17_a_tool_with_no_batch_command_has_the_three_batch_rows_unsupported" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:51.169+09:00" time="48.538" />
+        <testcase name="atip_checkl2input_20_a_write_the_fixture_does_not_list_is_named_unlisted_and_never_run_by_an_input_row" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:58.198+09:00" time="53.555" />
+        <testcase name="atip_checkl2input_22_the_conforming_fake_and_the_checker_itself_pass" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:47:03.982+09:00" time="81.630" />
+        <testcase name="atip_checkl2input_18_a_fixture_without_batch_fails_at_or_first_makes_batch_incomplete_unprovided_and_exits_1" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:53.312+09:00" time="157.374" />
+        <testcase name="atip_checkl2input_20_an_unlisted_write_never_decides_unsupported_and_leaves_the_batch_rows_unprovided" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:59.523+09:00" time="163.789" />
+        <testcase name="atip_checkl2input_16_a_first_item_failure_with_exit_2_and_a_preflight_refusal_as_batch_incomplete_each_fail_only_their_row" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:46:49.085+09:00" time="214.776" />
+        <testcase name="atip_checkl2input_21_every_condition_of_the_input_and_batch_rows_has_a_case_and_the_conforming_tool_judges_each" classname="atip-check::atip_checkl2input" timestamp="2026-11-03T05:47:00.161+09:00" time="642.475" />
+    </testsuite>
+    <testsuite name="atip-check::atip_checkl2safety" tests="16" skipped="0" errors="0" failures="0">
+        <testcase name="atip_checkl2safety_01_a_conforming_destructive_preview_names_the_plan_and_changes_nothing_and_the_stdin_preview_replays" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:47:26.133+09:00" time="96.333" />
+        <testcase name="atip_checkl2safety_06_a_write_the_fixture_does_not_list_is_named_and_never_run" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:49:02.468+09:00" time="64.957" />
+        <testcase name="atip_checkl2safety_03_a_one_character_digest_is_plan_stale_with_the_preview_next_and_the_right_commit_commits" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:47:39.707+09:00" time="164.967" />
+        <testcase name="atip_checkl2safety_04_a_stale_digest_accepted_or_a_commit_alone_that_commits_fails_its_row_and_the_pairs_own_code_passes" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:47:51.753+09:00" time="160.377" />
+        <testcase name="atip_checkl2safety_05_the_three_idempotency_values_pass_and_a_second_run_with_a_new_effect_or_an_accepted_once_fails" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:48:25.618+09:00" time="134.291" />
+        <testcase name="atip_checkl2safety_08_at_l0_and_l1_l2_effects_is_an_advisory_and_a_failure_leaves_the_level_met" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:49:43.314+09:00" time="82.857" />
+        <testcase name="atip_checkl2safety_02_a_preview_that_writes_fails_only_l2_destructive_preview_and_a_commit_that_is_not_flag_only_fails_l2_destructive_safety" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:47:33.473+09:00" time="224.764" />
+        <testcase name="atip_checkl2safety_07_a_dry_run_or_help_or_version_that_writes_fails_l2_effects_and_an_allowed_read_change_passes" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:49:30.687+09:00" time="119.139" />
+        <testcase name="atip_checkl2safety_09_a_directory_made_to_hold_an_allowed_file_is_not_an_effect_and_an_unallowed_file_is_named" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:50:07.425+09:00" time="101.509" />
+        <testcase name="atip_checkl2safety_10_an_async_outcome_the_fixture_leaves_out_is_unprovided_and_a_tool_without_wait_has_the_row_unsupported" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:50:24.676+09:00" time="105.825" />
+        <testcase name="atip_checkl2safety_09_a_read_change_outside_allowed_effects_fails_and_the_report_names_the_path" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:50:23.862+09:00" time="107.084" />
+        <testcase name="atip_checkl2safety_14_the_conforming_fake_and_the_checker_itself_pass" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:51:18.238+09:00" time="52.946" />
+        <testcase name="atip_checkl2safety_12_a_tool_without_destructive_or_async_commands_has_those_rows_unsupported_and_a_start_that_claims_done_fails_async" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:51:06.171+09:00" time="67.726" />
+        <testcase name="atip_checkl2safety_11_the_same_operation_key_returns_the_same_work_and_another_payload_is_operation_reused" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:50:39.910+09:00" time="108.924" />
+        <testcase name="atip_checkl2safety_10_the_worker_is_driven_to_done_failed_and_timeout_and_the_wait_exits_as_the_contract_says" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:50:32.131+09:00" time="153.100" />
+        <testcase name="atip_checkl2safety_13_every_condition_of_the_safety_rows_has_a_case_and_the_conforming_tool_judges_each" classname="atip-check::atip_checkl2safety" timestamp="2026-11-03T05:51:08.806+09:00" time="434.411" />
+    </testsuite>
+    <testsuite name="atip-check::claim12" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_109_a_tool_with_no_invocation_to_change_has_check_order_unprovided_and_the_level_is_not_met" classname="atip-check::claim12" timestamp="2026-11-03T05:52:28.834+09:00" time="5.740" />
+        </testsuite>
+    <testsuite name="atip-check::not_run" tests="12" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_115_a_command_that_ignores_sigterm_is_killed_after_the_grace_period_and_the_checker_does_not_hang" classname="atip-check::not_run" timestamp="2026-11-03T05:53:28.284+09:00" time="5.533" />
+        <testcase name="atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_unprovided_with_its_code_and_any_other_refusal_is_a_fixture_error" classname="atip-check::not_run" timestamp="2026-11-03T05:53:33.782+09:00" time="4.747" />
+        <testcase name="atip_check_117_a_command_that_prints_no_document_before_the_time_limit_fails_l0_envelope_and_only_it" classname="atip-check::not_run" timestamp="2026-11-03T05:53:33.817+09:00" time="5.180" />
+        <testcase name="atip_check_116_a_command_that_ends_on_its_own_before_or_after_its_first_document_is_a_fixture_error_and_no_check_runs" classname="atip-check::not_run" timestamp="2026-11-03T05:53:31.582+09:00" time="8.393" />
+        <testcase name="atip_check_114_with_no_ok_invocation_the_first_example_is_the_one_run_and_the_other_examples_are_skipped_and_reported" classname="atip-check::not_run" timestamp="2026-11-03T05:53:26.845+09:00" time="13.997" />
+        <testcase name="atip_check_95_a_command_named_in_not_run_runs_once_up_to_its_first_document_and_the_checker_ends_it_by_a_signal" classname="atip-check::not_run" timestamp="2026-11-03T05:53:40.842+09:00" time="3.819" />
+        <testcase name="atip_check_119_with_no_ok_invocation_and_no_example_the_checks_that_judge_its_document_are_unprovided_and_the_level_is_not_met" classname="atip-check::not_run" timestamp="2026-11-03T05:53:38.529+09:00" time="17.147" />
+        <testcase name="atip_check_121_a_check_whose_every_run_was_skipped_is_unprovided_so_listing_commands_cannot_pass_a_level" classname="atip-check::not_run" timestamp="2026-11-03T05:53:39.975+09:00" time="16.160" />
+        <testcase name="atip_check_96_a_not_run_command_that_is_the_probe_or_has_no_effect_note_or_is_not_in_the_tools_documents_is_fixture_invalid_and_no_check_runs" classname="atip-check::not_run" timestamp="2026-11-03T05:53:44.662+09:00" time="15.647" />
+        <testcase name="atip_check_118_a_bad_first_document_fails_the_check_that_owns_the_fault_and_no_other" classname="atip-check::not_run" timestamp="2026-11-03T05:53:36.278+09:00" time="24.575" />
+        <testcase name="atip_check_97_the_example_syntax_check_still_judges_the_examples_of_a_not_run_command_and_the_command_is_never_missing_from_the_report" classname="atip-check::not_run" timestamp="2026-11-03T05:53:51.663+09:00" time="13.573" />
+        <testcase name="atip_check_120_the_runs_of_a_not_run_command_that_are_refused_still_run_and_a_domain_it_does_not_enforce_fails_l1_domains" classname="atip-check::not_run" timestamp="2026-11-03T05:53:38.997+09:00" time="44.552" />
+    </testsuite>
+    </testsuites>

@@ -1,5 +1,16 @@
 {
   "commands": {
+    "artifacts move": {
+      "preview": [
+        [
+          "artifacts",
+          "move",
+          "--tier",
+          "local",
+          "--json"
+        ]
+      ]
+    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -45,6 +56,15 @@
           "-core"
         ]
       }
+    },
+    "dashboard": {
+      "ok": [
+        [
+          "dashboard",
+          "--port",
+          "0"
+        ]
+      ]
     },
     "divergence list": {
       "domainRejects": {
@@ -108,6 +128,34 @@
       }
     },
     "export": {
+      "allowedEffects": [
+        ".canon/audit/access.jsonl"
+      ],
+      "batchFailsAt": [
+        {
+          "index": 1,
+          "input": [
+            {
+              "kind": "subject"
+            },
+            {
+              "kind": "subject",
+              "output": "no-such-directory/out.json"
+            }
+          ]
+        }
+      ],
+      "batchFailsFirst": [
+        {
+          "index": 0,
+          "input": [
+            {
+              "kind": "subject",
+              "output": "no-such-directory/out.json"
+            }
+          ]
+        }
+      ],
       "domainRejects": {
         "after": [
           "Core",
@@ -144,6 +192,62 @@
       ]
     },
     "finding close": {
+      "batchFailsAt": [
+        {
+          "index": 1,
+          "input": [
+            {
+              "disposition": "fixed",
+              "operands": [
+                "add-login"
+              ],
+              "round": 1,
+              "seq": 1
+            },
+            {
+              "disposition": "fixed",
+              "operands": [
+                "add-login"
+              ],
+              "round": 1,
+              "seq": 9
+            }
+          ]
+        }
+      ],
+      "batchFailsFirst": [
+        {
+          "index": 0,
+          "input": [
+            {
+              "disposition": "fixed",
+              "operands": [
+                "add-login"
+              ],
+              "round": 1,
+              "seq": 9
+            }
+          ]
+        }
+      ],
+      "domainRejects": {
+        "change": [
+          "Core",
+          "-core"
+        ],
+        "reason": [
+          "",
+          " "
+        ],
+        "role": [
+          "Core",
+          "-core"
+        ],
+        "session": [
+          "",
+          " x"
+        ]
+      },
       "missingValue": [
         [
           "finding",
@@ -151,6 +255,34 @@
           "add-login",
           "--round",
           "1",
+          "--disposition",
+          "fixed",
+          "--json"
+        ]
+      ],
+      "ok": [
+        [
+          "finding",
+          "close",
+          "add-login",
+          "--round",
+          "1",
+          "--seq",
+          "1",
+          "--disposition",
+          "fixed",
+          "--json"
+        ]
+      ],
+      "refused": [
+        [
+          "finding",
+          "close",
+          "add-login",
+          "--round",
+          "1",
+          "--seq",
+          "9",
           "--disposition",
           "fixed",
           "--json"
@@ -191,6 +323,23 @@
         ]
       ]
     },
+    "ledger compact": {
+      "preview": [
+        [
+          "ledger",
+          "compact",
+          "--json"
+        ]
+      ]
+    },
+    "migrate": {
+      "preview": [
+        [
+          "migrate",
+          "--json"
+        ]
+      ]
+    },
     "prompt show": {
       "domainRejects": {
         "bundle": [
@@ -199,7 +348,22 @@
         ]
       }
     },
+    "purge": {
+      "preview": [
+        [
+          "purge",
+          "--kind",
+          "session",
+          "--before",
+          "2030-01-01",
+          "--json"
+        ]
+      ]
+    },
     "query": {
+      "allowedEffects": [
+        ".canon/audit/access.jsonl"
+      ],
       "domainRejects": {
         "change": [
           "Core",
@@ -335,6 +499,15 @@
         ]
       }
     },
+    "tier age": {
+      "preview": [
+        [
+          "tier",
+          "age",
+          "--json"
+        ]
+      ]
+    },
     "trace": {
       "domainRejects": {
         "id": [
@@ -344,12 +517,15 @@
       }
     }
   },
-  "contractVersion": "1.1",
+  "contractVersion": "1.2",
   "globalOptions": [
     [
       "--repo",
       "."
     ]
+  ],
+  "notRun": [
+    "dashboard"
   ],
   "prepare": [
     [
@@ -367,6 +543,11 @@
       "--allow-empty",
       "-qm",
       "fixture"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
     ]
   ],
   "probe": "status",
@@ -826,11 +1007,6 @@
       "retryable": false
     },
     {
-      "code": "INIT_SKILL_INSTALL_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
       "code": "INPUT_CONFLICT",
       "exit": 2,
       "retryable": false
@@ -1086,6 +1262,11 @@
       "retryable": false
     },
     {
+      "code": "REPO_WRITE_BUSY",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "RETENTION_EXPORT_FAILED",
       "exit": 1,
       "retryable": false
@@ -1178,6 +1359,14 @@
     {
       "code": "SPEC_ROOT_UNRESOLVED",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STOPPED_MIDWAY",
+      "exit": 1,
+      "reasons": [
+        "SKILLS_INVALID_ARGUMENT"
+      ],
       "retryable": false
     },
     {
@@ -1389,6 +1578,17 @@
       "fixture",
       "--role",
       "reviewer"
+    ],
+    [
+      "finding",
+      "close",
+      "add-login",
+      "--round",
+      "1",
+      "--seq",
+      "1",
+      "--disposition",
+      "fixed"
     ]
   ],
   "timeoutSeconds": 120,

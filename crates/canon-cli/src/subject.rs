@@ -1033,7 +1033,9 @@ pub fn run_move(
         };
     let gate_context = if ships || reviews || reopens {
         match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string())) {
-            Ok(ctx) => {
+            Ok(mut ctx) => {
+                // The index a refresh would write, in memory: a refusal below must leave the files as they were (spec 8.2).
+                crate::inventory::overlay_stale_index(&mut ctx);
                 Some(ctx)
             }
             Err(e) => {
@@ -1197,6 +1199,8 @@ pub fn run_move(
     subject.status = target;
     subject.envelope.at = Utc::now();
 
+    // Every refusal is behind us: the refresh this writer owes (`effectNote`) happens now, with the write it belongs to.
+    crate::inventory::refresh_stale_index(&repo, "canon subject move");
     match registry.persist(&subject) {
         Ok(_) => {
             let pending: Vec<crate::json_out::Warning> = pending_note.iter().map(|note| crate::json_out::Warning::new("BRIEF_DRAFT_PENDING", note.clone())).collect();
@@ -1223,6 +1227,8 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> u8 {
         Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject show", json),
         Err(e) => return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
     };
+    // The cache effect `effectNote` declares, after every refusal: a subject that does not exist leaves the index as it was (spec 12.2).
+    crate::inventory::refresh_stale_index(&repo, "canon subject show");
     if json {
         crate::json_out::data("subject show", &SubjectReport(&subject));
     } else {

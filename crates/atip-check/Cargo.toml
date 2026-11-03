@@ -33,7 +33,8 @@ default = []
 test-support = []
 
 [dependencies]
-atip = { workspace = true }
+# The checker validates every document it reads against the contract's schemas, so it needs the validators of `atip`.
+atip = { workspace = true, features = ["validate"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

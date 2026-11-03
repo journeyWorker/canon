@@ -1152,12 +1152,15 @@ fn first_three(items: &[String]) -> String {
 
 /// A writer's stale-index refresh (0.16 D2): `canon subject move`,
 /// `canon review add`, `canon evidence add` and the other commands that
-/// record something call this before they read the scenario index, so an
-/// edited, added or deleted scenario never needs a separate `canon
-/// inventory sync` step. The read commands (`canon gate check`, `canon
-/// status`) do not call it: a `read` command writes nothing (0.27), so
-/// they grade the index as this refresh would leave it, in memory
-/// ([`overlay_stale_index`]).
+/// record something call this, so an edited, added or deleted scenario never
+/// needs a separate `canon inventory sync` step. They call it LAST: once the
+/// call is past every refusal and about to write what it was asked to write
+/// (0.35, spec 8.2 and 12.2: a refused call writes nothing), and until then
+/// they read the index as this refresh would leave it, in memory
+/// ([`overlay_stale_index`]). `canon subject show` calls it once the subject
+/// is found, as the cache effect its `effectNote` declares. The read commands
+/// (`canon gate check`, `canon status`) do not call it: a `read` command
+/// writes nothing (0.27), so they grade the index in memory too.
 ///
 /// It runs the same materialization `canon inventory sync` runs
 /// ([`sync_one_root`]), scoped to the changed files, plus the same
@@ -1209,6 +1212,14 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
         Some((stale, _)) if !stale.is_empty() => {}
         _ => return,
     }
+    // The repository write lock first (it is the outermost one; a writer already holds it), then the index's own.
+    let _repo_lock = match crate::write_lock::hold(&ctx.repo) {
+        Ok(lock) => lock,
+        Err(e) => {
+            crate::warn_err!("SCENARIO_INDEX_NOT_REFRESHED", "{command}: the scenario index is stale but was not refreshed: {}", e.message);
+            return;
+        }
+    };
     let _lock = match lock_index(&ctx.repo) {
         Ok(lock) => lock,
         Err(e) => {

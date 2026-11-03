@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2guides_01_a_conforming_tool_passes_skills_show_each_guide_and_an_unknown_name",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_checkl2guides_01_a_skills_show_that_writes_fails_l2_skills_alone_and_l2_effects_leaves_it_to_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 99,
+  "scenario_id": "atip.checkl2guides.01",
+  "schema": 1,
+  "staging_id": "56daed23",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -18,6 +18,11 @@ use canon_cli::skills::{self, Lock};
 
 /// `key: value` pairs of a `SKILL.md` frontmatter block, or `None` when the
 /// content does not open with a closed `---` block.
+/// `.canon` holds nothing a call wrote: it is absent or empty.
+fn no_state_under_canon(target: &Path) -> bool {
+    fs::read_dir(target.join(".canon")).map_or(true, |mut entries| entries.next().is_none())
+}
+
 fn frontmatter(content: &str) -> Option<BTreeMap<String, String>> {
     let rest = content.strip_prefix("---\n")?;
     let end = rest.find("\n---\n")?;
@@ -628,7 +633,7 @@ fn skills_install_55_a_missing_skills_source_is_refused_with_exit_two() {
         assert_eq!(doc["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{command}: {doc}");
         assert_eq!(doc["error"]["field"], "--skills-source", "{command}: {doc}");
     }
-    assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "nothing is written");
+    assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "nothing is written");
 }
 
 /// skills.install.40
@@ -929,7 +934,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
             let output = canon(&["skills", command, "--providers", "gemini"], &source, &target);
             assert_eq!(output.status.code(), Some(2), "{command} --providers gemini: {}", String::from_utf8_lossy(&output.stderr));
         }
-        assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "{section:?}: nothing is written");
+        assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
 
         let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
@@ -1362,7 +1367,7 @@ fn skills_install_64_doctor_reports_a_missing_gitignore_line_with_the_fix() {
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     let install = canon(&["skills", "install", "--providers", "claude"], &source, &target);
     assert_eq!(install.status.code(), Some(0), "{}", String::from_utf8_lossy(&install.stdout));
-    let managed = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
+    let managed = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/repo-write.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
 
     fs::write(target.join(".gitignore"), managed.replace(".canon/learn/\n", "").replace(".canon/r2/\n", "")).unwrap();
     let doctor = canon(&["skills", "doctor"], &source, &target);

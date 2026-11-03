@@ -49,9 +49,12 @@ overlays:
 Drive it through the sync command (never hand-write records):
 
 ```bash
-canon plugin sync porting                       # every canon.yaml specs.roots[] entry
-canon plugin sync porting --repo ../svc         # a specific repo
-canon plugin sync porting --spec-root ./specs   # ad hoc: ignore canon.yaml
+# every canon.yaml specs.roots[] entry
+canon plugin sync porting
+# a specific repo
+canon plugin sync porting --repo ../svc
+# ad hoc: ignore canon.yaml
+canon plugin sync porting --spec-root ./specs
 ```
 
 `canon plugin sync <plugin-id>` resolves the manifest, then for each
@@ -70,9 +73,12 @@ error; the next step (3) reads the overlay back.
 ## 3. Project a read
 
 ```bash
-canon query --kind scenario --plugin porting          # human table, projected fields appended
-canon query --kind scenario --plugin porting --json   # merged record bodies
-canon query --kind scenario                           # no --plugin: byte-identical to the core view
+# human table, projected fields appended
+canon query --kind scenario --plugin porting
+# merged record bodies
+canon query --kind scenario --plugin porting --json
+# no --plugin: byte-identical to the core view
+canon query --kind scenario
 ```
 
 `--plugin <id>` folds the plugin's overlay records (latest-by-

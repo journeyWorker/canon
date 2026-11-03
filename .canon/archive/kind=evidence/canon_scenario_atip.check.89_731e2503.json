@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-03T00:27:13.951240Z",
+  "attachments": [
+    {
+      "case": "atip_check_89_a_fixture_call_refused_with_a_registered_precondition_code_makes_the_checks_that_run_it_unprovided_and_names_the_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    }
+  ],
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2d.xml"
+  },
+  "evidence_sha": "7508143a2ff26f33539c6da3c94fd1a9f683c0e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 783,
+  "scenario_id": "atip.check.89",
+  "schema": 1,
+  "staging_id": "feedd4b6",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T10:53:48.942916Z",
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "kind": "review",
+  "pin": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claiml2_05_a_fixture_without_the_previews_leaves_the_destructive_rows_unprovided"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "241245b5ed3265f7ddbebd79b720673a4cfae526318413c582b44f2314c3337e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
+  },
+  "review_id": "01M6GGPDGE7BKT9WR46CG2N0KG",
+  "reviewer": "rev-claim-l2",
+  "scenario_id": "atip.claiml2.05",
+  "schema": 2,
+  "worktree_dirty": false
+}

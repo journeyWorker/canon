@@ -63,7 +63,6 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
             };
             // A human accepts as the reviewer: with no declared role the attribution defaults to `reviewer`.
             let role = role.unwrap_or_else(|| RoleId::parse("reviewer").expect("a role name is a valid role id"));
-            crate::inventory::refresh_stale_index(&repo, "canon divergence accept");
             ExitCode::from(crate::divergence::run_accept(&repo, &crate::divergence::AcceptArgs { project_id, scenario_ids, reason, tracking, expiry, reviewer: actor_id.clone(), actor_id, role, session_id, relay, json }))
         }
         DivergenceCliCommand::List(DivergenceListArgs { repo, as_of, json, page, fields }) => ExitCode::from(crate::divergence::run_list(&repo, as_of, json, &page.page(), fields.as_deref())),

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-02T22:35:38.764312Z",
+  "attachments": [
+    {
+      "case": "atip_check_95_a_command_named_in_not_run_runs_once_up_to_its_first_document_and_the_checker_ends_it_by_a_signal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    }
+  ],
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2c.xml"
+  },
+  "evidence_sha": "44b242705daf17dd8a56656eef0f24b5109f5501",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 675,
+  "scenario_id": "atip.check.95",
+  "schema": 1,
+  "staging_id": "fccaffc0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

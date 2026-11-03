@@ -74,7 +74,10 @@ const ENV_VARS: &[EnvVar] = &[
 /// Variables canon reads or sets that are not a user's to set: a build input,
 /// the roots canon points its own DuckDB views at, and debug-build test seams (`CANON_WITNESS_DIR`:
 /// where a debug build records which (command, report) pairs it emitted, for the T9 witness; `CANON_TEST_PANIC`:
-/// a debug build panics at start, for the test of the `INTERNAL` error).
+/// a debug build panics at start, for the test of the `INTERNAL` error; `CANON_TEST_REPO_LOCK_WAIT_MS`: how long a debug
+/// build waits for the repository write lock, in milliseconds; `CANON_TEST_HOLD_AFTER_RUN_MS`: how long a debug build keeps
+/// the lock after its run; `CANON_TEST_PAUSE_AFTER_GATE_MS`: how long a debug build pauses between the check of a plan's
+/// digest and its first effect: the three seams of the test of the lock).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -83,7 +86,10 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_LEARN_ROOT",
     "CANON_R2_LOCAL_ROOT",
     "CANON_R2_ROOT",
+    "CANON_TEST_HOLD_AFTER_RUN_MS",
     "CANON_TEST_PANIC",
+    "CANON_TEST_PAUSE_AFTER_GATE_MS",
+    "CANON_TEST_REPO_LOCK_WAIT_MS",
     "CANON_WITNESS_DIR",
 ];
 
@@ -93,12 +99,13 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 }
 
 
-/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it once `atip check --level L1` passes on the
-/// build: the check runs in CI beside the tests that build these documents.
-pub const LEVEL: &str = "L1";
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.2`
+/// passes on the build: the check runs in CI beside the tests that build these documents (`just atip`, the `atip-l2` job).
+pub const LEVEL: &str = "L2";
 
-/// The first line of every `--help` (spec 4.7): it points at the self-description, so an agent that read nothing else knows it exists.
-pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every command as JSON.";
+/// The first line of every `--help` (spec 4.7, 4.8): it points at the self-description and at the guide, so an agent that read nothing else
+/// knows both entrances exist.
+pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every command; \"canon skills show\" prints the guide.";
 
 /// The value type of every parser canon wrote itself, by the value name of the argument that uses it (approaches/rust.md
 /// 4.1). clap cannot read a type out of a function, and a guessed `string` is how canon once published none: an argument
@@ -154,6 +161,7 @@ const DEFAULT_NOTES: &[(&str, &str, &str)] = &[
     ("skills install", "providers", "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories"),
     ("skills check", "providers", "the providers `skills install` would use"),
     ("skills doctor", "providers", "the providers `skills install` would use"),
+    ("skills show", "name", "the default guide, `canon`"),
 ];
 
 /// The environment variable a command reads to fill an option that clap does not give an `env` (spec 16.3: a variable may
@@ -357,7 +365,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     }
     let mut options = Vec::new();
     for arg in node.cmd.get_arguments().filter(|arg| !arg.is_positional() && !project::is_builtin_arg(arg)) {
-        let mut option = built(project::option_doc(path, arg, CUSTOM_PARSERS, crate::input::FLAGS_ONLY))?;
+        let mut option = built(project::option_doc(path, arg, CUSTOM_PARSERS, crate::input::flags_only()))?;
         option.env = option.env.or_else(|| declared_env(path, &option.name).map(str::to_string));
         if (option.default.is_null() && !option.required) || option.name == "promote" {
             option.default_note = default_note(path, &option.name).map(str::to_string);
@@ -369,8 +377,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     let input = input_of(path, node.cmd, &operands, &options, &mut schemas);
     let batch = input.as_ref().is_some_and(|input| input.batch);
     let outputs = outputs_of(path, batch, &mut schemas)?;
-    let mut constraints = atip::constraint::clap_rules(node.cmd);
-    constraints.extend(crate::arg_rules::rules_for(path).iter().map(atip::constraint::Rule::doc));
+    let constraints: Vec<_> = crate::arg_rules::rules_of(node.cmd, path).iter().map(atip::constraint::Rule::doc).collect();
     let validators: Vec<ValidatorDoc> = crate::arg_rules::validators_for(path).iter().map(atip::constraint::Validator::doc).collect();
     let examples = examples_of(path)?;
     let errors = errors_of(path, &options, &operands, batch);
@@ -516,7 +523,7 @@ pub fn generate() -> Value {
         "envVars": ENV_VARS.iter().map(|v| json!({ "name": v.name, "about": v.about })).collect::<Vec<_>>(),
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
         "contract": atip::CONTRACT,
-        "contractVersion": atip::CONTRACT_VERSION,
+        "contractVersion": crate::json_out::DECLARED_MINOR,
         "errors": error_rows(),
         "warnings": warning_rows(),
         "removed": removed_rows(),

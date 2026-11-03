@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T17:02:38.241479Z",
+  "code_tree": "ca63c482407ec7d931beba874e366be6f5cb0dba",
+  "kind": "review",
+  "pin": "2fd3934fcbf6216b5b8c7e632ff5a9351f06662e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_crateplan_12_a_plan_of_the_crates_own_type_has_the_same_digest_for_every_vector",
+          "junit:atip_crateplan_12_an_integer_beyond_the_safe_range_is_refused_and_its_string_is_the_vectors_form",
+          "junit:atip_crateplan_12_every_vector_has_the_canonical_text_and_the_digest_the_contract_gives",
+          "junit:atip_crateplan_12_the_vendored_vectors_are_the_ones_of_the_pinned_contract_tag_byte_for_byte"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ac6246c9ca47f0e0da6e31d8a539f8164951bcdacf99076a1d479a3fa254b5f6",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-plan/brief.md"
+  },
+  "review_id": "01M6EKD151ZPC40QEWE70QGZ9X",
+  "reviewer": "rev-crate-0-35",
+  "scenario_id": "atip.crateplan.12",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-last",
+    "role": "reviewer",
+    "session_id": "s-0-35-last-rev"
+  },
+  "at": "2026-11-03T15:28:35.139652Z",
+  "change_id": "canon-0-33-atip-l0",
+  "code_tree": "8fa758de852cbe6f3744b7b1073879eb02b2430a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/exit_registry.rs",
+  "kind": "finding",
+  "reviewed_sha": "048a5ffa12f29db1e1533668b835fd43c559ba82",
+  "reviewer": "rev-0-35-last",
+  "round": 3,
+  "scenario_ids": [
+    "atip.l0.25"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity (atip.l0.25 Then 1: 'the CHANGELOG lists the split, moved and kept codes in one table'): the two bound tests (exit_registry atip_l0_25_the_checked_codes_hold_their_decided_exits, ..._every_split_gives_each_exit_its_own_code) read only the registry (code_info exits); neither opens CHANGELOG.md and no other test does for this table, so deleting the table (CHANGELOG.md, the 'thirteen exit-2 codes' table) leaves both green. I read the table by hand against the registry at 048a5ffa (14 rows, every Exit column agrees with code_info, decisions a/b/c match) so it is true today; it is unguarded against regression. The scenario sentence also still says thirteen while the test holds twelve (INIT_SKILL_INSTALL_FAILED left the registry in 0.35, now STOPPED_MIDWAY; the test comment says so). Blast radius: this scenario only; atip.midway.03 and old_names.rs cover the moved code elsewhere. Signed with the gap named.",
+  "worktree_dirty": false
+}

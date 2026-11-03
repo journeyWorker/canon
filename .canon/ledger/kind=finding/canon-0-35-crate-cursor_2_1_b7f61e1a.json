@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:55:48.707906Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "introduced_by": "12224ee2d6e7c7e549293a610d4f790d09c04632",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 2,
+  "scenario_ids": [
+    "atip.cratecursor.13"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: atip.cratecursor.13 says 'or a changed default is refused by both'; atip_cratecursor_13 adds role=member to a page that had none, which is the contract's 'an option added at its default value is another call in both' (the same case as atip_cratecursor_11), not a default that changed between two pages. The assertion is right; reword the scenario or add the changed-value case (role=member on page one, role=admin on page two).",
+  "worktree_dirty": false
+}

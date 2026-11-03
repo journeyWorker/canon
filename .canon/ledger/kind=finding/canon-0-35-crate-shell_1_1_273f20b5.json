@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T10:10:34.333499Z",
+  "change_id": "canon-0-35-crate-shell",
+  "code_tree": "989d91064a153d3c4a15a5f01aadddd066266be6",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/tests/atip_crateshell.rs",
+  "introduced_by": "9fd8257b1164beeaa6789167b772e272ad969710",
+  "kind": "finding",
+  "reviewed_sha": "4cf85cba2737a021cfe56edcf9122d829e4d83e0",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.crateshell.06"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: scenario 06 Given says 'a fake tool', but the bound tests feed a hand-built envelope to next_findings (L0.next's function), not a fake tool run through the checker; the red/green proof is real (red record archived, green re-run by me) and the 'still fails' twin shows the check is not weakened. Blast radius: the other split_argv callers (canon-cli next.rs, safety, migrate_names) are not exercised by the new tests; they rest on the existing suite (3812 passed per the evidence), and no canon command string changed.",
+  "worktree_dirty": false
+}

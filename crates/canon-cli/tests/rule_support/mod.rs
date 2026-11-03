@@ -291,6 +291,8 @@ pub type Assignment = BTreeMap<String, Vec<String>>;
 pub enum Goal {
     /// The call breaks rule `at` and, when possible, nothing else.
     Violate(usize),
+    /// The call breaks rules `a` and `b` and, when possible, nothing else.
+    Both(usize, usize),
     /// The call breaks nothing and exercises rule `at`: gives what makes it apply and meets it.
     Satisfy(usize),
 }
@@ -381,14 +383,15 @@ pub fn solve(doc: &Value, example: &[String], rules: &[ConstraintDoc], goal: Goa
         let size = given.len();
         let fits = match goal {
             Goal::Violate(target) => broken.contains(&target),
+            Goal::Both(a, b) => broken.contains(&a) && broken.contains(&b),
             Goal::Satisfy(target) => broken.is_empty() && exercised(&rules[target], &given),
         };
         if fits {
             let others: Vec<usize> = match goal {
                 Goal::Violate(target) => broken.iter().copied().filter(|at| *at != target).collect(),
+                Goal::Both(a, b) => broken.iter().copied().filter(|at| *at != a && *at != b).collect(),
                 Goal::Satisfy(_) => Vec::new(),
             };
-            // A call that breaks only the target beats one that breaks more; among those, the smaller call.
             let rank = others.len() * 1000 + size;
             if best.as_ref().is_none_or(|(known, _)| rank < *known) {
                 let assignment: Assignment = chosen

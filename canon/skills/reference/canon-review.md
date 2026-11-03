@@ -468,7 +468,7 @@ With `require_review` present, `canon subject move <id> --to <state>`
 prints on stderr which review checks it ran or skipped:
 
 ```stderr
-canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+stderr: canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```

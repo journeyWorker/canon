@@ -37,7 +37,13 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
         },
     };
 
+    let root = canon_yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
     loop {
+        // The repository write lock for this pass alone: a polling run must not hold it while it sleeps.
+        let pass = match crate::write_lock::hold_pass(root, dry_run) {
+            Ok(pass) => pass,
+            Err(error) => return ExitCode::from(error.emit("canon ingest sessions", json)),
+        };
         match crate::ingest::run(canon_yaml, &home, true, full, all_workspaces, dry_run) {
             Ok(outcome) if json => {
                 // One document per pass (one per poll under `--watch`); the human summary is for human mode.
@@ -78,6 +84,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
         if !watch {
             return ExitCode::SUCCESS;
         }
+        drop(pass);
         std::thread::sleep(std::time::Duration::from_secs(interval_secs));
     }
 }
@@ -92,6 +99,11 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
 /// run rather than a guessed one.
 fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, dry_run: bool, json: bool, run_id: Option<&RunId>) -> ExitCode {
     loop {
+        // The repository write lock for this pass alone: a polling run must not hold it while it sleeps.
+        let pass = match crate::write_lock::hold_pass(repo, dry_run) {
+            Ok(pass) => pass,
+            Err(error) => return ExitCode::from(error.emit("canon ingest records", json)),
+        };
         match crate::artifact_ingest::run(repo, run_id, dry_run) {
             Ok(mut outcome) => {
                 let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml")).filter(|_| !outcome.dry_run);
@@ -116,6 +128,7 @@ fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, d
         if !watch {
             return ExitCode::SUCCESS;
         }
+        drop(pass);
         std::thread::sleep(std::time::Duration::from_secs(interval_secs));
     }
 }

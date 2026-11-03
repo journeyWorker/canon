@@ -1,0 +1,76 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split"
+  },
+  "at": "2026-11-03T11:54:25.283065Z",
+  "attachments": [
+    {
+      "case": "jcs::tests::atip_cratecursor_12_a_control_character_is_escaped_short_where_the_rfc_has_a_short_form_and_by_u00xx_otherwise",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_an_integer_beyond_the_safe_range_is_an_error_and_every_other_number_is_the_ecmascript_form_of_its_double",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_integers_within_the_safe_range_are_written_and_a_whole_float_is_the_integer",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_appendix_b_number_forms",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_sorts_members_by_utf16_code_units",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_writes_strings_and_literals_as_the_appendix_does",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_whitespace_nulls_and_empty_members_are_kept_exactly",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "68d8ba446fdae8bdeda1fb136b77e13d9ee8ff79a58d99af596ee7412f1a9e33"
+    }
+  ],
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check: cargo nextest run --workspace (default profile, atip-check left out by default-filter, 3732 passed) and --profile atip (the checker crate's own 369 passed), from the clean worktree at the commit of the change"
+  },
+  "evidence_sha": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 49,
+  "scenario_id": "atip.cratecursor.12",
+  "schema": 1,
+  "staging_id": "9bb0da81",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

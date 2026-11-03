@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T14:17:36.362075Z",
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-learn --lib config::tests::a_role_with_no_promotion_entry_gets_the_conservative_occurrence_default"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: command re-run on the current tree: cargo nextest run --workspace (default profile, 3732 tests; the test of this record passed), from the clean worktree"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 100,
+  "scenario_id": "learn.promotion.07",
+  "schema": 1,
+  "staging_id": "00f71f1b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

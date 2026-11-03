@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "checks::tests::atip_check_48_an_exit_is_allowed_when_it_is_0_1_2_a_signal_or_128_plus_a_signal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    },
+    {
+      "case": "atip_check_48_a_signal_exit_of_either_form_is_accepted_and_an_exit_of_3_is_not",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "dc69d80151f120ed34e53c42ab5741634fd28f400129af36fa0769094b8b0f68"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1114,
+  "scenario_id": "atip.check.48",
+  "schema": 1,
+  "staging_id": "08160c7e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -672,7 +672,8 @@ fn gate_check_106_gate_install_hooks_with_dry_run_reports_what_it_would_install_
     assert_eq!(real.status.code(), Some(0), "{}", text(&real));
     assert_eq!(stdout_json(&real)["data"]["dryRun"], false);
     let written: Vec<PathBuf> = snapshot(repo).into_keys().filter(|p| !before.contains_key(p)).collect();
-    let expected: Vec<PathBuf> = [".canon/scripts/canon-gate-pre-commit.sh", ".claude/settings.json", ".codex/hooks.json"].iter().map(PathBuf::from).collect();
+    // The lock file is the writer's own: a real run takes the repository write lock, and a dry run (above) wrote nothing, not even it.
+    let expected: Vec<PathBuf> = [".canon/repo-write.lock", ".canon/scripts/canon-gate-pre-commit.sh", ".claude/settings.json", ".codex/hooks.json"].iter().map(PathBuf::from).collect();
     assert_eq!(written, expected, "the real run writes exactly these files");
 }
 

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-canon-misc",
+    "role": "implementer",
+    "session_id": "s-0-35-canon-misc"
+  },
+  "at": "2026-11-02T09:00:37.570716Z",
+  "attachments": [
+    {
+      "case": "atip_checkorder_02_a_value_of_the_wrong_type_before_an_unknown_option_answers",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "evidence-tmp/workspace.xml",
+      "sha256": "705a2d7adbb6e00581d8d34a80a9e0b0722752602db317eaaf46e6ab9bb57e88"
+    }
+  ],
+  "code_tree": "34234f18baf5a4a642fca6c6794a3fa92d42b704",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked (3812 passed) from the clean worktree; clippy x3, check_visibility.sh, check-mutations.sh, check-release-workflow-safety.py, atip check L0/L1 green"
+  },
+  "evidence_sha": "5e472df5cb4ada866ff8700fa04840e9259c1649",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "atip.checkorder.02",
+  "schema": 1,
+  "staging_id": "5336b33e",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

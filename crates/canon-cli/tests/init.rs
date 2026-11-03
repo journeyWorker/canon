@@ -137,7 +137,7 @@ fn init_rerun_with_no_agents_md_leaves_an_existing_canon_yaml_alone_and_reports_
 
 /// Every canon `.gitignore` line, as a repo set up by `canon init` 0.17 has them.
 const CANON_GITIGNORE: &str =
-    ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
+    ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/repo-write.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
 
 /// authoring.init.97 (#35): `canon init` re-run on a repo an older canon
 /// set up adds the canon `.gitignore` lines it lacks, each once, and keeps
@@ -155,7 +155,7 @@ fn authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines() {
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("canon.yaml already exists — left unchanged; the AGENTS.md block and the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
     assert!(
-        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"),
+        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/repo-write.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"),
         "{}",
         stdout(&out)
     );
@@ -388,7 +388,7 @@ fn authoring_init_34_a_policy_level_with_no_policy_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let out = run_canon(&["init", "--policy", "light", "--no-policy"], dir.path());
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains("cannot be used with"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("exclusive") && stderr(&out).contains("--no-policy"), "{}", stderr(&out));
     assert!(!dir.path().join("canon.yaml").exists());
     assert!(!dir.path().join(".canon").exists());
 }
@@ -609,6 +609,37 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
     assert_eq!(stdout(&doctor), format!("providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp]).join("\n")));
 }
 
+/// authoring.init.96: with a terminal on stdin and stderr (a pty from `script`) and no `--providers`, init prints no question, waits for no answer
+/// and takes the detected harnesses, as it does off a terminal (spec 5.5: a tool never prompts).
+#[cfg(unix)]
+#[test]
+fn authoring_init_96_on_a_terminal_init_asks_nothing_and_takes_the_detected_harnesses() {
+    use std::process::Stdio;
+    let tmp = tempfile::tempdir().unwrap();
+    let source = skill_source(tmp.path());
+    let repo = tmp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".claude")).unwrap();
+    std::fs::create_dir_all(repo.join(".omp")).unwrap();
+    let exe = env!("CARGO_BIN_EXE_canon");
+    let mut command = Command::new("script");
+    if cfg!(target_os = "macos") {
+        command.args(["-q", "/dev/null", exe, "init"]);
+    } else {
+        command.args(["-qec", &format!("{} init", atip::quote(exe)), "/dev/null"]);
+    }
+    // `script` copies its own stdin to the pty: with a pipe that stays open, a prompt would wait for an answer, and the test would time out, not pass.
+    let mut child = command.current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).env_remove("CANON_ROLE").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("`script` gives canon a terminal; install it to run this case");
+    let _held_open = child.stdin.take();
+    let out = child.wait_with_output().unwrap();
+    let shown = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(out.status.success(), "{shown}");
+    assert!(!shown.contains("which harnesses") && !shown.contains("Enter for the checked ones") && !shown.contains("Comma-separated list"), "init asked on a terminal: {shown}");
+    assert!(shown.contains("installed the canon skill for claude,omp"), "{shown}");
+    assert_eq!(projected(&repo), vec![".claude/skills/canon", ".omp/skills/canon"]);
+    let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    assert!(config.ends_with("skills:\n  providers: [claude, omp]\n"), "{config}");
+}
+
 /// authoring.init.91: `--providers codex` answers without a prompt and
 /// installs only `.agents/skills/canon`, whatever markers exist.
 #[test]
@@ -698,7 +729,9 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
 }
 
 /// authoring.init.95: when the skill source is missing, init still
-/// records the choice, then exits 1 naming the install to run.
+/// records the choice, then exits 1 with `STOPPED_MIDWAY` (the refusal
+/// `canon skills install` gives before its work is the reason) naming
+/// the install to run.
 #[test]
 fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry() {
     let tmp = tempfile::tempdir().unwrap();
@@ -707,7 +740,7 @@ fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry(
 
     let out = init_with_source(&[], &repo, &tmp.path().join("missing"));
     assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
-    assert!(stderr(&out).contains("INIT_SKILL_INSTALL_FAILED"), "{}", stderr(&out));
+    assert!(stderr(&out).starts_with("canon: STOPPED_MIDWAY: "), "{}", stderr(&out));
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [pi]\n"));
     assert!(projected(&repo).is_empty());
 

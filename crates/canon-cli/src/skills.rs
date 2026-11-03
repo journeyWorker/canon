@@ -957,6 +957,7 @@ pub fn owned_path_globs(providers: &[Provider]) -> Vec<String> {
         paths::PRE_COMMIT_SCRIPT,
         paths::SCENARIO_INDEX_LOCK_FILE,
         paths::ARTIFACT_STORE_LOCK_FILE,
+        paths::REPO_WRITE_LOCK_FILE,
     ];
     let mut canon: Vec<String> = dirs.into_iter().map(dir_glob).chain(files.into_iter().map(str::to_string)).collect();
     canon.sort();
@@ -2059,18 +2060,45 @@ pub struct SkillsDoctorReport<'a> {
 
 impl crate::json_out::Report for SkillsDoctorReport<'_> {}
 
-/// `--json` of `canon skills show`: the guide `name` names, as this canon embeds it.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// `--json` of `canon skills show`: the guide `name` names, as this canon embeds it, in the shape of the contract's
+/// `guide.schema.json` (spec 14.3), which is this report's schema (`atip::GUIDE_SCHEMA`, referenced by its `$id`).
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsShowReport {
+    /// The guide's name: the one asked for, `canon` (the default guide) when none was.
     pub name: String,
-    /// The canon version the guide is embedded in.
-    pub version: &'static str,
-    /// The guide's markdown, as `canon skills show` prints it.
-    pub markdown: std::borrow::Cow<'static, str>,
+    /// The guide's Markdown, as `canon skills show` prints it.
+    pub text: std::borrow::Cow<'static, str>,
+    /// The name of every guide this build embeds, this one included, in the order `crate::guide::names` gives.
+    pub guides: &'static [&'static str],
+    /// Whether `--full` material (every reference after the core guide) is in `text`.
+    pub full: bool,
+    /// The canon version the guide is embedded in (the contract's schema leaves `x-` members to the tool).
+    #[serde(rename = "x-canon")]
+    pub x_canon: GuideCanon,
 }
 
-impl crate::json_out::Report for SkillsShowReport {}
+/// `x-canon` of [`SkillsShowReport`].
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuideCanon {
+    pub version: &'static str,
+}
+
+impl schemars::JsonSchema for SkillsShowReport {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "SkillsShowReport".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({ "$ref": "https://atip.dev/1/guide.schema.json" })
+    }
+}
+
+impl crate::json_out::Report for SkillsShowReport {
+    /// 2.0: `markdown` became `text` and the top-level `version` became `x-canon.version` (0.35, atip/1 1.2 spec 14.3).
+    const SCHEMA_VERSION: &'static str = "2.0";
+}
 
 #[cfg(test)]
 mod tests {

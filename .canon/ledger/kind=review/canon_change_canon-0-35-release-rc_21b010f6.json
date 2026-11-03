@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-last",
+    "role": "reviewer",
+    "session_id": "s-0-35-last-rev"
+  },
+  "at": "2026-11-03T18:02:55.598257Z",
+  "change_id": "canon-0-35-release-rc",
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "kind": "review",
+  "pin": "ce0989b7808bb7b709cb0362acbb3f9071c73915",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "8fc7e24d4c524adbe9b11dc0d5f5ab49c5dc48939e676ef212a337d7f3e6ea69",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-release-rc/brief.md"
+  },
+  "review_id": "01M6H984QEV7DA866CFC81QQ3Z",
+  "reviewer": "rev-0-35-last",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev-b"
+  },
+  "at": "2026-11-02T17:44:45.463229Z",
+  "change_id": "canon-0-35-canon-cursor-1-2",
+  "code_tree": "276e9a2237949d440c74791e0fc4d5450c7b4b92",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "792712dc344fb492b687e823fed87af2df55c2ea",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Spec fidelity: the brief's F5 failure path reads 'no source holds a flag-only list naming repo and as; the crate's set is used', while its own F5 paragraph says canon's set is the crate's plus repo and as. The change resolves it as the second (input::OWN_FLAGS_ONLY = [repo, as], flags_only() = those plus atip::flag_only_options(V1_2), and atip.canoncursor.11 asserts the set and that no source names the contract's options); no list of the contract's eight options survives in canon's source (FLAGS_ONLY, INVOCATION and set_invocation are gone, grep). Verified in the real binary: query, finding list, divergence list, export, retrieve and search have limit/cursor/all/fields (retrieve and search: limit) flagOnly true and no fragment schema key of theirs; export --input with limit, cursor, all or fields, and a batch with limit in element 1, answers INPUT_INVALID FLAG_ONLY_KEY at /limit, /cursor, /all, /fields, /1/limit. query, finding list and divergence list take no --input, so F5's input rule has no document path there (the scenarios say so by testing export only). Blast radius: retrieve and search now declare limit flagOnly in docs/cli/canon.cli.json; a consumer of that document that read flagOnly false there sees the change.",
+  "worktree_dirty": false
+}

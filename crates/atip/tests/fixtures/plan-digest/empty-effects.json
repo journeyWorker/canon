@@ -1,0 +1,6 @@
+{
+  "description": "A plan with nothing to do: no effects and no inputs.",
+  "plan": {"effects": [], "inputs": {}},
+  "canonical": "{\"effects\":[],\"inputs\":{}}",
+  "digest": "sha256:eb61caa92376f836ebd3ec5c7bbae637d285bf9a9dd174d13f750d15c1ea8f28"
+}

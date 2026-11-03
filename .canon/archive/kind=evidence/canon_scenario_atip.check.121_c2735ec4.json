@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T17:31:36.189646Z",
+  "attachments": [
+    {
+      "case": "atip_check_121_a_check_whose_every_run_was_skipped_is_unprovided_so_listing_commands_cannot_pass_a_level",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-notrun-junit.xml",
+      "sha256": "5e06fc4077fde4a1948763b8d67f54c90939d5dcecade9263f7d42f8fc900853"
+    }
+  ],
+  "code_tree": "be4231bc4799917b48d6961c07b9ca13ccf18ba1",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-notrun-junit.xml"
+  },
+  "evidence_sha": "37263f4a71a5b72e92279a5a11e37cbd694666a4",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 547,
+  "scenario_id": "atip.check.121",
+  "schema": 1,
+  "staging_id": "9645b88b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

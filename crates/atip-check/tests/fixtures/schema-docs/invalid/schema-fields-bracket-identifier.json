@@ -28,6 +28,7 @@
         "required": false,
         "repeatable": false,
         "default": 50,
+        "flagOnly": true,
         "help": "Return at most this many members",
         "domain": {
           "minimum": 1
@@ -40,6 +41,7 @@
         "required": false,
         "repeatable": false,
         "default": null,
+        "flagOnly": true,
         "help": "Resume after the last member of the previous page (meta.page.nextCursor)"
       },
       {
@@ -48,6 +50,7 @@
         "required": false,
         "repeatable": false,
         "default": false,
+        "flagOnly": true,
         "help": "Return every member from the cursor on"
       },
       {
@@ -57,6 +60,7 @@
         "required": false,
         "repeatable": false,
         "default": null,
+        "flagOnly": true,
         "help": "Keep only these member fields (comma-separated dot paths); see outputs[0].fields"
       },
       {
@@ -261,8 +265,8 @@
   "meta": {
     "command": "schema",
     "contract": "atip/1",
-    "contractVersion": "1.1",
-    "schemaVersion": "1.1",
+    "contractVersion": "1.2",
+    "schemaVersion": "1.2",
     "tool": "acme",
     "toolVersion": "1.0.0"
   }

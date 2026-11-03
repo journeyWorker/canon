@@ -14,7 +14,7 @@ use serde_json::json;
 use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_canon_yaml;
 use crate::json_out::Report;
-use crate::safety::{Effect, Mode, Plan};
+use crate::safety::{path_digest, Effect, Mode, Plan, Preview, Reads};
 use schemars::JsonSchema;
 use serde::Serialize;
 use crate::tiers;
@@ -197,10 +197,13 @@ pub struct PurgeReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub learn_store: Option<PurgeLearnStore>,
     #[serde(flatten)]
-    pub plan: Plan,
+    pub plan: Preview,
 }
 
-impl Report for PurgeReport {}
+impl Report for PurgeReport {
+    /// 1.1: the plan is `atip::plan::Preview`, whose `effects` may carry an `append` of the audit line and whose `planDigest` is `sha256:` and 64 hex digits.
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
 
 /// The `data` of a purge that stopped partway: tiers are not transactional, so
 /// some records may be gone.
@@ -218,7 +221,7 @@ pub struct PartialPurgeReport {
 
 impl Report for PartialPurgeReport {}
 
-fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, plan: Plan) -> PurgeReport {
+fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, plan: Preview) -> PurgeReport {
     PurgeReport {
         kind: outcome.kind.as_str().to_string(),
         before: outcome.before.to_rfc3339(),
@@ -244,11 +247,28 @@ fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[S
     effects
 }
 
+/// The record a purge's audit line is made of, as far as it is known when the plan is made: everything but `actor` and `at`.
+fn audit_effect(repo: &Path, kind: RecordKind, matched: usize) -> Option<Effect> {
+    let path = audit_path(repo)?;
+    let label = path.strip_prefix(repo).unwrap_or(&path).display().to_string();
+    let line = json!({"operation": "purge", "kind": kind.as_str(), "scope": PURGE_SCOPE, "sensitive": false, "result_counts": {"matched": matched, "deleted": matched}});
+    Some(Effect::path("append", label).detail(format!("one access audit line: purge of {}, {matched} matched and deleted", kind.as_str())).with("line", line))
+}
+
+/// The scope a purge's audit line names.
+const PURGE_SCOPE: &str = "routed_and_aging_destinations";
+
+/// A time after every record: the removal set of a purge before it is the whole kind, which is what the plan read.
+fn after_every_record() -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339("9999-12-31T23:59:59Z").expect("a fixed time parses").with_timezone(&Utc)
+}
+
 /// `canon purge --kind K --before T [--commit --plan-digest D]`. A bare run
 /// previews and writes nothing, not even the access-audit line; `--commit`
-/// deletes only when the plan recomputed now has the digest given. `base` is
-/// the command line without the `--commit`/`--plan-digest` flags.
-pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
+/// deletes only when the plan recomputed now has the digest given. The plan lists the audit line a commit
+/// appends (when it deletes anything) as its last effect, and reads the whole kind in every rung it lives in.
+pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, json_output: bool) -> u8 {
+    let base = crate::safety::preview_command("purge");
     let deleting = std::cell::Cell::new(false);
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind, true)?;
@@ -257,8 +277,19 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let preflight = RetentionService::new(&registry).purge(kind, before, true)?;
         let keys = RetentionService::new(&registry).purge_plan_keys(kind, before)?;
         let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
-        let plan = Plan::new(purge_effects(&preflight, &keys, learn_keys.as_deref()));
-        let commit = plan.gate(mode, base).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        // What the plan read to pick its removal set: every record of the kind in every rung, with its content digest.
+        let every = after_every_record();
+        let scanned = RetentionService::new(&registry).purge_plan_keys(kind, every)?;
+        let learn_scanned = if let Some(store) = &learn_store { store.purge_keys_before(every)? } else { Vec::new() };
+        let root = yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(repo);
+        let reads = Reads::new().digest("canon.yaml", path_digest(root, &yaml)).set("records", &scanned).set("learn-records", &learn_scanned);
+        let will_match: usize = preflight.rungs.iter().map(|rung| rung.matched).sum::<usize>() + learn_preflight.unwrap_or(0);
+        let mut effects = purge_effects(&preflight, &keys, learn_keys.as_deref());
+        if will_match > 0 {
+            effects.extend(audit_effect(repo, kind, will_match));
+        }
+        let plan = Plan::new("purge", effects, reads).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        let commit = plan.gate(mode).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
         // Deleting touches every rung the kind lives in, and a committed run appends an audit line: each must take the change before the first removal. A plan that removes nothing writes nothing and is not refused.
         if commit && (preflight.rungs.iter().any(|rung| rung.matched > 0) || learn_preflight.unwrap_or(0) > 0) {
             let mut targets = crate::write_mode::resident_targets(&yaml, kind);
@@ -296,16 +327,16 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             // Nothing was in the removal set, so nothing was read or deleted: no audit line, an unchanged run.
             crate::json_out::mark_unchanged();
         } else if commit {
-            append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
+            append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted)?;
         }
-        let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan });
+        let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan.preview() });
         if commit {
             if !json_output {
                 println!("canon purge --kind {}: {matched} matched, {deleted} deleted", kind.as_str());
             }
             crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, json_output, &report);
         } else {
-            crate::safety::finish_preview(base, "purge", &report.plan, "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
+            plan.finish_preview("purge", "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
         }
         Ok(())
     })();
@@ -320,7 +351,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             };
             // A refusal that read and deleted nothing leaves no audit line (O7).
             if matched > 0 || deleted > 0 {
-                let _ = append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
+                let _ = append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted);
             }
             // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, a failure is a failure during the work (exit 1).
             let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { "RETENTION_PURGE_REFUSED" };
@@ -630,7 +661,7 @@ mod tests {
             rungs: vec![],
             unavailable: vec![],
         };
-        let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new(Vec::new()))).unwrap();
+        let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new("purge", Vec::new(), Reads::new()).unwrap().preview())).unwrap();
         assert_eq!(value["learnStore"]["backend"], "parquet");
         assert_eq!(value["learnStore"]["matched"], 3);
         assert_eq!(value["learnStore"]["deleted"], 2);

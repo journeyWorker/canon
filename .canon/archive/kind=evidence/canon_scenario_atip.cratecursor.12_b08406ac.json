@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T12:32:33.380501Z",
+  "attachments": [
+    {
+      "case": "jcs::tests::atip_cratecursor_12_a_control_character_is_escaped_short_where_the_rfc_has_a_short_form_and_by_u00xx_otherwise",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_sorts_members_by_utf16_code_units",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_a_number_that_is_not_a_safe_whole_number_is_an_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_whitespace_nulls_and_empty_members_are_kept_exactly",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_integers_within_the_safe_range_are_written_and_a_whole_float_is_the_integer",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_writes_strings_and_literals_as_the_appendix_does",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    }
+  ],
+  "code_tree": "ae4413d088710b98fac9bd70312272e59850f09d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-cursor-junit.xml"
+  },
+  "evidence_sha": "63861b2995380a2d7dfe4aebd8ad8f80a0a7eaa6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "atip.cratecursor.12",
+  "schema": 1,
+  "staging_id": "3d445f35",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

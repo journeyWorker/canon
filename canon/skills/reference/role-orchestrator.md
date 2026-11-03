@@ -19,25 +19,25 @@ in your ids. Use only the options on a line; never guess one. Ask `canon schema
 
 <!-- canon:generated commands-orchestrator begin -->
 Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `regime show`, `schema`, `selftest`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list of the paths `canon schema <COMMAND> --json` declares under `outputs[].fields.paths`; a path is the record's own key, spelled as the answer spells it.
-In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
+A `usage:` line shows the syntax and is not itself a command to run (the runnable example under it is): `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
 
 ```text
 # Authorize declared capabilities against repository policy (preflight only)
-canon adapter authorize --response <FILE>
+usage: canon adapter authorize --response <FILE>
 ```
 ```bash
 canon adapter authorize --response adapter-response.json --repo . --json
 ```
 ```text
 # Read and validate one provider-neutral response envelope
-canon adapter validate --response <FILE>
+usage: canon adapter validate --response <FILE>
 ```
 ```bash
 canon adapter validate --response adapter-response.json --json
 ```
 ```text
 # Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
-canon artifacts move --tier <TIER> [--commit --plan-digest <DIGEST>] [--input]
+usage: canon artifacts move --tier <TIER> [--commit --plan-digest <DIGEST>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -45,182 +45,182 @@ canon artifacts move --tier cold --json
 ```
 ```text
 # Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
-canon artifacts store [--max-artifact-mib <N>] [--dry-run] [--input]
+usage: canon artifacts store [--max-artifact-mib <N>] [--dry-run] [--input]
 ```
 ```bash
 canon artifacts store --json
 ```
 ```text
 # Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes)
-canon artifacts verify [--full]
+usage: canon artifacts verify [--full]
 ```
 ```bash
 canon artifacts verify --json
 ```
 ```text
 # Write the shell completion script for canon (bash, zsh or fish)
-canon completion <SHELL>
+usage: canon completion <SHELL>
 ```
 ```bash
 canon completion zsh --json
 ```
 ```text
 # Show what you can author here: record kinds, fields, enums, policies
-canon context [--fields <FIELDS>]
+usage: canon context [--fields <FIELDS>]
 ```
 ```bash
 canon context --json
 ```
 ```text
 # Create an immutable context pack from a repository-local JSON manifest
-canon context-pack add --manifest <FILE> [--input]
+usage: canon context-pack add --manifest <FILE> [--input]
 ```
 ```bash
 canon context-pack add --manifest .canon/context-manifest.json --json
 ```
 ```text
 # Show a context pack after verifying its manifest and content objects
-canon context-pack show <PACK_ID>
+usage: canon context-pack show <PACK_ID>
 ```
 ```bash
 canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000 --json
 ```
 ```text
 # Verify a context pack's manifest and immutable content objects
-canon context-pack verify <PACK_ID>
+usage: canon context-pack verify <PACK_ID>
 ```
 ```bash
 canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000 --json
 ```
 ```text
 # Serve the local status dashboard
-canon dashboard [--snapshot <DIR>] [--port <N>] [--input]
+usage: canon dashboard [--snapshot <DIR>] [--port <N>] [--input]
 ```
 ```bash
 canon dashboard --json
 ```
 ```text
 # Scaffold the demo repo (gate starts RED)
-canon demo init [--input]
+usage: canon demo init [--input]
 ```
 ```bash
 canon demo init --repo canon-demo --json
 ```
 ```text
 # Record the missing reviewer evidence (gate turns GREEN)
-canon demo review [--input]
+usage: canon demo review [--input]
 ```
 ```bash
 canon demo review --json
 ```
 ```text
 # Mint a Run manifest with retrieved guidance and context/policy lineage
-canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <ID>] [--skill-digest <DIGEST> (with --skill)] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
+usage: canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <ID>] [--skill-digest <DIGEST> (with --skill)] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
 ```
 ```bash
 canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer --json
 ```
 ```text
 # Diff the declared plan DAG against the observed execution graph
-canon dispatch diff
+usage: canon dispatch diff
 ```
 ```bash
 canon dispatch diff --json
 ```
 ```text
 # Close a dispatched run with a terminal status and an ended_at
-canon dispatch end <RUN_ID> --run-outcome <succeeded|failed> [--input]
+usage: canon dispatch end <RUN_ID> --run-outcome <succeeded|failed> [--input]
 ```
 ```bash
 canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded --json
 ```
 ```text
 # List the current divergence burn-down state
-canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon divergence list --as-of 2030-01-01 --json
 ```
 ```text
 # Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
-canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task <TASK_ID>] [--project <PROJECT_ID>] [--scenario <SCENARIO_ID>] [--run <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
+usage: canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task <TASK_ID>] [--project <PROJECT_ID>] [--scenario <SCENARIO_ID>] [--run <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
 ```
 ```bash
 canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --json
 ```
 ```text
 # Export a redacted retention manifest without deleting records
-canon export --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--before <TIMESTAMP>] [--after <TIMESTAMP>] [--output <FILE>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>] [--dry-run] [--input]
+usage: canon export --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--before <TIMESTAMP>] [--after <TIMESTAMP>] [--output <FILE>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>] [--dry-run] [--input]
 ```
 ```bash
 canon export --kind evidence --output evidence.json --json
 ```
 ```text
 # List a change's committed findings at their latest version
-canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon finding list --change add-login --json
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
-canon format [<DIR>]
+usage: canon format [<DIR>]
 ```
 ```bash
 canon format .canon/specs --json
 ```
 ```text
 # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
-canon gate check [--release]
+usage: canon gate check [--release]
 ```
 ```bash
 canon gate check --json
 ```
 ```text
 # Install the gate hook into .claude/settings.json / .codex/hooks.json
-canon gate install-hooks [--event <NAME>] [--matcher <TEXT>] [--command <TEXT>] [--timeout <N>] [--dry-run] [--input]
+usage: canon gate install-hooks [--event <NAME>] [--matcher <TEXT>] [--command <TEXT>] [--timeout <N>] [--dry-run] [--input]
 ```
 ```bash
 canon gate install-hooks --json
 ```
 ```text
 # Import plans as Change/Task records
-canon ingest plans [--dialect <NAME> --plan-source <DIR>] [--dry-run] [--input]
+usage: canon ingest plans [--dialect <NAME> --plan-source <DIR>] [--dry-run] [--input]
 ```
 ```bash
 canon ingest plans --json
 ```
 ```text
 # Import review/divergence/task/handoff records and derive verdicts
-canon ingest records [--watch] [--interval-secs <N>] [--dry-run] [--run <RUN_ID>] [--input]
+usage: canon ingest records [--watch] [--interval-secs <N>] [--dry-run] [--run <RUN_ID>] [--input]
 ```
 ```bash
 canon ingest records --json
 ```
 ```text
 # Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
-canon ingest sessions [--watch] [--interval-secs <N>] [--home <DIR>] [--full] [--all-workspaces] [--dry-run] [--input]
+usage: canon ingest sessions [--watch] [--interval-secs <N>] [--home <DIR>] [--full] [--all-workspaces] [--dry-run] [--input]
 ```
 ```bash
 canon ingest sessions --json
 ```
 ```text
 # Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
-canon init [--check] [--no-agents-md | --check] [--policy <light|standard|strict> | --check | --no-policy] [--providers <LIST> | --check] [--language <TAG> | --check] [--dry-run | --check] [--input]
+usage: canon init [--check] [--no-agents-md | --check] [--policy <light|standard|strict> | --check | --no-policy] [--providers <LIST> | --check] [--language <TAG> | --check] [--dry-run | --check] [--input]
 ```
 ```bash
 canon init --json
 ```
 ```text
 # Validate each spec root, then materialize scenario index records
-canon inventory sync [--spec-root <DIR>] [--dry-run] [--input]
+usage: canon inventory sync [--spec-root <DIR>] [--dry-run] [--input]
 ```
 ```bash
 canon inventory sync --json
 ```
 ```text
 # Move superseded versions of every record out of the ledger into the archive
-canon ledger compact [--commit --plan-digest <DIGEST>] [--input]
+usage: canon ledger compact [--commit --plan-digest <DIGEST>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -228,7 +228,7 @@ canon ledger compact --json
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-canon migrate [--commit --plan-digest <DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
+usage: canon migrate [--commit --plan-digest <DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -236,35 +236,35 @@ canon migrate --json
 ```
 ```text
 # Validate and write a plugin's overlay records
-canon plugin sync <PLUGIN_ID> [--spec-root <DIR>] [--dry-run] [--input]
+usage: canon plugin sync <PLUGIN_ID> [--spec-root <DIR>] [--dry-run] [--input]
 ```
 ```bash
 canon plugin sync my-plugin --json
 ```
 ```text
 # Show the policy's digest and its approval (who, when, which bytes)
-canon policy show
+usage: canon policy show
 ```
 ```bash
 canon policy show --json
 ```
 ```text
 # Add a prompt bundle from a repository-local JSON manifest
-canon prompt add <NAME@VERSION> --manifest <FILE> [--input]
+usage: canon prompt add <NAME@VERSION> --manifest <FILE> [--input]
 ```
 ```bash
 canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json --json
 ```
 ```text
 # Select a registered prompt bundle version
-canon prompt show <NAME@VERSION>
+usage: canon prompt show <NAME@VERSION>
 ```
 ```bash
 canon prompt show reviewer@v1 --json
 ```
 ```text
 # Remove allowlisted records older than a cutoff
-canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <DIGEST>] [--input]
+usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <DIGEST>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -272,161 +272,161 @@ canon purge --kind session --before 2020-01-01T00:00:00Z --json
 ```
 ```text
 # Read stored records across every storage tier
-canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
 ```
 ```text
 # Build a canonical regime key for hook scripts
-canon regime show --role-segment <NAME> --repo-name <NAME> --area <NAME> --hash <HASH>
+usage: canon regime show --role-segment <NAME> --repo-name <NAME> --area <NAME> --hash <HASH>
 ```
 ```bash
 canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345 --json
 ```
 ```text
 # Write the status report (.canon/REPORT.md)
-canon report build [--input]
+usage: canon report build [--input]
 ```
 ```bash
 canon report build --json
 ```
 ```text
 # Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing
-canon report check
+usage: canon report check
 ```
 ```bash
 canon report check --json
 ```
 ```text
 # Export the panel marts to <DIR>/*.parquet plus manifest.json
-canon report snapshot <DIR> [--input]
+usage: canon report snapshot <DIR> [--input]
 ```
 ```bash
 canon report snapshot snapshot-out --json
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
+usage: canon retrieve --for-role <ROLE> (--regime <KEY> | --domain <NAME>) [--subject <SUBJECT_ID> (with --domain)] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20 --json
 ```
 ```text
 # Describe canon's own commands
-canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
+usage: canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json
 ```
 ```text
 # Run canon's built-in fixture self-tests
-canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|session-ingest|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
+usage: canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|session-ingest|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
 ```
 ```bash
 canon selftest --suite trust-spine-gate --json
 ```
 ```text
 # Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote
-canon skills check [--skills-source <DIR>] [--providers <LIST>]
+usage: canon skills check [--skills-source <DIR>] [--providers <LIST>]
 ```
 ```bash
 canon skills check --json
 ```
 ```text
 # Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits
-canon skills doctor [--skills-source <DIR>] [--providers <LIST>]
+usage: canon skills doctor [--skills-source <DIR>] [--providers <LIST>]
 ```
 ```bash
 canon skills doctor --json
 ```
 ```text
 # Install the canonical `canon` bundle or legacy developer skills
-canon skills install [--skills-source <DIR>] [--providers <LIST>] [--dry-run] [--input]
+usage: canon skills install [--skills-source <DIR>] [--providers <LIST>] [--dry-run] [--input]
 ```
 ```bash
 canon skills install --json
 ```
 ```text
 # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
-canon skills show <NAME> [--full]
+usage: canon skills show [<NAME>] [--full]
 ```
 ```bash
 canon skills show canon --full --json
 ```
 ```text
 # Show where this repo stands: subjects by status, their gaps, and the next commands
-canon status [--fields <FIELDS>]
+usage: canon status [--fields <FIELDS>]
 ```
 ```bash
 canon status --json
 ```
 ```text
 # The unsigned approval payload bytes an external signer signs
-canon strategy approval-payload <STRATEGY_ID> --evaluation <FILE> --approver <NAME> --approval-at <TIMESTAMP>
+usage: canon strategy approval-payload <STRATEGY_ID> --evaluation <FILE> --approver <NAME> --approval-at <TIMESTAMP>
 ```
 ```bash
 canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z --json
 ```
 ```text
 # Promote a strategy after paired evaluation and signed approval
-canon strategy promote <STRATEGY_ID> [--evaluation <FILE> --approval <FILE>] [--signature-file <FILE> (with --approval)] [--dry-run] [--input]
+usage: canon strategy promote <STRATEGY_ID> [--evaluation <FILE> --approval <FILE>] [--signature-file <FILE> (with --approval)] [--dry-run] [--input]
 ```
 ```bash
 canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json
 ```
 ```text
 # Disable an active strategy with durable rollback provenance
-canon strategy rollback <STRATEGY_ID> --reason <TEXT> --actor <ACTOR_ID> --signature-file <FILE> --approval-at <TIMESTAMP> [--contradicting-trajectory <ID>] [--input]
+usage: canon strategy rollback <STRATEGY_ID> --reason <TEXT> --actor <ACTOR_ID> --signature-file <FILE> --approval-at <TIMESTAMP> [--contradicting-trajectory <ID>] [--input]
 ```
 ```bash
 canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json
 ```
 ```text
 # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
-canon subject adopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
+usage: canon subject adopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
 canon subject adopt demo --change add-login --json
 ```
 ```text
 # Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
-canon subject move <SUBJECT_ID> --to <proposed|specced|building|verifying|shipped|retired> [--override-reason <TEXT>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
+usage: canon subject move <SUBJECT_ID> --to <proposed|specced|building|verifying|shipped|retired> [--override-reason <TEXT>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject move demo --to specced --json
 ```
 ```text
 # Author a new subject at status `proposed`
-canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
+usage: canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject new payments --domain dev --title Payments --json
 ```
 ```text
 # Show a subject (read-only)
-canon subject show <SUBJECT_ID>
+usage: canon subject show <SUBJECT_ID>
 ```
 ```bash
 canon subject show demo --json
 ```
 ```text
 # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
-canon subject unadopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
+usage: canon subject unadopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
 canon subject unadopt demo --change add-login --json
 ```
 ```text
 # Apply canon.yaml aging rules, moving old records to their destination tier
-canon tier age [--commit --plan-digest <DIGEST>] [--input]
+usage: canon tier age [--commit --plan-digest <DIGEST>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -434,7 +434,7 @@ canon tier age --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
-canon trace <ID>
+usage: canon trace <ID>
 ```
 ```bash
 canon trace add-login_1_1 --json
@@ -624,9 +624,14 @@ move` and `canon migrate` delete or rewrite existing data. A bare run only
 previews: exit 0, nothing written, a report with `planDigest` and
 `effects[]`. Read the effects, then act with `--commit --plan-digest
 <planDigest>`; it refuses (`PLAN_STALE`, exit 2) when the plan recomputed
-now differs from the one you previewed. A document passed with `--input`
-never carries `--commit` or `--plan-digest`, and these five leaves take one
-object only (`INPUT_INVALID`).
+now differs from the one you previewed. The digest is `sha256:` and 64 hex
+digits, over the effects and what the plan read, so a file or record the plan
+read that changed since is `PLAN_STALE` too, and `meta.next[0]` is the preview
+to run again. A commit holds the repository write lock for its whole run:
+another command that writes waits for it, and one that waited 30 seconds
+answers `REPO_WRITE_BUSY` (exit 2, retryable): run it again. A document passed
+with `--input` never carries `--commit` or `--plan-digest`, and these five
+leaves take one object only (`INPUT_INVALID`).
 
 ```bash
 canon purge --kind session --before 2026-01-01

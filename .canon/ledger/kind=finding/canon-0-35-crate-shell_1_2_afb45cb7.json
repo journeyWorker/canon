@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T10:10:37.364928Z",
+  "change_id": "canon-0-35-crate-shell",
+  "code_tree": "989d91064a153d3c4a15a5f01aadddd066266be6",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/shell.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4cf85cba2737a021cfe56edcf9122d829e4d83e0",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.crateshell.03",
+    "atip.crateshell.04"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards (kept by the brief, so not a defect of this change): split_argv still differs from a POSIX shell in two places the tests do not pin. (1) c.is_whitespace() splits on Unicode and CR whitespace (U+00A0, U+2003, CR) where a shell's IFS is space, tab, newline; quote() always quotes such a word, so the round trip holds, but a hand-written command with an unquoted NBSP splits differently from sh. (2) inside double quotes only the escaped quote and escaped backslash are read, while sh also reads backslash-dollar, backslash-backtick and backslash-newline there; the brief and contract 7.1 say 'as before'. quote() never writes double quotes, so no word of quote's is affected. Blast radius: a tool whose command uses backslash-dollar inside double quotes would be reported by L0.next although a shell runs it as written.",
+  "worktree_dirty": false
+}

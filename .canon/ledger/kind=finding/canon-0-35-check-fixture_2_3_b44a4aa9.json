@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev"
+  },
+  "at": "2026-11-02T18:07:01.424780Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "9c40336d27f4c0f2ec481820b37dbe6526a97cc3",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_check.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "adf05245c6b8ad2be47dcf0b36fc7ffaa43c97ed",
+  "reviewer": "rev-check-0-35",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.98"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Standards: three planted-violation wrappers (atip_checkl1_34, atip_check_42, atip_check_75) now 'exec' canon directly for any invocation naming dashboard, so the planted violation is never applied to the dashboard document; the dashboard run is covered only by the unmodified canon run. Also atip_check_107 (check-1-2) failed once for me under load average ~30 (panic at tests/support/mod.rs:58) and passed alone in 49 s; the evidence also needed a retry. Blast radius: a hint/null/example violation in dashboard's envelope would not be caught by those three tests; the load flake is in the harness, not in notRun.",
+  "worktree_dirty": false
+}

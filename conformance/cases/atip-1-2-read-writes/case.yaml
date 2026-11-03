@@ -1,0 +1,13 @@
+description: "atip/1 1.2 (0.35): a refused call writes nothing, a read command declares the cache it refreshes, and dashboard is declared a server: subject show of a subject that does not exist is refused with no scenario index written, schema subject show names the cache refresh, schema dashboard says one report then serves until signalled"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [subject, show, nosuch, --json]
+    exit: 2
+  - args: [subject, move, nosuch, --to, specced, --json]
+    exit: 2
+  - args: [schema, subject, show, --json]
+    exit: 0
+  - args: [schema, dashboard, --json]
+    exit: 0

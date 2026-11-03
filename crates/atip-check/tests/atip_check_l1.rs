@@ -11,11 +11,13 @@ use serde_json::{json, Value};
 use atip_check::app::check_binary_mutated;
 use atip_check::cli::{CheckArgs, Level};
 use support::l1::{l1_bin, l1_cases, l1_config, l1_engine_difference_case, l1_standard_config};
-use support::{atip_in, Case, Harness, Output};
+use support::{atip_in, kind_verdict, Case, Harness, Output};
 
 /// The L0 checks of a run and the L1 ones that apply to a 1.1 claim.
 const L0_CHECKS: usize = 28;
 const L1_CHECKS: usize = 31;
+/// `L2.effects` is in every report (a SHOULD below L2).
+const EFFECTS: usize = 1;
 /// Conditions a case plants that the conforming fake gives no occasion to judge (a code in both registries, which the conforming fake has none of).
 const EXEMPT_FROM_CONFORMING_RUN: &[&str] = &["warnings/meaning-agrees"];
 
@@ -63,8 +65,8 @@ fn check_of<'a>(data: &'a Value, id: &str) -> &'a Value {
 /// The owner is `fail` with a reason and rule numbers, and every other check passes or does not apply.
 fn verdict(data: &Value, owner: &str) -> Result<(), String> {
     let checks = data["checks"].as_array().ok_or("data.checks is missing")?;
-    if checks.len() != L0_CHECKS + L1_CHECKS {
-        return Err(format!("{} checks, expected {}", checks.len(), L0_CHECKS + L1_CHECKS));
+    if checks.len() != L0_CHECKS + L1_CHECKS + EFFECTS {
+        return Err(format!("{} checks, expected {}", checks.len(), L0_CHECKS + L1_CHECKS + EFFECTS));
     }
     for check in checks {
         let id = check["id"].as_str().unwrap_or_default();
@@ -111,6 +113,8 @@ fn proves(ids: &[&str]) {
     let cases: Vec<Case> = l1_cases()
         .into_iter()
         .filter(|case| ids.contains(&case.condition.split('/').next().unwrap_or_default()))
+        // `tree/level` needs an L2 claim over an L1 tree, where the L2 rows fail too: `atip_checkl1_03` and the case loop of `atip_checkl1_28` prove it.
+        .filter(|case| case.condition != "tree/level")
         .collect();
     for id in ids {
         assert!(
@@ -126,6 +130,7 @@ fn proves(ids: &[&str]) {
                 let output = run_case(&case);
                 let document = output.envelope();
                 verdict(&document["data"], &owner).map_err(|why| format!("{}: {why}\n{}", case.condition, output.stdout.chars().take(600).collect::<String>()))?;
+                kind_verdict(&document["data"], &owner, case.condition.split('/').nth(1).unwrap_or_default()).map_err(|why| format!("{}: {why}", case.condition))?;
                 let must = check_of(&document["data"], &owner)["strength"] == "MUST";
                 let expected = if must { (Some(1), Some(false)) } else { (Some(0), Some(true)) };
                 let got = (output.code, document["ok"].as_bool());
@@ -154,7 +159,7 @@ fn atip_checkl1_01_a_conforming_1_1_tool_passes_the_28_l0_and_the_31_l1_checks_w
     let data = &document["data"];
     assert_eq!((data["level"].as_str(), data["contractVersion"].as_str()), (Some("L1"), Some("1.1")));
     let checks = data["checks"].as_array().expect("checks");
-    assert_eq!(checks.len(), L0_CHECKS + L1_CHECKS);
+    assert_eq!(checks.len(), L0_CHECKS + L1_CHECKS + EFFECTS);
     let ids: Vec<&str> = checks.iter().filter_map(|check| check["id"].as_str()).collect();
     assert_eq!(ids.iter().filter(|id| id.starts_with("L0.")).count(), L0_CHECKS);
     let l1: Vec<&str> = ids.iter().copied().filter(|id| id.starts_with("L1.")).collect();
@@ -177,15 +182,16 @@ fn atip_checkl1_01_a_conforming_1_1_tool_passes_the_28_l0_and_the_31_l1_checks_w
 }
 
 #[test]
-fn atip_checkl1_02_level_l2_is_level_unsupported_naming_0_35_and_an_unknown_level_is_usage() {
+fn atip_checkl1_02_level_l2_runs_and_an_unknown_level_is_usage() {
     let harness = Harness::new();
     let config = l1_standard_config();
     let fixture = harness.l1_fixture(&config);
+    // L2 is a level of the checker: a tool that declares L1 does not meet it (its tree says L1), and nothing says it is unsupported.
     let output = run_fixture(&harness, &config, &fixture, "L2");
     let document = output.envelope();
-    assert_eq!((output.code, document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some(2), Some("LEVEL_UNSUPPORTED"), Some("--level")), "{}", output.stdout);
-    assert_eq!(document["error"]["expected"], json!(["L0", "L1"]));
-    assert!(document["error"]["hint"].as_str().unwrap_or_default().contains("0.35"), "{}", output.stdout);
+    assert_eq!((output.code, document["error"]["code"].as_str()), (Some(1), Some("LEVEL_NOT_MET")), "{}", output.stdout);
+    assert_eq!(document["data"]["level"], "L2");
+    assert_eq!(check_of(&document["data"], "L1.tree")["result"], "fail", "{}", output.stdout);
     let output = run_fixture(&harness, &config, &fixture, "L9");
     assert_eq!((output.code, output.envelope()["error"]["code"].as_str()), (Some(2), Some("USAGE")), "{}", output.stdout);
 }
@@ -193,9 +199,11 @@ fn atip_checkl1_02_level_l2_is_level_unsupported_naming_0_35_and_an_unknown_leve
 #[test]
 fn atip_checkl1_03_a_tree_whose_level_is_not_the_claim_and_a_tool_without_schema_fail_l1_tree() {
     let mismatched = l1_cases().into_iter().find(|case| case.condition == "tree/level").expect("case");
-    let output = run_case(&mismatched);
-    verdict(&output.envelope()["data"], "L1.tree").unwrap_or_else(|why| panic!("{why}\n{}", output.stdout));
-    assert!(check_of(&output.envelope()["data"], "L1.tree")["reason"].as_str().unwrap_or_default().contains("level"), "{}", output.stdout);
+    // The tree says L1 and the claim is L2.
+    let harness = Harness::new();
+    let output = harness.check_l2_at(&mismatched.config, &harness.l1_fixture(&mismatched.config), "L2");
+    assert_eq!(check_of(&output.envelope()["data"], "L1.tree")["result"], "fail", "{}", output.stdout);
+    assert!(check_of(&output.envelope()["data"], "L1.tree")["reason"].as_str().unwrap_or_default().contains("below the claimed level"), "{}", output.stdout);
     // A tool with no `schema` at all, claiming L1: `L1.tree` is `answered`'s failure; the other checks that need the tree do not each fail for it.
     let answered = l1_cases().into_iter().find(|case| case.condition == "tree/answered").expect("case");
     let output = run_case(&answered);
@@ -529,7 +537,8 @@ fn atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_c
     assert!(report.passed, "{}", report.text());
     let l0_args = CheckArgs { level: Level::L0, ..args.clone() };
     let (_, judged_l0) = check_binary_mutated(&l0_args, &[], &[]).expect("a report");
-    let judged: BTreeSet<String> = judged.difference(&judged_l0).cloned().collect();
+    // The conditions of `L2.effects` are planted by `atip_checkl2safety`: the row runs at every level.
+    let judged: BTreeSet<String> = judged.difference(&judged_l0).filter(|condition| !condition.starts_with("effects/")).cloned().collect();
     let mut named: BTreeSet<String> = l1_cases().iter().map(|case| case.condition.to_string()).collect();
     named.insert(l1_engine_difference_case().condition.to_string());
     let l1_judged = judged;
@@ -554,7 +563,7 @@ fn atip_checkl1_28_a_check_forced_to_pass_makes_its_seeded_case_fail_and_every_c
                 }
                 let args = CheckArgs {
                     bin: l1_bin(&harness, &case.config).into(),
-                    level: Level::L1,
+                    level: if case.condition == "tree/level" { Level::L2 } else { Level::L1 },
                     fixture: harness.write("fixture.json", &fixture).into(),
                     contract: None,
                 };
@@ -593,7 +602,7 @@ fn atip_checkl1_29_the_checker_run_on_itself_at_l0_with_its_own_fixture_passes()
 }
 
 #[test]
-fn atip_checkl1_30_canons_fixture_claims_l1_and_the_ci_job_and_the_just_recipe_run_it_and_a_broken_example_turns_the_job_red() {
+fn atip_checkl1_30_canons_fixture_is_read_by_the_checker_and_the_ci_job_and_the_just_recipe_run_it_at_l2_and_a_broken_example_turns_the_job_red() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let fixture: Value = serde_json::from_str(&std::fs::read_to_string(root.join("crates/canon-cli/tests/atip/canon.fixture.json")).expect("canon fixture")).expect("JSON");
     let parsed = atip_check::fixture::parse(&fixture).expect("canon's fixture is one the checker reads");
@@ -603,9 +612,9 @@ fn atip_checkl1_30_canons_fixture_claims_l1_and_the_ci_job_and_the_just_recipe_r
     assert_eq!(paged, ["divergence list", "export", "finding list", "query"]);
     assert!(commands.values().any(|entry| !entry.fields.is_empty()));
     let workflow = std::fs::read_to_string(root.join(".github/workflows/test.yml")).expect("workflow");
-    assert!(workflow.contains("atip-l1:") && workflow.contains("--level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "the CI job runs canon at L1");
+    assert!(workflow.contains("atip-l2:") && workflow.contains("--level L2 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "the CI job runs canon at L2, whose report holds the L1 rows");
     let just = std::fs::read_to_string(root.join("justfile")).expect("justfile");
-    assert!(just.contains("--level L1 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "just atip runs canon at L1");
+    assert!(just.contains("--level L2 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json"), "just atip runs canon at L2");
     // The red path: an example that does not parse fails `L1.examples`, so the job fails.
     let case = l1_cases().into_iter().find(|case| case.condition == "examples/grammar").expect("case");
     let output = run_case(&case);
@@ -692,4 +701,26 @@ fn draft_config() {
             println!("    {} {} {}: {}", check["id"], check["strength"], check["result"], check["reason"].as_str().unwrap_or_default().chars().take(500).collect::<String>());
         }
     }
+}
+
+#[test]
+fn atip_checkl1_03_a_tree_that_declares_a_higher_level_than_the_claim_meets_it() {
+    // Levels are cumulative: an L1 claim against a tree that says L2 passes L1.tree.
+    let case = Case { condition: "tree/level", config: l1_config(&json!({"treeLevel": "L2"})), tweak: None };
+    let output = run_case(&case);
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L1.tree")["result"], "pass", "{}", output.stdout);
+}
+
+#[test]
+fn atip_checkl1_03_a_tree_above_the_checked_level_says_the_higher_claim_was_not_checked() {
+    let case = Case { condition: "tree/level", config: l1_config(&json!({"treeLevel": "L2"})), tweak: None };
+    let output = run_case(&case);
+    let data = &output.envelope()["data"];
+    let tree = check_of(data, "L1.tree");
+    assert_eq!(tree["result"], "pass", "{}", output.stdout);
+    assert!(tree["notes"].to_string().contains("higher claim was not checked"), "{tree}");
+    // A tree at the checked level says nothing of the kind.
+    let output = run_config(&l1_standard_config());
+    assert!(!check_of(&output.envelope()["data"], "L1.tree")["notes"].to_string().contains("higher claim"), "{}", output.stdout);
 }

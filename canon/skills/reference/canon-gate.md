@@ -42,8 +42,10 @@ corpus and runs them, printing every violation grouped by failure class.
 when `--release` is passed.
 
 ```bash
-canon gate check --repo .            # ordinary evaluation
-canon gate check --repo . --release  # + trust-below-required
+# ordinary evaluation
+canon gate check --repo .
+# + trust-below-required
+canon gate check --repo . --release
 ```
 
 Exit `0` clean, `1` gate-red (any violation), `2` usage/load failure
@@ -314,8 +316,8 @@ check `canon status` and the ship guard use; see
 `--task`:
 
 ```stderr
-canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
-canon evidence add: refused — stop and get the human's answer to the brief: nothing is built or attested for a subject before its brief is approved. Show it (`canon brief show --body`), ask with the harness question tool, and on their explicit approval record it with `canon brief approve --approver <their name> --note "<their words>" --relayed-via <the question tool> --actor <your actor id> --digest <change>=<the digest shown>` (or they approve on `canon dashboard`); never unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+stderr: canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
+stderr: canon evidence add: refused — stop and get the human's answer to the brief: nothing is built or attested for a subject before its brief is approved. Show it (`canon brief show --body`), ask with the harness question tool, and on their explicit approval record it with `canon brief approve --approver <their name> --note "<their words>" --relayed-via <the question tool> --actor <your actor id> --digest <change>=<the digest shown>` (or they approve on `canon dashboard`); never unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
 For a change from an external plan with no canon brief yet, the first
@@ -553,7 +555,7 @@ current pinned review saw, `canon evidence add` prints one line per
 review it makes stale (its verdict or checks differ from what the review saw), with the command that re-pins it:
 
 ```stderr
-canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario cart.add.01 --project root --actor reviewer-2 --role reviewer --original-spec-ref specs/kind=feature/area=cart/add.feature
+stderr: canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario cart.add.01 --project root --actor reviewer-2 --role reviewer --original-spec-ref specs/kind=feature/area=cart/add.feature
 ```
 
 The decision is the gate's own (the same stale-review rule `canon gate
@@ -737,8 +739,10 @@ prints the plan (target path + assigned `run_seq` per candidate) without
 writing or deleting.
 
 ```bash
-canon gate promote --repo .            # land every staged candidate
-canon gate promote --repo . --dry-run  # preview only
+# land every staged candidate
+canon gate promote --repo .
+# preview only
+canon gate promote --repo . --dry-run
 ```
 
 Which writes need this step: `evidence add`, `finding add` and `finding

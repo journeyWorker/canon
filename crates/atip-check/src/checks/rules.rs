@@ -56,7 +56,7 @@ pub fn contract_version_findings(document: &Value, claim: Claim) -> Vec<Finding>
     let meta = |member: &str| document.pointer(&format!("/meta/{member}"));
     let mut findings: Vec<Finding> = Vec::new();
     match claim {
-        Claim::V1_1 => {
+        Claim::V1_1 | Claim::V1_2 => {
             let missing: Vec<&str> = ["contract", "contractVersion"]
                 .into_iter()
                 .filter(|member| meta(member).is_none())
@@ -64,7 +64,7 @@ pub fn contract_version_findings(document: &Value, claim: Claim) -> Vec<Finding>
             findings.push((
                 "markers-present",
                 (!missing.is_empty())
-                    .then(|| format!("meta has no {}, a 1.1 tool sets both on every envelope", missing.join(" and "))),
+                    .then(|| format!("meta has no {}, a {} tool sets both on every envelope", missing.join(" and "), claim.as_str())),
             ));
             findings.push((
                 "version-is-claim",
@@ -220,7 +220,7 @@ pub fn registry_findings(
     let unknown_reasons: Vec<String> = found
         .reasons
         .iter()
-        .filter(|_| claim.is_1_1())
+        .filter(|_| claim.at_least(Claim::V1_1))
         .filter(|(code, reason)| {
             rows.iter()
                 .find(|row| &row.code == code)

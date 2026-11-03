@@ -1,0 +1,12 @@
+{
+  "description": "Members in arbitrary order on input; the canonical form sorts every object's keys, at every depth, and keeps array order.",
+  "plan": {
+    "inputs": {"scope": "all", "Before": "2030-01-01", "_kind": "session", "10": "ten", "9": "nine", "a": {"z": 1, "b": 2}},
+    "effects": [
+      {"path": "b.json", "action": "delete"},
+      {"action": "delete", "path": "a.json"}
+    ]
+  },
+  "canonical": "{\"effects\":[{\"action\":\"delete\",\"path\":\"b.json\"},{\"action\":\"delete\",\"path\":\"a.json\"}],\"inputs\":{\"10\":\"ten\",\"9\":\"nine\",\"Before\":\"2030-01-01\",\"_kind\":\"session\",\"a\":{\"b\":2,\"z\":1},\"scope\":\"all\"}}",
+  "digest": "sha256:a7d53af4cba759426e36f92dbbe59a6d63f8d29962daaa880c7a1f69c58905ce"
+}

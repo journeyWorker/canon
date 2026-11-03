@@ -129,11 +129,15 @@ fn row(code: &str) -> (u8, bool) {
 /// before and during the work is split: the old name keeps the failure during
 /// the work (exit 1) and the new one is the precondition (exit 2). One that
 /// can only happen before the work stays exit 2. One that can only happen
-/// during it is exit 1.
+/// during it is exit 1. `INIT_SKILL_INSTALL_FAILED`, the one of the
+/// thirteen decided "only during the work", is not in the registry since
+/// 0.35: it was the failure of a later step that met a refusal after earlier
+/// steps made their effects, which is `STOPPED_MIDWAY` (spec 8.3.2,
+/// `atip.midway`), the other twelve hold their decided exits.
 #[test]
-fn atip_l0_25_the_thirteen_checked_codes_hold_their_decided_exits() {
+fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
     // (code, decided exit)
-    let decided: [(&str, u8); 13] = [
+    let decided: [(&str, u8); 12] = [
         // split: the failure during the work is the old code, exit 1; the precondition is the partner below.
         ("ARTIFACTS_STORE_FAILED", 1),
         ("ARTIFACTS_STORE_UNREACHABLE", 2), // the precondition partner of ARTIFACTS_STORE_FAILED
@@ -144,7 +148,6 @@ fn atip_l0_25_the_thirteen_checked_codes_hold_their_decided_exits() {
         ("RETENTION_EXPORT_FAILED", 1),
         ("RETENTION_PURGE_FAILED", 1),
         // only during the work: exit 1.
-        ("INIT_SKILL_INSTALL_FAILED", 1),
         ("MIGRATE_PINS_FAILED", 1),
         // only before the work: exit 2.
         ("LEDGER_ARCHIVE_UNAVAILABLE", 2),

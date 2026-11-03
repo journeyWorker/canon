@@ -295,10 +295,10 @@ pub fn role_commands(spec: &Value, role: &str) -> String {
         let _ = write!(out, "; `--repo <DIR>` too, except {}", no_repo.join(", "));
     }
     out.push_str(". `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list of the paths `canon schema <COMMAND> --json` declares under `outputs[].fields.paths`; a path is the record's own key, spelled as the answer spells it.\n");
-    out.push_str("In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).\n\n");
+    out.push_str("A `usage:` line shows the syntax and is not itself a command to run (the runnable example under it is): `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).\n\n");
     for leaf in mine {
         let about = gist(leaf["summary"].as_str().expect("summary"));
-        let _ = writeln!(out, "```text\n# {about}\n{}", syntax_line(leaf));
+        let _ = writeln!(out, "```text\n# {about}\nusage: {}", syntax_line(leaf));
         if leaf["effect"] == "destructive" {
             out.push_str("# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts\n");
         }

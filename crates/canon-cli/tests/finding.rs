@@ -208,7 +208,7 @@ fn finding_add_refuses_a_session_id_outside_the_grammar() {
     let dir = repo();
     let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "s", "--session", " padded"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
-    assert!(stderr(&out).contains("--session") && stderr(&out).contains("SessionId"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("--session") && stderr(&out).contains("pattern"), "{}", stderr(&out));
     assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
 }
 

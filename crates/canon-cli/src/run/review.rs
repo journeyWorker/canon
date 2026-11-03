@@ -41,7 +41,6 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
         Ok(id) => id,
         Err(code) => return ExitCode::from(code),
     };
-    crate::inventory::refresh_stale_index(&repo, command);
     ExitCode::from(crate::review::run_add(
         &repo,
         &crate::review::ReviewAddArgs {

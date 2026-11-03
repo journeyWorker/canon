@@ -1,13 +1,14 @@
 //! What `canon schema` says about the arguments of a command that clap's tree does not (0.34, atip/1 spec 10.7.4, 10.8):
 //! the `constraints` between arguments, the `domain` of one argument's own value, and the `validators`.
 //!
-//! clap says what it has public getters for (`conflicts_with`, `ArgGroup`: [`atip::constraint::clap_rules`]) and the
-//! integer type of an argument ([`atip::domain::implicit`]). Everything else is a table, in this module and its
-//! children, one child per group of commands:
+//! clap says the integer type of an argument ([`atip::domain::implicit`]) and nothing else about how arguments go together:
+//! no `conflicts_with`, `requires`, `required_unless_present` or `ArgGroup` is declared on the command tree, because clap enforces
+//! those while it parses, before the domains, and the contract (atip/1 spec 11.7 step 6) answers a failure to parse first, then
+//! `required`, then domains, then constraints, then validators. So everything else is a table, in this module and its children,
+//! one child per group of commands:
 //!
-//! - [`Rule`]: a relation between arguments the parser or the handler enforces without reading state. clap's `requires`
-//!   and `required_unless_present` have no getter, so they are written here too; the old reading of clap's `Debug` text
-//!   is gone, and `tests/arg_rules.rs` drives every rule through the real parser instead;
+//! - [`Rule`]: a relation between arguments the parser or the handler enforces without reading state. [`rules_of`] lists a
+//!   command's rules in the order its document gives them; `tests/arg_rules.rs` drives every rule through the real parser;
 //! - [`DomainRow`]: the restriction of one argument's value (a minimum, a length, a pattern) with the code a value outside it is
 //!   refused with, and values just inside and outside it that the tests run through the real parser;
 //! - [`Validator`]: a stateless check neither can say (a calendar date that must exist, an order between two timestamps),
@@ -87,9 +88,40 @@ pub(crate) fn groups() -> [&'static Tables; 4] {
     [&SHARED, &evidence::TABLES, &authoring::TABLES, &reads::TABLES]
 }
 
-/// The rules of the command `path` that clap does not state itself, in the order the tables list them.
+/// The rules of the command `path` that its tables state themselves, in the order the tables list them.
 pub fn rules_for(path: &str) -> Vec<Rule> {
     groups().iter().flat_map(|tables| tables.rules.iter().filter(|(command, _)| *command == path).flat_map(|(_, rules)| rules.iter().copied())).collect()
+}
+
+/// The relations that used to be clap's own (`conflicts_with`, `ArgGroup`), in the order the command documents list them.
+const PORTED: &[(&str, &[Rule])] = &[
+    ("init", &[Rule::at_most_one(&["check", "no-agents-md"]), Rule::at_most_one(&["check", "policy", "no-policy"]), Rule::at_most_one(&["check", "providers"]), Rule::at_most_one(&["check", "language"]), Rule::at_most_one(&["check", "dry-run"])]),
+    ("migrate", &[Rule::at_most_one(&["revert", "relayed-via"])]),
+    ("query", &[Rule::at_most_one(&["plugin", "history"])]),
+    ("review change", &[Rule::exactly_one(&["upstream-ref", "original-spec-ref"])]),
+    ("review scenario", &[Rule::exactly_one(&["upstream-ref", "original-spec-ref"])]),
+    ("schema", &[Rule::at_most_one(&["path", "errors", "error", "warnings", "warning"])]),
+];
+
+/// The pairs of options a flattened group of arguments gives every command that has it: `--promote` and `--no-promote` of
+/// every staged write, `--limit` and `--all` of every bounded listing.
+const SHARED_PAIRS: &[[&str; 2]] = &[["promote", "no-promote"], ["limit", "all"]];
+
+/// Every rule of the command `node`, whose path is `path`, in the order its document lists them (spec 10.8.1): its own relations,
+/// the pair each flattened group of arguments gives it, then the rest of the tables. Constraints are checked in this order.
+pub fn rules_of(node: &clap::Command, path: &str) -> Vec<Rule> {
+    let has = |name: &str| node.get_arguments().any(|arg| arg.get_long() == Some(name) || (arg.is_positional() && atip::constraint::name_of(arg) == name));
+    let mut rules: Vec<Rule> = PORTED.iter().filter(|(command, _)| *command == path).flat_map(|(_, rules)| rules.iter().copied()).collect();
+    for pair in SHARED_PAIRS {
+        if pair.iter().all(|name| has(name)) {
+            rules.push(match pair {
+                ["promote", "no-promote"] => Rule::at_most_one(&["promote", "no-promote"]),
+                _ => Rule::at_most_one(&["limit", "all"]),
+            });
+        }
+    }
+    rules.extend(rules_for(path));
+    rules
 }
 
 /// The validators of the command `path`, in the order the tables list them.
@@ -157,6 +189,7 @@ macro_rules! any_char {
 }
 
 pub mod enforce;
+pub mod relaxed;
 pub mod semantic;
 mod authoring;
 mod evidence;
@@ -263,46 +296,9 @@ pub fn missing_names(raw: &str) -> Vec<String> {
     vec![argument_name(trimmed.split_whitespace().next().unwrap_or_default())]
 }
 
-/// Of the arguments clap says are missing, the one a declared rule that the command line breaks names first (spec 10.8.1:
-/// a violation's `field` is the first argument of the rule at fault). clap lists what a `requires` needs together with what
-/// that needs in turn, in its own order; the rule says which of them the caller left out.
-pub fn first_fault(node: &clap::Command, path: &str, tokens: &[String], missing: &[String]) -> Option<String> {
-    let mut rules = atip::constraint::clap_rules(node);
-    rules.extend(rules_for(path).iter().map(Rule::doc));
+/// Of the arguments clap says are missing, the one the contract answers with (spec 11.7 step 6): the operands in their order, then
+/// the options in their declaration order, the document's order, whatever order clap lists them in.
+pub fn first_required(node: &clap::Command, missing: &[String]) -> Option<String> {
     let args: Vec<&clap::Arg> = node.get_positionals().chain(node.get_arguments().filter(|arg| !arg.is_positional())).filter(|arg| !atip::project::is_builtin_arg(arg)).collect();
-    let positionals: Vec<&clap::Arg> = node.get_positionals().collect();
-    let mut given = atip::constraint::Given::new();
-    let mut operand_at = 0;
-    let mut only_operands = false;
-    // The words of the command path come first (`canon schema`, `canon finding add`): they are not operands.
-    let mut at = path.split(' ').filter(|word| !word.is_empty()).count().min(tokens.len());
-    while at < tokens.len() {
-        let token = &tokens[at];
-        at += 1;
-        if !only_operands && token == "--" {
-            only_operands = true;
-            continue;
-        }
-        if !only_operands && token.starts_with("--") {
-            let (name, inline) = token[2..].split_once('=').map_or((&token[2..], None), |(name, value)| (name, Some(value.to_string())));
-            let Some(arg) = node.get_arguments().find(|arg| arg.get_long() == Some(name)) else { continue };
-            let value = if arg.get_action().takes_values() {
-                inline.or_else(|| {
-                    let next = tokens.get(at).cloned();
-                    at += usize::from(next.is_some());
-                    next
-                })
-            } else {
-                None
-            };
-            given.entry(name.to_string()).or_default().push(value.map_or_else(|| serde_json::json!(true), serde_json::Value::String));
-        } else if !token.starts_with('-') || only_operands {
-            let Some(arg) = positionals.get(operand_at.min(positionals.len().saturating_sub(1))) else { continue };
-            if !arg.get_num_args().is_some_and(|range| range.max_values() > 1) && !matches!(arg.get_action(), clap::ArgAction::Append) {
-                operand_at += 1;
-            }
-            given.entry(atip::constraint::name_of(arg)).or_default().push(serde_json::Value::String(token.clone()));
-        }
-    }
-    atip::constraint::violations(&rules, &given).into_iter().map(|(_, field)| enforce::field_of(&args, &field)).find(|field| missing.is_empty() || missing.contains(field))
+    args.iter().map(|arg| enforce::field_of(&args, &atip::constraint::name_of(arg))).find(|field| missing.contains(field))
 }

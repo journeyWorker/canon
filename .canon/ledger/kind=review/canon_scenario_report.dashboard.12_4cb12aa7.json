@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-last",
+    "role": "reviewer",
+    "session_id": "s-0-35-last-rev"
+  },
+  "at": "2026-11-03T15:28:54.631602Z",
+  "code_tree": "8fa758de852cbe6f3744b7b1073879eb02b2430a",
+  "kind": "review",
+  "pin": "048a5ffa12f29db1e1533668b835fd43c559ba82",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:report.dashboard.12: the page total counts advisories across briefs and says when there are none"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f3811c9f93b15e6ce8b03c7681bf1bb489d8c59ec888f173e03ca2087c61d134",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/specs"
+  },
+  "review_id": "01M6H0E4B7QSDJSBQRR4BM1PYA",
+  "reviewer": "rev-0-35-last",
+  "scenario_id": "report.dashboard.12",
+  "schema": 2,
+  "worktree_dirty": false
+}

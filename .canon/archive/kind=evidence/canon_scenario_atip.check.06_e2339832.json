@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split"
+  },
+  "at": "2026-11-03T11:54:25.283065Z",
+  "attachments": [
+    {
+      "case": "cli::tests::atip_check_06_a_complete_check_line_parses_with_either_option_spelling",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "cli::tests::atip_check_06_a_malformed_check_line_is_a_usage_error_naming_the_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "cli::tests::atip_check_06_the_root_answers_a_missing_or_unknown_command_with_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "app::tests::atip_check_06_a_panic_is_an_internal_failure_with_exit_1_and_a_way_to_report_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "output::tests::atip_check_06_the_registry_is_sorted_and_each_code_reads_its_own_row",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    },
+    {
+      "case": "atip_check_06_a_malformed_atip_command_line_is_refused_naming_the_argument_at_fault",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "de93a6c37f9b0d663b9ed1759c40c7cea790950e0653e098da7739b8415d4fc3"
+    }
+  ],
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check: cargo nextest run --workspace (default profile, atip-check left out by default-filter, 3732 passed) and --profile atip (the checker crate's own 369 passed), from the clean worktree at the commit of the change"
+  },
+  "evidence_sha": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 802,
+  "scenario_id": "atip.check.06",
+  "schema": 1,
+  "staging_id": "544679ae",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

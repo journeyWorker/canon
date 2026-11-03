@@ -3,13 +3,16 @@
 //! `crates/atip/schema/` holds the envelope, the error object and the registry
 //! entry exactly as the atip repository publishes them (spec sections 6, 7.1
 //! and 7.3). A test pins each copy by digest, so an edit is a deliberate
-//! re-vendoring and never an accident. [`envelope_problems`] checks a document
+//! re-vendoring and never an accident. With the feature `validate`, `envelope_problems` checks a document
 //! against them; a tool's debug build and its tests call it on every envelope
 //! they print, so a document that breaks the contract fails where it is made.
 
+#[cfg(feature = "validate")]
 use std::sync::LazyLock;
 
+#[cfg(feature = "validate")]
 use jsonschema::{Registry, Resource, Validator};
+#[cfg(feature = "validate")]
 use serde_json::Value;
 
 /// `schema/envelope.schema.json`: the one document `--json` prints.
@@ -30,21 +33,29 @@ pub const INPUT_DOCUMENT_SCHEMA: &str = include_str!("../schema/input-document.s
 /// `schema/batch-report.schema.json`: the shape every batch output's `data` shares (spec 11.11).
 pub const BATCH_REPORT_SCHEMA: &str = include_str!("../schema/batch-report.schema.json");
 
+/// `schema/guide.schema.json`: the `data` of `skills show --json` (spec 14.3; since 1.2).
+pub const GUIDE_SCHEMA: &str = include_str!("../schema/guide.schema.json");
+
 /// `meta.contract`: the contract every document follows.
 pub const CONTRACT: &str = "atip/1";
-/// `meta.contractVersion`: the minor of the contract the vendored schemas are (spec 15.7). The value is never `"1.0"` written out.
-pub const CONTRACT_VERSION: &str = "1.1";
+/// `meta.contractVersion`: the newest minor of the contract this crate implements ([`crate::Minor::LATEST`]), which is
+/// not the minor a tool declares. A tool states its own minor in a constant of its own, so that adopting a crate release
+/// does not change what the tool prints (spec 15.7). The value is never `"1.0"` written out.
+pub const CONTRACT_VERSION: &str = "1.2";
 
 /// `$id` of the error schema, which the envelope and the registry entry `$ref`.
+#[cfg(feature = "validate")]
 const ERROR_ID: &str = "https://atip.dev/1/error.schema.json";
 
+#[cfg(feature = "validate")]
 fn parse(text: &str) -> Value {
     serde_json::from_str(text).expect("a vendored contract schema is JSON")
 }
 
 /// Every vendored schema by its `$id`, so a `$ref` between them resolves (`error.schema.json` from the envelope,
 /// `envelope.schema.json` from the self-description's own schema).
-const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
+#[cfg(feature = "validate")]
+const CONTRACT_SCHEMAS: [(&str, &str); 8] = [
     (ERROR_ID, ERROR_SCHEMA),
     ("https://atip.dev/1/envelope.schema.json", ENVELOPE_SCHEMA),
     ("https://atip.dev/1/registry-entry.schema.json", REGISTRY_ENTRY_SCHEMA),
@@ -52,9 +63,11 @@ const CONTRACT_SCHEMAS: [(&str, &str); 7] = [
     ("https://atip.dev/1/input-document.schema.json", INPUT_DOCUMENT_SCHEMA),
     ("https://atip.dev/1/batch-report.schema.json", BATCH_REPORT_SCHEMA),
     ("https://atip.dev/1/stream-line.schema.json", STREAM_LINE_SCHEMA),
+    ("https://atip.dev/1/guide.schema.json", GUIDE_SCHEMA),
 ];
 
 /// The registry of the contract's schemas, for a validator of this crate or of a tool's own schemas that `$ref` them by `$id`.
+#[cfg(feature = "validate")]
 pub fn contract_registry() -> Registry<'static> {
     CONTRACT_SCHEMAS
         .iter()
@@ -63,16 +76,26 @@ pub fn contract_registry() -> Registry<'static> {
         .expect("the registry prepares")
 }
 
+#[cfg(feature = "validate")]
 fn compile(text: &str) -> Validator {
     jsonschema::options().with_registry(&contract_registry()).build(&parse(text)).expect("a vendored contract schema compiles")
 }
 
+#[cfg(feature = "validate")]
 static ENVELOPE: LazyLock<Validator> = LazyLock::new(|| compile(ENVELOPE_SCHEMA));
+#[cfg(feature = "validate")]
 static ERROR: LazyLock<Validator> = LazyLock::new(|| compile(ERROR_SCHEMA));
+#[cfg(feature = "validate")]
 static REGISTRY_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(REGISTRY_ENTRY_SCHEMA));
+#[cfg(feature = "validate")]
 static WARNING_ENTRY: LazyLock<Validator> = LazyLock::new(|| compile(WARNING_ENTRY_SCHEMA));
+#[cfg(feature = "validate")]
 static SCHEMA_DOC: LazyLock<Validator> = LazyLock::new(|| compile(SCHEMA_DOC_SCHEMA));
 
+#[cfg(feature = "validate")]
+static GUIDE: LazyLock<Validator> = LazyLock::new(|| compile(GUIDE_SCHEMA));
+
+#[cfg(feature = "validate")]
 fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
     validator.iter_errors(document).map(|error| format!("{error} at {}", error.instance_path())).collect()
 }
@@ -80,21 +103,25 @@ fn problems_of(validator: &Validator, document: &Value) -> Vec<String> {
 /// What breaks the envelope schema in `document`: one line per violation,
 /// empty when the document is a conforming envelope. The schema alone judges it, `meta.contractVersion` never
 /// `"1.0"` written out included (its pattern starts at minor 1, since 1.1.1).
+#[cfg(feature = "validate")]
 pub fn envelope_problems(document: &Value) -> Vec<String> {
     problems_of(&ENVELOPE, document)
 }
 
 /// What breaks the error-object schema in `error` (the `error` member of a failure envelope), empty when it conforms.
+#[cfg(feature = "validate")]
 pub fn error_problems(error: &Value) -> Vec<String> {
     problems_of(&ERROR, error)
 }
 
 /// What breaks the registry-entry schema in `row`, empty when it conforms.
+#[cfg(feature = "validate")]
 pub fn registry_entry_problems(row: &Value) -> Vec<String> {
     problems_of(&REGISTRY_ENTRY, row)
 }
 
 /// What breaks the warning-entry schema in `row` (one row of the warning registry, since 1.1), empty when it conforms.
+#[cfg(feature = "validate")]
 pub fn warning_entry_problems(row: &Value) -> Vec<String> {
     problems_of(&WARNING_ENTRY, row)
 }
@@ -102,8 +129,16 @@ pub fn warning_entry_problems(row: &Value) -> Vec<String> {
 /// What breaks the contract's schema for a `schema --json` answer (`schema/schema-doc.schema.json`) in `document`, the
 /// whole envelope: one line per violation, empty when it conforms. The rules of spec 10.13 that JSON Schema cannot
 /// express are not checked here.
+#[cfg(feature = "validate")]
 pub fn schema_doc_problems(document: &Value) -> Vec<String> {
     problems_of(&SCHEMA_DOC, document)
+}
+
+/// What breaks the contract's guide schema (`schema/guide.schema.json`) in `data`, the `data` of a `skills show --json` answer: one line
+/// per violation, empty when it conforms.
+#[cfg(feature = "validate")]
+pub fn guide_problems(data: &Value) -> Vec<String> {
+    problems_of(&GUIDE, data)
 }
 
 #[cfg(test)]
@@ -117,7 +152,7 @@ mod tests {
         Sha256::digest(text.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect()
     }
 
-    /// The digests of the files as the atip repository published them (tag v1.1.1 for the envelope, v1.1.0 for the rest, which did not change). A
+    /// The digests of the files as the atip repository published them (tag v1.1.1 for the envelope, v1.2.0 for `schema-doc` (only the description of `flagOnly` changed), v1.1.0 for the rest, which did not change). A
     /// changed copy fails here; re-vendoring updates the file and its digest
     /// together.
     const ENVELOPE_DIGEST: &str = "81a05fac5a09dd8f16543590d061bf94ac1f16136d3c129e0696e996c868503b";
@@ -125,9 +160,10 @@ mod tests {
     const REGISTRY_ENTRY_DIGEST: &str = "18e73eec11f662d6c19e18574a1c1d3424f037f0ad5d232f24ab0a56fab28622";
     const WARNING_ENTRY_DIGEST: &str = "66d2eaaea38eaf723343c262dea4b710bcd1b22dc547124f68f0abc2ee0fcfde";
     const STREAM_LINE_DIGEST: &str = "cfa0647e4907a9447a992be8f9226b5873dc9b3cae89b5a9073c5fafef75c145";
-    const SCHEMA_DOC_DIGEST: &str = "1aaa4625f000df3221f355be2725e5d36f353b835b822cbce11498e11540484a";
+    const SCHEMA_DOC_DIGEST: &str = "ffa4a5e3a4605136f51a6c7767416e25a8e5919e2c2bd152f79a882ebd35f57b";
     const INPUT_DOCUMENT_DIGEST: &str = "a3e194a8f5b2d232bd46f84dc664a8a7d3bb38c2b7658a0edbfd4767d58c97a7";
     const BATCH_REPORT_DIGEST: &str = "74ed7e2a5a0f234d447da186f313500756850313e752d500711401d41498944e";
+    const GUIDE_DIGEST: &str = "43229f3cfbd518307b1e6071b9e12adad114c0da4f8fdba695c06d2e16c47d3f";
 
     #[test]
     fn atip_l0_07_the_vendored_schemas_are_the_published_bytes() {
@@ -139,6 +175,7 @@ mod tests {
         assert_eq!(digest(SCHEMA_DOC_SCHEMA), SCHEMA_DOC_DIGEST);
         assert_eq!(digest(INPUT_DOCUMENT_SCHEMA), INPUT_DOCUMENT_DIGEST);
         assert_eq!(digest(BATCH_REPORT_SCHEMA), BATCH_REPORT_DIGEST);
+        assert_eq!(digest(GUIDE_SCHEMA), GUIDE_DIGEST);
     }
 
     /// A copy with one character changed no longer matches the pin: the pin test above would fail on it.
@@ -158,7 +195,7 @@ mod tests {
     }
 
     fn meta() -> Value {
-        json!({ "schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.34.0", "contract": CONTRACT, "contractVersion": CONTRACT_VERSION, "command": "status" })
+        json!({ "schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.34.0", "contract": CONTRACT, "contractVersion": "1.1", "command": "status" })
     }
 
     #[test]

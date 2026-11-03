@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:33:04.740926Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against_a_repeat",
+          "junit:atip_checkl2safety_05_the_three_idempotency_values_pass_and_a_second_run_with_a_new_effect_or_an_accepted_once_fails"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "8ab5cb3e822c5979e06b889773f2c15568336e915efe614b761a8b7fc2fd9b36",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-safety/brief.md"
+  },
+  "review_id": "01M6FTX8Q4NQHT4YRRF77SM2V3",
+  "reviewer": "rev-0-35-fixes",
+  "scenario_id": "atip.checkl2safety.05",
+  "schema": 2,
+  "worktree_dirty": false
+}

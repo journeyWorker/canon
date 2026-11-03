@@ -3,7 +3,7 @@
   "cli": {
     "about": "Specs, evidence gates, and agent memory for your repo",
     "name": "canon",
-    "version": "0.34.0"
+    "version": "0.35.0"
   },
   "commands": [
     {
@@ -454,6 +454,7 @@
         "INTERNAL",
         "PLAN_STALE",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -556,7 +557,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/ArtifactsMoveReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -609,14 +610,14 @@
               "type": "integer"
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "configWritten": {
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -631,7 +632,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "removedLocal": {
@@ -683,28 +684,22 @@
           "type": "object"
         },
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -727,7 +722,7 @@
     {
       "command": "artifacts store",
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
@@ -740,8 +735,10 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon artifacts store --json"
@@ -1033,7 +1030,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -1044,7 +1041,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -1068,6 +1065,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -1126,6 +1133,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -1368,6 +1430,7 @@
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
         "RELAY_DIGEST_MISMATCH",
+        "REPO_WRITE_BUSY",
         "SPEC_ROOTS_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -1697,7 +1760,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -1708,7 +1771,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -1922,6 +1985,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -1979,6 +2052,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -2675,6 +2803,7 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SUBJECT_NOT_FOUND",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -2890,7 +3019,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -2901,7 +3030,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -3039,6 +3168,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -3096,6 +3235,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -4263,9 +4457,11 @@
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon context-pack add --manifest .canon/context-manifest.json --json"
@@ -4406,7 +4602,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -4417,7 +4613,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -4738,6 +4934,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -4795,6 +5001,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -5514,7 +5775,7 @@
     {
       "command": "dashboard",
       "effect": "write",
-      "effectNote": "regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
+      "effectNote": "prints one report, then serves until signalled; regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
       "errors": [
         "APPROVAL_INCOMPLETE",
         "BRIEF_APPROVE_REFUSED",
@@ -5532,8 +5793,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon dashboard --json"
@@ -5889,7 +6152,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -5900,7 +6163,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -5978,6 +6241,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -6035,6 +6308,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -6233,7 +6561,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -6244,7 +6572,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -6318,6 +6646,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -6375,6 +6713,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -6444,6 +6837,7 @@
         "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
         "UNKNOWN_ROLE",
@@ -6767,7 +7161,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -6778,7 +7172,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -7019,6 +7413,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -7076,6 +7480,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -7405,6 +7864,7 @@
         "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
         "UNKNOWN_ROLE",
@@ -7613,7 +8073,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -7624,7 +8084,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -7759,6 +8219,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -7819,6 +8289,61 @@
           ],
           "type": "object"
         },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
         "ItemStatus": {
           "description": "What happened to one element of a batch.",
           "oneOf": [
@@ -7875,7 +8400,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_MISSING",
@@ -7888,6 +8413,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -8198,7 +8724,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -8209,7 +8735,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -8395,6 +8921,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -8452,6 +8988,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -8562,6 +9153,7 @@
         "NO_COMMIT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -8868,7 +9460,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -8879,7 +9471,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -9094,6 +9686,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -9151,6 +9753,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -9216,10 +9873,12 @@
         "INTERNAL",
         "NO_COMMIT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon divergence defer auth.login.01 --actor alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer --json"
@@ -9460,7 +10119,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -9471,7 +10130,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -9650,6 +10309,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -9707,6 +10376,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -9823,6 +10547,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -9832,6 +10557,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -9841,6 +10567,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -10056,10 +10783,12 @@
         "INTERNAL",
         "NO_COMMIT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon divergence resolve auth.login.01 --actor alice --role reviewer --json"
@@ -10286,7 +11015,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -10297,7 +11026,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -10466,6 +11195,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -10523,6 +11262,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -10698,7 +11492,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "BRIEF_CHANGED_SINCE_APPROVAL",
@@ -10724,6 +11518,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "TYPED_ATOMS_INVALID",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -11206,7 +12001,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -11217,7 +12012,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -11241,6 +12036,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -11299,6 +12104,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -12099,7 +12959,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "BRIEF_CHANGED_SINCE_APPROVAL",
@@ -12125,6 +12985,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "TYPED_ATOMS_INVALID",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -12508,7 +13369,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -12519,7 +13380,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -12543,6 +13404,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -12601,6 +13472,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -13116,7 +14042,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "writes the --output file (mode 0600) and one audit line",
+      "effectNote": "writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on each run that succeeds; a refused run writes neither",
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_MISSING",
@@ -13244,6 +14170,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -13253,6 +14180,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -13262,6 +14190,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -13427,7 +14356,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -13438,7 +14367,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -13462,6 +14391,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -13523,6 +14462,61 @@
           ],
           "type": "object"
         },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
         "ExportAnswer": {
           "anyOf": [
             {
@@ -13544,16 +14538,8 @@
               "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
               "type": "string"
             },
-            "all": {
-              "description": "Return every record from the cursor on, not one page",
-              "type": "boolean"
-            },
             "before": {
               "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
-              "type": "string"
-            },
-            "cursor": {
-              "description": "Resume after the last record of the previous page (the `nextCursor` it reported)",
               "type": "string"
             },
             "dryRun": {
@@ -13581,14 +14567,6 @@
                 "evidence",
                 "subject",
                 "finding"
-              ]
-            },
-            "limit": {
-              "description": "Return at most this many records per page",
-              "pattern": "^-?(0|[1-9][0-9]*)$",
-              "type": [
-                "integer",
-                "string"
               ]
             },
             "output": {
@@ -13609,16 +14587,8 @@
               "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
               "type": "string"
             },
-            "all": {
-              "description": "Return every record from the cursor on, not one page",
-              "type": "boolean"
-            },
             "before": {
               "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
-              "type": "string"
-            },
-            "cursor": {
-              "description": "Resume after the last record of the previous page (the `nextCursor` it reported)",
               "type": "string"
             },
             "dryRun": {
@@ -13646,14 +14616,6 @@
                 "evidence",
                 "subject",
                 "finding"
-              ]
-            },
-            "limit": {
-              "description": "Return at most this many records per page",
-              "pattern": "^-?(0|[1-9][0-9]*)$",
-              "type": [
-                "integer",
-                "string"
               ]
             },
             "output": {
@@ -14077,6 +15039,7 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "SPEC_ROOT_UNRESOLVED",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -14289,7 +15252,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -14300,7 +15263,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -14324,6 +15287,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -14382,6 +15355,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -14588,6 +15616,7 @@
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -14999,7 +16028,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -15010,7 +16039,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -15034,6 +16063,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -15092,6 +16131,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -15499,6 +16593,7 @@
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -15814,7 +16909,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -15825,7 +16920,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -15849,6 +16944,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -15907,6 +17012,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -16224,6 +17384,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -16233,6 +17394,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -16242,6 +17404,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -16715,6 +17878,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -16919,7 +18083,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -16930,7 +18094,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16954,6 +18118,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -17012,6 +18186,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -17164,8 +18393,10 @@
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon gate promote --kind evidence --json"
@@ -17353,7 +18584,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -17364,7 +18595,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -17388,6 +18619,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -17446,6 +18687,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -17645,8 +18941,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ingest plans --json"
@@ -17840,7 +19138,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -17851,7 +19149,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -17940,6 +19238,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -17997,6 +19305,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -18480,8 +19843,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ingest records --json"
@@ -18783,7 +20148,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -18794,7 +20159,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18849,6 +20214,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -18907,6 +20282,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -19141,8 +20571,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ingest sessions --json"
@@ -19448,7 +20880,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -19459,7 +20891,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -19483,6 +20915,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -19541,6 +20983,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -20080,12 +21577,15 @@
         "INIT_AGENTS_MD_CONFLICT",
         "INIT_CONFIG_EXISTS",
         "INIT_INVALID_ARGUMENT",
-        "INIT_SKILL_INSTALL_FAILED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
+        "SKILLS_FAILED",
+        "SKILLS_INVALID_ARGUMENT",
+        "STOPPED_MIDWAY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -20311,7 +21811,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -20322,7 +21822,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -20346,6 +21846,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -20404,6 +21914,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -20644,8 +22209,10 @@
         "INVENTORY_FAILED",
         "INVENTORY_REFUSED",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon inventory sync --json"
@@ -20822,7 +22389,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -20833,7 +22400,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -20857,6 +22424,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -20915,6 +22492,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -21145,8 +22777,10 @@
         "LEDGER_COMPACT_FAILED",
         "OLD_LAYOUT",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon ledger compact --json"
@@ -21234,7 +22868,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/LedgerCompactReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -21243,28 +22877,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -21301,11 +22929,11 @@
               "type": "integer"
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -21338,7 +22966,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "superseded": {
@@ -21517,6 +23145,7 @@
         "MIGRATE_STOPPED",
         "MIGRATE_UNCOMMITTED",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
@@ -21664,7 +23293,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/MigrateReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -21672,28 +23301,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -21868,11 +23491,11 @@
               ]
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -21903,7 +23526,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "steps": {
@@ -22014,8 +23637,10 @@
         "OLD_LAYOUT",
         "PLUGIN_SYNC_ERRORS",
         "PLUGIN_SYNC_FAILED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon plugin sync my-plugin --json"
@@ -22143,7 +23768,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -22154,7 +23779,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22252,6 +23877,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -22309,6 +23944,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -22533,6 +24223,7 @@
         "INTERNAL",
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -22716,7 +24407,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -22727,7 +24418,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22824,6 +24515,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -22881,6 +24582,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -23276,9 +25032,11 @@
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SERIALIZE_FAILED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json --json"
@@ -23402,7 +25160,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -23413,7 +25171,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23492,6 +25250,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -23549,6 +25317,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -23990,10 +25813,12 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "RETENTION_PURGE_FAILED",
         "RETENTION_PURGE_REFUSED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon purge --kind session --before 2020-01-01T00:00:00Z --json"
@@ -24111,7 +25936,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/PurgeReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -24119,28 +25944,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -24227,11 +26046,11 @@
               "type": "string"
             },
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -24256,7 +26075,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "rungs": {
@@ -24577,6 +26396,7 @@
           "domain": {
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "Return at most this many records per page",
           "name": "limit",
           "repeatable": false,
@@ -24586,6 +26406,7 @@
         },
         {
           "default": null,
+          "flagOnly": true,
           "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
           "name": "cursor",
           "repeatable": false,
@@ -24595,6 +26416,7 @@
         },
         {
           "default": false,
+          "flagOnly": true,
           "help": "Return every record from the cursor on, not one page",
           "name": "all",
           "repeatable": false,
@@ -25478,7 +27300,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -25489,7 +27311,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -25560,6 +27382,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -25617,6 +27449,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -25917,7 +27804,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -25928,7 +27815,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -26005,6 +27892,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -26062,6 +27959,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -26269,6 +28221,7 @@
           "domain": {
             "minimum": 0
           },
+          "flagOnly": true,
           "help": "Cap on the guidance items returned",
           "name": "limit",
           "repeatable": false,
@@ -26389,7 +28342,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
@@ -26403,6 +28356,7 @@
         "NO_COMMIT",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -26672,7 +28626,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -26683,7 +28637,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -26740,6 +28694,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -26798,6 +28762,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -27138,7 +29157,7 @@
         }
       ],
       "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
@@ -27151,6 +29170,7 @@
         "INTERNAL",
         "NO_COMMIT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -27420,7 +29440,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -27431,7 +29451,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -27488,6 +29508,16 @@
             "code": {
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
@@ -27546,6 +29576,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -27899,6 +29984,7 @@
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SCAFFOLD_INVALID_ARGUMENT",
         "SCENARIO_TAG_EXISTS",
         "SPEC_ROOT_UNRESOLVED",
@@ -28133,7 +30219,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -28144,7 +30230,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -28224,6 +30310,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -28281,6 +30377,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -28575,7 +30726,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/SchemaReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -29740,6 +31891,7 @@
             "maximum": 4294967295,
             "minimum": 1
           },
+          "flagOnly": true,
           "help": "The most hits to list, best first (there is no next page)",
           "name": "limit",
           "repeatable": false,
@@ -30532,10 +32684,12 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "REPO_WRITE_BUSY",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon skills install --json"
@@ -30664,7 +32818,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -30675,7 +32829,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -30800,6 +32954,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -30857,6 +33021,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -31044,6 +33263,7 @@
       "operands": [
         {
           "default": null,
+          "defaultNote": "the default guide, `canon`",
           "help": "A guide built into the binary: `canon`, or the stem of a reference file such as `role-implementer`",
           "name": "name",
           "possibleValues": [
@@ -31075,7 +33295,7 @@
             "role-planner",
             "role-reviewer"
           ],
-          "required": true,
+          "required": false,
           "valueName": "NAME",
           "valueType": "enum",
           "variadic": false
@@ -31122,7 +33342,7 @@
           "kind": "artifact",
           "mediaType": "text/markdown",
           "schemaRef": "#/schemas/SkillsShowReport",
-          "schemaVersion": "1.0"
+          "schemaVersion": "2.0"
         }
       ],
       "path": [
@@ -31131,27 +33351,8 @@
       ],
       "schemas": {
         "SkillsShowReport": {
-          "description": "`--json` of `canon skills show`: the guide `name` names, as this canon embeds it.",
-          "properties": {
-            "markdown": {
-              "description": "The guide's markdown, as `canon skills show` prints it.",
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "version": {
-              "description": "The canon version the guide is embedded in.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name",
-            "version",
-            "markdown"
-          ],
-          "title": "SkillsShowReport",
-          "type": "object"
+          "$ref": "https://atip.dev/1/guide.schema.json",
+          "title": "SkillsShowReport"
         }
       },
       "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
@@ -32218,8 +34419,10 @@
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json"
@@ -32368,7 +34571,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -32379,7 +34582,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -32466,6 +34669,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -32523,6 +34736,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -32691,8 +34959,10 @@
         "LEARN_TRAJECTORY_NOT_FOUND",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json"
@@ -32858,7 +35128,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -32869,7 +35139,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -32977,6 +35247,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -33034,6 +35314,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -33242,10 +35577,12 @@
         "INTERNAL",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject adopt demo --change add-login --json"
@@ -33418,7 +35755,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -33429,7 +35766,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -33491,6 +35828,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -33548,6 +35895,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -33878,7 +36280,7 @@
     {
       "command": "subject move",
       "effect": "write",
-      "effectNote": "reads without --to: `subject move <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first",
+      "effectNote": "refreshes stale scenario-index records once the transition is allowed; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
@@ -33892,6 +36294,7 @@
         "POLICY_APPROVAL_UNREADABLE",
         "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_INVALID_ARGUMENT",
@@ -33900,7 +36303,8 @@
         "SUBJECT_REASON_REQUIRED",
         "UNKNOWN_ROLE",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject move demo --to specced --json"
@@ -34115,7 +36519,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -34126,7 +36530,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -34188,6 +36592,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -34245,6 +36659,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -34752,13 +37221,15 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_EXISTS",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_INVALID_ARGUMENT",
         "UNKNOWN_ROLE",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_FAILED",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject new payments --domain dev --title Payments --json"
@@ -34975,7 +37446,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -34986,7 +37457,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -35048,6 +37519,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -35105,6 +37586,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -35468,7 +38004,7 @@
     {
       "command": "subject show",
       "effect": "read",
-      "effectNote": "refreshes stale scenario-index records first",
+      "effectNote": "refreshes the stale scenario-index cache once the subject is found; a refused call writes nothing",
       "errors": [
         "CHANGE_ADOPTION_INCOMPLETE",
         "CONFIG_MISSING",
@@ -35845,11 +38381,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
+        "REPO_WRITE_BUSY",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_UNADOPT_REFUSED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject unadopt demo --change add-login --json"
@@ -36022,7 +38560,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -36033,7 +38571,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -36095,6 +38633,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -36152,6 +38700,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -36496,6 +39099,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
+        "REPO_WRITE_BUSY",
         "TASK_NOT_FOUND",
         "TASK_ROW_NOT_FOUND",
         "TYPED_ATOMS_INVALID",
@@ -36616,7 +39220,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary report (`written`, `unchanged`, and a failure that kept one)."
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
             },
             "error": {
               "anyOf": [
@@ -36627,7 +39231,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -36709,6 +39313,16 @@
               "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
               "type": "string"
             },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expected": {
               "description": "The valid values of `field`, when it takes a closed set.",
               "items": {
@@ -36766,6 +39380,61 @@
             "code",
             "message",
             "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
           ],
           "type": "object"
         },
@@ -36910,9 +39579,11 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "PLAN_STALE",
+        "REPO_WRITE_BUSY",
         "TIER_FAILED",
         "UNKNOWN_ROLE",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon tier age --json"
@@ -37000,7 +39671,7 @@
         {
           "kind": "report",
           "schemaRef": "#/schemas/TierAgeReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         }
       ],
       "path": [
@@ -37009,28 +39680,22 @@
       ],
       "schemas": {
         "Effect": {
-          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
           "properties": {
             "action": {
-              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
               "type": "string"
             },
             "detail": {
-              "description": "Where it goes, or why, when `action` alone does not say.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
             },
             "path": {
-              "description": "The file acted on, relative to the repo.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "record": {
-              "description": "The record acted on (an id, key or digest) when it is not a file.",
               "type": [
                 "string",
                 "null"
@@ -37058,11 +39723,11 @@
           "description": "`canon tier age`'s `data`: the plan and one entry per `aging:` rule.",
           "properties": {
             "committed": {
-              "description": "`true` once the run acted, `false` for a preview.",
+              "description": "`false` for a preview, `true` after the commit.",
               "type": "boolean"
             },
             "effects": {
-              "description": "Everything the run would do, in the order it does it.",
+              "description": "Every effect the commit would make, in the order it makes them.",
               "items": {
                 "$ref": "#/schemas/Effect"
               },
@@ -37074,7 +39739,7 @@
               "type": "integer"
             },
             "planDigest": {
-              "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
             "rules": {
@@ -37440,7 +40105,7 @@
     }
   ],
   "contract": "atip/1",
-  "contractVersion": "1.1",
+  "contractVersion": "1.2",
   "envVars": [
     {
       "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
@@ -37730,16 +40395,16 @@
       "reasons": [
         {
           "fix": "Repeat the call with the arguments that issued the cursor, or restart without --cursor.",
-          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor, --fields and --json",
+          "meaning": "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except the options that never change the result set",
           "reason": "ARGUMENTS_CHANGED"
         },
         {
           "fix": "Restart the listing without --cursor.",
-          "meaning": "this command issued the cursor for these arguments but the record it points after is gone",
+          "meaning": "this command issued the cursor for these arguments but the position it points at can no longer be resumed",
           "reason": "EXPIRED"
         },
         {
-          "fix": "Pass the `nextCursor` this same command returned, or restart without --cursor.",
+          "fix": "Pass the nextCursor this same command returned, or restart without --cursor.",
           "meaning": "the cursor is not one this command issued, or is not a cursor",
           "reason": "FOREIGN"
         }
@@ -38134,13 +40799,6 @@
       "exit": 2,
       "fix": "Pass a supported language and skill providers to `canon init`.",
       "meaning": "an `init` option is invalid (language or skill providers)",
-      "retryable": false
-    },
-    {
-      "code": "INIT_SKILL_INSTALL_FAILED",
-      "exit": 1,
-      "fix": "Fix the skill install target the error names, then run `canon skills install`.",
-      "meaning": "canon.yaml was written but the canon skill was not installed",
       "retryable": false
     },
     {
@@ -38539,6 +41197,13 @@
       "retryable": false
     },
     {
+      "code": "REPO_WRITE_BUSY",
+      "exit": 2,
+      "fix": "A canon command that writes or commits is still running in this repository: run the same command again in a moment.",
+      "meaning": "another canon process held the repository write lock for the whole wait, so this command, which writes or commits, started nothing",
+      "retryable": true
+    },
+    {
       "code": "RETENTION_EXPORT_FAILED",
       "exit": 1,
       "fix": "Check that the export destination is writable and has space, then run the export again.",
@@ -38669,6 +41334,20 @@
       "exit": 2,
       "fix": "Pass --project with the id of the spec root to use.",
       "meaning": "no single spec root could be chosen; pass --project",
+      "retryable": false
+    },
+    {
+      "code": "STOPPED_MIDWAY",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step reads it), then act on the fix of the reason; never run the same command again unread.",
+      "meaning": "a command that works in steps stopped after an earlier step made its effects, because a later step met what the command refuses before its work; `reason` is the code of that refusal, and the message and `meta.next` say what was already done",
+      "reasons": [
+        {
+          "fix": "Read what init wrote (`canon status`), fix the skill source or the `skills:` section the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md, or the providers or the `skills:` section are invalid: what `canon skills install` refuses before it starts",
+          "reason": "SKILLS_INVALID_ARGUMENT"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41435,7 +44114,7 @@
       }
     ],
     "kind": "tree",
-    "level": "L1"
+    "level": "L2"
   },
   "warnings": [
     {

@@ -58,10 +58,10 @@ pub struct BriefApproveArgs {
     #[arg(long, value_name = "NAME")]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID", requires = "relayed_via")]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor: Option<String>,
     /// With --relayed-via, the digest `canon brief show --body` showed the human, as `<change>=<sha256:digest>`, once per change; a brief whose digest differs is refused
-    #[arg(long = "digest", value_name = "DIGEST", requires = "relayed_via")]
+    #[arg(long = "digest", value_name = "DIGEST")]
     pub digests: Vec<String>,
     /// The changes to approve, one answer for all, none written unless every one is approvable (default: the repo's only live change)
     #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]

@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-02T22:35:38.764312Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2guides_01_a_skills_show_that_writes_fails_l2_skills_alone_and_l2_effects_leaves_it_to_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    },
+    {
+      "case": "atip_checkl2guides_01_a_conforming_tool_passes_skills_show_each_guide_and_an_unknown_name",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2c.xml",
+      "sha256": "0159331bde324bb6ab2b1f3eb422ec1b0e4b77a675aff032b070bcc422d96405"
+    }
+  ],
+  "code_tree": "073129b7cd60e72fb9c39cc469e2621d8c8cc4df",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2c.xml"
+  },
+  "evidence_sha": "44b242705daf17dd8a56656eef0f24b5109f5501",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 43,
+  "scenario_id": "atip.checkl2guides.01",
+  "schema": 1,
+  "staging_id": "b7dbd870",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="6" skipped="0" failures="0" errors="0" uuid="fcf4d16a-6db9-48d2-9528-f1a205cc24e6" timestamp="2026-11-03T22:14:37.457+09:00" time="6.045">
+    <testsuite name="canon-cli::repo_discovery" tests="6" skipped="0" errors="0" failures="0">
+        <testcase name="gate_check_in_a_directory_without_canon_yaml_refuses_instead_of_reporting_clean" classname="canon-cli::repo_discovery" timestamp="2026-11-03T22:14:37.457+09:00" time="3.384"/>
+        <testcase name="gate_check_with_a_repo_that_has_no_canon_yaml_refuses_even_inside_a_canon_repo" classname="canon-cli::repo_discovery" timestamp="2026-11-03T22:14:37.457+09:00" time="3.805"/>
+        <testcase name="format_never_reports_a_missing_path_or_a_missing_config_as_clean" classname="canon-cli::repo_discovery" timestamp="2026-11-03T22:14:37.457+09:00" time="4.133"/>
+        <testcase name="commands_that_run_without_a_canon_yaml_still_do" classname="canon-cli::repo_discovery" timestamp="2026-11-03T22:14:37.457+09:00" time="4.154"/>
+        <testcase name="a_nested_directory_of_a_canon_repo_finds_the_root_without_repo" classname="canon-cli::repo_discovery" timestamp="2026-11-03T22:14:37.457+09:00" time="4.185"/>
+        <testcase name="every_command_that_needs_canon_state_refuses_without_a_canon_yaml" classname="canon-cli::repo_discovery" timestamp="2026-11-03T22:14:37.457+09:00" time="6.044"/>
+    </testsuite>
+</testsuites>

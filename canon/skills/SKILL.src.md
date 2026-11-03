@@ -221,20 +221,20 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in
   `data`). `meta` carries `tool`, `toolVersion`, `contract` (`atip/1`),
-  `contractVersion` (`1.1`), `schemaVersion`,
+  `contractVersion` (`1.2`), `schemaVersion`,
   `command`, and when present `next`, `warnings` (`[{code, message}]`) and
   `page`; a repeated write that changed nothing reports `data.unchanged: true`.
   Absent members are omitted, never `null` or `[]` (a value you sent empty comes back as `received: ""`).
   Read the members you know and ignore the ones you do not: a later canon
   adds members, and a value of a closed set you have not seen (a `severity`, an
   `outcome`, a `reason`) is one item to leave out, never a reason to reject the document. A paged list puts
-  `meta.page.nextCursor` on the call's `meta.next` as `--cursor <nextCursor>`;
-  no `nextCursor` means no more.
+  `meta.page.nextCursor` in the first entry of the call's `meta.next` as `--cursor=<nextCursor>`
+  (run that entry as it is); no `nextCursor` means no more.
   On failure branch on `error.code`, and on `error.reason` where the code has
   reasons (`INPUT_INVALID` says `NOT_JSON`, `UNKNOWN_KEY`, `STDIN_TTY`, … so you
   know whether to fix the JSON or the shell); fix the option `error.field` names
   using the `error.expected` values (`field` is an option name, or a JSON
-  pointer such as `/items/2/scenario` into an `--input` document), and
+  pointer such as `/2/scenario` into an `--input` document, `/<index>/<key>` in a batch), and
   follow `error.hint`: it is one runnable command line that starts with `canon`, the
   same with `<PLACEHOLDER>`s you fill in, or one sentence. The codes
   are stable; `canon schema --errors --json` lists them with their reasons and
@@ -258,7 +258,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   has blockers; the approval step appears only when the brief is clean and
   unapproved.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
-  for everything); a cursor holds only for the call that issued it, so change nothing but `--limit`, `--all` and `--fields` (`CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED` otherwise). Project fields with `--fields a,b`
+  for everything); a cursor holds only for the call that issued it, so change nothing but `--limit`, `--all`, `--fields` and `--json`, and keep `CANON_ROLE` as it was (`CURSOR_INVALID` with `error.reason` `ARGUMENTS_CHANGED` otherwise; `FOREIGN` for a cursor of another command or another canon version: start again from the first page). `--limit`, `--cursor`, `--all` and `--fields` are flags: an `--input` document key of that name is `INPUT_INVALID` with `reason` `FLAG_ONLY_KEY`. Project fields with `--fields a,b`
   (`status`, `export`, `query`, `finding list`, `divergence list`, `context`): the paths `canon schema <command> --json` lists under `outputs[].fields`, spelled as the answer spells them; `meta.fields` lists what was kept.
 - `--override-reason <text>` is the only way to proceed past a waivable
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`
@@ -277,10 +277,11 @@ the positional arguments. An object is one invocation; a JSON array (or NDJSON
 from a file or stdin) is a batch, run in order and answered with
 `data.items[]` (`index`, `status` of `written`, `unchanged`, `failed` or
 `skipped`, and that element's `data` or `error`). A batch is validated whole
-before anything is written: an invalid element writes nothing and exits 2,
-`error.field` pointing at `/items/<i>/<key>`; a write that fails stops there
-(exit 1, `BATCH_INCOMPLETE`) and re-running the same batch reports the finished elements
-`unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped.
+before anything is written, and that check reads no state: an invalid element writes nothing and exits 2 with
+its own code, `error.field` pointing at `/<i>/<key>` and no `data`. An element that fails when it runs (the object
+it names does not exist) stops the batch: exit 1, `BATCH_INCOMPLETE`, `error.field` exactly `/<i>`, the element
+`failed` with its own `error` (no `data`), the later ones `skipped`, and the earlier ones done (not undone). Re-running the same batch reports the finished elements
+`unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped; a document with several problems reports them all, the first as the error and every one in `error.details` in the order the document wrote its keys, and a value outside a closed set is `INPUT_INVALID` too (`reason` `INVALID_VALUE`, `field` the key), not `USAGE`. Every non-empty line of an NDJSON file is a document (a `#` line is not a comment). Integers compare by number: `1`, `"1"` and `--round +1` are one value, and `"+1"`, `"0x1"` and `1.0` in a document are `INVALID_VALUE`.
 `canon schema <command> --json` shows the leaf's `input`: the schema of one document and a complete `example`.
 
 ```text
@@ -329,12 +330,18 @@ and `canon context` warn when the repo holds 0.27-era state and put
 ## Setup and provider projection
 
 ```bash
-canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
-canon init --providers=claude,codex          # harnesses for the canon skill; without it init asks on a terminal, else takes the detected .claude/.codex/.omp/.pi
-canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
-canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
-canon skills check                           # read-only drift check; exit 1 (SKILLS_DRIFT) names each orphan, a projected file the bundle no longer ships
-canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
+# canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
+canon init
+# harnesses for the canon skill; without it init takes the detected .claude/.codex/.omp/.pi (it never asks)
+canon init --providers=claude,codex
+# follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
+canon skills install
+# any subset or none; rewrites skills.providers
+canon skills install --providers=claude,codex,omp,pi
+# read-only drift check; exit 1 (SKILLS_DRIFT) names each orphan, a projected file the bundle no longer ships
+canon skills check
+# diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
+canon skills doctor
 ```
 
 `install` writes, per selected harness, a short `SKILL.md` stub (this file's

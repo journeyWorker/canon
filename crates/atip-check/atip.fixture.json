@@ -19,7 +19,7 @@
       ]
     }
   },
-  "contractVersion": "1.1",
+  "contractVersion": "1.2",
   "globalOptions": [],
   "probe": "check",
   "registry": [
@@ -53,11 +53,6 @@
     {
       "code": "LEVEL_NOT_MET",
       "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "LEVEL_UNSUPPORTED",
-      "exit": 2,
       "retryable": false
     },
     {

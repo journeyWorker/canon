@@ -1,4 +1,4 @@
-Agents: "canon schema --json" describes every command as JSON.
+Agents: "canon schema --json" describes every command; "canon skills show" prints the guide.
 
 Move an already-committed finding's disposition (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
 

@@ -847,7 +847,7 @@ fn authoring_migrate_20_the_preview_writes_nothing_and_says_first_whether_it_re_
     assert!(all.contains("`kind: chore`"), "{all}");
     let old_digest = canon_cli::brief::brief_digest(&read_brief(r, "a"));
     assert!(all.contains(&format!("Approved: {old_digest} -> sha256:")), "old and new digest: {all}");
-    assert_eq!(digest.len(), 64);
+    assert!(digest.strip_prefix("sha256:").is_some_and(|hex| hex.len() == 64), "{digest}");
 }
 
 /// authoring.migrate.21

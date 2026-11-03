@@ -31,20 +31,20 @@ fn atip_contract11_01_every_envelope_declares_the_contract_and_its_version_and_a
     for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["finding", "nosuch", "--json"], vec!["--json"], vec!["schema", "--json"], vec!["schema", "status", "--json"], vec!["schema", "--errors", "--json"], vec!["schema", "--warnings", "--json"], vec!["gate", "check", "--json"]] {
         let document = json(&canon(dir.path(), &args));
         assert_eq!(document["meta"]["contract"], "atip/1", "{args:?}: {document}");
-        assert_eq!(document["meta"]["contractVersion"], "1.1", "{args:?}: the same build says the same version everywhere: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.2", "{args:?}: the same build says the same version everywhere: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     for (flag, kind) in [("--errors", "errors"), ("--warnings", "warnings")] {
         let document = json(&canon(dir.path(), &["schema", flag, "--json"]));
         assert_eq!(document["data"]["kind"], kind);
-        assert_eq!(document["meta"]["schemaVersion"], "1.1", "{document}");
+        assert_eq!(document["meta"]["schemaVersion"], "1.2", "{document}");
         assert_eq!(document["meta"]["command"], "schema");
     }
     for (flag, code, kind) in [("--error", "USAGE", "error"), ("--warning", "OLD_LAYOUT_FOUND", "warning")] {
         let document = json(&canon(dir.path(), &["schema", flag, code, "--json"]));
-        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.1")), "{document}");
+        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.2")), "{document}");
     }
-    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.1.
+    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.2.
     assert_eq!(json(&canon(dir.path(), &["nosuch", "--json"]))["meta"]["schemaVersion"], "1.0");
 }
 
@@ -65,7 +65,8 @@ fn atip_contract11_08_an_empty_value_the_caller_sent_is_received_empty_and_a_val
         assert_eq!((missing["error"]["code"].as_str(), missing["error"]["field"].as_str()), (Some("USAGE"), Some("--change")), "{args:?}: {missing}");
         assert!(missing["error"].get("received").is_none(), "{args:?}: a value never sent has no received: {missing}");
     }
-    let equals = json(&canon(dir.path(), &["finding", "add", "--change=", "--json"]));
+    // The value is judged by the domain stage (after `required`, spec 11.7 step 6), so the rest of the call is whole.
+    let equals = json(&canon(dir.path(), &["finding", "add", "--change=", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "a", "--summary", "s", "--json"]));
     assert_eq!(equals["error"]["received"], "", "an explicit empty value keeps received: {equals}");
     // The same through `--input`: an empty key of the document is reported as the caller sent it.
     let document = json(&canon(dir.path(), &["scenario", "new", "--input", r#"{"operands":["auth.login.01"],"title":"t","":1}"#, "--json"]));

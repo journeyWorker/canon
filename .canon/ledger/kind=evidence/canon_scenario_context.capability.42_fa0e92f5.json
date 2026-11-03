@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T13:43:35.013900Z",
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test cli_spec completion_refuses_a_shell_it_does_not_know_and_needs_no_repo"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: command re-run on the current tree: cargo nextest run --workspace (default profile, 3732 tests; the test of this record passed), from the clean worktree"
+  },
+  "evidence_sha": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 556,
+  "scenario_id": "context.capability.42",
+  "schema": 1,
+  "staging_id": "aa9da94f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

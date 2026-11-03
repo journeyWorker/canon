@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T17:25:12.169991Z",
+  "attachments": [
+    {
+      "case": "atip_crate12_02_the_checker_declares_its_own_contract_version_apart_from_the_crates",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/rebind-junit.xml",
+      "sha256": "9c78faf072822e20821611a8e907ccbd40932d3bfb171ce2ecf21cfc1e1a82f1"
+    },
+    {
+      "case": "atip_crate12_02_canon_still_declares_contract_version_1_1_though_the_crate_is_at_1_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/rebind-junit.xml",
+      "sha256": "9c78faf072822e20821611a8e907ccbd40932d3bfb171ce2ecf21cfc1e1a82f1"
+    }
+  ],
+  "code_tree": "276e9a2237949d440c74791e0fc4d5450c7b4b92",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/rebind-junit.xml"
+  },
+  "evidence_sha": "125019cbfd19a0ea6820ca9a05242c499aa3efb3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 12,
+  "scenario_id": "atip.crate12.02",
+  "schema": 1,
+  "staging_id": "c4722710",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

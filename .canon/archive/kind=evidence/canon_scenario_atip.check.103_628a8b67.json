@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T11:27:17.622765Z",
+  "attachments": [
+    {
+      "case": "atip_check_103_each_1_2_violation_fails_the_row_that_owns_it_and_no_other_row_at_a_claim_of_1_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-1-2-junit.xml",
+      "sha256": "1db837335213196e97a6c88fbce73d37ab57600e261394d4c97991b564f84403"
+    }
+  ],
+  "code_tree": "0107e2fe355820f1bd0b24ed8959ecd0792fc74f",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-1-2-junit.xml"
+  },
+  "evidence_sha": "f338a072f3a73ebaa76d86b53d8f3b2fcb36b32e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 525,
+  "scenario_id": "atip.check.103",
+  "schema": 1,
+  "staging_id": "1f16a61b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

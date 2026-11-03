@@ -1,30 +1,36 @@
 //! `--input <JSON|FILE|->` (0.28 D7): a leaf's arguments as a JSON document.
 //!
-//! The document is turned into an ordinary command line before clap sees it,
-//! so every rule of the flags (required, exactly-one-of sets, value sets, error
+//! A leaf run with `--input` follows the order of spec 11.7. The document is turned into an ordinary
+//! command line before clap sees it, so every rule of the flags (required, exactly-one-of sets, value sets, error
 //! codes) applies unchanged; [`expand`] is that step and `main` runs it first.
 //!
-//! - **Source:** inline JSON when the value starts with `{` or `[` after
-//!   whitespace, `-` for stdin (a terminal is refused), else a file path.
-//! - **Framing:** the whole source is one JSON value first; only if that fails
-//!   and the source is a file or stdin are its non-empty lines parsed as NDJSON
-//!   (`#` lines skipped). An object is one invocation and prints the ordinary
-//!   report; an array or NDJSON is a batch and prints a [`BatchReport`], even
-//!   with one element.
-//! - **Document:** keys are the leaf's long option names in camelCase,
-//!   `operands` an array. Repeatable options are arrays, flags are booleans
-//!   (`false` emits `--no-x` when it exists). Every value becomes one
-//!   `--kebab=value` element, never shell-parsed. A flag on the command line
-//!   and the same key with a different value is `INPUT_CONFLICT`.
-//! - **Batch:** every element is validated (clap, then the leaf's own
-//!   `--dry-run` where it has one) before the first write. Then the elements
-//!   run in order, each as one `canon … --json` child process; the first
-//!   failure stops the run (`failed`, the rest `skipped`, exit 1).
+//! - **Step 1, read and frame.** Inline JSON when the value starts with `{` or `[` after whitespace, `-` for stdin (a
+//!   terminal is refused), else a file path. The whole source is one JSON value first; only if that fails and
+//!   the source is a file or stdin are its non-empty lines parsed as NDJSON (a `#` line is not a comment: it is
+//!   not JSON). An object is one invocation and prints the ordinary report; an array or NDJSON is a batch and
+//!   prints a [`BatchReport`], even with one element.
+//! - **Step 2, fragment validation.** Keys are the leaf's long option names in camelCase, `operands` an array.
+//!   Repeatable options are arrays, flags are booleans (`false` emits `--no-x` when it exists). The document is
+//!   checked against what the fragment schema says ([`Leaf`]: known keys, types, value sets, integers in the
+//!   grammar of spec 11.5, `null`) and every problem is reported, in the order the document wrote its keys.
+//! - **Step 3, conflict check.** The command line alone is read first: what clap refuses while parsing it (an
+//!   unknown option, a value of the wrong type or outside its set) answers as it does without `--input`. Then a
+//!   flag on the command line and the same key with another normalised value is `INPUT_CONFLICT` (`+1` on argv
+//!   and `1` in the document are one integer).
+//! - **Steps 4 to 6, merge, environment and defaults, invocation validation.** Every value becomes one
+//!   `--kebab=value` element, never shell-parsed, and clap parses the result: it applies `env` and defaults to
+//!   the options the merged line lacks, and checks requirements, domains and constraints.
+//! - **A batch** puts every element through steps 1 to 6 before the first write, and those steps read no state
+//!   (spec 11.11): a failure there is the element's own code, exit 2, `field` `/<index>/…`, no `data`, and nothing
+//!   has run. Then the elements run in order, each as one `canon … --json` child process (step 7); the first
+//!   failure, a failed state-dependent precondition included, stops the run: `BATCH_INCOMPLETE`, exit 1, `field`
+//!   `/<index>`, the element `failed` with its own `error` and no `data`, the rest `skipped`.
 //!
 //! The same [`Leaf`] description (keys, types, value sets) is what the example document of the spec
 //! is read with ([`example_document`]); the JSON Schemas the spec publishes for a document
 //! come from the command's document ([`atip::project::fragment_schema`]).
 
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io::{IsTerminal, Read};
 use std::process::{ExitCode, Stdio};
@@ -33,7 +39,8 @@ use std::sync::OnceLock;
 use clap::builder::ValueParser;
 use clap::{value_parser, Arg, ArgAction, Command};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{de, Serialize};
+use serde_json::value::RawValue;
 use serde_json::{json, Map, Value};
 
 use crate::cli_error::{CliErrorExt as _, CliError, ErrorBody};
@@ -44,10 +51,17 @@ pub const MAX_BYTES: u64 = 8 * 1024 * 1024;
 /// The most elements one batch may hold.
 pub const MAX_ELEMENTS: usize = 10_000;
 
-/// Options a document can never carry: the globals, the safety pair and `--fields`. A
-/// document is a command invocation, not a way past a preview; `--fields` is read against the output the
-/// invocation selects, and a batch output declares none (spec 6.10). The spec marks each `flagOnly`.
-pub const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-digest", "fields"];
+/// The options canon defines beside the contract's flag-only ones: the tool-wide `--repo` and `--as`.
+pub const OWN_FLAGS_ONLY: [&str; 2] = ["repo", "as"];
+
+/// Options a document can never carry: the contract's flag-only set at 1.2 ([`atip::flag_only_options`]: `--json`, `--input`,
+/// `--commit`, `--plan-digest`, `--limit`, `--cursor`, `--all`, `--fields`) and canon's own ([`OWN_FLAGS_ONLY`]). A
+/// document is a command invocation, not a way past a preview, a page or a projection; `--fields` is read against the
+/// output the invocation selects, and a batch output declares none (spec 6.10). The spec marks each `flagOnly`.
+pub fn flags_only() -> &'static [&'static str] {
+    static SET: std::sync::LazyLock<Vec<&'static str>> = std::sync::LazyLock::new(|| OWN_FLAGS_ONLY.into_iter().chain(atip::flag_only_options(atip::Minor::V1_2).iter().copied()).collect());
+    &SET
+}
 
 // ---------------------------------------------------------------- batch report
 
@@ -72,10 +86,10 @@ pub struct BatchItem<R> {
     /// 0-based position in the input.
     pub index: usize,
     pub status: ItemStatus,
-    /// The element's ordinary report (`written`, `unchanged`, and a failure that kept one).
+    /// The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<R>,
-    /// The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`).
+    /// The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`).
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<ErrorBody>")]
     pub error: Option<Value>,
@@ -106,6 +120,15 @@ enum Kind {
     Value,
 }
 
+/// What one value of an option or operand may be, read from its clap value parser.
+#[derive(Debug, Clone, Default)]
+struct Spec {
+    /// An integer: the document's value is a JSON integer or a string of digits (spec 11.5).
+    integer: bool,
+    /// The closed set of values, when the argument takes one.
+    values: Option<Vec<String>>,
+}
+
 /// One option of a leaf a document can set.
 #[derive(Debug, Clone)]
 struct Key {
@@ -115,7 +138,7 @@ struct Key {
     long: String,
     kind: Kind,
     repeatable: bool,
-    integer: bool,
+    spec: Spec,
     /// `--no-<long>` exists.
     negatable: bool,
 }
@@ -128,9 +151,10 @@ pub struct Leaf {
     /// `(min, max)` of the operands, when the leaf has any.
     operands: Option<(usize, Option<usize>)>,
     operand_names: Vec<String>,
+    /// The value description of each operand, in declaration order.
+    operand_specs: Vec<Spec>,
     /// Option groups of which exactly one is required, as document keys.
     one_of: Vec<Vec<String>>,
-    has_dry_run: bool,
 }
 
 fn camel(long: &str) -> String {
@@ -156,6 +180,11 @@ fn is_integer(arg: &Arg) -> bool {
         .any(|parser| parser.type_id() == id)
 }
 
+fn spec_of(arg: &Arg) -> Spec {
+    let values: Vec<String> = arg.get_possible_values().iter().filter(|value| !value.is_hide_set()).map(|value| value.get_name().to_string()).collect();
+    Spec { integer: is_integer(arg), values: (!values.is_empty()).then_some(values) }
+}
+
 fn takes_value(arg: &Arg) -> bool {
     !matches!(arg.get_action(), ArgAction::SetTrue | ArgAction::SetFalse | ArgAction::Count | ArgAction::Help | ArgAction::HelpShort | ArgAction::HelpLong | ArgAction::Version)
 }
@@ -169,7 +198,7 @@ impl Leaf {
             .filter(|a| !a.is_positional())
             .filter_map(|a| {
                 let long = a.get_long()?;
-                if FLAGS_ONLY.contains(&long) {
+                if flags_only().contains(&long) {
                     return None;
                 }
                 let kind = match a.get_action() {
@@ -182,7 +211,7 @@ impl Leaf {
                     long: long.to_string(),
                     kind,
                     repeatable: matches!(a.get_action(), ArgAction::Append),
-                    integer: kind == Kind::Value && is_integer(a),
+                    spec: if kind == Kind::Value { spec_of(a) } else { Spec::default() },
                     negatable: args.iter().any(|o| o.get_long().is_some_and(|l| l.strip_prefix("no-") == Some(long))),
                 })
             })
@@ -202,23 +231,24 @@ impl Leaf {
             }
             (min, max)
         });
-        let by_id = |id: &str| -> Option<String> {
-            match args.iter().find(|a| a.get_id() == id) {
+        let by_name = |name: &str| -> Option<String> {
+            match args.iter().find(|a| atip::constraint::name_of(a) == name) {
                 Some(a) if a.is_positional() => Some("operands".to_string()),
                 Some(a) => a.get_long().map(camel),
                 None => None,
             }
         };
-        let one_of = cmd
-            .get_groups()
-            .filter(|g| g.is_required_set() && !(*g).clone().is_multiple())
-            .map(|g| g.get_args().filter_map(|id| by_id(id.as_str())).collect::<Vec<String>>())
+        // The groups of which exactly one is required are the `exactlyOne` rules the command's tables state (`arg_rules::rules_of`).
+        let one_of = crate::arg_rules::rules_of(cmd, &path.join(" "))
+            .iter()
+            .filter(|rule| rule.kind == atip::doc::RuleKind::ExactlyOne)
+            .map(|rule| rule.names.iter().filter_map(|name| by_name(name)).collect::<Vec<String>>())
             .collect();
         Leaf {
             path: path.to_vec(),
-            has_dry_run: keys.iter().any(|k| k.long == "dry-run"),
             keys,
             operands,
+            operand_specs: positionals.iter().map(|a| spec_of(a)).collect(),
             operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(std::string::ToString::to_string).unwrap_or_default()]).collect(),
             one_of,
         }
@@ -240,6 +270,11 @@ impl Leaf {
     /// The document keys a caller may use, `operands` first.
     fn valid_keys(&self) -> Vec<String> {
         self.operands.iter().map(|_| "operands".to_string()).chain(self.keys.iter().map(|k| k.key.clone())).collect()
+    }
+
+    /// The description of the `n`th operand: the last one repeats for a variadic operand.
+    fn operand_spec(&self, n: usize) -> Spec {
+        self.operand_specs.get(n).or(self.operand_specs.last()).cloned().unwrap_or_default()
     }
 }
 
@@ -337,7 +372,9 @@ fn lex(cmd: &Command, path: &[String], tokens: &[String]) -> Lexed {
             };
             let arg = find_long(cmd, name);
             let mut value = inline;
-            if arg.is_some_and(takes_value) && value.is_none() && i + 1 < tokens.len() {
+            // clap does not read a following long option as the value (`--round --input …` is a missing value), unless the option takes hyphen values
+            let next_is_option = tokens.get(i + 1).is_some_and(|next| next.len() > 2 && next.starts_with("--")) && !arg.is_some_and(Arg::is_allow_hyphen_values_set);
+            if arg.is_some_and(takes_value) && value.is_none() && i + 1 < tokens.len() && !next_is_option {
                 value = Some(tokens[i + 1].clone());
                 i += 1;
             }
@@ -422,15 +459,62 @@ enum Source {
     Stdin,
 }
 
-/// A parsed `--input`: one invocation or a batch.
-enum Document {
-    One(Map<String, Value>),
-    Batch(Vec<Value>),
+/// One member of a document object, in the order the document wrote it. The value stays JSON text, because the
+/// spelling of a number decides whether it is an integer (`-0` is, `1.0` is not), which a parsed `Value` forgets.
+struct Member {
+    key: String,
+    raw: Box<RawValue>,
 }
 
-/// `INPUT_TOO_LARGE`: `reason` is `TOO_MANY_BYTES` (the source) or `TOO_MANY_ITEMS` (a batch).
+/// The members of a document object in document order: step 2 of spec 11.7 reports its problems in that order.
+struct Members(Vec<Member>);
+
+impl<'de> de::Deserialize<'de> for Members {
+    fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visit;
+        impl<'de> de::Visitor<'de> for Visit {
+            type Value = Members;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a JSON object")
+            }
+
+            fn visit_map<A: de::MapAccess<'de>>(self, mut map: A) -> Result<Members, A::Error> {
+                let mut members: Vec<Member> = Vec::new();
+                let mut at: HashMap<String, usize> = HashMap::new();
+                while let Some((key, raw)) = map.next_entry::<String, Box<RawValue>>()? {
+                    match at.get(&key) {
+                        // the later of two equal keys wins, as in a parsed `Map`, and keeps the earlier place
+                        Some(&place) => members[place].raw = raw,
+                        None => {
+                            at.insert(key.clone(), members.len());
+                            members.push(Member { key, raw });
+                        }
+                    }
+                }
+                Ok(Members(members))
+            }
+        }
+        deserializer.deserialize_map(Visit)
+    }
+}
+
+/// One element of a batch: an object with its members in order, or whatever else the source held.
+enum Item {
+    Object(Vec<Member>),
+    Other(Value),
+}
+
+/// A parsed `--input`: one invocation or a batch.
+enum Document {
+    One(Vec<Member>),
+    Batch(Vec<Item>),
+}
+
+/// `INPUT_TOO_LARGE`: `reason` is `TOO_MANY_BYTES` (the source) or `TOO_MANY_ITEMS` (a batch); `field` is `--input` in both, as for every
+/// failure of reading and framing the value (spec 11.7 step 1).
 fn too_large(reason: &'static str, what: &str) -> CliError {
-    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit").reason(reason)
+    refused("INPUT_TOO_LARGE", format!("{what} exceeds the limit of {MAX_BYTES} bytes or {MAX_ELEMENTS} elements"), "split the batch into several runs, each under the limit").reason(reason).field("--input")
 }
 
 /// Reads at most [`MAX_BYTES`] from `reader`; one byte more is `INPUT_TOO_LARGE`.
@@ -467,28 +551,47 @@ fn load(value: &str) -> Result<(String, Source), CliError> {
     Ok((read_capped(file, &format!("`{value}`"))?, Source::File))
 }
 
-/// Frames `text`: one JSON value first, then (file or stdin only) NDJSON.
+fn not_json(error: &serde_json::Error) -> CliError {
+    framing("NOT_JSON", format!("the input is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")
+}
+
+/// A batch element from its JSON text.
+fn item_of(raw: &RawValue) -> Result<Item, serde_json::Error> {
+    if raw.get().starts_with('{') {
+        serde_json::from_str::<Members>(raw.get()).map(|members| Item::Object(members.0))
+    } else {
+        serde_json::from_str(raw.get()).map(Item::Other)
+    }
+}
+
+/// Frames `text`: one JSON value first, then (file or stdin only) NDJSON, every non-empty line one document.
 fn frame(text: &str, source: Source) -> Result<Document, CliError> {
-    match serde_json::from_str::<Value>(text) {
-        Ok(Value::Object(object)) => Ok(Document::One(object)),
-        Ok(Value::Array(items)) if items.len() > MAX_ELEMENTS => Err(too_large("TOO_MANY_ITEMS", &format!("the array ({} elements)", items.len()))),
-        Ok(Value::Array(items)) => Ok(Document::Batch(items)),
-        Ok(_) => Err(framing("NOT_OBJECT", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
+    match serde_json::from_str::<Box<RawValue>>(text) {
+        Ok(raw) => match raw.get().as_bytes().first() {
+            Some(b'{') => serde_json::from_str::<Members>(raw.get()).map(|members| Document::One(members.0)).map_err(|error| not_json(&error)),
+            Some(b'[') => {
+                let items: Vec<Box<RawValue>> = serde_json::from_str(raw.get()).map_err(|error| not_json(&error))?;
+                if items.len() > MAX_ELEMENTS {
+                    return Err(too_large("TOO_MANY_ITEMS", &format!("the array ({} elements)", items.len())));
+                }
+                items.iter().map(|item| item_of(item)).collect::<Result<Vec<_>, _>>().map(Document::Batch).map_err(|error| not_json(&error))
+            }
+            _ => Err(framing("NOT_OBJECT", "the document is JSON but not an object or an array of objects", SCHEMA_HINT)),
+        },
         Err(error) if source == Source::Inline => Err(framing("NOT_JSON", format!("the inline document is not valid JSON: {error}"), "fix the JSON, or put one object per line in a file and pass its path (NDJSON)")),
         Err(_) => {
             let mut items = Vec::new();
             for (n, line) in text.lines().enumerate() {
                 let line = line.trim();
-                if line.is_empty() || line.starts_with('#') {
+                if line.is_empty() {
                     continue;
                 }
                 if items.len() == MAX_ELEMENTS {
                     return Err(too_large("TOO_MANY_ITEMS", &format!("the NDJSON input (more than {MAX_ELEMENTS} lines)")));
                 }
-                match serde_json::from_str::<Value>(line) {
-                    Ok(value) => items.push(value),
-                    Err(error) => return Err(framing("NOT_JSON", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line, or pass a single JSON object or array")),
-                }
+                let not_json_line = |error: &serde_json::Error| framing("NOT_JSON", format!("the input is neither one JSON value nor NDJSON: line {} is not JSON ({error})", n + 1), "fix the line (a `#` line is not a comment), or pass a single JSON object or array");
+                let raw = serde_json::from_str::<Box<RawValue>>(line).map_err(|error| not_json_line(&error))?;
+                items.push(item_of(&raw).map_err(|error| not_json_line(&error))?);
             }
             if items.is_empty() {
                 return Err(framing("EMPTY", "the input holds no JSON value and no NDJSON line", SCHEMA_HINT));
@@ -514,13 +617,43 @@ struct Setting {
     count: bool,
 }
 
-fn scalar(value: &Value, pointer: &str, expected: &str) -> Result<String, CliError> {
-    match value {
-        Value::String(s) => Ok(s.clone()),
-        Value::Number(n) => Ok(n.to_string()),
-        Value::Null => Err(null_refusal(pointer)),
-        other => Err(invalid(format!("`{pointer}` must be {expected}, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+/// The most an integer of a document may be, in either sign (spec 11.5: ±(2^53-1)).
+const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
+
+/// `text` as an integer of a document (spec 11.5): `-?(0|[1-9][0-9]*)` within ±(2^53-1), `-0` being `0`. The
+/// result is the canonical decimal form; any other spelling (`+1`, `0x1`, `1e3`, ` 1`, `1.0`) is `INVALID_VALUE`.
+fn integer(text: &str, pointer: &str) -> Result<String, CliError> {
+    let digits = text.strip_prefix('-').unwrap_or(text);
+    let grammar = digits == "0" || (digits.starts_with(|c: char| c.is_ascii_digit() && c != '0') && digits.bytes().all(|b| b.is_ascii_digit()));
+    if !grammar {
+        return Err(invalid(format!("`{pointer}` must be an integer: a JSON integer or a string of digits written -?(0|[1-9][0-9]*), not `{text}`"), "write the integer as 12, -3 or \"12\" (no `+`, no exponent, no spaces, no `.0`)").field(pointer).received(text));
     }
+    match digits.parse::<u64>() {
+        Ok(0) => Ok("0".to_string()),
+        Ok(n) if n <= MAX_SAFE_INTEGER => Ok(text.to_string()),
+        _ => Err(invalid(format!("`{pointer}` is `{text}`, outside the integers a document can carry (±{MAX_SAFE_INTEGER})"), "use an integer within ±9007199254740991").field(pointer).received(text)),
+    }
+}
+
+/// One value of a document: an integer (as [`integer`] reads it), a member of a closed set, or a string.
+/// A number is not a string (spec 11.5: no other coercion happens).
+fn element(spec: &Spec, raw: &RawValue, pointer: &str) -> Result<String, CliError> {
+    let value: Value = serde_json::from_str(raw.get()).expect("the member of a parsed document is JSON");
+    match (&value, spec.integer) {
+        (Value::Null, _) => Err(null_refusal(pointer)),
+        (Value::Number(_), true) => integer(raw.get(), pointer),
+        (Value::String(text), true) => integer(text, pointer),
+        (Value::String(text), false) => match &spec.values {
+            Some(values) if !values.contains(text) => Err(invalid(format!("`{pointer}` must be one of {}, not `{text}`", values.join(", ")), "pick one of the listed values").field(pointer).expected(values.clone()).received(text.clone())),
+            _ => Ok(text.clone()),
+        },
+        (other, integer) => Err(invalid(format!("`{pointer}` must be {}, not {}", if integer { "an integer" } else { "a string" }, type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
+    }
+}
+
+/// The elements of a JSON array given as text.
+fn elements(raw: &RawValue) -> Vec<Box<RawValue>> {
+    serde_json::from_str(raw.get()).expect("an array of a parsed document is JSON")
 }
 
 fn null_refusal(pointer: &str) -> CliError {
@@ -561,51 +694,102 @@ fn key_suggestions(name: &str, valid: &[String]) -> Vec<String> {
     out
 }
 
-fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Vec<Setting>, CliError> {
-    let mut out = Vec::with_capacity(object.len());
-    for (name, value) in object {
-        let pointer = format!("{prefix}/{}", escape(name));
-        if name == "operands" && leaf.operands.is_some() {
-            let items = match value {
-                Value::Array(items) => items,
-                Value::Null => return Err(null_refusal(&pointer)),
-                other => return Err(invalid(format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
-            };
-            let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string")).collect::<Result<Vec<_>, _>>()?;
-            out.push(Setting { key: name.clone(), long: None, values, flag: None, negatable: false, count: false });
-            continue;
+/// The refusal of a key the leaf does not take: a flag-only key (`FLAG_ONLY_KEY`) or an unknown one (`UNKNOWN_KEY`).
+fn unknown_key(leaf: &Leaf, name: &str, pointer: &str) -> CliError {
+    let forbidden = flags_only().iter().any(|f| camel(f) == name);
+    let valid = leaf.valid_keys();
+    let message = if forbidden { format!("`{name}` is a command-line flag and cannot be set in a document") } else { format!("`{name}` is not an option of `{}`", leaf.command()) };
+    let suggestions = key_suggestions(name, &valid);
+    let hint = match (forbidden, suggestions.first()) {
+        (true, _) => "pass it as a flag on the command line".to_string(),
+        (false, Some(best)) => {
+            let shape = if leaf.key(best).is_some_and(|k| k.repeatable) { "[...]" } else { "..." };
+            format!("use \"{best}\": {shape} (document keys are the option names in camelCase, singular even when the option repeats); {SCHEMA_HINT}")
         }
-        let Some(key) = leaf.key(name) else {
-            let forbidden = FLAGS_ONLY.iter().any(|f| camel(f) == *name);
-            let valid = leaf.valid_keys();
-            let message = if forbidden { format!("`{name}` is a command-line flag and cannot be set in a document") } else { format!("`{name}` is not an option of `{}`", leaf.command()) };
-            let suggestions = key_suggestions(name, &valid);
-            let hint = match (forbidden, suggestions.first()) {
-                (true, _) => "pass it as a flag on the command line".to_string(),
-                (false, Some(best)) => {
-                    let shape = if leaf.key(best).is_some_and(|k| k.repeatable) { "[...]" } else { "..." };
-                    format!("use \"{best}\": {shape} (document keys are the option names in camelCase, singular even when the option repeats); {SCHEMA_HINT}")
-                }
-                (false, None) => SCHEMA_HINT.to_string(),
-            };
-            return Err(CliError::refused("INPUT_INVALID", message).reason(if forbidden { "FLAG_ONLY_KEY" } else { "UNKNOWN_KEY" }).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
-        };
-        let setting = match (key.kind, value) {
-            (_, Value::Null) => return Err(null_refusal(&pointer)),
-            (Kind::Flag, Value::Bool(on)) => Setting { key: name.clone(), long: Some(key.long.clone()), values: Vec::new(), flag: Some(*on), negatable: key.negatable, count: false },
-            (Kind::Flag, other) => return Err(invalid(format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
-            (Kind::Count, Value::Number(n)) if n.as_u64().is_some() => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![n.to_string()], flag: None, negatable: false, count: true },
-            (Kind::Count, other) => return Err(invalid(format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
-            (Kind::Value, Value::Array(items)) if key.repeatable => {
-                let values = items.iter().enumerate().map(|(n, v)| scalar(v, &format!("{pointer}/{n}"), "a string or number")).collect::<Result<Vec<_>, _>>()?;
-                Setting { key: name.clone(), long: Some(key.long.clone()), values, flag: None, negatable: false, count: false }
-            }
-            (Kind::Value, other) if key.repeatable => return Err(invalid(format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())),
-            (Kind::Value, other) => Setting { key: name.clone(), long: Some(key.long.clone()), values: vec![scalar(other, &pointer, if key.integer { "a number" } else { "a string or number" })?], flag: None, negatable: false, count: false },
-        };
-        out.push(setting);
+        (false, None) => SCHEMA_HINT.to_string(),
+    };
+    CliError::refused("INPUT_INVALID", message).reason(if forbidden { "FLAG_ONLY_KEY" } else { "UNKNOWN_KEY" }).hint(hint).field(pointer).expected(valid).received(name).suggestions(suggestions)
+}
+
+/// The problems of a document as one error (spec 11.7 step 2): the first is the error, and with several they are
+/// all in `details`, in the order the document wrote its keys.
+fn several(mut problems: Vec<CliError>) -> CliError {
+    if problems.len() < 2 {
+        return problems.pop().expect("at least one problem");
     }
-    Ok(out)
+    let mut first = problems[0].clone();
+    let more = problems.len() - 1;
+    first.message = format!("{} (and {more} more {} in the document: `error.details` lists them all)", first.message, if more == 1 { "problem" } else { "problems" });
+    first.details(problems)
+}
+
+/// What one key of a document says, or every problem with it.
+fn setting(leaf: &Leaf, member: &Member, prefix: &str) -> Result<Setting, Vec<CliError>> {
+    let name = &member.key;
+    let pointer = format!("{prefix}/{}", escape(name));
+    let value: Value = serde_json::from_str(member.raw.get()).expect("the member of a parsed document is JSON");
+    if name == "operands" && leaf.operands.is_some() {
+        match &value {
+            Value::Array(_) => {}
+            Value::Null => return Err(vec![null_refusal(&pointer)]),
+            other => return Err(vec![invalid(format!("`{pointer}` must be an array of operands, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())]),
+        }
+        let items = elements(&member.raw);
+        let mut problems = Vec::new();
+        if items.is_empty() {
+            problems.push(invalid(format!("`{pointer}` is an empty array: omit the key to give no operands"), "drop the key, or list the operands").field(pointer.clone()));
+        }
+        if let Some(most) = leaf.operands.and_then(|(_, most)| most).filter(|most| items.len() > *most) {
+            problems.push(invalid(format!("`{pointer}` has {} operands and `{}` takes at most {most}", items.len(), leaf.command()), SCHEMA_HINT).field(pointer.clone()));
+        }
+        let mut values = Vec::with_capacity(items.len());
+        for (n, item) in items.iter().enumerate() {
+            match element(&leaf.operand_spec(n), item, &format!("{pointer}/{n}")) {
+                Ok(value) => values.push(value),
+                Err(problem) => problems.push(problem),
+            }
+        }
+        return if problems.is_empty() { Ok(Setting { key: name.clone(), long: None, values, flag: None, negatable: false, count: false }) } else { Err(problems) };
+    }
+    let Some(key) = leaf.key(name) else { return Err(vec![unknown_key(leaf, name, &pointer)]) };
+    let one = |values: Vec<String>, flag: Option<bool>, count: bool| Setting { key: name.clone(), long: Some(key.long.clone()), values, flag, negatable: key.negatable && flag.is_some(), count };
+    match (key.kind, &value) {
+        (_, Value::Null) => Err(vec![null_refusal(&pointer)]),
+        (Kind::Flag, Value::Bool(on)) => Ok(one(Vec::new(), Some(*on), false)),
+        (Kind::Flag, other) => Err(vec![invalid(format!("`{pointer}` is a flag and must be true or false, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())]),
+        (Kind::Count, Value::Number(_)) => match integer(member.raw.get(), &pointer) {
+            Ok(total) if !total.starts_with('-') => Ok(one(vec![total], None, true)),
+            Ok(total) => Err(vec![invalid(format!("`{pointer}` must be a count, not {total}"), SCHEMA_HINT).field(pointer).received(total)]),
+            Err(problem) => Err(vec![problem]),
+        },
+        (Kind::Count, other) => Err(vec![invalid(format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())]),
+        (Kind::Value, Value::Array(_)) if key.repeatable => {
+            let mut problems = Vec::new();
+            let mut values = Vec::new();
+            for (n, item) in elements(&member.raw).iter().enumerate() {
+                match element(&key.spec, item, &format!("{pointer}/{n}")) {
+                    Ok(value) => values.push(value),
+                    Err(problem) => problems.push(problem),
+                }
+            }
+            if problems.is_empty() { Ok(one(values, None, false)) } else { Err(problems) }
+        }
+        (Kind::Value, other) if key.repeatable => Err(vec![invalid(format!("`{pointer}` is repeatable and must be an array, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())]),
+        (Kind::Value, _) => element(&key.spec, &member.raw, &pointer).map(|value| one(vec![value], None, false)).map_err(|problem| vec![problem]),
+    }
+}
+
+/// Step 2 of spec 11.7 for one document: every problem of its keys, or what the keys say.
+fn settings(leaf: &Leaf, members: &[Member], prefix: &str) -> Result<Vec<Setting>, CliError> {
+    let mut out = Vec::with_capacity(members.len());
+    let mut problems = Vec::new();
+    for member in members {
+        match setting(leaf, member, prefix) {
+            Ok(found) => out.push(found),
+            Err(mut found) => problems.append(&mut found),
+        }
+    }
+    if problems.is_empty() { Ok(out) } else { Err(several(problems)) }
 }
 
 /// The command line a leaf run is built from: the flags given, minus `--input`.
@@ -628,15 +812,26 @@ fn has_flag(lexed: &Lexed, long: &str) -> bool {
     lexed.opts.iter().any(|o| o.long.as_deref() == Some(long))
 }
 
+/// A value of the command line the way a document's value of the same argument is normalised (spec 11.7 step 3):
+/// an integer by the number it denotes (`+1`, `-0` and `1` are 1, 0 and 1), anything else as written. The command
+/// line's own spelling is the leaf's: what clap accepts there is unchanged.
+fn normalised(spec: &Spec, value: &str) -> String {
+    match value.parse::<i128>() {
+        Ok(number) if spec.integer => number.to_string(),
+        _ => value.to_string(),
+    }
+}
+
 /// The full argument list (after the program name) for one document object.
-fn assemble(base: &Base<'_>, settings: &[Setting], prefix: &str) -> Result<Vec<String>, CliError> {
+fn assemble(leaf: &Leaf, base: &Base<'_>, settings: &[Setting], prefix: &str) -> Result<Vec<String>, CliError> {
     let mut options: Vec<String> = Vec::new();
     let mut operands: Vec<String> = Vec::new();
     for s in settings {
         let pointer = format!("{prefix}/{}", escape(&s.key));
         let Some(long) = &s.long else {
             if !base.lexed.positionals.is_empty() {
-                if base.lexed.positionals != s.values {
+                let given: Vec<String> = base.lexed.positionals.iter().enumerate().map(|(n, value)| normalised(&leaf.operand_spec(n), value)).collect();
+                if given != s.values {
                     return Err(conflict(pointer, "operands", &base.lexed.positionals.join(" "), &s.values.join(" ")));
                 }
             } else {
@@ -670,7 +865,8 @@ fn assemble(base: &Base<'_>, settings: &[Setting], prefix: &str) -> Result<Vec<S
             None => {
                 let given = cmdline_values(base.lexed, long);
                 if !given.is_empty() {
-                    if given != s.values.iter().map(String::as_str).collect::<Vec<_>>() {
+                    let spec = leaf.keys.iter().find(|key| key.long == *long).map(|key| key.spec.clone()).unwrap_or_default();
+                    if given.iter().map(|value| normalised(&spec, value)).collect::<Vec<_>>() != s.values {
                         return Err(conflict(pointer, &format!("--{long}"), &given.join(","), &s.values.join(",")));
                     }
                 } else {
@@ -689,6 +885,51 @@ fn assemble(base: &Base<'_>, settings: &[Setting], prefix: &str) -> Result<Vec<S
         argv.extend(operands);
     }
     Ok(argv)
+}
+
+/// `cmd` and its subcommands with no `env` on any argument: the command line read without the environment.
+fn without_env(cmd: Command) -> Command {
+    cmd.mut_args(|arg| arg.env(None::<&str>)).mut_subcommands(without_env)
+}
+
+/// Whether the command line alone, without `--input`, fails to parse: an unknown option, a value of the wrong type
+/// or outside its set, a missing option value (spec 11.7 step 3). A missing required argument, a conflict or a
+/// missing command word is not one, because the document may supply what is missing; a value outside a declared
+/// domain is not one either, because the domain is judged at step 6 ([`crate::arg_rules::relaxed`] reads it as text);
+/// and the environment is left out, because an `env` value applies only to an argument the merged line lacks (step 5).
+fn argv_fails(root: &Command, kept: &[String]) -> bool {
+    use clap::error::ErrorKind;
+    let mut argv = vec![root.get_name().to_string()];
+    argv.extend_from_slice(kept);
+    match without_env(crate::arg_rules::relaxed::tree(root.clone())).try_get_matches_from(argv) {
+        Ok(_) => false,
+        Err(error) => !matches!(error.kind(), ErrorKind::MissingRequiredArgument | ErrorKind::ArgumentConflict | ErrorKind::MissingSubcommand | ErrorKind::DisplayHelp | ErrorKind::DisplayVersion | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand),
+    }
+}
+
+/// The parse of one element's merged command line in the order of spec 11.7 step 6, as `validators::parse` does it for a call with
+/// no document, with the refusal returned instead of printed: the first parse on the relaxed tree (the failure that comes first on
+/// the line answers), the declared domains and constraints, then the real tree, for the typed arguments the handlers read.
+fn parse_element(root: &Command, argv: &[String]) -> Result<clap::ArgMatches, CliError> {
+    let mut args = vec![OsString::from(root.get_name())];
+    args.extend(argv.iter().map(OsString::from));
+    let relaxed = crate::arg_rules::relaxed::tree(root.clone());
+    let first = match relaxed.clone().try_get_matches_from(&args) {
+        Ok(first) => first,
+        Err(error) => {
+            let error = crate::arg_rules::relaxed::earlier_failure(&relaxed, &args, &error).unwrap_or(error);
+            return Err(crate::run::entry::usage_parts(&error, root).1);
+        }
+    };
+    if let Some((_, error)) = crate::arg_rules::enforce::check(root, &first) {
+        return Err(error);
+    }
+    root.clone().try_get_matches_from(&args).map_err(|error| crate::run::entry::usage_parts(&error, root).1)
+}
+
+/// The command line without `--input`, for `main` to parse: its parse failure answers as it does for a run with no document.
+fn argv_alone(program: OsString, base: &Base<'_>) -> Expanded {
+    Expanded::Argv(std::iter::once(program).chain(base.kept.iter().map(OsString::from)).collect())
 }
 
 // ---------------------------------------------------------------- expand
@@ -717,18 +958,6 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     let lexed = lex(cmd, &path, &tokens);
     let inputs: Vec<&Opt> = lexed.opts.iter().filter(|o| o.long.as_deref() == Some("input")).collect();
     if inputs.is_empty() {
-        return Expanded::Argv(args);
-    }
-    // An option the leaf does not have is clap's to refuse (`USAGE` naming it), as it is without `--input`:
-    // reading its value as an operand here would turn the refusal into a conflict with the document.
-    let known_elsewhere = |token: &str| match token.strip_prefix("--") {
-        Some(rest) => {
-            let name = rest.split('=').next().unwrap_or_default();
-            matches!(name, "help" | "version") || find_long(root, name).is_some()
-        }
-        None => matches!(token, "-h" | "-V") || token.chars().nth(1).is_some_and(|c| find_short(root, c).is_some()),
-    };
-    if lexed.opts.iter().any(|o| o.long.is_none() && !known_elsewhere(&tokens[o.span.start])) {
         return Expanded::Argv(args);
     }
     let leaf = Leaf::of(cmd, &path);
@@ -778,8 +1007,15 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     let map = DocMap::new(&leaf, &lexed);
     let program = args[0].clone();
     match document {
-        Document::One(object) => {
-            let argv = match settings(&leaf, &object, "").and_then(|s| assemble(&base, &s, "")) {
+        Document::One(members) => {
+            let found = match settings(&leaf, &members, "") {
+                Ok(found) => found,
+                Err(error) => return fail(error),
+            };
+            if argv_fails(root, &base.kept) {
+                return argv_alone(program, &base);
+            }
+            let argv = match assemble(&leaf, &base, &found, "") {
                 Ok(argv) => argv,
                 Err(error) => return fail(error),
             };
@@ -788,7 +1024,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
         }
         Document::Batch(items) => {
             crate::json_out::set_batch_input(true);
-            run_batch(root, &leaf, &base, &map, &lexed, items, json)
+            run_batch(root, &leaf, &base, &map, &lexed, program, items, json)
         }
     }
 }
@@ -805,11 +1041,16 @@ fn pointed(error: CliError, map: &DocMap, prefix: &str) -> CliError {
     error.field(field)
 }
 
-/// The error of a child's failure envelope, `field` pointed into the batch.
+/// The error of a child's failure envelope, `field` pointed into the batch. The element's `reason` is its own: an item that
+/// stopped midway is `STOPPED_MIDWAY` with the refusal's code as its reason (spec 8.3.2, 11.11), and the batch is `BATCH_INCOMPLETE`.
 fn error_of(envelope: &Value, map: &DocMap, prefix: &str) -> CliError {
     let body = &envelope["error"];
-    let code = body["code"].as_str().and_then(crate::cli_error::code_info).map_or("INTERNAL", |info| info.code);
+    let row = body["code"].as_str().and_then(crate::cli_error::code_info);
+    let code = row.map_or("INTERNAL", |info| info.code);
     let mut error = CliError::failed(code, body["message"].as_str().unwrap_or("the element failed without a message")).hint(body["hint"].as_str().unwrap_or("run the element on its own to see its output"));
+    if let Some(reason) = row.zip(body["reason"].as_str()).and_then(|(info, reason)| info.find_reason(reason)) {
+        error = error.reason(reason.reason);
+    }
     if let Some(field) = body["field"].as_str() {
         error = error.field(field);
     }
@@ -848,18 +1089,17 @@ fn crashed(child: &Child) -> CliError {
     CliError::failed("INTERNAL", message).hint("run the element on its own to see its output, and report what it prints at https://github.com/journeyWorker/canon/issues")
 }
 
-/// The error of a batch that stopped at element `index`: `BATCH_INCOMPLETE`, which says where and why,
-/// while `data.items[index].error` keeps the element's own error (its code, `field` as a pointer into the document).
+/// The error of a batch that stopped at element `index` (spec 11.11): `BATCH_INCOMPLETE`, `field` exactly `/<index>`, which
+/// says where and why, while `data.items[index].error` keeps the element's own error (its code, `field` a pointer
+/// deeper into the document).
 fn incomplete(element: &CliError, index: usize) -> CliError {
-    let mut error = CliError::failed("BATCH_INCOMPLETE", format!("the batch stopped at element {index}: {}: {}; the elements before it were applied and the ones after it were skipped", element.code, element.message))
-        .hint("`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)");
-    if let Some(field) = element.field_name() {
-        error = error.field(field);
-    }
-    error
+    CliError::failed("BATCH_INCOMPLETE", format!("the batch stopped at element {index}: {}: {}; the elements before it were applied and the ones after it were skipped", element.code, element.message))
+        .hint("`data.items` says what each element did: fix the failed one, then run the batch again (the written ones report `unchanged`)")
+        .field(format!("/{index}"))
 }
 
-fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: &Lexed, items: Vec<Value>, json: bool) -> Expanded {
+#[expect(clippy::too_many_arguments, reason = "the pieces of one batch run, each already computed by `expand`")]
+fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: &Lexed, program: OsString, items: Vec<Item>, json: bool) -> Expanded {
     let command_name = leaf.command();
     let exit_refused = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let exe = match std::env::current_exe() {
@@ -867,32 +1107,37 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         Err(e) => return exit_refused(CliError::failed("INTERNAL", format!("canon cannot find its own executable to run the batch: {e}")).hint("run the elements one by one instead")),
     };
     let wants_json = has_flag(lexed, "json");
-    let dry_run_given = has_flag(lexed, "dry-run");
     // `--fields` is read against the output the invocation selects, and the output of a batch declares no `fields` (spec 6.10):
     // refused before any element is planned, so no element is run and nothing is written.
     if has_flag(lexed, "fields") {
         return exit_refused(refused("USAGE", format!("`{command_name}` takes no `--fields` with a batch: the output of a batch declares no fields"), "drop `--fields`, or run one element at a time with it").field("--fields"));
     }
 
-    // Validate every element before the first write.
+    // Preflight: steps 1 to 6 of every element before the first write. It reads no state, so an element may name an
+    // object an earlier element creates; what the state refuses is the failure of that element when it runs.
     let mut argvs: Vec<Vec<String>> = Vec::with_capacity(items.len());
+    let mut argv_checked = false;
     for (i, item) in items.iter().enumerate() {
-        let prefix = format!("/items/{i}");
-        let Some(object) = item.as_object() else {
-            return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(item)), SCHEMA_HINT).reason("NOT_OBJECT").field(prefix).received(item.to_string()));
+        let prefix = format!("/{i}");
+        let members = match item {
+            Item::Object(members) => members,
+            Item::Other(value) => return exit_refused(refused("INPUT_INVALID", format!("`{prefix}` must be an object, not {}", type_name(value)), SCHEMA_HINT).reason("NOT_OBJECT").field(prefix).received(value.to_string())),
         };
-        let argv = match settings(leaf, object, &prefix).and_then(|s| assemble(base, &s, &prefix)) {
+        let found = match settings(leaf, members, &prefix) {
+            Ok(found) => found,
+            Err(error) => return exit_refused(error),
+        };
+        // The command line is the same for every element: its parse failure answers at the first element that gets past step 2.
+        if !std::mem::replace(&mut argv_checked, true) && argv_fails(root, &base.kept) {
+            return argv_alone(program, base);
+        }
+        let argv = match assemble(leaf, base, &found, &prefix) {
             Ok(argv) => argv,
             Err(error) => return exit_refused(error),
         };
-        let mut parse_argv = vec![root.get_name().to_string()];
-        parse_argv.extend(argv.iter().cloned());
-        let mut matches = match root.clone().try_get_matches_from(&parse_argv) {
+        let mut matches = match parse_element(root, &argv) {
             Ok(matches) => matches,
-            Err(error) => {
-                let (_, usage) = crate::run::entry::usage_parts(&error, root);
-                return exit_refused(pointed(usage, map, &prefix));
-            }
+            Err(error) => return exit_refused(pointed(error, map, &prefix)),
         };
         // Preflight is the whole stateless stage (spec 11.11, 10.8.3): required, domains, constraints, validators, on every element,
         // so a stateless fault anywhere refuses the batch with exit 2 before the first element writes.
@@ -905,23 +1150,6 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
         argvs.push(argv);
     }
 
-    // Then each element's own dry run, which reads state (a missing repository is `CONFIG_MISSING`): after every element's stateless stage, so
-    // a stateless fault in a later element is the answer, not the first element's missing repository (spec 11.11).
-    if leaf.has_dry_run && !dry_run_given {
-        for (i, argv) in argvs.iter().enumerate() {
-            let prefix = format!("/items/{i}");
-            let child = spawn(&exe, argv, if wants_json { &["--dry-run"] } else { &["--dry-run", "--json"] });
-            let ok = child.exit == 0 && child.envelope.as_ref().is_some_and(|e| e["ok"] == true);
-            if !ok {
-                let error = match &child.envelope {
-                    Some(envelope) if envelope["ok"] == false => error_of(envelope, map, &prefix),
-                    _ => crashed(&child),
-                };
-                return exit_refused(error);
-            }
-        }
-    }
-
     // Run in order; the first failure stops the run.
     let mut report: Vec<BatchItem<Value>> = Vec::with_capacity(argvs.len());
     let mut failure: Option<CliError> = None;
@@ -931,7 +1159,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
             continue;
         }
         let child = spawn(&exe, argv, if wants_json { &[] } else { &["--json"] });
-        let prefix = format!("/items/{i}");
+        let prefix = format!("/{i}");
         match &child.envelope {
             Some(envelope) if envelope["ok"] == true && child.exit == 0 => {
                 // `unchanged` is a member of the report, or of `meta.x-canon` for a report that cannot take one.
@@ -944,20 +1172,17 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
                     Some(envelope) if envelope["ok"] == false => error_of(envelope, map, &prefix),
                     _ => crashed(&child),
                 };
-                report.push(BatchItem { index: i, status: ItemStatus::Failed, data: envelope.as_ref().and_then(|e| e.get("data")).cloned(), error: Some(serde_json::to_value(error.body()).expect("an error body serializes")) });
+                report.push(BatchItem { index: i, status: ItemStatus::Failed, data: None, error: Some(serde_json::to_value(error.body()).expect("an error body serializes")) });
                 failure = Some(incomplete(&error, i));
             }
         }
     }
-    let all_unchanged = !report.is_empty() && report.iter().all(|item| item.status == ItemStatus::Unchanged);
     if json {
         let data = BatchReport { items: report };
         return Expanded::Exit(ExitCode::from(match &failure {
             Some(error) => error.emit_with_data(&command_name, true, &data),
+            // The contract's batch report is closed (`items` and nothing else): a batch whose elements are all `unchanged` says so by their statuses, not by a member of `data`.
             None => {
-                if all_unchanged {
-                    crate::json_out::mark_unchanged();
-                }
                 crate::json_out::data(&command_name, &data);
                 0
             }
@@ -1035,7 +1260,7 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
             (Kind::Flag, _) => json!(true),
             (Kind::Count, _) => json!(lexed.opts.iter().filter(|o| o.long.as_deref() == Some(key.long.as_str())).count()),
             (Kind::Value, Some(v)) => match v.parse::<i64>() {
-                Ok(n) if key.integer => json!(n),
+                Ok(n) if key.spec.integer => json!(n),
                 _ => json!(v),
             },
             (Kind::Value, None) => continue,
@@ -1051,4 +1276,31 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
         }
     }
     Some(Value::Object(object))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn map() -> DocMap {
+        DocMap { fields: Vec::new(), operand_names: Vec::new(), operands_on_cmdline: false }
+    }
+
+    /// atip.midway.08: a batch element that stops midway is `failed` with `STOPPED_MIDWAY` and its reason as its own error, the
+    /// batch is `BATCH_INCOMPLETE` (spec 8.3.2, 11.11); a reason the registry does not hold under the code is not carried.
+    #[test]
+    fn atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error() {
+        let child = json!({"ok": false, "error": {"code": "STOPPED_MIDWAY", "reason": "SKILLS_INVALID_ARGUMENT", "message": "wrote canon.yaml, then the install was refused", "retryable": false}});
+        let element = error_of(&child, &map(), "/items/0");
+        assert_eq!((element.code, element.reason_name(), element.exit, element.retryable), ("STOPPED_MIDWAY", Some("SKILLS_INVALID_ARGUMENT"), 1, false));
+        let item = serde_json::to_value(element.body()).expect("an error body serializes");
+        assert_eq!((item["code"].clone(), item["reason"].clone()), (json!("STOPPED_MIDWAY"), json!("SKILLS_INVALID_ARGUMENT")), "{item}");
+        let batch = incomplete(&element, 0);
+        assert_eq!((batch.code, batch.exit), ("BATCH_INCOMPLETE", 1));
+        assert!(batch.message.contains("STOPPED_MIDWAY"), "{}", batch.message);
+        let made_up = json!({"ok": false, "error": {"code": "STOPPED_MIDWAY", "reason": "MADE_UP", "message": "m", "retryable": false}});
+        assert_eq!(error_of(&made_up, &map(), "/items/0").reason_name(), None, "an unregistered reason is dropped, so the item error stays one the registry holds");
+        let plain = json!({"ok": false, "error": {"code": "WRITE_FAILED", "message": "m", "retryable": false}});
+        assert_eq!(error_of(&plain, &map(), "/items/0").reason_name(), None);
+    }
 }

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-03T01:04:41.980322Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
+  "disposition": "fixed",
+  "file_ref": "crates/atip-check/src/checks/l2/safety.rs",
+  "introduced_by": "70f7c4378ef13a07772dd7513935ab8591df78ff",
+  "kind": "finding",
+  "resolution_code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
+  "resolution_sha": "dc4c93c7d181e184cc5d1cc03eef12b1ccfb2e33",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "916a0bf65ffd8358552dd3111813f2400a898997",
+  "reviewer": "rev-check-0-35b",
+  "round": 2,
+  "scenario_ids": [
+    "atip.checkl2safety.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity (ruling 2, recorded for the contract author): L2.async returns unsupported when no command document has the option --wait (safety.rs l2_async head), so a tool that declares async: true and takes no --wait skips the whole MUST row (accepted exit 0, async:true and an identifier, not-complete, next[0] a wait, the three outcomes), though checker.md makes the row 'M (when offered)' and offered is async: true; 13.3 makes --wait a SHOULD. Real canon L2 run: L2.async unsupported 'no command has the reserved option --wait' and there is no async command at all, so no effect on canon. Blast radius: tools that declare async and wait some other way. Closes when the contract says how a wait is recognised.",
+  "worktree_dirty": false
+}

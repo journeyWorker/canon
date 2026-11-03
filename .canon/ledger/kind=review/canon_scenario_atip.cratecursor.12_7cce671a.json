@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T17:02:38.241479Z",
+  "code_tree": "ca63c482407ec7d931beba874e366be6f5cb0dba",
+  "kind": "review",
+  "pin": "2fd3934fcbf6216b5b8c7e632ff5a9351f06662e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:jcs::tests::atip_cratecursor_12_a_control_character_is_escaped_short_where_the_rfc_has_a_short_form_and_by_u00xx_otherwise",
+          "junit:jcs::tests::atip_cratecursor_12_an_integer_beyond_the_safe_range_is_an_error_and_every_other_number_is_the_ecmascript_form_of_its_double",
+          "junit:jcs::tests::atip_cratecursor_12_integers_within_the_safe_range_are_written_and_a_whole_float_is_the_integer",
+          "junit:jcs::tests::atip_cratecursor_12_rfc_8785_appendix_b_number_forms",
+          "junit:jcs::tests::atip_cratecursor_12_rfc_8785_sorts_members_by_utf16_code_units",
+          "junit:jcs::tests::atip_cratecursor_12_rfc_8785_writes_strings_and_literals_as_the_appendix_does",
+          "junit:jcs::tests::atip_cratecursor_12_whitespace_nulls_and_empty_members_are_kept_exactly"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f268dd1db95678bfa261ed6e07a2ea0c20c3b2fe4e025325bd7d8d805d18b141",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-plan/brief.md"
+  },
+  "review_id": "01M6EKD151ZPC40QEWE70QGZ9X",
+  "reviewer": "rev-crate-0-35",
+  "scenario_id": "atip.cratecursor.12",
+  "schema": 2,
+  "worktree_dirty": false
+}

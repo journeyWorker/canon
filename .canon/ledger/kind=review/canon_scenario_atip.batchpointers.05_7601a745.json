@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T12:44:42.046763Z",
+  "code_tree": "a7273e9d613129dd3526455fb7f9eb9fc98a9e82",
+  "kind": "review",
+  "pin": "83b83fe805cb57eaad740d4b07c870868b914afd",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_batchpointers_05_preflight_does_not_run_the_dry_run_so_a_missing_object_fails_the_item_not_the_batch"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "64b912c93f574f7a81edf60b4db852c3ff4062e5d280305defe4888494ac3d6c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-batch-pointers/brief.md"
+  },
+  "review_id": "01M6E4MQNYW9JMJXAE87BNEVAH",
+  "reviewer": "rev-canon-0-35",
+  "scenario_id": "atip.batchpointers.05",
+  "schema": 2,
+  "worktree_dirty": false
+}

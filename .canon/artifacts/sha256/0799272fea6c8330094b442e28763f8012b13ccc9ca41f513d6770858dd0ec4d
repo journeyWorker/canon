@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="26" assertions="131" failures="0" skipped="0" time="0.188558">
+  <testsuite name="test/briefs-render.test.ts" file="test/briefs-render.test.ts" tests="26" assertions="131" failures="0" skipped="0" time="0.091581" hostname="journeyMac16.local">
+    <testcase name="brief text is shown as text: markup in any field never becomes an element" classname="" time="0.003042" file="test/briefs-render.test.ts" line="46" assertions="38" />
+    <testcase name="the page code never assigns HTML" classname="" time="0.001735" file="test/briefs-render.test.ts" line="70" assertions="4" />
+    <testcase name="a brief shows its change id, subjects, and each section with its heading" classname="" time="0.004049" file="test/briefs-render.test.ts" line="77" assertions="7" />
+    <testcase name="flow steps keep their ids in an ordered list" classname="" time="0.002144" file="test/briefs-render.test.ts" line="88" assertions="2" />
+    <testcase name="a section with a Korean heading is shown under that heading" classname="" time="0.000161" file="test/briefs-render.test.ts" line="95" assertions="1" />
+    <testcase name="blockers are red and listed first, advisories muted" classname="" time="0.00009" file="test/briefs-render.test.ts" line="100" assertions="3" />
+    <testcase name="a coverage blocker does not stop approval and is not drawn red" classname="" time="0.000072" file="test/briefs-render.test.ts" line="107" assertions="2" />
+    <testcase name="report.dashboard.13: a brief with blockers cannot be selected, an approvable one can" classname="" time="0.000173" file="test/briefs-render.test.ts" line="117" assertions="4" />
+    <testcase name="report.dashboard.13: the page has one name, one answer and one button, and shows how many are selected" classname="" time="0.000473" file="test/briefs-render.test.ts" line="126" assertions="7" />
+    <testcase name="report.dashboard.13: Approve waits for a selection, the name and the answer, and for a request in flight" classname="" time="0.000018" file="test/briefs-render.test.ts" line="139" assertions="5" />
+    <testcase name="report.dashboard.13: the request carries the name and answer once and each selected brief&apos;s change id and sha256" classname="" time="0.000031" file="test/briefs-render.test.ts" line="147" assertions="1" />
+    <testcase name="report.dashboard.14: a refused multi-brief approval names each refused brief and says to read it again" classname="" time="0.000059" file="test/briefs-render.test.ts" line="159" assertions="4" />
+    <testcase name="report.dashboard.14: refusal text from the server is shown as text, never markup" classname="" time="0.000039" file="test/briefs-render.test.ts" line="173" assertions="2" />
+    <testcase name="atip/1: an error without a hint member has no hint, and a null hint is tolerated" classname="" time="0.000055" file="test/briefs-render.test.ts" line="179" assertions="7" />
+    <testcase name="atip/1: no dashboard source reads an old canon JSON key" classname="" time="0.00645" file="test/briefs-render.test.ts" line="191" assertions="6" />
+    <testcase name="the selection boxes are empty on load and the fields hold no value, autofill off" classname="" time="0.021034" file="test/briefs-render.test.ts" line="198" assertions="5" />
+    <testcase name="no briefs shows the empty message" classname="" time="0.000046" file="test/briefs-render.test.ts" line="207" assertions="2" />
+    <testcase name="a brief with no sections (pre-0.19) shows its text" classname="" time="0.001216" file="test/briefs-render.test.ts" line="212" assertions="1" />
+    <testcase name="markdown subset: paragraphs join, lists group, sub-headings, key-sentence marks drop" classname="" time="0.000216" file="test/briefs-render.test.ts" line="218" assertions="4" />
+    <testcase name="report.dashboard.11: advisories are grouped by rule, with the count, line and matched text" classname="" time="0.000488" file="test/briefs-render.test.ts" line="228" assertions="6" />
+    <testcase name="report.dashboard.11: the badge sits next to the blocker count and is absent with none" classname="" time="0.000127" file="test/briefs-render.test.ts" line="250" assertions="2" />
+    <testcase name="report.dashboard.11: advisory text is a text node, never markup" classname="" time="0.000129" file="test/briefs-render.test.ts" line="257" assertions="2" />
+    <testcase name="report.dashboard.12: the page total counts advisories across briefs and says when there are none" classname="" time="0.000161" file="test/briefs-render.test.ts" line="264" assertions="4" />
+    <testcase name="each brief card names the language it was judged in and where that came from" classname="" time="0.00012" file="test/briefs-render.test.ts" line="272" assertions="2" />
+    <testcase name="subject.lifecycle.52: the page lists the approvals an agent recorded for the human, and says so on an edited brief" classname="" time="0.002963" file="test/briefs-render.test.ts" line="279" assertions="6" />
+    <testcase name="subject.lifecycle.52: the relayed panel stays on the page when the last waiting brief is approved" classname="" time="0.00073" file="test/briefs-render.test.ts" line="291" assertions="4" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-03T18:17:50.614060Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-loop",
+    "canon-0-31-fixes",
+    "canon-0-31-cli-ids",
+    "canon-0-33-atip-l0",
+    "canon-0-35-canon-stopped-midway"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-35-orch"
+    },
+    "reason": "0.35 atip/1 1.2 + L2: every change reviewed, gate clean"
+  },
+  "subject_id": "evidence-attestation",
+  "summary": "",
+  "title": "Evidence: staged attributed attestation"
+}

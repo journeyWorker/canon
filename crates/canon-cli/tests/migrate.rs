@@ -230,9 +230,9 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         "  canon.yaml: remove the plans source `{ dialect: openspec, root: . }` canon init wrote; no change is left under it\n",
         "  remove openspec/changes/.gitkeep (canon init's placeholder for that source)\n",
         "  canon.yaml: skills.providers: [claude, codex] (from the install lock)\n",
-        "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n",
+        "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/repo-write.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n",
         "  rebuild the scenario index (full sync)\n",
-        "nothing written. To act: canon migrate --commit --plan-digest ",
+        "nothing written. To act: canon migrate --commit --plan-digest=sha256:",
     ] {
         assert!(dry.contains(line), "missing {line:?} in:\n{dry}");
     }
@@ -262,7 +262,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         "every other byte of canon.yaml is kept"
     );
     let gitignore = read(repo, ".gitignore");
-    for line in [".canon/hot.db*", ".canon/audit/", ".canon/ledger/kind=scenario/", ".canon/archive/kind=scenario/", ".canon/scenario-index.lock", ".canon/artifact-store.lock", ".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"] {
+    for line in [".canon/hot.db*", ".canon/audit/", ".canon/ledger/kind=scenario/", ".canon/archive/kind=scenario/", ".canon/scenario-index.lock", ".canon/artifact-store.lock", ".canon/repo-write.lock", ".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"] {
         assert_eq!(gitignore.lines().filter(|l| l.trim() == line).count(), 1, "{line} once in:\n{gitignore}");
     }
 
@@ -648,11 +648,11 @@ fn authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_on
     commit_all(repo, "a 0.25 gitignore");
 
     let dry = ok(repo, &["migrate"]);
-    assert!(dry.contains("  .gitignore: add .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"), "{dry}");
+    assert!(dry.contains("  .gitignore: add .canon/archive/kind=scenario/, .canon/repo-write.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"), "{dry}");
     assert_eq!(read(repo, ".gitignore"), old, "--dry-run writes nothing");
 
     let out = ok_commit(repo);
-    assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"), "{out}");
+    assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/repo-write.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/\n"), "{out}");
     let gitignore = read(repo, ".gitignore");
     assert!(gitignore.starts_with(old), "every existing byte is kept: {gitignore}");
     for line in [".canon/archive/kind=scenario/", ".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"] {
@@ -706,7 +706,7 @@ fn migrate_previews_by_default_and_commits_only_the_previewed_plan() {
     assert_eq!(body["data"]["committed"], false, "{body}");
     assert!(body["data"]["effects"].as_array().unwrap().iter().any(|e| e["action"] == "move"), "{body}");
     let digest = body["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
-    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--commit", "--plan-digest", digest, "--json"]), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--commit", format!("--plan-digest={digest}"), "--json"]), "{body}");
     assert_eq!(tree(), before, "a preview writes nothing");
 
     let stale = canon(repo, &["migrate", "--commit", "--plan-digest", &"0".repeat(64), "--json"]);

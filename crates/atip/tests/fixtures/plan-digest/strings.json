@@ -1,0 +1,15 @@
+{
+  "description": "String escaping: only the quote, the backslash and control characters below U+0020 are escaped (\\b, \\t, \\n, \\f, \\r by name, the rest as lower-case \\u00xx); every other character, DEL, U+2028 and non-ASCII included, is written as itself in UTF-8, whatever escape the input used. The first value is RFC 8785 section 3.2.2's.",
+  "plan": {
+    "effects": [{"action": "write", "path": "notes/caf\u00e9.md", "detail": "café"}],
+    "inputs": {
+      "rfc": "\u20ac$\u000F\u000aA'\u0042\u0022\u005c\\\"\/",
+      "controls": "\u0001\u001f\b\t\n\f\r\u007f",
+      "separators": "line\u2028paragraph\u2029end",
+      "emoji": ["\ud83d\ude00", "😀"],
+      "hangul": "\ud55c\uae00"
+    }
+  },
+  "canonical": "{\"effects\":[{\"action\":\"write\",\"detail\":\"café\",\"path\":\"notes/café.md\"}],\"inputs\":{\"controls\":\"\\u0001\\u001f\\b\\t\\n\\f\\r\",\"emoji\":[\"😀\",\"😀\"],\"hangul\":\"한글\",\"rfc\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\",\"separators\":\"line paragraph end\"}}",
+  "digest": "sha256:7e65dcf6fb226c77ba791a628a12f2e14b5110774ef1687639f635a0d7ed936c"
+}

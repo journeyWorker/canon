@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-lockfix",
+    "role": "implementer",
+    "session_id": "s-0-35-lockfix"
+  },
+  "at": "2026-11-03T08:23:41.399792Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_10_a_purge_preview_and_a_refused_commit_leave_the_tree_as_it_was",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "9faa30d71f81b9590f30289d79b4917e87cfe36ad9c61b2b90d50c9efc901a98"
+    },
+    {
+      "case": "atip_planjcs_10_a_refused_commit_without_the_lock_file_leaves_the_tree_byte_identical",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "9faa30d71f81b9590f30289d79b4917e87cfe36ad9c61b2b90d50c9efc901a98"
+    }
+  ],
+  "code_tree": "1a7c512d3d3e839fe63f0ab43303a39b2b4d67a4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run (profile ci, -j 6) of atip_planjcs, spec030_storage_gate, spec028_b, write_unavailable, exit_registry, skills_install, canon-store file_lock and the write_lock unit tests: 123 passed; full workspace run on the same tree but gate_check_106 (fixed in the next commit): 4090 passed, 1 failed; clippy x3, check_visibility, release safety check, doctests, check-mutations and just atip green; a mutant that never calls leave_no_trace fails atip.planjcs 02, 04, 05, 10, 11 and the new test"
+  },
+  "evidence_sha": "9161e5640079dfe76f02c53a15355f81b37b83ca",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 31,
+  "scenario_id": "atip.planjcs.10",
+  "schema": 1,
+  "staging_id": "650fecca",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

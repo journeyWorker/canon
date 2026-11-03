@@ -25,6 +25,7 @@ use clap::{Arg, ArgAction, Command};
 use serde_json::{json, Map, Value};
 
 use crate::doc::{OperandDoc, OptionDoc, ValueType};
+use crate::minor::Minor;
 
 /// Why a command tree cannot be projected: a defect of the tool's tables or declarations, found when the document is built.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -371,6 +372,27 @@ pub fn option_doc(command: &str, arg: &Arg, custom: CustomParsers<'_>, flag_only
         domain: implicit_domain(arg, value_type),
         help: help_of(command, arg)?,
     })
+}
+
+/// The options no document can carry in a tool that declares `minor` (spec 11.6): `json`, `input`, `commit` and
+/// `plan-digest`, and since 1.2 `limit`, `cursor`, `all` and `fields` too. A tool adds its own flag-only options
+/// (canon's `repo` and `as`) to this set before it passes it to [`option_doc`]; the crate does not know their names.
+pub const fn flag_only_options(minor: Minor) -> &'static [&'static str] {
+    if minor.at_least(Minor::V1_2) {
+        &["json", "input", "commit", "plan-digest", "limit", "cursor", "all", "fields"]
+    } else {
+        &["json", "input", "commit", "plan-digest"]
+    }
+}
+
+/// What is wrong with the `flagOnly` marks of one command's `options` in a tool that declares `minor`: one line per
+/// option of [`flag_only_options`] that the command has and does not mark `flagOnly: true` (spec 11.6, 10.7.1).
+pub fn flag_only_problems(options: &[OptionDoc], minor: Minor) -> Vec<String> {
+    options
+        .iter()
+        .filter(|option| flag_only_options(minor).contains(&option.name.as_str()) && !option.flag_only)
+        .map(|option| format!("`--{}` is flag-only in a tool that declares {minor} (spec 11.6) but its document does not say `flagOnly: true`", option.name))
+        .collect()
 }
 
 /// A kebab-case word naming an operand: its clap id without a trailing `_id` or `_ids` (`change_ids` is `change`).
@@ -832,5 +854,40 @@ mod tests {
         assert_eq!(found.conflicts_with["b"], ["a"]);
         assert_eq!(found.requires["change"], ["flow"]);
         assert_eq!(found.required_one_of, [vec!["flow".to_string(), "change".to_string()]]);
+    }
+
+    #[test]
+    fn atip_crate12_06_the_flag_only_set_is_four_options_at_1_1_and_eight_at_1_2_and_option_doc_marks_limit() {
+        assert_eq!(flag_only_options(Minor::V1_0), ["json", "input", "commit", "plan-digest"]);
+        assert_eq!(flag_only_options(Minor::V1_1), ["json", "input", "commit", "plan-digest"]);
+        assert_eq!(flag_only_options(Minor::V1_2), ["json", "input", "commit", "plan-digest", "limit", "cursor", "all", "fields"]);
+        assert_eq!((flag_only_options(Minor::V1_1).len(), flag_only_options(Minor::V1_2).len()), (4, 8));
+        // A tool adds its own flag-only options (canon's `repo` and `as`) to the crate's set; the crate knows none of them.
+        let with_own: Vec<&str> = flag_only_options(Minor::V1_2).iter().copied().chain(["repo", "as"]).collect();
+        let limit = command(Arg::new("limit").long("limit").value_parser(value_parser!(u32)).help("h"));
+        assert!(option_doc("run", only_arg(&limit), &[], &with_own).expect("limit").flag_only, "at 1.2 `limit` is flagOnly: true");
+        let repo = command(Arg::new("repo").long("repo").help("h"));
+        assert!(option_doc("run", only_arg(&repo), &[], &with_own).expect("repo").flag_only, "the tool's own option is marked too");
+        let at_11: Vec<&str> = flag_only_options(Minor::V1_1).to_vec();
+        assert!(!option_doc("run", only_arg(&limit), &[], &at_11).expect("limit").flag_only, "at 1.1 `limit` is an ordinary option");
+    }
+
+    #[test]
+    fn atip_crate12_07_an_option_of_the_set_that_a_document_does_not_mark_flag_only_is_a_problem() {
+        let limit = command(Arg::new("limit").long("limit").value_parser(value_parser!(u32)).help("h"));
+        let json_flag = command(Arg::new("json").long("json").action(ArgAction::SetTrue).help("h"));
+        let name = command(Arg::new("name").long("name").help("h"));
+        let unmarked = [
+            option_doc("run", only_arg(&limit), &[], &[]).expect("limit"),
+            option_doc("run", only_arg(&json_flag), &[], &["json"]).expect("json"),
+            option_doc("run", only_arg(&name), &[], &[]).expect("name"),
+        ];
+        let at_12 = flag_only_problems(&unmarked, Minor::V1_2);
+        assert_eq!(at_12.len(), 1, "{at_12:?}");
+        assert!(at_12[0].contains("`--limit`") && at_12[0].contains("flagOnly: true"), "{at_12:?}");
+        assert_eq!(flag_only_problems(&unmarked, Minor::V1_1), Vec::<String>::new(), "at 1.1 `limit` is an ordinary option");
+        // Marked with the 1.2 set, no option is a problem.
+        let marked = [option_doc("run", only_arg(&limit), &[], flag_only_options(Minor::V1_2)).expect("limit")];
+        assert_eq!(flag_only_problems(&marked, Minor::V1_2), Vec::<String>::new());
     }
 }

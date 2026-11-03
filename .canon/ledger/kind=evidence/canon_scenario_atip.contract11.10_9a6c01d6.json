@@ -1,0 +1,59 @@
+{
+  "actor": {
+    "agent_id": "impl-release-rc",
+    "role": "implementer",
+    "session_id": "s-0-35-release-rc"
+  },
+  "at": "2026-11-03T17:26:13.793999Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6775a15d0ff4615f437c8641b3263d41d73cf4566c6e10c68d3a8951e515d25"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_in_the_sources_is_a_command_line_a_template_or_prose",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6775a15d0ff4615f437c8641b3263d41d73cf4566c6e10c68d3a8951e515d25"
+    },
+    {
+      "case": "atip_contract11_10_the_rule_catches_prose_after_a_command_and_a_lowercase_placeholder",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6775a15d0ff4615f437c8641b3263d41d73cf4566c6e10c68d3a8951e515d25"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_conformance_corpus_froze_follows_the_same_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6775a15d0ff4615f437c8641b3263d41d73cf4566c6e10c68d3a8951e515d25"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6775a15d0ff4615f437c8641b3263d41d73cf4566c6e10c68d3a8951e515d25"
+    }
+  ],
+  "code_tree": "072f5143aed20d6fa2cb86dc71161dab2ef64f66",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_sha": "e99d876f0e0420269ac93b2a1706b0debc5361a6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 91,
+  "scenario_id": "atip.contract11.10",
+  "schema": 1,
+  "staging_id": "610754c2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

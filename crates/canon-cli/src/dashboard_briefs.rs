@@ -69,6 +69,8 @@ fn status_of(code: &str) -> u16 {
         "APPROVAL_INCOMPLETE" => 400,
         "BRIEF_NOT_FOUND" => 404,
         "BRIEF_APPROVE_REFUSED" | "BRIEF_UNAPPROVABLE" | CHANGED_SINCE_PAGE_LOAD => 409,
+        // Another canon process holds the repository write lock: the page may ask again.
+        "REPO_WRITE_BUSY" => 503,
         _ => 500,
     }
 }
@@ -281,6 +283,11 @@ pub fn approve(repo: &Path, body: &[u8]) -> Reply {
     let request: ApproveRequest = match serde_json::from_slice(body) {
         Ok(request) => request,
         Err(e) => return bad_request(format!("the body is not the approval request: {e}")),
+    };
+    // The one write the dashboard makes of what a plan reads: the repository write lock, for as long as the approval is written.
+    let _hold = match crate::write_lock::hold(repo) {
+        Ok(hold) => hold,
+        Err(error) => return refused_reply(error, None),
     };
     match (&request.change_id, &request.sha256, &request.briefs) {
         (Some(id), Some(sha256), None) => approve_one(repo, id, sha256, &request),

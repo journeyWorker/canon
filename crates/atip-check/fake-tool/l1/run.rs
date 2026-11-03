@@ -11,7 +11,7 @@ use super::project;
 use crate::Tool;
 
 /// The words of a path: the arguments before `--` that are no option, `--repo` taking its value with it.
-fn path_words(args: &[String]) -> Vec<String> {
+pub fn path_words(args: &[String]) -> Vec<String> {
     let mut words = Vec::new();
     let mut rest = args.iter().take_while(|arg| arg.as_str() != "--");
     while let Some(arg) = rest.next() {
@@ -36,10 +36,29 @@ pub fn handle(tool: &Tool, args: &[String]) -> Option<ExitCode> {
     if before.iter().any(|arg| arg == "--help" || arg == "-h") {
         return Some(help_for(tool, &words));
     }
+    if tool.flag("l2") {
+        if let Some(code) = super::safety::handle(tool, args, &words).or_else(|| super::guides::handle(tool, args, &words)) {
+            return Some(code);
+        }
+    }
     match words.first().map(String::as_str) {
         Some("member") => Some(member(tool, args, &words)),
+        Some("serve") if tool.config.contains_key("serveMode") => Some(serve_command(tool, args)),
+        Some("record") if tool.flag("l2") => Some(record(tool, args, &words)),
         Some("schema") if !tool.flag("noSchema") => Some(schema(tool, args)),
         _ => None,
+    }
+}
+
+/// `serve` of the seeded `notRun` runs: its arguments are parsed by the model, then it serves (`Tool::serve`).
+fn serve_command(tool: &Tool, args: &[String]) -> ExitCode {
+    let model = Model::of(tool);
+    let Some(command) = model.command("serve") else {
+        return tool.unknown_command("serve", &[], None);
+    };
+    match parse(tool, command, args, false) {
+        Err(failure) => refuse_failure(tool, "serve", failure),
+        Ok(_) => crate::serve(tool),
     }
 }
 
@@ -63,6 +82,9 @@ fn help_for(tool: &Tool, words: &[String]) -> ExitCode {
             break;
         }
     }
+    if tool.flag("helpWrites") {
+        std::fs::write("help-cache.txt", "written by --help").unwrap_or_default();
+    }
     let text = if let Some(command) = model.command(&current) {
         let doc = patched(
             tool,
@@ -78,7 +100,7 @@ fn help_for(tool: &Tool, words: &[String]) -> ExitCode {
 }
 
 /// A refusal of the model's own rules, in the shape the configuration asks for.
-fn refuse_failure(tool: &Tool, command: &str, failure: Failure) -> ExitCode {
+pub fn refuse_failure(tool: &Tool, command: &str, failure: Failure) -> ExitCode {
     match failure {
         Failure::Unknown(option) => tool.unknown_option(&option, Some(command)),
         Failure::Refuse {
@@ -170,6 +192,11 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
         .flat_map(str::split_whitespace)
         .map(ToString::to_string)
         .collect();
+    if let Some(query) = parsed.text("search") {
+        cache();
+        let tree = patched(tool, "<tree>", super::guides::search_tree(tool, &model, query));
+        return tool.success("schema", tree);
+    }
     let registry: Vec<(String, Option<String>)> = ["errors", "error", "warnings", "warning"]
         .iter()
         .filter(|name| parsed.has(name))
@@ -206,7 +233,7 @@ fn schema(tool: &Tool, args: &[String]) -> ExitCode {
             &[("field", json!("--errors"))],
         );
     }
-    let tree = patched(tool, "<tree>", tree_doc(&model, tool.flag("treeGroupsLast")));
+    let tree = patched(tool, "<tree>", tree_doc(&model, tool.flag("treeGroupsLast"), &tool.text("treeLevel", if tool.flag("l2") { "L2" } else { "L1" })));
     cache();
     tool.success("schema", tree)
 }
@@ -261,7 +288,12 @@ fn schema_path(tool: &Tool, model: &Model, words: &[String], quoted: bool, cache
         }
     }
     let mut doc = if let Some(command) = model.command(&current) {
-        command_doc(&tool.name(), command)
+        let mut doc = command_doc(&tool.name(), command);
+        // Seeded: a tool whose documents carry no example (so no read command has an invocation to change into a pair).
+        if tool.flag("noExamples") || (tool.flag("examplesOnlyServe") && current != "serve") {
+            doc["examples"] = json!([]);
+        }
+        doc
     } else {
         group_doc(model, &current)
     };
@@ -302,11 +334,16 @@ fn member(tool: &Tool, args: &[String], words: &[String]) -> ExitCode {
             };
             match parse(tool, command, args, false) {
                 Err(failure) => refuse_failure(tool, &id, failure),
-                Ok(parsed) => match verb {
-                    "list" => list(tool, args, &parsed),
-                    "search" => search(tool, &parsed),
-                    _ => tag(tool, &parsed),
-                },
+                Ok(parsed) => {
+                    if let Some(refused) = tool.seeded_refusal(&id) {
+                        return refused;
+                    }
+                    match verb {
+                        "list" => list(tool, args, &parsed),
+                        "search" => search(tool, &parsed),
+                        _ => tag(tool, &parsed),
+                    }
+                }
             }
         }
         Some(word) => tool.unknown_command(word, &verbs, Some("member")),
@@ -461,22 +498,24 @@ fn decode_cursor(tool: &Tool, cursor: &str, binding: &str, total: usize) -> Resu
 }
 
 /// `argv` of the next page: the invocation again, with the cursor of the next page.
-fn next_page_argv(args: &[String], cursor: &str) -> Vec<String> {
+fn next_page_argv(args: &[String], cursor: &str, document: &[String], keep_input: bool) -> Vec<String> {
     let mut argv = Vec::new();
     let mut words = args.iter().take_while(|arg| arg.as_str() != "--");
     while let Some(word) = words.next() {
         if word == "--json" {
             continue;
         }
-        if word == "--cursor" {
+        if word == "--cursor" || (word == "--input" && !keep_input) {
             words.next();
             continue;
         }
-        if word.starts_with("--cursor=") {
+        if word.starts_with("--cursor=") || (word.starts_with("--input=") && !keep_input) {
             continue;
         }
         argv.push(word.clone());
     }
+    // What an `--input` document gave is written out as options: the next page needs no document.
+    argv.extend(document.iter().cloned());
     argv.push("--cursor".to_string());
     argv.push(cursor.to_string());
     argv.push("--json".to_string());
@@ -520,7 +559,7 @@ fn projection(tool: &Tool, value: &str, doc: &Value) -> Result<(Vec<String>, Vec
     let mut selection: Vec<String> = Vec::new();
     for path in project::split_list(value) {
         if !selectable(tool, &declared, &["attributes"], &path) {
-            if tool.flag("fieldsAcceptsUnknown") {
+            if tool.flag("fieldsAcceptsUnknown") || (tool.flag("fieldsUnknownAcceptedInText") && !tool.json) {
                 continue;
             }
             return Err(tool.refuse(
@@ -551,8 +590,17 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
         // The seeded violation: a refusal the model does not declare, for a value its documents accept.
         return tool.refuse("USAGE", "there is no such team", "member list", &[("field", json!("--team"))]);
     }
-    let team = parsed.text("team");
+    if tool.flag("inputRefused") && parsed.has("input") {
+        return tool.refuse("INPUT_INVALID", "the document is not read", "member list", &[("field", json!("--input"))]);
+    }
+    let env_team = std::env::var("FAKE_TEAM").ok().filter(|_| tool.is_1_2());
+    let team_text = parsed.text("team").map(ToString::to_string).or_else(|| env_team.clone());
+    let team = team_text.as_deref();
     let sort = parsed.text("sort").unwrap_or("name");
+    if tool.flag("fieldsNeedsJson") && !tool.json && parsed.has("fields") {
+        // The seeded violation of 1.2: `--fields` is refused without `--json`.
+        return tool.refuse("USAGE", "--fields needs --json", "member list", &[("field", json!("--fields"))]);
+    }
     let mut members: Vec<&Member> = MEMBERS
         .iter()
         .filter(|member| team.is_none_or(|team| member.team == team))
@@ -562,7 +610,19 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
     } else {
         members.sort_by_key(|member| member.id);
     }
-    let binding = format!("team={};sort={sort}", team.unwrap_or_default());
+    // A cursor is bound to the arguments the invocation gave (a default written out is another invocation) and, for
+    // an option it left out, to the value its environment variable has (spec 6.9, 1.2); before 1.2, to the effective values.
+    let binding = if tool.is_1_2() && !tool.flag("cursorBindsEffective") {
+        let env = if tool.flag("cursorIgnoresEnv") || parsed.has("team") { String::new() } else { env_team.clone().unwrap_or_default() };
+        let kinds: Vec<&str> = parsed.values("kind").iter().filter_map(Value::as_str).collect();
+        format!("team={};sort={};env={env};kind={}", parsed.text("team").unwrap_or_default(), parsed.text("sort").unwrap_or_default(), kinds.join(","))
+    } else {
+        format!("team={};sort={sort}", team.unwrap_or_default())
+    };
+    if tool.flag("cursorRefusesAll") && parsed.has("all") && parsed.has("cursor") {
+        // The seeded violation of 1.2: a cursor made under `--limit` is refused when `--all` replaces it.
+        return tool.refuse("CURSOR_INVALID", "that cursor was made with --limit", "member list", &[("field", json!("--cursor"))]);
+    }
     let offset = match parsed.text("cursor") {
         None => 0,
         Some(cursor) => match decode_cursor(tool, cursor, &binding, members.len()) {
@@ -586,7 +646,20 @@ fn list(tool: &Tool, args: &[String], parsed: &Parsed) -> ExitCode {
         let next_offset = if tool.flag("cursorRepeats") { offset } else { offset + size };
         let cursor = encode_cursor(next_offset, &binding);
         page_meta["nextCursor"] = json!(cursor);
-        let argv = next_page_argv(args, &cursor);
+        // The arguments an `--input` document gave, as options (and, seeded, a default written out beside them).
+        let mut document: Vec<String> = Vec::new();
+        if parsed.has("input") {
+            for name in ["team", "sort"] {
+                let written = args.iter().any(|word| word == &format!("--{name}") || word.starts_with(&format!("--{name}=")));
+                if let (Some(value), false) = (parsed.text(name), written) {
+                    document.extend([format!("--{name}"), value.to_string()]);
+                }
+            }
+            if tool.flag("nextCarriesDefault") && !document.iter().any(|word| word == "--sort") {
+                document.extend(["--sort".to_string(), "name".to_string()]);
+            }
+        }
+        let argv = next_page_argv(args, &cursor, &document, tool.flag("nextKeepsInput"));
         meta.insert(
             "next".into(),
             json!([{"command": display(tool, &argv), "argv": argv, "reason": "the next page of members"}]),
@@ -700,21 +773,41 @@ fn search(tool: &Tool, parsed: &Parsed) -> ExitCode {
     tool.success_with("member search", data, meta)
 }
 
+/// A refusal of an item of a command: what [`Tool::refuse`] prints, or what a failed item of a batch reports.
+pub struct ItemError {
+    code: &'static str,
+    message: String,
+    extras: Vec<(&'static str, Value)>,
+}
+
 fn tag(tool: &Tool, parsed: &Parsed) -> ExitCode {
+    match tag_item(tool, parsed) {
+        Ok(data) => {
+            let mut meta = Map::new();
+            if tool.flag("l2") {
+                meta.insert("output".into(), json!("MemberTagReport"));
+            }
+            tool.success_with("member tag", data, meta)
+        }
+        Err(error) => tool.refuse(error.code, &error.message, "member tag", &error.extras),
+    }
+}
+
+/// One `member tag`: the data it reports, or the refusal.
+fn tag_item(tool: &Tool, parsed: &Parsed) -> Result<Value, ItemError> {
     let id = parsed.int("member").unwrap_or_default();
     if !MEMBERS.iter().any(|member| member.id == id) {
         // The hint is a runnable command line; the seeded violation names a command the tool does not have.
         let listing = if tool.flag("hintNoCommand") { "member lst" } else { "member list" };
-        return tool.refuse(
-            "MEMBER_NOT_FOUND",
-            &format!("there is no member {id}"),
-            "member tag",
-            &[
+        return Err(ItemError {
+            code: "MEMBER_NOT_FOUND",
+            message: format!("there is no member {id}"),
+            extras: vec![
                 ("field", json!("MEMBER")),
                 ("received", json!(id.to_string())),
                 ("hint", json!(format!("{} {listing} --json", tool.name()))),
             ],
-        );
+        });
     }
     let path = std::path::Path::new("tags").join(format!("{id}.json"));
     let before: Value = std::fs::read_to_string(&path)
@@ -747,5 +840,170 @@ fn tag(tool: &Tool, parsed: &Parsed) -> ExitCode {
         std::fs::write(&path, after.to_string()).unwrap_or_default();
     }
     after["status"] = json!(status);
-    tool.success_with("member tag", after, Map::new())
+    Ok(after)
+}
+
+// ---- record ----
+
+fn record(tool: &Tool, args: &[String], words: &[String]) -> ExitCode {
+    let model = Model::of(tool);
+    match words.get(1).map(String::as_str) {
+        None => tool.fail("group", "COMMAND_REQUIRED", "record needs a command", Some("record"), &[("expected", json!(["put"]))], 2),
+        Some("put") => {
+            let Some(command) = model.command("record put") else {
+                return tool.unknown_command("put", &["put"], Some("record"));
+            };
+            match parse(tool, command, args, false) {
+                Err(failure) => refuse_failure(tool, "record put", failure),
+                Ok(parsed) => {
+                    if let Some(refused) = tool.seeded_refusal("record put") {
+                        return refused;
+                    }
+                    put(tool, &parsed)
+                }
+            }
+        }
+        Some(word) => tool.unknown_command(word, &["put"], Some("record")),
+    }
+}
+
+/// `record put <ID> --round <N> ...`: writes `records/<ID>.json`; the same record again is `unchanged`.
+fn put(tool: &Tool, parsed: &Parsed) -> ExitCode {
+    let id = parsed.int("id").unwrap_or_default();
+    // Seeded: a label that starts like an option, an inline document or a file is looked up in the state and refused by a precondition (as a revision
+    // that is not in the repository is). With `dashPreconditionNamed` the refusal names the argument and the value it received.
+    if tool.flag("dashPrecondition") {
+        let both = tool.flag("dashPreconditionBoth");
+        let mut given = parsed.text("label").map(|label| ("/label", label)).into_iter().chain(parsed.text("note").filter(|_| both).map(|note| ("/note", note)));
+        if let Some((pointer, text)) = given.find(|(_, text)| text.starts_with(['-', '{', '['])) {
+            let field = tool.text("dashPreconditionField", pointer);
+            let extras: Vec<(&str, Value)> = if tool.flag("dashPreconditionNamed") { vec![("field", json!(field)), ("received", json!(text))] } else { Vec::new() };
+            let code = tool.text("dashPreconditionCode", "ALREADY_SEALED");
+            return tool.fail("usage", &code, "the value names something that is not there", Some("record put"), &extras, 2);
+        }
+    }
+    let mut record = json!({"id": id, "round": parsed.int("round").unwrap_or_default()});
+    for (key, value) in [("label", parsed.text("label").map(|text| json!(text))), ("weight", parsed.values("weight").first().cloned()), ("score", parsed.values("score").first().cloned()), ("meta", parsed.values("meta").first().cloned())] {
+        if let Some(value) = value {
+            record[key] = value;
+        }
+    }
+    if let Some(note) = parsed.text("note").filter(|_| !parsed.has("clear-note")) {
+        record["note"] = json!(note);
+    }
+    let path = std::path::Path::new("records").join(format!("{id}.json"));
+    let before: Option<Value> = std::fs::read_to_string(&path).ok().and_then(|text| serde_json::from_str(&text).ok());
+    let status = if before.as_ref() == Some(&record) { "unchanged" } else { "written" };
+    if status == "written" {
+        std::fs::create_dir_all("records").unwrap_or_default();
+        std::fs::write(&path, record.to_string()).unwrap_or_default();
+    }
+    record["status"] = json!(status);
+    if tool.flag("replayStatusWritten") && status == "unchanged" {
+        // The seeded violation: a repeat is reported as new work, with a result that differs from the first run's.
+        record["status"] = json!("written");
+        record["label"] = json!(format!("run-{}", std::process::id()));
+    }
+    if tool.flag("dataFormDiffers") && std::env::var_os("FAKE_FROM_DOCUMENT").is_some() {
+        // Seeded: the document form prints another label than the argv form, in `data` alone: the same exit, `ok` and code, and a value that is the same
+        // on every run of the argv form (so it is not a varying path).
+        record["label"] = json!(format!("{}-from-document", record["label"].as_str().unwrap_or("")));
+    }
+    if tool.flag("dataStamp") {
+        // Seeded: a value that differs on every run, as a timestamp does (the label carries the nanoseconds of the run).
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_nanos());
+        record["label"] = json!(format!("{}@{nanos}", record["label"].as_str().unwrap_or("")));
+    }
+    tool.success_with("record put", record, Map::new())
+}
+
+// ---- batches ----
+
+/// Executes a batch whose preflight passed (spec 11.11): the items one at a time, in order, stopping at the first that fails.
+pub fn execute_batch(tool: &Tool, id: &'static str, items: Vec<Parsed>) -> ExitCode {
+    let mut report: Vec<Value> = Vec::new();
+    let mut failed: Option<(usize, ItemError)> = None;
+    for (index, parsed) in items.iter().enumerate() {
+        if failed.is_some() {
+            if tool.flag("batchStatusWrong") {
+                // The seeded violation: an item that did not run is reported as written: a valid item, the wrong status.
+                report.push(json!({"index": index, "status": "unchanged", "data": {}}));
+            } else {
+                report.push(json!({"index": index, "status": "skipped"}));
+            }
+            continue;
+        }
+        let result = if parsed.has("__late__") {
+            Err(ItemError { code: "USAGE", message: "the item is not valid".to_string(), extras: vec![("field", json!(format!("/{index}")))] })
+        } else {
+            match id {
+                "member tag" => tag_item(tool, parsed),
+                _ => Err(ItemError { code: "USAGE", message: format!("{id} takes no batch"), extras: Vec::new() }),
+            }
+        };
+        match result {
+            Ok(data) => {
+                let status = data["status"].as_str().unwrap_or("written").to_string();
+                report.push(json!({"index": index, "status": status, "data": data}));
+            }
+            Err(error) => {
+                let object = json!({"code": error.code, "message": error.message, "retryable": tool.flag("batchRetryableWrong"), "field": format!("/{index}/operands/0")});
+                report.push(json!({"index": index, "status": "failed", "error": object}));
+                failed = Some((index, error));
+            }
+        }
+    }
+    let mut meta = tool.meta(Some(id));
+    let failing = failed.is_some() || tool.flag("batchFailsOnSuccess");
+    if !(tool.flag("batchNoOutput") || tool.flag(if failing { "batchNoOutputOnFailure" } else { "batchNoOutputOnSuccess" })) {
+        let output = if id == "member tag" { "MemberTagBatchReport" } else { "BatchReport" };
+        meta.insert("output".into(), json!(output));
+    }
+    if tool.flag("batchItemsShort") {
+        report.retain(|item| item["status"] != "skipped");
+    }
+    let failed = failed.or_else(|| {
+        // The seeded violation: a batch whose items all ran is reported as stopped at its last item.
+        tool.flag("batchFailsOnSuccess").then(|| (items.len().saturating_sub(1), ItemError { code: "INTERNAL", message: "the batch stopped".to_string(), extras: Vec::new() }))
+    });
+    let Some((index, error)) = failed else {
+        if tool.flag("batchOkSingleReport") {
+            return tool.success(id, json!({"items": report.len()}));
+        }
+        if tool.flag("batchOkItemsShort") {
+            report.pop();
+        }
+        if tool.flag("batchOkStatusOdd") {
+            if let Some(item) = report.first_mut() {
+                *item = json!({"index": 0, "status": "skipped"});
+            }
+        }
+        if tool.flag("batchOkReportBadShape") {
+            if let Some(item) = report.first_mut() {
+                item["note"] = json!("extra");
+            }
+        }
+        tool.print_document(&json!({"ok": true, "data": {"items": report}, "meta": meta}));
+        return ExitCode::SUCCESS;
+    };
+    if index == 0 && tool.flag("batchFirstFailPlain") {
+        return tool.refuse(error.code, &error.message, id, &error.extras);
+    }
+    let field = if tool.flag("batchWrongField") { "--input".to_string() } else { format!("/{index}") };
+    if tool.flag("batchReportBadShape") {
+        if let Some(item) = report.first_mut() {
+            item["note"] = json!("extra");
+        }
+    }
+    let mut document = json!({
+        "ok": false,
+        "error": {"code": "BATCH_INCOMPLETE", "message": format!("item {index} of {} failed ({})", items.len(), error.code), "retryable": false, "field": field},
+        "data": {"items": report},
+        "meta": meta,
+    });
+    if tool.flag("batchNoData") {
+        document.as_object_mut().map(|object| object.remove("data"));
+    }
+    tool.print_document(&document);
+    ExitCode::from(1)
 }

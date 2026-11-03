@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-crate-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-crate"
+  },
+  "at": "2026-11-02T12:31:35.826171Z",
+  "attachments": [
+    {
+      "case": "cursor::tests::atip_cratecursor_09_the_next_page_argv_carries_the_explicit_arguments_and_the_cursor_and_nothing_else",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "given::tests::atip_cratecursor_09_arguments_are_written_as_argv_options_and_operands_after_one_double_dash",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    },
+    {
+      "case": "given::tests::atip_cratecursor_09_a_default_an_env_value_an_absent_argument_and_input_are_not_written",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-crate-cursor-junit.xml",
+      "sha256": "d534c2d90217e86499cdb7c78a2831f64690fb76a68008ab783ad549e2f0851a"
+    }
+  ],
+  "code_tree": "ae4413d088710b98fac9bd70312272e59850f09d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-crate-cursor-junit.xml"
+  },
+  "evidence_sha": "63861b2995380a2d7dfe4aebd8ad8f80a0a7eaa6",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "atip.cratecursor.09",
+  "schema": 1,
+  "staging_id": "1a68ccae",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

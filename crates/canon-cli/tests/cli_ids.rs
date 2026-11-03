@@ -144,7 +144,8 @@ fn options_by_name() -> BTreeMap<String, Vec<String>> {
     out
 }
 
-/// Masks times, ULIDs and digests, the values that differ between two runs of one fixture.
+/// Masks times, ULIDs and digests, the values that differ between two runs of one fixture. A digest is 8 (a short one) or 40 and more lower-case
+/// hex characters as a whole word, with or without a digit: one that happens to be all letters (`cfcaaadc`) is masked too.
 fn masked(text: &str) -> String {
     let mut out = String::new();
     let mut word = String::new();
@@ -155,7 +156,7 @@ fn masked(text: &str) -> String {
         let digits = word.len();
         let timestamp = digits >= 20 && word.as_bytes()[4] == b'-' && word.contains('T') && word.ends_with('Z');
         let ulid = digits == 26 && word.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
-        let digest = (digits >= 40 || digits == 8) && word.chars().all(|c| c.is_ascii_hexdigit()) && word.chars().any(|c| c.is_ascii_digit());
+        let digest = (digits >= 40 || digits == 8) && word.chars().all(|c| c.is_ascii_digit() || matches!(c, 'a'..='f'));
         out.push_str(&if timestamp {
             format!("<time>{suffix}")
         } else if ulid {
@@ -265,12 +266,12 @@ fn parity_transcript(binary: &Path, old_spelling: bool) -> String {
         out.push_str(&format!("--- stdout\n{}\n--- stderr\n{}\n", normalize(&stdout(&result)), normalize(&stderr(&result))));
     }
     // The stored records: every text file canon keeps under `.canon/`, by path. The briefs are the brief-format
-    // change's (0.31 writes the template without comments), not this one's; the access log is no record.
+    // change's (0.31 writes the template without comments), not this one's; the access log and the repository write lock (0.35, which 0.30 did not have) are no record.
     out.push_str("=== stored\n");
     let mut stored: Vec<(String, String)> = harness::tree(&repo.join(".canon"))
         .into_iter()
         .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes?).ok()?)))
-        .filter(|(path, _)| !path.ends_with("brief.md") && !path.starts_with("audit"))
+        .filter(|(path, _)| !path.ends_with("brief.md") && !path.starts_with("audit") && !path.ends_with("repo-write.lock"))
         .map(|(path, text)| (normalize(&path.to_string_lossy()), normalize(&text)))
         .collect();
     stored.sort();
@@ -533,7 +534,7 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
     assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/scenarioId", "{body}");
+    assert_eq!(body["error"]["field"], "/1/scenarioId", "{body}");
     assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "scenario"), "{body}");
     assert_eq!(body["error"]["suggestions"][0], "scenario", "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("use \"scenario\""), "{body}");
@@ -552,7 +553,7 @@ fn context_capability_53_a_batch_whose_second_element_keeps_an_old_id_key_is_ref
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
     assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/subjectId", "{body}");
+    assert_eq!(body["error"]["field"], "/1/subjectId", "{body}");
     assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == "subject"), "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("use \"subject\""), "{body}");
     unchanged(repo, &before, "a refused scenario batch, its first element included");

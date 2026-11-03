@@ -18,11 +18,16 @@ concurrency outgrows sqlite's single-writer mode.
 ## `canon ingest sessions [--watch] [--interval-secs N] [--home <dir>] [--full] [--all-workspaces]`
 
 ```bash
-canon ingest sessions                   # one pass over this project's sources
-canon ingest sessions --watch           # poll every 30s (see --interval-secs)
-canon ingest sessions --full            # ignore the watermark; re-parse every in-scope file
-canon ingest sessions --all-workspaces  # machine-wide scan
-canon ingest sessions --home /custom    # override the scan-root home ($HOME)
+# one pass over this project's sources
+canon ingest sessions
+# poll every 30s (see --interval-secs)
+canon ingest sessions --watch
+# ignore the watermark; re-parse every in-scope file
+canon ingest sessions --full
+# machine-wide scan
+canon ingest sessions --all-workspaces
+# override the scan-root home ($HOME)
+canon ingest sessions --home /custom
 ```
 
 **Done when:** the run summary (below) ends with `malformed records … : 0`
@@ -175,7 +180,8 @@ These events interleave with `token_usage` events in one deterministic
 order (directive-before-token on a timestamp tie). Query them with:
 
 ```bash
-canon query --kind event   # filter detail.label == "user_directive"
+# filter detail.label == "user_directive"
+canon query --kind event
 ```
 
 ## Reading the run summary

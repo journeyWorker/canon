@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:56:44.396926Z",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "kind": "review",
+  "pin": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2input_09_a_document_and_argv_split_three_ways_and_numeric_strings_give_the_argv_result",
+          "junit:atip_checkl2input_09_a_value_that_varies_between_two_runs_of_the_reference_is_not_compared_and_the_rest_of_data_still_is"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "19ffd6121826ef7ef4b0d371601e9799bbfdea839800a8a5baaca1b08248e569",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
+  },
+  "review_id": "01M6GM9MFC5R1CCY5S8XPF6HDB",
+  "reviewer": "rev-0-35-final",
+  "scenario_id": "atip.checkl2input.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

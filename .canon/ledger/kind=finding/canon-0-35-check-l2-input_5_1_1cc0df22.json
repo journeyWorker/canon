@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:55:44.947940Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l1.rs",
+  "introduced_by": "809b0295db41511924dcd8aab265aa5ef22443cd",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 5,
+  "scenario_ids": [
+    "atip.checkl2input.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Test gap (mutation probe of is_usage at d3a270f7): two parts of the rule are pinned only by tests of other rows. Allowing a code a command document declares to stand for USAGE fails only atip_checkl1_04 (L1.tree's owner case) and leaving the stateless test's field unfiltered (any pointer, not only --name) fails only atip_checkl2input_13; atip_checkl2safety_04 and atip_checkl2input_07 kill the other mutants (ignore field, reserved code, any exit, no OPTION_INVALID in L1.registry). Dropping the !code.starts_with(INPUT_) guard survives everything: every INPUT_* code the contract reserves is also excluded by reserved_code, so the guard only matters for an unreserved INPUT_* name (equivalent for the spec's codes). Add a seeded case: a command that declares code X on a constraint with field --name, refused with X by a half (L2.destructive-half must not read it as USAGE), and a registered unreserved INPUT_FOO at exit 2 with an argument field.",
+  "worktree_dirty": false
+}

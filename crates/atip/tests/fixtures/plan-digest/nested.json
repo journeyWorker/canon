@@ -1,0 +1,12 @@
+{
+  "description": "Nested arrays and objects, empty containers and literals: arrays keep their order and their elements are canonicalized in place.",
+  "plan": {
+    "effects": [
+      {"action": "move", "path": "a", "detail": {"to": "b", "keep": [[3, 2, 1], [], [{"y": null, "x": true}], {}]}},
+      {"action": "tag", "record": "r-1", "detail": {"tags": ["b", "a"], "flags": {"z": false, "a": {"nested": [[[]]]}}}}
+    ],
+    "inputs": {"empty": {}, "list": [null, true, false, "", 0]}
+  },
+  "canonical": "{\"effects\":[{\"action\":\"move\",\"detail\":{\"keep\":[[3,2,1],[],[{\"x\":true,\"y\":null}],{}],\"to\":\"b\"},\"path\":\"a\"},{\"action\":\"tag\",\"detail\":{\"flags\":{\"a\":{\"nested\":[[[]]]},\"z\":false},\"tags\":[\"b\",\"a\"]},\"record\":\"r-1\"}],\"inputs\":{\"empty\":{},\"list\":[null,true,false,\"\",0]}}",
+  "digest": "sha256:696c545400b994dbcd60151cc13d7aaf197d2d5f19b7497d421f59db3418ecfb"
+}

@@ -181,7 +181,7 @@ fn report_of(output: &Value) -> String {
 /// A validator of the schema `name` of the command document `doc`: its `$ref`s resolve inside the document.
 fn schema_validator(doc: &Value, name: &str) -> jsonschema::Validator {
     use jsonschema::{Registry, Resource};
-    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(doc.clone())).expect("the document registers").prepare().expect("the registry prepares");
+    let registry = Registry::new().add("https://atip.dev/1/guide.schema.json", Resource::from_contents(serde_json::from_str(atip::GUIDE_SCHEMA).expect("the guide schema is JSON"))).expect("the contract schema registers").add("urn:canon:doc", Resource::from_contents(doc.clone())).expect("the document registers").prepare().expect("the registry prepares");
     jsonschema::options().with_registry(&registry).build(&serde_json::json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).unwrap_or_else(|e| panic!("`{name}` does not compile: {e}"))
 }
 
@@ -421,8 +421,8 @@ fn an_object_is_one_invocation_and_an_array_or_ndjson_is_a_batch() {
     assert_eq!(body["meta"]["command"], "subject new", "the batch keeps the leaf id");
     validates(&spec_command("subject new"), "BatchSubjectNewReport", &body["data"]);
 
-    // NDJSON in a file: comments and blank lines skipped
-    std::fs::write(repo.join("batch.ndjson"), "# subjects\n\n{\"operands\":[\"gamma\"],\"domain\":\"dev\",\"title\":\"Gamma\"}\n\n# more\n{\"operands\":[\"delta\"],\"domain\":\"dev\",\"title\":\"Delta\"}\n").unwrap();
+    // NDJSON in a file: blank lines skipped (a `#` line is not a comment: see atip_inputorder_02)
+    std::fs::write(repo.join("batch.ndjson"), "\n{\"operands\":[\"gamma\"],\"domain\":\"dev\",\"title\":\"Gamma\"}\n\n{\"operands\":[\"delta\"],\"domain\":\"dev\",\"title\":\"Delta\"}\n").unwrap();
     let out = canon(repo, home.path(), &["subject", "new", "--input", "batch.ndjson", "--json"], None);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
     let body = json_of(&out);
@@ -447,7 +447,7 @@ fn text_that_is_neither_one_json_value_nor_ndjson_is_input_invalid() {
     let repo = dir.path();
     std::fs::write(repo.join("bad.txt"), "this is not json\n").unwrap();
     std::fs::write(repo.join("half.ndjson"), "{\"operands\":[\"a\"],\"domain\":\"dev\",\"title\":\"A\"}\nnot json\n").unwrap();
-    std::fs::write(repo.join("empty.ndjson"), "# only a comment\n\n").unwrap();
+    std::fs::write(repo.join("empty.ndjson"), "\n  \n\n").unwrap();
     let before = tree(repo);
     for (what, args, stdin, expected, fragment) in [
         ("inline text that is not JSON", vec!["--input", "{not json"], None, "INPUT_INVALID", "not valid JSON"),
@@ -535,7 +535,7 @@ fn unknown_keys_null_conflicts_and_the_flags_only_options_are_refused() {
     // and so does a value set
     let out = canon(repo, home.path(), &["finding", "add", "--input", r#"{"change":"add-login","round":1,"seq":1,"severity":"urgent","actor":"a","summary":"s"}"#, "--json"], None);
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("/severity")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some("INVALID_VALUE"), Some("/severity")), "{body}");
     assert!(body["error"]["expected"].as_array().is_some_and(|e| e.iter().any(|v| v == "blocker")), "{body}");
 }
 
@@ -583,7 +583,7 @@ fn a_value_that_starts_with_a_dash_survives_and_is_never_parsed_as_a_flag() {
     let out = canon(dir.path(), home.path(), &["subject", "new", "--input", r#"{"operands":["-dashed"],"domain":"dev","title":"T"}"#, "--json"], None);
     let body = json_of(&out);
     assert_eq!(body["error"]["field"], "/operands", "{body}");
-    assert!(body["error"]["message"].as_str().unwrap().contains("-dashed"), "{body}");
+    assert_eq!(body["error"]["received"], "-dashed", "{body}");
 }
 
 // ---------------------------------------------------------------- batches
@@ -603,23 +603,24 @@ fn one_invalid_element_writes_nothing_and_points_at_it() {
     let out = canon(repo, home.path(), &["scenario", "new", "--input", &doc, "--json"], None);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("/items/2/title")), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("/2/title")), "{body}");
     assert_eq!(tree(repo), before, "nothing was written, not even the valid elements");
 
     // an unknown key and a bad value of a leaf with a value set
     let doc = json!([{"change":"add-login","round":1,"seq":2,"severity":"note","actor":"a","summary":"s"},{"change":"add-login","round":1,"seq":3,"severity":"urgent","actor":"a","summary":"s"}]).to_string();
     let out = canon(repo, home.path(), &["finding", "add", "--input", &doc, "--json"], None);
     let body = json_of(&out);
-    assert_eq!((out.status.code(), body["error"]["field"].as_str()), (Some(2), Some("/items/1/severity")), "{body}");
+    assert_eq!((out.status.code(), body["error"]["field"].as_str()), (Some(2), Some("/1/severity")), "{body}");
     assert_eq!(tree(repo), before);
 
-    // the destructive leaves' own refusals ride the leaf's --dry-run: a leaf with one validates the whole batch first
+    // preflight reads no state, even for a leaf with a `--dry-run`: an element naming a change that does not exist fails when it runs,
+    // after the element before it did its work (spec 11.11)
     let doc = json!([{"operands": ["demo"], "change": "add-login"}, {"operands": ["demo"], "change": "no-such-change"}]).to_string();
     let out = canon(repo, home.path(), &["subject", "unadopt", "--input", &doc, "--json"], None);
     let body = json_of(&out);
-    assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!(body["error"]["field"], "/items/1", "{body}");
-    assert_eq!(tree(repo), before, "the dry run of element 1 refused before element 0 wrote");
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("BATCH_INCOMPLETE"), Some("/1")), "{body}");
+    assert_ne!(tree(repo), before, "element 0 ran before element 1 failed");
 }
 
 #[test]
@@ -640,7 +641,7 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     assert_eq!(statuses, ["written", "written", "failed", "skipped"], "{body}");
     assert_eq!(body["data"]["items"][2]["error"]["code"], "TASK_NOT_FOUND", "the failed element keeps its own error: {body}");
     assert_eq!(body["error"]["code"], "BATCH_INCOMPLETE", "{body}");
-    assert_eq!(body["error"]["field"], "/items/2", "{body}");
+    assert_eq!(body["error"]["field"], "/2", "{body}");
     assert!(body["data"]["items"][0]["data"]["records"].is_array(), "{body}");
     assert_eq!(body["meta"]["command"], "evidence add");
     validates(&spec_command("evidence add"), "BatchEvidenceAddReport", &body["data"]);
@@ -671,7 +672,7 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     let (_batch_scratch, batch) = scratch_copy(base.path());
     let (_single_scratch, single) = scratch_copy(base.path());
 
-    let ndjson = "# the login scenarios\n\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
+    let ndjson = "\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
     let out = canon(&batch, home.path(), &["scenario", "new", "--input", "-", "--json"], Some(ndjson));
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(0), "{body}");
@@ -690,9 +691,9 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     let statuses: Vec<&str> = body["data"]["items"].as_array().unwrap().iter().map(|i| i["status"].as_str().unwrap()).collect();
     assert_eq!(statuses, ["written", "failed", "skipped"], "{body}");
     assert_eq!(body["error"]["code"], "BATCH_INCOMPLETE", "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/operands", "the runtime refusal points into the batch: {body}");
+    assert_eq!(body["error"]["field"], "/1", "{body}");
     assert_eq!(body["data"]["items"][1]["error"]["code"], "SCENARIO_TAG_EXISTS", "the failed element keeps its own error: {body}");
-    assert_eq!(body["data"]["items"][1]["error"]["field"], "/items/1/operands", "{body}");
+    assert_eq!(body["data"]["items"][1]["error"]["field"], "/1/operands", "{body}");
     let feature = std::fs::read_to_string(batch.join(".canon/specs/kind=feature/area=auth/login.feature")).unwrap();
     assert!(feature.contains("auth.login.03") && !feature.contains("auth.login.04"), "{feature}");
 }

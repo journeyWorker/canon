@@ -62,6 +62,61 @@ pub fn l1_config(extra: &Value) -> Value {
     config
 }
 
+/// The standard configuration of a fake tool that claims 1.2: the copy of the tool named `claims12` claims 1.2 in the runs that get no configuration too.
+pub fn l1_config_1_2(extra: &Value) -> Value {
+    let mut config = l1_config(&json!({"claims": "1.2", "binAlias": "atip-fake-tool-claims12"}));
+    if let (Some(config), Some(extra)) = (config.as_object_mut(), extra.as_object()) {
+        for (key, value) in extra {
+            config.insert(key.clone(), value.clone());
+        }
+    }
+    config
+}
+
+/// A pass condition of a 1.2 row: `condition` is `<check>/<condition>` as the checker names it, `owner` is the check.
+pub fn l1_case_1_2(condition: &'static str, extra: Value, tweak: Option<fn(&mut Value)>) -> Case {
+    Case { condition, config: l1_config_1_2(&extra), tweak }
+}
+
+/// Every pass condition of the 1.2 halves of the L1 rows and of `L1.check-order`, each with the configuration of a 1.2 tool that breaks it
+/// (approaches/checker.md 7.2). A 1.2 case fails its owner and no other check at a claim of 1.2, and fails nothing at a claim of 1.1.
+pub fn l1_cases_1_2() -> Vec<Case> {
+    vec![
+        // grammar: `limit`, `cursor`, `all` and `fields` are flag-only
+        l1_case_1_2("grammar/reserved-shape", json!({"limitNotFlagOnly": true}), None),
+        // registry: `STOPPED_MIDWAY` is exit 1 and not retryable
+        l1_case_1_2("registry/reserved-exit", json!({"stoppedMidway": true, "stoppedMidwayExit2": true}), None),
+        l1_case_1_2("registry/reserved-exit", json!({"stoppedMidway": true, "stoppedMidwayRetryable": true}), None),
+        // paging: the cursor is bound to what the invocation gave
+        l1_case_1_2("paging/cursor-survives-all", json!({"cursorRefusesAll": true}), None),
+        l1_case_1_2("paging/cursor-bound-to-given-arguments", json!({"cursorBindsEffective": true}), None),
+        l1_case_1_2("paging/cursor-bound-to-environment", json!({"cursorIgnoresEnv": true}), None),
+        l1_case_1_2("paging/paged-through-input", json!({"inputRefused": true}), None),
+        l1_case_1_2("paging/next-after-input", json!({"nextCarriesDefault": true}), None),
+        l1_case_1_2("paging/next-after-input", json!({"nextKeepsInput": true}), None),
+        // fields: `--fields` alone is no reason to refuse, and an unknown path is USAGE without `--json` too
+        l1_case_1_2("fields/fields-without-json", json!({"fieldsNeedsJson": true}), None),
+        l1_case_1_2("fields/unknown-path-refused-in-text", json!({"fieldsUnknownAcceptedInText": true}), None),
+        // check-order: the earlier stage answers
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderConstraintFirst": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderDomainFirst": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderLaterDomain": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"orderValidatorFirst": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"unknownOptionLast": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"unknownOptionDeferred": true}), None),
+        l1_case_1_2("check-order/earlier-stage-answers", json!({"rulesReversed": true}), None),
+    ]
+}
+
+/// The 1.2 case fixture: the standard fixture of the tool, changed by the case.
+pub fn l1_fixture_of(harness: &Harness, case: &Case) -> Value {
+    let mut fixture = harness.l1_fixture(&case.config);
+    if let Some(tweak) = case.tweak {
+        tweak(&mut fixture);
+    }
+    fixture
+}
+
 /// The executable a case runs: the fake tool itself, or, when the configuration has `binAlias`, a copy of it under
 /// that name in the harness's directory. The no-state cases need it: the run of `schema --json` in an empty
 /// directory gets no fixture environment, so the only thing that can make the tool misbehave there is how it is
@@ -78,7 +133,7 @@ pub fn l1_bin(harness: &Harness, config: &Value) -> PathBuf {
 }
 
 /// What the fixture says about the L1 commands of the fake tool (approaches/checker.md 5).
-fn l1_commands(is_1_1: bool) -> Value {
+fn l1_commands(is_1_1: bool, is_1_2: bool) -> Value {
     let mut fields = vec![
         json!(["profile.name"]),
         json!(["owners[].email", "tags"]),
@@ -101,7 +156,8 @@ fn l1_commands(is_1_1: bool) -> Value {
         "schema": {"ok": [["schema", "--errors", "--json"]]},
         "member list": {
             "ok": [["member", "list", "--team", "core", "--limit", "2", "--sort", "name", "--json"]],
-            "paged": [["member", "list", "--team", "core", "--limit", "1", "--sort", "name", "--json"]],
+            // A 1.2 tool is paged with no filter given, so that its defaults and environment variables are left to be written out.
+            "paged": if is_1_2 { json!([["member", "list", "--limit", "1", "--json"]]) } else { json!([["member", "list", "--team", "core", "--limit", "1", "--sort", "name", "--json"]]) },
             "fields": fields
         },
         "member search": {
@@ -179,13 +235,33 @@ impl Harness {
                 fixture["warnings"] = json!(warnings);
             }
         }
-        fixture["commands"] = l1_commands(is_1_1);
+        fixture["commands"] = l1_commands(is_1_1, config["claims"] == "1.2");
         fixture
     }
 
     /// The fixture of the conforming L1 fake.
     pub fn l1_standard_fixture(&self) -> Value {
         self.l1_fixture(&l1_standard_config())
+    }
+}
+
+impl Harness {
+    /// `atip check --bin <the fake tool of config> --level L1 --fixture <fixture> --json`, with the given arguments after.
+    pub fn check_l1_with(&self, config: &Value, fixture: &Value, extra: &[&str]) -> super::Output {
+        let fixture_path = self.write("fixture.json", fixture);
+        let bin = l1_bin(self, config);
+        let work = self.path("cwd");
+        std::fs::create_dir_all(&work).expect("cwd");
+        let tmp = self.path("tmp");
+        std::fs::create_dir_all(&tmp).expect("tmp");
+        let mut args = vec!["check", "--bin", bin.to_str().expect("utf8"), "--level", "L1", "--fixture", fixture_path.to_str().expect("utf8"), "--json"];
+        args.extend(extra);
+        super::atip_in(&work, &tmp, &args)
+    }
+
+    /// The same without more arguments.
+    pub fn check_l1(&self, config: &Value, fixture: &Value) -> super::Output {
+        self.check_l1_with(config, fixture, &[])
     }
 }
 
@@ -282,7 +358,8 @@ pub fn l1_cases() -> Vec<Case> {
         // tree
         case("tree/answered", json!({"treeAnswer": "usage"})),
         case("tree/valid", patch(&[("<tree>", vec![remove("/commands/0/summary")])])),
-        case("tree/level", patch(&[("<tree>", vec![set("/level", json!("L2"))])])),
+        // The tree says L1 and the claim is L2 (`atip_check_l1` runs this case at L2): a tree below the claimed level. Levels are cumulative, so a tree above it passes.
+        case("tree/level", json!({})),
         case("tree/groups-first", json!({"treeGroupsLast": true})),
         case("tree/unique-ids", patch(&[("<tree>", vec![copy("/commands/0", "/commands/-")])])),
         case("tree/entry-path", patch(&[("<tree>", vec![set("/commands/0/command", json!("initx"))])])),

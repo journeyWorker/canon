@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-03T00:27:13.951240Z",
+  "attachments": [
+    {
+      "case": "atip_crateplan_12_an_integer_beyond_the_safe_range_is_refused_and_its_string_is_the_vectors_form",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "atip_crateplan_12_a_plan_of_the_crates_own_type_has_the_same_digest_for_every_vector",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "atip_crateplan_12_every_vector_has_the_canonical_text_and_the_digest_the_contract_gives",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "atip_crateplan_12_the_vendored_vectors_are_the_ones_of_the_pinned_contract_tag_byte_for_byte",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    }
+  ],
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2d.xml"
+  },
+  "evidence_sha": "7508143a2ff26f33539c6da3c94fd1a9f683c0e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 35,
+  "scenario_id": "atip.crateplan.12",
+  "schema": 1,
+  "staging_id": "0a891406",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

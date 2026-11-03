@@ -1,0 +1,19 @@
+[package]
+name = "atip-probe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "The smallest tool that depends on `atip`, with the crate's default features: it proves, by `cargo tree`, that a tool which only builds documents and refuses arguments does not link a JSON Schema validator. Not published."
+
+[lib]
+name = "atip_probe"
+path = "src/lib.rs"
+
+[dependencies]
+# Default features only: no `validate`, so no `jsonschema`.
+atip = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

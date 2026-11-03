@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:55:52.466874Z",
+  "change_id": "canon-0-35-skills-show",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "introduced_by": "12224ee2d6e7c7e549293a610d4f790d09c04632",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 2,
+  "scenario_ids": [
+    "atip.skillsshow.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards: the four 'first lines' of atip.skillsshow.10 are judged by points_at_both, a closure of the test file (contains schema and contains skills show), so asserting that it refuses four constants proves nothing about canon. What proves the failure path is the loop over every node of the real clap tree and canon_cli::spec::HELP_POINTER (mutant: the pointer drops 'skills show' fails atip_skillsshow_10 and _06). Keep the loop, drop or label the four constants.",
+  "worktree_dirty": false
+}

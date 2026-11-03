@@ -3,15 +3,20 @@
 //! of a printed document (`patch`), field selection (`project`) and the handlers (`run`).
 
 mod doc;
+mod guides;
 mod help;
+mod input;
+mod inputdoc;
 mod parse;
 mod patch;
 mod project;
 mod run;
+mod safety;
 mod spec;
 
 pub use doc::patched;
-pub use run::handle;
+pub use input::{prepare as prepare_input, Prepared};
+pub use run::{execute_batch, handle};
 pub use spec::{MAX_BATCH_ITEMS, MAX_INPUT_BYTES};
 
 /// The registry rows an L1 fake adds to the L0 ones: code, exit, meaning and fix (none is retryable). `{tool}`

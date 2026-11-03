@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-plan-jcs",
+    "role": "implementer",
+    "session_id": "s-0-35-plan-jcs"
+  },
+  "at": "2026-11-03T00:31:17.171654Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_13_the_report_schemas_hold_the_preview_and_their_minor_is_raised",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci2/junit.xml",
+      "sha256": "9d32eba3a410c9e81cd8b40e2c7001bc710484063e6ceb494fbb31d4ed3f341a"
+    }
+  ],
+  "code_tree": "812ec3d8d7607dfcfdf68275146f54c568c445a2",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace (4054 passed, in three partitions)"
+  },
+  "evidence_sha": "7ddc01ac440a825d014e8cf2c633ad40dd617c19",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "atip.planjcs.13",
+  "schema": 1,
+  "staging_id": "b90d246d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

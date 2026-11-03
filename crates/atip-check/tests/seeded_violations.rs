@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use atip_check::app::check_binary_mutated;
 use atip_check::cli::{CheckArgs, Level};
-use support::{case_verdict, cases, cases_of, Case, Harness, FAKE_TOOL};
+use support::{case_verdict, cases, cases_of, kind_verdict, Case, Harness, FAKE_TOOL};
 
 /// Every case of the check `id`: `atip check` exits as the strength says, fails that check and no other.
 fn proves(id: &str) {
@@ -26,6 +26,8 @@ fn proves(id: &str) {
         let output = harness.check(&case.fixture(&harness), true);
         let document = output.envelope();
         case_verdict(&document["data"], id)
+            .unwrap_or_else(|why| panic!("{}: {why}\n{}", case.condition, output.stdout));
+        kind_verdict(&document["data"], id, case.condition.split('/').nth(1).unwrap_or_default())
             .unwrap_or_else(|why| panic!("{}: {why}\n{}", case.condition, output.stdout));
         let must = document["data"]["checks"]
             .as_array()
@@ -380,7 +382,8 @@ fn atip_check_56_each_pass_condition_fails_exactly_its_owner_and_a_run_with_the_
         let args = args_for(&harness, &harness.fixture(&config));
         let (report, conditions) = check_binary_mutated(&args, &[], &[]).expect("a report");
         assert!(report.passed, "{config}: {}", report.text());
-        judged.extend(conditions);
+        // The conditions of `L2.effects` are planted by `atip_checkl2safety`: the row runs at every level.
+        judged.extend(conditions.into_iter().filter(|condition| !condition.starts_with("effects/")));
     }
     let named: BTreeSet<String> = cases()
         .iter()

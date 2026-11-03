@@ -139,7 +139,7 @@ fn atip_contract11_05_schema_lists_every_warning_and_explains_each() {
     let dir = tempfile::tempdir().unwrap();
     let listing = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--warnings", "--json"]), &[]));
     assert_eq!(listing["data"]["kind"], "warnings");
-    assert_eq!(listing["meta"]["schemaVersion"], "1.1");
+    assert_eq!(listing["meta"]["schemaVersion"], "1.2");
     let listed = listing["data"]["warnings"].as_array().expect("--warnings lists the codes").clone();
     assert_eq!(listed.iter().map(|e| e["code"].as_str().unwrap().to_string()).collect::<Vec<_>>(), canon_cli::cli_error::all_warnings().iter().map(|i| i.code.to_string()).collect::<Vec<_>>());
     for entry in &listed {
@@ -150,7 +150,7 @@ fn atip_contract11_05_schema_lists_every_warning_and_explains_each() {
         assert!(atip::envelope_problems(&one).is_empty());
     }
     let errors = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--errors", "--json"]), &[]));
-    assert_eq!((errors["data"]["kind"].as_str(), errors["meta"]["schemaVersion"].as_str()), (Some("errors"), Some("1.1")));
+    assert_eq!((errors["data"]["kind"].as_str(), errors["meta"]["schemaVersion"].as_str()), (Some("errors"), Some("1.2")));
     let error_codes: Vec<&str> = errors["data"]["errors"].as_array().unwrap().iter().map(|e| e["code"].as_str().unwrap()).collect();
     let warning_codes: Vec<&str> = listed.iter().map(|e| e["code"].as_str().unwrap()).collect();
     assert!(warning_codes.contains(&"OLD_LAYOUT_FOUND") && !error_codes.contains(&"OLD_LAYOUT_FOUND"), "a code that is only a warning left the error registry");

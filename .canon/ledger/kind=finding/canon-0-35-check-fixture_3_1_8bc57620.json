@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:29:57.117943Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/report.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.95",
+    "atip.check.98"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity (checker.md 1.2.1 section 5, last sentence: 'The report lists the notRun commands, as it lists the prepare steps'): data has a top-level prepare member and no notRun member. The command ids appear only inside data.checks[].notRun of the checks that need `commands` (and L1.next), and in text mode as '(not run: dashboard)'. canon's L0 JSON report has data keys contractVersion, level, passed, prepare, checks: no notRun. A consumer that wants 'what did the fixture leave out' must union the per-check lists. Blast radius: every report of a fixture with notRun; no check result changes.",
+  "worktree_dirty": true
+}

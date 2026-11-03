@@ -384,7 +384,7 @@ fn context_capability_21_a_batch_element_with_a_removed_key_name_refuses_the_bat
         assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
         assert_eq!(body["error"]["code"], "INPUT_INVALID", "{body}");
-        assert_eq!(body["error"]["field"], format!("/items/1/{key}"), "{body}");
+        assert_eq!(body["error"]["field"], format!("/1/{key}"), "{body}");
         assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == new), "{body}");
         assert_eq!(body["error"]["suggestions"][0], new, "{body}");
         assert!(body["error"]["hint"].as_str().unwrap().contains(&format!("use \"{new}\"")), "{body}");

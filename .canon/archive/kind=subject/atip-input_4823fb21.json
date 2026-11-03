@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-02T06:30:04.992841Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "atip-input",
+  "summary": "The --input document processing order, fragment schemas, conflicts, env values and batch pointers of atip/1 L2",
+  "title": "ATIP: canon's --input documents and batches (L2)"
+}

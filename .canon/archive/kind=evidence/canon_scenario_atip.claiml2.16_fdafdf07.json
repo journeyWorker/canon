@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-claim-l2-fix"
+  },
+  "at": "2026-11-03T10:21:43.765969Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_16_the_preview_of_a_move_to_the_local_store_leads_with_the_commit_call",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "fd2e17a51b29d71052d5b6aa824242c8d86a1c1936bcc47e67af8888a831618a"
+    }
+  ],
+  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "fd55f5a569f7d2791414f56b606da713cf06f028",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 32,
+  "scenario_id": "atip.claiml2.16",
+  "schema": 1,
+  "staging_id": "22e6510e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

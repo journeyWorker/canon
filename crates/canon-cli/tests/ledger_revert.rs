@@ -64,7 +64,8 @@ fn tree(repo: &Path) -> BTreeMap<String, (Vec<u8>, u32)> {
         for entry in fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             let relative = path.strip_prefix(repo).unwrap().to_string_lossy().replace('\\', "/");
-            if relative == ".git" || relative == ".canon/migrate-backup" {
+            // The repository write lock file is local process state (0.35): the first commit makes it and a revert does not give it back.
+            if relative == ".git" || relative == ".canon/migrate-backup" || relative == ".canon/repo-write.lock" {
                 continue;
             }
             if path.is_dir() {
@@ -136,7 +137,8 @@ fn reverting_the_migrate_of_a_0_29_ledger_restores_the_tree_and_the_index() {
     }
     assert_eq!(after.keys().collect::<Vec<_>>(), before.keys().collect::<Vec<_>>(), "files appeared or vanished");
     assert_eq!(git(repo, &["ls-files", "-s"]), index, "the git index is back to the 0.29 paths (the `git mv`s undone)");
-    assert_eq!(git(repo, &["status", "--porcelain", "--", ".", ":!.canon/migrate-backup"]), "", "a clean work tree again");
+    // The repository write lock file (0.35) is local process state the first commit made in this 0.29 repo, whose restored `.gitignore` has no line for it.
+    assert_eq!(git(repo, &["status", "--porcelain", "--", ".", ":!.canon/migrate-backup", ":!.canon/repo-write.lock"]), "", "a clean work tree again");
     assert!(repo.join(&backup).is_dir(), "the backup stays after the revert");
 }
 
@@ -225,5 +227,5 @@ fn the_revert_names_a_backup_and_undoes_the_other_steps_too() {
     }
     assert_eq!(after, before, "the spec root, canon.yaml, .gitignore and everything the migrate wrote are as before");
     assert_eq!(git(&repo, &["ls-files", "-s"]), index);
-    assert_eq!(git(&repo, &["status", "--porcelain", "--", ".", ":!.canon/migrate-backup"]), "");
+    assert_eq!(git(&repo, &["status", "--porcelain", "--", ".", ":!.canon/migrate-backup", ":!.canon/repo-write.lock"]), "");
 }

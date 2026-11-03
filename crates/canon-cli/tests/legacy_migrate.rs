@@ -156,7 +156,7 @@ fn migrate_previews_the_027_effects_and_writes_nothing() {
     assert!(warnings.iter().any(|w| w["message"].as_str().is_some_and(|w| w.contains("canon migrate --json") && w.contains("canon skills show canon"))), "{warnings:?}");
     let digest = preview["data"]["planDigest"].as_str().unwrap();
     let step = &preview["meta"]["next"][0];
-    assert_eq!(step["argv"], serde_json::json!(["migrate", "--commit", "--plan-digest", digest, "--json"]));
+    assert_eq!(step["argv"], serde_json::json!(["migrate", "--commit", format!("--plan-digest={digest}"), "--json"]));
 }
 
 /// D9: the commit rewrites each file, backs up the originals, and a second run has nothing left.

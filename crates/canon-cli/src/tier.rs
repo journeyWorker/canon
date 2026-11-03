@@ -16,7 +16,7 @@ use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Duration, Utc};
 
 use crate::json_out::Report;
-use crate::safety::{Effect, Plan};
+use crate::safety::{Effect, Preview};
 use crate::tiers::{self, TierCliError};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -45,33 +45,38 @@ pub struct AgeRuleReport {
     pub already_aged: usize,
 }
 
+/// What [`preview`] found: the report of each aging rule, the `move` effects and every record read.
+pub type Planned = (Vec<AgeRuleReport>, Vec<Effect>, Vec<String>);
+
 /// The plan: per aging rule, the records `age_all` would move, as `move`
-/// effects (`<kind>:<id>:<digest12>` and where to). Reads only.
-pub fn preview(loaded: &tiers::LoadedTiers) -> Result<(Vec<AgeRuleReport>, Vec<Effect>), TierAgeError> {
+/// effects (`<kind>:<id>:<digest12>` and where to), and every record it read to pick them (`<rung>:<kind>:<id>:<digest>`, the
+/// set the plan's digest covers). Reads only.
+pub fn preview(loaded: &tiers::LoadedTiers) -> Result<Planned, TierAgeError> {
     let mut entries: Vec<_> = loaded.policy.aging.iter().collect();
     entries.sort_by_key(|(kind, _)| kind.as_str());
 
     let now: DateTime<Utc> = Utc::now();
     let mut reports = Vec::with_capacity(entries.len());
     let mut effects = Vec::new();
+    let mut scanned = Vec::new();
     for (kind, rule) in entries {
         let source = loaded.policy.tier_for(*kind)?;
         let cutoff = now - rule.after;
         let result = tiers::read_tier(source, loaded, &TierQuery::kind(*kind))?;
-        let mut ids: Vec<String> = result
-            .records
-            .iter()
-            .filter(|raw| canon_store::tier::raw_record_at(raw) < cutoff)
-            .map(|raw| {
-                let id = canon_store::partition::resolve_partition(*kind, &raw.0).ok().map(|p| p.natural_key).unwrap_or_default();
-                format!("{}:{id}:{}", kind.as_str(), canon_store::partition::content_digest(&raw.0))
-            })
-            .collect();
+        let mut ids: Vec<String> = Vec::new();
+        for raw in &result.records {
+            let id = canon_store::partition::resolve_partition(*kind, &raw.0).ok().map(|p| p.natural_key).unwrap_or_default();
+            let id = format!("{}:{id}:{}", kind.as_str(), canon_store::partition::content_digest(&raw.0));
+            scanned.push(format!("{}:{id}", source.as_str()));
+            if canon_store::tier::raw_record_at(raw) < cutoff {
+                ids.push(id);
+            }
+        }
         ids.sort();
         reports.push(AgeRuleReport { kind: *kind, source, destination: rule.to, after: rule.after, candidates: ids.len(), moved: 0, already_aged: 0 });
         effects.extend(ids.into_iter().map(|id| Effect::record("move", id).detail(format!("{} -> {}", source.as_str(), rule.to.as_str()))));
     }
-    Ok((reports, effects))
+    Ok((reports, effects, scanned))
 }
 
 /// Apply every aging rule (the real run), reporting `candidates` from `planned`.
@@ -148,12 +153,15 @@ pub struct TierAgeRule {
 pub struct TierAgeReport {
     pub rules: Vec<TierAgeRule>,
     #[serde(flatten)]
-    pub plan: Plan,
+    pub plan: Preview,
 }
 
-impl Report for TierAgeReport {}
+impl Report for TierAgeReport {
+    /// 1.1: the plan is `atip::plan::Preview` (`planDigest` is `sha256:` and 64 hex digits).
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
 
-pub fn report(reports: &[AgeRuleReport], plan: Plan) -> TierAgeReport {
+pub fn report(reports: &[AgeRuleReport], plan: Preview) -> TierAgeReport {
     let rules = reports
         .iter()
         .map(|r| TierAgeRule {

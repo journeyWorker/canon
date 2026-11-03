@@ -18,21 +18,11 @@ use crate::schema::schemas;
 /// One condition judged: its id, and what is wrong when something is.
 pub type Finding = (&'static str, Option<String>);
 
-/// The twelve reserved codes with their exit (spec 7.2.1); every one is not retryable.
-pub const RESERVED_CODES: [(&str, i64); 12] = [
-    ("USAGE", 2),
-    ("UNKNOWN_COMMAND", 2),
-    ("COMMAND_REQUIRED", 2),
-    ("INTERNAL", 1),
-    ("UNVERIFIABLE", 1),
-    ("INPUT_INVALID", 2),
-    ("INPUT_CONFLICT", 2),
-    ("INPUT_TOO_LARGE", 2),
-    ("BATCH_INCOMPLETE", 1),
-    ("PLAN_STALE", 2),
-    ("OPERATION_REUSED", 2),
-    ("CURSOR_INVALID", 2),
-];
+/// The minor a claim stands for, as the `atip` crate names it.
+pub fn minor_of(claim: Claim) -> atip::Minor {
+    atip::Minor::parse(claim.as_str()).expect("a claim names a minor the crate knows")
+}
+
 /// The four reserved codes whose exit `L0.ok-exit` already judges.
 pub const L0_RESERVED: [&str; 4] = ["USAGE", "UNKNOWN_COMMAND", "COMMAND_REQUIRED", "INTERNAL"];
 
@@ -49,25 +39,21 @@ fn repeated<'a>(names: &[&'a str]) -> BTreeSet<&'a str> {
     names.iter().copied().filter(|name| names.iter().filter(|other| *other == name).count() > 1).collect()
 }
 
-/// `L1.registry`, for the entries of an `errors` answer: `codes-unique`, `reserved-exit`.
-pub fn registry_findings(entries: &[Value]) -> Vec<Finding> {
+/// `L1.registry`, for the entries of an `errors` answer of a document that declares `minor`: `codes-unique`, `reserved-exit`.
+/// What a reserved code must be registered as is the `atip` crate's table, and the check is `atip::registration_problem`,
+/// the one a tool's own tests call.
+pub fn registry_findings(entries: &[Value], minor: atip::Minor) -> Vec<Finding> {
     let codes: Vec<&str> = entries.iter().map(code_of).collect();
     let duplicated = repeated(&codes);
     let wrong: Vec<String> = entries
         .iter()
         .filter_map(|entry| {
             let code = code_of(entry);
-            let (_, exit) = RESERVED_CODES.iter().find(|(name, _)| *name == code)?;
-            let got_exit = entry.get("exit").and_then(Value::as_i64);
+            let reserved = atip::reserved_code(code, minor)?;
             let retryable = entry.get("retryable").and_then(Value::as_bool);
-            let exit_wrong = !L0_RESERVED.contains(&code) && got_exit != Some(*exit);
-            (exit_wrong || retryable != Some(false)).then(|| {
-                format!(
-                    "{code} is exit {} retryable {}, reserved is exit {exit} retryable false",
-                    got_exit.map_or("?".to_string(), |exit| exit.to_string()),
-                    retryable.map_or("?".to_string(), |flag| flag.to_string())
-                )
-            })
+            // `L0.ok-exit` already judges the exit of the four L0 codes, so the row is judged by its retryability alone.
+            let exit = if L0_RESERVED.contains(&code) { Some(i64::from(reserved.exit)) } else { entry.get("exit").and_then(Value::as_i64) };
+            atip::registration_problem(minor, code, exit, retryable)
         })
         .collect();
     vec![
@@ -346,8 +332,9 @@ pub fn is_kebab(word: &str) -> bool {
     first_ok && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
 }
 
-/// `L1.grammar`, for the entries of a tree (their paths) and one command document: `kebab-words`, `no-id-suffix`, `reserved-shape`.
-pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandDoc>) -> Vec<Finding> {
+/// `L1.grammar`, for the entries of a tree (their paths) and one command document: `kebab-words`, `no-id-suffix`, `reserved-shape`. For a 1.2 claim
+/// `limit`, `cursor`, `all` and `fields` are flag-only too (spec 11.6).
+pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandDoc>, minor: atip::Minor) -> Vec<Finding> {
     let mut bad_words: Vec<String> = Vec::new();
     for (command, path) in entry_paths {
         bad_words.extend(path.iter().filter(|word| !is_kebab(word)).map(|word| format!("the path word {word:?} of {command}")));
@@ -370,7 +357,7 @@ pub fn grammar_findings(entry_paths: &[(&str, &[String])], doc: Option<&CommandD
                     shapes.push(format!("{}: --{} is {}, reserved as {shape}", doc.command, option.name, option.value_type));
                 }
             }
-            if FLAG_ONLY.contains(&option.name.as_str()) && !option.flag_only {
+            if atip::flag_only_options(minor).contains(&option.name.as_str()) && !option.flag_only {
                 shapes.push(format!("{}: --{} is not flagOnly", doc.command, option.name));
             }
         }
@@ -474,6 +461,8 @@ pub fn reserved_applicable_findings(doc: &CommandDoc) -> Vec<Finding> {
 mod tests {
     use serde_json::json;
 
+    use atip::Minor;
+
     use super::{registry_findings, reasons_findings, warnings_findings};
 
     fn problems(findings: Vec<super::Finding>) -> Vec<&'static str> {
@@ -483,12 +472,12 @@ mod tests {
     #[test]
     fn atip_checkl1_documents_registry_reasons_and_warnings_name_their_conditions() {
         let good = vec![json!({"code": "USAGE", "exit": 2, "retryable": false, "reasons": [{"reason": "A_B"}]})];
-        assert!(problems(registry_findings(&good)).is_empty() && problems(reasons_findings(&good)).is_empty());
+        assert!(problems(registry_findings(&good, Minor::V1_1)).is_empty() && problems(reasons_findings(&good)).is_empty());
         let twice = vec![json!({"code": "X"}), json!({"code": "X"})];
-        assert_eq!(problems(registry_findings(&twice)), ["codes-unique"]);
+        assert_eq!(problems(registry_findings(&twice, Minor::V1_1)), ["codes-unique"]);
         assert_eq!(problems(warnings_findings(&twice)), ["codes-unique"]);
         let wrong = vec![json!({"code": "CURSOR_INVALID", "exit": 1, "retryable": false})];
-        assert_eq!(problems(registry_findings(&wrong)), ["reserved-exit"]);
+        assert_eq!(problems(registry_findings(&wrong, Minor::V1_1)), ["reserved-exit"]);
         let reasons = vec![json!({"code": "C", "reasons": [{"reason": "a"}, {"reason": "a", "exit": 2}]})];
         assert_eq!(problems(reasons_findings(&reasons)), ["reason-form", "reasons-unique", "no-exit-on-reason"]);
     }

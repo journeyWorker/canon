@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T11:14:30.123792Z",
+  "change_id": "canon-0-35-input-order",
+  "code_tree": "d1c1740f4a8b21d854d4751139b12dc126c3b288",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "0675da58429056cae9744cdeac2914df86fae4a5",
+  "kind": "finding",
+  "reviewed_sha": "920696d1d1e606421dbb7ef01700963e793fa74b",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Blast radius: NDJSON files with # comment lines (valid in 0.34) are now INPUT_INVALID NOT_JSON; the CHANGELOG lists it as breaking with the fix, and canon/skills/SKILL.src.md was updated. Anything outside the repo that writes NDJSON with comment lines (scripts, agent prompts, example files not under tests) is not exercised by the checks; I found none in the repo that the suite does not already run (input.rs every_spec_example_document passes). Also not in scope but seen: the batch pointers read /items/N/... where spec 11.8/11.11 say /N/...; that is canon-0-35-batch-pointers.",
+  "worktree_dirty": false
+}

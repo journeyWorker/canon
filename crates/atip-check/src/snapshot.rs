@@ -1,9 +1,11 @@
 //! The files under a directory, before and after an invocation.
 //!
-//! A snapshot lists every entry under a root by its path relative to the
-//! root: a file by size and SHA-256, a directory by its existence, a symlink
-//! by its target. Two snapshots differ in exactly the paths that were
-//! created, removed or changed (spec 8.2: a refusal changes nothing).
+//! A snapshot lists every file under a root by its path relative to the
+//! root, by size and SHA-256, and every symlink by its target. A bare
+//! directory is not an entry: a directory made to hold an allowed file is
+//! not an effect (checker.md 1.3.1 section 4). Two snapshots differ in
+//! exactly the paths that were created, removed or changed (spec 8.2: a
+//! refusal changes nothing).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -16,7 +18,6 @@ use sha2::{Digest, Sha256};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Entry {
     File { size: u64, sha256: [u8; 32] },
-    Dir,
     Symlink(String),
 }
 
@@ -42,7 +43,6 @@ fn walk(dir: &Path, prefix: &str, snapshot: &mut Snapshot) -> io::Result<()> {
                 Entry::Symlink(fs::read_link(entry.path())?.to_string_lossy().into_owned()),
             );
         } else if kind.is_dir() {
-            snapshot.insert(relative.clone(), Entry::Dir);
             walk(&entry.path(), &relative, snapshot)?;
         } else {
             let bytes = fs::read(entry.path())?;
@@ -106,11 +106,9 @@ mod tests {
         fs::remove_file(dir.path().join("gone")).expect("remove");
         fs::create_dir(dir.path().join("made")).expect("mkdir");
         fs::write(dir.path().join("made").join("inside"), "").expect("write");
+        fs::create_dir(dir.path().join("bare")).expect("mkdir");
         let after = take(dir.path()).expect("snapshot");
-        assert_eq!(
-            changed(&before, &after),
-            ["edited", "gone", "made", "made/inside"]
-        );
+        assert_eq!(changed(&before, &after), ["edited", "gone", "made/inside"]);
         assert!(changed(&after, &after).is_empty());
     }
 

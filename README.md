@@ -20,10 +20,10 @@ canon format spec                # validate a spec corpus
 canon gate check                 # run the evidence gate
 ```
 
-Run `canon <command> --help` for any explicit CLI command. `canon init` asks
-which harnesses get the provider-neutral companion skill (on a terminal; the
-detected ones are checked), records the answer in `canon.yaml`, and installs
-it. Afterwards:
+Run `canon <command> --help` for any explicit CLI command. `canon init` never
+asks: it installs the provider-neutral companion skill for the detected
+harnesses (or the `--providers` list), records the choice in `canon.yaml`, and
+installs it. Afterwards:
 
 ```bash
 canon skills install                         # follows canon.yaml skills.providers
@@ -59,7 +59,11 @@ Canon with `canon skills install --source canon/skills-dev`.
 
 Contributors: run `just` to list the recipes for the build, the tests, the lint,
 canon's own gate and the other CI checks (`just ci` runs every check that needs
-no docker).
+no docker). `just test` leaves the tests of the checker crate `atip-check` out: canon proves
+its own conformance with `just atip` (the checker run on the canon binary), and the checker's
+tests are `just test-atip` (cargo-nextest), a separate CI job. `cargo nextest run` skips them too
+(`.config/nextest.toml`; `--profile atip` runs only them). A bare `cargo test --workspace` still
+runs them, until the crate moves to the atip repo (0.36); add `--exclude atip-check` to leave them out.
 
 ## Safety boundaries
 

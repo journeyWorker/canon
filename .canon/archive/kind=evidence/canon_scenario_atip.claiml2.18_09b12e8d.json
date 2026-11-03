@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-claim-l2-fix2"
+  },
+  "at": "2026-11-03T11:20:16.101271Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_18_no_source_of_canon_reads_the_terminal_through_dev_tty_or_a_prompt_library_and_the_one_prompt_it_has_is_named",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "fe82ba937cf29445476ea25d0ba07f45e3e8a538abece7bb1f30c83303590add"
+    }
+  ],
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "a8a3483eb22b7eb2c270ca5d2182d1b98454eddc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 36,
+  "scenario_id": "atip.claiml2.18",
+  "schema": 1,
+  "staging_id": "ec60de34",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

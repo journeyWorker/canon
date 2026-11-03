@@ -153,7 +153,7 @@ fn scaffold_15_a_batch_with_an_invalid_case_writes_nothing_and_points_at_the_ele
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let body = json(&out);
     assert_eq!(body["ok"], false, "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/case", "{body}");
+    assert_eq!(body["error"]["field"], "/1/case", "{body}");
     assert_eq!(body["error"]["received"], "Not A Slug", "{body}");
     assert!(!repo.join(".canon/specs/kind=feature/area=demo").exists(), "element 0 was not written");
     assert_eq!(tree(repo), before, "the refused batch changed nothing");

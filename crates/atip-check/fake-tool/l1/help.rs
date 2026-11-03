@@ -9,7 +9,9 @@ use crate::Tool;
 
 fn agents_line(tool: &Tool, path: &str) -> String {
     let name = tool.name();
-    if path.is_empty() {
+    if path.is_empty() && tool.flag("l2") && !tool.flag("helpNoSkillsLine") {
+        format!("Agents: \"{name} schema --json\" describes every command as JSON; \"{name} skills show\" prints the guides.\n\n")
+    } else if path.is_empty() {
         format!("Agents: \"{name} schema --json\" describes every command as JSON.\n\n")
     } else {
         format!("Agents: \"{name} schema {path} --json\" describes this command as JSON.\n\n")
@@ -58,6 +60,9 @@ pub fn command_help(tool: &Tool, doc: &Value) -> String {
         }
         out.push('\n');
     }
+    if tool.flag("helpBullet") {
+        out.push_str("  - see --limit (the usual [default: 99])\n\n");
+    }
     out.push_str("Options:\n");
     for option in doc["options"].as_array().cloned().unwrap_or_default() {
         let long = option["name"].as_str().unwrap_or_default();
@@ -68,7 +73,11 @@ pub fn command_help(tool: &Tool, doc: &Value) -> String {
         if let Some(value_name) = option["valueName"].as_str() {
             let _ = write!(label, " <{value_name}>");
         }
-        let mut line = format!("  {label:<28}{}", option["help"].as_str().unwrap_or_default());
+        let mut help = option["help"].as_str().unwrap_or_default().to_string();
+        if let Some(mentioned) = tool.config.get("helpMentions").and_then(|mentions| mentions.get(long)).and_then(Value::as_str) {
+            let _ = write!(help, " (see {mentioned})");
+        }
+        let mut line = format!("  {label:<28}{help}");
         let kind = option["valueType"].as_str().unwrap_or_default();
         if let Some(values) = option["possibleValues"].as_array() {
             let list: Vec<String> = values.iter().map(shown).collect();

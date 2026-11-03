@@ -35,6 +35,11 @@ complete list of checks. The fixture-only supply-chain API is intentionally
 small (`supply_chain_errors`) so its reject/accept shapes can be tested
 without a Git checkout or network access.
 
+It also requires every `npm publish` step of publish.yml to split prereleases
+from stable versions: a hyphenated version (`0.35.0-rc.1`) publishes with
+`--tag next`, never `latest`, and a stable version keeps the plain command
+(`prerelease_publish_errors`).
+
 Coverage note (the upstream lesson): a
 drift checker only guards what it is told to compare. This one compares
 the build/publish matrices, the shared `CARGO_*` env, and the package
@@ -185,6 +190,82 @@ def dashboard_embed_errors(text: str, workflow: str) -> list[str]:
     dashboard = _job_block(text, "dashboard")
     if "name: dashboard-app" not in dashboard or "bun install --frozen-lockfile" not in dashboard:
         errors.append(f"{workflow}: the dashboard job must install with the frozen lockfile and upload `dashboard-app`")
+    return errors
+
+
+STABLE_PUBLISH = "npm publish --provenance --access public"
+PRERELEASE_PUBLISH = "npm publish --provenance --access public --tag next"
+PRERELEASE_GUARD = re.compile(r'^(?:el)?if \[\[ "\$VERSION" == \*-\* \]\]; then$')
+GITHUB_RELEASE = re.compile(r"\bgh\s+release\b|action-gh-release|create-release")
+PRERELEASE_TEST = re.compile(r"\*-\*|contains\([^)]*'-'[^)]*\)")
+
+
+def _steps(job: str) -> list[str]:
+    """Every step of a job block, each as its own text."""
+    steps: list[str] = []
+    current: list[str] = []
+    for line in job.splitlines():
+        if re.match(r"^\s*- (name|uses|run):", line):
+            if current:
+                steps.append("\n".join(current))
+            current = []
+        current.append(line)
+    if current:
+        steps.append("\n".join(current))
+    return steps
+
+
+def prerelease_publish_errors(text: str, workflow: str) -> list[str]:
+    """A hyphenated version (`0.35.0-rc.1`) is a prerelease and publishes under
+    the `next` dist-tag, never `latest`; a stable version keeps the one
+    `npm publish --provenance --access public` it always ran. Every `npm
+    publish` step carries the split, so no package lands on `latest` alone
+    (npm refuses a prerelease without `--tag`, and a `--tag latest` would
+    defeat the point). A GitHub release, if the workflow creates one, is
+    marked prerelease for a hyphenated version.
+    """
+    errors: list[str] = []
+    job = _job_block(text, "publish")
+    if not job:
+        return [f"{workflow}: no `publish` job"]
+    if re.search(r"--tag[ =]latest\b", job):
+        errors.append(f"{workflow}: the publish job must never pass `--tag latest`; a stable version publishes with no tag")
+    publish_steps = [step for step in _steps(job) if "npm publish" in step]
+    if not publish_steps:
+        errors.append(f"{workflow}: the publish job has no `npm publish` step")
+    for step in publish_steps:
+        name = step.splitlines()[0].strip()
+        lines = [
+            line.strip()
+            for line in step.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        publishes = [i for i, line in enumerate(lines) if line.startswith("npm publish")]
+        stable = [i for i in publishes if lines[i] == STABLE_PUBLISH]
+        pre = [i for i in publishes if lines[i] == PRERELEASE_PUBLISH]
+        if len(stable) != 1 or len(pre) != 1 or len(publishes) != 2:
+            errors.append(
+                f"{workflow}: `{name}` must run exactly `{STABLE_PUBLISH}` and `{PRERELEASE_PUBLISH}`, "
+                f"found {[lines[i] for i in publishes]}"
+            )
+            continue
+        if not PRERELEASE_GUARD.match(lines[pre[0] - 1]):
+            errors.append(
+                f"{workflow}: `{name}`: `{PRERELEASE_PUBLISH}` must sit directly under "
+                "`elif [[ \"$VERSION\" == *-* ]]; then` (a hyphenated version is a prerelease)"
+            )
+        if lines[stable[0] - 1] != "else" or stable[0] < pre[0]:
+            errors.append(
+                f"{workflow}: `{name}`: `{STABLE_PUBLISH}` must be the `else` branch after the prerelease branch"
+            )
+        if not re.search(r"^\s*VERSION:\s*\S", step, re.MULTILINE):
+            errors.append(f"{workflow}: `{name}` must set VERSION in its env, or the prerelease test reads nothing")
+    for step in _steps(text):
+        if GITHUB_RELEASE.search(step) and not (
+            "prerelease" in step and PRERELEASE_TEST.search(step)
+        ):
+            name = step.splitlines()[0].strip()
+            errors.append(f"{workflow}: `{name}` creates a GitHub release and must mark a hyphenated version prerelease")
     return errors
 
 
@@ -522,7 +603,9 @@ def main(argv: list[str] | None = None) -> int:
             "SHAs; curl/wget executable downloads require nearby SHA-256 "
             "verification; Compose images require @sha256: digests; npm/bun/"
             "pnpm/yarn installs require frozen lockfiles and reject floating "
-            "channels. Local actions/workflows are allowed."
+            "channels. Local actions/workflows are allowed. Release policy: "
+            "every npm publish step of publish.yml publishes a hyphenated "
+            "(prerelease) version with --tag next, never latest."
         ),
     )
     parser.parse_args(argv)
@@ -683,6 +766,9 @@ def main(argv: list[str] | None = None) -> int:
     # 9. Every platform row embeds the one dashboard build, in both workflows.
     ERRORS.extend(dashboard_embed_errors(build_text, "build-native.yml"))
     ERRORS.extend(dashboard_embed_errors(publish_text, "publish.yml"))
+    # 10. Every `npm publish` step splits stable from prerelease: a hyphenated
+    #    version publishes `--tag next`, never `latest`.
+    ERRORS.extend(prerelease_publish_errors(publish_text, "publish.yml"))
 
     # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
     #    repo root in s43 round 7 and was committed by a `git add -A`: a file

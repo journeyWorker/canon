@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T19:30:01.120426Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l1.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 3,
+  "scenario_ids": [
+    "atip.check.95",
+    "atip.check.121"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Spec fidelity [INFERENCE from the code, not run: needs a fake whose only --cursor command is under notRun]: L0.page (mod.rs:1867) and L1.paging (l1.rs:1198) leave a notRun command out of 'commands that declare --cursor'. checker.md section 5 says L0.page and L1.paging are unsupported only when no command document declares --cursor, and a check whose every run was skipped as notRun is unprovided, so listing the only paging command under notRun would make both MUST checks unsupported (the level passes) where the contract says unprovided. L1.paging does record a skip for it (l1_plan.rs:410) but End::Unsupported returns before the skipped-runs rule at mod.rs:943 is reached. Blast radius: tools with a paging server command; narrow, but it is the 'listing commands cannot pass a level' rule.",
+  "worktree_dirty": true
+}

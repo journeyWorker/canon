@@ -84,7 +84,7 @@ fn atip_l0_01_status_json_names_the_tool_its_version_and_the_contract() {
     let meta = &document["meta"];
     assert_eq!(meta["tool"], "canon");
     assert_eq!(meta["contract"], "atip/1");
-    assert_eq!(meta["contractVersion"], "1.1", "every envelope declares the contract minor it follows");
+    assert_eq!(meta["contractVersion"], "1.2", "every envelope declares the contract minor it follows");
     assert_eq!(version.trim(), format!("canon {}", meta["toolVersion"].as_str().unwrap()), "toolVersion is the version `canon --version` prints");
     assert!(meta.get("canonVersion").is_none(), "canonVersion is gone");
     assert_eq!(meta["command"], "status");
@@ -202,11 +202,10 @@ fn atip_l0_08_a_page_is_in_meta_page_with_a_next_step_for_the_next_one() {
         assert!(meta.get(old).is_none(), "`{old}` is not a top-level meta member any more");
     }
     let steps = meta["next"].as_array().expect("the next page is a step");
-    let step = steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w == "--cursor"))).expect("a step with --cursor");
+    let step = steps.iter().find(|s| s["argv"].as_array().is_some_and(|a| a.iter().any(|w| w.as_str().is_some_and(|w| w.starts_with("--cursor="))))).expect("a step with --cursor");
     let argv: Vec<&str> = step["argv"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
-    let at = argv.iter().position(|w| *w == "--cursor").unwrap();
-    assert_eq!(argv[at + 1], cursor);
-    assert!(argv.contains(&"query") && argv.contains(&"--json") && argv.contains(&"--limit"));
+    assert_eq!(argv.iter().find_map(|w| w.strip_prefix("--cursor=")), Some(cursor));
+    assert!(argv.contains(&"query") && argv.contains(&"--json") && argv.contains(&"--limit=1"));
     // Running the step gives the last page: neither a cursor nor a step for one.
     let second = json(&canon(repo.path(), &argv));
     assert_eq!(second["meta"]["page"]["returned"], 1);
@@ -596,7 +595,7 @@ fn atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract() {
         let meta = &document["meta"];
         assert_eq!(meta["tool"], "canon", "{args:?}");
         assert_eq!(meta["contract"], "atip/1");
-        assert_eq!(meta["contractVersion"], "1.1", "{args:?}");
+        assert_eq!(meta["contractVersion"], "1.2", "{args:?}");
         assert_eq!(format!("canon {}", meta["toolVersion"].as_str().unwrap()), version.trim());
         assert!(meta["schemaVersion"].is_string());
         assert!(document["error"]["retryable"].is_boolean());
@@ -683,7 +682,7 @@ fn atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reaso
     let many = json(&canon(repo.path(), &["scenario", "new", "--input", &items, "--json"]));
     assert_eq!((many["error"]["code"].as_str(), many["error"]["reason"].as_str()), (Some("INPUT_TOO_LARGE"), Some("TOO_MANY_ITEMS")), "{many}");
     for document in [&bytes, &many] {
-        assert_eq!(document["meta"]["contractVersion"], "1.1");
+        assert_eq!(document["meta"]["contractVersion"], "1.2");
         assert!(document["error"].get("x-canon").is_none(), "{document}");
         assert!(atip::envelope_problems(document).is_empty(), "{document}");
     }

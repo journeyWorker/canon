@@ -8,9 +8,9 @@
 //! `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it. Unset, every command behaves
 //! as before.
 //!
-//! [`init`] runs once at startup: it resolves the declared role, refuses an
-//! unknown `CANON_ROLE` value (`UNKNOWN_ROLE`), and remembers the result so
-//! [`Role::current`] can be called from anywhere without threading the flag.
+//! [`declare`] runs once at startup: it resolves the declared role and remembers the result so [`Role::current`] can be called from
+//! anywhere without threading the flag. An unknown `CANON_ROLE` value (`UNKNOWN_ROLE`) declares nothing; the refusal comes back from
+//! `declare` and `main` raises it after the other validators (ATIP 10.8.1, 11.7 step 6).
 
 use std::sync::OnceLock;
 
@@ -161,23 +161,30 @@ pub fn init_flag_only(flag: Option<Role>) -> Option<Role> {
     *DECLARED.get_or_init(|| flag)
 }
 
-/// Resolve the declared role once, at startup. The `--as` flag wins over
-/// `CANON_ROLE`; an unknown `CANON_ROLE` value is refused unless the flag
-/// overrides it.
-pub fn init(flag: Option<Role>) -> Result<Option<Role>, CliError> {
-    let role = match flag {
-        Some(role) => Some(role),
-        None => match std::env::var(ENV) {
-            Ok(value) if !value.trim().is_empty() => Some(Role::parse(&value).ok_or_else(|| {
-                CliError::refused("UNKNOWN_ROLE", format!("{ENV}=`{}` is not a role", value.trim()))
-                    .field(ENV)
-                    .expected(["planner", "implementer", "reviewer", "orchestrator"])
-                    .hint(format!("use one of: {}; or pass --as <role>", ALL.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", ")))
-            })?),
-            _ => None,
-        },
-    };
-    Ok(*DECLARED.get_or_init(|| role))
+/// The refusal of an unknown `CANON_ROLE` value: the one the environment fills, never the explicit `--as` (a value `clap` reads
+/// itself and refuses, with the other values that fail to parse).
+pub fn unknown_env_role() -> Option<CliError> {
+    let value = std::env::var(ENV).ok()?;
+    let value = value.trim();
+    if value.is_empty() || Role::parse(value).is_some() {
+        return None;
+    }
+    Some(
+        CliError::refused("UNKNOWN_ROLE", format!("{ENV}=`{value}` is not a role"))
+            .field(ENV)
+            .expected(["planner", "implementer", "reviewer", "orchestrator"])
+            .hint(format!("use one of: {}; or pass --as <role>", ALL.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", "))),
+    )
+}
+
+/// Resolve the declared role once, at startup: the `--as` flag, else the `CANON_ROLE` variable when it names a role, else none. An
+/// unknown `CANON_ROLE` value declares nothing and is the refusal [`unknown_env_role`] returns, which `main` raises as the last
+/// validator of step 6 (spec 10.8.1: a check that depends on an environment value is a validator), unless the flag overrides it.
+pub fn declare(flag: Option<Role>) -> Option<CliError> {
+    let error = if flag.is_some() { None } else { unknown_env_role() };
+    let role = flag.or_else(|| std::env::var(ENV).ok().and_then(|value| Role::parse(&value)));
+    DECLARED.get_or_init(|| role);
+    error
 }
 
 #[cfg(test)]

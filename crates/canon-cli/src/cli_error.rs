@@ -221,10 +221,12 @@ const INPUT_TOO_LARGE_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "TOO_MANY_ITEMS", meaning: "a batch is over 10000 items", fix: "Split the batch into several runs, each under the limit." },
 ];
 
-const CURSOR_INVALID_REASONS: &[ReasonInfo] = &[
-    ReasonInfo { reason: "ARGUMENTS_CHANGED", meaning: "the cursor was issued for other arguments: a cursor is bound to every argument of the call that issued it except --limit, --all, --cursor, --fields and --json", fix: "Repeat the call with the arguments that issued the cursor, or restart without --cursor." },
-    ReasonInfo { reason: "EXPIRED", meaning: "this command issued the cursor for these arguments but the record it points after is gone", fix: "Restart the listing without --cursor." },
-    ReasonInfo { reason: "FOREIGN", meaning: "the cursor is not one this command issued, or is not a cursor", fix: "Pass the `nextCursor` this same command returned, or restart without --cursor." },
+/// The reasons registered under `STOPPED_MIDWAY` (spec 8.3.2, 7.6): each is the name of an exit-2 code, the refusal a later
+/// step met after an earlier step made its effects. A reason is registered for a refusal the sources can meet that way and
+/// no other (`canon-0-35-canon-stopped-midway`), and never for an I/O category that has its own code for the work
+/// (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`, spec 8.3); the order is the sort order of the names.
+const STOPPED_MIDWAY_REASONS: &[ReasonInfo] = &[
+    ReasonInfo { reason: "SKILLS_INVALID_ARGUMENT", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md, or the providers or the `skills:` section are invalid: what `canon skills install` refuses before it starts", fix: "Read what init wrote (`canon status`), fix the skill source or the `skills:` section the message names, then run `canon skills install`; do not run `canon init` again." },
 ];
 
 const CODES: &[CodeInfo] = &[
@@ -262,7 +264,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "CONTEXT_PACK_TAMPERED", meaning: "a context pack is stale or was changed after it was created", exit: 1, retryable: false, fix: "Discard the stale or altered pack and build a new one.", reasons: &[] },
     CodeInfo { code: "CONTEXT_SECRET_DETECTED", meaning: "a selected context input contains plaintext secret material", exit: 2, retryable: false, fix: "Remove the plaintext secret from the selected input or deselect it, then build the pack again.", reasons: &[] },
     CodeInfo { code: "CONTEXT_UNSAFE_PATH", meaning: "a selected path is absolute, leaves the repository, or contains a symlink", exit: 2, retryable: false, fix: "Select only repository-relative paths that stay inside the repository and contain no symlink.", reasons: &[] },
-    CodeInfo { code: "CURSOR_INVALID", meaning: "`--cursor` is not one this listing issued, was issued for other arguments, or points after a record that is gone; `reason` says which", exit: 2, retryable: false, fix: "Restart the listing without --cursor and page with the cursor it returns.", reasons: CURSOR_INVALID_REASONS },
+    CodeInfo { code: "CURSOR_INVALID", meaning: "`--cursor` is not one this listing issued, was issued for other arguments, or points after a record that is gone; `reason` says which", exit: 2, retryable: false, fix: "Restart the listing without --cursor and page with the cursor it returns.", reasons: &atip::CURSOR_INVALID_REASONS },
     CodeInfo { code: "DASHBOARD_BAD_REQUEST", meaning: "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body", exit: 2, retryable: false, fix: "Send requests only through the briefs page the dashboard serves.", reasons: &[] },
     CodeInfo { code: "DASHBOARD_CONFIG_INVALID", meaning: "the dashboard's canon.yaml section is present but unusable", exit: 2, retryable: false, fix: "Fix the dashboard section of canon.yaml, then start the dashboard again.", reasons: &[] },
     CodeInfo { code: "DASHBOARD_FAILED", meaning: "the dashboard could not start for a reason that is not one of the other DASHBOARD_ codes (an I/O failure)", exit: 1, retryable: false, fix: "Read the I/O error in the message, fix its cause, then start the dashboard again.", reasons: &[] },
@@ -317,7 +319,6 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "INIT_AGENTS_MD_CONFLICT", meaning: "AGENTS.md cannot take the canon block without overwriting content", exit: 2, retryable: false, fix: "Move or merge the conflicting AGENTS.md content by hand, then run `canon init` again.", reasons: &[] },
     CodeInfo { code: "INIT_CONFIG_EXISTS", meaning: "canon.yaml already exists and there is nothing else to refresh; `demo init` refuses any directory that holds one", exit: 2, retryable: false, fix: "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it, or `canon demo init` in a directory without one.", reasons: &[] },
     CodeInfo { code: "INIT_INVALID_ARGUMENT", meaning: "an `init` option is invalid (language or skill providers)", exit: 2, retryable: false, fix: "Pass a supported language and skill providers to `canon init`.", reasons: &[] },
-    CodeInfo { code: "INIT_SKILL_INSTALL_FAILED", meaning: "canon.yaml was written but the canon skill was not installed", exit: 1, retryable: false, fix: "Fix the skill install target the error names, then run `canon skills install`.", reasons: &[] },
     CodeInfo { code: "INPUT_CONFLICT", meaning: "a flag on the command line and the same key in `--input` disagree", exit: 2, retryable: false, fix: "Give the value once: drop the flag or the key, or make the two equal.", reasons: &[] },
     CodeInfo { code: "INPUT_INVALID", meaning: "`--input` cannot be read or framed (empty, not JSON or NDJSON, not an object, a file or stdin that cannot be read, stdin a terminal, an array on a leaf that takes one object) or the document breaks its fragment schema (an unknown key, a flag-only key, a value of the wrong type, null); `field` is `--input` for a fault in the value itself and a JSON pointer for a fault in the document; `reason` says which", exit: 2, retryable: false, fix: "Pass one JSON object, a JSON array, or a file or `-` with one object per line, using only the keys `canon schema <command> --json` lists under `inputs`; `canon schema <command> --json` shows an example.", reasons: INPUT_INVALID_REASONS },
     CodeInfo { code: "INPUT_TOO_LARGE", meaning: "the `--input` document is over 8 MiB or a batch is over 10000 elements", exit: 2, retryable: false, fix: "Split the batch into several runs, each under the limit.", reasons: INPUT_TOO_LARGE_REASONS },
@@ -366,6 +367,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "REPORT_FAILED", meaning: "the report could not be built or checked", exit: 1, retryable: false, fix: "Read the error message, fix its cause, then run `canon report build` or `canon report check` again.", reasons: &[] },
     CodeInfo { code: "REPORT_STALE", meaning: "`report check` found the report missing or out of date", exit: 1, retryable: false, fix: "Run `canon report build` or `canon report snapshot` to refresh the report.", reasons: &[] },
     CodeInfo { code: "REPO_UNREADABLE", meaning: "the repository, its ledger or an input file could not be read", exit: 2, retryable: false, fix: "Check that --repo points at a readable repository and that the named input file exists.", reasons: &[] },
+    CodeInfo { code: "REPO_WRITE_BUSY", meaning: "another canon process held the repository write lock for the whole wait, so this command, which writes or commits, started nothing", exit: 2, retryable: true, fix: "A canon command that writes or commits is still running in this repository: run the same command again in a moment.", reasons: &[] },
     CodeInfo { code: "RETENTION_EXPORT_FAILED", meaning: "the export failed once it started writing: the output file or the access audit line could not be written", exit: 1, retryable: false, fix: "Check that the export destination is writable and has space, then run the export again.", reasons: &[] },
     CodeInfo { code: "RETENTION_EXPORT_REFUSED", meaning: "the export could not start: the ledger or its tiers could not be read, `--include-sensitive` was not allowed; nothing was written", exit: 2, retryable: false, fix: "Check that the ledger is readable and the tiers resolve, then run the export again.", reasons: &[] },
     CodeInfo { code: "RETENTION_PURGE_FAILED", meaning: "the purge stopped after it began deleting: what was deleted stays deleted (`data` names the counts)", exit: 1, retryable: false, fix: "Fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.", reasons: &[] },
@@ -385,6 +387,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "SKILLS_INVALID_ARGUMENT", meaning: "a skill provider is unknown, the `skills:` section of canon.yaml is malformed, or the `--skills-source` directory does not exist", exit: 2, retryable: false, fix: "Name providers from claude, codex, omp, pi (or none), and keep the canon.yaml `skills:` section a mapping whose `providers` is a list of those names.", reasons: &[] },
     CodeInfo { code: "SPEC_ROOTS_UNREADABLE", meaning: "the scenario files a brief's flow steps point at could not be read", exit: 2, retryable: false, fix: "Make the scenario files the brief's flow steps point at readable, or correct the paths.", reasons: &[] },
     CodeInfo { code: "SPEC_ROOT_UNRESOLVED", meaning: "no single spec root could be chosen; pass --project", exit: 2, retryable: false, fix: "Pass --project with the id of the spec root to use.", reasons: &[] },
+    CodeInfo { code: "STOPPED_MIDWAY", meaning: "a command that works in steps stopped after an earlier step made its effects, because a later step met what the command refuses before its work; `reason` is the code of that refusal, and the message and `meta.next` say what was already done", exit: 1, retryable: false, fix: "Read what was done first (the first `meta.next` step reads it), then act on the fix of the reason; never run the same command again unread.", reasons: STOPPED_MIDWAY_REASONS },
     CodeInfo { code: "SUBJECT_ADOPT_REFUSED", meaning: "the change could not be adopted by the subject", exit: 2, retryable: false, fix: "Fix the problem the error names, then run `canon subject adopt` again.", reasons: &[] },
     CodeInfo { code: "SUBJECT_EXISTS", meaning: "a subject with that id already exists", exit: 2, retryable: false, fix: "Choose a different subject id, or use the existing subject (`canon subject show`).", reasons: &[] },
     CodeInfo { code: "SUBJECT_GATE_VIOLATION", meaning: "the status transition is blocked by gate violations", exit: 1, retryable: false, fix: "Fix each gate violation reported, then run `canon subject move` again.", reasons: &[] },
@@ -482,5 +485,41 @@ mod fix_tests {
         let codes = all_codes();
         assert!(codes.windows(2).all(|pair| pair[0].code < pair[1].code), "the registry must be sorted by code, each once");
         assert!(codes.iter().all(|info| matches!(info.exit, 1 | 2)), "a registry exit is 1 or 2");
+    }
+}
+
+/// `canon-0-35-crate-1-2` (`atip.crate12.08`): canon's own code table can carry a `STOPPED_MIDWAY` row (spec 8.3.2) whose
+/// reasons are made from its exit-2 rows, with the helpers of the `atip` crate. The probe row has another name, so it
+/// stays a probe whatever canon registers.
+#[cfg(test)]
+mod stopped_midway_probe {
+    use atip::{count_with_exit, find_code, reasons_with_exit, with_row, CodeInfo, ReasonInfo, EXIT_FAILED, EXIT_REFUSED};
+
+    use super::CODES;
+
+    const REASONS: [ReasonInfo; count_with_exit(CODES, EXIT_REFUSED)] = reasons_with_exit(CODES, EXIT_REFUSED);
+    const PROBE: CodeInfo = CodeInfo { code: "STOPPED_MIDWAY_PROBE", meaning: "probe", exit: EXIT_FAILED, retryable: false, fix: "probe", reasons: &REASONS };
+    static WITH_PROBE: [CodeInfo; CODES.len() + 1] = with_row(CODES, PROBE);
+
+    #[test]
+    fn atip_crate12_08_canons_code_table_gives_a_probe_row_every_exit_2_row_as_a_reason() {
+        let refusals: Vec<&str> = CODES.iter().filter(|row| row.exit == EXIT_REFUSED).map(|row| row.code).collect();
+        assert!(refusals.len() > 10, "canon has exit-2 rows");
+        let reasons: Vec<&str> = REASONS.iter().map(|reason| reason.reason).collect();
+        assert_eq!(reasons, refusals, "the reasons are the exit-2 codes, in the table's sort order");
+        for row in CODES.iter().filter(|row| row.exit == EXIT_REFUSED) {
+            let reason = REASONS.iter().find(|reason| reason.reason == row.code).expect("a reason");
+            assert_eq!((reason.meaning, reason.fix), (row.meaning, row.fix), "{}: the meaning and the fix are the row's", row.code);
+        }
+        // The order of the table does not matter: the same rows reversed make the same reasons.
+        let mut reversed = CODES.to_vec();
+        reversed.reverse();
+        let from_reversed: [ReasonInfo; count_with_exit(CODES, EXIT_REFUSED)] = reasons_with_exit(&reversed, EXIT_REFUSED);
+        assert_eq!(from_reversed, REASONS);
+        // The probe row sits in the table in its place, so the table stays sorted by code.
+        assert!(WITH_PROBE.windows(2).all(|pair| pair[0].code < pair[1].code));
+        let probe = find_code(&WITH_PROBE, "STOPPED_MIDWAY_PROBE").expect("the probe row");
+        assert_eq!(probe.reasons.len(), refusals.len());
+        assert_eq!(WITH_PROBE.len(), CODES.len() + 1);
     }
 }

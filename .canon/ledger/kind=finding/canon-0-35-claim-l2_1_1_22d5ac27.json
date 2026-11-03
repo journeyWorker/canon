@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T10:53:29.215473Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "kind": "finding",
+  "resolution_code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "resolution_sha": "605a87abb8a494d21dbf9022092550c9b27fd751",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "reviewer": "rev-claim-l2",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.11",
+    "atip.claiml2.13"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards, spec fidelity] The 17.2 evidence list is not the contract's list and one sentence under it is false. approaches/checker.md section 8 (identical in v1.2.1 and v1.3.1) has 19 obligations; the table has 8 rows. Missing with neither a row, an N/A reason nor a stated gap: remote effects of reads and refusals, commit atomicity (canon has tests: atip_planjcs_06, _07, _14), no /dev/tty prompt, conservative staging (exit 2 only before the work), reasons emitted only when registered, validators tested in isolation; streams and L0 paging are N/A and unsaid. The sentence 'canon has no remote reads' is wrong: canon.yaml routes session, run, event and handoff to postgres and the cold rung to s3, and query, tier age, purge and artifacts move reach them (PgTier, R2Tier); no test uses a fake backend and asserts no calls on a read or a refusal. Fix: one row per section 8 obligation naming its tests, or an N/A reason, or a stated gap (remote reads/refusals is a gap today); scenarios .11 and .13 say one row per obligation. Blast radius: atip.claiml2.11/.12 pass because OBLIGATIONS in atip_claiml2.rs is the same 8 words, so the list can be incomplete and green.",
+  "worktree_dirty": false
+}

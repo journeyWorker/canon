@@ -105,9 +105,9 @@ canon query --kind trajectory --json
 
 # Page a long result and keep only the fields you need; `meta` carries
 # `page` = {returned, total, nextCursor} and `fields` = the paths kept; a present `nextCursor` means more, and
-# `meta.next` repeats the call with `--cursor <nextCursor>` (`--all` returns everything). A cursor is bound to the
-# call that issued it: change only `--limit`, `--all` or `--fields`; any other change is `CURSOR_INVALID`
-# (`error.reason` `ARGUMENTS_CHANGED`). A field path is the record's own key, written as it is.
+# `meta.next` repeats the call's explicit arguments with `--cursor=<nextCursor>` (`--all` returns everything). A cursor is bound to the
+# call that issued it, `CANON_ROLE` included: change only `--limit`, `--all`, `--fields` or `--json`; any other change is `CURSOR_INVALID`
+# (`error.reason` `ARGUMENTS_CHANGED`; `FOREIGN` for a cursor an older canon issued: start from the first page). A field path is the record's own key, written as it is.
 canon query --kind trajectory --json --limit 50 --fields at,kind
 canon query --kind trajectory --json --limit 50 --fields at,kind --cursor <nextCursor>
 ```
@@ -122,9 +122,12 @@ file names, tracked in git. `status`, the gate, the guards and `canon query`
 read the ledger only.
 
 ```bash
-canon query --kind evidence --history   # every version, archive included
-canon ledger compact                           # preview; writes nothing
-canon ledger compact --commit --plan-digest "$PLAN_DIGEST"   # pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
+# every version, archive included
+canon query --kind evidence --history
+# preview; writes nothing
+canon ledger compact
+# pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
+canon ledger compact --commit --plan-digest "$PLAN_DIGEST"
 ```
 
 A crash between the write and the move leaves a readable ledger that the next
@@ -287,10 +290,10 @@ skills:
   providers: [claude, codex]   # any of claude, codex, omp, pi; [] for none
 ```
 
-`canon init` writes it: on a terminal it asks, with the harnesses whose
-`.claude`, `.codex`, `.omp` or `.pi` directory exists checked;
-`--providers a,b` (or `none`) answers without asking; with neither it takes
-the detected ones, and with none detected it writes only a commented example
+`canon init` writes it and never asks: `--providers a,b` (or `none`) is the
+answer; without it init takes the harnesses whose
+`.claude`, `.codex`, `.omp` or `.pi` directory exists, and with none detected
+it writes only a commented example
 and installs nothing. `.agents` alone never selects Codex. `canon skills
 install|check|doctor` follow the section; `install` prunes projected files the bundle no longer ships when their bytes match the lock (a modified one stays, reported as `kept:`), `check` exits 1 (`SKILLS_DRIFT`) naming each orphan and `doctor` prints `orphan:` lines; `canon skills install
 --providers=<list>` rewrites it in place. Without the section they use the
@@ -311,17 +314,22 @@ or when the index holds a scenario of a spec root that no `.feature` file
 of it declares any more.
 
 The commands that write records (`canon subject move`, `canon review
-scenario`, `canon evidence add` and `canon artifacts store`) rebuild a stale index on disk first: they
+scenario`, `canon evidence add` and `canon artifacts store`) rebuild a stale index on disk, once nothing
+refuses the call (a refused call writes nothing, whatever the index; until then they read the index as the
+refresh would leave it, in memory): they
 run `canon inventory sync`'s code on the changed files (validation still
-covers the whole root) and print one stderr line:
+covers the whole root) and print one stderr line (in JSON mode the line is a `meta.warnings` entry,
+never a line on stderr):
 
 ```stderr
-canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+stderr: canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 The commands that only read (`canon gate check`, `canon status`) write
 nothing: they grade a stale index as the refresh would leave it, built in
-memory, and print no refresh line. `canon query --kind scenario` and the
+memory, and print no refresh line. `canon subject show` is the one read
+command that declares the refresh, as a cache effect (its `effectNote`), after the subject is found.
+`canon query --kind scenario` and the
 report panels read the index on disk as it is.
 
 A deleted scenario is not erased: `canon inventory sync` — and a writer's
@@ -332,7 +340,7 @@ a live generation that supersedes the tombstone. A root that fails to
 sync writes no tombstone either.
 
 ```stderr
-canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
+stderr: canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
 ```
 
 `canon inventory sync` and every refresh hold an OS file lock on
@@ -350,7 +358,7 @@ the `verifying → shipped` guard refuses, and `canon status` lists only
 `canon inventory sync`:
 
 ```stderr
-canon artifacts store: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
+stderr: canon artifacts store: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
 ```
 
 Nothing is written in a directory without `canon.yaml`. `canon inventory
@@ -370,6 +378,26 @@ released when its holder exits, however it exits, so it never goes stale;
 a writer gives up after 30 s with a message naming the file and saying to
 retry (the command exits `2` and writes no record).
 
+## The repository write lock
+
+A committed destructive command (`canon purge`, `canon tier age`, `canon ledger
+compact`, `canon artifacts move`, `canon migrate`) recomputes its plan, checks
+its digest and then makes the effects, and nothing may change the plan in
+between. It holds an OS file lock on `.canon/repo-write.lock` for the whole
+span, from before it recomputes the plan to after its last effect; a preview
+holds nothing. Every other command that writes what a plan reads (ledger
+appends, the artifact store, briefs, specs, hooks, skill files, `canon.yaml`)
+holds the same lock while it writes, so it waits for a commit and a commit
+waits for it; reads, `--dry-run` runs and previews hold nothing. The lock is
+the outermost one: it is taken before the scenario-index lock and the
+artifact-store lock. It is released when its holder exits, however it exits,
+so a killed commit never leaves it held, and the file is removed only by a
+call that made it to take the lock and then ended refused (a refusal leaves
+no file and no `.git/info/exclude` line behind). A
+command that waited 30 s for it starts nothing: it exits `2` with
+`REPO_WRITE_BUSY` (retryable; run it again in a moment). The first
+call that needs the lock makes the file, in any repository.
+
 ## What `canon init` keeps out of git
 
 A fresh `canon init` writes these lines to `.gitignore` (each under a
@@ -384,6 +412,8 @@ comment, only the missing ones):
 - `.canon/scenario-index.lock` — the lock serializing index rebuilds.
 - `.canon/artifact-store.lock` — the lock serializing artifact store
   writes.
+- `.canon/repo-write.lock` — the lock a committed destructive command and
+  every writer of what its plan reads hold.
 - `.canon/dashboard-snapshot/` — the snapshot `canon dashboard`
   regenerates on every run.
 - `.canon/learn/` and `.canon/r2/` — local learn scratch and the local

@@ -1,5 +1,14 @@
 {
   "commands": {
+    "dashboard": {
+      "ok": [
+        [
+          "dashboard",
+          "--port",
+          "0"
+        ]
+      ]
+    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -107,6 +116,13 @@
         ]
       }
     },
+    "artifacts move": {"preview": [["artifacts", "move", "--tier", "local", "--json"]]},
+
+    "ledger compact": {"preview": [["ledger", "compact", "--json"]]},
+    "migrate": {"preview": [["migrate", "--json"]]},
+    "purge": {"preview": [["purge", "--kind", "session", "--before", "2030-01-01", "--json"]]},
+
+    "tier age": {"preview": [["tier", "age", "--json"]]},
     "export": {
       "domainRejects": {
         "after": [
@@ -141,21 +157,23 @@
           "1",
           "--json"
         ]
-      ]
+      ],
+      "allowedEffects": [".canon/audit/access.jsonl"],
+      "batchFailsAt": [{"input": [{"kind": "subject"}, {"kind": "subject", "output": "no-such-directory/out.json"}], "index": 1}],
+      "batchFailsFirst": [{"input": [{"kind": "subject", "output": "no-such-directory/out.json"}], "index": 0}]
     },
     "finding close": {
-      "missingValue": [
-        [
-          "finding",
-          "close",
-          "add-login",
-          "--round",
-          "1",
-          "--disposition",
-          "fixed",
-          "--json"
-        ]
-      ]
+      "domainRejects": {
+        "change": ["Core", "-core"],
+        "reason": ["", " "],
+        "role": ["Core", "-core"],
+        "session": ["", " x"]
+      },
+      "ok": [["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--json"]],
+      "refused": [["finding", "close", "add-login", "--round", "1", "--seq", "9", "--disposition", "fixed", "--json"]],
+      "missingValue": [["finding", "close", "add-login", "--round", "1", "--disposition", "fixed", "--json"]],
+      "batchFailsAt": [{"input": [{"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "fixed"}, {"operands": ["add-login"], "round": 1, "seq": 9, "disposition": "fixed"}], "index": 1}],
+      "batchFailsFirst": [{"input": [{"operands": ["add-login"], "round": 1, "seq": 9, "disposition": "fixed"}], "index": 0}]
     },
     "finding list": {
       "domainRejects": {
@@ -239,7 +257,8 @@
           "1",
           "--json"
         ]
-      ]
+      ],
+      "allowedEffects": [".canon/audit/access.jsonl"]
     },
     "regime show": {
       "domainRejects": {
@@ -344,12 +363,15 @@
       }
     }
   },
-  "contractVersion": "1.1",
+  "contractVersion": "1.2",
   "globalOptions": [
     [
       "--repo",
       "."
     ]
+  ],
+  "notRun": [
+    "dashboard"
   ],
   "prepare": [
     [
@@ -367,6 +389,11 @@
       "--allow-empty",
       "-qm",
       "fixture"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
     ]
   ],
   "probe": "status",
@@ -473,7 +500,8 @@
       "fixture",
       "--role",
       "reviewer"
-    ]
+    ],
+    ["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]
   ],
   "timeoutSeconds": 120
 }

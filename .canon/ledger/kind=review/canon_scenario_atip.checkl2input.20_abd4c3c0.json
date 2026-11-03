@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:32:56.349382Z",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "kind": "review",
+  "pin": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2input_20_a_write_the_fixture_does_not_list_is_named_unlisted_and_never_run_by_an_input_row",
+          "junit:atip_checkl2input_20_an_unlisted_write_never_decides_unsupported_and_leaves_the_batch_rows_unprovided"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "4a0685ad3a3b86a3148cfbafb2c6409c18b5674d3339814096f09312d10e5a6c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-input/brief.md"
+  },
+  "review_id": "01M6FTX0GXFZF3DP90HEB3M6QV",
+  "reviewer": "rev-0-35-fixes",
+  "scenario_id": "atip.checkl2input.20",
+  "schema": 2,
+  "worktree_dirty": false
+}

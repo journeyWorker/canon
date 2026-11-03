@@ -79,10 +79,10 @@ fn run() -> ExitCode {
         Expanded::Argv(args) => args,
         Expanded::Exit(code) => return code,
     };
-    canon_cli::json_out::set_invocation(args.iter().skip(1).map(|arg| arg.to_string_lossy().into_owned()).collect());
-    let mut matches = match command.clone().try_get_matches_from(args) {
+    // The order of ATIP 11.7 step 6: a failure to parse, `required`, the domains, the constraints, (below) the validators.
+    let mut matches = match canon_cli::validators::parse(&command, args) {
         Ok(matches) => matches,
-        Err(error) => return usage_error(&error),
+        Err(code) => return code,
     };
     let parsed = matches.clone();
     record_context(&command, &parsed);
@@ -91,20 +91,30 @@ fn run() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),
     };
-    // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
+    // The role is resolved before any command runs. An unknown `CANON_ROLE` is a check that depends on an environment value, so it is a
+    // validator and answers after the others (spec 10.8.1).
     // `canon context` and `canon skills show` never fail on the role: a bad `CANON_ROLE` is a warning there.
     // `canon schema` does not read `CANON_ROLE` at all (spec 10.2.2, 16.3): only its own `--as` declares a role there.
-    let resolved = if matches!(&cli.command, canon_cli::cli::Command::Schema(_)) { Ok(canon_cli::role::init_flag_only(cli.declared_role)) } else { canon_cli::role::init(cli.declared_role) };
-    if let Err(error) = resolved {
+    let unknown_role = if matches!(&cli.command, canon_cli::cli::Command::Schema(_)) {
+        canon_cli::role::init_flag_only(cli.declared_role);
+        None
+    } else {
+        canon_cli::role::declare(cli.declared_role)
+    };
+    let unknown_role = unknown_role.and_then(|error| {
         let role_free = matches!(&cli.command, canon_cli::cli::Command::Context(_) | canon_cli::cli::Command::Skills { action: canon_cli::cli::SkillsCommand::Show(_) });
-        if !role_free {
-            return ExitCode::from(error.emit("canon", atip::argv_wants_json()));
+        if role_free {
+            canon_cli::json_out::warn("UNKNOWN_ROLE_IGNORED", error.message);
+            return None;
         }
-        canon_cli::json_out::warn("UNKNOWN_ROLE_IGNORED", error.message);
-    }
+        Some(error)
+    });
     // The validators (ATIP 10.8.3) answer before any precondition or state read.
     if let Some(code) = canon_cli::validators::check(&cli, &command, &parsed) {
         return code;
+    }
+    if let Some(error) = unknown_role {
+        return ExitCode::from(error.emit("canon", atip::argv_wants_json()));
     }
     if let Some(code) = refuse_without_config(&command, &parsed) {
         return code;
@@ -112,5 +122,24 @@ fn run() -> ExitCode {
     if let Some(code) = canon_cli::old_layout::refuse_write(&command, &parsed) {
         return code;
     }
-    canon_cli::run::run(cli)
+    // The repository write lock (atip/1 12.7): a committed destructive command holds it from before it recomputes its plan to its
+    // last effect, and every other leaf that writes what a plan reads holds it while it writes (`write_lock::POLICY`). It is
+    // released when the run ends, so the plan cannot change between the check of its digest and the effects.
+    let write_lock = match canon_cli::write_lock::hold_for_call(&command, &parsed) {
+        Ok(hold) => hold,
+        Err(code) => return code,
+    };
+    let code = canon_cli::run::run(cli);
+    // The tests' way to keep the lock held past the last effect, to see another writer wait for it and a killed holder release it.
+    #[cfg(debug_assertions)]
+    if let Some(millis) = std::env::var("CANON_TEST_HOLD_AFTER_RUN_MS").ok().and_then(|text| text.parse::<u64>().ok()) {
+        std::thread::sleep(std::time::Duration::from_millis(millis));
+    }
+    // A refusal makes no effect (spec 8.2): a call that took the lock by making its file takes the file back when it ended refused.
+    if code != ExitCode::SUCCESS {
+        if let Some(hold) = write_lock {
+            hold.leave_no_trace();
+        }
+    }
+    code
 }

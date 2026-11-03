@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-plan-jcs",
+    "role": "implementer",
+    "session_id": "s-0-35-plan-jcs"
+  },
+  "at": "2026-11-02T20:21:47.740380Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_05_a_change_to_what_the_plan_read_is_plan_stale_though_its_effects_are_the_same",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit.xml",
+      "sha256": "b266d396d1708bf91625afe2742659a026260f21bc3f5d593d5b15ac4e7fd3ec"
+    }
+  ],
+  "code_tree": "8e3278d006c012d2e1f6e196b0a7775609cda73f",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace (4038 passed)"
+  },
+  "evidence_sha": "ea7d15afb1916d3b75e6f3f3195e4aa2baed3c42",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 5,
+  "scenario_id": "atip.planjcs.05",
+  "schema": 1,
+  "staging_id": "de06674a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

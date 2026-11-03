@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-claim-l2",
+    "role": "reviewer",
+    "session_id": "s-0-35-claim-l2-rev"
+  },
+  "at": "2026-11-03T10:53:31.239336Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/schema.rs",
+  "introduced_by": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "kind": "finding",
+  "resolution_code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "resolution_sha": "605a87abb8a494d21dbf9022092550c9b27fd751",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "cfec1a052e8f272e2e54793177195b8d5d83d94c",
+  "reviewer": "rev-claim-l2",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.09"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[spec fidelity] The export effectNote says it appends one line to .canon/audit/access.jsonl 'on every run'. A refused or failed export writes none: I ran export to a missing directory and with an unknown --kind and the file did not appear or grow (the query note says 'a refused run writes none'). The ATIP checker only needs the note to name the file, so L2.idempotency passes; the text overstates to a caller. Say 'on each run that succeeds'. Separately the fixture previews five commands, the five the schema marks destructive; the sixth place of canon-0-35-plan-jcs (migrate --revert) has no preview entry because it needs an earlier migrate commit, which the L2 rows do not cover (ledger_revert.rs does).",
+  "worktree_dirty": false
+}

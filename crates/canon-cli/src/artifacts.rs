@@ -47,7 +47,7 @@ use serde::Serialize;
 use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::context::resolve_repo_root;
 use crate::json_out::Report;
-use crate::safety::{Effect, Mode, Plan};
+use crate::safety::{Effect, Mode, Plan, Preview, Reads};
 
 /// The `.gitignore` line an object-store repo gains: the local store is
 /// gone, and a stray local blob must never be committed.
@@ -298,10 +298,13 @@ pub struct ArtifactsMoveReport {
     /// Entries of the local store that are not blobs and stay.
     pub skipped: Vec<String>,
     #[serde(flatten)]
-    pub plan: Plan,
+    pub plan: Preview,
 }
 
-impl Report for ArtifactsMoveReport {}
+impl Report for ArtifactsMoveReport {
+    /// 1.1: the plan is `atip::plan::Preview` (`planDigest` is `sha256:` and 64 hex digits).
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
 
 /// What the read-only pass found: the plan's effects and the blobs that
 /// verified (the ones a commit uploads and removes).
@@ -316,7 +319,6 @@ struct MovePlan<'a> {
 pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) -> u8 {
     const CMD: &str = "canon artifacts move";
     let refuse = |message: String, hint: &str| CliError::refused("ARTIFACTS_MOVE_REFUSED", message).hint(hint.to_string()).emit("canon artifacts move", json);
-    let base = crate::safety::command("artifacts move", &[("--tier", to.to_string())], repo);
     let repo = resolve_repo_root(repo);
 
     let current = match artifacts_config(&repo) {
@@ -326,8 +328,11 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     if to == "local" {
         if matches!(current.backend, ArtifactsBackend::Local) {
             // Nothing to move: the empty plan still takes the digest handshake.
-            let plan = Plan::new(Vec::new());
-            let commit = match plan.gate(mode, &base) {
+            let plan = match Plan::new("artifacts move", Vec::new(), Reads::new().path(&repo, "canon.yaml")) {
+                Ok(plan) => plan,
+                Err(e) => return e.emit("canon artifacts move", json),
+            };
+            let commit = match plan.gate(mode) {
                 Ok(commit) => commit,
                 Err(e) => return e.emit("canon artifacts move", json),
             };
@@ -335,9 +340,14 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
                 crate::json_out::mark_unchanged();
             }
             crate::say!(json, "{CMD}: the artifact store is already local; nothing to move");
-            let report = ArtifactsMoveReport { backend: "local".into(), blobs: 0, uploaded: 0, already_in_store: 0, removed_local: 0, config_written: false, gitignore_added: false, skipped: Vec::new(), plan: if commit { plan.committed() } else { plan } };
+            let report = ArtifactsMoveReport { backend: "local".into(), blobs: 0, uploaded: 0, already_in_store: 0, removed_local: 0, config_written: false, gitignore_added: false, skipped: Vec::new(), plan: if commit { plan.committed() } else { plan.preview() } };
             if json {
-                crate::json_out::data("artifacts move", &report);
+                if commit {
+                    crate::json_out::data("artifacts move", &report);
+                } else {
+                    // The empty plan still takes the handshake: the preview's `meta.next[0]` is the commit (spec 12.5).
+                    crate::json_out::data_with_next("artifacts move", &report, &plan.next_step("the store is already local, so the plan is empty; committing it takes its planDigest"));
+                }
             }
             return 0;
         }
@@ -374,16 +384,6 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
         }
     }
 
-    // A commit holds the local store for the whole move, so no writer adds a
-    // local blob between the plan and the removal. A preview writes nothing and takes no lock.
-    let _lock = if matches!(mode, Mode::Commit(_)) {
-        match StoreLock::acquire(&repo) {
-            Ok(lock) => Some(lock),
-            Err(e) => return refuse(e.to_string(), e.hint()),
-        }
-    } else {
-        None
-    };
     let (blobs, skipped) = match local_blobs(&repo) {
         Ok(listing) => listing,
         Err(e) => return CliError::refused("REPO_UNREADABLE", format!("cannot read the local artifact store: {e}")).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again").emit("canon artifacts move", json),
@@ -432,20 +432,41 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     if !gitignored(&repo) {
         moving.effects.push(Effect::path("rewrite", ".gitignore").detail(format!("add {GITIGNORE_LINE}")));
     }
-    let plan = Plan::new(std::mem::take(&mut moving.effects));
-    let commit = match plan.gate(mode, &base) {
+    // What the plan read: canon.yaml (the target tier and where the block goes), .gitignore, and the blobs of the local store by
+    // content digest (each was hashed above, so its name is its bytes) with the entries that are not blobs.
+    let reads = Reads::new()
+        .path(&repo, "canon.yaml")
+        .path(&repo, ".gitignore")
+        .set("blobs", blobs.iter().map(|blob| blob.digest.as_str()))
+        .set("not-blobs", skipped.iter().map(String::as_str));
+    let plan = match Plan::new("artifacts move", std::mem::take(&mut moving.effects), reads) {
+        Ok(plan) => plan,
+        Err(e) => return e.emit("canon artifacts move", json),
+    };
+    let commit = match plan.gate(mode) {
         Ok(commit) => commit,
         Err(e) => return e.emit("canon artifacts move", json),
     };
     let (verified, already) = (moving.verified, moving.already);
+
+    // A commit holds the local store for the whole move, so no writer adds a local blob between the plan and the removal
+    // (`main` holds the repository write lock for the whole run). A preview writes nothing and takes no lock.
+    let _lock = if commit {
+        match StoreLock::acquire(&repo) {
+            Ok(lock) => Some(lock),
+            Err(e) => return refuse(e.to_string(), e.hint()),
+        }
+    } else {
+        None
+    };
 
     if !commit {
         crate::say!(json, "{CMD}: {} local blob(s) -> {} — {} already in the store", blobs.len(), store.location(), already);
         for name in &skipped {
             crate::say!(json, "  left in place (not a blob): {name}");
         }
-        let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded: 0, already_in_store: already, removed_local: 0, config_written: false, gitignore_added: false, skipped, plan };
-        crate::safety::finish_preview(&base, "artifacts move", &report.plan, "the plan only lists the uploads and removals; moving takes its planDigest", json, &report);
+        let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded: 0, already_in_store: already, removed_local: 0, config_written: false, gitignore_added: false, skipped, plan: plan.preview() };
+        plan.finish_preview("artifacts move", "the plan only lists the uploads and removals; moving takes its planDigest", json, &report);
         return 0;
     }
 

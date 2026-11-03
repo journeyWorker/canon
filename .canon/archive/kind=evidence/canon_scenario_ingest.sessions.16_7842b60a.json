@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-gateclean",
+    "role": "implementer",
+    "session_id": "s-0-35-gateclean"
+  },
+  "at": "2026-11-03T15:28:58.840362Z",
+  "attachments": [
+    {
+      "case": "ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "002dca60d5ccae597493ca5afd865b715a80797cace5e2c7308f87122d380827"
+    },
+    {
+      "case": "ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "002dca60d5ccae597493ca5afd865b715a80797cace5e2c7308f87122d380827"
+    }
+  ],
+  "code_tree": "8fa758de852cbe6f3744b7b1073879eb02b2430a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35 gate clean: both cases of the scenario (16 and 16b) bound to the default nextest run (3732 tests, from the split run's report on the same code; both passed)"
+  },
+  "evidence_sha": "14defd8d3e127b1a5e5707732295bc7290058e70",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 98,
+  "scenario_id": "ingest.sessions.16",
+  "schema": 1,
+  "staging_id": "645d3b7c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

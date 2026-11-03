@@ -14,7 +14,7 @@ same code this command runs, scoped to the changed files, and say so in one
 stderr line:
 
 ```stderr
-canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+stderr: canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 `canon status` and `canon gate check` are read commands and write nothing:
@@ -76,14 +76,14 @@ author .feature corpus (canon scenario new)
 scenario index                  # refreshed by the writers; `canon inventory sync` rebuilds it
         │
         ▼
-canon review scenario           # attests a review — see canon-inventory downstream / canon-gate
-canon divergence add|resolve|defer|accept|list   # tracks/resolves a divergence
-canon gate check [--release]    # trust-ladder / staleness / coverage — see canon-gate
+review:   canon review scenario           # attests a review — see canon-inventory downstream / canon-gate
+diverge:  canon divergence add|resolve|defer|accept|list   # tracks/resolves a divergence
+gate:     canon gate check [--release]    # trust-ladder / staleness / coverage — see canon-gate
         │
         ▼
-canon ingest records            # with artifacts.native_records: true in canon.yaml —
-                                # feeds review/divergence verdicts into the flywheel
-                                # (see canon-artifact-ingest)
+ingest:   canon ingest records            # with artifacts.native_records: true in canon.yaml —
+                                          # feeds review/divergence verdicts into the flywheel
+                                          # (see canon-artifact-ingest)
 ```
 
 Every stage after the index joins on the SAME `(project_id, scenario_id)`
@@ -92,9 +92,12 @@ pair it materializes — one identity scheme, no second one.
 ## `canon inventory sync [--repo <dir>] [--spec-root <dir>]`
 
 ```bash
-canon inventory sync                        # every canon.yaml specs.roots[] entry
-canon inventory sync --repo ../svc          # a specific repo
-canon inventory sync --spec-root ./specs    # ad hoc: ignore canon.yaml entirely
+# every canon.yaml specs.roots[] entry
+canon inventory sync
+# a specific repo
+canon inventory sync --repo ../svc
+# ad hoc: ignore canon.yaml entirely
+canon inventory sync --spec-root ./specs
 ```
 
 Per configured root, in order:

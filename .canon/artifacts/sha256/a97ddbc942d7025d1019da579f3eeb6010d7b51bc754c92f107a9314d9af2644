@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="10" skipped="0" failures="7" errors="0" uuid="0263e099-7a50-4a61-914d-ad4cd3d4bd3a" timestamp="2026-11-02T17:39:41.136+09:00" time="7.236">
+    <testsuite name="canon-cli::atip_inputorder" tests="10" skipped="0" errors="0" failures="7">
+        <testcase name="atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="5.629">
+            <failure message="thread &apos;atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage&apos; (102834761) panicked at crates/canon-cli/tests/atip_inputorder.rs:218:5" type="test failure with exit code 101">thread &apos;atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage&apos; (102834761) panicked at crates/canon-cli/tests/atip_inputorder.rs:218:5:
+assertion `left == right` failed: {&quot;error&quot;:{&quot;code&quot;:&quot;USAGE&quot;,&quot;expected&quot;:[&quot;open&quot;,&quot;fixed&quot;,&quot;rejected&quot;,&quot;deferred&quot;],&quot;field&quot;:&quot;/disposition&quot;,&quot;hint&quot;:&quot;a working call: canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \&quot;works as designed\&quot;; `canon schema finding close --json` lists every argument&quot;,&quot;message&quot;:&quot;invalid value &apos;nope&apos; for &apos;--disposition &lt;DISPOSITION&gt;&apos;&quot;,&quot;received&quot;:&quot;nope&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(2), &quot;USAGE&quot;, None, Some(&quot;/disposition&quot;))
+ right: (Some(2), &quot;INPUT_INVALID&quot;, Some(&quot;INVALID_VALUE&quot;), Some(&quot;/disposition&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 5.58s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_argv_is_usage&apos; (102834761) panicked at crates/canon-cli/tests/atip_inputorder.rs:218:5:
+assertion `left == right` failed: {&quot;error&quot;:{&quot;code&quot;:&quot;USAGE&quot;,&quot;expected&quot;:[&quot;open&quot;,&quot;fixed&quot;,&quot;rejected&quot;,&quot;deferred&quot;],&quot;field&quot;:&quot;/disposition&quot;,&quot;hint&quot;:&quot;a working call: canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \&quot;works as designed\&quot;; `canon schema finding close --json` lists every argument&quot;,&quot;message&quot;:&quot;invalid value &apos;nope&apos; for &apos;--disposition &lt;DISPOSITION&gt;&apos;&quot;,&quot;received&quot;:&quot;nope&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(2), &quot;USAGE&quot;, None, Some(&quot;/disposition&quot;))
+ right: (Some(2), &quot;INPUT_INVALID&quot;, Some(&quot;INVALID_VALUE&quot;), Some(&quot;/disposition&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_inputorder_01_the_non_empty_lines_of_an_ndjson_file_are_all_documents" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="5.989"/>
+        <testcase name="atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="6.283">
+            <failure message="thread &apos;atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order&apos; (102834765) panicked at crates/canon-cli/tests/atip_inputorder.rs:157:55" type="test failure with exit code 101">thread &apos;atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order&apos; (102834765) panicked at crates/canon-cli/tests/atip_inputorder.rs:157:55:
+several problems carry details
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 6.23s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_03_every_problem_of_a_document_is_reported_in_its_key_order&apos; (102834765) panicked at crates/canon-cli/tests/atip_inputorder.rs:157:55:
+several problems carry details
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_inputorder_07_a_value_given_two_ways_that_differ_is_a_conflict_at_the_document_pointer" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="6.338"/>
+        <testcase name="atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="6.538">
+            <failure message="thread &apos;atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused&apos; (102834779) panicked at crates/canon-cli/tests/atip_inputorder.rs:202:55" type="test failure with exit code 101">thread &apos;atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused&apos; (102834779) panicked at crates/canon-cli/tests/atip_inputorder.rs:202:55:
+three problems
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 6.49s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_refused&apos; (102834779) panicked at crates/canon-cli/tests/atip_inputorder.rs:202:55:
+three problems
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="6.822">
+            <failure message="thread &apos;atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check&apos; (102834784) panicked at crates/canon-cli/tests/atip_inputorder.rs:247:9" type="test failure with exit code 101">thread &apos;atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check&apos; (102834784) panicked at crates/canon-cli/tests/atip_inputorder.rs:247:9:
+assertion `left == right` failed: [&quot;finding&quot;, &quot;close&quot;, &quot;add-login&quot;, &quot;--round&quot;, &quot;abc&quot;, &quot;--input&quot;, &quot;{\&quot;round\&quot;:1}&quot;, &quot;--json&quot;]: {&quot;error&quot;:{&quot;code&quot;:&quot;INPUT_CONFLICT&quot;,&quot;field&quot;:&quot;/round&quot;,&quot;hint&quot;:&quot;give the value once: drop the flag or the key, or make them equal&quot;,&quot;message&quot;:&quot;`--round` was given as abc and the document says 1&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(2), &quot;INPUT_CONFLICT&quot;, Some(&quot;/round&quot;))
+ right: (Some(2), &quot;USAGE&quot;, Some(&quot;--round&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 6.77s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_conflict_check&apos; (102834784) panicked at crates/canon-cli/tests/atip_inputorder.rs:247:9:
+assertion `left == right` failed: [&quot;finding&quot;, &quot;close&quot;, &quot;add-login&quot;, &quot;--round&quot;, &quot;abc&quot;, &quot;--input&quot;, &quot;{\&quot;round\&quot;:1}&quot;, &quot;--json&quot;]: {&quot;error&quot;:{&quot;code&quot;:&quot;INPUT_CONFLICT&quot;,&quot;field&quot;:&quot;/round&quot;,&quot;hint&quot;:&quot;give the value once: drop the flag or the key, or make them equal&quot;,&quot;message&quot;:&quot;`--round` was given as abc and the document says 1&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(2), &quot;INPUT_CONFLICT&quot;, Some(&quot;/round&quot;))
+ right: (Some(2), &quot;USAGE&quot;, Some(&quot;--round&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="6.894">
+            <failure message="thread &apos;atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input&apos; (102834604) panicked at crates/canon-cli/tests/atip_inputorder.rs:314:9" type="test failure with exit code 101">thread &apos;atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input&apos; (102834604) panicked at crates/canon-cli/tests/atip_inputorder.rs:314:9:
+assertion `left == right` failed: {&quot;round&quot;:&quot;+1&quot;}: {&quot;error&quot;:{&quot;code&quot;:&quot;USAGE&quot;,&quot;field&quot;:&quot;/seq&quot;,&quot;hint&quot;:&quot;a working call: canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \&quot;works as designed\&quot;; `canon schema finding close --json` lists every argument&quot;,&quot;message&quot;:&quot;the following required arguments were not provided: --seq, --disposition, CHANGE_ID&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(2), &quot;USAGE&quot;, None, Some(&quot;/seq&quot;))
+ right: (Some(2), &quot;INPUT_INVALID&quot;, Some(&quot;INVALID_VALUE&quot;), Some(&quot;/round&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 6.88s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_input&apos; (102834604) panicked at crates/canon-cli/tests/atip_inputorder.rs:314:9:
+assertion `left == right` failed: {&quot;round&quot;:&quot;+1&quot;}: {&quot;error&quot;:{&quot;code&quot;:&quot;USAGE&quot;,&quot;field&quot;:&quot;/seq&quot;,&quot;hint&quot;:&quot;a working call: canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \&quot;works as designed\&quot;; `canon schema finding close --json` lists every argument&quot;,&quot;message&quot;:&quot;the following required arguments were not provided: --seq, --disposition, CHANGE_ID&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: (Some(2), &quot;USAGE&quot;, None, Some(&quot;/seq&quot;))
+ right: (Some(2), &quot;INPUT_INVALID&quot;, Some(&quot;INVALID_VALUE&quot;), Some(&quot;/round&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_inputorder_10_the_environment_never_touches_a_key_the_document_gives" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="6.964"/>
+        <testcase name="atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="7.127">
+            <failure message="thread &apos;atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay&apos; (102834767) panicked at crates/canon-cli/tests/atip_inputorder.rs:122:9" type="test failure with exit code 101">thread &apos;atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay&apos; (102834767) panicked at crates/canon-cli/tests/atip_inputorder.rs:122:9:
+assertion `left == right` failed: first.ndjson: {&quot;data&quot;:{&quot;items&quot;:[{&quot;data&quot;:{&quot;actor&quot;:{&quot;agent_id&quot;:&quot;canon&quot;,&quot;role&quot;:&quot;implementer&quot;},&quot;at&quot;:&quot;2026-11-02T08:39:47.975596Z&quot;,&quot;domain&quot;:&quot;dev&quot;,&quot;kind&quot;:&quot;subject&quot;,&quot;owner_role&quot;:&quot;implementer&quot;,&quot;schema&quot;:1,&quot;status&quot;:&quot;proposed&quot;,&quot;subject_id&quot;:&quot;x&quot;,&quot;summary&quot;:&quot;&quot;,&quot;title&quot;:&quot;T&quot;},&quot;index&quot;:0,&quot;status&quot;:&quot;written&quot;}]},&quot;meta&quot;:{&quot;command&quot;:&quot;subject new&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchSubjectNewReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:true}
+  left: (Some(0), &quot;&quot;, None, None)
+ right: (Some(2), &quot;INPUT_INVALID&quot;, Some(&quot;NOT_JSON&quot;), Some(&quot;--input&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 7.08s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_02_a_hash_line_is_not_json_and_the_other_framing_refusals_stay&apos; (102834767) panicked at crates/canon-cli/tests/atip_inputorder.rs:122:9:
+assertion `left == right` failed: first.ndjson: {&quot;data&quot;:{&quot;items&quot;:[{&quot;data&quot;:{&quot;actor&quot;:{&quot;agent_id&quot;:&quot;canon&quot;,&quot;role&quot;:&quot;implementer&quot;},&quot;at&quot;:&quot;2026-11-02T08:39:47.975596Z&quot;,&quot;domain&quot;:&quot;dev&quot;,&quot;kind&quot;:&quot;subject&quot;,&quot;owner_role&quot;:&quot;implementer&quot;,&quot;schema&quot;:1,&quot;status&quot;:&quot;proposed&quot;,&quot;subject_id&quot;:&quot;x&quot;,&quot;summary&quot;:&quot;&quot;,&quot;title&quot;:&quot;T&quot;},&quot;index&quot;:0,&quot;status&quot;:&quot;written&quot;}]},&quot;meta&quot;:{&quot;command&quot;:&quot;subject new&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;output&quot;:&quot;BatchSubjectNewReport&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:true}
+  left: (Some(0), &quot;&quot;, None, None)
+ right: (Some(2), &quot;INPUT_INVALID&quot;, Some(&quot;NOT_JSON&quot;), Some(&quot;--input&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="atip_inputorder_08_integers_are_compared_by_the_number_they_denote" classname="canon-cli::atip_inputorder" timestamp="2026-11-02T17:39:41.136+09:00" time="7.234">
+            <failure message="thread &apos;atip_inputorder_08_integers_are_compared_by_the_number_they_denote&apos; (102834777) panicked at crates/canon-cli/tests/atip_inputorder.rs:290:9" type="test failure with exit code 101">thread &apos;atip_inputorder_08_integers_are_compared_by_the_number_they_denote&apos; (102834777) panicked at crates/canon-cli/tests/atip_inputorder.rs:290:9:
+assertion `left == right` failed: --round +1 with {&quot;round&quot;:1}: {&quot;error&quot;:{&quot;code&quot;:&quot;INPUT_CONFLICT&quot;,&quot;field&quot;:&quot;/round&quot;,&quot;hint&quot;:&quot;give the value once: drop the flag or the key, or make them equal&quot;,&quot;message&quot;:&quot;`--round` was given as +1 and the document says 1&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: Some(2)
+ right: Some(0)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test atip_inputorder_08_integers_are_compared_by_the_number_they_denote ... FAILED
+
+failures:
+
+failures:
+    atip_inputorder_08_integers_are_compared_by_the_number_they_denote
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 7.18s
+
+</system-out>
+            <system-err>
+thread &apos;atip_inputorder_08_integers_are_compared_by_the_number_they_denote&apos; (102834777) panicked at crates/canon-cli/tests/atip_inputorder.rs:290:9:
+assertion `left == right` failed: --round +1 with {&quot;round&quot;:1}: {&quot;error&quot;:{&quot;code&quot;:&quot;INPUT_CONFLICT&quot;,&quot;field&quot;:&quot;/round&quot;,&quot;hint&quot;:&quot;give the value once: drop the flag or the key, or make them equal&quot;,&quot;message&quot;:&quot;`--round` was given as +1 and the document says 1&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;finding close&quot;,&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.1&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.34.0&quot;},&quot;ok&quot;:false}
+  left: Some(2)
+ right: Some(0)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

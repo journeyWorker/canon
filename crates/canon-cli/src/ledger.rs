@@ -28,7 +28,7 @@ use serde::Serialize;
 
 use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::json_out::Report;
-use crate::safety::{Effect, Mode, Plan};
+use crate::safety::{path_digest, Effect, Mode, Plan, Preview, Reads};
 use crate::context::resolve_repo_root;
 
 /// One compaction pass over `repo`'s ledger: every archived kind's
@@ -93,12 +93,15 @@ pub struct LedgerCompactReport {
     pub moved: usize,
     pub bytes: u64,
     #[serde(flatten)]
-    pub plan: Plan,
+    pub plan: Preview,
 }
 
-impl Report for LedgerCompactReport {}
+impl Report for LedgerCompactReport {
+    /// 1.1: the plan is `atip::plan::Preview` (`planDigest` is `sha256:` and 64 hex digits).
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
 
-fn report(repo: &Path, kinds: &[KindCompaction], plan: Plan) -> LedgerCompactReport {
+fn report(repo: &Path, kinds: &[KindCompaction], plan: Preview) -> LedgerCompactReport {
     LedgerCompactReport {
         archive: archive_label(repo),
         kinds: kinds.iter().map(|k| LedgerKindRow { kind: k.kind.as_str(), files: k.files, live: k.live, superseded: k.superseded, moved: k.moved, bytes: k.bytes }).collect(),
@@ -161,19 +164,29 @@ pub fn lines(repo: &Path, dry_run: bool, kinds: &[KindCompaction]) -> Vec<String
 pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     const CMD: &str = "canon ledger compact";
     let repo_dir = resolve_repo_root(repo);
-    let base = crate::safety::command("ledger compact", &[], repo);
     let preview = match compact(&repo_dir, true) {
         Ok(kinds) => kinds,
         Err(e) => return e.emit(CMD, json),
     };
-    let plan = Plan::new(effects(&repo_dir, &preview));
-    let commit = match plan.gate(mode, &base) {
+    // What the pass read to tell a superseded version from the live one: the ledger and its archive, file by file.
+    let mut reads = Reads::new();
+    if let Ok(ctx) = GateCtx::from_repo(&repo_dir) {
+        reads = reads.digest("ledger", path_digest(&repo_dir, &ctx.ledger_root));
+        if let Some(archive) = canon_store::archive::archive_root_of(&ctx.ledger_root) {
+            reads = reads.digest("archive", path_digest(&repo_dir, &archive));
+        }
+    }
+    let plan = match Plan::new("ledger compact", effects(&repo_dir, &preview), reads) {
+        Ok(plan) => plan,
+        Err(e) => return e.emit(CMD, json),
+    };
+    let commit = match plan.gate(mode) {
         Ok(commit) => commit,
         Err(e) => return e.emit(CMD, json),
     };
     if !commit {
-        let report = report(&repo_dir, &preview, plan);
-        crate::safety::finish_preview(&base, "ledger compact", &report.plan, "the plan only lists what would move; moving takes its planDigest", json, &report);
+        let report = report(&repo_dir, &preview, plan.preview());
+        plan.finish_preview("ledger compact", "the plan only lists what would move; moving takes its planDigest", json, &report);
         return 0;
     }
     // Superseded versions move out of the ledger's `kind=` directories into the archive's: each must take the change before the first move. A pass with nothing to move writes nothing and is not refused.

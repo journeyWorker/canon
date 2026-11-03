@@ -1,4 +1,4 @@
-Agents: "canon schema --json" describes every command as JSON.
+Agents: "canon schema --json" describes every command; "canon skills show" prints the guide.
 
 Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
 

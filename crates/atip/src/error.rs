@@ -21,8 +21,10 @@
 //!   code, since 1.1), `message`, `retryable`, then `field` (the argument or
 //!   JSON pointer refused), `expected` (the valid set when there is one),
 //!   `received` (the refused value, secrets redacted; `""` when the caller
-//!   sent an empty value), `suggestions` and `hint`. A member with no value is
-//!   absent, never `null` and never `[]` (spec 6.5).
+//!   sent an empty value), `suggestions` and `hint`. When one input yields
+//!   several errors (spec 7.1.1) the first is the error itself and
+//!   [`CliError::details`] lists every one as `details`. A member with no value
+//!   is absent, never `null` and never `[]` (spec 6.5).
 //!
 //! Exit codes: `0` ok; `1` the command ran and its answer is negative or
 //! incomplete ([`EXIT_FAILED`]); `2` the command refused to run
@@ -92,6 +94,131 @@ impl CodeInfo {
     }
 }
 
+impl ReasonInfo {
+    /// The reason that stands for the code of `row` (spec 8.3.2): the name is the code, the meaning and the fix are the row's.
+    /// A `const fn`, so a static table can build a reason from another row of the same crate's tables.
+    pub const fn from_code(row: &CodeInfo) -> ReasonInfo {
+        ReasonInfo { reason: row.code, meaning: row.meaning, fix: row.fix }
+    }
+}
+
+const fn str_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut at = 0;
+    while at < a.len() {
+        if a[at] != b[at] {
+            return false;
+        }
+        at += 1;
+    }
+    true
+}
+
+/// Whether `a` sorts before `b`, byte by byte: the order `str::cmp` and the tables' sort use.
+const fn str_lt(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut at = 0;
+    while at < a.len() && at < b.len() {
+        if a[at] != b[at] {
+            return a[at] < b[at];
+        }
+        at += 1;
+    }
+    a.len() < b.len()
+}
+
+/// How many rows of `rows` carry `exit`: the `N` of [`reasons_with_exit`].
+pub const fn count_with_exit(rows: &[CodeInfo], exit: u8) -> usize {
+    let mut count = 0;
+    let mut at = 0;
+    while at < rows.len() {
+        if rows[at].exit == exit {
+            count += 1;
+        }
+        at += 1;
+    }
+    count
+}
+
+/// The reasons that stand for every row of `rows` with `exit`, sorted by name, whatever the order of `rows`: for the
+/// `STOPPED_MIDWAY` row, whose reasons are the tool's exit-2 codes (spec 8.3.2). `N` is [`count_with_exit`]`(rows, exit)`;
+/// any other length stops the evaluation, so the table does not compile.
+///
+/// `rows` is the table of the codes the reasons come from, without the row that holds them (a row cannot read the
+/// table that contains it). [`with_row`] then puts that row into the table.
+///
+/// ```
+/// use atip::{count_with_exit, reasons_with_exit, CodeInfo, ReasonInfo};
+///
+/// const REFUSALS: &[CodeInfo] = &[
+///     CodeInfo { code: "LEASE_HELD", meaning: "m", exit: 2, retryable: true, fix: "f", reasons: &[] },
+///     CodeInfo { code: "WRITE_FAILED", meaning: "m", exit: 1, retryable: false, fix: "f", reasons: &[] },
+///     CodeInfo { code: "PLAN_STALE", meaning: "m", exit: 2, retryable: false, fix: "f", reasons: &[] },
+/// ];
+/// const REASONS: [ReasonInfo; count_with_exit(REFUSALS, 2)] = reasons_with_exit(REFUSALS, 2);
+/// assert_eq!(REASONS.map(|reason| reason.reason), ["LEASE_HELD", "PLAN_STALE"]);
+/// ```
+pub const fn reasons_with_exit<const N: usize>(rows: &[CodeInfo], exit: u8) -> [ReasonInfo; N] {
+    assert!(count_with_exit(rows, exit) == N, "the length of the reasons is not the number of rows with that exit");
+    let mut out = [ReasonInfo { reason: "", meaning: "", fix: "" }; N];
+    let mut filled = 0;
+    let mut at = 0;
+    while at < rows.len() {
+        if rows[at].exit == exit {
+            // Insertion sort by name: the result does not depend on the order of `rows`.
+            let reason = ReasonInfo::from_code(&rows[at]);
+            let mut place = filled;
+            while place > 0 && str_lt(reason.reason, out[place - 1].reason) {
+                out[place] = out[place - 1];
+                place -= 1;
+            }
+            out[place] = reason;
+            filled += 1;
+        }
+        at += 1;
+    }
+    out
+}
+
+/// The reason that stands for the row of `code` in `rows`. A code that `rows` does not hold stops the evaluation, so a
+/// reason of a code the table lacks does not compile:
+///
+/// ```compile_fail,E0080
+/// const MISSING: atip::ReasonInfo = atip::reason_of_code(&[], "NOT_IN_THE_TABLE");
+/// ```
+pub const fn reason_of_code(rows: &[CodeInfo], code: &str) -> ReasonInfo {
+    let mut at = 0;
+    while at < rows.len() {
+        if str_eq(rows[at].code, code) {
+            return ReasonInfo::from_code(&rows[at]);
+        }
+        at += 1;
+    }
+    panic!("the table has no row of that code, so no reason stands for it")
+}
+
+/// `rows` with `row` put in its place by code, so a table sorted by code stays sorted ([`find_code`]). `N` is
+/// `rows.len() + 1`; a row whose code `rows` already holds, or any other length, stops the evaluation.
+pub const fn with_row<const N: usize>(rows: &[CodeInfo], row: CodeInfo) -> [CodeInfo; N] {
+    assert!(N == rows.len() + 1, "the length of the table is not the number of rows plus one");
+    let mut out = [row; N];
+    let mut place = 0;
+    while place < rows.len() && str_lt(rows[place].code, row.code) {
+        out[place] = rows[place];
+        place += 1;
+    }
+    assert!(place == rows.len() || !str_eq(rows[place].code, row.code), "the table already has a row of that code");
+    out[place] = row;
+    while place < rows.len() {
+        out[place + 1] = rows[place];
+        place += 1;
+    }
+    out
+}
+
 /// One refusal or operational failure.
 ///
 /// The members every error has stay inline; the optional ones that most errors
@@ -126,6 +253,8 @@ struct CliErrorDetail {
     suggestions: Vec<String>,
     /// Tool extension members of the error object (`x-<tool>`, spec 7.1): name and value.
     extensions: BTreeMap<String, Value>,
+    /// Every error of an input that yields several, the first included (spec 7.1.1); empty for an error alone.
+    details: Vec<CliError>,
 }
 
 /// The `error` member of a failure envelope. Field order is the document
@@ -158,6 +287,32 @@ pub struct ErrorBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
     /// The tool's own members (`x-canon`); the contract's error schema allows any `x-<tool>` member.
+    #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, Value>,
+    /// Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Vec<ErrorDetailBody>>,
+}
+
+/// One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorDetailBody {
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub received: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub suggestions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
     #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     #[schemars(skip)]
     pub extensions: BTreeMap<String, Value>,
@@ -261,6 +416,18 @@ impl CliError {
         self
     }
 
+    /// Lists every error of an input that yields several (spec 7.1.1), the error itself first. The body carries
+    /// them as `details` when there are two or more.
+    pub fn details(mut self, errors: Vec<CliError>) -> Self {
+        self.detail_mut().details = errors;
+        self
+    }
+
+    /// The errors listed with [`CliError::details`].
+    pub fn detail_errors(&self) -> &[CliError] {
+        self.detail.as_deref().map_or(&[], |detail| detail.details.as_slice())
+    }
+
     /// The stderr text: `<tool>: <CODE>: <message>`, then one indented line for
     /// each of `field`, `expected`, `suggestions` and `hint` the error has
     /// (spec 7.4.1). `tool` is the executable name (`canon`). `field` is the
@@ -279,6 +446,9 @@ impl CliError {
         if let Some(hint) = self.hint_text() {
             text.push_str(&format!("\n  hint: {hint}"));
         }
+        for item in self.detail_errors() {
+            text.push_str(&format!("\n  problem: {}: {}", item.field_name().unwrap_or_default(), item.message));
+        }
         text
     }
 
@@ -296,6 +466,22 @@ impl CliError {
             expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
             received: self.received_value().map(|received| redact(self.field_name(), received)),
             suggestions,
+            hint: self.hint_text().filter(|hint| !hint.is_empty()).map(str::to_string),
+            extensions: self.extensions().cloned().unwrap_or_default(),
+            details: (self.detail_errors().len() > 1).then(|| self.detail_errors().iter().map(CliError::detail_body).collect()),
+        }
+    }
+
+    /// This error as one item of `details`: the item's own `field` and suggestions, `received` redacted by that field.
+    fn detail_body(&self) -> ErrorDetailBody {
+        ErrorDetailBody {
+            code: self.code.to_string(),
+            reason: self.reason_name().map(str::to_string),
+            message: self.message.clone(),
+            field: self.field_name().filter(|field| !field.is_empty()).map(str::to_string),
+            expected: self.expected_values().filter(|expected| !expected.is_empty()).map(<[String]>::to_vec),
+            received: self.received_value().map(|received| redact(self.field_name(), received)),
+            suggestions: self.suggested().to_vec(),
             hint: self.hint_text().filter(|hint| !hint.is_empty()).map(str::to_string),
             extensions: self.extensions().cloned().unwrap_or_default(),
         }
@@ -350,7 +536,7 @@ pub fn redact(field: Option<&str>, received: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_code, redact, CliError, CodeInfo, ReasonInfo, EXIT_FAILED, EXIT_REFUSED};
+    use super::{count_with_exit, find_code, reason_of_code, reasons_with_exit, redact, with_row, CliError, CodeInfo, ReasonInfo, EXIT_FAILED, EXIT_REFUSED};
 
     const TABLE: &[CodeInfo] = &[
         CodeInfo { code: "GATE_VIOLATIONS", meaning: "m", exit: EXIT_FAILED, retryable: false, fix: "f", reasons: &[] },
@@ -413,5 +599,70 @@ mod tests {
         let digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
         assert_eq!(redact(Some("--plan-digest"), digest), digest, "a digest is not a secret");
         assert_eq!(redact(Some("--signature-file"), "approval.sig"), "approval.sig");
+    }
+
+    const ROWS: &[CodeInfo] = &[
+        CodeInfo { code: "A_REFUSED", meaning: "a refusal", exit: EXIT_REFUSED, retryable: false, fix: "fix a", reasons: &[] },
+        CodeInfo { code: "LEASE_HELD", meaning: "another run holds the lease", exit: EXIT_REFUSED, retryable: true, fix: "wait for the lease", reasons: &[] },
+        CodeInfo { code: "WRITE_FAILED", meaning: "a write failed", exit: EXIT_FAILED, retryable: false, fix: "fix write", reasons: &[] },
+        CodeInfo { code: "ZED_REFUSED", meaning: "z refusal", exit: EXIT_REFUSED, retryable: false, fix: "fix z", reasons: &[] },
+    ];
+    /// The same rows in another order.
+    const SHUFFLED: &[CodeInfo] = &[ROWS[3], ROWS[2], ROWS[0], ROWS[1]];
+    const REASONS: [ReasonInfo; count_with_exit(ROWS, EXIT_REFUSED)] = reasons_with_exit(ROWS, EXIT_REFUSED);
+    const REASONS_SHUFFLED: [ReasonInfo; count_with_exit(SHUFFLED, EXIT_REFUSED)] = reasons_with_exit(SHUFFLED, EXIT_REFUSED);
+    const STOPPED_MIDWAY: CodeInfo = CodeInfo { code: "STOPPED_MIDWAY", meaning: "m", exit: EXIT_FAILED, retryable: false, fix: "f", reasons: &REASONS };
+    static WITH_STOPPED: [CodeInfo; ROWS.len() + 1] = with_row(ROWS, STOPPED_MIDWAY);
+    const ONLY_FAILED: [ReasonInfo; count_with_exit(ROWS, EXIT_FAILED)] = reasons_with_exit(ROWS, EXIT_FAILED);
+
+    #[test]
+    fn atip_crate12_08_a_row_in_a_static_table_gets_its_reasons_from_the_other_rows_whatever_their_order() {
+        let names: Vec<&str> = REASONS.iter().map(|reason| reason.reason).collect();
+        assert_eq!(names, ["A_REFUSED", "LEASE_HELD", "ZED_REFUSED"], "every exit-2 row, sorted by name, and no exit-1 row");
+        assert_eq!(REASONS[1], ReasonInfo { reason: "LEASE_HELD", meaning: "another run holds the lease", fix: "wait for the lease" }, "the meaning and the fix are the row's");
+        assert_eq!(REASONS, REASONS_SHUFFLED, "the result does not depend on the order of the table");
+        assert_eq!(ONLY_FAILED.map(|reason| reason.reason), ["WRITE_FAILED"]);
+        // The row that holds them sits in the table in its place, so the table stays sorted for `find_code`.
+        let codes: Vec<&str> = WITH_STOPPED.iter().map(|row| row.code).collect();
+        assert_eq!(codes, ["A_REFUSED", "LEASE_HELD", "STOPPED_MIDWAY", "WRITE_FAILED", "ZED_REFUSED"]);
+        let found = find_code(&WITH_STOPPED, "STOPPED_MIDWAY").expect("a row");
+        assert_eq!((found.exit, found.retryable, found.reasons.len()), (EXIT_FAILED, false, 3));
+        assert_eq!(found.find_reason("LEASE_HELD"), Some(&REASONS[1]));
+        assert!(find_code(&WITH_STOPPED, "ZED_REFUSED").is_some() && find_code(&WITH_STOPPED, "A_REFUSED").is_some(), "the others keep their rows");
+        // A reason of one named row, made on its own.
+        assert_eq!(reason_of_code(ROWS, "ZED_REFUSED"), REASONS[2]);
+        assert_eq!(ReasonInfo::from_code(&ROWS[0]), REASONS[0]);
+    }
+
+    #[test]
+    fn atip_crate12_09_a_reason_of_a_code_the_table_does_not_hold_stops_the_evaluation() {
+        let missing = std::panic::catch_unwind(|| reason_of_code(ROWS, "NOT_IN_THE_TABLE"));
+        assert!(missing.is_err(), "a code the table lacks has no reason");
+        let empty = std::panic::catch_unwind(|| reason_of_code(&[], "A_REFUSED"));
+        assert!(empty.is_err(), "an empty table holds no code");
+        // A row of a code the table holds, and a length other than the count, stop the evaluation too.
+        let twice = std::panic::catch_unwind(|| with_row::<5>(ROWS, ROWS[1]));
+        assert!(twice.is_err(), "a table does not hold one code twice");
+        let wrong_length = std::panic::catch_unwind(|| reasons_with_exit::<2>(ROWS, EXIT_REFUSED));
+        assert!(wrong_length.is_err(), "the length of the reasons is the count of the rows");
+        let wrong_table_length = std::panic::catch_unwind(|| with_row::<9>(ROWS, STOPPED_MIDWAY));
+        assert!(wrong_table_length.is_err(), "the length of the table is the number of rows plus one");
+    }
+
+    #[test]
+    fn several_errors_of_one_input_are_details_and_one_error_has_none() {
+        let first = CliError::from_row("USAGE", "a is wrong", None).field("/a").reason("SHAPE");
+        let second = CliError::from_row("USAGE", "b is wrong", None).field("/api-token").received("hunter2").suggestions(["c"]);
+        let several = first.clone().details(vec![first.clone(), second.clone()]);
+        assert_eq!(several.detail_errors().len(), 2);
+        let body = several.body_with(Some("/a".to_string()), Vec::new());
+        assert_eq!(
+            serde_json::to_string(&body).expect("a body serializes"),
+            r#"{"code":"USAGE","reason":"SHAPE","message":"a is wrong","retryable":false,"field":"/a","details":[{"code":"USAGE","reason":"SHAPE","message":"a is wrong","field":"/a"},{"code":"USAGE","message":"b is wrong","field":"/api-token","received":"<redacted>","suggestions":["c"]}]}"#
+        );
+        assert_eq!(several.human("canon", Some("/a"), &[]), "canon: USAGE: a is wrong\n  field: /a\n  problem: /a: a is wrong\n  problem: /api-token: b is wrong");
+        // one item is not "several": the member is absent
+        let one = first.clone().details(vec![first]);
+        assert!(one.body_with(None, Vec::new()).details.is_none());
     }
 }

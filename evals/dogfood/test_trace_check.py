@@ -137,9 +137,9 @@ class TraceCheckTests(unittest.TestCase):
 
 
 def failure(command, code="USAGE", message="unexpected argument '--x' found", hint="", **error):
-    """An atip/1 JSON failure envelope as `canon <command> --json` prints it (contract 1.1); `error` adds members of the error."""
+    """An atip/1 JSON failure envelope as `canon <command> --json` prints it (contract 1.2); `error` adds members of the error."""
     return json.dumps({"ok": False, "error": {"code": code, "message": message, "hint": hint, "retryable": False, **error},
-                       "meta": {"schemaVersion": "1.1", "tool": "canon", "toolVersion": "0.34.0", "contract": "atip/1", "contractVersion": "1.1", "command": command}}, separators=(",", ":"))
+                       "meta": {"schemaVersion": "1.0", "tool": "canon", "toolVersion": "0.35.0", "contract": "atip/1", "contractVersion": "1.2", "command": command}}, separators=(",", ":"))
 
 
 class SyntheticTranscriptTests(unittest.TestCase):

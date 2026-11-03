@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:56:50.952928Z",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "kind": "review",
+  "pin": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_checkl2safety_09_a_directory_a_read_leaves_empty_is_not_an_effect",
+          "junit:atip_checkl2safety_09_a_directory_made_to_hold_an_allowed_file_is_not_an_effect_and_an_unallowed_file_is_named",
+          "junit:atip_checkl2safety_09_a_read_change_outside_allowed_effects_fails_and_the_report_names_the_path"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f9102f3d14d8df74e71e8d96361a9a472129e510236f05693c2c456a5299d6ee",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-l2-safety/brief.md"
+  },
+  "review_id": "01M6GM9TW8R4VBM4JJMRHWN3Q7",
+  "reviewer": "rev-0-35-final",
+  "scenario_id": "atip.checkl2safety.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

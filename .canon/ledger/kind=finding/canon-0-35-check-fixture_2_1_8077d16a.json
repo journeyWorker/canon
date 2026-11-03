@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev"
+  },
+  "at": "2026-11-02T18:06:54.915952Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "9c40336d27f4c0f2ec481820b37dbe6526a97cc3",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/exec.rs",
+  "introduced_by": "1c57c33eedd8c00e7380781852dcec602eaf0bc2",
+  "kind": "finding",
+  "reviewed_sha": "adf05245c6b8ad2be47dcf0b36fc7ffaa43c97ed",
+  "reviewer": "rev-check-0-35",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.116"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: the CHANGELOG and scenario 116 say a notRun command that ends on its own 'within the time limit, before or after its first document' is FIXTURE_INVALID, but execute_served only watches for SERVED_SETTLE_MILLIS (200 ms) after the document and then signals. I ran a wrapper whose serve prints its envelope, sleeps 1 s and exits 0: no FIXTURE_INVALID, the run counts as a served run ended by SIGTERM and the report goes on (LEVEL_NOT_MET on L0.ok-exit for the wrapper's own reasons, not for this). Scenario 116 only seeds processes that exit at once, so it cannot see the gap. checker.md 1.2.1 itself says only 'checks that the process is still running', so the code follows the contract and the overclaim is in the CHANGELOG/scenario wording. Blast radius: a command that ends a moment after its document is accepted as a server.",
+  "worktree_dirty": false
+}

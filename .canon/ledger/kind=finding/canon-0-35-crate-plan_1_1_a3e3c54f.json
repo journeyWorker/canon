@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T14:28:51.794422Z",
+  "change_id": "canon-0-35-crate-plan",
+  "code_tree": "eb390035522bf0f250331f0eb54da38ba7da24e3",
+  "disposition": "open",
+  "file_ref": "crates/atip/src/plan.rs",
+  "introduced_by": "0f6bac999b73b7ef35270073cfb58e4b7371e34f",
+  "kind": "finding",
+  "reviewed_sha": "194a1457e53ca29e9f8e8b4e6871d16744eea25a",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "scenario_ids": [
+    "atip.crateplan.08"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards: gate's PLAN_STALE message is 'the plan digest X no longer matches the plan (now Y)', so a refused caller is handed the digest of the plan as it is now and can commit it at once without re-running the preview its meta.next points at, which is the review step the digest exists to force (spec 12.5, 12.7). It is carried over unchanged from canon's safety.rs:117, so it is not a regression, but the crate is the place every tool inherits it from and gate has no way to leave it out. Blast radius: canon-0-35-plan-jcs adopts this message when it moves safety.rs onto the crate; test 08 asserts only code, exit, field and next, not the message.",
+  "worktree_dirty": false
+}

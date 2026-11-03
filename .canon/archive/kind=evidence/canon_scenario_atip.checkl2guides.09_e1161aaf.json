@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2"
+  },
+  "at": "2026-11-02T17:53:44.561540Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2guides_09_a_stream_without_an_end_line_an_event_that_breaks_its_schema_and_a_start_before_the_usage_error_fail_only_l2_stream",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-l2-junit.xml",
+      "sha256": "11ffba0659d600a334f167d9fa0af2e986db3ab264a1a978ebe4dc9b7ec7c16a"
+    }
+  ],
+  "code_tree": "f58a11eb422eccd72e33d8ffaac677b9e8f286ca",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-l2-junit.xml"
+  },
+  "evidence_sha": "b54f24a82299706b9d7ad8d0f334fd4ca35d6ad5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "atip.checkl2guides.09",
+  "schema": 1,
+  "staging_id": "144e1c07",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

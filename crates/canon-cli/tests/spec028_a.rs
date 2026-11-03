@@ -189,7 +189,7 @@ fn evidence_add_106_an_object_is_one_report_and_an_array_or_ndjson_is_a_batch() 
     let single = f.ok(&["evidence", "add", "--input", &json!([evidence_doc("auth.login.02", "a third run")]).to_string(), "--json"]);
     assert_eq!(statuses(&json_of(&single)), ["written"]);
     assert_eq!(refs(r), ["npm test again", "a third run"]);
-    std::fs::write(r.join("batch.ndjson"), format!("# the suite\n\n{}\n{}\n", evidence_doc("auth.login.01", "run a"), evidence_doc("auth.login.02", "run b"))).unwrap();
+    std::fs::write(r.join("batch.ndjson"), format!("\n{}\n\n{}\n", evidence_doc("auth.login.01", "run a"), evidence_doc("auth.login.02", "run b"))).unwrap();
     let nd = f.ok(&["evidence", "add", "--input", "batch.ndjson", "--json"]);
     assert_eq!(statuses(&json_of(&nd)), ["written", "written"]);
     assert_eq!(refs(r), ["run a", "run b"]);
@@ -206,14 +206,14 @@ fn evidence_add_107_one_invalid_element_writes_nothing_and_points_at_it() {
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
     assert_eq!(body["ok"], false);
-    assert_eq!(body["error"]["field"], "/items/1/verdict", "{body}");
+    assert_eq!(body["error"]["field"], "/1/verdict", "{body}");
     assert_eq!(tree(r), before, "the valid first element was not written either");
 
     let missing_key = json!([evidence_doc("auth.login.01", "npm test"), {"scenario": "auth.login.02", "ref": "npm test", "role": "implementer"}]);
     let out = f.run(&["evidence", "add", "--input", &missing_key.to_string(), "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/class", "{body}");
+    assert_eq!(body["error"]["field"], "/1/class", "{body}");
     assert_eq!(tree(r), before);
 }
 
@@ -323,7 +323,7 @@ fn finding_add_35_one_invalid_element_writes_nothing_and_points_at_it() {
     let out = f.run(&["finding", "add", "--input", &doc, "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/severity", "{body}");
+    assert_eq!(body["error"]["field"], "/1/severity", "{body}");
     assert_eq!(tree(r), before, "the valid first element was not written either");
 
     let mut no_summary = finding_doc(2, "note");
@@ -331,7 +331,7 @@ fn finding_add_35_one_invalid_element_writes_nothing_and_points_at_it() {
     let out = f.run(&["finding", "add", "--input", &json!([finding_doc(1, "note"), no_summary]).to_string(), "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/summary", "{body}");
+    assert_eq!(body["error"]["field"], "/1/summary", "{body}");
     assert_eq!(tree(r), before);
 }
 
@@ -446,7 +446,7 @@ fn review_scenario_94_one_invalid_or_unindexed_element_writes_nothing() {
     let out = f.run(&["review", "scenario", "--input", &bad_outcome.to_string(), "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
-    assert_eq!(body["error"]["field"], "/items/1/reviewOutcome", "{body}");
+    assert_eq!(body["error"]["field"], "/1/reviewOutcome", "{body}");
     assert_eq!(tree(r), before, "the valid first element was not written either");
 
     // A scenario no record carries is refused for the whole call.

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-fixes",
+    "role": "reviewer",
+    "session_id": "s-0-35-fixes-rev"
+  },
+  "at": "2026-11-03T04:26:29.515416Z",
+  "change_id": "canon-0-35-check-l2-input",
+  "code_tree": "3c11756326eee1b6c0bed06135b1804a1ceda3ab",
+  "disposition": "open",
+  "file_ref": "crates/atip-check/src/checks/l1.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0905e8d1ec46e77e613fddf4886a021bc2075989",
+  "reviewer": "rev-0-35-fixes",
+  "round": 4,
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Differs from checker.md 1.3.1 section 2 (ATIP feedback): 'USAGE stands for USAGE or its registered finer replacement: a registered exit-2 code the tool uses instead of USAGE, whose field names an argument'. Only L2.input-usage (input.rs:303-305) applies that; the shared is_usage (checks/l1.rs:157), used by L1.registry, L2.destructive-half (safety.rs:336), the stateless test and L2.input-pointer/-conflict answers, accepts exactly UNKNOWN_OPTION and OPTION_REQUIRED (the two codes of atip 1.2.1 7.2.2), ignores field and does not know OPTION_INVALID, which checker.md names. So a 1.3-style tool that registers OPTION_INVALID passes L2.input-usage and fails L2.destructive-half. Canon's claim is 1.2 and its own tool uses USAGE, so nothing fails today; either make is_usage take (code, field) or say in checker.md that the finer codes are the claim's.",
+  "worktree_dirty": false
+}

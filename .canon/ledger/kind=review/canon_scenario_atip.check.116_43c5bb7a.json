@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:56:37.856049Z",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "kind": "review",
+  "pin": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_116_a_command_that_ends_on_its_own_before_or_after_its_first_document_is_a_fixture_error_and_no_check_runs",
+          "junit:atip_check_116_a_not_run_command_refused_at_its_start_by_a_precondition_is_unprovided_with_its_code_and_any_other_refusal_is_a_fixture_error",
+          "junit:atip_check_116_a_not_run_command_that_exits_1_with_a_registered_code_has_ended_on_its_own_and_is_a_fixture_error",
+          "junit:atip_check_116_a_not_run_command_whose_effect_note_is_empty_or_blank_is_a_fixture_error_at_l1",
+          "junit:atip_check_116_a_not_run_refusal_naming_an_argument_or_an_unregistered_code_is_a_fixture_error",
+          "junit:atip_check_116_a_not_run_refusal_with_a_code_the_command_document_declares_is_a_fixture_error_at_l1_and_unprovided_without_the_document",
+          "junit:atip_check_116_a_refusal_of_a_step_that_reads_no_state_is_a_fixture_error_whatever_its_code_when_the_code_is_registered"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e223ce1e1712da338c064fc5bcab90e67bbc2a27f26448650387c5bf26833cd9",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-fixture/brief.md"
+  },
+  "review_id": "01M6GM9E3037MBB9F97F5YGAZX",
+  "reviewer": "rev-0-35-final",
+  "scenario_id": "atip.check.116",
+  "schema": 2,
+  "worktree_dirty": false
+}

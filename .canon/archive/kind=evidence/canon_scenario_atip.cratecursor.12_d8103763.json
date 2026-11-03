@@ -1,0 +1,73 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-03T00:27:13.951240Z",
+  "attachments": [
+    {
+      "case": "jcs::tests::atip_cratecursor_12_a_control_character_is_escaped_short_where_the_rfc_has_a_short_form_and_by_u00xx_otherwise",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_an_integer_beyond_the_safe_range_is_an_error_and_every_other_number_is_the_ecmascript_form_of_its_double",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_appendix_b_number_forms",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_whitespace_nulls_and_empty_members_are_kept_exactly",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_sorts_members_by_utf16_code_units",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_integers_within_the_safe_range_are_written_and_a_whole_float_is_the_integer",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "jcs::tests::atip_cratecursor_12_rfc_8785_writes_strings_and_literals_as_the_appendix_does",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    }
+  ],
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2d.xml"
+  },
+  "evidence_sha": "7508143a2ff26f33539c6da3c94fd1a9f683c0e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 36,
+  "scenario_id": "atip.cratecursor.12",
+  "schema": 1,
+  "staging_id": "b9bdab0d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

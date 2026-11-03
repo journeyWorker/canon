@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="2" skipped="0" failures="0" errors="0" uuid="06da80bf-2109-4722-8672-514524e16152" timestamp="2026-11-03T02:19:46.897+09:00" time="13.882">
+    <testsuite name="atip-check::atip_crate12" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_crate12_02_the_checker_declares_its_own_contract_version_apart_from_the_crates" classname="atip-check::atip_crate12" timestamp="2026-11-03T02:19:46.900+09:00" time="0.872"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_crate12" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_crate12_02_canon_still_declares_contract_version_1_1_though_the_crate_is_at_1_2" classname="canon-cli::atip_crate12" timestamp="2026-11-03T02:19:46.900+09:00" time="13.880"/>
+    </testsuite>
+</testsuites>

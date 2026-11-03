@@ -9,7 +9,7 @@
 //!
 //! `meta` holds only the members the contract defines and canon's own
 //! `x-canon` ([`Meta`]): `schemaVersion`, `tool`, `toolVersion`, `contract`,
-//! `contractVersion` (`"1.1"`, on every envelope),
+//! `contractVersion` (`"1.2"`, on every envelope),
 //! `command` (the resolved command id; absent when not even the first word
 //! resolved), `output` (the report's name, when the command declares several),
 //! `context` (the context options a command took: `repo`), `next` (runnable
@@ -72,8 +72,10 @@ pub const TOOL: &str = "canon";
 /// `meta.contract`: the contract the output follows.
 pub const CONTRACT: &str = atip::CONTRACT;
 
-/// `meta.contractVersion`: the minor of the contract the output follows, on every envelope (spec 15.7).
-pub const CONTRACT_VERSION: &str = atip::CONTRACT_VERSION;
+/// `meta.contractVersion`: the minor of the contract canon declares on every envelope (spec 15.7). It is canon's own
+/// constant: the `atip` crate's `CONTRACT_VERSION` is the newest minor the crate implements, which canon adopts by
+/// changing this value, not by updating the crate.
+pub const DECLARED_MINOR: &str = "1.2";
 
 /// `meta.context`: the context options a command took, with the value it used.
 /// canon's only context option is `--repo`.
@@ -227,7 +229,6 @@ impl Report for NoData {
 static REPO: OnceLock<Option<Option<PathBuf>>> = OnceLock::new();
 static WARNINGS: std::sync::Mutex<Vec<Warning>> = std::sync::Mutex::new(Vec::new());
 static FIRST_NEXT: std::sync::Mutex<Vec<crate::status::NextStep>> = std::sync::Mutex::new(Vec::new());
-static INVOCATION: OnceLock<Vec<String>> = OnceLock::new();
 
 /// Says a warning: on stderr in human mode; in JSON mode it waits for the
 /// document and travels in `meta.warnings`. `code` is registered in
@@ -270,12 +271,6 @@ pub fn set_repo(repo: Option<PathBuf>) {
 /// Records that the command takes no context option: `meta.context` is absent.
 pub fn set_repo_unused() {
     let _ = REPO.set(None);
-}
-
-/// The argv the run was parsed from (after `--input` expansion): the words
-/// after the program name. The next-page step repeats it with a new `--cursor`.
-pub fn set_invocation(args: Vec<String>) {
-    let _ = INVOCATION.set(args);
 }
 
 /// `command` as the schema id: `canon gate check`, `gate check` and `canon report check` are `gate check` and `report`.
@@ -444,30 +439,9 @@ fn split_extra(extra: Value) -> Extra {
     out
 }
 
-/// The `--cursor` step of a page: the same invocation with the next cursor.
+/// The `--cursor` step of a page: the explicit arguments of the call, normalised, with the next cursor ([`crate::paging::next_page_argv`]).
 fn next_page_step(cursor: &str) -> Option<NextEntry> {
-    let invocation = INVOCATION.get()?;
-    let mut argv: Vec<String> = Vec::with_capacity(invocation.len() + 2);
-    let mut words = invocation.iter().peekable();
-    let mut inserted = false;
-    while let Some(word) = words.next() {
-        if word == "--" && !inserted {
-            argv.extend(["--cursor".to_string(), cursor.to_string()]);
-            inserted = true;
-        }
-        if word == "--cursor" {
-            words.next();
-            continue;
-        }
-        if word.starts_with("--cursor=") {
-            continue;
-        }
-        argv.push(word.clone());
-    }
-    if !inserted {
-        argv.extend(["--cursor".to_string(), cursor.to_string()]);
-    }
-    NextEntry::runnable(argv, "the next page of this listing", None)
+    NextEntry::runnable(crate::paging::next_page_argv(cursor)?, "the next page of this listing", None)
 }
 
 /// The `meta` for `command`: its steps, then `extra`'s members. `extra`'s
@@ -502,7 +476,7 @@ fn build_meta(command: &str, schema_version: String, output: Option<String>, aft
         tool: TOOL,
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
         contract: CONTRACT,
-        contract_version: CONTRACT_VERSION,
+        contract_version: DECLARED_MINOR,
         output,
         context: context(),
         next: (!next.is_empty()).then_some(next),
@@ -690,7 +664,7 @@ fn validate<R: Report>(command: &str, text: &str) {
             if R::STATE_IN_DATA && carries_state(command) {
                 schema = with_state_properties(schema);
             }
-            (schema != Value::Bool(true)).then(|| std::sync::Arc::new(jsonschema::validator_for(&schema).unwrap_or_else(|e| panic!("the schema of {} does not compile: {e}", std::any::type_name::<R>()))))
+            (schema != Value::Bool(true)).then(|| std::sync::Arc::new(jsonschema::options().with_registry(&atip::schema::contract_registry()).build(&schema).unwrap_or_else(|e| panic!("the schema of {} does not compile: {e}", std::any::type_name::<R>()))))
         })
         .clone();
     if let Some(validator) = validator {

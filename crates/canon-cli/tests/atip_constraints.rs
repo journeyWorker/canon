@@ -705,10 +705,10 @@ fn run_in_copy(args: &[&str]) -> (Run, Vec<std::path::PathBuf>) {
 fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_before_it_writes() {
     let good = r#"{"change":"add-login","round":1,"seq":5,"severity":"note","actor":"alice","summary":"fine"}"#;
     for (bad, code, field) in [
-        (r#"{"change":"add-login","round":1,"seq":6,"severity":"blocker","actor":"alice","summary":"no origin"}"#, "FINDING_INTRODUCED_REQUIRED", "/items/1"),
-        (r#"{"change":"add-login","round":0,"seq":6,"severity":"note","actor":"alice","summary":"round zero"}"#, "FINDING_INVALID_ARGUMENT", "/items/1/round"),
-        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"both","introducedRev":"HEAD","introducedUnknown":true}"#, "FINDING_INVALID_ARGUMENT", "/items/1"),
-        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"two\nrows"}"#, "FINDING_INVALID_ARGUMENT", "/items/1/summary"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"blocker","actor":"alice","summary":"no origin"}"#, "FINDING_INTRODUCED_REQUIRED", "/1"),
+        (r#"{"change":"add-login","round":0,"seq":6,"severity":"note","actor":"alice","summary":"round zero"}"#, "FINDING_INVALID_ARGUMENT", "/1/round"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"both","introducedRev":"HEAD","introducedUnknown":true}"#, "FINDING_INVALID_ARGUMENT", "/1"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"two\nrows"}"#, "FINDING_INVALID_ARGUMENT", "/1/summary"),
     ] {
         for batch in [format!("[{good},{bad}]"), format!("[{bad},{good}]")] {
             let (outcome, changed) = run_in_copy(&["finding", "add", "--input", &batch]);
@@ -716,7 +716,7 @@ fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_
             assert_eq!(outcome.exit, 2, "{batch}: {}", outcome.body);
             assert_eq!(outcome.body["error"]["code"], code, "{batch}: {}", outcome.body);
             let at = outcome.body["error"]["field"].as_str().unwrap_or_default();
-            assert!(at.starts_with(&field.replace("/items/1", &format!("/items/{index}"))), "{batch}: field {at}");
+            assert!(at.starts_with(&field.replace("/1", &format!("/{index}"))), "{batch}: field {at}");
             assert!(changed.is_empty(), "{batch}: a refused batch wrote {changed:?}");
         }
     }
@@ -779,20 +779,21 @@ fn atip_constraints_25_an_integer_refusal_names_the_declared_bound() {
     assert!(seq.message.unwrap_or_default().contains("from 1 to 4294967295"));
 }
 
-/// atip.constraints.26: in a directory with no repository a batch answers the first stateless fault of any element, not the first valid
-/// element's `CONFIG_MISSING`: the stateless stage of every element runs before any element's dry run (spec 11.11).
+/// atip.constraints.26: in a directory with no repository a batch answers the first stateless fault of any element, in preflight; a
+/// batch with no such fault reaches the repository only when its first element runs, and answers its absence there (spec 11.11).
 #[test]
 fn atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elements_missing_repository() {
     for (command, items, code, field) in [
-        ("export", r#"[{"kind":"change"},{"kind":"change","after":"2026-02-01","before":"2026-01-02"}]"#, "USAGE", "/items/1/after"),
-        ("artifacts store", r#"[{},{"maxArtifactMib":0}]"#, "USAGE", "/items/1/maxArtifactMib"),
-        ("ingest records", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/items/1/intervalSecs"),
-        ("ingest sessions", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/items/1/intervalSecs"),
+        ("export", r#"[{"kind":"change"},{"kind":"change","after":"2026-02-01","before":"2026-01-02"}]"#, "USAGE", "/1/after"),
+        ("artifacts store", r#"[{},{"maxArtifactMib":0}]"#, "USAGE", "/1/maxArtifactMib"),
+        ("ingest records", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/1/intervalSecs"),
+        ("ingest sessions", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/1/intervalSecs"),
     ] {
         let outcome = empty(&format!("canon {command} --input '{items}'"), None);
         assert_refused(&outcome, code, field);
-        // The same batch with every element valid still reaches the repository and answers its absence.
+        // The same batch with every element valid is not refused in preflight: the first element runs and fails with the missing repository.
         let valid = items.replace(r#"{"kind":"change","after":"2026-02-01","before":"2026-01-02"}"#, r#"{"kind":"change"}"#).replace(r#"{"maxArtifactMib":0}"#, "{}").replace(r#"{"intervalSecs":-1}"#, "{}");
-        assert_eq!(empty(&format!("canon {command} --input '{valid}'"), None).code.as_deref(), Some("CONFIG_MISSING"), "{command}");
+        let ran = empty(&format!("canon {command} --input '{valid}'"), None);
+        assert_eq!((ran.exit, ran.code.as_deref(), ran.field.as_deref()), (1, Some("BATCH_INCOMPLETE"), Some("/0")), "{command}: {ran:?}");
     }
 }

@@ -8,7 +8,7 @@
 //!
 //! The projection ([`project`]) keeps the kept paths and what covers or leads to them. [`check_declaration`] holds a
 //! declaration and the schemas it points at to the contract: every cut node is projectable, every path names a member
-//! of the record schema and goes through arrays only with `[]`. [`projected_problems`] validates a projected value
+//! of the record schema and goes through arrays only with `[]`. `projected_problems` (feature `validate`) validates a projected value
 //! against the output's schema with `required` reduced to the members that are present, which is the claim spec 6.10
 //! makes: a tool's tests hold its real answers to it.
 //!
@@ -19,6 +19,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use serde_json::{json, Map, Value};
+
+use crate::minor::{Minor, UnknownMinor};
 
 /// Whether `name` is an identifier (`[A-Za-z_][A-Za-z0-9_]*`), which a path writes with a dot and never in brackets.
 pub fn is_identifier(name: &str) -> bool {
@@ -495,11 +497,29 @@ fn is_map(node: &Value) -> bool {
     types_of(node).contains(&"object") && node.get("additionalProperties").is_some_and(|extra| !extra.is_boolean() || extra.as_bool() == Some(true) || extra.is_object()) && node.get("properties").and_then(Value::as_object).is_none_or(Map::is_empty)
 }
 
-/// How a declaration is held to the contract (spec 10.13 rules 11, 15, 16).
+/// How a declaration is held to the contract (spec 10.13 rules 11, 15, 16): by the minor the command document declares.
+/// Built by [`Rules::at`] or [`Rules::for_minor`], never by its field:
+///
+/// ```compile_fail,E0451
+/// let _ = atip::fields::Rules { v11: true };
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rules {
-    /// The document declares 1.1: a bracketed path and map keys are allowed, and a declared map is a cut node.
-    pub v11: bool,
+    /// The document declares 1.1 or later (10.13 rule 16, "since 1.1" rules hold for every later minor): a bracketed
+    /// path and map keys are allowed, and a declared map is a cut node.
+    v11: bool,
+}
+
+impl Rules {
+    /// The rules of a document that declares `minor`: 1.1 and 1.2 keep the same rules, 1.0 has no bracketed path, no map key and no map cut node.
+    pub const fn at(minor: Minor) -> Self {
+        Self { v11: minor.at_least(Minor::V1_1) }
+    }
+
+    /// The rules of a document that declares the minor written `minor` (`"1.2"`), or [`UnknownMinor`] for any other text.
+    pub fn for_minor(minor: &str) -> Result<Self, UnknownMinor> {
+        Minor::parse(minor).map(Self::at)
+    }
 }
 
 /// The problems of one `fields` declaration and the schemas it points at; empty when it keeps the contract.
@@ -703,7 +723,7 @@ pub fn declared_maps(doc: &Value, root: &Value, records: &str, paths: &[String])
 
 /// `root` with `required` reduced to the members present, in every object cut node at or below the record (spec 6.10,
 /// "Projected schema"). The result is self-contained apart from the references it keeps to leaves and members kept
-/// whole; [`projected_problems`] puts the document back around it.
+/// whole; `projected_problems` (feature `validate`) puts the document back around it.
 pub fn reduced(doc: &Value, root: &Value, records: &str, kept: &[FieldPath]) -> Value {
     let kept: Vec<Vec<String>> = kept.iter().map(|path| path.names().into_iter().map(str::to_string).collect()).collect();
     let tokens = pointer_tokens(records).unwrap_or_default();
@@ -821,6 +841,7 @@ fn reduce_at(doc: &Value, node: &Value, rel: &mut Vec<String>, kept: &[Vec<Strin
 
 /// The problems of `data` against the output's schema with `required` reduced for `kept` (spec 6.10): empty when the
 /// projected value is one the contract allows. The schema is `root`, its `$ref`s read in `doc`.
+#[cfg(feature = "validate")]
 pub fn projected_problems(doc: &Value, root: &Value, records: &str, kept: &[FieldPath], data: &Value) -> Vec<String> {
     let mut schema = reduced(doc, root, records, kept);
     if !schema.is_object() {
@@ -993,7 +1014,34 @@ mod tests {
     }
 
     fn check(doc: &Value, paths: &[&str], keep: &[&str], default: &[&str]) -> Vec<String> {
-        check_declaration(doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(paths), &strings(keep), &strings(default), Rules { v11: true })
+        check_declaration(doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(paths), &strings(keep), &strings(default), Rules::at(Minor::V1_2))
+    }
+
+    #[test]
+    fn atip_crate12_10_rules_follow_the_declared_minor_and_1_1_and_1_2_agree() {
+        let doc = json!({ "schemas": { "Report": { "type": "object", "properties": { "rows": { "type": "array", "items": { "$ref": "#/schemas/Row" } } } }, "Row": { "type": "object", "properties": { "attributes": { "type": "object", "additionalProperties": { "type": "string" }, "minProperties": 1 } } } } });
+        let declaration = |rules: Rules| check_declaration(&doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(&["attributes"]), &[], &[], rules);
+        let bracketed = |rules: Rules| check_declaration(&doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(&["attributes", "attributes[\"x.y\"]"]), &[], &[], rules);
+        // 1.0 keeps a map whole, so its `minProperties` is no problem, and has no bracketed key.
+        let one_zero = Rules::for_minor("1.0").expect("1.0 is a minor");
+        assert_eq!(declaration(one_zero), Vec::<String>::new());
+        assert!(bracketed(one_zero).iter().any(|problem| problem.contains("bracketed key")), "{:?}", bracketed(one_zero));
+        // 1.1 and 1.2 are the same rules: the map is a cut node, which `minProperties` breaks, and a bracketed key is allowed.
+        for text in ["1.1", "1.2"] {
+            let rules = Rules::for_minor(text).expect("a known minor");
+            assert!(declaration(rules).iter().any(|problem| problem.contains("minProperties")), "{text}");
+            assert!(!bracketed(rules).iter().any(|problem| problem.contains("bracketed key")), "{text}");
+        }
+        assert_eq!(Rules::for_minor("1.1"), Rules::for_minor("1.2"));
+        assert_eq!(Rules::at(Minor::V1_2), Rules::for_minor("1.2").expect("known"));
+        assert_ne!(Rules::at(Minor::V1_0), Rules::at(Minor::V1_1));
+    }
+
+    #[test]
+    fn atip_crate12_11_a_minor_the_crate_does_not_know_is_refused_never_read_as_the_nearest_one() {
+        for text in ["1.9", "1.3", "2.0", "", "1"] {
+            assert_eq!(Rules::for_minor(text), Err(UnknownMinor(text.to_string())), "{text:?}");
+        }
     }
 
     #[test]
@@ -1062,7 +1110,7 @@ mod tests {
         doc["schemas"]["Row"]["properties"]["attributes"]["minProperties"] = json!(1);
         let bad = check(&doc, &["attributes"], &[], &[]);
         assert!(bad.iter().any(|p| p.contains("minProperties")), "{bad:?}");
-        let old = check_declaration(&doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(&["attributes"]), &[], &[], Rules { v11: false });
+        let old = check_declaration(&doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(&["attributes"]), &[], &[], Rules::at(Minor::V1_0));
         assert_eq!(old, Vec::<String>::new(), "a 1.0 map is kept whole");
         assert_eq!(declared_maps(&doc, &json!({ "$ref": "#/schemas/Report" }), "/rows", &strings(&["attributes", "name"])), kept(&["attributes"]));
     }

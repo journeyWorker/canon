@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2"
+  },
+  "at": "2026-11-02T18:44:24.361504Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2input_16_a_first_item_failure_with_exit_2_and_a_preflight_refusal_as_batch_incomplete_each_fail_only_their_row",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-l2-junit.xml",
+      "sha256": "cfa1c0512f4a9e7b44b2bbf66f442f31e0ecedae35e32b2b97a88ee8a2121211"
+    }
+  ],
+  "code_tree": "6459f47806fae8ed34497094860ec43489d0b6a0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-l2-junit.xml"
+  },
+  "evidence_sha": "c774a98f0d3b0a647ed4771aacfb55450907c0e2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 38,
+  "scenario_id": "atip.checkl2input.16",
+  "schema": 1,
+  "staging_id": "7652c0f4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T17:40:11.504937Z",
+  "change_id": "canon-0-35-canon-cursor-1-2",
+  "code_tree": "276e9a2237949d440c74791e0fc4d5450c7b4b92",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/paging.rs",
+  "introduced_by": "4c646bd8827a5468f97c524171bcd12021729d8f",
+  "kind": "finding",
+  "reviewed_sha": "792712dc344fb492b687e823fed87af2df55c2ea",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Blast radius / spec fidelity: only export has --input among the four paged commands (query, finding list, divergence list reject --input as an unknown option, so F5's FLAG_ONLY_KEY is reachable on export alone; the document-key rule is enforced for them through the shared flags_only set and the schema check). Test 12 pins a 0.34 cursor as a literal made by the pre-change binary, which is sound only while the crate's decoder rejects it; I replayed a hand-made 0.34-shaped hex cursor and it is FOREIGN. CANON_ROLE is bound through a hand-written read in paging::given_of (role.rs ENV) because --as is not a clap env, so a future option with an env needs no change but another non-clap env source would be missed; the brief names CANON_ROLE as the only one. Not a defect.",
+  "worktree_dirty": false
+}

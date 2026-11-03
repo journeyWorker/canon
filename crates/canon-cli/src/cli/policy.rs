@@ -22,7 +22,7 @@ pub struct PolicyApproveArgs {
     #[arg(long, value_name = "NAME")]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID", requires = "relayed_via")]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

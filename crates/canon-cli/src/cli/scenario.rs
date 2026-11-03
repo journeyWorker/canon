@@ -33,7 +33,7 @@ pub struct ScenarioNewArgs {
     #[arg(long, value_name = "FLOW_ID")]
     pub flow: Option<String>,
     /// The change whose brief defines --flow (default: --subject's newest adopted change)
-    #[arg(long = "change", requires = "flow", value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
+    #[arg(long = "change", value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: Option<ChangeId>,
     /// Agent id written into provenance (env: CANON_ACTOR)
     #[arg(long = "actor", env = "CANON_ACTOR", default_value = "canon-scaffold", value_name = "ACTOR_ID")]

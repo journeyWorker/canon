@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:54:56.093141Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "c4289fc876a8f2af4509f05f555ead0c845330fa",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 3,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Stale prose after the fix (no behavior): CHANGELOG.md line 184 ('The lock file is made by the first call that locks it (write_lock::hold_within: opened with create, never truncated, never deleted)') and the module doc of crates/canon-cli/src/write_lock.rs line 8 ('the file never deleted') still say the file is never deleted, while the entry above it and the next sentences say a refused call that made the file removes it. The test write_lock::tests 'the lock file is never deleted' is about a file that was already there and is right. Say 'never deleted by a call that found it'.",
+  "worktree_dirty": false
+}

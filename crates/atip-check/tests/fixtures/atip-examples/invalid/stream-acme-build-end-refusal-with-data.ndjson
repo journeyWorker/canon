@@ -1,2 +1,2 @@
-{"type":"start","contract":"atip/1","contractVersion":"1.1","tool":"acme","toolVersion":"1.0.0","command":"build","schemaVersion":"1.0","output":"BuildResult"}
-{"type":"end","result":{"ok":false,"error":{"code":"USAGE","message":"unexpected argument '--bogus' found","field":"--bogus","retryable":false},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.1","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0","output":"BuildResult"},"data":{"artifacts":0}}}
+{"type":"start","contract":"atip/1","contractVersion":"1.2","tool":"acme","toolVersion":"1.0.0","command":"build","schemaVersion":"1.0","output":"BuildResult"}
+{"type":"end","result":{"ok":false,"error":{"code":"USAGE","message":"unexpected argument '--bogus' found","field":"--bogus","retryable":false},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.2","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0","output":"BuildResult"},"data":{"artifacts":0}}}

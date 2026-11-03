@@ -1,1 +1,1 @@
-{"ok":false,"error":{"code":"BUILD_FAILED","message":"step link failed","retryable":false},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.1","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0"}}
+{"ok":false,"error":{"code":"BUILD_FAILED","message":"step link failed","retryable":false},"meta":{"command":"build","contract":"atip/1","contractVersion":"1.2","schemaVersion":"1.0","tool":"acme","toolVersion":"1.0.0"}}

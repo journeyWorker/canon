@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-check-l2b",
+    "role": "implementer",
+    "session_id": "s-0-35-check-l2b"
+  },
+  "at": "2026-11-03T00:27:13.951240Z",
+  "attachments": [
+    {
+      "case": "app::tests::atip_check_06_a_panic_is_an_internal_failure_with_exit_1_and_a_way_to_report_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "cli::tests::atip_check_06_a_malformed_check_line_is_a_usage_error_naming_the_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "cli::tests::atip_check_06_a_complete_check_line_parses_with_either_option_spelling",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "cli::tests::atip_check_06_the_root_answers_a_missing_or_unknown_command_with_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "output::tests::atip_check_06_the_registry_is_sorted_and_each_code_reads_its_own_row",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    },
+    {
+      "case": "atip_check_06_a_malformed_atip_command_line_is_refused_naming_the_argument_at_fault",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci/junit-0-35-check-l2d.xml",
+      "sha256": "e35c314ae418414bb4cf4db908204d9b8acba00e444b873d490f5f08995634d6"
+    }
+  ],
+  "code_tree": "09cd2b60211f3f5f90144f8da7575ba6ae52f1a0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/ci/junit-0-35-check-l2d.xml"
+  },
+  "evidence_sha": "7508143a2ff26f33539c6da3c94fd1a9f683c0e9",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 684,
+  "scenario_id": "atip.check.06",
+  "schema": 1,
+  "staging_id": "b83875e4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

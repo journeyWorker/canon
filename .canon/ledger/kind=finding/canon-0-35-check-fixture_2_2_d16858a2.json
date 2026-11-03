@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev"
+  },
+  "at": "2026-11-02T18:06:57.847802Z",
+  "change_id": "canon-0-35-check-fixture",
+  "code_tree": "9c40336d27f4c0f2ec481820b37dbe6526a97cc3",
+  "disposition": "open",
+  "file_ref": ".canon/changes/canon-0-35-check-fixture/brief.md",
+  "introduced_by": "643109469316c260d50372f678b5aaaf8016f79b",
+  "kind": "finding",
+  "reviewed_sha": "adf05245c6b8ad2be47dcf0b36fc7ffaa43c97ed",
+  "reviewer": "rev-check-0-35",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.95"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Spec fidelity: the amended and re-approved brief still carries the pre-1.2.1 sentences: F4 detail says the command is 'run by no other check' and that a notRun command listed in commands is FIXTURE_INVALID (line 87), while the same brief's outcome, the contract and the implementation allow commands and notRun together (first ok is the one run; atip.check.95 lists two ok entries). The implementation follows the contract as Main said, so this is a brief defect, not a code one; recorded as a finding because I may not edit the brief. Blast radius: a later reader of the brief gets the opposite rule from the code for commands-and-notRun.",
+  "worktree_dirty": false
+}

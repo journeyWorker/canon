@@ -87,18 +87,51 @@ impl Tool {
         self.text("tool", "fake")
     }
 
-    /// Whether the tool claims 1.1 (the default).
+    /// The minor the tool claims (`"claims"`: `1.0`, `1.1` the default, or `1.2`). A copy of the tool whose name has `claims12` in it claims
+    /// 1.2 by default, so that the runs that get no configuration (`L1.no-state` runs in an empty directory) say what the configured ones say.
+    fn minor(&self) -> String {
+        let alias = std::env::args().next().unwrap_or_default();
+        let default = if alias.contains("claims12") { "1.2" } else { "1.1" };
+        self.text("claims", default)
+    }
+
+    /// Whether the tool claims 1.1 or later.
     fn is_1_1(&self) -> bool {
-        self.text("claims", "1.1") == "1.1"
+        self.minor() != "1.0"
+    }
+
+    /// Whether the tool claims 1.2.
+    fn is_1_2(&self) -> bool {
+        self.minor() == "1.2"
     }
 
     fn commands(&self) -> Vec<&'static str> {
         let mut commands = vec!["init", "items", "member", "reject", "status", "team", "touch"];
+        if self.flag("l2") {
+            commands.retain(|command| *command != "touch");
+            commands.extend(["build", "deploy", "log", "peek", "purge", "record", "seal", "skills", "stamp"]);
+        }
         if !self.flag("noSchema") {
             commands.push("schema");
         }
+        if self.config.contains_key("serveMode") {
+            commands.push("serve");
+        }
         commands.sort_unstable();
         commands
+    }
+
+    /// The code the tool answers for `code`: with `usageRenamed` the tool has no `USAGE` and answers `usageReplacement` (default `OPTION_INVALID`).
+    fn usage_name(&self) -> String {
+        self.text("usageReplacement", "OPTION_INVALID")
+    }
+
+    fn renamed<'a>(&self, code: &'a str) -> std::borrow::Cow<'a, str> {
+        if code == "USAGE" && self.flag("usageRenamed") {
+            std::borrow::Cow::Owned(self.usage_name())
+        } else {
+            std::borrow::Cow::Borrowed(code)
+        }
     }
 
     fn registered_exit(code: &str) -> u8 {
@@ -108,13 +141,26 @@ impl Tool {
             .map_or(2, |(_, exit, _)| u8::try_from(*exit).unwrap_or(2))
     }
 
+    /// The seeded refusal of the command `id` (`refuseWith`: `{code, commands, unlessEnv?}`): the command is refused with `code` when its
+    /// environment does not hold the variable `unlessEnv` (always, when the knob names none). A refusal of state or environment, not of the arguments.
+    fn seeded_refusal(&self, id: &str) -> Option<ExitCode> {
+        let knob = self.config.get("refuseWith")?;
+        let listed = knob.get("commands").and_then(Value::as_array)?.iter().any(|command| command == id);
+        let given = knob.get("unlessEnv").and_then(Value::as_str).is_some_and(|name| std::env::var_os(name).is_some());
+        if !listed || given {
+            return None;
+        }
+        let code = knob.get("code").and_then(Value::as_str).unwrap_or("NEEDS_TOKEN");
+        Some(self.refuse(code, "the backend needs a credential", id, &[]))
+    }
+
     fn meta(&self, command: Option<&str>) -> Map<String, Value> {
         let mut meta = Map::new();
         let schema_answer = command == Some("schema");
         let version = if schema_answer {
             self.text(
                 "schemaAnswerVersion",
-                if self.is_1_1() { "1.1" } else { "1.0" },
+                &if self.is_1_1() { self.minor() } else { "1.0".to_string() },
             )
         } else {
             "1.0".to_string()
@@ -133,7 +179,7 @@ impl Tool {
         if markers {
             meta.insert(
                 "contractVersion".into(),
-                json!(self.text("contractVersionSays", "1.1")),
+                json!(self.text("contractVersionSays", &self.minor())),
             );
         }
         if self.flag("metaUnknownMember") {
@@ -191,6 +237,8 @@ impl Tool {
         extras: &[(&str, Value)],
         exit: u8,
     ) -> ExitCode {
+        let usage = code == "USAGE";
+        let code = &*self.renamed(code);
         if self.flag("refusalWrites") {
             std::fs::write("refused.txt", "written by a refusal").unwrap_or_default();
         }
@@ -219,6 +267,10 @@ impl Tool {
             error.insert("hint".into(), Value::Null);
         }
         for (key, value) in extras {
+            // Seeded (`usageNoField`): a refusal that is a usage problem does not say which argument.
+            if *key == "field" && usage && self.flag("usageNoField") {
+                continue;
+            }
             error.insert((*key).to_string(), value.clone());
         }
         let mut document = json!({"ok": false, "error": error, "meta": self.meta(command)});
@@ -351,7 +403,9 @@ impl Tool {
 
     /// A refusal with a code, a field and the hint a seeded violation may change.
     fn refuse(&self, code: &str, message: &str, command: &str, extras: &[(&str, Value)]) -> ExitCode {
-        self.fail("usage", code, message, Some(command), extras, Self::registered_exit(code))
+        // Seeded: INPUT_INVALID exits 1 where the registry says 2 (the code and the envelope are right).
+        let exit = if code == "INPUT_INVALID" && self.flag("inputInvalidExit1") { 1 } else { Self::registered_exit(code) };
+        self.fail("usage", code, message, Some(command), extras, exit)
     }
 
     fn success(&self, command: &str, data: Value) -> ExitCode {
@@ -624,6 +678,38 @@ impl Tool {
                 ((*code).to_string(), *exit, &[][..], (*meaning).to_string(), fix.replace("{tool}", &tool))
             }));
         }
+        // `stoppedMidway` registers the code `STOPPED_MIDWAY` (spec 8.3.2): exit 1 and not retryable (`reservedExit` and
+        // `stoppedMidwayRetryable` seed it wrong; below 1.2 it is a code of the tool's own).
+        if self.flag("stoppedMidway") {
+            let exit = if self.flag("stoppedMidwayExit2") { 2 } else { 1 };
+            table.push(("STOPPED_MIDWAY".to_string(), exit, &[][..], "m".to_string(), "f".to_string()));
+        }
+        if self.flag("l2") {
+            const INPUT_INVALID: &[&str] = &["BATCH_UNSUPPORTED", "EMPTY", "FLAG_ONLY_KEY", "INVALID_VALUE", "NOT_JSON", "NOT_OBJECT", "STDIN_TTY", "UNKNOWN_KEY", "UNREADABLE"];
+            const TOO_LARGE: &[&str] = &["TOO_MANY_BYTES", "TOO_MANY_ITEMS"];
+            for row in &mut table {
+                match row.0.as_str() {
+                    "INPUT_INVALID" => row.2 = INPUT_INVALID,
+                    "INPUT_TOO_LARGE" => row.2 = TOO_LARGE,
+                    _ => {}
+                }
+            }
+        }
+        for row in self.config.get("extraCodes").and_then(Value::as_array).into_iter().flatten() {
+            table.push((
+                row["code"].as_str().unwrap_or_default().to_string(),
+                row["exit"].as_i64().unwrap_or(2),
+                &[][..],
+                "m".to_string(),
+                "f".to_string(),
+            ));
+        }
+        if self.flag("usageRenamed") {
+            let replacement = self.usage_name();
+            for row in table.iter_mut().filter(|row| row.0 == "USAGE") {
+                row.0 = replacement.clone();
+            }
+        }
         table.sort_by(|left, right| left.0.cmp(&right.0));
         table
             .into_iter()
@@ -639,7 +725,9 @@ impl Tool {
                         .and_then(Value::as_i64)
                         .unwrap_or(exit)
                 };
-                let mut row = json!({"code": code, "exit": exit, "retryable": false, "meaning": meaning, "fix": fix});
+                let retryable = (code == "STOPPED_MIDWAY" && self.flag("stoppedMidwayRetryable"))
+                    || self.config.get("retryableCodes").and_then(Value::as_array).is_some_and(|codes| codes.iter().any(|retryable| retryable == &code));
+                let mut row = json!({"code": code, "exit": exit, "retryable": retryable, "meaning": meaning, "fix": fix});
                 if self.is_1_1() && !reasons.is_empty() {
                     row["reasons"] = json!(reasons
                         .iter()
@@ -702,10 +790,34 @@ fn wait_in_raw_mode(mode: &str) {
 }
 
 fn main() -> ExitCode {
-    let config: Map<String, Value> = std::env::var_os("FAKE_ATIP_CONFIG")
+    let mut config: Map<String, Value> = std::env::var_os("FAKE_ATIP_CONFIG")
         .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default();
+    // An executable named `...claims12...` is a tool that claims 1.2 when no configuration says otherwise (the run in an empty directory has no environment).
+    if config.is_empty() {
+        // The name of the executable alone: the directory it is in says nothing.
+        let name = std::env::args().next().and_then(|path| std::path::Path::new(&path).file_name().map(|file| file.to_string_lossy().into_owned())).unwrap_or_default();
+        if name.contains("claims12") {
+            config.insert("claims".to_string(), json!("1.2"));
+        }
+        // An L2 tool answers `skills show` in an empty directory with a minimal environment, which has no configuration to read.
+        if name.contains("-l2") {
+            config.insert("l2".to_string(), json!(true));
+            config.insert("l1Registry".to_string(), json!(true));
+            // The seeded violations of what that run answers are named in the executable's name, after `-l2`: `...-l2-skillswrites`.
+            const KNOBS: [&str; 11] = [
+                "skillsPutsFile", "skillsNeedsState", "skillsBadSchema", "skillsDefaultNotListed", "skillsGuideBadSchema", "skillsWrongName", "skillsGuidesDiffer", "skillsUnknownOk",
+                "skillsUnknownNoExpected", "skillsMissingName", "guideBadOption",
+            ];
+            let file = name.to_lowercase();
+            for knob in KNOBS {
+                if file.split('-').any(|token| token == knob.to_lowercase()) {
+                    config.insert(knob.to_string(), json!(true));
+                }
+            }
+        }
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut tool = Tool {
         config,
@@ -720,6 +832,18 @@ fn main() -> ExitCode {
     if tool.flag("dirtyMarker") && std::path::Path::new("dirty.txt").exists() {
         eprintln!("state leaked in from an earlier invocation");
         return ExitCode::from(70);
+    }
+    if let Some(log) = tool.config.get("invocationLog").and_then(Value::as_str) {
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(log) {
+            let _ = std::io::Write::write_all(&mut file, format!("{}\n", args.join(" ")).as_bytes());
+        }
+    }
+    if let Some(command) = tool.config.get("hangCommand").and_then(Value::as_str) {
+        let words: Vec<&str> = args.iter().take_while(|arg| arg.as_str() != "--").filter(|arg| !arg.starts_with('-')).map(String::as_str).collect();
+        let asks_help = args.iter().any(|arg| arg == "--help" || arg == "-h");
+        if !asks_help && words.join(" ").starts_with(command) {
+            std::thread::sleep(Duration::from_secs(600));
+        }
     }
     run(&tool, &args)
 }
@@ -789,8 +913,52 @@ fn is_unknown_option(arg: &str) -> bool {
         "--total",
         "--note",
         "--clear-note",
+        "--round",
+        "--label",
+        "--weight",
+        "--score",
+        "--meta",
     ];
     arg.starts_with("--") && arg != "--" && !known.contains(&arg)
+}
+
+/// The command `serve` of the seeded `notRun` runs (`serveMode`): it prints one envelope and then serves until it is signalled.
+/// `exitBefore` ends without a document, `exitAfter` ends after it, `silent` prints none and keeps running, `ignoreTerm` ignores SIGTERM;
+/// `dataPatch` and `metaPatch` of `serve` seed a bad document, and `invocationLog` counts the runs.
+#[expect(
+    unsafe_code,
+    reason = "libc::signal is an unsafe FFI call; the seeded violation is a server that ignores SIGTERM"
+)]
+fn serve(tool: &Tool) -> ExitCode {
+    let mode = tool.text("serveMode", "serve");
+    if mode == "ignoreTerm" {
+        // SAFETY: sets the disposition of SIGTERM of this process to ignore; nothing else touches signals.
+        unsafe {
+            libc::signal(libc::SIGTERM, libc::SIG_IGN);
+        }
+    }
+    match mode.as_str() {
+        "exitBefore" => return ExitCode::SUCCESS,
+        // Refused at the start with exit 2 and the code `serveRefuseCode` (a precondition when it is `CURSOR_INVALID`, a usage error as `USAGE`).
+        "refuseStart" => {
+            let code = tool.text("serveRefuseCode", "CURSOR_INVALID");
+            let field = tool.text("serveRefuseField", "");
+            let extras: Vec<(&str, Value)> = if field.is_empty() { Vec::new() } else { vec![("field", json!(field))] };
+            // `serveRefuseExit` seeds the exit of the refusal (default 2): with 1 it is not a refusal of the kind the contract knows.
+            let exit = tool.number("serveRefuseExit").map_or(2, |exit| u8::try_from(exit).unwrap_or(2));
+            return tool.fail("usage", &code, "serve cannot start here", Some("serve"), &extras, exit);
+        }
+        "silent" => {}
+        _ => {
+            tool.success("serve", json!({"serving": true}));
+        }
+    }
+    if mode == "exitAfter" {
+        return ExitCode::SUCCESS;
+    }
+    loop {
+        std::thread::sleep(Duration::from_secs(1));
+    }
 }
 
 #[expect(
@@ -805,6 +973,23 @@ fn die_by_signal() {
 }
 
 fn run(tool: &Tool, args: &[String]) -> ExitCode {
+    // An L2 tool reads `--input` first (spec 11.7): a refusal, a batch, or the argv that says what the document and argv say.
+    let synthesized: Vec<String>;
+    let args: &[String] = if tool.flag("l2") {
+        match l1::prepare_input(tool, args) {
+            l1::Prepared::Unchanged => args,
+            l1::Prepared::Done(code) => return code,
+            l1::Prepared::Argv(words) => {
+                // What a handler that answers differently for a document needs to know: the arguments came from `--input`.
+                std::env::set_var("FAKE_FROM_DOCUMENT", "1");
+                synthesized = words;
+                &synthesized
+            }
+            l1::Prepared::Batch(id, items) => return l1::execute_batch(tool, id, items),
+        }
+    } else {
+        args
+    };
     if let Some(code) = l1::handle(tool, args) {
         return code;
     }
@@ -873,6 +1058,12 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
             .find(|(option, _)| option == name)
             .and_then(|(_, value)| value.clone())
     };
+    if let Some(refused) = tool.seeded_refusal(command) {
+        return refused;
+    }
+    if command == "serve" {
+        return serve(tool);
+    }
     if command == "team" {
         return team(tool, &words, repo_given);
     }
@@ -889,6 +1080,13 @@ fn run(tool: &Tool, args: &[String]) -> ExitCode {
     match command.as_str() {
         "init" => {
             std::fs::write("state.txt", "initialised").unwrap_or_default();
+            if tool.flag("l2") {
+                // The logs `purge` removes.
+                std::fs::create_dir_all("logs").unwrap_or_default();
+                for name in ["run-a", "session-a", "session-b"] {
+                    std::fs::write(format!("logs/{name}.log"), format!("{name}\n")).unwrap_or_default();
+                }
+            }
             if let Some(log) = tool.config.get("initLog").and_then(Value::as_str) {
                 let mut file = std::fs::OpenOptions::new()
                     .create(true)
@@ -965,7 +1163,7 @@ fn team(tool: &Tool, words: &[String], repo_given: bool) -> ExitCode {
         }
         // A stream command (13.5): a start line, an event, an end line holding the envelope.
         Some("add") if tool.flag("teamAddStream") && tool.json => {
-            let version = tool.text("streamStartContractVersion", "1.1");
+            let version = tool.text("streamStartContractVersion", &tool.minor());
             let mut start = json!({"type": "start", "contract": "atip/1", "tool": tool.name(), "toolVersion": "1.2.3", "command": "team add", "schemaVersion": "1.0"});
             if version != "none" {
                 start["contractVersion"] = json!(version);
@@ -1090,6 +1288,9 @@ fn touch(tool: &Tool, name: &Option<String>, input: &Option<String>) -> ExitCode
 }
 
 fn version(tool: &Tool) -> ExitCode {
+    if tool.flag("versionWrites") {
+        std::fs::write("version-cache.txt", "written by --version").unwrap_or_default();
+    }
     if tool.flag("versionStderr") {
         eprintln!("warming up");
     }

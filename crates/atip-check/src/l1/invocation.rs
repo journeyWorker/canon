@@ -853,6 +853,14 @@ fn document_args(doc: &CommandDoc, item: &Value, at: &str, problems: &mut Vec<St
     out
 }
 
+/// The explicit arguments of one `--input` document (the keys are camelCase option names and `operands`) and the problems of its values:
+/// a key no option has, a flag-only key, a value outside its type or domain.
+pub fn document_arguments(doc: &CommandDoc, item: &Value) -> (Args, Vec<String>) {
+    let mut problems = Vec::new();
+    let args = document_args(doc, item, "", &mut problems);
+    (args, problems)
+}
+
 /// Compares a document's arguments with argv's and merges them (spec 11.7 steps 3-4).
 fn merge_args(
     doc: &CommandDoc,
@@ -1014,6 +1022,49 @@ fn value_problems(doc: &CommandDoc, invocation: &Invocation) -> Vec<String> {
         }
     }
     problems
+}
+
+/// The names of the arguments of `invocation` whose value is outside its type or its domain (a count by its occurrences), each once, in the order of the arguments.
+pub fn broken_arguments(doc: &CommandDoc, invocation: &Invocation) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    let mut operand_index = 0;
+    let mut counts: BTreeMap<&str, u64> = BTreeMap::new();
+    for item in &invocation.items {
+        let (arg, text) = match item {
+            Item::Operand(text) => {
+                let index = operand_index;
+                operand_index += 1;
+                (operand_arg(doc, index), text)
+            }
+            Item::Option { name, value } => {
+                let Some(option) = doc.option(name).filter(|option| option.name != "input") else {
+                    continue;
+                };
+                if option.value_type == "count" {
+                    *counts.entry(&option.name).or_insert(0) += 1;
+                    continue;
+                }
+                let Some(text) = value else { continue };
+                (Some(option), text)
+            }
+        };
+        let Some(arg) = arg else { continue };
+        let wrong = match typed(Some(arg), text) {
+            Ok(value) => value_problem(arg, &value).is_some(),
+            Err(_) => true,
+        };
+        if wrong && !names.contains(&arg.name) {
+            names.push(arg.name.clone());
+        }
+    }
+    for (name, count) in counts {
+        if let Some(option) = doc.option(name) {
+            if value_problem(option, &Value::from(count)).is_some() && !names.contains(&option.name) {
+                names.push(option.name.clone());
+            }
+        }
+    }
+    names
 }
 
 /// `Some(problems joined)` when there are any.

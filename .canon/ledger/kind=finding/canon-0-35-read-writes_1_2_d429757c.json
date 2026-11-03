@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T16:43:32.270505Z",
+  "change_id": "canon-0-35-read-writes",
+  "code_tree": "1af2db291ecb2de2366ed07496189718d50cbf41",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_readwrites.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "8606feadd8b3ad45e22ee204ee913003ab76f837",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards (atip.readwrites.04): the preview sweep counts a preview as proved when it succeeds (previewed >= 10) but compares the snapshot for every call, refused or not; it lists 12 previews in a loop plus ingest sessions and init separately, so all 14 dry-run commands are covered, but a --dry-run that was refused for a missing argument, as the checker's fixture would, writes nothing by the same assertion without proving the preview path. The refusal part (01, 07) is strong: it is the stale-index world with a snapshot of repo, HOME and TMPDIR, and 07 makes the store unwritable for a call that would otherwise refresh. Blast radius: spec 12.2 lists --dry-run, --help, --version, schema and skills show; the sweep covers every leaf's --help and schema and five guides, not every guide name.",
+  "worktree_dirty": false
+}

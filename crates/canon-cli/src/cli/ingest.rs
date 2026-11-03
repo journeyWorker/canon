@@ -67,10 +67,10 @@ pub struct IngestRecordsArgs {
 #[derive(Debug, Args)]
 pub struct IngestPlansArgs {
     /// One-shot override: import this dialect's --plan-source root (requires --plan-source)
-    #[arg(long, requires = "plan_source", value_name = "NAME")]
+    #[arg(long, value_name = "NAME")]
     pub dialect: Option<String>,
     /// One-shot override's source root (paired with --dialect)
-    #[arg(long, value_name = "DIR", requires = "dialect")]
+    #[arg(long, value_name = "DIR")]
     pub plan_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

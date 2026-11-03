@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-stopped-midway",
+    "role": "implementer",
+    "session_id": "s-0-35-stopped"
+  },
+  "at": "2026-11-02T14:49:56.738148Z",
+  "attachments": [
+    {
+      "case": "atip_midway_03_init_stops_midway_when_the_skill_install_meets_a_refusal_after_the_writes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-stopped-midway-junit.xml",
+      "sha256": "38fce25eaab9ec03dbc8421b9bd8c31573912126deddee8c0d5bc75d31966a7f"
+    }
+  ],
+  "code_tree": "a33c734e998912f82d997a274762105888448f45",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-stopped-midway-junit.xml"
+  },
+  "evidence_sha": "906fbbc964aa375b0b0cbb4f5e5054250d9abc90",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "atip.midway.03",
+  "schema": 1,
+  "staging_id": "4b4b9010",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

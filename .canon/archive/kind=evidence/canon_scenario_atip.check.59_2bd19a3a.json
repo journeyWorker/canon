@@ -1,0 +1,55 @@
+{
+  "actor": {
+    "agent_id": "impl-split",
+    "role": "implementer",
+    "session_id": "s-0-35-split-fix"
+  },
+  "at": "2026-11-03T14:27:04.951678Z",
+  "attachments": [
+    {
+      "case": "checks::rules::tests::atip_check_59_a_hint_that_starts_with_the_tool_name_is_judged_as_one_command_line",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "b78874de9bab593bda95e679e64e905470c127e4616a73d8cee3327f2bac270a"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_the_markers_and_the_version_are_the_claims",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "b78874de9bab593bda95e679e64e905470c127e4616a73d8cee3327f2bac270a"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_every_code_reason_and_warning_a_document_emits_is_listed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "b78874de9bab593bda95e679e64e905470c127e4616a73d8cee3327f2bac270a"
+    },
+    {
+      "case": "checks::rules::tests::atip_check_59_a_finding_belongs_to_one_rule_and_the_envelope_schema_leaves_the_others_theirs",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/atip/junit.xml",
+      "sha256": "b78874de9bab593bda95e679e64e905470c127e4616a73d8cee3327f2bac270a"
+    }
+  ],
+  "code_tree": "8fa758de852cbe6f3744b7b1073879eb02b2430a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml,target/nextest/atip/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-35-split-atip-check after review 1_1-1_5: cargo nextest run --workspace (default profile, 3732 passed) and just test-atip = cargo nextest run -p atip-check --profile atip (369 passed), from the clean worktree at the fix commit, under the load of parallel agents"
+  },
+  "evidence_sha": "70cf7b30fbb3c0367850aefa7bdd051325458a83",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1002,
+  "scenario_id": "atip.check.59",
+  "schema": 1,
+  "staging_id": "1d1cbaed",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-check-0-35b",
+    "role": "reviewer",
+    "session_id": "s-0-35-check-rev-b"
+  },
+  "at": "2026-11-02T21:44:58.809207Z",
+  "change_id": "canon-0-35-check-l2-safety",
+  "code_tree": "6a387a08328d3a648b18d3f324f0bc55c41725ac",
+  "disposition": "fixed",
+  "file_ref": "crates/atip-check/src/fixture.rs",
+  "introduced_by": "e1ff4c4c118159a35131245d7462d7d68fa1bd21",
+  "kind": "finding",
+  "resolution_code_tree": "20fe1f32037994a8b834db07968a075fb306f935",
+  "resolution_sha": "916a0bf65ffd8358552dd3111813f2400a898997",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "383fc2a0486aafaffc8be3517984f17db5663bd9",
+  "reviewer": "rev-check-0-35b",
+  "round": 1,
+  "scenario_ids": [
+    "atip.checkl2safety.10",
+    "atip.checkl2safety.12"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (checker.md section 5/6: 'The checker drives done, failed and timeout outcomes'; section 2: 'a tool cannot pass by withholding fixtures'): fixture.rs:567 accepts an async.outcomes list of any non-empty subset, and plan_async drives only those. Probe on the conforming fake with outcomes [\"done\"]: L2.async is pass, exit 0; the failed and timeout conditions (failed exits 1 with a registered code, timeout exits 1 retryable with the same wait in next[0]) are never exercised and nothing says so. A tool whose test build cannot hang or fail passes the MUST row by listing the outcome it supports. A missing outcome should leave L2.async unprovided naming commands.<id>.async.outcomes. Blast radius: L2.async for every async tool; atip.checkl2safety.10 and .12 use the full list.",
+  "worktree_dirty": true
+}

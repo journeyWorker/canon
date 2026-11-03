@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-check-0-35",
+    "role": "implementer",
+    "session_id": "s-0-35-check"
+  },
+  "at": "2026-11-02T09:13:17.755302Z",
+  "attachments": [
+    {
+      "case": "atip_check_90_the_same_checks_pass_when_the_environment_removes_the_refusal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/0-35-check-fixture-junit.xml",
+      "sha256": "77d6ee1edcb7dc3f2c3fcc77a14003dd575a19a50d83b4cf5e763f6a383a318a"
+    }
+  ],
+  "code_tree": "b1cb2b90fec78db3098a7e5bad95310221bf7a65",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-35-check-fixture-junit.xml"
+  },
+  "evidence_sha": "11cd338cc0d004f0715f327374e7344819f9909c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 513,
+  "scenario_id": "atip.check.90",
+  "schema": 1,
+  "staging_id": "06c9e344",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

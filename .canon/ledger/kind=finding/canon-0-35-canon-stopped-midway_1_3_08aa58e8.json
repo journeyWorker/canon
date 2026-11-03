@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T15:59:34.689795Z",
+  "change_id": "canon-0-35-canon-stopped-midway",
+  "code_tree": "98df3ad748c58d9d22ec1a24455ce4b899422fe6",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/init.rs",
+  "introduced_by": "43ce8c36c1fdd4b79d562429c94fe86ef8bd44d6",
+  "kind": "finding",
+  "reviewed_sha": "d7ba1b76f682837ca5310d437d746f8d2b4c2ffa",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Verified in the binary (d7ba1b76): init with the skill source missing in a repo that holds .pi exits 1 STOPPED_MIDWAY reason SKILLS_INVALID_ARGUMENT, retryable false, canon.yaml/.gitignore/AGENTS.md/.canon left written, meta.next[0] canon status --json (read) then canon skills install --json; init --dry-run with the same cause is exit 2 SKILLS_INVALID_ARGUMENT, nothing written; a batch [{},{providers:none}] is exit 1 BATCH_INCOMPLETE /0 with item 0 failed STOPPED_MIDWAY reason SKILLS_INVALID_ARGUMENT and item 1 skipped; canon schema --error STOPPED_MIDWAY and --errors list the same row with its reason; INIT_SKILL_INSTALL_FAILED is gone from the registry and from every consumer except the replacement table, the audit and the old-name guard. Note for readers: re-running canon init after the stop in an unchanged environment is a no-op that reports ok (verified: rerun ok true, code none) and does not repeat the install, so the stop's repeat is canon skills install, as meta.next says. Blast radius: only init moves; canon schema init lists STOPPED_MIDWAY, SKILLS_INVALID_ARGUMENT, SKILLS_FAILED and WRITE_FAILED. atip check L1 is met at the 1.1 claim; with a 1.2 fixture copy the only failures are claim and cursor work (meta.contractVersion, limit/cursor/all flagOnly) and the old SHOULD L1.one-meaning-values.",
+  "worktree_dirty": false
+}

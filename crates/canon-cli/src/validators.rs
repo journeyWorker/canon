@@ -17,9 +17,37 @@ use crate::cli::finding::FindingCommand;
 use crate::cli::policy::PolicyCommand;
 use crate::cli_error::{CliError, CliErrorExt as _};
 
+/// Parses `args` in the order ATIP 11.7 step 6 fixes for a tool that declares 1.2, and answers the first failure, so that the same call
+/// gets the same code and `field` from every tool: a failure to parse (an unknown option or command word, a missing option value, a value
+/// that is no integer or not one of its `possibleValues`; the earliest on the line) → a missing `required` argument (operands in order, then
+/// options in declaration order) → the declared domains → the declared constraints, each in the order of the document. A value outside a
+/// domain is read as text by the first parse ([`crate::arg_rules::relaxed`]), so it cannot answer ahead of the failures that come before
+/// it; the real command tree then parses what that let through, for the typed arguments the handlers read. The validators run later,
+/// on the typed arguments ([`check`]).
+///
+/// `command` is the built command tree (`crate::cli::command()` after `build`). `Err` is the exit code, the refusal already printed.
+pub fn parse(command: &clap::Command, args: Vec<std::ffi::OsString>) -> Result<clap::ArgMatches, ExitCode> {
+    let relaxed = crate::arg_rules::relaxed::tree(crate::cli::command());
+    let first = match relaxed.clone().try_get_matches_from(args.clone()) {
+        Ok(matches) => matches,
+        Err(error) => {
+            // The failure that comes first on the line answers, though clap judged a value later than it (`--seq x --bogus`).
+            let error = crate::arg_rules::relaxed::earlier_failure(&relaxed, &args, &error).unwrap_or(error);
+            return Err(crate::run::entry::usage_error(&error));
+        }
+    };
+    // The refusals below carry the repository the call named (`meta.context`), as they did when they were made after the real parse.
+    crate::run::entry::record_context(command, &first);
+    if let Some((label, error)) = crate::arg_rules::enforce::check(command, &first) {
+        return Err(ExitCode::from(error.emit(&label, atip::argv_wants_json())));
+    }
+    command.clone().try_get_matches_from(args).map_err(|error| crate::run::entry::usage_error(&error))
+}
+
 /// The refusal of the first stateless fault of an invocation, with the label of its command, in the order of step 6 of 11.7: domains,
-/// then constraints (`arg_rules::enforce`), then validators; `None` when there is none. It reads nothing but the parsed arguments
-/// (and the role the environment declares), so a batch runs it on every element in preflight before it writes any.
+/// then constraints (`arg_rules::enforce`), then validators; `None` when there is none. The domains and constraints are the ones
+/// [`parse`] already judged (a batch runs this on every element in preflight before it writes any). It reads nothing but the parsed
+/// arguments and the role the environment declares.
 pub fn refusal(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> Option<(String, CliError)> {
     if let Some(found) = crate::arg_rules::enforce::check(root, matches) {
         return Some(found);

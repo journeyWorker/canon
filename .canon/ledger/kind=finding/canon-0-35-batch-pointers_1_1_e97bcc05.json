@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-canon-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-canon-rev"
+  },
+  "at": "2026-11-02T12:42:57.749797Z",
+  "change_id": "canon-0-35-batch-pointers",
+  "code_tree": "a7273e9d613129dd3526455fb7f9eb9fc98a9e82",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/input.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "83b83fe805cb57eaad740d4b07c870868b914afd",
+  "reviewer": "rev-canon-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity (brief F1/F4, spec 11.7 step 6, 11.11; scenarios atip.batchpointers.01, .04): an invalid CANON_ROLE is a stateless step-6 check (the brief of canon-0-35-canon-check-order makes it a validator), but in a batch the parent does not run it: the children do. Real binary: CANON_ROLE=bogus canon finding close --input '[valid,valid]' -> exit 1 BATCH_INCOMPLETE field /0, items [failed UNKNOWN_ROLE, skipped]; a single document gives exit 2 UNKNOWN_ROLE field CANON_ROLE, and a batch whose later item has a domain fault gives that item's exit 2 (/1/round). The contract's preflight (every item through steps 1-6 before any runs, exit 2, no data) would answer the first. Same shape in 0.34 (BATCH_INCOMPLETE field CANON_ROLE), so not a regression; nothing runs because the element-0 child fails first, so the blast radius is the code and exit value only. L2.batch-preflight does not set CANON_ROLE.",
+  "worktree_dirty": false
+}

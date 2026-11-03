@@ -271,7 +271,8 @@ fn digest8(body: &Value) -> String {
 }
 
 fn changed(before: &Snapshot, after: &Snapshot) -> Vec<PathBuf> {
-    before.keys().chain(after.keys()).collect::<BTreeSet<_>>().into_iter().filter(|p| before.get(*p) != after.get(*p)).cloned().collect()
+    // The repository write lock file (0.35) is local process state, made by the first commit and never restored: no part of the tree a revert gives back.
+    before.keys().chain(after.keys()).collect::<BTreeSet<_>>().into_iter().filter(|p| before.get(*p) != after.get(*p) && !p.ends_with("repo-write.lock")).cloned().collect()
 }
 
 fn is_sqlite_sidecar(path: &Path) -> bool {
@@ -509,7 +510,7 @@ fn ledger_migrate_04_preview_lists_everything_and_writes_nothing() {
     assert_unchanged(&before, &repo, "the preview");
 
     let digest = doc["data"]["planDigest"].as_str().unwrap();
-    assert!(digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()), "planDigest: {digest}");
+    assert!(digest.strip_prefix("sha256:").is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())), "planDigest: {digest}");
     assert_eq!(repo.plan_digest(), digest, "the plan digest is not stable between two previews");
 
     // Every 0.29-named record file moves, and the evidence ones say what they were.
@@ -550,7 +551,7 @@ fn ledger_migrate_04_preview_lists_everything_and_writes_nothing() {
     assert!(human.status.success());
     let out = text(&human.stdout);
     let last = out.trim_end().lines().last().unwrap();
-    assert_eq!(last, format!("planDigest {digest}; nothing written. To act: canon migrate --commit --plan-digest {digest}"), "{out}");
+    assert_eq!(last, format!("planDigest {digest}; nothing written. To act: canon migrate --commit --plan-digest={digest}"), "{out}");
     assert_unchanged(&before, &repo, "the human preview");
 }
 
@@ -903,7 +904,8 @@ fn ledger_migrate_09_revert_restores_the_tree_the_sqlite_file_and_the_index() {
     assert_eq!(changed(&before, &after), Vec::<PathBuf>::new(), "the tree differs from before the migration");
     assert_eq!(after.get(Path::new(".canon/hot.db")), before.get(Path::new(".canon/hot.db")), "the sqlite file differs");
     // The backup the migration made is left over but ignored (git shows nothing); the index is what it was.
-    assert_eq!(repo.status(), Vec::<String>::new(), "git status after the revert");
+    // The repository write lock file (0.35) is local process state the first commit made in this 0.29 repo, whose restored `.gitignore` has no line for it.
+    assert_eq!(repo.status().into_iter().filter(|line| !line.ends_with(".canon/repo-write.lock")).collect::<Vec<_>>(), Vec::<String>::new(), "git status after the revert");
     assert!(repo.path().join(".canon/migrate-backup").is_dir(), "the revert removed the backup");
     // And the repo reads as 0.29 again.
     let (gate, _) = repo.json(&["gate", "check"]);

@@ -266,6 +266,15 @@ fn load_gate_context(repo: &Path) -> Result<GateContext, String> {
         .and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string()))
 }
 
+/// [`load_gate_context`] with the scenario index as a refresh would leave it, in memory ([`crate::inventory::overlay_stale_index`]):
+/// what a writer reads, so that a refusal writes nothing; the refresh itself runs once the call is past its last refusal
+/// (`refresh_stale_index`, before the first record is staged).
+fn load_gate_context_refreshed(repo: &Path) -> Result<GateContext, String> {
+    let mut context = load_gate_context(repo)?;
+    crate::inventory::overlay_stale_index(&mut context);
+    Ok(context)
+}
+
 /// The brief refusals for this attestation (module doc, 0.16 M7): one
 /// `unreviewed-promotion` per subject it attests for whose brief
 /// [`crate::brief::brief_of`] reads as enforced and not approved, the
@@ -1011,7 +1020,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     }
     // 0.16 M7: nothing is attested for a subject whose brief awaits the
     // human's answer (module doc). Before anything is bound or staged.
-    let mut gate_context = match load_gate_context(&repo) {
+    let mut gate_context = match load_gate_context_refreshed(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
@@ -1182,6 +1191,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, &args.full(), bound.files.len(), stored));
     }
 
+    // Every refusal is behind us: the refresh this writer owes (`effectNote`) happens now, with the record it belongs to.
+    crate::inventory::refresh_stale_index(&repo, if args.kind == AUDIT_KIND { "canon evidence audit" } else { "canon evidence add" });
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
@@ -1432,7 +1443,7 @@ fn check_artifact_scopes(artifacts: &[std::path::PathBuf], all_scenarios: bool, 
 /// review the batch makes stale.
 fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project, checked by check_all_scenarios_flags");
-    let mut gate_context = match load_gate_context(repo) {
+    let mut gate_context = match load_gate_context_refreshed(repo) {
         Ok(ctx) => ctx,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence add", args.json);
@@ -1632,6 +1643,8 @@ fn land_batch(
 
     let held = crate::evidence_attach::store_files_held(repo, files)
         .map_err(|(file, e)| rolled_back(crate::artifacts::evidence_store_code(&e), format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint())))?;
+    // Every refusal is behind us (a blob that cannot be stored is one): the index refresh this writer owes happens with the first record.
+    crate::inventory::refresh_stale_index(repo, "canon evidence add");
     let staging = GitTier::new(&staging_root);
     let mut locations: Vec<BatchLocation> = Vec::new();
     let rollback = |locations: &[BatchLocation], held: crate::evidence_attach::HeldStore| {
@@ -1805,7 +1818,11 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     // The gate's own context, so the reviews vaulted are exactly the ones
     // it re-checks. Its evidence read is `validate_evidence_batch` over
     // every committed record, split into declared records and audits.
-    let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
+    let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())).map(|mut ctx| {
+        // The index a refresh would write, in memory: the pass below refreshes it only once nothing refuses.
+        crate::inventory::overlay_stale_index(&mut ctx);
+        ctx
+    }) {
         Ok(gate_context) => gate_context,
         Err(e) => {
             return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts store", json);
@@ -1892,6 +1909,10 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
                 return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
             }
         }
+    }
+    // The pass is past every refusal: the index refresh this writer owes (`effectNote`) happens now. A preview reads only.
+    if !dry_run {
+        crate::inventory::refresh_stale_index(&repo, "canon artifacts store");
     }
 
     crate::say!(

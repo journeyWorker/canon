@@ -31,7 +31,7 @@ fn generated() -> Value {
         .collect();
     let warnings: Vec<&str> = WARNINGS.iter().map(|warning| warning.code).collect();
     json!({
-        "contractVersion": "1.1",
+        "contractVersion": atip_check::output::DECLARED_MINOR,
         "probe": "check",
         "globalOptions": [],
         "registry": rows,
@@ -89,7 +89,7 @@ fn atip_check_37_atip_check_passes_on_atip_itself() {
     let document = output.envelope();
     assert_eq!(document["data"]["passed"], true);
     let results = output.results();
-    assert_eq!(results.len(), 28);
+    assert_eq!(results.len(), 29);
     // atip's own answers carry no `meta.next` and no page, offer no `schema`, and name no USAGE without a field; it claims 1.1 and has
     // no group: six checks do not apply and the other 22 pass.
     for (id, result) in &results {

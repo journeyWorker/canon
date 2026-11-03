@@ -324,7 +324,7 @@
         "domain": { "$ref": "#/$defs/domain" },
         "env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
         "flagOnly": {
-          "description": "true: the option cannot appear in an --input document (spec 11.6).",
+          "description": "true: the option cannot appear in an --input document (spec 11.6). Required for json, input, commit and plan-digest; in a document that declares 1.2 also for limit, cursor, all and fields, which depends on the declared minor and is checked by scripts/check.ts (spec 10.13 rule 8).",
           "type": "boolean"
         },
         "help": { "type": "string", "minLength": 1 }

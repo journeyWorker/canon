@@ -24,13 +24,13 @@
 //!
 //! # Harness choice (0.17 D5)
 //! A fresh `init` also picks the harnesses the canon skill is installed
-//! for ([`SkillsChoice`]): `--providers` answers; otherwise, on a
-//! terminal, it asks with the detected harnesses (`.claude`, `.codex`,
-//! `.omp`, `.pi` directories) checked; otherwise it takes the detected
-//! ones. The answer is written as `canon.yaml` `skills.providers` and the
+//! for ([`SkillsChoice`]): `--providers` answers; otherwise it takes the
+//! detected ones (`.claude`, `.codex`, `.omp`, `.pi` directories), on a
+//! terminal as well as off one: `init` never asks (spec 5.5, 0.35). The
+//! answer is written as `canon.yaml` `skills.providers` and the
 //! skill is installed (the stub written from the text built into the
 //! binary, with no `canon/skills` tree in the repo), as `canon skills
-//! install` does. With no terminal, no flag and nothing detected, it
+//! install` does. With no flag and nothing detected, it
 //! records nothing, installs nothing and says how to choose.
 //! `--check` validates `skills:` through
 //! [`crate::skills::configured_providers`].
@@ -47,7 +47,7 @@
 //! own literal join) is used exactly as given, default `.` meaning cwd.
 
 use std::fs;
-use std::io::{BufRead, IsTerminal as _, Write as _};
+use std::io::Write as _;
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
@@ -85,13 +85,14 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// object-store stand-in), which would otherwise be untracked after the
 /// first run (#105, #107); and the archive of superseded scenario index
 /// versions, which every rewrite of the derived index fills.
-const GITIGNORE_LINES: [(&str, &str); 11] = [
+const GITIGNORE_LINES: [(&str, &str); 12] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
     ("# the archive of superseded scenario index versions -- derived like the index, never committed.", paths::SCENARIO_ARCHIVE_GITIGNORE),
     ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
     ("# the lock that serializes artifact store writes -- local process state.", paths::ARTIFACT_STORE_LOCK_FILE),
+    ("# the lock a committed destructive command and every writer of what its plan reads hold -- local process state.", paths::REPO_WRITE_LOCK_FILE),
     ("# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
     ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
     ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
@@ -267,7 +268,11 @@ fn gitignore_step(repo: &Path, dry_run: bool) -> std::io::Result<Vec<&'static st
     if dry_run {
         return Ok(missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect());
     }
-    scaffold_gitignore(repo)
+    let added = scaffold_gitignore(repo)?;
+    // The repository write lock's file is made with the `.gitignore` line that names it, so a repository set up by this canon is
+    // locked from its first call without a refused call ever having to make it (`write_lock`).
+    let _ = crate::write_lock::create_file(repo);
+    Ok(added)
 }
 
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
@@ -481,13 +486,12 @@ pub struct InitOptions {
     pub dry_run: bool,
 }
 
-/// How a fresh `canon init` picks the harnesses (0.17 D5).
+/// How a fresh `canon init` picks the harnesses (0.17 D5; since 0.35 it never asks).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillsChoice {
-    /// Ask on a terminal, the detected harnesses checked; without a
-    /// terminal, the detected harnesses.
-    Ask,
-    /// `--providers <list>`: this list (`none` or empty for none), no prompt.
+    /// No `--providers`: the detected harnesses.
+    Detected,
+    /// `--providers <list>`: this list (`none` or empty for none).
     Providers(String),
     /// Record and install nothing (`canon demo init`).
     Skip,
@@ -501,56 +505,20 @@ struct InitSkills {
     recorded: bool,
 }
 
-/// Asks which harnesses get the canon skill: the four providers with the
-/// `detected` ones checked, then a comma- or space-separated list, `none`,
-/// or an empty line (or end of input) for the checked ones. An unknown
-/// name is reported and asked again.
-fn prompt_providers(detected: &[Provider], input: &mut impl BufRead, out: &mut impl std::io::Write) -> std::io::Result<Vec<Provider>> {
-    writeln!(out, "canon init: which harnesses should get the canon skill?")?;
-    for provider in skills::ALL_PROVIDERS {
-        if detected.contains(&provider) {
-            writeln!(out, "  [x] {:<7} ({} found)", provider.as_str(), provider.marker())?;
-        } else {
-            writeln!(out, "  [ ] {}", provider.as_str())?;
-        }
-    }
-    loop {
-        write!(out, "Comma-separated list, `none`, or Enter for the checked ones [{}]: ", skills::provider_names(detected))?;
-        out.flush()?;
-        let mut line = String::new();
-        if input.read_line(&mut line)? == 0 {
-            writeln!(out)?;
-            return Ok(detected.to_vec());
-        }
-        let answer = line.trim();
-        if answer.is_empty() {
-            return Ok(detected.to_vec());
-        }
-        match skills::parse_provider_list(&answer.replace(char::is_whitespace, ",")) {
-            Ok(providers) => return Ok(providers),
-            Err(e) => writeln!(out, "canon init: {e}")?,
-        }
-    }
-}
-
 /// Resolves [`InitOptions::skills`] for a fresh `init` in `repo`. `Err`
-/// for an unknown `--providers` name, before anything is written.
+/// for an unknown `--providers` name, before anything is written. Nothing
+/// is asked: without `--providers` the detected harnesses are the choice,
+/// on a terminal and off one (spec 5.5: a tool never prompts).
 fn choose_skills(repo: &Path, choice: &SkillsChoice) -> Result<Option<InitSkills>, String> {
     match choice {
         SkillsChoice::Skip => Ok(None),
         SkillsChoice::Providers(list) => skills::parse_provider_list(list)
             .map(|providers| Some(InitSkills { providers, recorded: true }))
             .map_err(|e| e.to_string()),
-        SkillsChoice::Ask => {
+        SkillsChoice::Detected => {
             let detected = skills::detected_providers(repo);
-            if std::io::stdin().is_terminal() && std::io::stderr().is_terminal() {
-                let providers = prompt_providers(&detected, &mut std::io::stdin().lock(), &mut std::io::stderr())
-                    .map_err(|e| format!("failed to read the harness choice: {e}"))?;
-                Ok(Some(InitSkills { providers, recorded: true }))
-            } else {
-                let recorded = !detected.is_empty();
-                Ok(Some(InitSkills { providers: detected, recorded }))
-            }
+            let recorded = !detected.is_empty();
+            Ok(Some(InitSkills { providers: detected, recorded }))
         }
     }
 }
@@ -605,18 +573,51 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
             log.step("skills-installed", dirs.clone(), format!("canon init: {verb} the canon skill for {} ({dirs})", skills::provider_names(&report.providers)));
             Ok(())
         }
-        Err(e) => {
-            Err(CliError::refused(
-                "INIT_SKILL_INSTALL_FAILED",
-                format!(
-                    "wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {e}",
-                    chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
-                    canon_yaml_path.display()
-                ),
-            )
-            .hint(format!("once the skill source is available, run `canon skills install` (the override {} names a directory without a SKILL.src.md; unset it, or pass --skills-source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
-            .emit(log.command(), log.json))
-        }
+        Err(e) => Err(skill_install_error(&e, canon_yaml_path, chosen, dry_run).emit(log.command(), log.json)),
+    }
+}
+
+/// What a failed skill install of a fresh `init` is. `canon skills install` says of the same error a refusal before its work
+/// (`SKILLS_INVALID_ARGUMENT`: the skill source, the providers or the `skills:` section; `WRITE_UNAVAILABLE`: a target that
+/// cannot be written) or a failure (`SKILLS_FAILED`), and `init` says the same with what its step order changes (spec 8.3,
+/// 8.3.2): by this step the run has written `canon.yaml` and the files beside it, so nothing can be an exit 2 any more.
+/// - the refusal of an argument (`SKILLS_INVALID_ARGUMENT`) is `STOPPED_MIDWAY` with that code as its reason;
+/// - a target that cannot be written is the I/O category's code for the work, `WRITE_FAILED`, which keeps its name;
+/// - any other failure is `SKILLS_FAILED`.
+///
+/// `meta.next` leads with the command that reads what `init` wrote. A preview (`--dry-run`) wrote nothing, so there a
+/// refusal stays what it is, exit 2 with its own code.
+fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool) -> CliError {
+    let said = crate::run::skills::skills_error(error).code;
+    if dry_run {
+        let hint = format!("fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset), then run the command again", skills::CANONICAL_SOURCE_ENV);
+        return match said {
+            code @ ("SKILLS_INVALID_ARGUMENT" | "WRITE_UNAVAILABLE") => CliError::refused(code, error.to_string()).hint(hint),
+            _ => CliError::failed("SKILLS_FAILED", error.to_string()).hint(hint),
+        };
+    }
+    let message = format!(
+        "wrote `skills: {{ providers: [{}] }}` to {} but did not install the canon skill: {error}",
+        chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "),
+        canon_yaml_path.display()
+    );
+    crate::json_out::prepend_next(crate::status::NextStep {
+        command: "canon status --json".into(),
+        why: "read what `canon init` already wrote (canon.yaml, .gitignore, the starter policy, the AGENTS.md block) before running anything again".into(),
+        actor: crate::status::StepActor::Agent,
+        role: Some(crate::role::Role::Orchestrator),
+    });
+    crate::json_out::prepend_next(crate::status::NextStep {
+        command: "canon skills install --json".into(),
+        why: "install the canon skill once its cause is fixed; it follows skills.providers in canon.yaml".into(),
+        actor: crate::status::StepActor::Agent,
+        role: Some(crate::role::Role::Orchestrator),
+    });
+    let hint = format!("read what init wrote with `canon status`, fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset; the skill directories must be writable), then run `canon skills install`; it follows skills.providers", skills::CANONICAL_SOURCE_ENV);
+    match said {
+        "SKILLS_INVALID_ARGUMENT" => CliError::failed("STOPPED_MIDWAY", message).hint(hint).reason(said),
+        "WRITE_UNAVAILABLE" => CliError::failed("WRITE_FAILED", message).hint(hint),
+        _ => CliError::failed("SKILLS_FAILED", message).hint(hint),
     }
 }
 
@@ -697,7 +698,11 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 ///   refuse (exit `2`) before anything is written.
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
-///   exits `1` naming the retry. A rerun never asks and never installs.
+///   exits `1`: `STOPPED_MIDWAY` when `canon skills install` would have
+///   refused its arguments (the reason is that refusal's code),
+///   `WRITE_FAILED` when a target cannot be written, `SKILLS_FAILED`
+///   otherwise, and `meta.next` leads with `canon status`. A rerun never
+///   installs.
 pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> u8 {
     run_init_in(repo, options, json, true)
 }
@@ -1006,35 +1011,6 @@ pub fn run_check_config(repo: &Path, json: bool) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// authoring.init.96: on a terminal init lists the four harnesses with
-    /// the detected ones checked; Enter (or end of input) keeps the checked
-    /// ones, a list or `none` replaces them, and an unknown name is asked
-    /// again.
-    #[test]
-    fn authoring_init_96_the_prompt_prechecks_the_detected_harnesses() {
-        let detected = [Provider::Claude, Provider::Omp];
-        let ask = |answers: &str| {
-            let mut out = Vec::new();
-            let chosen = prompt_providers(&detected, &mut answers.as_bytes(), &mut out).unwrap();
-            (chosen, String::from_utf8(out).unwrap())
-        };
-
-        let (chosen, shown) = ask("\n");
-        assert_eq!(chosen, detected);
-        assert_eq!(
-            shown,
-            "canon init: which harnesses should get the canon skill?\n  [x] claude  (.claude found)\n  [ ] codex\n  [x] omp     (.omp found)\n  [ ] pi\nComma-separated list, `none`, or Enter for the checked ones [claude,omp]: "
-        );
-        assert_eq!(ask("").0, detected, "end of input keeps the checked ones");
-        assert_eq!(ask("pi, codex\n").0, vec![Provider::Codex, Provider::Pi]);
-        assert_eq!(ask("codex omp\n").0, vec![Provider::Codex, Provider::Omp], "spaces separate too");
-        assert_eq!(ask("none\n").0, vec![]);
-        let (chosen, shown) = ask("gemini\nclaude\n");
-        assert_eq!(chosen, vec![Provider::Claude]);
-        assert!(shown.contains("canon init: invalid provider `gemini`"), "{shown}");
-        assert_eq!(shown.matches("Enter for the checked ones").count(), 2, "asked again: {shown}");
-    }
 
     /// The `skills:` section init appends parses back to the choice, and
     /// the skeleton with it still loads under every section loader.

@@ -291,19 +291,19 @@ Feature: authoring init
   Scenario: A missing skill source override keeps the recorded choice and names the install to run
     Given an empty repository holding a .pi directory, and CANON_SKILLS_SOURCE naming a directory that does not exist
     When canon init runs with no terminal and no --providers
-    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 2 with INIT_SKILL_INSTALL_FAILED
+    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 1 with STOPPED_MIDWAY whose reason is SKILLS_INVALID_ARGUMENT
     And canon skills install, run without the override, projects pi from canon.yaml with the stub the binary carries
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
   @case:happy
   @authoring.init.96
-  Scenario: On a terminal init asks with the detected harnesses checked
-    Given detected .claude and .omp directories
-    When init asks which harnesses get the canon skill
-    Then it lists claude, codex, omp and pi with claude and omp checked
-    And Enter or the end of input keeps the checked ones, a comma- or space-separated list or none replaces them
-    And an unknown name is reported and asked again
+  Scenario: On a terminal init asks nothing and takes the detected harnesses, as it does off one
+    Given detected .claude and .omp directories, no --providers, and canon run with a terminal on stdin and stderr
+    When init runs
+    Then it prints no question and waits for no answer
+    And it installs the canon skill for claude and omp and records them as skills.providers
+    And with --providers the list is the answer, and with nothing detected nothing is installed, on a terminal or not
 
   # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold

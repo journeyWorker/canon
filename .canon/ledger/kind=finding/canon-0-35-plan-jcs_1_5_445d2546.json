@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:54:17.457899Z",
+  "change_id": "canon-0-35-plan-jcs",
+  "code_tree": "70506e0a6a410c3ed31a4333b12ff5ed157f6968",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/write_lock.rs",
+  "introduced_by": "38f175397b32087a42bcddf4ab94c9a99a722607",
+  "kind": "finding",
+  "reason": "re-verified at d3a270f7: the real binary on a repo without the lock file and with the exclude file as the checkout has it, with no final line break, absent, and with no .canon directory: a refused commit (PLAN_STALE), a finding add refused inside the leaf (FINDING_UNKNOWN_SCENARIO, NO_COMMIT) and a USAGE leave the tree and .git byte identical; atip_planjcs_10 (whole tree, .git included, four variants) passes; mutants that keep the .canon directory, skip the exclude cut-back and skip the removal of an exclude file this call created each fail it",
+  "resolution_code_tree": "35dfcfce31e6f6fbec04a3488dc711c806b77d23",
+  "resolution_sha": "c4289fc876a8f2af4509f05f555ead0c845330fa",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "c963a4fffd5a3cb64b028417f274668dc72f0811",
+  "reviewer": "rev-canon-0-35b",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "Spec spec 8.2 / 11.2 ('A refusal ... MUST NOT make any effect (no file, record, cache, log ...)'; approaches/checker.md §4: for every refusal any change is a MUST fail): a refused destructive commit now makes two files. Real binary at c963a4ff on a repo that has no .canon/repo-write.lock: 'canon purge --kind run --before 2099-01-01T00:00:00Z --commit --plan-digest=sha256:00' answers PLAN_STALE exit 2 and leaves an empty .canon/repo-write.lock and a '/.canon/repo-write.lock' line appended to .git/info/exclude (the second one is an edit of an existing file). A preview, a status and a finding add refused by clap (USAGE) or inside the leaf (unknown scenario) leave nothing. Cause: hold_for_call takes the lock (creating the file) before the leaf recomputes and gates the plan, so every PLAN_STALE and every later refusal (read-only store, busy store) is after the creation. The module doc and the tests state it as an exemption (tree snapshots skip the lock file), which is not in the contract: 'process state' is still a file. Atip's own L0.refusal-effects / L2.destructive-stale would fail on a fixture repo that lacks the file. Fix without losing 1_2/1_3: when the file does not exist, a commit that is refused (PLAN_STALE or any refusal) removes the file it made and the exclude line it added before it answers (the lock is released first on all platforms by then or the file is unlinked while held, which is safe for flock if no one else made it in between), or create the file only when the call is past its last refusal and hold a lock on a path that always exists (canon.yaml or .canon/) for the recompute-to-gate span. Blast radius: only repositories without the file (set up by 0.34 and never re-inited, or never inited); after the first success the file exists and every later refusal is clean. Scenarios 02, 10 and 11 say 'the tree is the same' and pass only because their repos start with the file (the helper init_repo makes it) or the snapshot skips it.",
+  "worktree_dirty": false
+}

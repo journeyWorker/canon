@@ -204,10 +204,13 @@ pub struct MigrateReport {
     #[schemars(with = "Option<crate::inventory::InventorySyncReport<'static>>")]
     pub index: Option<serde_json::Value>,
     #[serde(flatten)]
-    pub plan: safety::Plan,
+    pub plan: safety::Preview,
 }
 
-impl Report for MigrateReport {}
+impl Report for MigrateReport {
+    /// 1.1: the plan is `atip::plan::Preview` (`planDigest` is `sha256:` and 64 hex digits).
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
 
 /// What `plan` and the ledger and review steps would do, as plan effects
 /// (`canon.yaml` is one `rewrite`; the files it moves are listed one by one).
@@ -297,7 +300,6 @@ pub struct RelayArgs {
 
 pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json: bool) -> u8 {
     let mut log = crate::json_out::Log::new(json);
-    let base = safety::command("migrate", &[], repo);
     let repo = resolve_repo_root(repo);
     let canon_yaml = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml) else {
@@ -375,11 +377,17 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let pins = migrate_pins::run_in(&repo, world.as_ref().map(migrate_names::Scratch::ledger_root), &old_world, false);
     let mut listed = effects(&repo, &plan, &names, config != text, ledger_effects, pins.as_ref().ok(), index_changes);
     listed.extend(briefs.effects());
-    let safe_plan = safety::Plan::new(listed);
+    // What the plan read: canon.yaml and every path it moves, rewrites, renames or removes, by content (the files and the
+    // trees under the directories it moves).
+    let reads = safety::Reads::new().path(&repo, "canon.yaml").effect_paths(&repo, &listed);
+    let safe_plan = match safety::Plan::new("migrate", listed, reads) {
+        Ok(plan) => plan,
+        Err(e) => return e.emit("canon migrate", json),
+    };
     // A plan that re-binds an `Approved:` line or a review pin is the human's to commit.
     let mut relay = None;
     if matches!(mode, Mode::Commit(_)) && (briefs.rebinds() || relay_args.via.is_some()) {
-        let human_call = format!("{base} --commit --plan-digest {}", safe_plan.plan_digest);
+        let human_call = safe_plan.commit_command();
         let relay_call = format!("{human_call} --approver <their name> --note \"<their own words>\" --relayed-via <the question tool> --actor <your actor id>");
         let call = crate::relay::Call { via: relay_args.via.as_deref(), actor: relay_args.actor.as_deref(), approver: relay_args.approver.as_deref(), note: relay_args.note.as_deref() };
         match crate::relay::authorize("canon migrate", &human_call, &relay_call, &repo, call) {
@@ -387,7 +395,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
             Err(error) => return error.emit("canon migrate", json),
         }
     }
-    let commit = match safe_plan.gate(mode, &base) {
+    let commit = match safe_plan.gate(mode) {
         Ok(commit) => commit,
         Err(e) => return e.emit("canon migrate", json),
     };
@@ -404,14 +412,14 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
             }
             Err(e) => log.line(format!("canon migrate: could not check the reviews against their evidence ({e}); a run that applies the plan checks them again")),
         }
-        log.line(safe_plan.commit_hint(&base));
-        let report = MigrateReport { steps: log.into_lines(), backup_dir: None, index_records_written: None, index: None, plan: safe_plan };
+        log.line(safe_plan.commit_hint());
+        let report = MigrateReport { steps: log.into_lines(), backup_dir: None, index_records_written: None, index: None, plan: safe_plan.preview() };
         if json {
-            crate::json_out::data_with_next("migrate", &report, &report.plan.next_step(&base, "the plan only lists what would change; applying it takes its planDigest"));
+            crate::json_out::data_with_next("migrate", &report, &safe_plan.next_step("the plan only lists what would change; applying it takes its planDigest"));
         }
         return 0;
     }
-    let safe_plan = safe_plan.committed();
+    let committed_plan = safe_plan.committed();
 
     // Every file the run rewrites or removes is copied first (D9), then the 0.27-era hooks, scripts and skill are rewritten.
     let mut backed_up = plan.legacy.backed_up();
@@ -443,7 +451,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     };
     // Everything a step may touch is copied once more, whole, so `canon migrate --revert` can undo every step; a
     // repeat that only rebuilds the index leaves no snapshot (the newest one stays the one to revert).
-    let snapshotted = safe_plan.effects.iter().any(|effect| effect.action != "rebuild");
+    let snapshotted = safe_plan.effects().iter().any(|effect| effect.action != "rebuild");
     let resume = migrate_briefs::resume_backup(&repo);
     let backup_path = if resume.is_some() {
         resume.clone()
@@ -566,7 +574,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     }
     // A run that wrote something, or that finished a stopped one in its backup (whose plan may have nothing left but
     // the index), seals the backup.
-    rebuild_index(&repo, log, safe_plan, backup_dir, snapshotted || resume.is_some(), &old_world, json)
+    rebuild_index(&repo, log, committed_plan, backup_dir, snapshotted || resume.is_some(), &old_world, json)
 }
 
 /// The plan for `repo` with `canon.yaml` `text`, or why it is refused.
@@ -1408,7 +1416,7 @@ fn tracked_index_files(repo: &Path) -> usize {
 /// The full index rebuild (module doc). Exit `1` when a root does not
 /// sync clean: the migration stands, and `canon inventory sync` lists
 /// what to fix. With `seal`, the backup records what the migrate left.
-fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, seal: bool, old_world: &migrate_names::OldWorld, json: bool) -> u8 {
+fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Preview, backup_dir: Option<String>, seal: bool, old_world: &migrate_names::OldWorld, json: bool) -> u8 {
     match crate::inventory::rebuild(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             // Nothing planned but the index rebuild, and the rebuild wrote nothing: a repeat that found the repo migrated.

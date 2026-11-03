@@ -92,11 +92,14 @@ a scoped gate.
 ## The commands — and the one thing you never type
 
 ```bash
-canon feature new checkout.cart --title "Cart"                       # once per surface
+# once per surface
+canon feature new checkout.cart --title "Cart"
+# once per behavior
 canon scenario new checkout.cart.01 --title "Adding an item raises the count" \
-  --subject checkout-core --lane behavior --case happy               # once per behavior
+  --subject checkout-core --lane behavior --case happy
+# and its failure path
 canon scenario new checkout.cart.04 --title "Adding an out-of-stock item is refused" \
-  --subject checkout-core --lane behavior --case failure             # and its failure path
+  --subject checkout-core --lane behavior --case failure
 ```
 
 There is no format or sync step after these: the scaffold writes a

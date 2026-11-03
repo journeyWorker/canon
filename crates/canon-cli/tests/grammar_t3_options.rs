@@ -10,14 +10,12 @@
 //! - no valued option is named like a verb, no leaf like `update|get|delete`;
 //! - short aliases are `-h -V -o -q` only; `--json`, `--repo`, `--as` mean the
 //!   same thing everywhere;
-//! - every conflict and requirement clap declares ([`relations_of`]) is enforced when the
-//!   command line is parsed.
+//! - every conflict and requirement the rule tables declare ([`relations_of`]) is enforced after the command line is parsed.
 
 mod harness;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use clap::error::ErrorKind;
 use harness::*;
 use serde_json::Value;
 
@@ -369,9 +367,12 @@ fn required_line(cmd: &clap::Command, path: &str, skip: &[&str]) -> Vec<String> 
     line
 }
 
+/// The conflicts and requirements of a command are the rules of its tables (`arg_rules::rules_of`), checked by the stateless stage after the
+/// parse (spec 11.7 step 6), not by clap while it parses. A pair that conflicts is a line that parses and is then refused for the pair.
 #[test]
-fn every_conflict_clap_declares_is_enforced_when_parsing() {
-    let root = canon_cli::cli::command();
+fn every_conflict_the_tables_declare_is_enforced_by_the_stateless_stage() {
+    let mut root = canon_cli::cli::command();
+    root.build();
     let mut conflicts = 0;
     let mut problems = Vec::new();
     for leaf in leaves() {
@@ -392,15 +393,18 @@ fn every_conflict_clap_declares_is_enforced_when_parsing() {
                 let mut line = required_line(cmd, &path, &[own.get_id().as_str(), other_arg.get_id().as_str()]);
                 line.extend(given(own));
                 line.extend(given(other_arg));
-                match root.clone().try_get_matches_from(std::iter::once("canon".to_string()).chain(line.iter().cloned())) {
-                    Err(e) if e.kind() == ErrorKind::ArgumentConflict => {}
-                    Err(e) => problems.push(format!("`{path}`: --{option} with {other} fails, but not as a conflict ({:?}): {}", e.kind(), e.to_string().lines().next().unwrap_or_default())),
-                    Ok(_) => problems.push(format!("`{path}`: --{option} and {other} are declared to conflict and parse together: {line:?}")),
+                let argv = std::iter::once("canon".to_string()).chain(line.iter().cloned());
+                match canon_cli::arg_rules::relaxed::tree(canon_cli::cli::command()).try_get_matches_from(argv) {
+                    Err(e) => problems.push(format!("`{path}`: --{option} with {other} does not parse ({:?}), so no conflict is checked: {}", e.kind(), e.to_string().lines().next().unwrap_or_default())),
+                    Ok(matches) => match canon_cli::arg_rules::enforce::check(&root, &matches) {
+                        Some(_) => {}
+                        None => problems.push(format!("`{path}`: --{option} and {other} are declared to conflict and are not refused together: {line:?}")),
+                    },
                 }
             }
         }
     }
-    assert!(conflicts > 20, "clap declares conflicts ({conflicts})");
+    assert!(conflicts > 20, "the tables declare conflicts ({conflicts})");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-split",
+    "role": "reviewer",
+    "session_id": "s-0-35-split-rev"
+  },
+  "at": "2026-11-03T13:44:43.160999Z",
+  "change_id": "canon-0-35-split-atip-check",
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_report/mod.rs",
+  "introduced_by": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "finding",
+  "reviewed_sha": "54c771cbde112f1c31197c33b6077bab7e6ff93f",
+  "reviewer": "rev-split",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] The lock-file sharing is right: under nextest (9 tests, 6 slow) the first test ran the checker once, wrote atip_check-canon-l1.json under target/tmp/atip-report/<NEXTEST_RUN_ID>/ and the three waiters finished together at 260 s with the result of that one run (shim count 4 = 1 + 3 planted); under cargo test the LazyLock does the same (4). No .partial file is left and the publish is a rename under the lock. Two small things: the run directories under target/tmp/atip-report are never removed, and if the first test panics inside the run each waiter takes the lock in turn and reruns the checker. Also the atip-profile junit (timestamp 19:57, run 39 min) is older than the commit (20:42) although the evidence says `from the clean worktree at the commit`; atip-check is unchanged since, and my own run of the crate at HEAD stands in for it. `cargo nextest run -p atip-check` under the default profile runs nothing (the default-filter): use --profile atip.",
+  "worktree_dirty": false
+}

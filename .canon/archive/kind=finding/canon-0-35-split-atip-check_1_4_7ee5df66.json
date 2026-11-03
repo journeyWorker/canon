@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-split",
+    "role": "reviewer",
+    "session_id": "s-0-35-split-rev"
+  },
+  "at": "2026-11-03T13:44:41.545340Z",
+  "change_id": "canon-0-35-split-atip-check",
+  "code_tree": "61fdc209489e4c29a74bcdc19c9989b641e68b00",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_check.rs; crates/canon-cli/tests/atip_claiml2.rs",
+  "introduced_by": "087e2e68bac6c7465e31d18e565834872a367586",
+  "kind": "finding",
+  "reviewed_sha": "54c771cbde112f1c31197c33b6077bab7e6ff93f",
+  "reviewer": "rev-split",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[spec fidelity] Invariant 2 says full `atip check` runs in canon-cli tests are at most one per test binary. Counted at runtime with a shim on the fixture's prepare step: atip_check.rs makes 4 runs (1 shared L1 + 3 that plant a violation in a wrapper: atip_checkl1_34, atip_check_42, atip_check_75), atip_claiml2.rs makes 5 (one canon-at-L2 compliance run, atip_claiml2_04, + 4 planted/changed-fixture runs), 9 in all as the evidence says (11 before), under cargo test and under nextest alike. The Checks sentence (the compliance tests need one run per binary) holds; the invariant's sentence read literally does not, since the planted-violation tests are the first kind in the Intent. Reading accepted; the human should confirm it. atip_check_41 no longer runs the checker at L0 on canon (it reads the L0 rows of the L1 report); `atip-l0`, atip_claiml2_08 and the planted L0 tests still cover that level.",
+  "worktree_dirty": false
+}

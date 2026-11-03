@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-checker-tests",
+    "role": "implementer",
+    "session_id": "s-0-35-checker-tests"
+  },
+  "at": "2026-11-03T09:22:59.294672Z",
+  "attachments": [
+    {
+      "case": "atip_checkl2safety_05_a_directory_a_repeat_makes_and_leaves_empty_is_not_an_effect_and_a_file_in_it_is",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    },
+    {
+      "case": "atip_checkl2safety_05_an_effect_note_that_does_not_name_the_allowed_file_hides_nothing_from_a_repeat",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    },
+    {
+      "case": "atip_checkl2safety_05_the_three_idempotency_values_pass_and_a_second_run_with_a_new_effect_or_an_accepted_once_fails",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    },
+    {
+      "case": "atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against_a_repeat",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d6e1fb6079cffd1a96be13aa413a44fa427389ed3aa90bfdd119d7d533a130f2"
+    }
+  ],
+  "code_tree": "381681fa4b1fa2b9c0cf357c5512f6607c7107bb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run -p atip-check (369 passed)"
+  },
+  "evidence_sha": "581567ce30b187c876b0d67d838cd58c6f8ad8e8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 72,
+  "scenario_id": "atip.checkl2safety.05",
+  "schema": 1,
+  "staging_id": "03d4df2a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

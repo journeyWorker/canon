@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-shipfix",
+    "role": "implementer",
+    "session_id": "s-0-35-shipfix"
+  },
+  "at": "2026-11-03T18:14:12.083353Z",
+  "attachments": [
+    {
+      "case": "atip_batchpointers_09_a_failed_item_points_at_what_to_fix_in_its_own_error_and_the_items_after_it_carry_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "206c2c91dcc230032f2e03d07a9c2b046ba734fbd7e4c712b512276a1d0cf116"
+    }
+  ],
+  "code_tree": "6e2043142b3c19e43b8c17486e68546b3bb2cbb5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "0c6f4734fcf30373dc4625e03a3a8f4d0ba5a560",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 37,
+  "scenario_id": "atip.batchpointers.09",
+  "schema": 1,
+  "staging_id": "d82c49cf",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

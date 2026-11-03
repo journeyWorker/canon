@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 /// Error codes 0.33 deleted (each has a replacement in the CHANGELOG's table).
 const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATCH_UNSUPPORTED", "INPUT_INVALID_TYPE", "INPUT_UNKNOWN_FIELD", "INPUT_UNREADABLE", "INPUT_STDIN_TTY", "INPUT_STDIN_CONFLICT", "INPUT_MISSING", "INVALID_CURSOR", "UNKNOWN_FIELD"];
 
+/// Error codes 0.35 moved to `STOPPED_MIDWAY` (`atip.midway`; each has a replacement in the CHANGELOG's table).
+const MOVED_CODES: &[&str] = &["INIT_SKILL_INSTALL_FAILED"];
+
 /// `meta` keys 0.33 deleted, each a whole word or dotted path.
 const OLD_KEYS: &[&str] = &["canonVersion", "hasMore", "meta.unchanged", "meta.waitingOn", "meta.nextOmitted", "meta.hotStore", "meta.context.role", "meta.context.actor", "meta.next[].why"];
 
@@ -128,4 +131,39 @@ fn atip_l0_27_the_check_catches_an_old_shape_that_comes_back() {
     assert_eq!(old_shapes_in(r#""schemaVersion": "1.0","#), Vec::<&str>::new());
     assert_eq!(old_shapes_in(r#"{ "argv": ["a"], "reason": "r", "actor": "agent", "role": "planner" }"#).len(), 1, "a flat actor and role");
     assert_eq!(old_shapes_in(r#"{ "argv": ["a"], "why": "r" }"#).len(), 1, "why");
+}
+
+/// Every moved code `text` spells.
+fn moved_names_in(text: &str) -> Vec<&'static str> {
+    MOVED_CODES.iter().copied().filter(|moved| word_in(text, moved)).collect()
+}
+
+/// atip.midway.11: no guide, website page, dashboard source, eval script, design document, scenario outside `area=atip`, README or
+/// the sources of canon spells a code 0.35 moved to `STOPPED_MIDWAY`; the CHANGELOG's replacement table and the history of a change
+/// are the only places that spell them.
+#[test]
+fn atip_midway_11_no_consumer_spells_a_code_that_moved_to_stopped_midway() {
+    let mut files = consumers();
+    let root = repo_root();
+    let skip = ["node_modules", "dist", "target", ".git", "__pycache__"];
+    collect(&root.join("crates/canon-cli/src"), &["rs"], &skip, &mut files);
+    collect(&root.join("conformance"), &["out", "json", "sh", "md", "txt"], &skip, &mut files);
+    collect(&root.join("docs/cli"), &["json", "md"], &skip, &mut files);
+    files.push(root.join("crates/canon-cli/tests/atip/canon.fixture.json"));
+    assert!(files.len() > 100, "the scan found {} files: a consumer directory moved", files.len());
+    let hits: Vec<String> = files
+        .iter()
+        .filter_map(|file| std::fs::read_to_string(file).ok().map(|text| (file, text)))
+        .flat_map(|(file, text)| moved_names_in(&text).into_iter().map(move |moved| format!("{} spells `{moved}`", file.strip_prefix(repo_root()).unwrap_or(file).display())))
+        .collect();
+    assert!(hits.is_empty(), "moved codes left in consumers: {hits:#?}");
+}
+
+/// atip.midway.11: the check catches a moved code that comes back, and does not take a longer name for it.
+#[test]
+fn atip_midway_11_the_check_catches_a_moved_code_that_comes_back() {
+    assert_eq!(moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_INVALID_ARGUMENT"), Vec::<&str>::new());
+    assert_eq!(moved_names_in("run again: INIT_SKILL_INSTALL_FAILED"), ["INIT_SKILL_INSTALL_FAILED"]);
+    assert_eq!(moved_names_in(r#"{"code": "INIT_SKILL_INSTALL_FAILED", "exit": 1}"#), ["INIT_SKILL_INSTALL_FAILED"]);
+    assert_eq!(moved_names_in("MY_INIT_SKILL_INSTALL_FAILED_TOO is another name"), Vec::<&str>::new());
 }

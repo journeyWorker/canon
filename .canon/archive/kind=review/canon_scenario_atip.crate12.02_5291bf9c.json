@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T17:08:46.626539Z",
+  "code_tree": "ca63c482407ec7d931beba874e366be6f5cb0dba",
+  "kind": "review",
+  "pin": "2fd3934fcbf6216b5b8c7e632ff5a9351f06662e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_crate12_02_canon_still_declares_contract_version_1_1_though_the_crate_is_at_1_2",
+          "junit:atip_crate12_02_the_checker_still_declares_contract_version_1_1_though_the_crate_is_at_1_2"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "28c7c80d99b78549b43429da6f00627a8bfb92c3fc3f56d3aa65fb9fdfbf245f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-1-2/brief.md"
+  },
+  "review_id": "01M6EKR8X2QQVPXXTD3E4S179C",
+  "reviewer": "rev-crate-0-35",
+  "scenario_id": "atip.crate12.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

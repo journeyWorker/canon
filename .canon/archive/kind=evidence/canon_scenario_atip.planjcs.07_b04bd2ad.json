@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-plan-jcs",
+    "role": "implementer",
+    "session_id": "s-0-35-plan-jcs"
+  },
+  "at": "2026-11-03T00:30:58.218903Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_07_a_wait_that_runs_out_refuses_and_a_killed_holder_releases_the_lock",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/ci1/junit.xml",
+      "sha256": "e949869e7fdaf4da45ae2e288c18294a97cc6c2e6dbea3c8bf2ff9204449d9bf"
+    }
+  ],
+  "code_tree": "812ec3d8d7607dfcfdf68275146f54c568c445a2",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace (4054 passed, in three partitions)"
+  },
+  "evidence_sha": "7ddc01ac440a825d014e8cf2c633ad40dd617c19",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 20,
+  "scenario_id": "atip.planjcs.07",
+  "schema": 1,
+  "staging_id": "e9254f4c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

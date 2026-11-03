@@ -66,7 +66,7 @@ fn camel(name: &str) -> String {
 
 /// A validator of the schema `name` of the command document `doc`, whose `schemas` the `$ref`s of the members resolve in.
 fn member_validator(doc: &Value, name: &str) -> Result<jsonschema::Validator, String> {
-    let registry = Registry::new().add("urn:canon:doc", Resource::from_contents(doc.clone())).map_err(|e| e.to_string())?.prepare().map_err(|e| e.to_string())?;
+    let registry = Registry::new().add("https://atip.dev/1/guide.schema.json", Resource::from_contents(serde_json::from_str(atip::GUIDE_SCHEMA).expect("the guide schema is JSON"))).expect("the contract schema registers").add("urn:canon:doc", Resource::from_contents(doc.clone())).map_err(|e| e.to_string())?.prepare().map_err(|e| e.to_string())?;
     jsonschema::options().with_registry(&registry).build(&json!({ "$ref": format!("urn:canon:doc#/schemas/{name}") })).map_err(|e| format!("`{name}` does not compile: {e}"))
 }
 
@@ -251,15 +251,15 @@ fn parse_problem(example: &str) -> Option<String> {
 // ----------------------------------------------------------------------------------------------------------
 // atip.schemadoc.01 — F1: the tree
 
-/// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L1, lists 27 groups and 78 commands once, a
+/// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L2, lists 27 groups and 78 commands once, a
 /// group before its commands, byte-identically twice; `--as` filters and `CANON_ROLE` does not.
 #[test]
-fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l1() {
+fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2() {
     let (code, first, text) = answer(&["schema", "--json"]);
     assert_eq!(code, Some(0));
     assert_eq!(first["data"]["kind"], "tree");
-    assert_eq!(first["data"]["level"], "L1");
-    assert_eq!(first["meta"]["schemaVersion"], "1.1");
+    assert_eq!(first["data"]["level"], "L2");
+    assert_eq!(first["meta"]["schemaVersion"], "1.2");
     assert_eq!(first["meta"]["command"], "schema");
     assert_eq!(atip::schema_doc_problems(&first), Vec::<String>::new());
     assert!(first["data"].get("roles").is_none(), "the old top-level roles member is gone");
@@ -623,10 +623,10 @@ fn atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation
     let mut cmd = clap::Command::new("canon").subcommand(clap::Command::new("probe").about("Probe").arg(clap::Arg::new("thing").long("thing").value_name("THING_ID").value_parser(parse_thing).help("A thing")));
     cmd.build();
     let arg = cmd.find_subcommand("probe").and_then(|probe| probe.get_arguments().find(|arg| arg.get_id() == "thing")).expect("the probe argument");
-    let failure = atip::project::option_doc("probe", arg, canon_cli::spec::CUSTOM_PARSERS, canon_cli::input::FLAGS_ONLY).expect_err("a parser with no table entry is refused");
+    let failure = atip::project::option_doc("probe", arg, canon_cli::spec::CUSTOM_PARSERS, canon_cli::input::flags_only()).expect_err("a parser with no table entry is refused");
     assert!(failure.to_string().contains("THING_ID"), "{failure}");
     let table: Vec<(&str, atip::doc::ValueType)> = canon_cli::spec::CUSTOM_PARSERS.iter().copied().chain([("THING_ID", atip::doc::ValueType::String)]).collect();
-    assert_eq!(atip::project::option_doc("probe", arg, &table, canon_cli::input::FLAGS_ONLY).expect("listed").value_type, atip::doc::ValueType::String);
+    assert_eq!(atip::project::option_doc("probe", arg, &table, canon_cli::input::flags_only()).expect("listed").value_type, atip::doc::ValueType::String);
     // Every value name in the table is used by a parser of canon's own: no entry stands for nothing.
     let used: BTreeSet<String> = {
         let mut root = canon_cli::cli::command();
@@ -655,7 +655,7 @@ fn atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation
 fn atip_schemadoc_07_errors_outputs_and_schemas_hold_together_in_every_command_document() {
     let mut problems = Vec::new();
     for doc in COMMANDS.iter() {
-        let envelope = json!({ "ok": true, "data": doc, "meta": { "tool": "canon", "toolVersion": "0.0.0", "contract": "atip/1", "contractVersion": "1.1", "schemaVersion": "1.1", "command": "schema" } });
+        let envelope = json!({ "ok": true, "data": doc, "meta": { "tool": "canon", "toolVersion": "0.0.0", "contract": "atip/1", "contractVersion": "1.2", "schemaVersion": "1.2", "command": "schema" } });
         problems.extend(atip::schema_doc_problems(&envelope).into_iter().map(|problem| format!("`{}`: {problem}", doc["command"])));
         problems.extend(rule_problems(doc));
         for code in names(doc, "errors") {
@@ -798,7 +798,7 @@ fn first_line(args: &[&str]) -> String {
 #[test]
 fn atip_schemadoc_11_every_help_starts_with_the_line_that_points_at_schema() {
     let line = canon_cli::spec::HELP_POINTER;
-    assert_eq!(line, "Agents: \"canon schema --json\" describes every command as JSON.");
+    assert_eq!(line, "Agents: \"canon schema --json\" describes every command; \"canon skills show\" prints the guide.");
     for args in [&["--help"][..], &["finding", "--help"], &["finding", "close", "--help"], &["help", "finding"], &["finding", "close", "-h"], &["schema", "--help"]] {
         assert_eq!(first_line(args), line, "{args:?}");
     }
@@ -833,7 +833,7 @@ fn spec_file() -> Value {
 fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command() {
     let file = spec_file();
     assert_eq!(file["tree"], *TREE);
-    assert_eq!(file["tree"]["level"], "L1");
+    assert_eq!(file["tree"]["level"], "L2");
     let commands = file["commands"].as_array().expect("commands");
     assert_eq!(commands.len(), 78);
     let dir = tempfile::tempdir().expect("tempdir");

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-crate-0-35",
+    "role": "reviewer",
+    "session_id": "s-0-35-crate-rev"
+  },
+  "at": "2026-11-02T14:29:00.066142Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "eb390035522bf0f250331f0eb54da38ba7da24e3",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "87159df68f13f92a07ec7eed05e35a84b4f58e78",
+  "kind": "finding",
+  "reviewed_sha": "194a1457e53ca29e9f8e8b4e6871d16744eea25a",
+  "reviewer": "rev-crate-0-35",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Docs: the crate-validate CHANGELOG entry says 'cargo tree -p atip -e normal lists 35 crates instead of 103'; since this change made sha2 a normal dependency (and crate-plan reuses it) the same command lists 44 (I ran it at 194a1457), so the published count is wrong and the probe's figure (36) is too. The brief accepts sha2; the number was not updated. Blast radius: documentation only; atip-probe's test asserts only that jsonschema is absent, so it still passes.",
+  "worktree_dirty": false
+}
