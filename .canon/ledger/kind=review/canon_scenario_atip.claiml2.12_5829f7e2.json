@@ -4,10 +4,10 @@
     "role": "reviewer",
     "session_id": "s-0-35-claim-l2-rev"
   },
-  "at": "2026-11-03T10:53:48.942916Z",
-  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "at": "2026-11-03T12:52:07.264792Z",
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
   "kind": "review",
-  "pin": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
+  "pin": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
   "pins": {
     "checks": [
       {
@@ -25,7 +25,7 @@
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
   },
-  "review_id": "01M6GGPDGE7BKT9WR46CG2N0KG",
+  "review_id": "01M6GQF1F0AW15V8PAY29TVH80",
   "reviewer": "rev-claim-l2",
   "scenario_id": "atip.claiml2.12",
   "schema": 2,

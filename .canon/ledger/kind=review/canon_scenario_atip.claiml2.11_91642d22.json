@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-35-claim-l2-rev"
   },
-  "at": "2026-11-03T10:53:48.942916Z",
-  "code_tree": "c03db2eeabac0b9259d93c8f3ab857416360668c",
+  "at": "2026-11-03T12:52:07.264792Z",
+  "code_tree": "5fa34d9990fac810dff64b76d91ad772e6cd06b9",
   "kind": "review",
-  "pin": "3a5de22ff70fd8a6b58ae1dd4dd5679e1bd55560",
+  "pin": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_claiml2_13_the_release_section_carries_every_change_of_the_release_once_and_the_evidence_list"
+          "junit:atip_claiml2_11_every_obligation_of_contract_17_2_has_a_row_with_live_tests_or_a_stated_reason"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "b14f97d5819893ead43a09c9ce1e6a17ab52ea456163869b5e722dc4d00c030a",
+    "scenario_digest": "cae0298ba37ae2f9e11e9af6caa4602131a9f3f044e11b0aacfb74d1ce4aa67a",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
   },
-  "review_id": "01M6GGPDGE7BKT9WR46CG2N0KG",
+  "review_id": "01M6GQF1F0AW15V8PAY29TVH80",
   "reviewer": "rev-claim-l2",
-  "scenario_id": "atip.claiml2.13",
+  "scenario_id": "atip.claiml2.11",
   "schema": 2,
   "worktree_dirty": false
 }
