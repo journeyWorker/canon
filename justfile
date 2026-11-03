@@ -22,13 +22,9 @@ build:
 install:
     cargo install --path crates/canon-cli
 
-# The workspace tests without the checker crate's own (test.yml `offline`, without the network ban). The checker crate is left out by name: a bare `cargo test --workspace` still runs its tests, until the crate moves to the atip repo (0.36).
+# The workspace tests (test.yml `offline`, without the network ban). The checker (`atip check`) is the atip repo's: its tests are not run here (`just atip` runs it on canon).
 test:
-    cargo test --workspace --exclude atip-check --locked
-
-# The checker crate's own tests: its fake tool and one full `atip check` run per violation it must notice (test.yml `atip-check-tests`). Needs cargo-nextest: `cargo test -p atip-check` runs every test of a binary at once and a few of them miss their time limit under that load. Canon's own conformance is `just atip`.
-test-atip:
-    cargo nextest run -p atip-check --profile atip --locked
+    cargo test --workspace --locked
 
 # The three clippy runs of test.yml `clippy`.
 lint:
@@ -90,12 +86,14 @@ live:
     env {{ live_env }} cargo test -p canon-store --features live-pg,live-r2 --locked
     env {{ live_env }} cargo test -p canon-cli --test ledger_pg_live --locked
 
-# atip check on the canon binary at L0 (test.yml `atip-l0`) and at L2 (`atip-l2`, whose report holds every L0 and L1 row too), and on the checker itself at L0: every run claims contract 1.2.
+# Install the checker canon is held to: the atip repo's `atip check`, at the tag the CI job `atip` installs.
+atip-install:
+    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked
+
+# atip check on the canon binary: every check of L2 (the report holds every L0 and L1 row too), contract 1.2, `--deep` (test.yml `atip`). Needs the checker: `just atip-install`.
 atip:
-    cargo build --locked -p canon-cli -p atip-check
-    {{ target }}/debug/atip check --bin {{ target }}/debug/canon --level L0 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json
-    {{ target }}/debug/atip check --bin {{ target }}/debug/canon --level L2 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json
-    {{ target }}/debug/atip check --bin {{ target }}/debug/atip --level L0 --contract 1.2 --fixture crates/atip-check/atip.fixture.json
+    cargo build --locked -p canon-cli
+    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # Every CI check that needs no docker.
-ci: release-check lint test test-atip gate launcher platformer atip
+ci: release-check lint test gate launcher platformer atip

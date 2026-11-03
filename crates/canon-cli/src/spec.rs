@@ -393,6 +393,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
         effect: meta.effect,
         idempotency: facts.idempotency,
         effect_note: meta.effect_note.map(str::to_string),
+        is_async: false,
         errors,
         operands,
         options,

@@ -1,16 +1,12 @@
-//! `canon-0-35-claim-l2`: canon declares atip/1 1.2 and claims level L2, and the CI jobs prove it (scenarios `atip.claiml2.01-14`).
+//! `canon-0-35-claim-l2`: canon declares atip/1 1.2 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-18`; `canon-0-36-atip-dep` moved the checker to the atip repository).
 //!
-//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.2`
-//! on the committed fixture, which `just atip` and the job `atip-l2` run too. The CHANGELOG holds the release entry and the list of tests that
+//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.2 --deep`
+//! on the committed fixture, which `just atip` and the job `atip` run, and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
 //! stand for the obligations of contract 17.2 that a green checker run does not prove; the last four tests read it.
 
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use atip_check::app::check_binary;
-use atip_check::cli::{CheckArgs, Level};
-use atip_check::report::{CheckResult, Report, Strength};
 use serde_json::{json, Value};
 
 const CANON: &str = env!("CARGO_BIN_EXE_canon");
@@ -36,25 +32,6 @@ fn canon_out(dir: &Path, args: &[&str]) -> (Option<i32>, Value) {
 
 fn canon_in(dir: &Path, args: &[&str]) -> Value {
     canon_out(dir, args).1
-}
-
-fn run(bin: &Path, level: Level, fixture: &Path) -> Report {
-    let args = CheckArgs { bin: bin.into(), level, fixture: fixture.into(), contract: Some("1.2".to_string()) };
-    check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message))
-}
-
-/// The ids of the MUST rows that are neither a pass nor unsupported.
-fn red_musts(report: &Report) -> Vec<&'static str> {
-    report.checks.iter().filter(|check| check.strength == Strength::Must && !matches!(check.result, CheckResult::Pass | CheckResult::Unsupported)).map(|check| check.id).collect()
-}
-
-/// A script that runs canon, and `rewrite` on what it prints; `dashboard` (it serves until it is signalled) is run as it is.
-fn wrapper(dir: &Path, name: &str, body: &str) -> PathBuf {
-    let path = dir.join(name);
-    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\n{body}");
-    std::fs::write(&path, script).expect("write the wrapper");
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-    path
 }
 
 #[test]
@@ -108,62 +85,6 @@ fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1() {
 }
 
 #[test]
-fn atip_claiml2_03_a_canon_that_declares_l2_and_breaks_one_rule_of_l2_is_red_on_that_row() {
-    // canon with one planted violation: `skills show` without a name is refused, the way 0.34 refused it (the name was required): `L2.skills` fails.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let body = format!("if [ \"$1 $2 $3\" = \"skills show --json\" ]; then printf '%s\\n' '{{\"ok\":false,\"error\":{{\"code\":\"USAGE\",\"message\":\"the following required arguments were not provided: NAME\",\"retryable\":false,\"field\":\"NAME\"}},\"meta\":{{\"tool\":\"canon\",\"toolVersion\":\"0.35.0\",\"contract\":\"atip/1\",\"contractVersion\":\"1.2\",\"schemaVersion\":\"1.0\"}}}}'; exit 2; fi\nexec '{CANON}' \"$@\"\n");
-    let bin = wrapper(dir.path(), "canon-with-a-required-guide-name", &body);
-    let report = run(&bin, Level::L2, &fixture_path());
-    assert!(!report.passed, "{}", report.text());
-    assert_eq!(red_musts(&report), ["L2.skills"], "the violated row is the only one that fails: {}", report.text());
-    let skills = report.find("L2.skills").expect("L2.skills");
-    assert_eq!(skills.result, CheckResult::Fail);
-    assert!(skills.reason.as_deref().is_some_and(|reason| !reason.is_empty()), "the row says why: {skills:?}");
-}
-
-#[test]
-fn atip_claiml2_04_canon_passes_every_applicable_row_of_l2_and_the_rows_it_does_not_offer_are_unsupported() {
-    let report = run(Path::new(CANON), Level::L2, &fixture_path());
-    assert!(report.passed, "{}", report.text());
-    assert_eq!((report.level, report.contract_version), ("L2", "1.2"), "{}", report.text());
-    assert_eq!(red_musts(&report), Vec::<&str>::new(), "{}", report.text());
-    for id in ["L2.stream", "L2.async", "L2.operation-key", "L2.search"] {
-        assert_eq!(report.find(id).map(|check| check.result), Some(CheckResult::Unsupported), "{id}: {}", report.text());
-    }
-    for id in ["L1.tree", "L2.input-refusals", "L2.input-fragment", "L2.batch-preflight", "L2.batch-incomplete", "L2.idempotency", "L2.destructive-preview", "L2.destructive-commit", "L2.skills", "L2.guide-commands", "L2.help-guide", "L2.effects"] {
-        assert_eq!(report.find(id).map(|check| check.result), Some(CheckResult::Pass), "{id}: {}", report.text());
-    }
-}
-
-/// The committed fixture as a value, and a copy of it written under `dir` after `change`.
-fn changed_fixture(dir: &Path, change: impl FnOnce(&mut Value)) -> PathBuf {
-    let mut fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
-    change(&mut fixture);
-    let path = dir.join("canon.fixture.json");
-    std::fs::write(&path, serde_json::to_string_pretty(&fixture).expect("json")).expect("write the fixture");
-    path
-}
-
-#[test]
-fn atip_claiml2_05_a_fixture_without_the_previews_leaves_the_destructive_rows_unprovided() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let fixture = changed_fixture(dir.path(), |fixture| {
-        for entry in fixture["commands"].as_object_mut().expect("commands").values_mut() {
-            entry.as_object_mut().expect("an entry").remove("preview");
-        }
-    });
-    let report = run(Path::new(CANON), Level::L2, &fixture);
-    assert!(!report.passed, "{}", report.text());
-    let destructive = ["L2.destructive-preview", "L2.destructive-preview-stdin", "L2.destructive-stale", "L2.destructive-half", "L2.destructive-commit"];
-    assert_eq!(red_musts(&report), destructive, "{}", report.text());
-    for id in destructive {
-        let check = report.find(id).expect(id);
-        assert_eq!(check.result, CheckResult::Unprovided, "{id}");
-        assert!(check.reason.as_deref().unwrap_or_default().contains("no `preview`"), "{id}: {:?}", check.reason);
-    }
-}
-
-#[test]
 fn atip_claiml2_06_input_too_large_names_the_field_input() {
     let dir = tempfile::tempdir().expect("tempdir");
     let init = Command::new(CANON).args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
@@ -194,36 +115,23 @@ fn recipe_lines(justfile: &str, name: &str) -> Vec<String> {
 }
 
 #[test]
-fn atip_claiml2_07_just_atip_and_the_jobs_run_canon_at_l0_and_l2_and_the_checker_at_l0_at_1_2() {
+fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
     let root = repo_root();
     let workflow = read(&root.join(".github/workflows/test.yml"));
     let justfile = read(&root.join("justfile"));
-    let canon_at = |level: &str| format!("target/debug/atip check --bin target/debug/canon --level {level} --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json");
-    let checker = "target/debug/atip check --bin target/debug/atip --level L0 --contract 1.2 --fixture crates/atip-check/atip.fixture.json";
+    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
     let recipe = recipe_lines(&justfile, "atip");
-    for line in [canon_at("L0"), canon_at("L2"), checker.to_string()] {
-        assert!(recipe.contains(&line), "the recipe runs `{line}`: {recipe:?}");
+    assert!(recipe.contains(&canon_at_l2), "the recipe runs `{canon_at_l2}`: {recipe:?}");
+    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "the recipe builds canon only: {recipe:?}");
+    assert!(!recipe.iter().any(|line| line.contains("--level L0") || line.contains("--level L1")), "the L2 report holds the L0 and L1 rows: {recipe:?}");
+    let job = job_commands(&workflow, "atip");
+    assert!(job.contains(&canon_at_l2), "the job atip runs `{canon_at_l2}`: {job:?}");
+    assert!(job.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{job:?}");
+    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
+        assert!(!workflow.lines().any(|line| line == format!("  {retired}:")), "the job {retired} is folded into the job atip");
     }
-    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && line.contains("-p atip-check")), "{recipe:?}");
-    assert!(!recipe.iter().any(|line| line.contains("--level L1")), "the L2 report holds the L1 rows: {recipe:?}");
-    let l0 = job_commands(&workflow, "atip-l0");
-    assert!(l0.contains(&canon_at("L0")) && l0.contains(&checker.to_string()), "the job atip-l0 runs canon and the checker at L0: {l0:?}");
-    let l2 = job_commands(&workflow, "atip-l2");
-    assert!(l2.contains(&canon_at("L2")), "the job atip-l2 runs canon at L2: {l2:?}");
-    assert!(l2.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && line.contains("-p atip-check")), "{l2:?}");
-    assert!(!workflow.lines().any(|line| line == "  atip-l1:"), "the 0.34 job atip-l1 is folded into atip-l2");
     let ci = justfile.lines().find(|line| line.starts_with("ci:")).expect("the recipe ci");
     assert!(ci.split_whitespace().any(|word| word == "atip"), "just ci runs the recipe atip: {ci}");
-}
-
-#[test]
-fn atip_claiml2_08_a_canon_whose_plain_answer_says_1_1_fails_l0_contract_version_alone() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let body = format!("out=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"contractVersion\":\"1.2\"/\"contractVersion\":\"1.1\"/g'; fi\nexit $code\n");
-    let bin = wrapper(dir.path(), "canon-that-says-1-1", &body);
-    let report = run(&bin, Level::L0, &fixture_path());
-    assert!(!report.passed, "{}", report.text());
-    assert_eq!(red_musts(&report), ["L0.contract-version"], "{}", report.text());
 }
 
 #[test]
@@ -254,24 +162,6 @@ fn atip_claiml2_09_the_fixture_claims_1_2_and_lists_what_the_l2_rows_need() {
     let mut previewed: Vec<String> = commands.iter().filter(|(_, entry)| entry.get("preview").is_some()).map(|(id, _)| id.clone()).collect();
     previewed.sort();
     assert_eq!(previewed, destructive, "every destructive command has a preview in the fixture");
-}
-
-#[test]
-fn atip_claiml2_10_a_fixture_that_runs_dashboard_outside_not_run_does_not_pass_a_level() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let fixture = changed_fixture(dir.path(), |fixture| {
-        fixture.as_object_mut().expect("object").remove("notRun");
-        fixture["timeoutSeconds"] = json!(4);
-    });
-    // From L1 the checker knows `dashboard` serves (its `effectNote`) and runs it with the rest: it is signalled by the time limit, which no row passes.
-    let args = CheckArgs { bin: CANON.into(), level: Level::L1, fixture: fixture.into(), contract: Some("1.2".to_string()) };
-    match check_binary(&args) {
-        Err(failure) => assert!(!failure.message.is_empty()),
-        Ok(report) => {
-            assert!(!report.passed, "dashboard serves until it is signalled: {}", report.text());
-            assert!(!red_musts(&report).is_empty(), "{}", report.text());
-        }
-    }
 }
 
 /// The part of the CHANGELOG that is the release being prepared (the section `## 0.35.0`).
@@ -616,8 +506,8 @@ fn atip_claiml2_18_no_command_of_canon_reads_a_terminal_for_input_and_init_asks_
     let mut offenders: Vec<String> = Vec::new();
     for (path, text) in &found {
         for needle in ["/dev/tty", "rpassword", "dialoguer", "inquire::", "read_password", "termios"] {
-            // The checker's own pty harness and its fake tool name the file in order to refuse it; the scan is for the tool that is checked.
-            if text.lines().any(|line| line.contains(needle) && !line.trim_start().starts_with("//")) && !path.components().any(|part| part.as_os_str() == "atip-check") {
+            // The scan is for the tool that is checked: every crate of this workspace.
+            if text.lines().any(|line| line.contains(needle) && !line.trim_start().starts_with("//")) {
                 offenders.push(format!("{}: {needle}", path.display()));
             }
         }
@@ -627,10 +517,7 @@ fn atip_claiml2_18_no_command_of_canon_reads_a_terminal_for_input_and_init_asks_
     // instead of waiting. A new reader is a new prompt until the contract's 5.5 is met by it and it is named here.
     let mut readers: Vec<String> = found
         .iter()
-        .filter(|(path, text)| {
-            !path.components().any(|part| part.as_os_str() == "atip-check")
-                && text.lines().any(|line| !line.trim_start().starts_with("//") && (line.contains("io::stdin()") || line.contains("/dev/stdin") || line.contains("Stdio::inherit")))
-        })
+        .filter(|(_, text)| text.lines().any(|line| !line.trim_start().starts_with("//") && (line.contains("io::stdin()") || line.contains("/dev/stdin") || line.contains("Stdio::inherit"))))
         .map(|(path, _)| path.strip_prefix(repo_root().join("crates")).unwrap_or(path).display().to_string().replace("/../", "/"))
         .collect();
     readers.sort();

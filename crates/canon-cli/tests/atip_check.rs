@@ -1,33 +1,26 @@
-//! `atip check` against canon (0.34, `canon-0-34-atip-check-1-1` F6; 0.33 `canon-0-33-atip-check`).
+//! The fixture `atip check` reads for canon (0.34, `canon-0-34-atip-check-1-1` F6; 0.33 `canon-0-33-atip-check`; 0.36 `canon-0-36-atip-dep`).
 //!
 //! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: it claims 1.2 (0.35: `canon-0-35-claim-l2`); `setup` is `init`, two
 //! subjects (so a listing has a second page) and what the findings, scenarios and divergences of the entries need; `probe` is `status`; `globalOptions` is `--repo .`; `commands` holds a paging call
 //! that also emits a next step (`query`) and the refusal of a missing value (`finding close` without `--seq`); `registry`
 //! and `warnings` are generated from `canon schema --errors --json` and `--warnings --json`, never written by hand.
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
-//! committed file differs from what the binary says. The CI jobs `atip-l0` and `atip-l2` (which holds the L1 rows) and `just atip` run the same
-//! `atip check --contract 1.2` on the same binary and fixture. The L2 claim is `atip_claiml2.rs`'s.
+//! committed file differs from what the binary says.
 //!
-//! canon's conformance is one run of the checker at L1 (`canon_at_l1`): the tests that judge canon read rows of its report (`atip_report`), and the
-//! tests that plant a violation in canon run the checker themselves, because each needs a canon of its own (0.35 `canon-0-35-split-atip-check`).
+//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.1.0`) and canon runs it once, in the
+//! CI job `atip` and in `just atip`: `atip check --level L2 --contract 1.2 --deep` on the canon binary and this fixture. No test of canon runs the checker.
 
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::LazyLock;
 
-use atip_check::app::check_binary;
-use atip_check::cli::{CheckArgs, Level};
 use serde_json::{json, Value};
-
-mod atip_report;
 
 const CANON: &str = env!("CARGO_BIN_EXE_canon");
 
-/// The command line the CI job and the just recipe run, with the binaries' directory spelled `target/debug`.
-const COMMAND: &str = "atip check --bin target/debug/canon --level L0 --contract 1.2 --fixture crates/canon-cli/tests/atip/canon.fixture.json";
-/// The same for the checker on itself.
-const SELF_COMMAND: &str = "atip check --bin target/debug/atip --level L0 --contract 1.2 --fixture crates/atip-check/atip.fixture.json";
+/// The command the CI job and the just recipe run, with the binary's directory spelled `target/debug`.
+const COMMAND: &str = "atip check --bin target/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json";
+/// The command that installs the checker, at the tag canon is held to, in the CI job and in the just recipe.
+const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked";
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -144,136 +137,6 @@ fn atip_check_40_a_stale_registry_in_the_canon_fixture_fails_the_generation_test
     assert_eq!(registry_rows(&answer), [json!({"code": "X", "exit": 2, "retryable": false, "reasons": ["R"]})]);
 }
 
-fn run_checker_at(bin: &Path, level: Level) -> atip_check::report::Report {
-    let args = CheckArgs { bin: bin.into(), level, fixture: fixture_path().into(), contract: None };
-    check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message))
-}
-
-fn run_checker(bin: &Path) -> atip_check::report::Report {
-    run_checker_at(bin, Level::L0)
-}
-
-/// The one full run of the checker on canon in this binary, at L1: its report holds every L0 row too (the same rows as a run at L0, which
-/// `atip_check_41` reads), and the run at L1 is what `atip_checkl1_31` and `atip_check_98` judge.
-fn canon_at_l1() -> &'static atip_report::Rows {
-    static REPORT: LazyLock<atip_report::Rows> = LazyLock::new(|| atip_report::shared("atip_check-canon-l1", || run_checker_at(Path::new(CANON), Level::L1)));
-    &REPORT
-}
-
-#[test]
-fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_committed_fixture() {
-    let report = canon_at_l1();
-    // The 28 L0 checks and `L2.effects`, which every level reports (a SHOULD below L2): the rows of a run at L0, which a run at L1 holds unchanged.
-    let l0: Vec<&Value> = report.checks().iter().filter(|check| check["id"].as_str().is_some_and(|id| id.starts_with("L0.") || id == "L2.effects")).collect();
-    assert_eq!(l0.len(), 28 + 1, "{}", report.text());
-    assert_eq!(report.contract_version(), "1.2");
-    // The fixture has a paging call and a next-step call, so these two are judged, and only `L0.contract` (a 1.0 rule) does not apply.
-    for id in ["L0.next", "L0.page"] {
-        assert_eq!(report.result(id), Some("pass"), "{id}: {}", report.text());
-    }
-    assert_eq!(report.result("L0.contract"), Some("unsupported"));
-    // `L0.usage-hint` judges every `USAGE` without a `field`, and every `USAGE` canon prints names its field (7.1.3): none is observed, so it does not apply.
-    let not_applicable: Vec<&str> = l0.iter().filter(|check| check["result"] == "unsupported").map(|check| check["id"].as_str().expect("id")).collect();
-    assert_eq!(not_applicable, ["L0.contract", "L0.usage-hint"], "{}", report.text());
-    let failing: Vec<&str> = l0.iter().filter(|check| !matches!(check["result"].as_str(), Some("pass" | "unsupported"))).map(|check| check["id"].as_str().expect("id")).collect();
-    assert!(failing.is_empty(), "the 21 MUST and 5 SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
-}
-
-#[test]
-fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l2_which_a_run_at_l1_accepts() {
-    let report = canon_at_l1();
-    assert!(report.passed(), "{}", report.text());
-    assert_eq!((report.level(), report.contract_version(), report.checks().len()), ("L1", "1.2", 28 + 31 + 1 + 1));
-    let failing = report.ids_where(|_, result| matches!(result, "fail" | "unprovided"));
-    // The one advisory canon does not meet: `--kind` names the set of ledger kinds on `gate promote` and the kinds `gate purge` can delete, which share no value (L1.one-meaning-values, a SHOULD).
-    // `L2.effects`, a SHOULD below L2, passes: `query` writes its access line to `.canon/audit/access.jsonl`, and the fixture lists it under `allowedEffects` (`canon-0-35-claim-l2`).
-    assert_eq!(failing, ["L1.one-meaning-values"], "no MUST check fails or is unprovided for canon, and the one advisory is the known one:\n{}", report.text());
-    assert_eq!(report.advisories(), 1);
-    // The tree says L2, the level canon claims; a run at L1 takes a level above the claim (L1.tree), and the fixture names every step it made outside canon.
-    assert_eq!(report.result("L1.tree"), Some("pass"), "{}", report.text());
-    // Two `git` steps and the stub app that `canon dashboard` (under `notRun`: it serves until it is signalled) needs in the sandbox repo.
-    let prepare = report.prepare();
-    assert!(prepare.iter().all(|step| step.first().is_some_and(|program| matches!(*program, "git" | "sh"))), "{prepare:?}");
-    assert_eq!(prepare.len(), 3);
-    // The checks that probe the arguments and the data were exercised, not skipped for lack of a fixture entry.
-    for id in ["L1.constraints", "L1.domains", "L1.patterns", "L1.numbers", "L1.validators", "L1.paging", "L1.fields", "L1.output-data"] {
-        assert_eq!(report.result(id), Some("pass"), "{id}: {}", report.text());
-    }
-}
-
-#[test]
-fn atip_check_98_canon_lists_dashboard_under_not_run_and_passes_its_own_level_with_it() {
-    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(fixture_path()).expect("fixture")).expect("json");
-    assert_eq!(fixture["notRun"], json!(["dashboard"]), "the fixture leaves the command that does not end out of the run");
-    let report = canon_at_l1();
-    assert!(report.passed(), "{}", report.text());
-    // The checks that run commands say they left it out, and the other checks do not.
-    for id in ["L1.example-runs", "L1.constraints", "L1.domains", "L1.validators", "L1.output-data", "L1.next", "L1.paging", "L1.fields", "L0.page"] {
-        let check = report.find(id).unwrap_or_else(|| panic!("{id}"));
-        assert_eq!(check["notRun"], json!(["dashboard"]), "{id}");
-    }
-    let tree = report.find("L1.tree").expect("L1.tree");
-    assert!(tree.get("notRun").is_none(), "{tree}");
-    // `canon dashboard --json` ran once, printed its envelope, and was ended by the checker's signal; the other runs of it that would succeed were skipped.
-    let envelope = report.find("L0.envelope").expect("L0.envelope");
-    let served: Vec<&Value> = envelope["observed"].as_array().expect("observed").iter().filter(|call| call["served"] == true).collect();
-    assert_eq!(served.len(), 1, "{envelope}");
-    assert_eq!(served[0]["argv"][0], "dashboard");
-    assert!(served[0]["stdout"].as_str().is_some_and(|text| text.contains("\"url\"")), "{}", served[0]);
-}
-
-#[test]
-fn atip_checkl1_34_a_canon_command_whose_example_does_not_parse_fails_only_l1_examples() {
-    // canon with one planted violation: the documented example of `status` names `canonn`, a tool that is not this one, so the job that runs canon at L1 is red on `L1.examples` alone.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let wrapper = dir.path().join("canon-with-a-broken-example");
-    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"canon status --json\"/\"canonn status --json\"/g'; fi\nexit $code\n");
-    std::fs::write(&wrapper, script).expect("write");
-    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-    let args = CheckArgs { bin: wrapper.clone().into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
-    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
-    assert!(!report.passed, "{}", report.text());
-    let check = report.find("L1.examples").expect("L1.examples");
-    assert_eq!(check.result, atip_check::report::CheckResult::Fail, "{}", report.text());
-    assert!(check.reason.as_deref().unwrap_or_default().contains("canonn status --json"), "{:?}", check.reason);
-    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail && check.strength == atip_check::report::Strength::Must).map(|check| check.id).collect();
-    assert_eq!(failing, ["L1.examples"], "the broken example is the only MUST failure: {}", report.text());
-}
-
-#[test]
-fn atip_check_42_a_canon_whose_error_prints_hint_null_fails_l0_no_null() {
-    // canon with one planted violation: every error that has a hint also prints `"x-was-hint":null` before it, the way canon 0.32 printed a member it had no value for; the hint itself stays, so only L0.no-null owns the violation.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let wrapper = dir.path().join("canon-with-null-hints");
-    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"/\"x-was-hint\":null,\"hint\":\"/'; fi\nexit $code\n");
-    std::fs::write(&wrapper, script).expect("write");
-    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-    let report = run_checker(&wrapper);
-    assert!(!report.passed);
-    let check = report.find("L0.no-null").expect("L0.no-null");
-    assert_eq!(check.result, atip_check::report::CheckResult::Fail, "{}", report.text());
-    assert!(check.reason.as_deref().unwrap_or_default().contains("hint"), "{:?}", check.reason);
-    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail).map(|check| check.id).collect();
-    assert_eq!(failing, ["L0.no-null"], "the planted null is the only thing wrong: {}", report.text());
-}
-
-#[test]
-fn atip_check_75_a_canon_whose_hint_is_prose_starting_with_its_name_fails_l0_hint_form() {
-    // canon with one planted violation: every "a working call: ..." hint is replaced by prose that starts with `canon ` and is not one command line.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let wrapper = dir.path().join("canon-with-prose-hints");
-    let script = format!("#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = dashboard ] && exec '{CANON}' \"$@\"; done\nout=$('{CANON}' \"$@\")\ncode=$?\nif [ -n \"$out\" ]; then printf '%s\\n' \"$out\" | sed 's/\"hint\":\"a working call: /\"hint\":\"canon can'\"'\"'t run this; try: /'; fi\nexit $code\n");
-    std::fs::write(&wrapper, script).expect("write");
-    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-    let report = run_checker(&wrapper);
-    assert!(!report.passed, "{}", report.text());
-    let check = report.find("L0.hint-form").expect("L0.hint-form");
-    assert_eq!(check.result, atip_check::report::CheckResult::Fail, "{}", report.text());
-    assert!(check.reason.as_deref().unwrap_or_default().contains("not one command line"), "{:?}", check.reason);
-    let failing: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Fail).map(|check| check.id).collect();
-    assert_eq!(failing, ["L0.hint-form"], "the prose hint is the only thing wrong: {}", report.text());
-}
-
 /// The `run:` commands of the workflow job `job` in test.yml.
 fn workflow_commands(job: &str) -> Vec<String> {
     let workflow = std::fs::read_to_string(repo_root().join(".github/workflows/test.yml")).expect("test.yml");
@@ -292,12 +155,13 @@ fn just_recipe(name: &str) -> Vec<String> {
 
 #[test]
 fn atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon_binary_with_the_same_command() {
-    let job = workflow_commands("atip-l0");
-    assert!(job.iter().any(|run| run.contains("cargo build") && run.contains("-p canon-cli") && run.contains("-p atip-check") && run.contains("--locked")), "the job builds both binaries: {job:?}");
-    assert!(job.iter().any(|run| run == &format!("target/debug/{COMMAND}") || run == &format!("./target/debug/{COMMAND}")), "the job runs `{COMMAND}`: {job:?}");
-    assert!(job.iter().any(|run| run.ends_with(SELF_COMMAND) && run.contains("target/debug/atip")), "the job runs the checker on itself: {job:?}");
+    let job = workflow_commands("atip");
+    assert!(job.iter().any(|run| run == INSTALL), "the job installs the checker at its tag: {job:?}");
+    assert!(job.iter().any(|run| run.contains("cargo build") && run.contains("-p canon-cli") && !run.contains("atip-check") && run.contains("--locked")), "the job builds canon only: {job:?}");
+    assert!(job.iter().any(|run| run == COMMAND), "the job runs `{COMMAND}`: {job:?}");
+    assert_eq!(job.iter().filter(|run| run.starts_with("atip check")).count(), 1, "the job runs the checker once: {job:?}");
     let recipe = just_recipe("atip");
-    assert!(recipe.iter().any(|line| line == &format!("target/debug/{COMMAND}")), "the recipe runs the same command: {recipe:?}");
-    assert!(recipe.iter().any(|line| line == &format!("target/debug/{SELF_COMMAND}")), "{recipe:?}");
-    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && line.contains("-p atip-check")), "{recipe:?}");
+    assert!(recipe.iter().any(|line| line == COMMAND), "the recipe runs the same command: {recipe:?}");
+    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{recipe:?}");
+    assert_eq!(just_recipe("atip-install"), [INSTALL], "the recipe that installs the checker runs the job's command");
 }

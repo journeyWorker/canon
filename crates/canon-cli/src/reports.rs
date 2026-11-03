@@ -117,7 +117,19 @@ pub fn declared_version(command: &str, batch: bool) -> Option<String> {
 pub fn schema_of<R: JsonSchema>() -> Value {
     // A report is only ever serialized, so its schema follows what `Serialize` writes (renames, skipped fields).
     let generator = schemars::generate::SchemaSettings::draft2020_12().for_serialize().into_generator();
-    serde_json::to_value(generator.into_root_schema_for::<R>()).expect("a JSON Schema serializes")
+    let mut schema = serde_json::to_value(generator.into_root_schema_for::<R>()).expect("a JSON Schema serializes");
+    without_later_minor_members(&mut schema);
+    schema
+}
+
+/// Takes out of a schema the members of the `atip` crate's documents that the minor canon declares (`json_out::DECLARED_MINOR`) does not have.
+/// The crate (tag `atip-crate-v0.1.0`) writes 1.3 and 1.4 as well, and its types name those members, so the schema of a report that holds one lists
+/// them. canon writes none (`CommandDoc::is_async` is false, which the document leaves out: no command of canon is asynchronous), and the schema it
+/// publishes for its own answers is what they say, so `canon schema` and `docs/cli/canon.cli.json` read as they did before the crate moved.
+fn without_later_minor_members(schema: &mut Value) {
+    if let Some(properties) = schema.pointer_mut("/$defs/CommandDoc/properties").and_then(Value::as_object_mut) {
+        properties.remove("async");
+    }
 }
 
 /// The typed reports of `command` (one entry per output, the batch output included), each with its schema: the

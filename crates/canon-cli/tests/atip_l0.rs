@@ -431,7 +431,7 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     // And no source, spec file or skill still spells an old code.
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut files = Vec::new();
-    for (dir, ext) in [("crates/canon-cli/src", "rs"), ("crates/atip/src", "rs"), ("crates/canon-vocab/src", "rs"), (".canon/specs", "feature"), ("canon/skills", "md")] {
+    for (dir, ext) in [("crates/canon-cli/src", "rs"), ("crates/canon-vocab/src", "rs"), (".canon/specs", "feature"), ("canon/skills", "md")] {
         collect(&root.join(dir), ext, &mut files);
     }
     assert!(files.len() > 100, "the scan found {} files", files.len());

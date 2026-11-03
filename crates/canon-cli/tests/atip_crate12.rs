@@ -31,7 +31,7 @@ fn sources_without_comments(dir: &Path) -> Vec<(PathBuf, String)> {
 
 #[test]
 fn atip_crate12_02_canon_declares_contract_version_1_2_by_its_own_constant_not_the_crates() {
-    assert_eq!(atip::CONTRACT_VERSION, "1.2", "the crate implements 1.2");
+    assert!(atip::Minor::parse(canon_cli::json_out::DECLARED_MINOR).is_ok(), "the crate knows the minor canon declares");
     assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.2", "canon declares 1.2: its own constant, changed by a decision to claim the minor");
     let dir = tempfile::tempdir().expect("a temp dir");
     let schema = canon(dir.path(), &["schema", "--json"]);
