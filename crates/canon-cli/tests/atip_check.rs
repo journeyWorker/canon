@@ -7,14 +7,20 @@
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
 //! committed file differs from what the binary says. The CI jobs `atip-l0` and `atip-l2` (which holds the L1 rows) and `just atip` run the same
 //! `atip check --contract 1.2` on the same binary and fixture. The L2 claim is `atip_claiml2.rs`'s.
+//!
+//! canon's conformance is one run of the checker at L1 (`canon_at_l1`): the tests that judge canon read rows of its report (`atip_report`), and the
+//! tests that plant a violation in canon run the checker themselves, because each needs a canon of its own (0.35 `canon-0-35-split-atip-check`).
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::LazyLock;
 
 use atip_check::app::check_binary;
 use atip_check::cli::{CheckArgs, Level};
 use serde_json::{json, Value};
+
+mod atip_report;
 
 const CANON: &str = env!("CARGO_BIN_EXE_canon");
 
@@ -138,49 +144,60 @@ fn atip_check_40_a_stale_registry_in_the_canon_fixture_fails_the_generation_test
     assert_eq!(registry_rows(&answer), [json!({"code": "X", "exit": 2, "retryable": false, "reasons": ["R"]})]);
 }
 
-fn run_checker(bin: &Path) -> atip_check::report::Report {
-    let args = CheckArgs { bin: bin.into(), level: Level::L0, fixture: fixture_path().into(), contract: None };
+fn run_checker_at(bin: &Path, level: Level) -> atip_check::report::Report {
+    let args = CheckArgs { bin: bin.into(), level, fixture: fixture_path().into(), contract: None };
     check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message))
+}
+
+fn run_checker(bin: &Path) -> atip_check::report::Report {
+    run_checker_at(bin, Level::L0)
+}
+
+/// The one full run of the checker on canon in this binary, at L1: its report holds every L0 row too (the same rows as a run at L0, which
+/// `atip_check_41` reads), and the run at L1 is what `atip_checkl1_31` and `atip_check_98` judge.
+fn canon_at_l1() -> &'static atip_report::Rows {
+    static REPORT: LazyLock<atip_report::Rows> = LazyLock::new(|| atip_report::shared("atip_check-canon-l1", || run_checker_at(Path::new(CANON), Level::L1)));
+    &REPORT
 }
 
 #[test]
 fn atip_check_41_canon_passes_the_26_applicable_of_the_28_l0_checks_through_the_committed_fixture() {
-    let report = run_checker(Path::new(CANON));
-    assert!(report.passed, "{}", report.text());
-    // The 28 L0 checks and `L2.effects`, which every level reports (a SHOULD below L2).
-    assert_eq!(report.checks.len(), 28 + 1);
-    assert_eq!(report.contract_version, "1.2");
+    let report = canon_at_l1();
+    // The 28 L0 checks and `L2.effects`, which every level reports (a SHOULD below L2): the rows of a run at L0, which a run at L1 holds unchanged.
+    let l0: Vec<&Value> = report.checks().iter().filter(|check| check["id"].as_str().is_some_and(|id| id.starts_with("L0.") || id == "L2.effects")).collect();
+    assert_eq!(l0.len(), 28 + 1, "{}", report.text());
+    assert_eq!(report.contract_version(), "1.2");
     // The fixture has a paging call and a next-step call, so these two are judged, and only `L0.contract` (a 1.0 rule) does not apply.
     for id in ["L0.next", "L0.page"] {
-        assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
+        assert_eq!(report.result(id), Some("pass"), "{id}: {}", report.text());
     }
-    assert_eq!(report.find("L0.contract").map(|check| check.result), Some(atip_check::report::CheckResult::Unsupported));
+    assert_eq!(report.result("L0.contract"), Some("unsupported"));
     // `L0.usage-hint` judges every `USAGE` without a `field`, and every `USAGE` canon prints names its field (7.1.3): none is observed, so it does not apply.
-    let not_applicable: Vec<&str> = report.checks.iter().filter(|check| check.result == atip_check::report::CheckResult::Unsupported).map(|check| check.id).collect();
+    let not_applicable: Vec<&str> = l0.iter().filter(|check| check["result"] == "unsupported").map(|check| check["id"].as_str().expect("id")).collect();
     assert_eq!(not_applicable, ["L0.contract", "L0.usage-hint"], "{}", report.text());
-    let failing: Vec<&str> = report.checks.iter().filter(|check| !matches!(check.result, atip_check::report::CheckResult::Pass | atip_check::report::CheckResult::Unsupported)).map(|check| check.id).collect();
+    let failing: Vec<&str> = l0.iter().filter(|check| !matches!(check["result"].as_str(), Some("pass" | "unsupported"))).map(|check| check["id"].as_str().expect("id")).collect();
     assert!(failing.is_empty(), "the 21 MUST and 5 SHOULD checks all pass for canon: {failing:?}\n{}", report.text());
 }
 
 #[test]
 fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l2_which_a_run_at_l1_accepts() {
-    let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
-    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
-    assert!(report.passed, "{}", report.text());
-    assert_eq!((report.level, report.contract_version, report.checks.len()), ("L1", "1.2", 28 + 31 + 1 + 1));
-    let failing: Vec<&str> = report.checks.iter().filter(|check| matches!(check.result, atip_check::report::CheckResult::Fail | atip_check::report::CheckResult::Unprovided)).map(|check| check.id).collect();
+    let report = canon_at_l1();
+    assert!(report.passed(), "{}", report.text());
+    assert_eq!((report.level(), report.contract_version(), report.checks().len()), ("L1", "1.2", 28 + 31 + 1 + 1));
+    let failing = report.ids_where(|_, result| matches!(result, "fail" | "unprovided"));
     // The one advisory canon does not meet: `--kind` names the set of ledger kinds on `gate promote` and the kinds `gate purge` can delete, which share no value (L1.one-meaning-values, a SHOULD).
     // `L2.effects`, a SHOULD below L2, passes: `query` writes its access line to `.canon/audit/access.jsonl`, and the fixture lists it under `allowedEffects` (`canon-0-35-claim-l2`).
     assert_eq!(failing, ["L1.one-meaning-values"], "no MUST check fails or is unprovided for canon, and the one advisory is the known one:\n{}", report.text());
     assert_eq!(report.advisories(), 1);
     // The tree says L2, the level canon claims; a run at L1 takes a level above the claim (L1.tree), and the fixture names every step it made outside canon.
-    assert_eq!(report.find("L1.tree").map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{}", report.text());
+    assert_eq!(report.result("L1.tree"), Some("pass"), "{}", report.text());
     // Two `git` steps and the stub app that `canon dashboard` (under `notRun`: it serves until it is signalled) needs in the sandbox repo.
-    assert!(report.prepare.iter().all(|step| step.first().is_some_and(|program| matches!(program.as_str(), "git" | "sh"))), "{:?}", report.prepare);
-    assert_eq!(report.prepare.len(), 3);
+    let prepare = report.prepare();
+    assert!(prepare.iter().all(|step| step.first().is_some_and(|program| matches!(*program, "git" | "sh"))), "{prepare:?}");
+    assert_eq!(prepare.len(), 3);
     // The checks that probe the arguments and the data were exercised, not skipped for lack of a fixture entry.
     for id in ["L1.constraints", "L1.domains", "L1.patterns", "L1.numbers", "L1.validators", "L1.paging", "L1.fields", "L1.output-data"] {
-        assert_eq!(report.find(id).map(|check| check.result), Some(atip_check::report::CheckResult::Pass), "{id}: {}", report.text());
+        assert_eq!(report.result(id), Some("pass"), "{id}: {}", report.text());
     }
 }
 
@@ -188,19 +205,17 @@ fn atip_checkl1_31_canon_passes_every_applicable_l1_check_and_its_tree_says_l2_w
 fn atip_check_98_canon_lists_dashboard_under_not_run_and_passes_its_own_level_with_it() {
     let fixture: Value = serde_json::from_str(&std::fs::read_to_string(fixture_path()).expect("fixture")).expect("json");
     assert_eq!(fixture["notRun"], json!(["dashboard"]), "the fixture leaves the command that does not end out of the run");
-    let args = CheckArgs { bin: Path::new(CANON).into(), level: Level::L1, fixture: fixture_path().into(), contract: None };
-    let report = check_binary(&args).unwrap_or_else(|failure| panic!("{}: {}", failure.code.info().code, failure.message));
-    assert!(report.passed, "{}", report.text());
-    let data = serde_json::to_value(&report).expect("the report is JSON");
+    let report = canon_at_l1();
+    assert!(report.passed(), "{}", report.text());
     // The checks that run commands say they left it out, and the other checks do not.
     for id in ["L1.example-runs", "L1.constraints", "L1.domains", "L1.validators", "L1.output-data", "L1.next", "L1.paging", "L1.fields", "L0.page"] {
-        let check = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == id).unwrap_or_else(|| panic!("{id}"));
+        let check = report.find(id).unwrap_or_else(|| panic!("{id}"));
         assert_eq!(check["notRun"], json!(["dashboard"]), "{id}");
     }
-    let tree = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == "L1.tree").expect("L1.tree");
+    let tree = report.find("L1.tree").expect("L1.tree");
     assert!(tree.get("notRun").is_none(), "{tree}");
     // `canon dashboard --json` ran once, printed its envelope, and was ended by the checker's signal; the other runs of it that would succeed were skipped.
-    let envelope = data["checks"].as_array().expect("checks").iter().find(|check| check["id"] == "L0.envelope").expect("L0.envelope");
+    let envelope = report.find("L0.envelope").expect("L0.envelope");
     let served: Vec<&Value> = envelope["observed"].as_array().expect("observed").iter().filter(|call| call["served"] == true).collect();
     assert_eq!(served.len(), 1, "{envelope}");
     assert_eq!(served[0]["argv"][0], "dashboard");

@@ -1,0 +1,17 @@
+# cargo-nextest profiles (`cargo nextest run`). CI itself runs `cargo test` (.github/workflows/test.yml).
+#
+# The checker crate `atip-check` holds the tests of the checker itself (its fake tool, one full `atip check` run per violation it must notice).
+# They are not canon's tests: canon proves its own conformance by running `atip check` once in CI. The default profile leaves them out, the
+# `atip` profile runs only them: `cargo nextest run --profile atip` (`just test-atip` runs the same tests with `cargo test`).
+
+[profile.default]
+default-filter = "not package(atip-check)"
+
+[profile.default.junit]
+path = "junit.xml"
+
+[profile.atip]
+default-filter = "package(atip-check)"
+
+[profile.atip.junit]
+path = "junit.xml"
