@@ -274,9 +274,9 @@ fn atip_claiml2_10_a_fixture_that_runs_dashboard_outside_not_run_does_not_pass_a
     }
 }
 
-/// The part of the CHANGELOG that is the release being prepared (the section `## Unreleased`).
+/// The part of the CHANGELOG that is the release being prepared (the section `## 0.35.0`).
 fn release_section(changelog: &str) -> &str {
-    let start = changelog.find("\n## Unreleased").expect("the CHANGELOG has the release section");
+    let start = changelog.find("\n## 0.35.0").expect("the CHANGELOG has the release section");
     let rest = &changelog[start + 1..];
     let end = rest[3..].find("\n## ").map_or(rest.len(), |at| at + 3);
     &rest[..end]

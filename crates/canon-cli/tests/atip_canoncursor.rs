@@ -501,8 +501,7 @@ fn atip_canoncursor_12_a_cursor_of_0_34_is_foreign() {
 #[test]
 fn atip_canoncursor_13_the_changelog_states_the_upgrade() {
     let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).expect("the CHANGELOG");
-    let unreleased = changelog.split("\n## ").nth(1).expect("the Unreleased section");
-    assert!(unreleased.starts_with("Unreleased"), "{}", &unreleased[..40]);
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.35.0")).expect("the 0.35.0 section");
     let entry = unreleased.split("\n**").find(|entry| entry.contains("canon-0-35-canon-cursor-1-2")).expect("the entry of this change");
     for phrase in ["0.34", "FOREIGN", "from the first page", "FLAG_ONLY_KEY", "--cursor=<value>", "CANON_ROLE", "ARGUMENTS_CHANGED"] {
         assert!(entry.contains(phrase), "the entry says `{phrase}`: {entry}");

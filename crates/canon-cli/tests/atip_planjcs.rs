@@ -792,7 +792,7 @@ fn digest_code_problems(code: &str) -> Vec<String> {
 fn atip_planjcs_12_the_changelog_has_the_upgrade_note_and_no_source_makes_the_old_digest() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.35.0")).expect("the 0.35.0 section");
     assert_eq!(note_problems(unreleased), Vec::<String>::new());
     // Each part is read where it stands: deleting the note's paragraph fails the check though the section still has its words elsewhere.
     let note = paragraph_of(unreleased, NOTE_PARTS[1].1).expect("the upgrade note");
@@ -814,7 +814,7 @@ fn atip_planjcs_12_the_changelog_has_the_upgrade_note_and_no_source_makes_the_ol
 fn atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fail_the_check() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.35.0")).expect("the 0.35.0 section");
     assert!(note_problems(unreleased).is_empty(), "the note as it stands has every part");
     let mut masked = 0;
     for (label, opening, needles) in NOTE_PARTS {
