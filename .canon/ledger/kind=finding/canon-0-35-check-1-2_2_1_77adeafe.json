@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:55:46.796688Z",
+  "change_id": "canon-0-35-check-1-2",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "introduced_by": "12224ee2d6e7c7e549293a610d4f790d09c04632",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 2,
+  "scenario_ids": [
+    "atip.check.122"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Spec fidelity: scenario atip.check.122 says 'a 1.2 document whose cursor, all or fields is not flag-only'; the brief (F5) and the test (atip_check_122, for name in limit, cursor, all, fields) also cover limit. The test is right; the scenario text should name limit.",
+  "worktree_dirty": false
+}

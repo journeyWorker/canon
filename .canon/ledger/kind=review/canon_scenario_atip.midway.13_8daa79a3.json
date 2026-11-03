@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:57:04.357394Z",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "kind": "review",
+  "pin": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_midway_13_an_io_failure_code_that_moves_or_is_absorbed_fails_the_check"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f8377bab42a2a7cb4d72fb4d630819d00dc9bea62eedb67ce653532bb107ed8c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-canon-stopped-midway/brief.md"
+  },
+  "review_id": "01M6GMA7Z58VBZ3BDBBV5K1MAX",
+  "reviewer": "rev-0-35-final",
+  "scenario_id": "atip.midway.13",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:57:17.368178Z",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "kind": "review",
+  "pin": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_check_123_an_unprovided_check_in_the_text_report_keeps_its_line_and_lists_no_findings"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "284488335fb90c9daaeefdc2822c740e8fe123698e3be3c9f1282ecd4ce4a883",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-check-findings/brief.md"
+  },
+  "review_id": "01M6GMAMNR3BF4GAAT3GK0AARC",
+  "reviewer": "rev-0-35-final",
+  "scenario_id": "atip.check.123",
+  "schema": 2,
+  "worktree_dirty": false
+}

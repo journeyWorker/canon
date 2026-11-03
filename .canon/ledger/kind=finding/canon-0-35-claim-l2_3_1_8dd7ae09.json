@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:55:06.553389Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip/canon.fixture.json",
+  "introduced_by": "605a87abb8a494d21dbf9022092550c9b27fd751",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 3,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Brief vs fixture, carried over from 1_7 (second half): brief F4 says preview 'six destructive commands'; the fixture previews five (purge, artifacts move, migrate, ledger compact, tier age) and the CHANGELOG says 'the five destructive commands' without saying why migrate --revert is out (it has nothing to preview before a migrate commit; ledger_revert.rs covers it). Say so in the entry, or amend the brief to five.",
+  "worktree_dirty": false
+}

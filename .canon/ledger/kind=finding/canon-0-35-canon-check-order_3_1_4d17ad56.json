@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-35-final",
+    "role": "reviewer",
+    "session_id": "s-0-35-final-rev"
+  },
+  "at": "2026-11-03T11:55:54.230773Z",
+  "change_id": "canon-0-35-canon-check-order",
+  "code_tree": "655176011d9c5d8887dfa4fcf71986afbeafc379",
+  "disposition": "open",
+  "introduced_by": "12224ee2d6e7c7e549293a610d4f790d09c04632",
+  "kind": "finding",
+  "reviewed_sha": "dc2ac5b80c9c4fed72bcd276411f5d5cceee553f",
+  "reviewer": "rev-0-35-final",
+  "round": 3,
+  "scenario_ids": [
+    "atip.checkorder.18"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Test strength: scenario atip.checkorder.18 lists the constraint alone and both orders for brief approve and policy approve; atip_checkorder_18 runs the constraint alone and the flipped order for brief approve only (policy approve: the validator alone and both). The behavior is the same code path; add the two policy approve calls so the test says what the scenario says.",
+  "worktree_dirty": false
+}
