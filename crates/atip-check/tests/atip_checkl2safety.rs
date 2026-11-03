@@ -278,6 +278,22 @@ fn atip_checkl2safety_05_a_side_effect_the_fixture_allows_does_not_count_against
 }
 
 #[test]
+fn atip_checkl2safety_05_a_directory_a_repeat_makes_and_leaves_empty_is_not_an_effect_and_a_file_in_it_is() {
+    // checker.md 1.3.1 section 4: snapshots count files only. `stamp` makes a new empty directory on every run, the repeat included.
+    let output = run_config(&l2_config(&json!({"stampBareDir": true})));
+    let data = &output.envelope()["data"];
+    assert_eq!(check_of(data, "L2.idempotency")["result"], "pass", "{}\n{}", check_of(data, "L2.idempotency"), not_passing(data));
+    assert_eq!(check_of(data, "L0.refusal-effects")["result"], "pass", "{}", not_passing(data));
+    // The same repeat that also writes a file (the duplicate of `stampDuplicates`) is still a new effect.
+    let output = run_config(&l2_config(&json!({"stampBareDir": true, "stampDuplicates": true})));
+    let data = &output.envelope()["data"];
+    let check = check_of(data, "L2.idempotency");
+    assert_eq!(check["result"], "fail", "{check}");
+    let reason = check["reason"].as_str().unwrap_or_default();
+    assert!(reason.contains("-again.txt") && !reason.contains("bare-"), "{reason}");
+}
+
+#[test]
 fn atip_checkl2safety_03_a_next_that_writes_the_digest_as_one_word_commits_the_plan_and_the_stale_probe_alters_it_there() {
     // next[0] is `... --commit --plan-digest=sha256:<hex> --json`, the form of spec 9.12.1.
     let output = run_config(&l2_config(&json!({"digestOneWord": true})));

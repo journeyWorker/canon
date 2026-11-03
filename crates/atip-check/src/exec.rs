@@ -977,7 +977,7 @@ mod tests {
                 "echo b > keep; mkdir -p \"$HOME/.cache\"; echo t > \"$HOME/.cache/log\"; exit 2",
             ))
             .expect("run");
-        assert_eq!(noisy.changes, ["./keep", "~/.cache", "~/.cache/log"]);
+        assert_eq!(noisy.changes, ["./keep", "~/.cache/log"]);
         let accepted = runner.run(&sh("echo b > keep; exit 0")).expect("run");
         assert!(accepted.changes.is_empty(), "only a refusal is measured");
     }

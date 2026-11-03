@@ -357,6 +357,11 @@ fn stamp_run(tool: &Tool, _args: &[String], parsed: &Parsed) -> ExitCode {
         let mut file = std::fs::OpenOptions::new().create(true).append(true).open(".stamp-audit.log").unwrap_or_else(|_| std::process::exit(70));
         writeln!(file, "stamped").unwrap_or_default();
     }
+    // Seeded: every run also makes a directory of its own that holds nothing (`bare-0`, `bare-1`, ...): a directory is no effect.
+    if tool.flag("stampBareDir") {
+        let made = std::fs::read_dir(".").map_or(0, |entries| entries.flatten().filter(|entry| entry.file_name().to_string_lossy().starts_with("bare-")).count());
+        std::fs::create_dir(format!("bare-{made}")).unwrap_or_default();
+    }
     if parsed.has("dry-run") {
         if tool.flag("dryRunWrites") {
             std::fs::write("dry-run-cache.txt", "written by a dry run").unwrap_or_default();
