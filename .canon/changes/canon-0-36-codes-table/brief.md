@@ -94,3 +94,5 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 approaches/migration.md
 - 경고 코드의 이름 바꾸기.
 - 옛 이름의 별칭이나 이전 안내를 내는 일.
 - 1.4 선언(`canon-0-36-claim-1-4`).
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:c2f8fb4cc51fbd8ec11eeda71c6418724ce7d30de478c1edac19842a8a36c49b)

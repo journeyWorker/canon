@@ -51,3 +51,5 @@ infra
 - 테스트 케이스의 이름 바꾸기나 테스트 수정.
 - 목록에 없는 시나리오의 증거 정리.
 - 검사기 시나리오의 감사. 그 시나리오는 `canon-0-36-atip-dep`가 처분한다.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:b82bdd869c1d834c00ad901ba7055550ca102f0e8814b7f231dea82281cecd0d)

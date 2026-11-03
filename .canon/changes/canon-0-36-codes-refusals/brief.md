@@ -165,3 +165,5 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 - 읽지 못한 파일과 깨진 저장 상태, 잠금과 저장소 접근(`canon-0-36-codes-stored`).
 - 중간에 멈추는 명령(`canon-0-36-codes-incomplete`)과 이유 이름 전체의 정리(`canon-0-36-code-reasons`).
 - 새 거절 규칙을 더하는 일.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:4c3c68720f0f6188f7f6cc9cf662437357864acb09fecacee2cd73a9a1404512)

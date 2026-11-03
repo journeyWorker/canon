@@ -140,3 +140,5 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3,
 - 이름만 바뀌는 코드(`canon-0-36-codes-rename`)와 여러 거절을 가리던 코드(`canon-0-36-codes-refusals`).
 - 게이트 거절의 종료 값(`canon-0-36-codes-exit`)과 중간에 멈추는 명령(`canon-0-36-codes-incomplete`).
 - 읽기 실패를 줄이거나 자동으로 고치는 일.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:ab7d404a94a94984188157d22f30404d65bf24f8f80f2bb84714ae89bf48a38f)

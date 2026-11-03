@@ -143,3 +143,5 @@ canon은 `meta.contractVersion` 1.2와 L2를 선언한다. `canon schema <명령
 - L3 같은 더 높은 수준의 주장.
 - `schema --search`와 같은 선택 기능을 더하는 일.
 - 출력 데이터(`data`)의 형식 변경.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:d574e18c1292ae583aa936eb2e6ad8570911ee8607afecded34a585dba1c191e)

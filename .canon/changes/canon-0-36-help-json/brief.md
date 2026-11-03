@@ -88,3 +88,5 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 4.4.1, 9.1, approa
 - 1.4 선언과 자기 설명 형식(`canon-0-36-claim-1-4`).
 - 사람용 도움말 글자의 내용 변경.
 - `canon help <명령>` 같은 새 명령.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:dea19750110e1d4bc4c27c5a774de7a57f7c470c951b4c2eea2ddf3af0cab5f8)

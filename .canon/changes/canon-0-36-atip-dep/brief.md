@@ -60,3 +60,5 @@ dependency
 - 검사기의 동작 변경. 태그가 가리키는 검사기를 그대로 쓴다.
 - crates.io 게시.
 - 크레이트 API를 canon에 맞춰 바꾸는 일. 태그의 API로 canon을 맞춘다.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:632996181d067fb8bd4beadd533a8cb2cddd4105ee28b18a490ce89b34adb204)

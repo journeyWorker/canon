@@ -115,3 +115,5 @@ canon은 0.35에서 `--input`의 처리 순서, 배치, 커서를 1.2 규칙으�
 - 1.4 선언과 자기 설명 형식(`canon-0-36-claim-1-4`).
 - 처리 순서와 필드 포인터의 규칙(0.35의 `canon-0-35-input-order`, `canon-0-35-batch-pointers`).
 - 새 배치 명령이나 새 옵션.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:3ec089ed9cd1c3a5815b6481b266609b3066b13ee8e1c0f61c215a0971b79b5e)

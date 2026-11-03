@@ -160,3 +160,5 @@ canon의 오류 레지스트리는 179개 코드를 갖는다. 대부분이 `FIN
 - 중간에 멈추는 코드와 `STOPPED_MIDWAY`(`canon-0-36-codes-incomplete`).
 - 이유 이름의 정리(`canon-0-36-code-reasons`)와 전체 대체표(`canon-0-36-codes-table`).
 - 경고 코드의 이름 바꾸기.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:6db223ece968cd12fd7426b223b6d10b6fc126312df2bd59ac0ffae2e4437e71)

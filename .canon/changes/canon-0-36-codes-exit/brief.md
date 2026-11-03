@@ -151,3 +151,5 @@ canon은 게이트나 승인이나 검사가 명령을 막을 때 종료 값 1�
 - 읽지 못한 파일과 깨진 저장 상태(`canon-0-36-codes-stored`).
 - 중간에 멈추는 명령의 코드(`canon-0-36-codes-incomplete`).
 - `gate check`, `format`, `brief check`의 종료 값 1 결과. 그 명령들의 정상 결과이다.
+
+Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:92d836ee933b572ed76877f883a87769fa655924f3cfe8283dbdab57333d8d6f)
