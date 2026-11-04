@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-flowfix-036",
+    "role": "implementer",
+    "session_id": "s-0-36-flowfix-4"
+  },
+  "at": "2026-11-04T20:13:20.279382Z",
+  "attachments": [
+    {
+      "case": "atip_codesplit_10_the_changelog_rows_say_what_each_split_code_became_and_the_old_names_are_gone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "fcd63e5123da74c606490fcf61da6adfeb8d7d44ca86dd2ee5e796b1448c144c"
+    }
+  ],
+  "code_tree": "60e72b3a26b60e8d5889a3148613d94a6218d1e4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "workspace nextest run, 3817 passed, from the clean worktree at bafd9bcce"
+  },
+  "evidence_sha": "bafd9bcce1bf3ce02726fb13b529394934535bb0",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 83,
+  "scenario_id": "atip.codesplit.10",
+  "schema": 1,
+  "staging_id": "f0ef290f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
