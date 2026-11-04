@@ -361,33 +361,49 @@ it.
 **Discover with `canon schema`.** The first line of every `--help` points at it. One call describes the whole CLI, a group or one command:
 
 ```bash
-canon schema --json               # the tree: every group and command, its effect, and the level canon claims
+canon schema --json               # the tree: every group and command, its effect, the shared options, and the level canon claims
 canon schema finding --json       # one group: its commands
-canon schema purge --json         # one command in full
-canon schema evidence add --json  # ... with the --input schema and a complete example
+canon schema purge --json         # one command: its call surface
+canon schema evidence add --schemas --json  # its JSON Schemas, the --input document schema (Input) and the validators' rejects
 canon schema --as reviewer --json # the tree of one role's commands (`x-canon.as` names the role)
 canon schema --errors --json      # every stable error code, its meaning and its reasons
 canon schema --warnings --json    # every warning code (meta.warnings) and its meaning
 ```
 
-`data.kind` says which document came back. The `tree` has `level` (`L2`) and
-`commands`: every group and command once, a group before its commands, each with
-`command`, `path`, `kind` (`group` or `command`), `summary` and, for a command,
-`effect` and `x-canon.roles`. A `group` has `command`, `path`, `summary` and its
-direct `commands`. A `command` has `effect` (`read`, `write` or `destructive`),
-`idempotency` (not for a read), `operands` and `options` (`name`, `valueName`,
-`valueType`, `required`, `repeatable`, a typed `default`, `possibleValues`, and
-where they apply `defaultNote`, `env`, `flagOnly` and `short`), `errors` (every
-code it can emit, the reserved ones of its features included), `outputs`, `input`,
-`examples` and `schemas`. The `valueType` is `switch`, `count`, `string`,
-`integer`, `number`, `path`, `enum` or `json`; an option that cannot be given in
-an `--input` document has `flagOnly: true`. Each output names its JSON Schema
-(`schemaRef`, `#/schemas/<Name>`) and `schemaVersion`, and says `batch: true` for
-the report of an array or NDJSON `--input`; `schemas` holds those schemas, so the
-shape of every report is in the answer. `input` names the schema of one
-`--input` document (`schemaRef`: the keys it accepts, no `required`), the schema of
-the arguments after the merge (`argumentsRef`), and one complete `example`.
-`examples` are complete calls that end with `--json` and run as written.
+`data.kind` says which document came back. The `tree` has `level` (`L2`), `options`
+and `commands`. `options` defines once every option that two or more commands
+define identically (`--repo`, `--as`, `--actor`, `--session`, `--role`, …); a command
+names such an option instead of repeating it. `commands` lists every group and command
+once, a group before its commands, each with `command`, `summary` and, for a command,
+`effect` and `x-canon.roles`, for a group `kind: "group"`; there is no `path`. A `group`
+has `command`, `summary` and its direct `commands`. A `command` document is the call
+surface and nothing more: `summary`, `effect` (`read`, `write` or `destructive`),
+`idempotency` (not for a read), `effectNote`, `operands`, `options` (a name that
+points to a tree option, or an option object with `name`, `valueName`, `valueType`,
+`required`, `repeatable`, a typed `default`, `possibleValues` and, where they apply,
+`defaultNote`, `env`, `flagOnly`, `short`), `constraints`, `validators`, `errors`,
+`outputs`, `input` and `examples`. A member equal to its default is absent: `required`,
+`repeatable`, `flagOnly` false, a null `default`, `valueType` `string`, an empty list.
+The `valueType` is `switch`, `count`, `string`, `integer`, `number`, `path`, `enum` or
+`json`; an option that cannot be given in an `--input` document has `flagOnly: true`.
+What every command accepts is not listed: `--json`; `--input` when the command has
+`input`; `--fields` when an output has `fields`. The codes `USAGE` (with canon's finer
+`*_INVALID` and `*_REQUIRED` argument codes), `INTERNAL`, `INPUT_INVALID`,
+`INPUT_CONFLICT`, `INPUT_TOO_LARGE`, `BATCH_INCOMPLETE`, `PLAN_STALE` (with `--commit`)
+and `CURSOR_INVALID` (with `--cursor`) are implied and not in `errors`. `--commit` and
+`--plan-digest` are listed, by name, on exactly the commands that offer them (`purge`,
+`artifacts move`, `migrate`, `ledger compact`, `tier age`), so the document says
+whether a bare run previews. Each output names its JSON Schema (`schemaRef`,
+`#/schemas/<Name>`) and says `batch: true` for the report of an array or NDJSON
+`--input`; `input` has `argumentsRef`, the schema of the arguments after the merge,
+and one complete `example`. `examples` are complete calls that end with `--json` and
+run as written. The schemas are not in the command document: `canon schema <command>
+--schemas --json` answers `kind: "schemas"` with `command`, `schemas` (every schema the
+document's refs name, and `Input`, the schema of one `--input` document: the keys it
+accepts, no `required`) and `rejects` (one list per validator, in order, what that
+validator refuses). `--schemas` needs a command path: without one, with a group, or
+with `--errors`, `--error`, `--warnings` or `--warning` it is `USAGE` with `field`
+`--schemas`.
 
 **Read the guide from the binary.** `canon skills show canon` prints the
 core guide; `canon skills show canon --full` adds every reference;
@@ -401,7 +417,7 @@ stderr: `{"ok": true, "data": …, "meta": …}` on success and
 `{"ok": false, "error": …, "meta": …}` on failure (an exit 1 partial report
 also carries `data`). The envelope follows atip/1. `meta` carries
 `schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`),
-`contractVersion` (`1.2`, on every envelope) and the
+`contractVersion` (`1.4`, on every envelope) and the
 resolved `command`, plus `output` (the report name, for a command that
 declares several), `context` (`{repo}`), `next`, `warnings`, `coverage`, `page`
 and `x-canon` (canon-only extras) where they apply. A member with no value is
@@ -421,7 +437,7 @@ members, and a value of a closed set it has not seen is one item to leave out.
     "tool": "canon",
     "toolVersion": "0.34.0",
     "contract": "atip/1",
-    "contractVersion": "1.2",
+    "contractVersion": "1.4",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [
@@ -471,7 +487,7 @@ take), and for a document that breaks its schema (`field` is a pointer) `UNKNOWN
 `FLAG_ONLY_KEY` or `INVALID_VALUE`; a source over the limits is `INPUT_TOO_LARGE`
 with `TOO_MANY_BYTES` or `TOO_MANY_ITEMS`; `-` together with another stdin
 reader is `USAGE` with `field` `--input`. `canon schema <command> --json` shows
-the input schema.
+the input example, and `canon schema <command> --schemas --json` the input schema (`Input`).
 
 ```text
 canon evidence add --input <JSON|FILE|->

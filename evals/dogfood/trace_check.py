@@ -19,20 +19,20 @@ SPEC_PATH = Path(__file__).resolve().parents[2] / "docs" / "cli" / "canon.cli.js
 
 
 def load_effects(path=SPEC_PATH):
-    """`{command path tuple: effect}` for every command of the generated spec (`read`, `write` or `destructive`)."""
+    """`{command path tuple: effect}` for every command of the generated spec (`read`, `write` or `destructive`); a 1.4 command entry names itself in `command` ("finding add")."""
     with open(path, encoding="utf-8") as stream:
         spec = json.load(stream)
-    return {tuple(node["path"]): node["effect"] for node in spec["commands"]}
+    return {tuple(node["command"].split()): node["effect"] for node in spec["commands"]}
 
 
 EFFECTS = load_effects()
 
 
 def load_options(path=SPEC_PATH):
-    """`{command path tuple: set of long option names (`--x`)}` for every command; `--as` is one of its options."""
+    """`{command path tuple: set of long option names (`--x`)}` for every command; `--as` is one of its options. An entry of a 1.4 command's `options` is a NAME of a tree option (defined once in `tree.options`) or its own option object."""
     with open(path, encoding="utf-8") as stream:
         spec = json.load(stream)
-    return {tuple(node["path"]): {f"--{o['name']}" for o in node["options"]} for node in spec["commands"]}
+    return {tuple(node["command"].split()): {f"--{o if isinstance(o, str) else o['name']}" for o in node.get("options", [])} for node in spec["commands"]}
 
 
 OPTIONS = load_options()

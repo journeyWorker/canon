@@ -213,7 +213,7 @@ Every write command takes `--input`: its arguments as one JSON object (keys
 are the option names in camelCase, plus `operands`), given inline, as a file
 path, or as `-` for stdin. A JSON array or NDJSON is a batch: every element is
 validated before anything is written. `canon schema <command> --json` prints
-the input schema and an example.
+an example, and `canon schema <command> --schemas --json` the input schema.
 
 ```bash
 canon scenario new auth.login.02 --title "Sign out"
