@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T03:57:06.964114Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "a395256258a1000fea97b1de753d3aa6d9fed04c7f0170ef3f7c1ec4ec74c343"
+    },
+    {
+      "case": "subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "a395256258a1000fea97b1de753d3aa6d9fed04c7f0170ef3f7c1ec4ec74c343"
+    }
+  ],
+  "code_tree": "e906ba7be5735b0a6898cedc4fcd13d5f52a4224",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "bbd7fc47efc579444d6419e9e367031031297a05",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 637,
+  "scenario_id": "subject.lifecycle.39",
+  "schema": 1,
+  "staging_id": "b87fa1df",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
