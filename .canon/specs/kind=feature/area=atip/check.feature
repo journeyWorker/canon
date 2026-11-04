@@ -2,7 +2,7 @@ Feature: atip check: the atip/1 L0 conformance checker
   # canon: {"schema":1,"at":"2026-10-31T11:45:03Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
 
   # canon: {"schema":1,"at":"2026-10-31T11:47:00Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
-  @subject:atip-check
+  @subject:atip-contract
   @lane:behavior
   @case:happy
   @flow:canon-0-33-atip-check.F6
@@ -13,7 +13,7 @@ Feature: atip check: the atip/1 L0 conformance checker
     Then they are equal by code, exit, retryable and reason names, and the fixture's keys are only contractVersion, setup, probe, globalOptions, registry, warnings and commands (a paging call, a next-step call and a missingValue)
 
   # canon: {"schema":1,"at":"2026-10-31T11:47:03Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
-  @subject:atip-check
+  @subject:atip-contract
   @lane:behavior
   @case:failure
   @flow:canon-0-33-atip-check.F6
@@ -24,7 +24,7 @@ Feature: atip check: the atip/1 L0 conformance checker
     Then each difference is noticed
 
   # canon: {"schema":1,"at":"2026-10-31T11:47:19Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
-  @subject:atip-check
+  @subject:atip-contract
   @lane:behavior
   @case:happy
   @flow:canon-0-33-atip-check.F6
