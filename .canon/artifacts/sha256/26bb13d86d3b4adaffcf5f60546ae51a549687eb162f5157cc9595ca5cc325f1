@@ -1,0 +1,82 @@
+# search at e4c15dca: the moved crates' paths and the removed recipes, jobs and filters
+
+## crates/atip
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+ARCHITECTURE.md:83:- [`atip`](https://github.com/journeyWorker/atip/tree/atip-crate-v0.1.0/crates/atip) is not a crate of this
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:11 CHANGELOG.md:117 CHANGELOG.md:233 CHANGELOG.md:238 CHANGELOG.md:249 CHANGELOG.md:275 CHANGELOG.md:491 CHANGELOG.md:494 CHANGELOG.md:537 CHANGELOG.md:600 
+
+## atip-check
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+.github/workflows/test.yml:206:  # at the tag `atip-check-v0.1.0` and cached, and the `atip` crate canon links is the tag `atip-crate-v0.1.0` (`Cargo.toml`). It runs once, here:
+.github/workflows/test.yml:241:          key: canon-test-atip-check-v0.1.0-${{ hashFiles('rust-toolchain.toml') }}
+.github/workflows/test.yml:245:        run: cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked
+ARCHITECTURE.md:93:  `atip-check-v0.1.0` by the CI job `atip` and by `just atip-install`.
+Cargo.toml:24:# The atip/1 contract crate: it lives in the atip repo (tag `atip-crate-v0.1.0`; the checker is `atip-check-v0.1.0`).
+README.md:66:checker once, on the canon binary: `just atip-install` installs it at the tag `atip-check-v0.1.0`
+crates/canon-cli/tests/atip_check.rs:1://! The fixture `atip check` reads for canon (0.34, `canon-0-34-atip-check-1-1` F6; 0.33 `canon-0-33-atip-check`; 0.36 `canon-0-36-atip-dep`).
+crates/canon-cli/tests/atip_check.rs:10://! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.1.0`) and canon runs it once, in the
+crates/canon-cli/tests/atip_check.rs:23:const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked";
+crates/canon-cli/tests/atip_check.rs:160:    assert!(job.iter().any(|run| run.contains("cargo build") && run.contains("-p canon-cli") && !run.contains("atip-check") && run.contains("--locked")), "the job builds canon onl
+crates/canon-cli/tests/atip_check.rs:165:    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{recipe:?}");
+crates/canon-cli/tests/atip_claiml2.rs:125:    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "the recipe builds canon only: {recipe:?}");
+crates/canon-cli/tests/atip_claiml2.rs:129:    assert!(job.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{job:?}");
+crates/canon-cli/tests/atip_claiml2.rs:130:    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
+justfile:91:    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:11 CHANGELOG.md:12 CHANGELOG.md:13 CHANGELOG.md:14 CHANGELOG.md:249 CHANGELOG.md:252 CHANGELOG.md:352 CHANGELOG.md:491 CHANGELOG.md:494 CHANGELOG.md:599 CHANGELOG.md:600 
+
+## atip-probe
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:11 CHANGELOG.md:249 
+
+## test-atip
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+.github/workflows/test.yml:233:          key: canon-test-atip-cargo-${{ hashFiles('Cargo.lock') }}
+.github/workflows/test.yml:241:          key: canon-test-atip-check-v0.1.0-${{ hashFiles('rust-toolchain.toml') }}
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:12 CHANGELOG.md:13 CHANGELOG.md:252 
+
+## atip-check-tests
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+crates/canon-cli/tests/atip_claiml2.rs:130:    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:12 CHANGELOG.md:252 
+
+## atip-fake-tool
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:491 CHANGELOG.md:600 
+
+## fake-tool
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:491 CHANGELOG.md:600 
+
+## atip-l0
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+crates/canon-cli/tests/atip_claiml2.rs:130:    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
+crates/canon-cli/tests/atip_l0.rs:1://! The atip/1 L0 output contract of canon 0.33 (`canon-0-33-atip-l0`, scenarios
+crates/canon-cli/tests/atip_l0.rs:20:    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
+crates/canon-cli/tests/atip_l0.rs:24:    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ROLE", role).env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
+crates/canon-cli/tests/atip_l0.rs:220:    let args = ["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "cargo test", "--actor", "unit-1", "--session", "s-1", "--override-reason", "atip-l0
+crates/canon-cli/tests/exit_registry.rs:2://! else (`canon-0-33-atip-l0` F7, scenarios `atip.l0.23` to `atip.l0.25`):
+crates/canon-cli/tests/exit_registry.rs:199:    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
+crates/canon-cli/tests/write_unavailable.rs:2://! changes anything (`canon-0-33-atip-l0` F7, scenario `atip.l0.24`): exit 2,
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:12 CHANGELOG.md:36 CHANGELOG.md:252 CHANGELOG.md:601 
+
+## atip-l1
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+crates/canon-cli/tests/atip_claiml2.rs:130:    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:36 CHANGELOG.md:490 
+
+## atip-l2
+### workspace, justfile, workflows, nextest, scripts, docs (README, ARCHITECTURE, docs/), crates, packages: every hit
+crates/canon-cli/src/spec.rs:103:/// passes on the build: the check runs in CI beside the tests that build these documents (`just atip`, the `atip-l2` job).
+crates/canon-cli/tests/atip_claiml2.rs:130:    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
+### CHANGELOG.md (release history of 0.35 and before is kept as it was; the Unreleased entry names the move)
+CHANGELOG.md:12 CHANGELOG.md:36 CHANGELOG.md:56 CHANGELOG.md:252 
+

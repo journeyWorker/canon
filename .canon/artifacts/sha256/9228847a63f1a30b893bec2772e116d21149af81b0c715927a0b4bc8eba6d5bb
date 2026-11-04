@@ -1,0 +1,59 @@
+# canon-0-36-atip-dep: evidence summary (HEAD deaed16e)
+
+Commits (main 1d34c9d6 ..):
+deaed16e chore(0.36): spec.rs names the job atip, not atip-l2
+e4c15dca chore(0.36): the docs say where the atip crate and the checker live
+79a2c8a9 chore(0.36): the scenarios of the checker and the crate leave canon's spec
+06e398e8 chore(0.36): atip and atip-check leave the workspace for the atip repo
+
+## Output invariant: canon's output is byte for byte the 0.35.0 one
+# output hashes before/after canon-0-36-atip-dep
+before = main 1d34c9d6 (canon 0.35.0), after = deaed16e; debug builds, run in an empty directory, stdout only
+
+## before
+canon schema --json  sha256:43e87d98574fc79f9fa7daed69348c60c3262dc61ad39c86667fea4ed7527596
+canon schema --errors --json  sha256:1ff89077e771fc1f72ca18f121a81fe4708d43220f445361eaea1042e1d2e67b
+canon schema --warnings --json  sha256:b84438a07686d885de02a5a4693aa9fa9cb93a20db77f156011161384ff85a1a
+## after
+canon schema --json  sha256:43e87d98574fc79f9fa7daed69348c60c3262dc61ad39c86667fea4ed7527596
+canon schema --errors --json  sha256:1ff89077e771fc1f72ca18f121a81fe4708d43220f445361eaea1042e1d2e67b
+canon schema --warnings --json  sha256:b84438a07686d885de02a5a4693aa9fa9cb93a20db77f156011161384ff85a1a
+
+Battery of 1971 files, the stdout, stderr and exit status of: `--version`, `--help`, `schema` (text and `--json`), `schema --errors` and `--warnings` (text and json), `schema --error <CODE> --json` for every code, and for every command path `schema <path>` (text and json), `<path> --help` and `<path> --bogus-option-xyz --json`; `skills show` (text and `--json`) for every guide, `--full`, an unknown guide; `completion bash|zsh|fish`; and in a fresh repository `init`, `status`, `context`, `subject new`, `feature new`, `scenario new` x5, `divergence list`, `query` (paging, `--fields`, bad field, bad kind), `--input` refusals, a missing value, an unknown command, `gate check`, `format`, `search`, `inventory sync --dry-run`, `selftest`, `report check`, a role refusal (paths, timestamps and uuids normalised; the baseline was run twice and is identical to itself).
+- before (main 1d34c9d6 build): total sha256 951897499b0c5e9b68934511a801270ac721a58ff2a43d384d8a8c1e07e5b325
+- after (HEAD deaed16e build): total sha256 951897499b0c5e9b68934511a801270ac721a58ff2a43d384d8a8c1e07e5b325  -> `diff -r` of the two output trees: no difference.
+- `just conformance` (conformance/regenerate.sh) rewrote no expectation: `git status --short -- conformance/` is empty.
+- `CANON_BLESS_CLI_SPEC=1 cargo test -p canon-cli --test cli_spec` and `just docs` rewrote nothing: `git diff` after them is empty, so `docs/cli/canon.cli.json` is the 0.35.0 file.
+- What had to change to keep it: the crate at atip-crate-v0.1.0 adds `async` to the `CommandDoc` type, so the JSON Schema of the `schema` report (the `SchemaReport` schema in `canon schema schema --json` and in `docs/cli/canon.cli.json`) gained a property (4 lines) the first time it was built. `canon-cli/src/reports.rs::schema_of` leaves the member out (canon writes none: `is_async` is false and left out of every document). This is the one place where the brief's assumption (the crate writes a 1.2 document as before) needed a change in canon; the documents themselves were byte-identical from the first build.
+
+## Build and tests
+- `cargo build --locked -p canon-cli`: passes; `cargo fetch --locked` passes; `Cargo.lock` pins `atip 0.1.0` to `git+https://github.com/journeyWorker/atip?tag=atip-crate-v0.1.0#b274d8ddb819f031ea270c7757c398b02d6c3ab9`; the lockfile loses `atip-check`, `atip-probe`, `regress` and the `atip` path entry and gains nothing else.
+- `just test` before (main, `cargo test --workspace --exclude atip-check --locked`): 3741 tests (3739 passed, 0 failed, 2 ignored), sum of the per-binary times 1348.8 s (wall 28 min 5 s: the machine also ran the output battery).
+- `just test` after (`cargo test --workspace --locked`): 3603 tests (3601 passed, 0 failed, 2 ignored), sum of the per-binary times 838.1 s (wall 15 min 38 s).
+- Removed: 138 = 127 of the moved crates (atip: 116 unit, 3 doc, 4 plan_digest_vectors; atip-probe: 4 dependency_tree) + 11 of canon-cli (atip_check 6, atip_claiml2 5); atip_claiml2_07 is renamed (one name out, one in). The audit table lists every test: `audit-tests.tsv`.
+- `cargo nextest run --workspace --locked` (the junit report bound below): Summary [ 277.162s] 3601 tests run: 3601 passed (3 slow), 2 skipped
+- `grammar_t9_witness -- --ignored` (every declared output was emitted by the suite): passes.
+- `just lint` (the three clippy runs): clean. `scripts/check_visibility.sh`: exit 0. `just release-check` (the release workflow safety check and its test): exit 0.
+- One flake seen once in the first full run, none in the later three (`cargo test`, nextest, and the rerun): `write_lock::tests::a_call_that_found_the_lock_file_leaves_it_and_a_second_guard_keeps_what_the_first_made` (`Busy(0ns)`, 7 of 7 pass alone, 3 of 3 reruns).
+
+## The checker on canon (what the CI job `atip` runs)
+`atip check --bin target/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json` with the checker installed from the tag (`cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked`, `atip 0.1.0`), `just atip`:
+```
+pass       MUST   L2.guide-commands (spec 14.5) [guide canon-context line 58: not judged, unsupported shell syntax: an unquoted `<` (unsupported); guide canon-context line 59: not judged, unsupported shell syntax: an unquoted `<` (unsupported); guide canon-learn line 186: not judged, unsupported shell syntax: an unquoted `<` (unsupported); guide canon-policy line 72: not judged, unsupported shell syntax: an unquoted `<` (unsupported)]
+unsupported SHOULD L2.search (spec 10.11) (not run: dashboard): the tool's `schema` has no `--search`
+pass       MUST   L2.help-guide (spec 4.8)
+pass       MUST   L2.effects (spec 12.2) (not run: dashboard)
+L2 met: 71 MUST passed, 0 MUST failed, 0 MUST unprovided, 7 not applicable, 1 SHOULD advisories
+
+real	2m19.192s
+user	2m48.625s
+sys	0m44.636s
+just atip exit=0
+```
+`--json` on the before (main) and after binaries: before {'pass': 82, 'unsupported': 7, 'fail': 1} passed=True, after {'pass': 82, 'unsupported': 7, 'fail': 1} passed=True; the failing row is the same one (before ['L1.one-meaning-values'], after ['L1.one-meaning-values']: a SHOULD advisory); the (id, result) lists of the two reports have the same sha256 prefix (39e670e0c822d74b and 39e670e0c822d74b).
+
+## Audit tables
+`audit-scenarios.md` (476 scenarios of area=atip: 217 kept, 5 kept and bound to other tests, 254 removed), `audit-tests.tsv` (4119 tests: every test of `just test` before and of `atip-check`), `audit-tests-README.md`. After `canon inventory sync` the corpus is 1089 canon scenarios (1343 before: 254 removed), 19 platformer. Before this evidence was recorded, `canon gate check` on this change listed only: stale reviews of `atip.check.43`, `atip.claiml2.07`, `atip.l0.06` (their text or cases changed: the reviewer signs again), the chore's own missing evidence (this record) and missing change-level review, and the same two rows of the other chore `canon-0-36-evidence-audit`.
+
+## Search
+`search.txt`: no hit of `crates/atip-check`, `crates/atip-probe`, `test-atip`, `atip-check-tests`, `atip-fake-tool` or `fake-tool` in the workspace, justfile, workflows, nextest, scripts, README, ARCHITECTURE or docs; the remaining hits of `atip-check` are the tag name and the install command; `atip-l0`, `atip-l1`, `atip-l2`, `atip-check-tests` appear only in the test that asserts those jobs are gone and in session names of unrelated tests; `crates/atip` appears only as the path in the atip repository that ARCHITECTURE links.

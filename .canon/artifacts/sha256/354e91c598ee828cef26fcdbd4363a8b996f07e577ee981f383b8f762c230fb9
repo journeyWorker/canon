@@ -1,0 +1,11 @@
+# output hashes before/after canon-0-36-atip-dep
+before = main 1d34c9d6 (canon 0.35.0), after = deaed16e; debug builds, run in an empty directory, stdout only
+
+## before
+canon schema --json  sha256:43e87d98574fc79f9fa7daed69348c60c3262dc61ad39c86667fea4ed7527596
+canon schema --errors --json  sha256:1ff89077e771fc1f72ca18f121a81fe4708d43220f445361eaea1042e1d2e67b
+canon schema --warnings --json  sha256:b84438a07686d885de02a5a4693aa9fa9cb93a20db77f156011161384ff85a1a
+## after
+canon schema --json  sha256:43e87d98574fc79f9fa7daed69348c60c3262dc61ad39c86667fea4ed7527596
+canon schema --errors --json  sha256:1ff89077e771fc1f72ca18f121a81fe4708d43220f445361eaea1042e1d2e67b
+canon schema --warnings --json  sha256:b84438a07686d885de02a5a4693aa9fa9cb93a20db77f156011161384ff85a1a

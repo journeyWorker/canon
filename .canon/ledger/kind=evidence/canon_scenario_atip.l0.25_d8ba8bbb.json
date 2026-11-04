@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-dep",
+    "role": "implementer",
+    "session_id": "s-0-36-atip-dep"
+  },
+  "at": "2026-11-04T00:36:43.716263Z",
+  "attachments": [
+    {
+      "case": "atip_l0_25_every_split_gives_each_exit_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "af76b5570c3d26b937698c15089f547a44cdc5e505c284e7b1113913b064c71b"
+    },
+    {
+      "case": "atip_l0_25_the_checked_codes_hold_their_decided_exits",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "af76b5570c3d26b937698c15089f547a44cdc5e505c284e7b1113913b064c71b"
+    }
+  ],
+  "code_tree": "96bc5485cc3a5d17b0c978ad311586937c0823c3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked (canon-0-36-atip-dep; the JUnit report of the whole workspace after the move of atip, atip-check and atip-probe to the atip repository)"
+  },
+  "evidence_sha": "deaed16e8a5511dd3e9659999563adadd307d11e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 305,
+  "scenario_id": "atip.l0.25",
+  "schema": 1,
+  "staging_id": "7aa6c235",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

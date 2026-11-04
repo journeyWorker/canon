@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-dep",
+    "role": "implementer",
+    "session_id": "s-0-36-atip-dep"
+  },
+  "at": "2026-11-04T00:36:43.716263Z",
+  "attachments": [
+    {
+      "case": "review_add_92_an_unknown_project_id_is_refused_and_writes_no_review",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "af76b5570c3d26b937698c15089f547a44cdc5e505c284e7b1113913b064c71b"
+    }
+  ],
+  "code_tree": "96bc5485cc3a5d17b0c978ad311586937c0823c3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked (canon-0-36-atip-dep; the JUnit report of the whole workspace after the move of atip, atip-check and atip-probe to the atip repository)"
+  },
+  "evidence_sha": "deaed16e8a5511dd3e9659999563adadd307d11e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 290,
+  "scenario_id": "review.add.92",
+  "schema": 1,
+  "staging_id": "2af8a1f1",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
