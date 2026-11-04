@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-table",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-table"
+  },
+  "at": "2026-11-04T14:19:25.739351Z",
+  "attachments": [
+    {
+      "case": "atip_codestable_10_no_guide_says_exit_1_for_a_refusal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "d03fe0eda8486156b409deb8dabf3cad16f8fc5ab219966151373949c3644b58"
+    }
+  ],
+  "code_tree": "6c825d1cbf7d1070f0a2daaca7523e0dd9f2ea67",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked"
+  },
+  "evidence_sha": "ff534b234107825962f893094e5d42d22c5550e8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "atip.codestable.10",
+  "schema": 1,
+  "staging_id": "19fbbcc2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
