@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-refusals-fix",
+    "role": "implementer",
+    "session_id": "s-0-36-refusals-fix"
+  },
+  "at": "2026-11-04T10:08:48.851756Z",
+  "attachments": [
+    {
+      "case": "context_capability_57_the_schema_shows_no_option_ending_in_id_and_the_docs_spell_none",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "e9cb74c023ab9b2ae65cb7f9ea743b4078c5bd03c50a8db9c8ada1e084db1f12"
+    },
+    {
+      "case": "context_capability_57_a_code_span_that_wraps_a_line_or_uses_double_backticks_is_read_whole",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "e9cb74c023ab9b2ae65cb7f9ea743b4078c5bd03c50a8db9c8ada1e084db1f12"
+    },
+    {
+      "case": "context_capability_57_every_command_in_the_docs_and_hints_parses",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "e9cb74c023ab9b2ae65cb7f9ea743b4078c5bd03c50a8db9c8ada1e084db1f12"
+    }
+  ],
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "56499ba18041cda113a7cf2dcff93d6b13026848",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 902,
+  "scenario_id": "context.capability.57",
+  "schema": 1,
+  "staging_id": "ca86222f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
