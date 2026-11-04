@@ -17,6 +17,7 @@ pub const SITES: &[Site] = &[
     site("query.rs:to_cli_error:QUERY_INVALID_ARGUMENT#2", Kind::Validator { command: "query", arguments: &["kind", "status"] }),
     site("retention.rs:check_window:USAGE#1", Kind::Validator { command: "export", arguments: &["after", "before"] }),
     site("run/entry.rs:usage_error:USAGE#1", Kind::Other("the refusal of a removed spelling of an option: it maps a fault, it does not check an argument of a command")),
+    site("run/entry.rs:help_json_refusal:USAGE#1", Kind::Other("the refusal of `--help` or `--version` with `--json` (spec 4.4.1): it maps a request for text to the envelope, it does not check an argument of a command")),
     site("run/entry.rs:usage_parts:USAGE#1", Kind::Other("the mapping of clap's own parse error to the USAGE refusal")),
     site("run/entry.rs:usage_parts:USAGE#2", Kind::Other("the mapping of clap's own parse error (a bare group of commands) to the USAGE refusal")),
     site("run/entry.rs:usage_parts:USAGE#3", Kind::Other("the mapping of clap's own 'required arguments were not provided' error to the USAGE refusal")),
