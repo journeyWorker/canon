@@ -258,7 +258,8 @@ fn needs_config_leaves() -> Vec<&'static str> {
             args.push("--json");
             let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).output().expect("spawn canon");
             let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("schema is JSON");
-            body["data"]["options"].as_array().expect("options").iter().any(|o| o["name"] == "repo")
+            // `--repo` is the tree's shared option: a 1.4 document names it (a string) unless it defines its own.
+            body["data"]["options"].as_array().expect("options").iter().any(|o| o == "repo" || o["name"] == "repo")
         })
         .collect()
 }

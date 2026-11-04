@@ -378,11 +378,8 @@ fn atip_canoncursor_08_fields_is_checked_the_same_in_text_mode_and_in_json_mode(
     assert_eq!(snapshot(repo.path()), before);
 }
 
-fn command_doc(dir: &Path, command: &str) -> Value {
-    let mut args: Vec<&str> = vec!["schema"];
-    args.extend(command.split(' '));
-    args.push("--json");
-    json(&canon(dir, &args))["data"].clone()
+fn command_doc(_dir: &Path, command: &str) -> Value {
+    canon_cli::spec::model()["commands"].as_array().unwrap().iter().find(|doc| doc["command"] == command).unwrap_or_else(|| panic!("`{command}` is a command of the model")).clone()
 }
 
 #[test]

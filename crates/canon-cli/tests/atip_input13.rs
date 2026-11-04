@@ -374,15 +374,10 @@ fn camel(name: &str) -> String {
 /// Every leaf that takes `--input`, as the words of its command and the properties of its input schema (`name`, `repeatable`).
 type InputLeaf = (Vec<String>, Vec<(String, bool)>);
 
-fn leaves_with_input(repo: &Path) -> Vec<InputLeaf> {
-    let tree = json_of(&canon(repo, &["schema", "--json"]));
+fn leaves_with_input(_repo: &Path) -> Vec<InputLeaf> {
     let mut out = Vec::new();
-    for entry in tree["data"]["commands"].as_array().unwrap().iter().filter(|entry| entry["kind"] == "command") {
-        let words: Vec<String> = entry["path"].as_array().unwrap().iter().map(|word| word.as_str().unwrap().to_string()).collect();
-        let mut argv = vec!["schema"];
-        argv.extend(words.iter().map(String::as_str));
-        argv.push("--json");
-        let doc = json_of(&canon(repo, &argv))["data"].clone();
+    for doc in canon_cli::spec::model()["commands"].as_array().unwrap() {
+        let words: Vec<String> = doc["path"].as_array().unwrap().iter().map(|word| word.as_str().unwrap().to_string()).collect();
         if !doc["options"].as_array().unwrap().iter().any(|option| option["name"] == "input") {
             continue;
         }

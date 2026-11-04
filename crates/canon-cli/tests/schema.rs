@@ -27,6 +27,20 @@ fn json(args: &[&str]) -> serde_json::Value {
     v["data"].clone()
 }
 
+/// The declaration of a command: its document in the full model form (every option, implied options and codes listed).
+fn model_command(name: &str) -> serde_json::Value {
+    canon_cli::spec::model()["commands"].as_array().unwrap().iter().find(|c| c["command"] == name).unwrap_or_else(|| panic!("no command {name}")).clone()
+}
+
+fn option_of(doc: &serde_json::Value, name: &str) -> serde_json::Value {
+    doc["options"].as_array().unwrap().iter().find(|o| o["name"] == name).unwrap_or_else(|| panic!("no --{name}")).clone()
+}
+
+/// The names a 1.4 command document lists: a string names a tree option or a reserved option, an object is the command's own option.
+fn option_names(doc: &serde_json::Value) -> Vec<String> {
+    doc["options"].as_array().map(|list| list.iter().map(|o| o.as_str().map_or_else(|| o["name"].as_str().unwrap().to_string(), str::to_string)).collect()).unwrap_or_default()
+}
+
 #[test]
 fn bare_schema_lists_every_group_and_command_with_an_effect_in_a_stable_order() {
     let first = json(&["schema", "--json"]);
@@ -45,29 +59,45 @@ fn bare_schema_lists_every_group_and_command_with_an_effect_in_a_stable_order() 
 
 #[test]
 fn one_command_shows_options_with_their_shape() {
-    let v = json(&["schema", "evidence", "add", "--json"]);
-    assert_eq!(v["command"], "evidence add");
-    let opt = |name: &str| v["options"].as_array().unwrap().iter().find(|o| o["name"] == name).unwrap_or_else(|| panic!("no --{name}")).clone();
-    assert_eq!(opt("all-scenarios")["valueType"], "switch");
-    assert_eq!(opt("report")["repeatable"], true);
-    assert_eq!(opt("report")["valueType"], "string");
-    assert_eq!(v["effect"], "write");
-    assert!(opt("json")["flagOnly"] == true);
-    let codes: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+    // What the command DECLARES, read in the full model form.
+    let m = model_command("evidence add");
+    assert_eq!(m["command"], "evidence add");
+    assert_eq!(option_of(&m, "all-scenarios")["valueType"], "switch");
+    assert_eq!(option_of(&m, "report")["repeatable"], true);
+    assert_eq!(option_of(&m, "report")["valueType"], "string");
+    assert!(option_of(&m, "json")["flagOnly"] == true);
+    let codes: Vec<&str> = m["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
     for code in ["EVIDENCE_NOTE_INVALID", "BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE", "EVIDENCE_ARGUMENT_REQUIRED", "USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE"] {
         assert!(codes.contains(&code), "{code} missing from {codes:?}");
     }
     assert!(!codes.contains(&"ARTIFACTS_STORE_FAILED"), "a sibling command's code leaked in: {codes:?}");
-    assert!(v.get("exits").is_none() && v.get("errorCodes").is_none());
+    // What `canon schema` ANSWERS: the 1.4 form, the call surface only.
+    let v = json(&["schema", "evidence", "add", "--json"]);
+    assert_eq!(v["command"], "evidence add");
+    assert_eq!(v["effect"], "write");
+    let names = option_names(&v);
+    assert!(names.contains(&"all-scenarios".to_string()) && names.contains(&"report".to_string()), "{names:?}");
+    assert!(!names.contains(&"json".to_string()) && !names.contains(&"input".to_string()), "implied options are not listed: {names:?}");
+    let answered: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+    for code in ["EVIDENCE_NOTE_INVALID", "BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE"] {
+        assert!(answered.contains(&code), "{code} missing from {answered:?}");
+    }
+    for implied in ["USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE", "EVIDENCE_ARGUMENT_REQUIRED"] {
+        assert!(!answered.contains(&implied), "{implied} is implied or a finer USAGE and is not listed: {answered:?}");
+    }
+    assert!(!answered.contains(&"ARTIFACTS_STORE_FAILED"), "a sibling command's code leaked in: {answered:?}");
+    assert!(v.get("exits").is_none() && v.get("errorCodes").is_none() && v.get("path").is_none() && v.get("schemas").is_none());
 }
 
 #[test]
 fn a_command_lists_the_codes_it_can_emit_and_a_read_lists_no_writes_codes() {
-    let errors = |cmd: &[&str]| {
+    // The declaration (model) lists every code; the 1.4 answer omits the implied ones.
+    let errors = |cmd: &[&str]| model_command(&cmd.join(" "))["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let answered = |cmd: &[&str]| {
         let mut args = vec!["schema"];
         args.extend_from_slice(cmd);
         args.push("--json");
-        json(&args)["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect::<Vec<_>>()
+        json(&args)["errors"].as_array().map(|list| list.iter().map(|c| c.as_str().unwrap().to_string()).collect::<Vec<_>>()).unwrap_or_default()
     };
     let context = errors(&["context"]);
     let finding_list = errors(&["finding", "list"]);
@@ -78,6 +108,12 @@ fn a_command_lists_the_codes_it_can_emit_and_a_read_lists_no_writes_codes() {
     assert!(errors(&["finding", "add"]).contains(&"PROMOTION_FAILED".to_string()));
     assert!(errors(&["finding", "add"]).contains(&"FINDING_INCOMPLETE".to_string()));
     assert!(errors(&["purge"]).contains(&"PLAN_STALE".to_string()));
+    // The answer lists what the command emits besides the implied codes.
+    assert!(answered(&["finding", "add"]).contains(&"PROMOTION_FAILED".to_string()));
+    assert!(answered(&["finding", "add"]).contains(&"FINDING_INCOMPLETE".to_string()));
+    for implied in ["USAGE", "INTERNAL", "CURSOR_INVALID", "PLAN_STALE", "INPUT_INVALID"] {
+        assert!(!answered(&["finding", "list"]).contains(&implied.to_string()) && !answered(&["purge"]).contains(&implied.to_string()), "{implied} is implied and is not listed");
+    }
 }
 
 #[test]
@@ -94,16 +130,25 @@ fn errors_lists_the_whole_registry() {
 
 #[test]
 fn enum_options_list_their_values_and_defaults() {
-    let v = json(&["schema", "init", "--json"]);
-    let policy = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "policy").unwrap().clone();
+    let m = model_command("init");
+    let policy = option_of(&m, "policy");
     assert!(policy["possibleValues"].as_array().unwrap().iter().any(|p| p == "strict"));
     // `init` sets up the directory as given (default `.`); every other leaf has no `--repo` default: absent means discovery.
-    let repo = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
-    assert_eq!(repo["default"], ".");
-    let gate = json(&["schema", "gate", "check", "--json"]);
-    let repo = gate["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
+    assert_eq!(option_of(&m, "repo")["default"], ".");
+    let gate = model_command("gate check");
+    let repo = option_of(&gate, "repo");
     assert!(repo["default"].is_null(), "{repo}");
     assert!(repo["defaultNote"].as_str().unwrap().contains("canon.yaml"), "{repo}");
+    // The answer: `init` defines its own `--repo` (default `.`), `gate check` names the tree's `--repo` (no default); the tree defines it once.
+    let v = json(&["schema", "init", "--json"]);
+    let own = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").expect("init defines its own --repo");
+    assert_eq!(own["default"], ".");
+    let answered_policy = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "policy").unwrap();
+    assert!(answered_policy["possibleValues"].as_array().unwrap().iter().any(|p| p == "strict") && answered_policy["default"] == "strict");
+    let tree = json(&["schema", "--json"]);
+    let shared = tree["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").expect("the tree defines --repo once");
+    assert!(shared.get("default").is_none() && shared["defaultNote"].as_str().unwrap().contains("canon.yaml"), "{shared}");
+    assert!(option_names(&json(&["schema", "gate", "check", "--json"])).contains(&"repo".to_string()));
 }
 
 /// Dogfood eval 8: an agent quoted the path as one word.

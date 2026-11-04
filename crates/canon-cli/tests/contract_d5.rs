@@ -445,14 +445,13 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
 /// exit-1 code but `INTERNAL` (a panic is `INTERNAL`, exit 1).
 #[test]
 fn the_exceptions_list_only_the_codes_they_have() {
-    let dir = TempDir::new().unwrap();
+    // What canon declares (the full model: `USAGE` and `INTERNAL` listed); the `canon schema` answer of the 1.4 form leaves the implied codes out.
+    let model = canon_cli::spec::model();
     let exit_of = |code: &str| canon_cli::cli_error::all_codes().iter().find(|info| info.code == code).unwrap_or_else(|| panic!("{code} is registered")).exit;
     for command in [vec!["context"], vec!["dispatch", "diff"], vec!["artifacts", "store"], vec!["gate", "check"]] {
-        let mut args = vec!["schema"];
-        args.extend(&command);
-        args.push("--json");
-        let schema = body(&run(dir.path(), &args))["data"].clone();
-        let errors: Vec<&str> = schema["errors"].as_array().unwrap().iter().map(|code| code.as_str().unwrap()).collect();
+        let name = command.join(" ");
+        let document = model["commands"].as_array().unwrap().iter().find(|document| document["command"] == name.as_str()).unwrap_or_else(|| panic!("{name} is declared"));
+        let errors: Vec<&str> = document["errors"].as_array().unwrap().iter().map(|code| code.as_str().unwrap()).collect();
         assert!(errors.contains(&"USAGE"), "{command:?}");
         if matches!(command[0], "context" | "dispatch") {
             let gating: Vec<&&str> = errors.iter().filter(|code| exit_of(code) == 1 && **code != "INTERNAL").collect();

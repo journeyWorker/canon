@@ -117,12 +117,9 @@ fn first_page(dir: &Path, args: &[&str]) -> (Value, String) {
     (document, cursor)
 }
 
-/// The command document of `command`, as `canon schema` answers it.
-fn command_doc(dir: &Path, command: &str) -> Value {
-    let mut args: Vec<&str> = vec!["schema"];
-    args.extend(command.split(' '));
-    args.push("--json");
-    json(&canon(dir, &args))["data"].clone()
+/// The command document of `command` as canon declares it (the model: every member, `schemas` inside).
+fn command_doc(_dir: &Path, command: &str) -> Value {
+    canon_cli::spec::model()["commands"].as_array().unwrap().iter().find(|doc| doc["command"] == command).unwrap_or_else(|| panic!("`{command}` is a command of the model")).clone()
 }
 
 /// Where the members of `data` that `--fields` cuts are, per command: the `records` pointer `outputs[].fields` declares.

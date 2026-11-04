@@ -107,7 +107,7 @@ fn context_capability_27_schema_nodes_are_the_nodes_of_the_checked_in_spec() {
     assert!(leaves.len() > 60, "{} leaves", leaves.len());
 
     let listing = json_of(&canon(dir.path(), &["schema", "--json"]));
-    let listed: BTreeSet<String> = listing["data"]["commands"].as_array().expect("commands").iter().filter(|c| c["kind"] == "command").map(|c| c["command"].as_str().expect("command").to_string()).collect();
+    let listed: BTreeSet<String> = listing["data"]["commands"].as_array().expect("commands").iter().filter(|c| c["kind"] != "group").map(|c| c["command"].as_str().expect("command").to_string()).collect();
     assert_eq!(listed, leaves, "the bare listing holds every command of the spec and nothing else");
 }
 
@@ -149,7 +149,8 @@ fn context_capability_29_a_success_is_ok_data_and_meta() {
         assert!(meta.get("canonVersion").is_none(), "meta.canonVersion is toolVersion now: {meta}");
         // `meta.context` is `{repo}` and is there exactly for a leaf that takes `--repo`.
         let node = json_of(&canon(dir.path(), &[&["schema"][..], &command.split(' ').collect::<Vec<_>>(), &["--json"]].concat()));
-        let takes_repo = node["data"]["options"].as_array().is_some_and(|o| o.iter().any(|o| o["name"] == "repo"));
+        // A 1.4 document names a shared option (a string) or defines its own (an object).
+        let takes_repo = node["data"]["options"].as_array().is_some_and(|o| o.iter().any(|o| o == "repo" || o["name"] == "repo"));
         assert_eq!(meta.get("context").is_some(), takes_repo, "{args:?}: {meta}");
         if takes_repo {
             assert_eq!(sorted_keys(&meta["context"]), ["repo"], "{args:?}: {meta}");
@@ -428,7 +429,7 @@ fn context_capability_36_a_removed_option_is_exit_two_with_the_option_that_repla
         assert!(expected.iter().any(|e| e.split_whitespace().next() == Some(replacement)), "{args:?}: `expected` leads with the replacing option {replacement}: {error}");
         assert!(hint.split('`').skip(1).step_by(2).any(|quoted| quoted.split_whitespace().any(|word| word == replacement)), "{args:?}: the hint quotes {replacement} as a whole option: {error}");
         let node = json_of(&canon(dir.path(), &[&["schema"][..], &leaf.split(' ').collect::<Vec<_>>(), &["--json"]].concat()));
-        let options: Vec<&str> = node["data"]["options"].as_array().expect("options").iter().map(|o| o["name"].as_str().expect("name")).collect();
+        let options: Vec<&str> = node["data"]["options"].as_array().expect("options").iter().map(|o| o.as_str().unwrap_or_else(|| o["name"].as_str().expect("name"))).collect();
         assert!(options.contains(&replacement.trim_start_matches("--")), "`canon {leaf}` takes {replacement}: {options:?}");
     }
 }

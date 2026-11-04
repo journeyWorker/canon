@@ -1,4 +1,4 @@
-//! canon-0-35-crate-1-2, seen from canon: the `atip` crate moves to 1.2; canon declares 1.2 by a constant of its own (`canon-0-35-claim-l2`).
+//! canon-0-35-crate-1-2, seen from canon: the `atip` crate moves to 1.2; canon declares its minor by a constant of its own (1.2 in `canon-0-35-claim-l2`, 1.4 in `canon-0-36-claim-1-4`).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,15 +32,15 @@ fn sources_without_comments(dir: &Path) -> Vec<(PathBuf, String)> {
 #[test]
 fn atip_crate12_02_canon_declares_contract_version_1_2_by_its_own_constant_not_the_crates() {
     assert!(atip::Minor::parse(canon_cli::json_out::DECLARED_MINOR).is_ok(), "the crate knows the minor canon declares");
-    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.2", "canon declares 1.2: its own constant, changed by a decision to claim the minor");
+    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.4", "canon declares 1.4: its own constant, changed by a decision to claim the minor");
     let dir = tempfile::tempdir().expect("a temp dir");
     let schema = canon(dir.path(), &["schema", "--json"]);
-    assert_eq!(schema["meta"]["contractVersion"], "1.2", "{schema}");
-    assert_eq!(schema["meta"]["schemaVersion"], "1.2", "the self-description follows the declared minor");
+    assert_eq!(schema["meta"]["contractVersion"], "1.4", "{schema}");
+    assert_eq!(schema["meta"]["schemaVersion"], "1.4", "the self-description follows the declared minor");
     // A refusal declares it too: `status` finds no canon.yaml here.
     let status = canon(dir.path(), &["status", "--json"]);
-    assert_eq!((status["ok"].clone(), status["meta"]["contractVersion"].clone()), (Value::Bool(false), Value::from("1.2")), "{status}");
-    assert!(atip::envelope_problems(&status).is_empty(), "a 1.2 document is valid against the vendored schema");
+    assert_eq!((status["ok"].clone(), status["meta"]["contractVersion"].clone()), (Value::Bool(false), Value::from("1.4")), "{status}");
+    assert!(atip::envelope_problems(&status).is_empty(), "a 1.4 document is valid against the vendored schema");
 }
 
 #[test]

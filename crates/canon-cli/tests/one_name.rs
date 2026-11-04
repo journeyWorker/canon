@@ -114,21 +114,13 @@ fn schema_json(args: &[&str]) -> Value {
     serde_json::from_slice::<Value>(&out.stdout).expect("stdout is JSON")["data"].clone()
 }
 
-/// Every command of the clap tree, read through `canon schema` (visible
-/// arguments only).
+/// Every command of the clap tree, read from what canon declares: the full model form of the command documents
+/// (every option listed, visible arguments only).
 fn command_tree() -> Vec<Surface> {
-    let all = schema_json(&["schema", "--json"]);
-    all["commands"]
-        .as_array()
-        .unwrap()
+    model_commands()
         .iter()
-        .filter(|entry| entry["kind"] == "command")
-        .map(|entry| {
-            let path = entry["command"].as_str().unwrap().to_string();
-            let mut args = vec!["schema"];
-            args.extend(path.split(' '));
-            args.push("--json");
-            let schema = schema_json(&args);
+        .map(|schema| {
+            let path = schema["command"].as_str().unwrap().to_string();
             let options = schema["options"].as_array().unwrap();
             let mut flags: Vec<String> = Vec::new();
             for option in options {
@@ -142,6 +134,16 @@ fn command_tree() -> Vec<Surface> {
             Surface { path, flags, kind_values }
         })
         .collect()
+}
+
+/// The command documents of the model: what canon declares (the `canon schema` answer is the 1.4 form of them).
+fn model_commands() -> Vec<Value> {
+    canon_cli::spec::model()["commands"].as_array().unwrap().clone()
+}
+
+fn model_command(path: &[&str]) -> Value {
+    let name = path.join(" ");
+    model_commands().into_iter().find(|doc| doc["command"] == name.as_str()).unwrap_or_else(|| panic!("no command {name}"))
 }
 
 /// context.capability.14 and .15: `canon schema --all` shows no concept spelled
@@ -309,19 +311,27 @@ fn context_capability_18_help_and_schema_show_only_the_one_name() {
     }
 
     for command in [&["brief", "approve"][..], &["scenario", "new"], &["dispatch", "end"], &["query"], &["export"], &["purge"]] {
-        let mut args = vec!["schema"];
-        args.extend(command);
-        args.push("--json");
-        let schema = schema_json(&args);
+        let schema = model_command(command);
         for option in schema["options"].as_array().unwrap() {
             assert!(option.get("deprecatedAliases").is_none() && option.get("deprecatedValues").is_none(), "{command:?}: {option}");
             assert!(option.get("aliases").is_none(), "{command:?}: no alias keeps an old spelling: {option}");
             assert!(!option["name"].as_str().unwrap().ends_with("-id"), "{command:?}: {option}");
         }
+        // What `canon schema` answers names no old spelling either: a name or an option object.
+        let mut args = vec!["schema"];
+        args.extend(command);
+        args.push("--json");
+        let answered = schema_json(&args);
+        for option in answered["options"].as_array().unwrap() {
+            let name = option.as_str().unwrap_or_else(|| option["name"].as_str().unwrap());
+            assert!(!name.ends_with("-id") && option.get("aliases").is_none(), "{command:?}: {option}");
+        }
     }
-    let kind = schema_json(&["schema", "query", "--json"])["options"].as_array().unwrap().iter().find(|o| o["name"] == "kind").unwrap().clone();
+    let kind = model_command(&["query"])["options"].as_array().unwrap().iter().find(|o| o["name"] == "kind").unwrap().clone();
     let possible: Vec<&str> = kind["possibleValues"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
     assert!(possible.contains(&"evidence") && possible.iter().all(|v| !v.ends_with("_record")), "{possible:?}");
+    let answered_kind = schema_json(&["schema", "query", "--json"])["options"].as_array().unwrap().iter().find(|o| o["name"] == "kind").unwrap().clone();
+    assert_eq!(answered_kind["possibleValues"], kind["possibleValues"]);
 }
 
 /// context.capability.19: only a token clap reads as a flag is a removed spelling.

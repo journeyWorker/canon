@@ -365,7 +365,8 @@ fn atip_readwrites_06_dashboard_is_declared_a_server_that_serves_until_signalled
     assert_eq!(schema["data"]["effect"], "write", "{schema}");
     let outputs = schema["data"]["outputs"].as_array().expect("outputs");
     assert_eq!(outputs.len(), 1, "one output, no stream lines: {outputs:?}");
-    assert_eq!((outputs[0]["kind"].as_str(), outputs[0]["schemaRef"].as_str()), (Some("report"), Some("#/schemas/DashboardReport")), "{outputs:?}");
+    // `kind` is absent when it is the default (`report`) in the 1.4 form: a stream would say `kind: "stream"`.
+    assert_eq!((outputs[0].get("kind").is_none() || outputs[0]["kind"] == "report", outputs[0]["schemaRef"].as_str()), (true, Some("#/schemas/DashboardReport")), "{outputs:?}");
 }
 
 /// atip.readwrites.09 (the failure path of F5): a `dashboard` call that is refused (a port that is no integer, an option it does not

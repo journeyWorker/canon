@@ -146,7 +146,7 @@ fn subject_move_is_a_write_and_subject_show_is_a_read() {
     assert_eq!(show["data"]["effect"], "read");
     let schema = json_of(&canon(dir.path(), &["schema", "subject", "move", "--json"]));
     assert_eq!(schema["data"]["effect"], "write");
-    let options: Vec<&str> = schema["data"]["options"].as_array().unwrap().iter().map(|o| o["name"].as_str().unwrap()).collect();
+    let options: Vec<&str> = schema["data"]["options"].as_array().unwrap().iter().map(|o| o.as_str().unwrap_or_else(|| o["name"].as_str().unwrap())).collect();
     assert!(options.contains(&"to"), "{options:?}");
     let arguments: Vec<&str> = schema["data"]["operands"].as_array().unwrap().iter().map(|a| a["name"].as_str().unwrap()).collect();
     assert_eq!(arguments, ["id"], "the positional state is not advertised");
@@ -205,8 +205,8 @@ fn as_reviewer_lists_the_reviewers_commands_only_and_canon_role_never_filters() 
     let listed = names(&commands);
     assert!(listed.contains(&"review scenario") && listed.contains(&"finding add") && listed.contains(&"brief check"), "{listed:?}");
     assert!(!listed.contains(&"evidence add") && !listed.contains(&"scenario new") && !listed.contains(&"gate promote"), "{listed:?}");
-    assert!(commands.iter().filter(|c| c["kind"] == "command").all(|c| c["x-canon"]["roles"].as_array().unwrap().contains(&json!("reviewer"))), "every listed command carries the role");
-    assert!(commands.iter().filter(|c| c["kind"] == "group").all(|g| commands.iter().any(|c| c["kind"] == "command" && c["command"].as_str().unwrap().starts_with(&format!("{} ", g["command"].as_str().unwrap())))), "a group is listed only for a command it holds");
+    assert!(commands.iter().filter(|c| c["kind"] != "group").all(|c| c["x-canon"]["roles"].as_array().unwrap().contains(&json!("reviewer"))), "every listed command carries the role");
+    assert!(commands.iter().filter(|c| c["kind"] == "group").all(|g| commands.iter().any(|c| c["kind"] != "group" && c["command"].as_str().unwrap().starts_with(&format!("{} ", g["command"].as_str().unwrap())))), "a group is listed only for a command it holds");
 
     let (_, everyone) = schema_listing(&[], &[]);
     assert!(everyone.len() > commands.len(), "no declared role lists every command");
@@ -229,7 +229,7 @@ fn every_command_declares_its_roles_and_humans_only_commands_declare_none() {
     assert_eq!(by_name("evidence add")["x-canon"]["roles"], json!(["implementer"]));
     assert_eq!(by_name("review scenario")["x-canon"]["roles"], json!(["reviewer"]));
     assert_eq!(by_name("brief approve")["x-canon"]["roles"], json!([]));
-    assert!(all.iter().filter(|c| c["kind"] == "command").all(|c| c["x-canon"]["roles"].is_array()));
+    assert!(all.iter().filter(|c| c["kind"] != "group").all(|c| c["x-canon"]["roles"].is_array()));
     assert!(all.iter().filter(|c| c["kind"] == "group").all(|c| c.get("x-canon").is_none()), "a group has no roles");
 }
 

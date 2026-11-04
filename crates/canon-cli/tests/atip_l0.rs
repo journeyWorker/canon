@@ -87,7 +87,7 @@ fn atip_l0_01_status_json_names_the_tool_its_version_and_the_contract() {
     let meta = &document["meta"];
     assert_eq!(meta["tool"], "canon");
     assert_eq!(meta["contract"], "atip/1");
-    assert_eq!(meta["contractVersion"], "1.2", "every envelope declares the contract minor it follows");
+    assert_eq!(meta["contractVersion"], "1.4", "every envelope declares the contract minor it follows");
     assert_eq!(version.trim(), format!("canon {}", meta["toolVersion"].as_str().unwrap()), "toolVersion is the version `canon --version` prints");
     assert!(meta.get("canonVersion").is_none(), "canonVersion is gone");
     assert_eq!(meta["command"], "status");
@@ -563,7 +563,12 @@ fn atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract() {
     assert_eq!(on_disk, canon_cli::spec::render(), "docs/cli/canon.cli.json is generated: CANON_BLESS_CLI_SPEC=1 cargo test -p canon-cli --test cli_spec");
     let spec: Value = serde_json::from_str(&on_disk).unwrap();
     assert_eq!(spec["contract"], "atip/1");
+    assert_eq!(spec["contractVersion"], "1.4");
     assert!(spec.get("envelopes").is_none());
+    // The file holds the 1.4 form: the tree entries carry no `path` and no `kind: "command"`, the command documents no `path`, `schemas` or `rejects`; the schemas answers are beside them.
+    assert!(spec["tree"]["commands"].as_array().is_some_and(|entries| !entries.is_empty() && entries.iter().all(|entry| entry.get("path").is_none() && entry.get("kind").is_none_or(|kind| kind == "group"))), "tree entries are 1.4 entries");
+    assert!(spec["commands"].as_array().is_some_and(|docs| !docs.is_empty() && docs.iter().all(|doc| doc.get("path").is_none() && doc.get("schemas").is_none() && doc.get("rejects").is_none())), "command documents are the call surface only");
+    assert!(spec["schemas"].as_object().is_some_and(|schemas| !schemas.is_empty()), "the schemas answers are the top-level `schemas` map");
     // Every JSON envelope a conformance case freezes passes the contract's envelope schema and names the tool.
     let mut envelopes = 0;
     let mut cases = Vec::new();
@@ -592,7 +597,7 @@ fn atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract() {
         let meta = &document["meta"];
         assert_eq!(meta["tool"], "canon", "{args:?}");
         assert_eq!(meta["contract"], "atip/1");
-        assert_eq!(meta["contractVersion"], "1.2", "{args:?}");
+        assert_eq!(meta["contractVersion"], "1.4", "{args:?}");
         assert_eq!(format!("canon {}", meta["toolVersion"].as_str().unwrap()), version.trim());
         assert!(meta["schemaVersion"].is_string());
         assert!(document["error"]["retryable"].is_boolean());
@@ -679,7 +684,7 @@ fn atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reaso
     let many = json(&canon(repo.path(), &["scenario", "new", "--input", &items, "--json"]));
     assert_eq!((many["error"]["code"].as_str(), many["error"]["reason"].as_str()), (Some("INPUT_TOO_LARGE"), Some("TOO_MANY_ITEMS")), "{many}");
     for document in [&bytes, &many] {
-        assert_eq!(document["meta"]["contractVersion"], "1.2");
+        assert_eq!(document["meta"]["contractVersion"], "1.4");
         assert!(document["error"].get("x-canon").is_none(), "{document}");
         assert!(atip::envelope_problems(document).is_empty(), "{document}");
     }

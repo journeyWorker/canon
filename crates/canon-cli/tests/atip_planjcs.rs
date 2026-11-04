@@ -854,12 +854,16 @@ fn atip_planjcs_13_the_report_schemas_hold_the_preview_and_their_minor_is_raised
         let minor: u32 = report.split('.').nth(1).unwrap().parse().unwrap();
         assert!(minor >= 1 && report.starts_with("1."), "{command}: {report}");
         let name = doc["outputs"][0]["schemaRef"].as_str().unwrap().rsplit('/').next().unwrap();
-        let schema = &doc["schemas"][name];
+        let mut schemas_args = args.clone();
+        schemas_args.insert(schemas_args.len() - 1, "--schemas".to_string());
+        let schemas = json_of(&canon_in(Path::new("."), &schemas_args, &[]));
+        let schemas = &schemas["data"]["schemas"];
+        let schema = &schemas[name];
         for member in ["planDigest", "effects", "committed"] {
             assert!(schema["properties"].get(member).is_some(), "{command} has {member}: {schema}");
         }
         assert_eq!(schema["properties"]["effects"]["items"]["$ref"], "#/schemas/Effect", "{command}");
-        let effect = &doc["schemas"]["Effect"]["properties"];
+        let effect = &schemas["Effect"]["properties"];
         assert!(["action", "path", "record", "detail"].iter().all(|key| effect.get(key).is_some()), "{command}: {effect}");
     }
 }

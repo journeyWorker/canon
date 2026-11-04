@@ -135,12 +135,13 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     let repo = scratch_repo();
     let listing = run(repo.path(), &["schema", "--json"]);
     let listing: Value = serde_json::from_slice(&listing.stdout).expect("schema lists the leaves");
-    let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command").map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group").map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
 
     let regime = String::from_utf8(run(repo.path(), &["regime", "show", "--role-segment", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let skipped: Vec<&str> = SKIPPED.iter().map(|(command, _)| *command).collect();
+    let model = canon_cli::spec::model()["commands"].as_array().expect("the model's commands").clone();
     let mut problems = Vec::new();
     let mut usage = Vec::new();
 
@@ -148,8 +149,10 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
         let mut schema_args = vec!["schema".to_string()];
         schema_args.extend(leaf.split(' ').map(str::to_string));
         schema_args.push("--json".to_string());
-        let schema: Value = serde_json::from_slice(&canon(repo.path(), &schema_args).stdout).unwrap();
-        let schema = schema["data"].clone();
+        let answered: Value = serde_json::from_slice(&canon(repo.path(), &schema_args).stdout).unwrap();
+        assert_eq!(answered["data"]["kind"], "command", "{leaf}");
+        // What the command declares (every option, `--json` included): the 1.4 document leaves the implied options out.
+        let schema = model.iter().find(|doc| doc["command"] == leaf.as_str()).expect("the model has the command").clone();
         let has = |name: &str| schema["options"].as_array().unwrap().iter().any(|o| o["name"] == name);
         if !has("json") {
             problems.push(format!("{leaf}: does not accept --json"));

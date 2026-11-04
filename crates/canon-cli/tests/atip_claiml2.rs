@@ -1,6 +1,6 @@
-//! `canon-0-35-claim-l2`: canon declares atip/1 1.2 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-18`; `canon-0-36-atip-dep` moved the checker to the atip repository).
+//! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4`: canon declares atip/1 1.4 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-18`; `canon-0-36-atip-dep` moved the checker to the atip repository).
 //!
-//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.2 --deep`
+//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.4 --deep`
 //! on the committed fixture, which `just atip-deep` and the job `atip` run (`just atip` runs it without `--deep`), and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
 //! stand for the obligations of contract 17.2 that a green checker run does not prove; the last four tests read it.
 
@@ -37,31 +37,31 @@ fn canon_in(dir: &Path, args: &[&str]) -> Value {
 #[test]
 fn atip_claiml2_01_every_envelope_declares_1_2_and_the_schema_tree_says_l2() {
     let dir = tempfile::tempdir().expect("tempdir");
-    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.2");
+    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.4");
     assert_eq!(canon_cli::spec::LEVEL, "L2");
     let init = Command::new(CANON).args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     for args in [&["status", "--json"][..], &["nosuch", "--json"], &["schema", "--json"], &["schema", "--errors", "--json"], &["schema", "--warnings", "--json"]] {
         let document = canon_in(dir.path(), args);
-        assert_eq!(document["meta"]["contractVersion"], "1.2", "{args:?}: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.4", "{args:?}: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     let schema = canon_in(dir.path(), &["schema", "--json"]);
-    assert_eq!((schema["data"]["kind"].as_str(), schema["data"]["level"].as_str(), schema["meta"]["schemaVersion"].as_str()), (Some("tree"), Some("L2"), Some("1.2")), "{schema}");
+    assert_eq!((schema["data"]["kind"].as_str(), schema["data"]["level"].as_str(), schema["meta"]["schemaVersion"].as_str()), (Some("tree"), Some("L2"), Some("1.4")), "{schema}");
 }
 
-/// Whether `text` says that canon's `contractVersion` is `1.1`, in any of the ways the repository writes it (JSON, escaped JSON, code spans, prose).
-fn spells_1_1(text: &str) -> bool {
+/// Whether `text` says that canon's `contractVersion` is one of the minors it no longer declares (`1.1`, `1.2`, `1.3`), in any of the ways the repository writes it (JSON, escaped JSON, code spans, prose).
+fn spells_an_old_minor(text: &str) -> bool {
     text.match_indices("contractVersion").any(|(at, word)| {
         let after: String = text[at + word.len()..].chars().take(12).filter(|c| !matches!(c, '"' | '\\' | ':' | '`' | '(' | ' ' | '=' | '\'')).collect();
-        after.starts_with("1.1") && !after.starts_with("1.1.")
+        ["1.1", "1.2", "1.3"].iter().any(|old| after.strip_prefix(old).is_some_and(|rest| !rest.starts_with(|c: char| c == '.' || c.is_ascii_digit())))
     })
 }
 
 #[test]
 fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1() {
-    assert!(spells_1_1("\"contractVersion\": \"1.1\"") && spells_1_1("`contractVersion` (`1.1`, on every envelope)") && spells_1_1("{\\\"contractVersion\\\":\\\"1.1\\\"}"), "the detector sees the spellings");
-    assert!(!spells_1_1("\"contractVersion\": \"1.2\"") && !spells_1_1("`contractVersion` (`1.2`)") && !spells_1_1("contractVersion 1.9"));
+    assert!(spells_an_old_minor("\"contractVersion\": \"1.1\"") && spells_an_old_minor("`contractVersion` (`1.2`, on every envelope)") && spells_an_old_minor("{\\\"contractVersion\\\":\\\"1.3\\\"}"), "the detector sees the spellings");
+    assert!(!spells_an_old_minor("\"contractVersion\": \"1.4\"") && !spells_an_old_minor("`contractVersion` (`1.4`)") && !spells_an_old_minor("contractVersion 1.9") && !spells_an_old_minor("contractVersion 1.2.1"));
     let root = repo_root();
     let mut found = Vec::new();
     // What reads canon's declaration: the skills, the website, the eval scripts, the conformance corpus, the generated spec and canon's own sources.
@@ -74,14 +74,14 @@ fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1() {
             if path.is_dir() {
                 pending.extend(std::fs::read_dir(&path).expect("a directory").map(|entry| entry.expect("an entry").path()));
             } else if let Ok(text) = std::fs::read_to_string(&path) {
-                if spells_1_1(&text) {
+                if spells_an_old_minor(&text) {
                     found.push(path.strip_prefix(&root).unwrap_or(&path).display().to_string());
                 }
             }
         }
     }
     found.sort();
-    assert!(found.is_empty(), "these files spell canon's contractVersion as 1.1: {found:?}");
+    assert!(found.is_empty(), "these files spell canon's contractVersion as 1.1, 1.2 or 1.3: {found:?}");
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
     let root = repo_root();
     let workflow = read(&root.join(".github/workflows/test.yml"));
     let justfile = read(&root.join("justfile"));
-    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
+    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.4 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
     let recipe = recipe_lines(&justfile, "atip-deep");
     assert!(recipe.contains(&canon_at_l2), "the recipe atip-deep runs `{canon_at_l2}`: {recipe:?}");
     assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "the recipe builds canon only: {recipe:?}");
@@ -139,7 +139,7 @@ fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
 #[test]
 fn atip_claiml2_09_the_fixture_claims_1_2_and_lists_what_the_l2_rows_need() {
     let fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
-    assert_eq!(fixture["contractVersion"], "1.2");
+    assert_eq!(fixture["contractVersion"], "1.4");
     assert_eq!(fixture["notRun"], json!(["dashboard"]));
     let prepare = fixture["prepare"].as_array().expect("prepare");
     assert_eq!(prepare[0], json!(["git", "init", "-q"]));
