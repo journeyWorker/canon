@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-4",
+    "role": "implementer",
+    "session_id": "s-0-36-claim-1-4"
+  },
+  "at": "2026-11-04T17:31:09.598911Z",
+  "attachments": [
+    {
+      "case": "ledger_migrate_15_divergence_writes_and_promotion_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "37225a801748ea73e0265161ca465c554ba6850d9d56e7ff4a20f68ef36b00d3"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "22d30144d79b96472c3b32a0eacc58fe66453ffa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 423,
+  "scenario_id": "ledger.migrate.15",
+  "schema": 1,
+  "staging_id": "16ba609f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

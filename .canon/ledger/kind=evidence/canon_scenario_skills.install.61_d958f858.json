@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-4",
+    "role": "implementer",
+    "session_id": "s-0-36-claim-1-4"
+  },
+  "at": "2026-11-04T17:31:09.598911Z",
+  "attachments": [
+    {
+      "case": "skills_install_61_a_subset_install_keeps_the_lock_entries_of_unselected_providers",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "37225a801748ea73e0265161ca465c554ba6850d9d56e7ff4a20f68ef36b00d3"
+    },
+    {
+      "case": "skills_install_61_install_prunes_only_selected_providers_and_only_what_the_lock_listed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "37225a801748ea73e0265161ca465c554ba6850d9d56e7ff4a20f68ef36b00d3"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "22d30144d79b96472c3b32a0eacc58fe66453ffa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 872,
+  "scenario_id": "skills.install.61",
+  "schema": 1,
+  "staging_id": "6ac7b162",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
