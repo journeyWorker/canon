@@ -172,16 +172,16 @@ fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
         ("RETENTION_PURGE_REFUSED", 2),
         // `ADAPTER_REFUSED` was exit 1 and 2.
         ("ADAPTER_REFUSED", 2),
-        ("ADAPTER_RESPONSE_INVALID", 1),
-        // `EVIDENCE_BATCH_REFUSED` was exit 1 (a refused promotion) and 2 (a preflight, a write failure).
-        ("EVIDENCE_BATCH_REFUSED", 1),
+        ("ADAPTER_VALIDATION_FAILED", 1),
+        // `EVIDENCE_BATCH_REFUSED` was exit 1 (a refused promotion) and 2 (a preflight, a write failure); 0.36 judges the gate before the first write, so the refusal is `PROMOTION_INVALID`.
+        ("PROMOTION_INVALID", 2),
         // a write that began and failed, and the same failure known before anything changed.
         ("WRITE_FAILED", 1),
         ("WRITE_UNAVAILABLE", 2),
-        // the closed policy gate of `subject move` was forced to exit 1 over a registry 2.
+        // the closed policy gate of `subject move` was forced to exit 1 over a registry 2; 0.36 gives a stale policy and a refused transition exit 2.
         ("POLICY_APPROVAL_UNREADABLE", 1),
-        ("POLICY_CHANGED_SINCE_APPROVAL", 1),
-        ("SUBJECT_GATE_VIOLATION", 1),
+        ("POLICY_APPROVAL_STALE", 2),
+        ("SUBJECT_INVALID", 2),
         // `brief approve` computed the exit of these; the registry row is the exit now.
         ("BRIEF_UNREADABLE", 2),
         ("BRIEF_WRITE_FAILED", 1),

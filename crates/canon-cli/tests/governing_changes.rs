@@ -166,14 +166,14 @@ fn subject_lifecycle_42_every_tagged_change_must_be_approved_in_either_order() {
         }
         // Both unapproved: both named, and the hint is one call with both ids.
         let out = ship(repo, "s");
-        assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+        assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         let err = stderr(&out);
         assert!(err.contains(".canon/changes/a/brief.md") && err.contains(".canon/changes/b/brief.md"), "{err}");
         assert!(err.contains("`canon brief approve a b --approver <their name> --note \"<their words>\" --relayed-via <the question tool>"), "one call with both ids: {err}");
 
         approve_all(repo, &[first]);
         let out = ship(repo, "s");
-        assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+        assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         let err = stderr(&out);
         assert!(err.contains(&format!(".canon/changes/{second}/brief.md")), "{err}");
         assert!(!err.contains(&format!(".canon/changes/{first}/brief.md")), "the approved one is not named: {err}");
@@ -211,9 +211,9 @@ fn subject_lifecycle_43_an_edited_tagged_change_refuses_and_removing_its_tags_do
             std::fs::write(&path, feature.replace("  @flow:b.F1\n", "")).unwrap();
         }
         let out = reopen(repo, "s");
-        assert_eq!(out.status.code(), Some(1), "{case}: {}", stderr(&out));
+        assert_eq!(out.status.code(), Some(2), "{case}: {}", stderr(&out));
         let err = stderr(&out);
-        assert!(err.contains(".canon/changes/b/brief.md changed after its approval (BRIEF_CHANGED_SINCE_APPROVAL)"), "{case}: {err}");
+        assert!(err.contains(".canon/changes/b/brief.md changed after its approval (BRIEF_APPROVAL_STALE)"), "{case}: {err}");
         assert!(!err.contains(".canon/changes/a/brief.md"), "{case}: only the edited change is named: {err}");
         assert!(!err.contains("has no `Approved:` line"), "an edit reads differently from a brief never approved: {err}");
     }
@@ -242,8 +242,8 @@ fn subject_lifecycle_44_an_edited_approved_brief_no_scenario_tags_refuses_ship()
     let text = std::fs::read_to_string(brief_path(repo, "c")).unwrap();
     std::fs::write(brief_path(repo, "c"), text.replace("Social sign-in.", "Social sign-in, later.")).unwrap();
     let out = ship(repo, "s");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains(".canon/changes/c/brief.md changed after its approval (BRIEF_CHANGED_SINCE_APPROVAL)"), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains(".canon/changes/c/brief.md changed after its approval (BRIEF_APPROVAL_STALE)"), "{}", stderr(&out));
     assert!(!stderr(&out).contains(".canon/changes/a/brief.md"), "{}", stderr(&out));
     let board = status(repo);
     let entry = subject(&board, "s")["briefs"].as_array().unwrap().iter().find(|b| b["change"] == "c").unwrap().clone();
@@ -270,7 +270,7 @@ fn subject_lifecycle_45_a_chore_that_is_not_approved_now_refuses_reopen_and_ship
     std::fs::write(brief_path(repo, "bump"), chore_brief()).unwrap();
     // A chore governs from the moment it is adopted: no scenario can tag it.
     let out = run(repo, &["subject", "move", "s", "--to", "verifying", "--reason", "fix", "--override-reason", "go on"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/bump/brief.md has no `Approved:` line"), "{}", stderr(&out));
     let board = status(repo);
     let entry = &subject(&board, "s")["briefs"].as_array().unwrap().iter().find(|b| b["change"] == "bump").unwrap().clone();
@@ -280,14 +280,14 @@ fn subject_lifecycle_45_a_chore_that_is_not_approved_now_refuses_reopen_and_ship
     let text = std::fs::read_to_string(brief_path(repo, "bump")).unwrap();
     std::fs::write(brief_path(repo, "bump"), text.replace("security fix", "security fix, urgent")).unwrap();
     let out = reopen(repo, "s");
-    assert_eq!(out.status.code(), Some(1), "an edited chore refuses the reopen too: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "an edited chore refuses the reopen too: {}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/bump/brief.md changed after its approval"), "{}", stderr(&out));
     approve_all(repo, &["bump"]);
     assert!(reopen(repo, "s").status.success(), "an approved chore lets the subject reopen");
     let text = std::fs::read_to_string(brief_path(repo, "bump")).unwrap();
     std::fs::write(brief_path(repo, "bump"), text.replace("security fix", "security fix, urgent!")).unwrap();
     let out = ship(repo, "s");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/bump/brief.md changed after its approval"), "{}", stderr(&out));
 }
 
@@ -377,16 +377,16 @@ fn evidence_add_123_a_tagged_scenario_waits_only_for_its_tagged_changes() {
 
     assert!(attest(repo, "shop.cart.01").status.success(), "b's edit does not block a scenario tagged for a");
     let out = attest(repo, "shop.cart.03");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("BRIEF_APPROVAL_STALE") && stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
 
     // Without its tag, the scenario answers to every approved change: b's edit still refuses it.
     let path = repo.join(FEATURE);
     let feature = std::fs::read_to_string(&path).unwrap();
     std::fs::write(&path, feature.replace("  @flow:a.F1\n  @shop.cart.01\n", "  @shop.cart.01\n")).unwrap();
     let out = attest(repo, "shop.cart.01");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("BRIEF_APPROVAL_STALE") && stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
 }
 
 /// evidence.add.124: an untagged scenario's evidence is refused when an
@@ -402,8 +402,8 @@ fn evidence_add_124_an_untagged_scenario_is_refused_while_an_approved_change_is_
     std::fs::write(brief_path(repo, "a"), text.replace("Social sign-in.", "Social sign-in, later.")).unwrap();
 
     let out = attest(repo, "shop.cart.01");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&out).contains(".canon/changes/a/brief.md"), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("BRIEF_APPROVAL_STALE") && stderr(&out).contains(".canon/changes/a/brief.md"), "{}", stderr(&out));
     approve_all(repo, &["a"]);
     assert!(attest(repo, "shop.cart.01").status.success());
 }
@@ -424,6 +424,6 @@ fn evidence_add_125_an_unapproved_chore_and_a_never_approved_brief_do_not_block_
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(!stdout(&out).contains("brief_override") && !stderr(&out).contains("override"), "{}{}", stdout(&out), stderr(&out));
     let out = ship(repo, "s");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/bump/brief.md has no `Approved:` line"), "{}", stderr(&out));
 }

@@ -260,7 +260,7 @@ fn evidence_add_113_an_explicit_faithful_verdict_over_a_skipped_or_failed_case_i
     for report in ["junit:skipped.xml", "junit:failed.xml"] {
         let before = tree(r);
         let out = add(report, Some("faithful"));
-        assert_eq!(out.status.code(), Some(1), "{report}: {}{}", text(&out.stdout), text(&out.stderr));
+        assert_eq!(out.status.code(), Some(2), "{report}: {}{}", text(&out.stdout), text(&out.stderr));
         assert_eq!(tree(r), before, "{report}: a refusal writes nothing");
     }
     let out = add("junit:skipped.xml", None);

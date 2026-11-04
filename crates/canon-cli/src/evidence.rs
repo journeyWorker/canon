@@ -239,7 +239,7 @@ const BRIEF_STOP: &str = "stop and get the human's answer to the brief: nothing 
 /// violation, exit 1 like every other gate-red refusal of this command
 /// (0.18 D5, #32).
 fn fabricated(violations: &[Violation]) -> CliError {
-    CliError::failed("EVIDENCE_FABRICATED", violations.iter().map(Violation::line).collect::<Vec<_>>().join("\n")).hint("replace the placeholder in --summary / --command-result with what was actually run and observed, or bind the artifact that backs the claim (`--artifact <file>`, `--report junit:<path>`)")
+    CliError::failed("EVIDENCE_NOTE_INVALID", violations.iter().map(Violation::line).collect::<Vec<_>>().join("\n")).hint("replace the placeholder in --summary / --command-result with what was actually run and observed, or bind the artifact that backs the claim (`--artifact <file>`, `--report junit:<path>`)")
 }
 
 /// A `--artifact`/`--report` binding refusal, with the exit its kind
@@ -255,7 +255,7 @@ fn bind_refusal(error: &crate::evidence_attach::BindError) -> CliError {
                 None => refusal,
             }
         }
-        BindError::Contradiction(message) => CliError::failed("EVIDENCE_REPORT_CONTRADICTION", message.as_str()).hint("make the claim match the report: re-run the suite, or correct the outcome you declared (`canon schema evidence add` lists the flags)"),
+        BindError::Contradiction(message) => CliError::failed("EVIDENCE_REPORT_CONFLICT", message.as_str()).hint("make the claim match the report: re-run the suite, or correct the outcome you declared (`canon schema evidence add` lists the flags)"),
     }
 }
 
@@ -323,7 +323,7 @@ fn brief_refusals(
 
 /// One brief refusal: the `unreviewed-promotion` violation it prints, and
 /// whether the brief was approved once and edited since (the code readers
-/// branch on is `BRIEF_CHANGED_SINCE_APPROVAL` then, `BRIEF_UNAPPROVED`
+/// branch on is `BRIEF_APPROVAL_STALE` then, `BRIEF_APPROVAL_REQUIRED`
 /// otherwise). Carried as a field, not read back out of the refusal text.
 #[derive(Clone)]
 struct BriefRefusal {
@@ -1008,7 +1008,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     if let Some(task_id) = &args.task_id {
         match typed_evidence_contract_for_task(&repo, task_id) {
             Ok(Some(contract)) if contract.kind != args.kind || contract.evidence_ref != args.evidence_ref => {
-                return CliError::failed("EVIDENCE_CONTRACT_MISMATCH", format!("{} declares a typed evidence contract kind=`{}` ref=`{}`, but this record carries kind=`{}` ref=`{}`; `canon task done` narrows to records matching the atom exactly, so this one would be refused as an unevidenced flip",
+                return CliError::failed("EVIDENCE_CONTRACT_CONFLICT", format!("{} declares a typed evidence contract kind=`{}` ref=`{}`, but this record carries kind=`{}` ref=`{}`; `canon task done` narrows to records matching the atom exactly, so this one would be refused as an unevidenced flip",
                     task_id, contract.kind, contract.evidence_ref, args.kind, args.evidence_ref
                 )).hint("pass --kind and --ref exactly as the plan task's typed evidence contract declares them").emit(&args.full(), args.json);
             }
@@ -1287,7 +1287,7 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Resu
     }
     let Some(reason) = &args.override_reason else {
         let lines = refusals.iter().map(|r| r.violation.line()).collect::<Vec<_>>().join("\n");
-        let code = if refusals.iter().any(|r| r.changed) { crate::brief::CHANGED_CODE } else { "BRIEF_UNAPPROVED" };
+        let code = if refusals.iter().any(|r| r.changed) { crate::brief::CHANGED_CODE } else { "BRIEF_APPROVAL_REQUIRED" };
         return Err(CliError::failed(code, lines).hint(BRIEF_STOP));
     };
     for refusal in refusals {
@@ -1303,7 +1303,7 @@ fn overrides_of(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Vec<crate::re
     let Some(reason) = args.override_reason.as_ref() else { return Vec::new() };
     let mut out: Vec<crate::reports::Override> = Vec::new();
     for refusal in refusals {
-        let code = if refusal.changed { crate::brief::CHANGED_CODE } else { "BRIEF_UNAPPROVED" };
+        let code = if refusal.changed { crate::brief::CHANGED_CODE } else { "BRIEF_APPROVAL_REQUIRED" };
         if !out.iter().any(|o| o.code == code) {
             out.push(crate::reports::Override { code: code.to_string(), reason: reason.clone() });
         }
@@ -1608,14 +1608,14 @@ struct LandedBatch {
     locations: Vec<BatchLocation>,
 }
 
-/// Write a batch all or nothing (0.18 D1): check that the staging (and,
-/// with `promote`, the committed) evidence directory can be written,
-/// store every bound file under the store lock, stage every body through
-/// `write`, then promote every staged record. A failure at any step
-/// removes every record this call staged or promoted and every blob it
-/// newly stored (the lock is held throughout, so no other writer's blob
-/// is touched), and is returned as the error. `write` is the staging
-/// write, `GitTier::write` outside tests.
+/// Write a batch (0.18 D1, 0.36): first judge the promotion gate of every body (with `promote`), so a body the gate refuses
+/// is refused before the first write: exit 2 with the gate's code for that record and `field` `/<index>`, nothing written
+/// (`atip.codeexit.07`). Then check that the staging (and, with `promote`, the committed) evidence directory can be written,
+/// store every bound file under the store lock, stage every body through `write`, then promote every staged record. A failure
+/// of the writing itself removes every record this call staged or promoted and every blob it newly stored (the lock is held
+/// throughout, so no other writer's blob is touched), and is returned as the error. A gate refusal while the records are
+/// promoted is not expected, since the gate was judged first; when it happens the records written so far stay, and the stop
+/// is `BATCH_INCOMPLETE` (exit 1). `write` is the staging write, `GitTier::write` outside tests.
 fn land_batch(
     repo: &Path,
     ledger_root: &Path,
@@ -1625,6 +1625,15 @@ fn land_batch(
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
 ) -> Result<LandedBatch, CliError> {
     let rolled_back = |code: &'static str, message: String| CliError::refused(code, message).hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed");
+    if promote {
+        for (index, body) in bodies.iter().enumerate() {
+            if let Err(refused) = canon_gate::promote::judge_evidence_body(body) {
+                return Err(CliError::refused("PROMOTION_INVALID", format!("record {} of the batch cannot be promoted: {}", index + 1, refused.violation.line()))
+                    .field(format!("/{index}"))
+                    .hint("fix that record (its `actor.role` and its scenario or task) or run the batch with `--no-promote`; nothing was written"));
+            }
+        }
+    }
     let staging_root = evidence_staging_dir(ledger_root);
     let kind_dir = format!("kind={}", RecordKind::Evidence.as_str());
     let mut destinations = vec![staging_root.join(&kind_dir)];
@@ -1674,14 +1683,14 @@ fn land_batch(
         // pass after the last record, instead of one of each per record.
         let committed = GitTier::new(ledger_root);
         let mut promoter = canon_gate::promote::EvidencePromoter::new(&staging, &committed);
-        for index in 0..locations.len() {
-            match crate::gate::try_promote_in(&mut promoter, &locations[index].staged) {
-                Ok(target) => locations[index].promoted = Some(target),
+        for (index, location) in locations.iter_mut().enumerate() {
+            match crate::gate::try_promote_in(&mut promoter, &location.staged) {
+                Ok(target) => location.promoted = Some(target),
                 Err(refusal) => {
                     let why = if refusal.lines.trim().is_empty() { refusal.error.message.clone() } else { refusal.lines.trim_end().to_string() };
-                    let error = format!("promoting record {} of the batch ({}) was refused: {why}", index + 1, locations[index].staged);
-                    rollback(&locations, held);
-                    return Err(rolled_back("EVIDENCE_BATCH_REFUSED", error));
+                    let error = format!("promoting record {} of the batch ({}) was refused after the gate had passed it: {why}; the {} record(s) before it are promoted and the others stay staged", index + 1, location.staged, index);
+                    let _ = held.stored();
+                    return Err(CliError::failed("BATCH_INCOMPLETE", error).hint("read what was done (`canon gate check`, `canon query --kind evidence`), then run `canon gate promote` to finish").field(format!("/{index}")));
                 }
             }
         }
@@ -2069,7 +2078,7 @@ mod tests {
         // The gate refuses the flip while the evidence is only staged —
         // proving the flip below is caused by the promotion, not by the
         // gate reading the staging directory.
-        assert_eq!(crate::gate::run_task(&repo, "demo-change#1.1", false), 1, "an unpromoted record must not satisfy the gate");
+        assert_eq!(crate::gate::run_task(&repo, "demo-change#1.1", false), 2, "an unpromoted record must not satisfy the gate");
         assert!(tasks_md(&repo).contains("- [ ] 1.1"), "a refused flip must leave the document untouched");
 
         assert_eq!(crate::gate::run_promote(&repo, None, false, false), 0, "promotion must be clean");
@@ -2138,7 +2147,7 @@ mod tests {
     fn a_fabricated_summary_is_refused_before_anything_is_staged() {
         let tmp = repo_with_plan_corpus();
 
-        assert_eq!(run_add(tmp.path(), &args(Some("this would pass once the suite is wired up"))), 1);
+        assert_eq!(run_add(tmp.path(), &args(Some("this would pass once the suite is wired up"))), 2);
         assert_eq!(staged_count(tmp.path()), 0, "a fabricated note must stage nothing");
     }
 
@@ -2187,7 +2196,7 @@ mod tests {
 
         assert_eq!(run_add(tmp.path(), &divergent), 0, "recording a divergent verdict is a real operation");
         assert_eq!(crate::gate::run_promote(tmp.path(), None, false, false), 0);
-        assert_eq!(crate::gate::run_task(tmp.path(), "demo-change#1.1", false), 1, "a divergent record must not satisfy the gate");
+        assert_eq!(crate::gate::run_task(tmp.path(), "demo-change#1.1", false), 2, "a divergent record must not satisfy the gate");
         assert!(tasks_md(tmp.path()).contains("- [ ] 1.1"), "the row must stay open");
     }
 
@@ -2297,7 +2306,7 @@ mod tests {
         assert_eq!(crate::gate::run_promote(tmp.path(), None, false, false), 0, "promotion validates the record, not the note — the hole has to be closed downstream");
         assert_eq!(committed(tmp.path()).len(), 1, "the malformed note IS in the append-only ledger");
 
-        assert_eq!(crate::gate::run_task(tmp.path(), "demo-change#1.1", false), 1, "a multi-line note is gate-red, not a flip");
+        assert_eq!(crate::gate::run_task(tmp.path(), "demo-change#1.1", false), 2, "a multi-line note is refused, not a flip");
         let doc = tasks_md(tmp.path());
         assert!(!doc.contains("9.9"), "no forged row may reach the document: {doc}");
         assert!(!doc.contains("- [x]"), "nothing may flip on a multi-line note: {doc}");
@@ -2311,9 +2320,9 @@ mod tests {
         serde_json::to_value(&record).unwrap()
     }
 
-    /// evidence.add.115: a batch that fails partway — its second record's
-    /// staging write fails, or its promotion is refused — leaves no
-    /// committed record, no staged record and no new blob.
+    /// evidence.add.115 and atip.codeexit.05: a batch that fails partway — its second record's staging write fails — leaves no committed
+    /// record, no staged record and no new blob; a batch whose second record the promotion gate would refuse is refused before the first
+    /// write (exit 2, `PROMOTION_INVALID`, `field` `/1`), so nothing at all is written.
     #[test]
     fn evidence_add_115_a_batch_that_fails_partway_leaves_nothing_behind() {
         let tmp = repo_with_plan_corpus();
@@ -2341,13 +2350,14 @@ mod tests {
         assert!(error.message.contains("staging record 2 of the batch failed: ") && error.message.contains("disk full"), "{}", error.message);
         assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "nothing staged, committed or stored");
 
-        // Both stage; the second's promotion is refused (it has no role)
-        // after the first was committed.
+        // The gate judges every record before the first write: the second has no role, so the batch is refused with that record's code,
+        // `field` `/1`, and nothing is staged, committed or stored (atip.codeexit.05).
         let refused = vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", Actor::new_unattributed("legacy-writer"))];
-        let Err(error) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second promotion is refused") };
-        assert_eq!((error.code, error.exit), ("EVIDENCE_BATCH_REFUSED", 1), "{}", error.message);
-        assert!(error.message.contains("promoting record 2 of the batch"), "{}", error.message);
-        assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "the first committed record is removed too");
+        let Err(error) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second record is refused") };
+        assert_eq!((error.code, error.exit), ("PROMOTION_INVALID", 2), "{}", error.message);
+        assert!(error.message.contains("record 2 of the batch cannot be promoted"), "{}", error.message);
+        assert_eq!(error.field_name(), Some("/1"), "the refused record is named by its index");
+        assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "nothing was written, not even the first record");
 
         // A read-only destination is refused before anything is written.
         let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence");

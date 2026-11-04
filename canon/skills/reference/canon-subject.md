@@ -137,7 +137,7 @@ canon subject move subject-domain-loop --to shipped
 
 On success the status updates in place; `--json` prints the updated
 record. On a gate block it prints violations by failure class to stderr,
-exits 1, and the record is unchanged.
+exits 2 (the code names the condition: `SUBJECT_APPROVAL_REQUIRED`, `EVIDENCE_STALE`, `LAYOUT_MIGRATION_REQUIRED` or `SUBJECT_INVALID`; several causes are `error.details[]`), and the record is unchanged.
 
 **Corpus-wide, the same join:** `canon gate check` with
 `.canon/policy.yaml`'s opt-in `spec_coverage` section generalizes this
@@ -166,7 +166,7 @@ from shipping, until every evidenced scenario has evidence recorded after
 the close or the approval; the refusal names the scenarios and the
 `canon evidence add --all-scenarios` command. Each refusal prints by
 failure class (`uncovered-cell`), carries a `hint`,
-exits 1, and the status stays `verifying`. `retired` is not gated.
+exits 2, and the status stays `verifying`. `retired` is not gated.
 
 **The brief (0.16, 0.17, 0.19):** `verifying → shipped` also refuses where a brief
 exists and is not approved, read exactly as `canon status` reads it (one
@@ -174,7 +174,7 @@ shared check, so status says `ship` only when this passes): the subject's
 scope (every change the subject answers for, see below) has a canon `.canon/changes/<change>/brief.md`
 with no `Approved:` line outside HTML comments and code fences, whose
 `Approved:` line carries a digest the brief's text no longer matches
-(`BRIEF_CHANGED_SINCE_APPROVAL`; the brief was edited after the human
+(`BRIEF_APPROVAL_STALE`; the brief was edited after the human
 answered), or has no canon `brief.md` yet but comes from an external
 openspec plan with a `proposal.md` under the plan sources. It also
 refuses while `canon brief check` has blocker findings for that change,
@@ -184,7 +184,7 @@ a policy. The refusal is an `unreviewed-promotion` naming the subject, and
 says what to do:
 
 ```output
-output: canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
+output: canon subject move: SUBJECT_INVALID — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
 output: canon subject move: refused — get the human's answer to the brief and record it with `canon brief approve`, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject
 ```
 
@@ -211,7 +211,7 @@ This refusal is a backstop, and so is the evidence one: shipping is not
 the first thing an unapproved brief stops. The agent writes the brief,
 runs `canon brief check` until it has no blockers, then shows it to the
 human and asks, and nothing is built or attested for the subject until the human
-answers. `canon evidence add` refuses (exit 1, nothing staged) a
+answers. `canon evidence add` refuses (exit 2, nothing staged) a
 scenario whose `@subject` owner, or a task whose change
 an adopting subject, has an enforced, unapproved brief, through the same
 check; see `canon-gate`.
@@ -223,7 +223,7 @@ check; see `canon-gate`.
 edited since, and even if the tags were removed; or (3) a *chore*, which has
 no scenario to tag and so governs from the moment it is adopted. They pass
 only when every one of them reads as approved now; an unapproved one and one
-edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`) are named for
+edited after its approval (`BRIEF_APPROVAL_STALE`) are named for
 different reasons, and the answer does not depend on the order the changes
 were adopted or approved. The ship guard's brief-structure check runs over
 all of them. When several block, the hint is one
@@ -245,7 +245,7 @@ answers only to the changes its tags name (counting only changes the subject
 adopted); another change's edit after its approval never blocks it. An untagged
 scenario (one whose tags were removed reads the same) answers to every adopted
 change with an `Approved:` line, a chore included, so an approved change edited
-since refuses it (`BRIEF_CHANGED_SINCE_APPROVAL`); an unapproved chore blocks
+since refuses it (`BRIEF_APPROVAL_STALE`); an unapproved chore blocks
 reopen and ship, never evidence. When no adopted change has an approved line,
 a scenario with evidence recorded before the subject first adopted a change
 (and without a brief override) needs no brief, and one without answers to the
@@ -270,7 +270,7 @@ A target outside `require_review.scope` prints `skipped
 unreviewed-promotion — `specced` is not in require_review.scope`. A
 transition INTO an in-scope status with gaps — an owned scenario with no
 qualifying review (`unreviewed-promotion`), or an open blocker finding
-on an adopted change (`open-blocker`) — prints the violations, exits 1,
+on an adopted change (`open-blocker`) — prints the violations, exits 2,
 leaves the record unchanged, and names `--override-reason`. `shipped`
 also refuses a `false-success` (a scenario whose latest audit is
 `refuted`) and, when `require_audit.scope` covers `shipped`, an owed
@@ -332,13 +332,13 @@ output: canon subject move: demo-subject → verifying — written directly; not
 - Inside the approved scope it needs no human: every change the subject
   answers for (tagged, approved or chore) has an approved brief, or there
   is no brief to answer.
-  Otherwise it refuses, exit 1, naming the brief to approve, and
+  Otherwise it refuses, exit 2, naming the brief to approve, and
   `--override-reason` does not waive it:
   ``unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; …``.
 - The review guard does not run on a reopen (it prints `skipped … — a
   reopen moves the subject back to fix its gaps; shipping again runs
   it`). `verifying → shipped` afterwards runs every guard above again.
-- A policy that fails closed (`POLICY_CHANGED_SINCE_APPROVAL`,
+- A policy that fails closed (`POLICY_APPROVAL_STALE`,
   `POLICY_APPROVAL_UNREADABLE`: see `canon-policy`) refuses the reopen and
   the ship, and `--override-reason` does not waive it.
 - `canon change new` on a shipped subject prints the reopen command
@@ -549,7 +549,7 @@ warn, and a command that writes and judges it is refused
   `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
   brief and records the policy approval in the same call. It refuses
   (exit 2) while the check has structure blockers. Edit the brief
-  afterwards and every reader says `BRIEF_CHANGED_SINCE_APPROVAL` until a
+  afterwards and every reader says `BRIEF_APPROVAL_STALE` until a
   human answers again and `approve` runs again. Run it only from the
   human's answer, with their words as `--note`.
 
@@ -619,7 +619,7 @@ uses, so status and the gate cannot disagree about a gap:
   `Approved: <who> <when> — "<the human's words>" (brief sha256:<digest>)`,
   the digest covering the brief without its `Approved:` lines. A brief
   edited after that reads `brief: not approved (<brief> changed after its
-  approval (BRIEF_CHANGED_SINCE_APPROVAL))` and names the re-approval
+  approval (BRIEF_APPROVAL_STALE))` and names the re-approval
   command: the changed brief needs a new human answer. A line with no
   digest (written before 0.19) stays approved, with an `advisory:` to
   re-approve so it binds to the text. Fixes and follow-ups

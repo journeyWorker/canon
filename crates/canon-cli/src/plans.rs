@@ -166,6 +166,10 @@ pub enum PlansError {
     /// changed (`WRITE_UNAVAILABLE`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
+    /// A source yields nothing usable: it holds malformed constructs and not one that parses. Known before anything is persisted
+    /// (`INGEST_SOURCE_INVALID`, exit 2): one message per malformed construct, in the order of the sources.
+    #[error("a plan source is malformed and yields nothing usable: {}", .0.join("; "))]
+    SourcesInvalid(Vec<String>),
 }
 
 /// [`crate::tiers::build_lenient_tiers`]'s relocated error type
@@ -301,10 +305,9 @@ pub struct PlansOutcome {
     /// to the unwritten seam").
     pub unwritten_changes: Vec<Change>,
     pub unwritten_tasks: Vec<Task>,
-    /// Every source this pass flagged non-clean (s18 spec) — the CLI
-    /// layer (`main.rs::run_ingest_plans`) prints an unconditional
-    /// stderr WARN per entry and exits non-zero whenever this is
-    /// non-empty. Empty for an ordinary clean/partial-success pass.
+    /// Every source this pass flagged non-clean (s18 spec): [`run`] refuses before it persists anything when this is non-empty
+    /// (`PlansError::SourcesInvalid`), so it is a refusal's cause and never part of a report.
+    #[serde(skip)]
     pub non_clean_sources: Vec<NonCleanSource>,
     /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -332,6 +335,12 @@ struct RawPlanSource {
 /// pass over every configured plan source, in config/one-shot order
 /// (module doc).
 fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
+    run_pass_for(repo, dialect, source, dry_run, !dry_run)
+}
+
+/// [`run_pass`], with `will_write` saying whether the import this pass previews goes on to persist: a preview that will be followed by a write takes the
+/// stores' writability check first, so a refusal does not even open the hot store.
+fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool, will_write: bool) -> Result<PlansOutcome, PlansError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
 
@@ -345,7 +354,7 @@ fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: 
     validate_source_roots(&sources)?;
 
     // Opening the store attaches the hot db (creating it), and an import persists changes and tasks: the stores they land in must take a write before the store is opened, so a refusal changes nothing.
-    if !dry_run {
+    if will_write {
         crate::write_mode::check_kinds_writable(&canon_yaml_path, &[RecordKind::Change, RecordKind::Task]).map_err(PlansError::Unavailable)?;
     }
     let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
@@ -506,7 +515,13 @@ fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: 
 /// was already imported (skipped unchanged, or persisting nothing) and nothing
 /// was left unwritten is marked unchanged ([`crate::json_out::mark_unchanged`]).
 pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
+    // A source that yields nothing usable is a refusal, and a refusal changes nothing (spec 8.3, 11.2): the sources are judged by a
+    // preview pass before the first record is persisted.
+    if !dry_run {
+        refuse_unusable_sources(&run_pass_for(repo, dialect, source, true, true)?)?;
+    }
     let outcome = run_pass(repo, dialect, source, dry_run)?;
+    refuse_unusable_sources(&outcome)?;
     let nothing_new = outcome.unwritten_changes.is_empty()
         && outcome.unwritten_tasks.is_empty()
         && outcome.non_clean_sources.is_empty()
@@ -515,6 +530,25 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: b
         crate::json_out::mark_unchanged();
     }
     Ok(outcome)
+}
+
+/// `PlansError::SourcesInvalid` for the sources `outcome` flagged non-clean: a source with malformed constructs and not one usable.
+fn refuse_unusable_sources(outcome: &PlansOutcome) -> Result<(), PlansError> {
+    if outcome.non_clean_sources.is_empty() {
+        return Ok(());
+    }
+    let mut causes = Vec::new();
+    for flagged in &outcome.non_clean_sources {
+        let Some(source) = outcome.sources.iter().find(|s| s.dialect == flagged.dialect && s.root == flagged.root) else { continue };
+        for entry in &source.malformed {
+            let hint = entry.hint.as_deref().map(|hint| format!(" ({hint})")).unwrap_or_default();
+            causes.push(format!("{} source `{}`: `{}` is malformed ({}){hint}", flagged.dialect, flagged.root, entry.path, entry.reason));
+        }
+    }
+    if causes.is_empty() {
+        causes.push("a plan source holds malformed constructs and none that parses".to_string());
+    }
+    Err(PlansError::SourcesInvalid(causes))
 }
 
 /// The routed store an import persists through, plus the git tier's

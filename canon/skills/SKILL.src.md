@@ -55,9 +55,9 @@ a feature, a one-line request included. A human is needed once per scope:
      human runs the call themselves. Never remove or unset your role
      (`env -u CANON_ROLE`, dropping `--as`) to run it yourself.
   Never edit the policy to make the gate pass: a policy that differs from
-  the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not
+  the approved one fails closed (`POLICY_APPROVAL_STALE`, not
   waivable); stop and ask the human. A brief edited after its
-  approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new
+  approval is not approved (`BRIEF_APPROVAL_STALE`): it needs a new
   answer. The ship guard and `canon evidence add` refuse an unapproved or
   edited brief, but those are backstops: the stop itself is at step 1.
 - **Approval is scoped.** Evidence for a scenario tagged `@flow:<change>.<F-id>`

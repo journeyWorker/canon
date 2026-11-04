@@ -207,7 +207,7 @@ Feature: authoring brief check
     When canon brief check runs, and the brief is approved and then a waiver entry is added
     Then the entry clears that rule in that section, or only the findings containing its match, and the output lists the waiver with its rule severity and whether it applied
     And the frontmatter is not prose: no sentence rule, length count or language detection reads it, and the reported lines are the file's real lines
-    And the approval digest covers the frontmatter, so the added entry reads as BRIEF_CHANGED_SINCE_APPROVAL
+    And the approval digest covers the frontmatter, so the added entry reads as BRIEF_APPROVAL_STALE
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:42Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
   @subject:authoring-scaffold

@@ -111,7 +111,7 @@ fn require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails() {
     let contradicted = attest(repo, &["--report", "junit:reports/junit.xml", "--verdict", "faithful"]);
     assert_eq!(
         contradicted.status.code(),
-        Some(1),
+        Some(2),
         "{}",
         text(&contradicted)
     );

@@ -342,6 +342,18 @@ impl GitTier {
         Ok(SharedRead { records: found.into_iter().map(|(_, raw)| raw).collect(), violations })
     }
 
+    /// Whether a staging read would refuse `body` as a record of `kind`: the answer of [`GitTier::read_at`] for the file a write of
+    /// `body` would make, without writing it. `None` is accepted. A caller that must know before its first write whether the
+    /// promotion of a record it is about to stage will refuse it asks here.
+    pub fn staged_body_violation(kind: RecordKind, body: &serde_json::Value) -> Option<EvidenceViolation> {
+        let relative = match expected_relative_path(kind, body) {
+            Ok(relative) => relative,
+            Err(violation) => return Some(violation),
+        };
+        let bytes = serde_json::to_vec(body).ok()?;
+        validate_file(kind, &relative, &bytes).err()
+    }
+
     /// The ONE `kind` record at tier-relative `relative`, validated
     /// exactly as [`Tier::read`]'s scan validates each file it walks
     /// (`validate_file`). `Ok(Err(violation))` is a file the scan

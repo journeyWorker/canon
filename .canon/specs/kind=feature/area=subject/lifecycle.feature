@@ -439,7 +439,7 @@ Feature: subject lifecycle
   Scenario: An approved tagged change edited afterwards, or one whose tags were removed, still refuses reopen and ship
     Given a shipped subject adopting two approved tagged changes
     When the brief of one is edited after its approval, and separately its scenarios' tags are removed
-    Then reopen and ship refuse naming that change's brief.md as changed since its approval, BRIEF_CHANGED_SINCE_APPROVAL, and say it differs from a brief never approved
+    Then reopen and ship refuse naming that change's brief.md as changed since its approval, BRIEF_APPROVAL_STALE, and say it differs from a brief never approved
     And the other approved change is not named, and approving the edited brief again lets both go through
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:21Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

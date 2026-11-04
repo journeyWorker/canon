@@ -65,6 +65,48 @@ Not renamed here: the warning `CONFIG_MISSING` of `canon status` keeps its name 
 
 A caller that branches on a code replaces the old name with the new one from the table; a caller that read the exit of the old name reads the same exit from the new one. The skills, the website pages (`cli`, in both languages), the dashboard sources, the eval scripts and the scenarios say the new names, and `atip_l0_27` and `atip_codenames_06` fail when one of them spells an old name.
 
+**Twenty-two codes that refused or failed with exit 1 answer with exit 2 or are split by condition, and a refusal carries no `data`** (`canon-0-36-codes-exit`, scenarios `atip.codeexit.01-12`). A command that refuses to start, or a gate that refuses a record or a transition, changed nothing and says so with exit 2, the code of the condition, and no `data`. The list a refusal used to put in `data.violations` or `data.refused` is `error.details[]`, one entry for each cause with its own `code` (the error itself is the first cause; a single cause has no `details`). A gate names the condition, not the gate: a missing approval, review or evidence is `SUBJECT_APPROVAL_REQUIRED`, stale evidence is `EVIDENCE_STALE`, a ledger in an old layout is `LAYOUT_MIGRATION_REQUIRED`, and any other rule is `<TARGET>_INVALID` (`PROMOTION`, `STRATEGY_PROMOTION`, `DIVERGENCE`, `SUBJECT`). Only the codes canon raises are registered: `gate promote` meets only `malformed-evidence` records, so it has `PROMOTION_INVALID` and no `PROMOTION_APPROVAL_REQUIRED`; the strategy gate judges statistics, so it has `STRATEGY_PROMOTION_INVALID` and no `STRATEGY_APPROVAL_REQUIRED`; `DIVERGENCE_INVALID` has no `DIVERGENCE_APPROVAL_REQUIRED`.
+
+A check command's negative answer stays exit 1 with its result in `data`: `adapter authorize` (`ADAPTER_AUTHORIZATION_FAILED`), `adapter validate` (`ADAPTER_VALIDATION_FAILED`, `data` is `{valid: false, problem}`), `report check` (`REPORT_CHECK_FAILED` with reason `STALE`), and `context-pack verify` (`CONTEXT_PACK_VERIFY_FAILED`, `data` is `{id, verified: false}`). A command that reads a changed pack and is not `verify` refuses with `CONTEXT_PACK_CORRUPT` (exit 2).
+
+An evidence batch (`evidence add --all-scenarios`) judges the promotion gate of every record before the first write: a record the gate refuses is exit 2, `PROMOTION_INVALID`, `field` `/<index>`, nothing written, and the stage-then-delete rollback is gone (`EVIDENCE_BATCH_REFUSED` no longer exists). A refusal found while the records are promoted, which the first judgement makes unexpected, is `BATCH_INCOMPLETE` (exit 1). `canon brief approve a b` that refuses several ids before any write is exit 2 with one `details` entry for each id, and one that stops after some ids were written is `BATCH_INCOMPLETE`. A command that staged a record and whose promotion the gate then refused is `STOPPED_MIDWAY` (exit 1, reason `PROMOTION_INVALID`; the record stays staged), and `canon strategy promote` that demoted a strategy and was then blocked is `STOPPED_MIDWAY` with reason `STRATEGY_PROMOTION_INVALID`. `canon ingest plans` judges every source before it persists: a source that holds malformed constructs and none that parses is exit 2, `INGEST_SOURCE_INVALID`, no `data` (`data.nonCleanSources` is gone), and nothing is written, not even by the well-formed sources of the same run.
+
+| 0.35 | 0.36 | exit |
+|---|---|---|
+| `ADAPTER_EXECUTION_NOT_AUTHORIZED` | `ADAPTER_AUTHORIZATION_FAILED` | 1 → 1 |
+| `ADAPTER_RESPONSE_INVALID` | `ADAPTER_VALIDATION_FAILED` | 1 → 1 |
+| `BRIEF_CHANGED_SINCE_APPROVAL` | `BRIEF_APPROVAL_STALE` | 1 → 2 |
+| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | 1 → 2 |
+| `CONTEXT_GIT_UNAVAILABLE` | `CONTEXT_GIT_REQUIRED` | 1 → 2 |
+| `DASHBOARD_NOT_BUILT` | `DASHBOARD_UNSUPPORTED` | 1 → 2 |
+| `DASHBOARD_PORT_IN_USE` | `DASHBOARD_PORT_UNAVAILABLE` | 1 → 2 |
+| `DISPATCH_END_IN_PROGRESS` | `DISPATCH_RUN_UNAVAILABLE` | 1 → 2 |
+| `EVIDENCE_CONTRACT_MISMATCH` | `EVIDENCE_CONTRACT_CONFLICT` | 1 → 2 |
+| `EVIDENCE_FABRICATED` | `EVIDENCE_NOTE_INVALID` | 1 → 2 |
+| `EVIDENCE_REPORT_CONTRADICTION` | `EVIDENCE_REPORT_CONFLICT` | 1 → 2 |
+| `GATE_TASK_BLOCKED` | `TASK_EVIDENCE_REQUIRED` | 1 → 2 |
+| `GATE_TASK_EVIDENCE_INVALID` | `TASK_EVIDENCE_INVALID` | 1 → 2 |
+| `INGEST_SOURCE_UNUSABLE` | `INGEST_SOURCE_INVALID` | 1 → 2 |
+| `LEARN_EVALUATION_REJECTED` | `STRATEGY_EVALUATION_INVALID` | 1 → 2 |
+| `POLICY_CHANGED_SINCE_APPROVAL` | `POLICY_APPROVAL_STALE` | 1 → 2 |
+| `REPORT_STALE` | `REPORT_CHECK_FAILED` | 1 → 1 (reason `STALE`) |
+| `PROMOTE_REFUSED` | `PROMOTION_INVALID` | 1 → 2 (by the condition of the violation) |
+| `PROMOTE_REFUSED` | `EVIDENCE_STALE` | 1 → 2 (by the condition of the violation) |
+| `PROMOTE_REFUSED` | `LAYOUT_MIGRATION_REQUIRED` | 1 → 2 (by the condition of the violation) |
+| `SUBJECT_GATE_VIOLATION` | `SUBJECT_APPROVAL_REQUIRED` | 1 → 2 (by the condition of the violation) |
+| `SUBJECT_GATE_VIOLATION` | `EVIDENCE_STALE` | 1 → 2 (by the condition of the violation) |
+| `SUBJECT_GATE_VIOLATION` | `LAYOUT_MIGRATION_REQUIRED` | 1 → 2 (by the condition of the violation) |
+| `SUBJECT_GATE_VIOLATION` | `SUBJECT_INVALID` | 1 → 2 (by the condition of the violation) |
+| `DIVERGENCE_REFUSED` | `DIVERGENCE_INVALID` | 1 → 2 (by the condition of the violation) |
+| `DIVERGENCE_REFUSED` | `EVIDENCE_STALE` | 1 → 2 (by the condition of the violation) |
+| `DIVERGENCE_REFUSED` | `LAYOUT_MIGRATION_REQUIRED` | 1 → 2 (by the condition of the violation) |
+| `LEARN_PROMOTION_BLOCKED` | `STRATEGY_PROMOTION_INVALID` | 1 → 2 |
+| `CONTEXT_PACK_TAMPERED` | `CONTEXT_PACK_VERIFY_FAILED` | 1 → 1 (`context-pack verify`) |
+| `CONTEXT_PACK_TAMPERED` | `CONTEXT_PACK_CORRUPT` | 1 → 2 (every other reader of the pack) |
+| `EVIDENCE_BATCH_REFUSED` | `PROMOTION_INVALID` | 1 or 2 → 2 (the code of the record the gate refuses, `field` `/<index>`) |
+
+The rows whose last column reads `1 → 2` are the codes that changed from exit 1 to exit 2. A script that waited for exit 1 from `subject move`, `gate promote`, `task done`, `evidence add`, `brief approve`, `strategy promote`, `ingest plans`, `dashboard` or `context-pack add` reads exit 2 now; the shipped pre-commit hook, the npm launcher and the eval scripts treat every non-zero exit alike and need no change. `POLICY_CHANGED_SINCE_APPROVAL` is a warning's name and stays; only the error is `POLICY_APPROVAL_STALE`. `DASHBOARD_PORT_UNAVAILABLE` and `DISPATCH_RUN_UNAVAILABLE` are retryable; the other codes of this table are not.
+
 **`--help --json` and `--version --json` are refused** (`canon-0-36-help-json`, scenarios `atip.helpjson.01-09`, atip/1 spec 4.4.1). `--help` is text for people and `canon schema` is the machine description, so a call that asks for JSON and for help or the version no longer gets text: it gets the failure envelope, exit 2, `USAGE`, and a `hint` that names what to run. The path is resolved first, so an unknown word still answers `UNKNOWN_COMMAND`, wherever the flag sits. The rule does not wait for the 1.4 declaration: a 1.2 tool may answer `--help --json` with the `schema` document or with a refusal (4.4.1).
 
 | Call | 0.35 | now |

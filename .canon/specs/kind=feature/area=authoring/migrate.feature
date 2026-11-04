@@ -236,7 +236,7 @@ Feature: canon migrate
   Scenario: Committing the plan rewrites every brief, keeps approved briefs approved and leaves the prose, and a second run has nothing to do
     Given a repo with approved and unapproved 0.30 briefs, feature and chore, with waivers, Korean headings and a review pinned to a chore
     When canon migrate --commit with the plan digest runs, and then runs again
-    Then every brief is in the 0.31 format with no HTML comment, the approved ones read approved with no BRIEF_CHANGED_SINCE_APPROVAL, and their blockers and advisories, waivers included, are as before except for line numbers
+    Then every brief is in the 0.31 format with no HTML comment, the approved ones read approved with no BRIEF_APPROVAL_STALE, and their blockers and advisories, waivers included, are as before except for line numbers
     And the prose outside comments and headings is byte-identical, the Approved: line keeps its approver, time and words, and the chore review is a new version pinned to the new digest with every other field as before
     And the second run says there is nothing to do
 
@@ -249,7 +249,7 @@ Feature: canon migrate
     Given a plan previewed and then a brief changed
     When canon migrate --commit runs with the old digest
     Then it is refused with PLAN_STALE and nothing is written
-    And a brief edited after its approval is rewritten and still reads BRIEF_CHANGED_SINCE_APPROVAL
+    And a brief edited after its approval is rewritten and still reads BRIEF_APPROVAL_STALE
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:55Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
   @subject:authoring-scaffold

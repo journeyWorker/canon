@@ -233,7 +233,7 @@ fn subject_lifecycle_53_a_relayed_approval_with_a_wrong_or_missing_digest_writes
     assert_eq!((none.status.code(), code(&none).as_str()), (Some(2), "USAGE"));
     let both = call(&["a", "b"], &[&a, &format!("b=sha256:{}", "1".repeat(64))]);
     assert_eq!(both.status.code(), Some(2), "{}", text(&both));
-    assert_eq!(code(&both), "BRIEF_APPROVE_REFUSED", "{}", text(&both));
+    assert_eq!(code(&both), "RELAY_DIGEST_STALE", "{}", text(&both));
     assert!(text(&both).contains("RELAY_DIGEST_STALE"), "{}", text(&both));
     assert_eq!(snapshot(r), before, "no brief and no policy approval changed");
     assert!(!r.join(".canon/policy.approval.json").exists());

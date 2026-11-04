@@ -267,9 +267,9 @@ fn an_unproven_strategy_is_blocked_by_the_promotion_gate() {
 
     let output = run_promote(dir.path(), &id, &["--json"]);
     assert!(!output.status.success(), "an unproven strategy must not reach the git-tracked tier");
-    assert_eq!(error_code(&output), "LEARN_PROMOTION_BLOCKED", "the gate itself refuses, not a downstream failure");
+    assert_eq!(error_code(&output), "STRATEGY_PROMOTION_INVALID", "the gate itself refuses, not a downstream failure");
     assert!(!git_tier_file(dir.path(), &id).exists(), "a blocked promotion must write nothing");
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
 }
 
 /// The exact state this repo was in before the flywheel was wired:
@@ -285,7 +285,7 @@ fn pending_trajectories_never_corroborate_a_promotion() {
 
     let output = run_promote(dir.path(), &id, &["--json"]);
     assert!(!output.status.success(), "pending samples must never satisfy the gate, however many there are");
-    assert_eq!(error_code(&output), "LEARN_PROMOTION_BLOCKED", "the gate itself refuses, not a downstream failure");
+    assert_eq!(error_code(&output), "STRATEGY_PROMOTION_INVALID", "the gate itself refuses, not a downstream failure");
     assert!(!git_tier_file(dir.path(), &id).exists(), "a blocked promotion must write nothing");
 }
 
@@ -302,7 +302,7 @@ fn a_later_contradiction_resets_the_streak_and_blocks() {
 
     let output = run_promote(dir.path(), &id, &["--json"]);
     assert!(!output.status.success(), "a contradiction after the streak must block");
-    assert_eq!(error_code(&output), "LEARN_PROMOTION_BLOCKED", "the gate itself refuses, not a downstream failure");
+    assert_eq!(error_code(&output), "STRATEGY_PROMOTION_INVALID", "the gate itself refuses, not a downstream failure");
     assert!(!git_tier_file(dir.path(), &id).exists(), "a blocked promotion must write nothing");
 }
 

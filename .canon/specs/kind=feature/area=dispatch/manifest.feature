@@ -92,7 +92,7 @@ Feature: dispatch manifest
   Scenario: adapter authorize denies by default when the policy declares no capability budget
     Given a repo with no adapter_capabilities in its policy and a well-formed response declaring a read-only filesystem
     When canon adapter authorize --response names that file
-    Then it exits 1 with ADAPTER_EXECUTION_NOT_AUTHORIZED, and data keeps the report with executionAuthorized false and executionPerformed false
+    Then it exits 1 with ADAPTER_AUTHORIZATION_FAILED, and data keeps the report with executionAuthorized false and executionPerformed false
     And data.reasons names runtime_enforced=false and the filesystem capability exceeding the policy budget
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:01Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -332,7 +332,7 @@ Feature: dispatch manifest
     Given an adapter response whose telemetry cost is negative, and a policy file that is not valid YAML
     When canon adapter authorize --response names that file, then runs with the broken policy
     Then each exits 2 with ADAPTER_REFUSED, the first naming telemetry.cost_usd and the second hinting to fix the policy file
-    And authorize still exits 1 with ADAPTER_EXECUTION_NOT_AUTHORIZED for a policy that sets no budget
+    And authorize still exits 1 with ADAPTER_AUTHORIZATION_FAILED for a policy that sets no budget
     And no file is created or changed in the repo
 
   # canon: {"schema":1,"at":"2026-10-27T10:48:59Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
@@ -344,4 +344,4 @@ Feature: dispatch manifest
     Given any directory
     When canon schema --error ADAPTER_REFUSED runs, and canon schema adapter authorize lists its exit codes
     Then the error table gives validate a rule-breaking envelope exit 1, and an unreadable response file or any authorize refusal exit 2
-    And the authorize exit table says exit 1 is only ADAPTER_EXECUTION_NOT_AUTHORIZED and exit 2 includes ADAPTER_REFUSED
+    And the authorize exit table says exit 1 is only ADAPTER_AUTHORIZATION_FAILED and exit 2 includes ADAPTER_REFUSED

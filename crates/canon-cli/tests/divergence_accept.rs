@@ -126,9 +126,9 @@ fn accepted_line(expires: &str) -> String {
 fn a_divergent_verdict_blocks_shipping_and_the_hint_names_both_ways_out() {
     let dir = repo();
     let json = canon(dir.path(), &["subject", "move", "demo-subject", "--to", "shipped", "--json"]);
-    assert_eq!(json.status.code(), Some(1), "{}", out(&json));
+    assert_eq!(json.status.code(), Some(2), "{}", out(&json));
     let body: Value = serde_json::from_slice(&json.stdout).expect("JSON error on stdout");
-    assert_eq!(body["error"]["code"], "SUBJECT_GATE_VIOLATION");
+    assert_eq!(body["error"]["code"], "SUBJECT_APPROVAL_REQUIRED");
     assert!(body["error"]["message"].as_str().unwrap().contains("uncovered-cell world.demo.01 — verifying → shipped: latest verdict is divergent (by impl-agent)"), "{body}");
     let hint = body["error"]["hint"].as_str().expect("the refusal carries a hint");
     assert!(hint.contains("re-attest") && hint.contains("canon divergence accept world.demo.01 --project demo"), "{hint}");
@@ -185,7 +185,7 @@ fn acceptance_from_the_evidence_actor_or_session_is_refused() {
     assert_eq!(same_actor.status.code(), Some(2), "{}", out(&same_actor));
     assert!(out(&same_actor).contains("`impl-agent` attested"), "{}", out(&same_actor));
 
-    assert_eq!(ship(repo).status.code(), Some(1), "nothing was accepted, so the gap still blocks");
+    assert_eq!(ship(repo).status.code(), Some(2), "nothing was accepted, so the gap still blocks");
 }
 
 /// New evidence that says something different (another verdict, or other
@@ -201,7 +201,7 @@ fn new_evidence_that_says_something_different_makes_the_acceptance_stale_and_blo
 
     attest_binding(repo, EvidenceVerdict::Divergent, Some("reports/other.xml"));
     let shipped = ship(repo);
-    assert_eq!(shipped.status.code(), Some(1), "{}", out(&shipped));
+    assert_eq!(shipped.status.code(), Some(2), "{}", out(&shipped));
     assert!(out(&shipped).contains("the acceptance by reviewer-2") && out(&shipped).contains("is stale"), "{}", out(&shipped));
     assert!(out(&shipped).contains("canon divergence accept"), "{}", out(&shipped));
     assert!(!out(&canon(repo, &["gate", "check"])).contains("accepted-divergence"), "a stale acceptance is not listed as covering anything");
@@ -218,7 +218,7 @@ fn an_expired_acceptance_blocks_again() {
     assert!(accept(repo, &[("--expiry", "2020-01-01")]).status.success());
 
     let shipped = ship(repo);
-    assert_eq!(shipped.status.code(), Some(1), "{}", out(&shipped));
+    assert_eq!(shipped.status.code(), Some(2), "{}", out(&shipped));
     assert!(out(&shipped).contains("expired 2020-01-01"), "{}", out(&shipped));
     assert!(out(&shipped).contains("canon divergence accept"), "{}", out(&shipped));
 }

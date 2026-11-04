@@ -515,7 +515,7 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     assert!(stdout(&gate).contains(violation), "{}", stdout(&gate));
 
     let ship = canon(repo, &["subject", "move", "demo", "--to", "shipped", "--actor", "lead"]);
-    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert_eq!(ship.status.code(), Some(2), "{}", stderr(&ship));
     assert!(stderr(&ship).contains("uncovered-cell root — verifying → shipped: the scenario index for spec root `root` is stale"), "{}", stderr(&ship));
     let doc: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
     let report = &doc["data"];

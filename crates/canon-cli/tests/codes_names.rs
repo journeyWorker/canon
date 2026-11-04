@@ -6,44 +6,24 @@ use atip::Minor;
 
 /// The codes that do not follow the rule yet, and the change of 0.36 that renames each.
 const NOT_YET_RENAMED: &[&str] = &[
-    "ADAPTER_EXECUTION_NOT_AUTHORIZED",
     "ADAPTER_REFUSED",
-    "ADAPTER_RESPONSE_INVALID",
     "ARTIFACTS_MOVE_REFUSED",
     "ARTIFACTS_STORE_UNREACHABLE",
     "BRIEF_APPROVE_REFUSED",
-    "BRIEF_CHANGED_SINCE_APPROVAL",
-    "BRIEF_UNAPPROVED",
     "BRIEF_UNREADABLE",
     "CONFIG_UNREADABLE",
-    "CONTEXT_GIT_UNAVAILABLE",
-    "CONTEXT_OBJECT_CONFLICT",
-    "CONTEXT_PACK_TAMPERED",
-    "DASHBOARD_NOT_BUILT",
-    "DASHBOARD_PORT_IN_USE",
     "DISPATCH_ALREADY_ENDED",
-    "DISPATCH_END_IN_PROGRESS",
     "DISPATCH_MANIFEST_MISMATCH",
     "DISPATCH_MANIFEST_UNREADABLE",
     "DISPATCH_NOT_RUNNING",
     "DIVERGENCE_ACCEPT_REFUSED",
-    "DIVERGENCE_REFUSED",
-    "EVIDENCE_BATCH_REFUSED",
     "EVIDENCE_BIND_REFUSED",
-    "EVIDENCE_CONTRACT_MISMATCH",
-    "EVIDENCE_FABRICATED",
     "EVIDENCE_INVALID_ARGUMENT",
     "EVIDENCE_REFUSED",
-    "EVIDENCE_REPORT_CONTRADICTION",
     "EVIDENCE_SCENARIO_NOT_INDEXED",
-    "GATE_TASK_BLOCKED",
-    "GATE_TASK_EVIDENCE_INVALID",
     "HOOKS_INSTALL_REFUSED",
-    "INGEST_SOURCE_UNUSABLE",
     "INVENTORY_ABORTED",
     "INVENTORY_REFUSED",
-    "LEARN_EVALUATION_REJECTED",
-    "LEARN_PROMOTION_BLOCKED",
     "LEARN_SIGNATURE_UNREADABLE",
     "LEDGER_ARCHIVE_UNAVAILABLE",
     "MIGRATE_REFUSED",
@@ -56,9 +36,6 @@ const NOT_YET_RENAMED: &[&str] = &[
     "PLUGIN_SYNC_FAILED",
     "POLICY_APPROVAL_REFUSED",
     "POLICY_APPROVAL_UNREADABLE",
-    "POLICY_CHANGED_SINCE_APPROVAL",
-    "PROMOTE_REFUSED",
-    "REPORT_STALE",
     "REPO_UNREADABLE",
     "REPO_WRITE_BUSY",
     "RETENTION_EXPORT_REFUSED",
@@ -69,10 +46,92 @@ const NOT_YET_RENAMED: &[&str] = &[
     "SPEC_ROOTS_UNREADABLE",
     "STOPPED_MIDWAY",
     "SUBJECT_ADOPT_REFUSED",
-    "SUBJECT_GATE_VIOLATION",
     "SUBJECT_UNADOPT_REFUSED",
     "WRITE_UNAVAILABLE",
 ];
+
+/// The codes that pass the name rule (or are listed above) and that `canon-0-36-codes-refusals`, `-stored` or `-incomplete` still change: split by
+/// meaning, moved to another exit, merged into another code or renamed with a reason (issue #135). The name check does not see them, so they are
+/// listed. Each of those changes deletes its codes from this list; `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
+const NOT_YET_RECLASSIFIED: &[&str] = &[
+    // canon-0-36-codes-refusals
+    "ADAPTER_REFUSED",
+    "ARTIFACTS_MOVE_REFUSED",
+    "BRIEF_APPROVE_REFUSED",
+    "DISPATCH_ALREADY_ENDED",
+    "DISPATCH_NOT_RUNNING",
+    "DIVERGENCE_ACCEPT_REFUSED",
+    "EVIDENCE_APPROVAL_INVALID",
+    "EVIDENCE_BIND_REFUSED",
+    "EVIDENCE_INVALID_ARGUMENT",
+    "EVIDENCE_REFUSED",
+    "EVIDENCE_SCENARIO_NOT_INDEXED",
+    "HOOKS_INSTALL_REFUSED",
+    "INVENTORY_REFUSED",
+    "LEARN_ROLLBACK_FAILED",
+    "MIGRATE_REFUSED",
+    "NO_BRIEF",
+    "OLD_BRIEF_FORMAT",
+    "OLD_LAYOUT",
+    "PLUGIN_SYNC_FAILED",
+    "POLICY_APPROVAL_REFUSED",
+    "RETENTION_EXPORT_REFUSED",
+    "RETENTION_PURGE_REFUSED",
+    "REVIEW_ARTIFACT_REFUSED",
+    "REVIEW_SCENARIO_NOT_INDEXED",
+    "SKILLS_INVALID_ARGUMENT",
+    "SUBJECT_ADOPT_REFUSED",
+    "SUBJECT_UNADOPT_REFUSED",
+    "TRACE_NOT_FOUND",
+    // canon-0-36-codes-stored
+    "ARTIFACTS_STORE_UNREACHABLE",
+    "BRIEF_UNREADABLE",
+    "CONFIG_UNREADABLE",
+    "DISPATCH_MANIFEST_MISMATCH",
+    "DISPATCH_MANIFEST_UNREADABLE",
+    "EVIDENCE_STORE_UNAVAILABLE",
+    "LEARN_SIGNATURE_UNREADABLE",
+    "LEDGER_ARCHIVE_UNAVAILABLE",
+    "PLAN_CORPUS_UNREADABLE",
+    "POLICY_APPROVAL_UNREADABLE",
+    "REPO_UNREADABLE",
+    "REPO_WRITE_BUSY",
+    "SPEC_ROOTS_UNREADABLE",
+    "TASK_ROW_NOT_FOUND",
+    "WRITE_UNAVAILABLE",
+    // canon-0-36-codes-incomplete
+    "ARTIFACTS_STORE_FAILED",
+    "EVIDENCE_STORE_FAILED",
+    "HOOKS_INSTALL_FAILED",
+    "INVENTORY_ABORTED",
+    "LEARN_PROMOTION_FAILED",
+    "LEDGER_COMPACT_FAILED",
+    "MIGRATE_INDEX_FAILED",
+    "MIGRATE_PINS_FAILED",
+    "MIGRATE_STOPPED",
+    "PLUGIN_SYNC_ERRORS",
+    "PROMOTE_FAILED",
+    "RETENTION_PURGE_FAILED",
+    "STOPPED_MIDWAY",
+    "TIER_FAILED",
+];
+
+/// atip.codenames.04: every code of the second list is in the registry (a code a change already renamed is taken off), and none of the
+/// `canon-0-36-codes-exit` codes is on either list.
+#[test]
+fn atip_codenames_04_the_list_of_codes_still_to_reclassify_holds_only_registered_codes() {
+    let all: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
+    for listed in NOT_YET_RECLASSIFIED {
+        assert!(all.contains(listed), "`{listed}` is on NOT_YET_RECLASSIFIED but not in the registry: take it off");
+    }
+    let mut sorted_unique: Vec<&&str> = NOT_YET_RECLASSIFIED.iter().collect();
+    sorted_unique.sort_unstable();
+    sorted_unique.dedup();
+    assert_eq!(sorted_unique.len(), NOT_YET_RECLASSIFIED.len(), "a code is listed twice");
+    for exit_code in ["BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE", "SUBJECT_INVALID", "PROMOTION_INVALID", "REPORT_CHECK_FAILED", "CONTEXT_PACK_VERIFY_FAILED"] {
+        assert!(!NOT_YET_RECLASSIFIED.contains(&exit_code) && !NOT_YET_RENAMED.contains(&exit_code), "`{exit_code}` was settled by codes-exit");
+    }
+}
 
 fn problem(info: &atip::CodeInfo) -> Option<String> {
     atip::code_name_problem(Minor::V1_3, info.code, Some(i64::from(info.exit)), Some(info.retryable))

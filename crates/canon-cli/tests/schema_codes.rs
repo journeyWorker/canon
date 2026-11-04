@@ -62,7 +62,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("git_rev.rs", &["review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "evidence add", "evidence audit", "evidence approval-payload", "finding add", "finding close"]),
     // The typed-atom errors `canon evidence add` reports with `task done`'s grading;
     // `promote_after_stage`'s command comes from its caller.
-    ("gate.rs", &["task done", "evidence add", "evidence audit"]),
+    ("gate.rs", &["task done", "evidence add", "evidence audit", "gate promote"]),
+    // The codes a gate's refusals take (`subject_code`, `promotion_code`): `subject move` and the promotions.
+    ("gate_refusal.rs", &["subject move", "gate promote", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
     // `require_spec_root`: the refusal of a `--project` no configured spec root carries, made by every write command that takes one.
     ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
@@ -80,6 +82,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/review.rs", &["review scenario", "review change"]),
     ("run/top.rs", &[]),
     ("run/adapter.rs", &[]),
+    ("run/context_pack.rs", &[]),
     ("run/ingest.rs", &[]),
     ("run/inventory.rs", &[]),
     ("run/plugin.rs", &[]),
@@ -129,7 +132,7 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.

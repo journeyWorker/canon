@@ -314,7 +314,7 @@ impl DispatchError {
             Self::AlreadyEnded { .. } => "DISPATCH_ALREADY_ENDED",
             Self::NotRunning { .. } => "DISPATCH_NOT_RUNNING",
             Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_MISMATCH",
-            Self::EndInProgress { .. } => "DISPATCH_END_IN_PROGRESS",
+            Self::EndInProgress { .. } => "DISPATCH_RUN_UNAVAILABLE",
             Self::Unreadable { .. } => "DISPATCH_MANIFEST_UNREADABLE",
         };
         let hint = match self {

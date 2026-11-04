@@ -337,6 +337,18 @@ pub struct ValidationSummary {
 
 impl Report for ValidationSummary {}
 
+/// `data` of the failure `ADAPTER_VALIDATION_FAILED`: the check's negative answer for a response that was read.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidationFailure {
+    /// Always `false`.
+    pub valid: bool,
+    /// The rule of the response envelope the response breaks.
+    pub problem: String,
+}
+
+impl Report for ValidationFailure {}
+
 /// [`AdapterTelemetry`] as the report states it (camelCase keys; the response itself is snake_case).
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

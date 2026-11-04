@@ -138,7 +138,7 @@ fn atip_midway_01_stopped_midway_is_registered_with_its_reasons_and_both_schema_
     let row = code_info("STOPPED_MIDWAY").expect("registered");
     assert_eq!((row.exit, row.retryable), (1, false));
     let names: Vec<&str> = row.reasons.iter().map(|reason| reason.reason).collect();
-    assert_eq!(names, ["SKILLS_INVALID_ARGUMENT"], "the one refusal a later step of canon meets after an earlier step wrote; an I/O category (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`) is not a reason");
+    assert_eq!(names, ["PROMOTION_INVALID", "SKILLS_INVALID_ARGUMENT", "STRATEGY_PROMOTION_INVALID"], "the refusals a later step of canon meets after an earlier step wrote (a record staged and then refused by the gate, a strategy demoted and then blocked, skills refused after init wrote); an I/O category (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`) is not a reason");
     for reason in row.reasons {
         let refusal = code_info(reason.reason).expect("a registered code");
         assert_ne!(reason.fix, refusal.fix, "{}: the fix says what to do once the caller has read what was done, not the refusal's own fix", reason.reason);
@@ -341,8 +341,6 @@ enum Why {
     Io,
     /// The command ran to the end and its answer is negative or incomplete: a finding, a verdict, a failed check. No later step met a refusal.
     Answer,
-    /// No earlier step had made an effect that stays (the refusal is the first thing that happens, or what was written was rolled back).
-    NoEffect,
     /// A bug of canon, whatever the command line was.
     Internal,
     /// The batch's own reserved code, which carries its items' errors (spec 11.11).
@@ -352,44 +350,27 @@ enum Why {
 /// The audit of every exit-1 code of the registry (0.34's, `INIT_SKILL_INSTALL_FAILED` included), each with a line that says why.
 /// `STOPPED_MIDWAY` itself is the destination and is not audited.
 const AUDIT: &[(&str, Class, &str)] = &[
-    ("ADAPTER_EXECUTION_NOT_AUTHORIZED", Class::Keep(Why::Answer), "`adapter authorize` answered that the response does not authorize execution"),
-    ("ADAPTER_RESPONSE_INVALID", Class::Keep(Why::Answer), "`adapter validate`'s negative answer on an envelope"),
+    ("ADAPTER_AUTHORIZATION_FAILED", Class::Keep(Why::Answer), "`adapter authorize` answered that the response does not authorize execution"),
+    ("ADAPTER_VALIDATION_FAILED", Class::Keep(Why::Answer), "`adapter validate`'s negative answer on an envelope"),
     ("ARTIFACTS_STORE_FAILED", Class::Keep(Why::Io), "a blob write or upload failed after the command began writing"),
     ("ARTIFACTS_VERIFY_FAILED", Class::Keep(Why::Answer), "`artifacts verify` found a bound file missing or altered"),
     ("BATCH_INCOMPLETE", Class::Keep(Why::Batch), "the batch's own reserved code; an element that stops midway is its item error"),
-    ("BRIEF_CHANGED_SINCE_APPROVAL", Class::Keep(Why::Answer), "the gate's verdict on a brief edited after approval"),
     ("BRIEF_CHECK_FAILED", Class::Keep(Why::Answer), "`brief check`'s findings"),
-    ("BRIEF_UNAPPROVED", Class::Keep(Why::NoEffect), "the attestation is refused before its record is written"),
     ("BRIEF_WRITE_FAILED", Class::Keep(Why::Io), "the brief file could not be written"),
     ("CHANGE_ADOPTION_INCOMPLETE", Class::Keep(Why::Io), "judged: the only cause is the second record's store write failing after the first was written, which is the I/O category (`WRITE_UNAVAILABLE` before the work, `WRITE_FAILED` during it, spec 8.3), not a refusal of an argument; a tool keeps a code of its own for it until it chooses to move (migration guide 7)"),
     ("CONFIG_CHECK_FAILED", Class::Keep(Why::Answer), "`init --check` found a section that fails its loader"),
-    ("CONTEXT_GIT_UNAVAILABLE", Class::Keep(Why::NoEffect), "the pack's git identity is read before anything is stored"),
-    ("CONTEXT_OBJECT_CONFLICT", Class::Keep(Why::Io), "an immutable object already holds other bytes where the pack writes"),
-    ("CONTEXT_PACK_TAMPERED", Class::Keep(Why::Answer), "`context-pack verify` found the pack changed"),
+    ("CONTEXT_PACK_VERIFY_FAILED", Class::Keep(Why::Answer), "`context-pack verify` found the pack changed: the check's negative answer"),
     ("DASHBOARD_FAILED", Class::Keep(Why::Io), "the dashboard could not start (an I/O failure)"),
-    ("DASHBOARD_NOT_BUILT", Class::Keep(Why::NoEffect), "the first thing `dashboard` checks"),
-    ("DASHBOARD_PORT_IN_USE", Class::Keep(Why::NoEffect), "the first thing `dashboard` binds"),
-    ("DISPATCH_END_IN_PROGRESS", Class::Keep(Why::NoEffect), "judged: the end lock is taken before any effect, so a refused end changed nothing and there is no earlier step to read"),
-    ("DIVERGENCE_REFUSED", Class::Keep(Why::Answer), "a gate rule's verdict on a candidate"),
-    ("EVIDENCE_BATCH_REFUSED", Class::Keep(Why::NoEffect), "judged: the gate's refusal while promoting rolls back every record and blob the run wrote, so no earlier effect stays"),
-    ("EVIDENCE_CONTRACT_MISMATCH", Class::Keep(Why::Answer), "the gate's verdict on the record's kind and ref"),
-    ("EVIDENCE_FABRICATED", Class::Keep(Why::Answer), "the gate's verdict on the note"),
-    ("EVIDENCE_REPORT_CONTRADICTION", Class::Keep(Why::Answer), "the gate's verdict on the bound report"),
     ("EVIDENCE_STORE_FAILED", Class::Keep(Why::Io), "a bound file could not be written to the artifact store; the record or batch is rolled back"),
     ("FORMAT_CHECK_FAILED", Class::Keep(Why::Answer), "`format`'s findings"),
-    ("GATE_TASK_BLOCKED", Class::Keep(Why::Answer), "`task done`'s verdict on the evidence"),
-    ("GATE_TASK_EVIDENCE_INVALID", Class::Keep(Why::Answer), "`task done`'s verdict on the evidence"),
     ("GATE_CHECK_FAILED", Class::Keep(Why::Answer), "`gate check`'s findings"),
     ("HOOKS_INSTALL_FAILED", Class::Keep(Why::Io), "a hook file could not be written after the install began"),
     ("INGEST_FAILED", Class::Keep(Why::Io), "an ingest read or write failed"),
-    ("INGEST_SOURCE_UNUSABLE", Class::Keep(Why::Answer), "a malformed plan source, reported with nothing persisted"),
     ("INIT_SKILL_INSTALL_FAILED", Class::Move("SKILLS_INVALID_ARGUMENT"), "moved: `init` wrote canon.yaml, then its last step met what `canon skills install` refuses before its work (the skill source or `skills:` section: SKILLS_INVALID_ARGUMENT); an unwritable target is WRITE_FAILED and any other failure SKILLS_FAILED, which keep their names"),
     ("INTERNAL", Class::Keep(Why::Internal), "a bug of canon"),
     ("INVENTORY_ABORTED", Class::Keep(Why::Answer), "`inventory sync`'s findings"),
     ("INVENTORY_FAILED", Class::Keep(Why::Io), "the record store failed while the index was read or written"),
     ("STRATEGY_DEMOTION_FAILED", Class::Keep(Why::Io), "the demotion's write failed"),
-    ("LEARN_EVALUATION_REJECTED", Class::Keep(Why::Answer), "the promotion gate's verdict on the evaluation"),
-    ("LEARN_PROMOTION_BLOCKED", Class::Keep(Why::Answer), "the promotion gate's verdict"),
     ("LEARN_PROMOTION_FAILED", Class::Keep(Why::Io), "the strategy store or file could not be written"),
     ("LEARN_ROLLBACK_FAILED", Class::Keep(Why::Io), "the rollback could not be recorded"),
     ("LEDGER_COMPACT_FAILED", Class::Keep(Why::Io), "a version could not be moved to the archive"),
@@ -399,12 +380,10 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("PLUGIN_SYNC_ERRORS", Class::Keep(Why::Io), "some candidates could not be written"),
     ("POLICY_APPROVAL_FAILED", Class::Keep(Why::Io), "the approval file could not be written"),
     ("POLICY_APPROVAL_UNREADABLE", Class::Keep(Why::Answer), "the closed policy gate's verdict"),
-    ("POLICY_CHANGED_SINCE_APPROVAL", Class::Keep(Why::Answer), "the closed policy gate's verdict"),
     ("PROMOTE_FAILED", Class::Keep(Why::Io), "judged: the staged record was written, then the ledger write failed (an I/O failure of the work)"),
-    ("PROMOTE_REFUSED", Class::Keep(Why::Answer), "the gate's verdict on the staged records, which stay staged"),
     ("QUERY_FAILED", Class::Keep(Why::Io), "the ledger could not be read"),
     ("REPORT_FAILED", Class::Keep(Why::Io), "the report could not be built or checked"),
-    ("REPORT_STALE", Class::Keep(Why::Answer), "`report check` found the report out of date"),
+    ("REPORT_CHECK_FAILED", Class::Keep(Why::Answer), "`report check` found the report out of date"),
     ("RETENTION_EXPORT_FAILED", Class::Keep(Why::Io), "the export's write failed"),
     ("RETENTION_PURGE_FAILED", Class::Keep(Why::Io), "the purge stopped after it began deleting"),
     ("SEARCH_INDEX_FAILED", Class::Keep(Why::Io), "the records or the index could not be read or built"),
@@ -412,7 +391,6 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("SERIALIZE_FAILED", Class::Keep(Why::Internal), "a result that cannot be serialized is a bug of canon"),
     ("SKILLS_CHECK_FAILED", Class::Keep(Why::Answer), "`skills check`'s finding"),
     ("SKILLS_FAILED", Class::Keep(Why::Io), "a skills command's own I/O failure; `init` says it too when the install fails and `canon skills install` would not have refused it"),
-    ("SUBJECT_GATE_VIOLATION", Class::Keep(Why::Answer), "the gate's verdict on a status transition"),
     ("TIER_FAILED", Class::Keep(Why::Io), "tier aging failed"),
     ("UNVERIFIABLE", Class::Keep(Why::Answer), "a check that examined nothing"),
     ("WRITE_FAILED", Class::Keep(Why::Io), "a write began and failed"),
@@ -488,9 +466,9 @@ fn atip_midway_09_the_audit_covers_every_exit_1_code_and_each_code_exists_where_
     let moved: Vec<&str> = AUDIT.iter().filter(|(_, class, _)| matches!(class, Class::Move(_))).map(|(code, _, _)| *code).collect();
     assert_eq!(moved, ["INIT_SKILL_INSTALL_FAILED"], "the move of this release");
     let kept = AUDIT.iter().filter(|(_, class, _)| matches!(class, Class::Keep(_))).count();
-    assert!(kept > 55, "{kept} kept codes");
+    assert!(kept > 40, "{kept} kept codes");
     // Every candidate the brief names was judged.
-    for candidate in ["MIGRATE_STOPPED", "CHANGE_ADOPTION_INCOMPLETE", "EVIDENCE_BATCH_REFUSED", "DISPATCH_END_IN_PROGRESS", "PROMOTE_FAILED"] {
+    for candidate in ["MIGRATE_STOPPED", "CHANGE_ADOPTION_INCOMPLETE", "PROMOTE_FAILED"] {
         assert!(AUDIT.iter().any(|(code, _, why)| *code == candidate && why.starts_with("judged: ")), "{candidate} is judged in the table");
     }
     assert_audit_faults_are_named(&sources);

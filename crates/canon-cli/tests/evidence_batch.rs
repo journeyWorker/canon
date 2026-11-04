@@ -160,7 +160,7 @@ fn evidence_add_81_a_faithful_claim_over_a_failed_case_refuses_the_batch() {
     write(repo, "reports/junit.xml", MIXED);
 
     let out = attest_all(repo, "junit:reports/junit.xml", &["--verdict", "faithful"]);
-    assert_eq!(out.status.code(), Some(1), "{}{}", stdout(&out), stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("shop.cart.02: reports/junit.xml records case `shop.cart.02 refuses` as failed"), "{err}");
     assert!(err.contains("no record of the batch is written"), "{err}");
@@ -212,16 +212,16 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
     write(repo, "reports/junit.xml", r#"<testsuite><testcase name="shop.cart.01 adds"/><testcase name="shop.cart.02 counts"/></testsuite>"#);
 
     let out = attest_all(repo, "junit:reports/junit.xml", &[]);
-    assert_eq!(out.status.code(), Some(1), "{}{}", stdout(&out), stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("canon: BRIEF_UNAPPROVED: unreviewed-promotion demo — evidence for shop.cart.01: brief not approved"), "{err}");
+    assert!(err.contains("canon: BRIEF_APPROVAL_REQUIRED: unreviewed-promotion demo — evidence for shop.cart.01: brief not approved"), "{err}");
     assert!(err.contains("  hint: no record of the batch is written"), "{err}");
     assert!(evidence_files(repo).is_empty(), "shop.cart.02 is not attested either");
 
     write(repo, ".canon/changes/c-demo/brief.md", "## Why\n\nSeeded brief.\n\nApproved: Journey 2026-10-12 — \"go\"\n");
     let out = attest_all(repo, "junit:reports/junit.xml", &["--summary", "would pass"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(stderr(&out).contains("canon: EVIDENCE_FABRICATED: fabricated-evidence"), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: EVIDENCE_NOTE_INVALID: fabricated-evidence"), "{}", stderr(&out));
     assert!(evidence_files(repo).is_empty(), "a fabricated summary writes nothing");
 
     let before = evidence_files(repo);
@@ -563,7 +563,7 @@ fn evidence_add_84_a_task_report_without_a_scenario_binds_every_case() {
     let task = |report: &str| canon(repo, &["evidence", "add", "--task", "c-demo#1.1", "--report", report, "--verdict", "faithful", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
 
     let out = task("junit:reports/failing.xml");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("records case `helper removes` as failed"), "{}", stderr(&out));
     assert!(evidence_files(repo).is_empty());
 

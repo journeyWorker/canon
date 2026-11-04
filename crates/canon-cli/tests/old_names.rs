@@ -12,6 +12,10 @@ const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATC
 /// the error is `CONFIG_REQUIRED`, but the warning of `status` keeps the name `CONFIG_MISSING`.
 const RENAMED_CODES: &[&str] = &["APPROVAL_INCOMPLETE", "BRIEF_CHANGED_SINCE_PAGE_LOAD", "BRIEF_HAS_BLOCKERS", "BRIEF_UNAPPROVABLE", "CHANGE_AMBIGUOUS", "CHANGE_INVALID_ARGUMENT", "CONTEXT_INPUT_MISSING", "CONTEXT_SECRET_DETECTED", "CONTEXT_UNSAFE_PATH", "DASHBOARD_BAD_REQUEST", "DASHBOARD_CONFIG_INVALID", "DASHBOARD_ORIGIN_REFUSED", "DEMO_NOT_INITIALIZED", "DISPATCH_INVALID_ARGUMENT", "DISPATCH_ROLE_REGIME_MISMATCH", "DIVERGENCE_INVALID_ARGUMENT", "FEATURE_OUTSIDE_SPEC_ROOTS", "FINDING_INVALID_ARGUMENT", "FINDING_RESOLUTION_REV_UNEXPECTED", "FINDING_SEQ_OCCUPIED", "FINDING_STAGED", "FINDING_UNKNOWN_SCENARIO", "FORMAT_VIOLATIONS", "GATE_TASK_INVALID_ARGUMENT", "GATE_TASK_UNSUPPORTED", "GATE_VIOLATIONS", "HUMAN_ONLY", "INIT_CONFIG_EXISTS", "INIT_INVALID_ARGUMENT", "LEARN_DEMOTION_FAILED", "LEARN_INVALID_ARGUMENT", "LEARN_INVALID_INPUT", "LEARN_STRATEGY_NOT_FOUND", "LEARN_TRAJECTORY_NOT_FOUND", "MIGRATE_UNCOMMITTED", "NO_COMMIT", "PLAN_SOURCES_MISSING", "QUERY_INVALID_ARGUMENT", "RELAY_DIGEST_MISMATCH", "RETRIEVE_FAILED", "REVIEW_INVALID_ARGUMENT", "SCAFFOLD_INVALID_ARGUMENT", "SEARCH_QUERY_EMPTY", "SKILLS_DRIFT", "SPEC_ROOT_UNRESOLVED", "SUBJECT_INVALID_ARGUMENT", "SUBJECT_INVALID_TRANSITION", "UNKNOWN_ROLE", "UNKNOWN_SPEC_ROOT"];
 
+/// Error codes `canon-0-36-codes-exit` renamed or removed (each has a replacement in the CHANGELOG's table). `POLICY_CHANGED_SINCE_APPROVAL` is not here:
+/// the error is `POLICY_APPROVAL_STALE`, but the warning of `status` keeps the name.
+const RENAMED_EXIT_CODES: &[&str] = &["ADAPTER_EXECUTION_NOT_AUTHORIZED", "ADAPTER_RESPONSE_INVALID", "BRIEF_CHANGED_SINCE_APPROVAL", "BRIEF_UNAPPROVED", "CONTEXT_GIT_UNAVAILABLE", "DASHBOARD_NOT_BUILT", "DASHBOARD_PORT_IN_USE", "DISPATCH_END_IN_PROGRESS", "EVIDENCE_CONTRACT_MISMATCH", "EVIDENCE_FABRICATED", "EVIDENCE_REPORT_CONTRADICTION", "GATE_TASK_BLOCKED", "GATE_TASK_EVIDENCE_INVALID", "INGEST_SOURCE_UNUSABLE", "LEARN_EVALUATION_REJECTED", "REPORT_STALE", "PROMOTE_REFUSED", "SUBJECT_GATE_VIOLATION", "DIVERGENCE_REFUSED", "LEARN_PROMOTION_BLOCKED", "CONTEXT_PACK_TAMPERED", "EVIDENCE_BATCH_REFUSED"];
+
 /// Error codes 0.35 moved to `STOPPED_MIDWAY` (`atip.midway`; each has a replacement in the CHANGELOG's table).
 const MOVED_CODES: &[&str] = &["INIT_SKILL_INSTALL_FAILED"];
 
@@ -62,7 +66,7 @@ fn word_in(text: &str, word: &str) -> bool {
 /// `meta.canonVersion` is gone), which a guide shows when it prints that report.
 fn old_names_in(text: &str) -> Vec<&'static str> {
     let text = text.replace("\"canonVersion\"", "\"statusReportMember\"");
-    OLD_CODES.iter().chain(RENAMED_CODES).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
+    OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
 }
 
 fn collect(dir: &Path, extensions: &[&str], skip: &[&str], out: &mut Vec<PathBuf>) {
@@ -182,7 +186,7 @@ fn atip_codenames_06_no_consumer_spells_a_renamed_code() {
     let mut hits = Vec::new();
     for file in &files {
         let Ok(text) = std::fs::read_to_string(file) else { continue };
-        for old in RENAMED_CODES.iter().filter(|old| word_in(&text, old)) {
+        for old in RENAMED_CODES.iter().chain(RENAMED_EXIT_CODES).filter(|old| word_in(&text, old)) {
             hits.push(format!("{} spells `{old}`", file.strip_prefix(repo_root()).unwrap_or(file).display()));
         }
     }

@@ -320,7 +320,7 @@ fn run_commit(verb: &str, status: DivergenceStatus, args: CommitArgs<'_>) -> u8 
             0
         }
         Err(message) => {
-            CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence list` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
+            CliError::failed("DIVERGENCE_INVALID", message).hint("`canon divergence list` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
     }
 }
@@ -690,15 +690,21 @@ mod tests {
             actor: Actor::new_unattributed("legacy-writer"),
             at: Utc::now(),
         });
-        stage(&gate_ctx_root(&dir), &malformed).unwrap();
+        let malformed_location = stage(&gate_ctx_root(&dir), &malformed).unwrap();
 
         assert_eq!(run_stage(commit_args(dir.path(), &project_id, &scenario_id, &sha, &role), DivergenceStatus::Open, Default::default()), 0);
 
+        // The gate judges every staged record before it promotes one: the malformed record makes the run a refusal that wrote nothing, so the
+        // well-formed one stays staged beside it and no `run_seq` was consumed.
         let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
-        assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
-
+        assert_eq!(code, 2, "a refusal of the gate is exit 2: it refused to promote and wrote nothing");
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let committed = GitTier::new(&gate_ctx.ledger_root);
+        assert!(committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.is_empty(), "nothing landed");
+
+        // With the malformed record gone the well-formed one takes the first `run_seq`.
+        std::fs::remove_file(crate::gate::evidence_staging_dir(&gate_ctx.ledger_root).join(&malformed_location)).unwrap();
+        assert_eq!(crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false), 0);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
         assert_eq!(landed.records.len(), 1);
         let run_seq = landed.records[0].0.get("run_seq").and_then(serde_json::Value::as_u64).unwrap();

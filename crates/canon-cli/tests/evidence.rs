@@ -134,7 +134,7 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
     // makes the flip below attributable to the promotion rather than to
     // the gate quietly reading the staging directory.
     let premature = run_canon(&["task", "done", "it-evidence-loop#1.1", "--repo", "."], repo);
-    assert_eq!(premature.status.code(), Some(1), "an unpromoted record must not satisfy the gate; stdout: {}", stdout(&premature));
+    assert_eq!(premature.status.code(), Some(2), "an unpromoted record must not satisfy the gate; stdout: {}", stdout(&premature));
     assert!(tasks_md(repo, change_id).contains("- [ ] 1.1"), "a refused flip must leave the document untouched");
 
     let promoted = run_canon(&["gate", "promote", "--repo", "."], repo);
@@ -265,8 +265,8 @@ fn evidence_add_refuses_a_fabricated_summary_before_staging_anything() {
         ],
         repo,
     );
-    assert_eq!(output.status.code(), Some(1), "a fabrication marker is a gate-red refusal; stdout: {}", stdout(&output));
-    assert!(stderr(&output).contains("canon: EVIDENCE_FABRICATED: fabricated-evidence"), "{}", stderr(&output));
+    assert_eq!(output.status.code(), Some(2), "a fabrication marker is a gate-red refusal; stdout: {}", stdout(&output));
+    assert!(stderr(&output).contains("canon: EVIDENCE_NOTE_INVALID: fabricated-evidence"), "{}", stderr(&output));
     assert!(staging_is_empty(repo), "a refused add must stage nothing");
 }
 

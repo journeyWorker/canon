@@ -475,7 +475,7 @@ stderr: canon subject move: review guard for building → verifying (spec_covera
 
 A target status outside the scope prints `skipped unreviewed-promotion —
 `specced` is not in require_review.scope`. A transition into an in-scope
-status with gaps prints the violations, exits 1, leaves the record
+status with gaps prints the violations, exits 2, leaves the record
 unchanged, and names `--override-reason`.
 
 `--override-reason "<one line>"` waives ONLY `unreviewed-promotion` and

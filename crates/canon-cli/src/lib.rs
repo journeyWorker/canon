@@ -31,6 +31,7 @@ pub mod fields;
 pub mod finding;
 pub mod fmt;
 pub mod gate;
+pub(crate) mod gate_refusal;
 pub mod git_rev;
 pub mod guide;
 pub mod hot_store;

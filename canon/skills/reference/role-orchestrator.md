@@ -536,7 +536,7 @@ dropping `--as`) to get past a refusal is the same act under another label.
 implementer before `canon brief show <slug>` reports `state: approved`.
 Never approve it yourself and never edit the policy to pass the gate. A
 policy that no longer matches the approval fails closed
-(`POLICY_CHANGED_SINCE_APPROVAL`, or `POLICY_APPROVAL_UNREADABLE`): the ship
+(`POLICY_APPROVAL_STALE`, or `POLICY_APPROVAL_UNREADABLE`): the ship
 guard and the reopen refuse, and `--override-reason` does not waive it. Run
 `canon policy show`, then show the policy to the human, ask them to re-approve
 and record their explicit answer (`canon policy approve --approver <their name>
@@ -576,7 +576,7 @@ its preview, never from an old digest.
 
 | The thought | The reality |
 |---|---|
-| "Edit the policy so the gate passes." | A changed policy fails closed (`POLICY_CHANGED_SINCE_APPROVAL`); ask the human to re-approve or restore it from git. |
+| "Edit the policy so the gate passes." | A changed policy fails closed (`POLICY_APPROVAL_STALE`); ask the human to re-approve or restore it from git. |
 | "The reviewer can be me under another label." | The reviewer is a separate process with its own real session id (#39). |
 | "Approve the brief; the human said they are busy." | An answer they did not give is not recorded. Show the brief, ask, and record only an explicit approval with `--relayed-via`. |
 | "Override the refusal to ship." | Fix the gap the refusal names; `--override-reason` waives only the `require_review` gaps and the brief gap, is recorded on the subject, and is for the human's call, not a shortcut. |
@@ -591,7 +591,8 @@ directly (a transition is a state change, not a destructive act) and is not
 repeatable: a move to the state the subject is already in is refused
 (exit 2), so after a lost response read `subject show` before you retry.
 It refuses a move the policy does not allow (missing evidence or reviews,
-open blockers, an unapproved brief) with `SUBJECT_GATE_VIOLATION` and exit 1,
+open blockers, an unapproved brief) with exit 2 and the code of the condition
+(`SUBJECT_APPROVAL_REQUIRED` for a missing review, evidence or approval, `EVIDENCE_STALE`, `SUBJECT_INVALID` for the rest; several causes are `error.details[]`),
 the record unchanged; fix the gap rather than overriding. Move to `shipped`
 yourself once its guard passes, unless the brief says the human ships. A
 follow-up on a shipped subject goes back to `verifying` with `--reason`,
@@ -614,7 +615,7 @@ red. A bad `--to` fails with `error.field` `--to` and `error.expected`
 listing the states.
 
 **Done when:** `canon subject show demo` (the subject's id) reports the
-state you moved it to and `canon gate check` is clean; when the move exits 1,
+state you moved it to and `canon gate check` is clean; when the move exits 2,
 read the refusal in `error` of `canon subject move demo --to shipped --json`.
 
 ## Destructive commands preview first

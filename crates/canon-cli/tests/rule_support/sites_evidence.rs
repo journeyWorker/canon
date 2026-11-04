@@ -4,7 +4,7 @@ use super::sites::{site, Kind, Site};
 
 pub const SITES: &[Site] = &[
     // ---------------------------------------------------------------------------------------- evidence.rs
-    site("evidence.rs:fabricated:EVIDENCE_FABRICATED#1", Kind::Undeclared("a note that a fabrication-marker scan rejects is refused with exit 1 (gate-red wording), and the contract's validators carry an exit 2 code; ATIP feedback")),
+    site("evidence.rs:fabricated:EVIDENCE_NOTE_INVALID#1", Kind::Undeclared("a note that a fabrication-marker scan rejects is refused with exit 1 (gate-red wording), and the contract's validators carry an exit 2 code; ATIP feedback")),
     site("evidence.rs:run_approval_payload:EVIDENCE_REFUSED#1", Kind::Rule { command: "evidence approval-payload", rule: "atLeastOne", arguments: &["task", "scenario"] }),
     // run_add: the checks of `evidence add` and `evidence audit`, in the order they run.
     site("evidence.rs:run_add:EVIDENCE_INVALID_ARGUMENT#1", Kind::Domain { command: "evidence add", argument: "class" }),

@@ -67,8 +67,8 @@ impl ContextPackError {
             Self::Serialize(_) => CliError::refused("SERIALIZE_FAILED", self.to_string()).hint("this is a canon bug: report it together with the command line that produced it"),
             Self::Io { .. } => CliError::failed("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
             Self::ObjectConflict { .. } => CliError::failed("CONTEXT_OBJECT_CONFLICT", self.to_string()).hint("an object already stored under this digest differs from the new content: inspect it with `git status` and restore or remove it, then run the command again"),
-            Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_TAMPERED", self.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack add`"),
-            Self::Git(_) => CliError::failed("CONTEXT_GIT_UNAVAILABLE", self.to_string()).hint("run from inside a git repository with git installed (`git init` creates one)"),
+            Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_CORRUPT", self.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack add`"),
+            Self::Git(_) => CliError::failed("CONTEXT_GIT_REQUIRED", self.to_string()).hint("run from inside a git repository with git installed (`git init` creates one)"),
             Self::Unavailable(error) => error.clone(),
         }
     }
@@ -637,7 +637,7 @@ fn scan_sensitive_bytes(bytes: &[u8], label: &str) -> Result<(), ContextPackErro
 pub struct VerifyReport {
     /// The pack id that was checked.
     pub id: String,
-    /// Always `true`: a pack that fails verification is the `CONTEXT_PACK_TAMPERED` error.
+    /// `true` when the pack verifies; `false` in the `data` of the failure `CONTEXT_PACK_VERIFY_FAILED` (a pack that cannot be read at all is the refusal `CONTEXT_PACK_CORRUPT` or `CONTEXT_PACK_NOT_FOUND`, with no `data`).
     pub verified: bool,
 }
 

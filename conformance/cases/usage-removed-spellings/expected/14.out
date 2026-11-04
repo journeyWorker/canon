@@ -29,5 +29,5 @@ first; one refused id refuses the call (BRIEF_APPROVE_REFUSED) and nothing is
 written. Writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
 brief (the digest covers the brief without its `Approved:` lines) and records
 `canon policy approve` in the same call. Edit the brief afterwards and it reads as
-not approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this
+not approved (BRIEF_APPROVAL_STALE) until a human answers again and this
 runs again. Run it only from the human's answer, with their words as --note.

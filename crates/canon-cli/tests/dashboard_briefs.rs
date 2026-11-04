@@ -721,9 +721,9 @@ fn report_dashboard_03_a_port_in_use_is_refused_with_the_flag_that_fixes_it() {
     let taken = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = taken.local_addr().unwrap().port().to_string();
     let out = canon(dir.path(), &["dashboard", "--port", &port, "--json"]);
-    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(out.status.code(), Some(2));
     let error: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(error["error"]["code"], "DASHBOARD_PORT_IN_USE");
+    assert_eq!(error["error"]["code"], "DASHBOARD_PORT_UNAVAILABLE");
     let hint = error["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("--port <n>") && hint.contains("--port 0"), "{hint}");
     assert!(error["error"]["message"].as_str().unwrap().contains(&port));
@@ -739,9 +739,9 @@ fn report_dashboard_02_no_app_is_refused_and_another_projects_dashboard_is_never
     std::fs::write(package.join("package.json"), r#"{"name":"@acme/dashboard"}"#).unwrap();
     std::fs::write(package.join("dist/index.html"), "<html>someone else's app</html>").unwrap();
     let out = canon(repo, &["dashboard", "--port", "0", "--json"]);
-    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(out.status.code(), Some(2));
     let error: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(error["error"]["code"], "DASHBOARD_NOT_BUILT");
+    assert_eq!(error["error"]["code"], "DASHBOARD_UNSUPPORTED");
     let hint = error["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("bun add -g @journeykit/canon") && hint.contains("bun run --cwd packages/dashboard build"), "{hint}");
 }

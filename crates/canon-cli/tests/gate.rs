@@ -546,7 +546,7 @@ fn gate_task_flip_is_blocked_with_no_evidence_record() {
     let tasks_path = write_tasks_md(dir.path(), "it-task-flip", "- [ ] 1 Do the thing\n");
 
     let output = run_canon(&["task", "done", "it-task-flip#1", "--repo", "."], dir.path());
-    assert_eq!(output.status.code(), Some(1), "no evidence must block the flip; stdout: {}", stdout(&output));
+    assert_eq!(output.status.code(), Some(2), "no evidence must block the flip; stdout: {}", stdout(&output));
     assert!(stderr(&output).contains("unevidenced-flip"), "{}", stderr(&output));
     assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), "- [ ] 1 Do the thing\n", "the row must stay byte-unchanged when the flip is blocked");
 }
@@ -577,7 +577,7 @@ fn gate_task_flip_is_blocked_on_a_divergent_verdict() {
     write_evidence(&dir.path().join(".canon/ledger"), "it-task-flip-divergent#1", "implementer", EvidenceVerdict::Divergent);
 
     let output = run_canon(&["task", "done", "it-task-flip-divergent#1", "--repo", "."], dir.path());
-    assert_eq!(output.status.code(), Some(1), "a Divergent verdict is no evidence; stdout: {}", stdout(&output));
+    assert_eq!(output.status.code(), Some(2), "a Divergent verdict is no evidence; stdout: {}", stdout(&output));
     assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), "- [ ] 1 Do the thing\n");
 }
 
@@ -789,7 +789,7 @@ fn gate_task_typed_path_blocks_on_a_wrong_kind_evidence_record() {
     write_typed_evidence(&dir.path().join(".canon/ledger"), "it-typed-gate-wrong-kind#1", "implementer", EvidenceVerdict::Faithful, "manual-review", "reviewer sign-off");
 
     let output = run_canon(&["task", "done", "it-typed-gate-wrong-kind#1", "--repo", "."], dir.path());
-    assert_eq!(output.status.code(), Some(1), "a wrong-kind evidence record must not satisfy the typed requirement; stdout: {}", stdout(&output));
+    assert_eq!(output.status.code(), Some(2), "a wrong-kind evidence record must not satisfy the typed requirement; stdout: {}", stdout(&output));
     assert!(stderr(&output).contains("unevidenced-flip"), "{}", stderr(&output));
     assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), "- [ ] 1 Do the typed thing\n", "the row must stay byte-unchanged when the typed flip is blocked");
 }
@@ -856,7 +856,7 @@ fn gate_task_typed_path_rejects_an_evidence_kind_outside_the_policy_domain() {
     write_typed_evidence(&dir.path().join(".canon/ledger"), "it-typed-gate-bad-kind#1", "implementer", EvidenceVerdict::Faithful, "not-a-real-kind", "whatever");
 
     let output = run_canon(&["task", "done", "it-typed-gate-bad-kind#1", "--repo", "."], dir.path());
-    assert_eq!(output.status.code(), Some(1), "an out-of-domain evidence kind must fail closed; stdout: {}", stdout(&output));
+    assert_eq!(output.status.code(), Some(2), "an out-of-domain evidence kind must fail closed; stdout: {}", stdout(&output));
     assert!(stderr(&output).contains("E-BAD-EVIDENCE-KIND"), "{}", stderr(&output));
     assert_eq!(std::fs::read_to_string(&tasks_path).unwrap(), "- [ ] 1 Do the typed thing\n");
 }
@@ -1185,9 +1185,9 @@ fn evidence_add_with_a_report_refuses_a_failed_case_and_binds_a_passing_one() {
     std::fs::write(dir.path().join("junit.xml"), failing).unwrap();
 
     let refused = run_canon(&scenario_add_args(&["--report", "junit:junit.xml", "--verdict", "faithful", "--json"]), dir.path());
-    assert_eq!(refused.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
+    assert_eq!(refused.status.code(), Some(2), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
     let error: serde_json::Value = serde_json::from_str(stdout(&refused).lines().last().unwrap()).unwrap();
-    assert_eq!(error["error"]["code"], "EVIDENCE_REPORT_CONTRADICTION", "{error}");
+    assert_eq!(error["error"]["code"], "EVIDENCE_REPORT_CONFLICT", "{error}");
     assert!(stdout(&refused).contains("core.login.01 signs in"), "the refusal names the failed case: {}", stdout(&refused));
     assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
 

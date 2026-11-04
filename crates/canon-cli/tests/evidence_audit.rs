@@ -252,7 +252,7 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     assert!(status_text.contains("evidence audit game.run.01"), "{status_text}");
 
     let ship = canon(repo, &["subject", "move", "run", "--to", "shipped", "--actor", "lead"]);
-    assert_eq!(ship.status.code(), Some(1), "{}", text(&ship));
+    assert_eq!(ship.status.code(), Some(2), "{}", text(&ship));
     assert!(text(&ship).contains("false-success game.run.01 — verifying → shipped: latest audit refuted"), "{}", text(&ship));
 
     record(repo, &attest_args("game.run.01", &[]));
@@ -365,7 +365,7 @@ fn require_audit_scope_defaults_to_claimed_done_subjects_and_rate_is_inclusive()
     let out = text(&canon(repo, &["gate", "check"]));
     assert!(out.contains("uncovered-cell game.run.01 — sampled for audit"), "{out}");
     let ship = canon(repo, &["subject", "move", "run", "--to", "shipped", "--actor", "lead"]);
-    assert_eq!(ship.status.code(), Some(1), "the ship guard refuses an owed audit: {}", text(&ship));
+    assert_eq!(ship.status.code(), Some(2), "the ship guard refuses an owed audit: {}", text(&ship));
     assert!(text(&ship).contains("uncovered-cell game.run.01 — verifying → shipped: sampled for audit"), "{}", text(&ship));
 
     write_policy(repo, "spec_coverage:\n  require_audit:\n    rate: 0\n");

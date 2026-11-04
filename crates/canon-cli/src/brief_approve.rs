@@ -7,7 +7,7 @@
 //! policy file). `<when>` is the UTC time to the second, RFC 3339: the
 //! chore re-verification rule (0.22 D2) reads it. The digest covers the brief with every `Approved:` line
 //! removed ([`crate::brief::brief_digest`]), so any later edit to the
-//! brief makes every reader say `BRIEF_CHANGED_SINCE_APPROVAL`.
+//! brief makes every reader say `BRIEF_APPROVAL_STALE`.
 //!
 //! Refused (exit 2) while `canon brief check` has blocker findings, and
 //! for an empty `--approver`/`--note`; exit 1 for an operational error. It takes
@@ -456,8 +456,16 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
     let opts = Opts { relay, shown: relay.map(|_| shown) };
     let many = match approve_all_with(&repo, &items, by, note, opts) {
         Ok(many) => many,
-        Err((e, Some(data))) if json => return e.emit_with_data("canon brief approve", true, &data),
-        Err((e, _)) => return e.emit("canon brief approve", json),
+        // Several ids refused before the first write: a refusal with no `data`, whose `error.details` hold one entry for each refused id with its own code.
+        Err((e, Some(data))) => {
+            let causes = data
+                .refused
+                .iter()
+                .map(|refused| crate::gate_refusal::Cause { code: crate::cli_error::code_info(&refused.code).map_or("BRIEF_APPROVE_REFUSED", |info| info.code), message: format!("`{}`: {}", refused.change_id, refused.message) })
+                .collect();
+            return crate::gate_refusal::refusal(causes, e.hint_text().unwrap_or_default()).emit("canon brief approve", json);
+        }
+        Err((e, None)) => return e.emit("canon brief approve", json),
     };
     if let [(_, Some(approved))] = many.entries.as_slice() {
         let unchanged = many.entries[0].0.outcome == Outcome::Unchanged;
@@ -500,7 +508,14 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
     }
     if let Some(e) = many.failure {
         let named = report.approvals.iter().map(|entry| format!("`{}` {}", entry.change, match entry.outcome { Outcome::Written => "written", Outcome::Unchanged => "unchanged", Outcome::Failed => "failed", Outcome::Skipped => "skipped" })).collect::<Vec<_>>().join(", ");
-        let error = refuse(e.code, &format!("{}; {named}; the ids written stay approved and the rest were skipped", e.message));
+        let message = format!("{}; {named}; the ids written stay approved and the rest were skipped", e.message);
+        // A stop after some ids were written is a stopped batch (exit 1, the report in `data`), whatever the stopping id's own code: a refusal carries no `data`.
+        let error = if crate::cli_error::code_info(e.code).is_some_and(|info| info.exit == crate::cli_error::EXIT_REFUSED) {
+            let at = report.approvals.iter().position(|entry| entry.outcome == Outcome::Failed).unwrap_or(0);
+            CliError::failed("BATCH_INCOMPLETE", format!("the batch stopped at element {at}: {}: {message}", e.code)).hint("`data.approvals` says what each id did: fix the failed one, then run the command again (the written ones report `unchanged`)").field(format!("/{at}"))
+        } else {
+            refuse(e.code, &message)
+        };
         return if json { error.emit_with_data("canon brief approve", true, &report) } else { error.emit("canon brief approve", false) };
     }
     crate::next::finish(&repo, "brief approve", &crate::next::Scope::Repo, false, json, &report);

@@ -3,8 +3,8 @@ steps:
   - args: [subject, move, checkout, --to, shipped, --override-reason, "the human approved in chat; line to follow", --actor, lead]
     exit: 0
   - args: [subject, move, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges"]
-    exit: 1
+    exit: 2
   - args: [subject, move, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges", --override-reason, "go"]
-    exit: 1
+    exit: 2
   - args: [query, --kind, subject, --json]
     exit: 0

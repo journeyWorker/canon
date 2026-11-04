@@ -96,7 +96,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 /// The error code readers print when a brief changed after its approval.
-pub const CHANGED_CODE: &str = "BRIEF_CHANGED_SINCE_APPROVAL";
+pub const CHANGED_CODE: &str = "BRIEF_APPROVAL_STALE";
 
 /// `sha256:<hex>` over `text` with every `Approved:` line removed: what
 /// an approval binds to.

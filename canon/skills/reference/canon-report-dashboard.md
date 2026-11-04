@@ -143,7 +143,7 @@ canon dashboard --snapshot /tmp/canon-snap --port 8080
 - Runs in any repo: the released binary carries the app (in canon's own
   checkout a built `packages/dashboard/dist` is used instead). It prints the
   panels URL and a briefs URL (`/briefs.html`), then serves until Ctrl-C.
-  A taken port fails with `DASHBOARD_PORT_IN_USE`: pass `--port <n>` or
+  A taken port fails with `DASHBOARD_PORT_UNAVAILABLE`: pass `--port <n>` or
   `--port 0`.
 - Without the `duckdb` CLI on `PATH` the server still runs; the panels page
   says why there is no snapshot and how to get one (it never shows demo

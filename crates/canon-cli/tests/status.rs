@@ -705,7 +705,7 @@ fn context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only
     let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "follow-up: the audit refuted run.01", "--actor", "impl-agent"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "shipped"]);
-    assert_eq!(out.status.code(), Some(1), "the ship guard refuses on the same gap: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "the ship guard refuses on the same gap: {}", stderr(&out));
     assert!(stderr(&out).contains("false-success world.demo.01"), "{}", stderr(&out));
 }
 

@@ -671,10 +671,10 @@ fn ledger_naming_13_messages_that_quote_a_key_quote_the_typed_key() {
     std::fs::write(&staged, serde_json::to_vec_pretty(&body).unwrap()).unwrap();
     let promote = canon_in(repo, &["gate", "promote", "--json"], &[]);
     let doc = json_of(&promote);
-    assert_eq!(doc["error"]["code"], "PROMOTE_REFUSED", "{}", text(&promote));
-    let refused = &doc["data"]["refused"][0];
-    assert_eq!(refused["subject"], "add-login_2_3");
-    assert!(refused["message"].as_str().unwrap().contains("natural key `add-login_2_3` is held at"), "{refused}");
+    assert_eq!(doc["error"]["code"], "PROMOTION_INVALID", "{}", text(&promote));
+    assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
+    let message = doc["error"]["message"].as_str().unwrap();
+    assert!(message.contains("add-login_2_3") && message.contains("natural key `add-login_2_3` is held at"), "{message}");
     assert!(staged.is_file(), "left staged");
 }
 

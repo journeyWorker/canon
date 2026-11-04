@@ -183,7 +183,7 @@ lists N blockers`); then, while prose advisories remain, to the polish pass
 (`polish the brief in <path> (canon skills show brief-polish), then run canon
 brief check <slug>`, with the advisory count and the top rule
 ids); the human step comes after it. A policy that no longer matches its approval fails closed
-(`POLICY_CHANGED_SINCE_APPROVAL`): never edit it; the human re-approves.
+(`POLICY_APPROVAL_STALE`): never edit it; the human re-approves.
 
 ## Steps
 
@@ -300,7 +300,7 @@ ids); the human step comes after it. A policy that no longer matches its approva
    evidence with its reason and tracking reference, the migrate plan), ask,
    count only an explicit approval, then record with the relay option.
    `canon brief show <slug>` then reports `state: approved`. A brief edited
-   after its approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it
+   after its approval is not approved (`BRIEF_APPROVAL_STALE`): it
    needs a new answer, shown and asked again, and a new `brief approve`. A follow-up that
    adds or changes a step of the brief is a scope change and needs a new
    answer.

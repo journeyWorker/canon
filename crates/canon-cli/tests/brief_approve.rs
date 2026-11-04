@@ -99,7 +99,7 @@ fn a_scope_changed_mid_build_is_reapproved_before_its_scenarios_exist() {
 
     let out = approve(repo, "Ana", "Sixty seconds, go.");
     assert!(out.status.success(), "coverage gates shipping, not approval: {}", stderr(&out));
-    assert!(!status_text(repo).contains("BRIEF_CHANGED_SINCE_APPROVAL"));
+    assert!(!status_text(repo).contains("BRIEF_APPROVAL_STALE"));
 }
 
 #[test]
@@ -122,10 +122,10 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     // One word changes: the approval no longer covers this text.
     std::fs::write(brief_path(repo), brief.replace("Social sign-in.", "Social sign-in, later.")).unwrap();
     let status = status_text(repo);
-    assert!(status.contains("brief: not approved") && status.contains("BRIEF_CHANGED_SINCE_APPROVAL") && status.contains("canon brief approve add-login"), "{status}");
+    assert!(status.contains("brief: not approved") && status.contains("BRIEF_APPROVAL_STALE") && status.contains("canon brief approve add-login"), "{status}");
     let attest = run(repo, &ATTEST);
-    assert_eq!(attest.status.code(), Some(1), "{}", stderr(&attest));
-    assert!(stderr(&attest).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&attest).contains("canon brief approve add-login"), "{}", stderr(&attest));
+    assert_eq!(attest.status.code(), Some(2), "{}", stderr(&attest));
+    assert!(stderr(&attest).contains("BRIEF_APPROVAL_STALE") && stderr(&attest).contains("canon brief approve add-login"), "{}", stderr(&attest));
     let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
     assert_eq!((json["data"]["state"].as_str(), json["data"]["next"][0]["step"].as_str()), (Some("changed-since-approval"), Some("approve")), "{json}");
 
@@ -199,5 +199,5 @@ fn a_line_in_a_fence_is_not_an_approval_and_does_not_leave_the_digest() {
     let brief = std::fs::read_to_string(brief_path(repo)).unwrap();
     assert!(brief.contains("Approved: Mallory"), "the fenced example is kept: {brief}");
     std::fs::write(brief_path(repo), brief.replace("Mallory", "Eve")).unwrap();
-    assert!(status_text(repo).contains("BRIEF_CHANGED_SINCE_APPROVAL"), "{}", status_text(repo));
+    assert!(status_text(repo).contains("BRIEF_APPROVAL_STALE"), "{}", status_text(repo));
 }

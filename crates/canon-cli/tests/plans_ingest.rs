@@ -572,22 +572,16 @@ fn root_pointed_one_level_above_openspec_changes_exits_non_zero_with_named_diagn
 
         let failure: Value = serde_json::from_slice(&output.stdout).expect("--json failure prints one JSON document");
         assert_eq!(failure["ok"], false, "run #{run_number}: {failure}");
-        assert_eq!(failure["error"]["code"], "INGEST_SOURCE_UNUSABLE", "run #{run_number}: {failure}");
+        assert_eq!(failure["error"]["code"], "INGEST_SOURCE_INVALID", "run #{run_number}: {failure}");
         assert_eq!(stderr(&output), "", "run #{run_number}: --json writes nothing to stderr");
 
-        let json = data_of(&stdout(&output));
-        assert_eq!(json["nonCleanSources"][0]["dialect"], "openspec", "run #{run_number}: the flagged source is named: {json}");
-        assert_eq!(json["nonCleanSources"][0]["malformed"], 1, "run #{run_number}: the malformed count is named: {json}");
-        assert_eq!(json["changesPersisted"], 0, "run #{run_number}: {json}");
-        assert_eq!(json["tasksPersisted"], 0, "run #{run_number}: {json}");
-        assert_eq!(json["sources"][0]["skippedUnchanged"], false, "run #{run_number}: a malformed-only source must never be silently skipped: {json}");
-        assert_eq!(json["sources"][0]["cursorAdvanced"], false, "run #{run_number}: a malformed-only, zero-persisted pass must never advance its cursor: {json}");
-        let malformed = json["sources"][0]["malformed"].as_array().expect("malformed must be a named-entry array, not a bare count");
-        assert_eq!(malformed.len(), 1, "run #{run_number}: {json}");
-        assert!(malformed[0]["path"].as_str().unwrap().ends_with("changes"), "run #{run_number}: {json}");
-        assert_eq!(malformed[0]["reason"], "missing-proposal-md", "run #{run_number}: {json}");
-        let hint = malformed[0]["hint"].as_str().expect("the `changes`-basename near-miss must carry the root hint");
-        assert!(hint.contains("root:"), "run #{run_number} hint: {hint}");
+        assert!(failure.get("data").is_none(), "run #{run_number}: a refusal carries no data: {failure}");
+        assert_eq!(output.status.code(), Some(2), "run #{run_number}: {failure}");
+        let message = failure["error"]["message"].as_str().expect("the refusal names the malformed construct");
+        assert!(message.contains("openspec source `") && message.contains("`changes` is malformed (missing-proposal-md)"), "run #{run_number}: the flagged source and construct are named: {message}");
+        assert!(message.contains("root:"), "run #{run_number}: the `changes`-basename near-miss must carry the root hint: {message}");
+        assert!(failure["error"].get("details").is_none(), "run #{run_number}: one cause is the error itself, no details: {failure}");
+        assert!(!dir.path().join(".canon/ledger/kind=change").exists(), "run #{run_number}: nothing was persisted, so a malformed-only source is never skipped and no cursor advanced");
     }
 }
 
@@ -604,8 +598,11 @@ fn a_malformed_only_source_becomes_quiet_once_the_config_is_fixed() {
     // zero-persisted, loud, no cursor written (s23).
     let first = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(!first.status.success(), "run #1 must fail loud: stdout={}", stdout(&first));
-    let first_json = data_of(&stdout(&first));
-    assert_eq!(first_json["sources"][0]["cursorAdvanced"], false, "{first_json}");
+    assert_eq!(first.status.code(), Some(2), "run #1: {}", stdout(&first));
+    let first_json: Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(first_json["error"]["code"], "INGEST_SOURCE_INVALID", "{first_json}");
+    assert!(first_json.get("data").is_none(), "{first_json}");
+    assert!(!dir.path().join(".canon/ledger/kind=change").exists(), "run #1 persists nothing and writes no cursor");
 
     // Fix: give `openspec/changes/` (root's own immediate child, the
     // exact dir the near-miss flagged) a real proposal.md/tasks.md of
@@ -711,9 +708,13 @@ fn one_flagged_source_among_several_makes_the_whole_pass_non_zero() {
     let output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(!output.status.success(), "one flagged source among several must make the whole pass non-zero");
 
-    let json = data_of(&stdout(&output));
-    assert_eq!(json["changesPersisted"], 1, "the well-formed source's records must still persist normally, visible in the summary: {json}");
-    assert_eq!(json["tasksPersisted"], 1, "{json}");
+    assert_eq!(output.status.code(), Some(2), "{}", stdout(&output));
+    let doc: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(doc["error"]["code"], "INGEST_SOURCE_INVALID", "{doc}");
+    assert!(doc.get("data").is_none(), "{doc}");
+    assert!(doc["error"]["message"].as_str().unwrap().contains("bad/openspec"), "the flagged source is named: {doc}");
+    assert!(!dir.path().join(".canon/ledger/kind=change").exists(), "the well-formed source's records are not persisted either: the run writes nothing");
+    assert!(!dir.path().join(".canon/ledger/kind=task").exists(), "{doc}");
 }
 
 // ── s30 plan-dialect-superpowers task 2.1: the `superpowers` dialect ──

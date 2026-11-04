@@ -304,10 +304,10 @@ never rides along into a confirming audit. `--drop-attachment` and
 The approval is never assumed: the agent writes the brief, shows it to the
 human and asks, and builds nothing for that scope until the human answers.
 `canon evidence add` is the backstop for that rule (0.16 M7). It
-refuses (exit `1`, nothing staged or stored) while a subject the record
+refuses (exit `2`, nothing staged or stored) while a subject the record
 attests for has an enforced, unapproved brief: a change the record
 answers to (below) has a canon `.canon/changes/<change>/brief.md` with no `Approved:`
-line, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`), or
+line, was edited after its approval (`BRIEF_APPROVAL_STALE`), or
 there is no canon `brief.md` yet but the change comes from an
 external openspec plan with a `proposal.md` under the plan sources (the
 check `canon status` and the ship guard use; see
@@ -734,7 +734,7 @@ Staging → committed: every well-formed record under
 applies, assigned a monotonic per-(role, surface) `run_seq` (gap-free
 within one invocation, continuing from the committed max), and moved into
 the committed ledger. A malformed or unpartitionable candidate is refused
-— exit `1`, no `run_seq` consumed, the file left in place. `--dry-run`
+— exit `2` (`PROMOTION_INVALID`; several are `error.details[]`), no `run_seq` consumed, the file left in place. A refusal carries no `data`. `--dry-run`
 prints the plan (target path + assigned `run_seq` per candidate) without
 writing or deleting.
 

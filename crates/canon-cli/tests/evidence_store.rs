@@ -220,7 +220,7 @@ fn a_summary_is_kept_on_scenario_only_evidence_and_still_scanned_for_fabrication
     assert_eq!(committed_records(repo)[0]["evidence_note"]["summary"], "3 vitest cases and 1 smoke check passed");
 
     let fabricated = attest(repo, &["--summary", "TBD after the review"]);
-    assert_eq!(fabricated.status.code(), Some(1), "{}", text(&fabricated));
+    assert_eq!(fabricated.status.code(), Some(2), "{}", text(&fabricated));
     assert!(text(&fabricated).contains("fabricated-evidence game.run.01"), "{}", text(&fabricated));
 }
 
@@ -239,7 +239,7 @@ fn a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabricatio
     assert_eq!(committed_records(repo)[0]["evidence_note"]["summary"], summary);
 
     let standalone = attest(repo, &["--summary", "atlas check: n/a"]);
-    assert_eq!(standalone.status.code(), Some(1), "{}", text(&standalone));
+    assert_eq!(standalone.status.code(), Some(2), "{}", text(&standalone));
     assert!(text(&standalone).contains("fabrication marker \"n/a\""), "{}", text(&standalone));
     assert_eq!(committed_records(repo).len(), 1, "a refused add writes nothing");
 }
@@ -254,11 +254,11 @@ fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
     let refused = attest(repo, &["--summary", "TBD after the review", "--command-result", "n/a"]);
-    assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
+    assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
     let stderr = String::from_utf8_lossy(&refused.stderr).into_owned();
     let lines: Vec<&str> = stderr.lines().collect();
     assert_eq!(lines.len(), 3, "one line per finding, then the hint: {stderr}");
-    assert!(lines[0].starts_with("canon: EVIDENCE_FABRICATED: fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("  hint: "), "{stderr}");
+    assert!(lines[0].starts_with("canon: EVIDENCE_NOTE_INVALID: fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("  hint: "), "{stderr}");
     assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
     assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
     let staged = repo.join(".canon/ledger/_staging/kind=evidence");
@@ -303,7 +303,7 @@ fn every_report_case_carrying_the_scenario_id_is_bound_and_any_failure_refuses_f
     )
     .unwrap();
     let refused = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "hud_survives_restart", "--verdict", "faithful"]);
-    assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
+    assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
     assert!(text(&refused).contains("game.run.01: result screen shows` as failed"), "{}", text(&refused));
     assert_eq!(committed_records(repo).len(), 1, "a refused faithful claim stages nothing");
 
@@ -342,7 +342,7 @@ fn a_case_that_mentions_another_scenario_id_binds_only_to_its_own() {
     assert_eq!(cases, ["game.run.01: hp hits zero"]);
 
     let named = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "game.run.02: restarting resets hp as in game.run.01", "--verdict", "faithful"]);
-    assert_eq!(named.status.code(), Some(1), "a case named with --report-case is bound, and its failure refuses faithful: {}", text(&named));
+    assert_eq!(named.status.code(), Some(2), "a case named with --report-case is bound, and its failure refuses faithful: {}", text(&named));
 }
 
 fn task_records(repo: &Path) -> serde_json::Value {

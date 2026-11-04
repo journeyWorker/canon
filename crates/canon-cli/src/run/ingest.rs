@@ -144,27 +144,19 @@ fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, d
 ///
 /// s18 `loud-plan-import-diagnostics` spec's "A malformed-nonzero,
 /// zero-persisted source makes canon ingest plans non-clean at the
-/// process level": whenever `PlansOutcome::non_clean_sources` is
-/// non-empty, an unconditional stderr WARN (regardless of `--json`) is
-/// printed per flagged source, naming its dialect, root, and malformed
-/// count, and the process exits non-zero -- never the unconditional
-/// `ExitCode::SUCCESS` this condition produced before this change. A
-/// pass with zero flagged sources keeps exiting `0` exactly as before.
-/// Distinct from the `Err(err)` arm below (a malformed CONFIGURATION,
-/// s17's own `PlansError` paths), which keeps failing loud with its own
-/// exit code before any source is even scanned.
+/// process level", as 0.36 answers it: a source with malformed
+/// constructs and none that parses is `INGEST_SOURCE_INVALID`, a refusal
+/// (exit 2, no `data`) judged before anything is persisted, with one
+/// `error.details` entry for each malformed construct. A pass with no
+/// such source exits `0`. Distinct from the `Err(err)` arm below for a
+/// malformed CONFIGURATION, which keeps failing loud with its own code.
 fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
     match crate::plans::run(repo, dialect, source, dry_run) {
         Ok(mut outcome) => {
             let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml")).filter(|_| !outcome.dry_run);
             outcome.hot_store = hot.as_ref().map(crate::hot_store::HotStore::location);
             if json {
-                if outcome.non_clean_sources.is_empty() {
-                    crate::next::finish(repo, "ingest plans", &crate::next::Scope::Repo, false, true, &outcome);
-                } else {
-                    // The failure keeps the outcome as `data` beside the shared `error`.
-                    CliError::failed("INGEST_SOURCE_UNUSABLE", "a plan source was malformed and persisted nothing").hint("fix the malformed plan source named in the output, then run `canon ingest plans` again").emit_with_data("canon ingest plans", true, &outcome);
-                }
+                crate::next::finish(repo, "ingest plans", &crate::next::Scope::Repo, false, true, &outcome);
             } else {
                 print!("{}", crate::plans::format_human(&outcome));
                 if let Some(hot) = &hot {
@@ -174,18 +166,16 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
                     println!("{body}");
                 }
             }
-            for flagged in &outcome.non_clean_sources {
-                crate::say_err!(
-                    json,
-                    "canon ingest plans: WARN {} ({}): {} malformed construct(s), 0 persisted -- this source's pass produced nothing usable; see the named malformed entries above (or in --json) for path + reason + hint, a `root:` misconfiguration is a likely cause",
-                    flagged.dialect, flagged.root, flagged.malformed
-                );
-            }
-            if outcome.non_clean_sources.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+            ExitCode::SUCCESS
         }
         Err(err) => {
             let error = match &err {
                 crate::plans::PlansError::Unavailable(error) => error.clone(),
+                // Several malformed constructs are `error.details`, one entry each: nothing was persisted.
+                crate::plans::PlansError::SourcesInvalid(causes) => crate::gate_refusal::refusal(
+                    causes.iter().map(|cause| crate::gate_refusal::Cause { code: "INGEST_SOURCE_INVALID", message: cause.clone() }).collect(),
+                    "fix the plan source named (a `root:` that points one level too high is the usual cause), then run `canon ingest plans` again; nothing was persisted",
+                ),
                 _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
             };
             ExitCode::from(error.emit("canon ingest plans", json))

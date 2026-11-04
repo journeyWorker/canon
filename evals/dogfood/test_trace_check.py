@@ -193,9 +193,9 @@ class SyntheticTranscriptTests(unittest.TestCase):
         report = self.run_calls(
             ("canon scenario new --input '{\"bogus\":1}' --json", failure("scenario new", "INPUT_INVALID", "`bogus` is not an option")),
             ("canon query --kind nope --json", failure("query", "UNKNOWN_COMMAND", "no such command")),
-            ("canon evidence add --scenario a.b.01 --json", failure("evidence add", "BRIEF_UNAPPROVED", "brief not approved")))
+            ("canon evidence add --scenario a.b.01 --json", failure("evidence add", "BRIEF_APPROVAL_REQUIRED", "brief not approved")))
         self.assertEqual(self.wrong(report), [("canon scenario new", "INPUT_INVALID", "other"), ("canon query", "UNKNOWN_COMMAND", "other")])
-        self.assertEqual([r["code"] for r in report["refusals"]], ["BRIEF_UNAPPROVED"])
+        self.assertEqual([r["code"] for r in report["refusals"]], ["BRIEF_APPROVAL_REQUIRED"])
 
     def test_two_failures_in_one_call_are_two_wrong_shapes(self):
         out = failure("review scenario", message="unexpected argument '--summary'") + "\n" + failure("review scenario", message="unexpected argument '--summary'")

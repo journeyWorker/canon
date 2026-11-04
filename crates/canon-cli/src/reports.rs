@@ -33,7 +33,7 @@ pub trait Report: serde::Serialize + JsonSchema {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Override {
-    /// The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).
+    /// The code of the waived refusal (`BRIEF_APPROVAL_REQUIRED`, `SUBJECT_INVALID`, …).
     pub code: String,
     /// The reason the caller gave, verbatim.
     pub reason: String,

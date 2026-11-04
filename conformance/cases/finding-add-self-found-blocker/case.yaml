@@ -7,4 +7,4 @@ steps:
   - args: [gate, promote]
     exit: 0
   - args: [subject, move, cart, --to, verifying]
-    exit: 1
+    exit: 2

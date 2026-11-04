@@ -214,7 +214,7 @@ fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewe
     seed_blocker(r, ago(200), Some(ago(100)));
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("open-blocker c-demo#1.1"), "{err}");
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("`world.demo.01`") && err.contains("`world.demo.02`"), "{err}");
@@ -229,13 +229,13 @@ fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewe
     seed_evidence(r, "world.demo.01", ago(150));
     seed_evidence(r, "world.demo.02", ago(150));
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("`world.demo.01`") && stderr(&out).contains("`world.demo.02`") && stderr(&out).contains("closed `fixed` but not re-verified"), "{}", stderr(&out));
 
     // One scenario evidenced after the close is not enough.
     seed_evidence(r, "world.demo.01", ago(50));
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("(`world.demo.02`)"), "only the scenario still without new evidence is named: {}", stderr(&out));
 
     // The rest: the new evidence says the same as the evidence the reviews
@@ -302,7 +302,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert!(steps.iter().all(|s| !s["command"].as_str().unwrap().contains("--to shipped")), "not ship: {steps:?}");
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("chore change `bump-client` approved") && err.contains("`world.demo.01`"), "{err}");
     assert!(err.contains("\n  hint: ") && err.contains("--all-scenarios"), "{err}");
@@ -313,7 +313,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     // this evidence, so it did not look at the chore's result).
     seed_evidence(r, "world.demo.01", ago(0));
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "the chore has no review yet: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "the chore has no review yet: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("no review of change `bump-client`") && !err.contains("unreviewed-promotion world.demo.01"), "{err}");
     let next = status_steps(r);
@@ -383,7 +383,7 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
     assert_eq!(reviews(r), before + 1, "a chore gets exactly one review");
     write_brief(r, "bump-client", &format!("{}\nAlso bump the lockfile.\n", chore_brief(ago(100))));
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("stale review of change `bump-client`") && stderr(&out).contains("brief was edited"), "{}", stderr(&out));
 
     assert!(change_review(r, "bump-client").status.success(), "reviewing the edited brief again");
@@ -410,7 +410,7 @@ fn evidence_recorded_after_the_chore_approval_satisfies_it_and_a_feature_approva
     // it per scenario, so the chore's own review is what covers it.
     seed_evidence(r, "world.demo.01", ago(0));
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "the chore still needs its review: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "the chore still needs its review: {}", stderr(&out));
     assert!(!stderr(&out).contains("no evidence recorded after"), "evidence newer than the chore approval is enough: {}", stderr(&out));
     assert!(change_review(r, "bump-client").status.success());
     assert!(ship(r).status.success(), "stderr: {}", stderr(&ship(r)));
@@ -485,7 +485,7 @@ fn gate_check_97_a_fixed_blocker_naming_a_scenario_is_reverified_by_that_scenari
     seed_scoped_blocker(r, ago(200), Some(ago(100)), &["world.demo.01"]);
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("1 evidenced scenario(s) (`world.demo.01`)"), "{err}");
     assert!(!err.contains("world.demo.02"), "B is not named: {err}");
@@ -501,7 +501,7 @@ fn gate_check_97_a_fixed_blocker_naming_a_scenario_is_reverified_by_that_scenari
 
     // Evidence for A recorded before the close does not count.
     seed_evidence(r, "world.demo.01", ago(150));
-    assert_eq!(ship(r).status.code(), Some(1));
+    assert_eq!(ship(r).status.code(), Some(2));
 
     // Evidence for A after the close is enough; B's is still 300s old.
     seed_evidence(r, "world.demo.01", ago(50));
@@ -522,7 +522,7 @@ fn gate_check_97_evidence_for_another_scenario_does_not_reverify_a_scoped_findin
     seed_evidence(r, "world.demo.02", ago(50));
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("(`world.demo.01`)") && !stderr(&out).contains("world.demo.02"), "{}", stderr(&out));
 }
 
@@ -537,7 +537,7 @@ fn gate_check_98_a_fixed_blocker_naming_no_scenario_still_asks_every_evidenced_s
     seed_evidence(r, "world.demo.01", ago(50));
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("(`world.demo.02`)") && stderr(&out).contains("--all-scenarios"), "{}", stderr(&out));
     seed_evidence(r, "world.demo.02", ago(40));
     assert!(ship(r).status.success());
@@ -571,7 +571,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
 
     // The close is newer than every evidence record seeded above.
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains("(`world.demo.01`)") && !stderr(&out).contains("world.demo.02"), "{}", stderr(&out));
     seed_evidence(r, "world.demo.01", Utc::now() + Duration::seconds(5));
     let out = ship(r);
@@ -645,7 +645,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
     seed_scoped_blocker(r, ago(200), Some(ago(100)), &["world.demo.01", "world.other.01", "world.other.02"]);
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("`canon evidence add --project demo --scenario <id> --report") && err.contains("for each of `world.demo.01`;"), "{err}");
     assert!(err.contains("`canon evidence add --project other --scenario <id> --report") && err.contains("for each of `world.other.01`, `world.other.02`;"), "{err}");
@@ -654,10 +654,10 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
     // Each root's command clears its own scenarios and no other's.
     seed_evidence(r, "world.demo.01", ago(50));
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(!stderr(&out).contains("world.demo.01") && stderr(&out).contains("--project other --scenario <id>") && stderr(&out).contains("`world.other.01`"), "{}", stderr(&out));
     seed_other("world.other.01", ago(40));
-    assert_eq!(ship(r).status.code(), Some(1));
+    assert_eq!(ship(r).status.code(), Some(2));
     seed_other("world.other.02", ago(30));
     let out = ship(r);
     assert!(out.status.success(), "stderr: {}", stderr(&out));

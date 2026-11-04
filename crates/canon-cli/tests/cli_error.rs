@@ -98,8 +98,8 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
         dir.path(),
         &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl"],
     );
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert_eq!(human_code(&out), "BRIEF_UNAPPROVED");
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert_eq!(human_code(&out), "BRIEF_APPROVAL_REQUIRED");
     assert!(stderr(&out).contains("\n  hint: stop and get the human's answer to the brief"), "the next step is its own hint line: {}", stderr(&out));
 }
 
@@ -107,8 +107,8 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
 fn gate_task_without_evidence_is_blocked_with_its_code() {
     let dir = repo_with_unapproved_brief();
     let out = run(dir.path(), &["task", "done", "add-login#1"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert_eq!(human_code(&out), "GATE_TASK_BLOCKED");
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    assert_eq!(human_code(&out), "TASK_EVIDENCE_REQUIRED");
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
     assert_eq!(exit_of("CONFIG_REQUIRED"), 2);
     assert_eq!(exit_of("USAGE"), 2);
     assert_eq!(exit_of("POLICY_APPROVAL_UNREADABLE"), 1, "an unreadable approval is a closed gate, not a refused run");
-    assert!(canon_cli::cli_error::code_info("DISPATCH_END_IN_PROGRESS").unwrap().retryable, "a concurrent close is the retryable case");
+    assert!(canon_cli::cli_error::code_info("DISPATCH_RUN_UNAVAILABLE").unwrap().retryable, "a concurrent close is the retryable case");
     assert!(!canon_cli::cli_error::code_info("USAGE").unwrap().retryable);
 }
 
@@ -291,5 +291,5 @@ fn a_cli_error_takes_its_exit_and_retryability_from_the_registry() {
     assert_eq!(CliError::refused("BRIEF_NOT_FOUND", "x").exit, 2);
     assert_eq!(CliError::failed("BRIEF_NOT_FOUND", "x").exit, 2, "the constructor does not choose the exit");
     assert_eq!(CliError::failed("GATE_CHECK_FAILED", "x").exit, 1);
-    assert!(CliError::refused("DISPATCH_END_IN_PROGRESS", "x").retryable);
+    assert!(CliError::refused("DISPATCH_RUN_UNAVAILABLE", "x").retryable);
 }

@@ -245,16 +245,16 @@ fn evidence_add_100_a_draft_change_freezes_only_the_scenarios_it_is_tagged_on() 
     // A scenario B adds waits for B's approval, naming B's brief.
     scenario(repo, "shop.cart.03", Some("b.F1"));
     let out = attest(repo, "shop.cart.03", "first run");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(
-        stderr(&out).contains("BRIEF_UNAPPROVED")
+        stderr(&out).contains("BRIEF_APPROVAL_REQUIRED")
             && stderr(&out).contains(".canon/changes/b/brief.md has no `Approved:` line"),
         "{}",
         stderr(&out)
     );
     // ... and the ship guard still asks for the newest adopted change's approval.
     let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
-    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert_eq!(ship.status.code(), Some(2), "{}", stderr(&ship));
     assert!(
         stderr(&ship).contains(".canon/changes/b/brief.md"),
         "{}",
@@ -290,9 +290,9 @@ fn evidence_add_101_an_unapproved_only_change_and_an_edited_approval_still_refus
     scenario(repo, "shop.cart.02", Some("a.F1"));
     for id in ["shop.cart.01", "shop.cart.02"] {
         let out = attest(repo, id, "run");
-        assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
+        assert_eq!(out.status.code(), Some(2), "{id}: {}", stderr(&out));
         assert!(
-            stderr(&out).contains("BRIEF_UNAPPROVED")
+            stderr(&out).contains("BRIEF_APPROVAL_REQUIRED")
                 && stderr(&out).contains(".canon/changes/a/brief.md"),
             "{id}: {}",
             stderr(&out)
@@ -321,9 +321,9 @@ fn evidence_add_101_an_unapproved_only_change_and_an_edited_approval_still_refus
     .unwrap();
     change(repo, "b", false);
     let out = attest(repo, "shop.cart.01", "second run");
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(
-        stderr(&out).contains("BRIEF_CHANGED_SINCE_APPROVAL")
+        stderr(&out).contains("BRIEF_APPROVAL_STALE")
             && stderr(&out).contains(".canon/changes/a/brief.md"),
         "{}",
         stderr(&out)
@@ -351,9 +351,9 @@ fn evidence_add_102_a_legacy_subject_keeps_re_verifying_its_evidenced_scenarios(
     let again = attest(repo, "shop.cart.01", "re-verified");
     assert!(again.status.success(), "{}", stderr(&again));
     let never = attest(repo, "shop.cart.02", "new");
-    assert_eq!(never.status.code(), Some(1), "{}", stderr(&never));
+    assert_eq!(never.status.code(), Some(2), "{}", stderr(&never));
     assert!(
-        stderr(&never).contains("BRIEF_UNAPPROVED"),
+        stderr(&never).contains("BRIEF_APPROVAL_REQUIRED"),
         "{}",
         stderr(&never)
     );
@@ -616,9 +616,9 @@ fn evidence_add_100_a_tag_naming_a_change_the_subject_did_not_adopt_is_ignored()
     scenario(repo, "shop.cart.03", Some("a.F1"));
     for id in ["shop.cart.01", "shop.cart.02", "shop.cart.03"] {
         let out = attest(repo, id, "run");
-        assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
+        assert_eq!(out.status.code(), Some(2), "{id}: {}", stderr(&out));
         assert!(
-            stderr(&out).contains("BRIEF_UNAPPROVED")
+            stderr(&out).contains("BRIEF_APPROVAL_REQUIRED")
                 && stderr(&out).contains(".canon/changes/a/brief.md"),
             "{id}: {}",
             stderr(&out)
@@ -636,7 +636,7 @@ fn evidence_add_101_an_override_attestation_does_not_exempt_the_scenario_later()
     change(repo, "a", false);
     scenario(repo, "shop.cart.01", None);
     let refused = attest(repo, "shop.cart.01", "run");
-    assert_eq!(refused.status.code(), Some(1), "{}", stderr(&refused));
+    assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
     let waived = run(
         repo,
         &[
@@ -647,8 +647,8 @@ fn evidence_add_101_an_override_attestation_does_not_exempt_the_scenario_later()
     );
     assert!(waived.status.success(), "{}", stderr(&waived));
     let again = attest(repo, "shop.cart.01", "run again");
-    assert_eq!(again.status.code(), Some(1), "{}", stderr(&again));
-    assert!(stderr(&again).contains("BRIEF_UNAPPROVED"), "{}", stderr(&again));
+    assert_eq!(again.status.code(), Some(2), "{}", stderr(&again));
+    assert!(stderr(&again).contains("BRIEF_APPROVAL_REQUIRED"), "{}", stderr(&again));
 }
 
 /// subject.lifecycle.37: a change a scenario of the subject is tagged
@@ -773,7 +773,7 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
     );
     scenario(repo, "shop.cart.02", Some("b.F1"));
     let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
-    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert_eq!(ship.status.code(), Some(2), "{}", stderr(&ship));
     assert!(
         stderr(&ship).contains(".canon/changes/b/brief.md"),
         "{}",
@@ -864,13 +864,13 @@ fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks
         run(repo, &["subject", "move", "s", "--to", "verifying", "--reason", "fix"])
     };
     let control = reopen(repo);
-    assert_eq!(control.status.code(), Some(1), "{}", stderr(&control));
+    assert_eq!(control.status.code(), Some(2), "{}", stderr(&control));
     assert!(stderr(&control).contains(".canon/changes/b/brief.md"), "{}", stderr(&control));
 
     // A newer untagged draft c changes nothing: the scope still ends at b.
     change(repo, "c", false);
     let out = reopen(repo);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
     assert!(!stderr(&out).contains(".canon/changes/c/brief.md"), "{}", stderr(&out));
     assert!(
@@ -879,7 +879,7 @@ fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks
         stderr(&out)
     );
     let json = run(repo, &["subject", "move", "s", "--to", "verifying", "--reason", "fix", "--json"]);
-    assert_eq!(json.status.code(), Some(1));
+    assert_eq!(json.status.code(), Some(2));
     assert!(stdout(&json).contains("`c` is a pending draft"), "{}", stdout(&json));
 
     // Status does not advise the reopen the guard refuses.
@@ -913,11 +913,11 @@ fn subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside()
     ok(repo, &["inventory", "sync"]);
     change(repo, "c", false);
     let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
-    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert_eq!(ship.status.code(), Some(2), "{}", stderr(&ship));
     assert!(stderr(&ship).contains(".canon/changes/b/brief.md"), "{}", stderr(&ship));
     assert!(stderr(&ship).contains("`c` is a pending draft"), "a refused ship names what it set aside: {}", stderr(&ship));
     let json = run(repo, &["subject", "move", "s", "--to", "shipped", "--json"]);
-    assert_eq!(json.status.code(), Some(1));
+    assert_eq!(json.status.code(), Some(2));
     assert!(stdout(&json).contains("`c` is a pending draft"), "{}", stdout(&json));
 
     // Retag shop.cart.03 for a: b and c are both set aside, and the line names both.
@@ -949,8 +949,8 @@ fn evidence_add_102_evidence_recorded_after_adoption_does_not_exempt() {
     assert!(first.status.success(), "{}", stderr(&first));
     ok(repo, &["subject", "move", "s", "--to", "building"]);
     let again = attest(repo, "shop.cart.01", "after building");
-    assert_eq!(again.status.code(), Some(1), "{}", stderr(&again));
-    assert!(stderr(&again).contains("BRIEF_UNAPPROVED"), "{}", stderr(&again));
+    assert_eq!(again.status.code(), Some(2), "{}", stderr(&again));
+    assert!(stderr(&again).contains("BRIEF_APPROVAL_REQUIRED"), "{}", stderr(&again));
 }
 
 /// context.status.82: a pending draft whose brief has no blockers and

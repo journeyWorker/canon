@@ -345,7 +345,7 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                     }
                     ExitCode::SUCCESS
                 } else {
-                    let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report build`");
+                    let error = CliError::failed("REPORT_CHECK_FAILED", format!("the report is {state}")).reason("STALE").hint("regenerate it with `canon report build`");
                     ExitCode::from(error.emit_with_data("canon report check", json, &data))
                 }
             }

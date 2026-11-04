@@ -565,7 +565,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
         Ok(Some(atom)) => match typed_path_evidence(&repo, &atom, &raw_records, &task_id) {
             Ok(pair) => pair,
             Err(e) => {
-                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+                return CliError::failed("TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
             }
         },
         Ok(None) => {
@@ -573,7 +573,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
             let notes = match notes_of(same_task_id, &task_id) {
                 Ok(n) => n,
                 Err(e) => {
-                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+                    return CliError::failed("TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
                 }
             };
             (canon_gate::history::evidence_history(&gate_context).to_vec(), notes)
@@ -609,7 +609,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
         // authored some other way still cannot forge a second checked
         // row.
         Err(e @ WriteBackError::MultiLineEvidenceNote { .. }) => {
-            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+            return CliError::failed("TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
         }
         Err(e @ WriteBackError::Unsupported { .. }) => {
             return CliError::refused("TASK_UNSUPPORTED", e.to_string()).hint("use a form the command supports (`canon schema task done` lists the arguments)").emit("canon task done", json);
@@ -646,7 +646,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task <id> ...`, then run `canon task done` again").emit("canon task done", json)
+            CliError::failed("TASK_EVIDENCE_REQUIRED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task <id> ...`, then run `canon task done` again").emit("canon task done", json)
         }
     }
 }
@@ -784,7 +784,7 @@ impl TypedContractError {
     pub(crate) fn to_cli_error(&self) -> CliError {
         match self {
             Self::Corpus(message) => CliError::refused("TYPED_ATOMS_INVALID", message.as_str()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again"),
-            Self::Invalid(message) => CliError::failed("GATE_TASK_EVIDENCE_INVALID", message.as_str()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`"),
+            Self::Invalid(message) => CliError::failed("TASK_EVIDENCE_INVALID", message.as_str()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`"),
         }
     }
 }
@@ -945,7 +945,7 @@ pub struct RefusedEntry {
     pub message: String,
 }
 
-/// `canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.
+/// `canon gate promote`: what left staging. A refusal (`PROMOTION_INVALID`, exit 2) carries no `data`.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GatePromoteReport {
@@ -988,10 +988,21 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
     }
     let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
     let committed = GitTier::new(ctx.ledger_root.clone());
-    let promoted = match kind {
+    let drain = |dry_run: bool| match kind {
         Some(kind) => canon_gate::promote_only(kind, &staging, &committed, dry_run),
         None => gate_promote(&staging, &committed, dry_run),
     };
+    // The gate judges every staged record before the first is promoted: one refused makes the whole run a refusal that wrote nothing
+    // (spec 8.3, 11.2), and the records stay staged.
+    if !dry_run {
+        if let Ok(preview) = drain(true) {
+            if !preview.refused.is_empty() {
+                crate::say_raw!(json, "{}", format_candidate_lines(&preview, true));
+                return refused_promotion(&preview.refused).emit("canon gate promote", json);
+            }
+        }
+    }
+    let promoted = drain(dry_run);
     match promoted {
         Ok(report) => {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
@@ -1009,15 +1020,26 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
                 }
                 0
             } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged record(s) refused", report.refused.len()))
-                    .hint("each refusal is named in data.refused; fix the staged record or re-add it, then run `canon gate promote` again")
-                    .emit_with_data("canon gate promote", json, &data)
+                refused_promotion(&report.refused).emit("canon gate promote", json)
             }
         }
         Err(e) => {
             CliError::refused("PROMOTE_FAILED", e.to_string()).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`").emit("canon gate promote", json)
         }
     }
+}
+
+/// The refusal of a promotion the gate refused: exit 2, the first record's code, and an entry of `error.details` for each record when
+/// there are several (`atip.codeexit.04`). No `data`: the refusals are the answer.
+pub(crate) fn refused_promotion(refused: &[canon_gate::promote::Refused]) -> CliError {
+    let mut causes: Vec<crate::gate_refusal::Cause> = refused
+        .iter()
+        .map(|r| crate::gate_refusal::Cause { code: crate::gate_refusal::promotion_code(r.violation.class), message: format!("{}: {}", r.violation.subject, r.violation.detail) })
+        .collect();
+    if causes.is_empty() {
+        causes.push(crate::gate_refusal::Cause { code: "PROMOTION_INVALID", message: "promotion landed nothing".to_string() });
+    }
+    crate::gate_refusal::refusal(causes, "the records stay staged: fix each one the error names (or re-add it), then run `canon gate promote` again")
 }
 
 /// The `--json` data for one [`PromoteReport`].
@@ -1103,10 +1125,22 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
         Ok(target) => StagedOutcome::Promoted { target },
         Err(refusal) => {
             crate::say_raw!(json, "{}", refusal.lines);
-            match refusal.data {
-                Some(data) => refusal.error.emit_with_data(command, json, &data),
-                None => refusal.error.emit(command, json),
+            // The record was staged before the gate refused it, so it stays staged: the command stopped after an effect (spec 8.3.2),
+            // and the refusal is the reason. A promotion that failed for another cause (`PROMOTE_FAILED`) keeps its own code.
+            let error = if refusal.data.is_some() {
+                crate::json_out::prepend_next(crate::status::NextStep {
+                    command: "canon gate promote --dry-run --json".into(),
+                    why: "read what is staged and why the gate refuses it before running anything again".into(),
+                    actor: crate::status::StepActor::Agent,
+                    role: Some(crate::role::Role::Orchestrator),
+                });
+                CliError::failed("STOPPED_MIDWAY", format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
+                    .reason(refusal.error.code)
+                    .hint("fix the record the message names and run `canon gate promote` (the refused record is still staged); do not add it again")
+            } else {
+                refusal.error
             };
+            error.emit(command, json);
             StagedOutcome::Refused
         }
     }
@@ -1141,8 +1175,7 @@ fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreErr
             Some(landed) => Ok(landed.target.display().to_string()),
             None => Err(Box::new(PromoteRefusal {
                 lines: format_candidate_lines(&report, false),
-                error: CliError::failed("PROMOTE_REFUSED", "staged, but promotion refused the record; it stays staged")
-                    .hint("the refusal is named in data.refused; fix it and run `canon gate promote`"),
+                error: refused_promotion(&report.refused),
                 data: Some(promote_report(&report, false)),
             })),
         },

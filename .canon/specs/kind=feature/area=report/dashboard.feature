@@ -18,7 +18,7 @@ Feature: report dashboard
   Scenario: With no app to serve the dashboard refuses and names how to get one
     Given a repository with no canon dashboard build and a canon binary that embeds none
     When canon dashboard is run
-    Then it exits nonzero with DASHBOARD_NOT_BUILT
+    Then it exits nonzero with DASHBOARD_UNSUPPORTED
     And the hint names the release install and the development build, and a packages/dashboard that belongs to another project is not served
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
@@ -28,7 +28,7 @@ Feature: report dashboard
   Scenario: A port already in use is its own refusal and names the flag that fixes it
     Given another process holds the port
     When canon dashboard is run with that port
-    Then it exits nonzero with DASHBOARD_PORT_IN_USE, not the catch-all DASHBOARD_FAILED
+    Then it exits nonzero with DASHBOARD_PORT_UNAVAILABLE, not the catch-all DASHBOARD_FAILED
     And the hint names --port <n> and --port 0
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}

@@ -152,7 +152,7 @@ fn a_docs_only_chore_needs_no_new_evidence_only_its_change_review() {
     commit_all(r, "docs-only chore");
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "the chore still needs its review: {}", text(&out.stderr));
+    assert_eq!(out.status.code(), Some(2), "the chore still needs its review: {}", text(&out.stderr));
     let err = text(&out.stderr);
     assert!(err.contains("no review of change `bump-client`"), "{err}");
     assert!(!err.contains("no evidence recorded after"), "evidence on the unchanged code needs nothing new: {err}");
@@ -175,7 +175,7 @@ fn a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_c
     commit_all(r, "chore that touches code");
 
     let out = ship(r);
-    assert_eq!(out.status.code(), Some(1), "{}", text(&out.stderr));
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
     let err = text(&out.stderr);
     assert!(err.contains("no evidence recorded after") && err.contains("`shop.cart.01`") && err.contains("`shop.cart.02`"), "{err}");
     let hint = err.lines().find(|l| l.starts_with("  hint: ")).unwrap_or_else(|| panic!("a refusal carries a hint: {err}"));
@@ -229,7 +229,7 @@ fn a_bound_report_decides_the_verdict_of_a_single_scenario_add() {
     let baseline = latest_verdicts(r, "shop.cart.01").len();
 
     let refused = add("junit:skipped.xml", &["--verdict", "faithful"]);
-    assert_eq!(refused.status.code(), Some(1), "an explicit faithful over a skipped case stays refused: {}", text(&refused.stderr));
+    assert_eq!(refused.status.code(), Some(2), "an explicit faithful over a skipped case stays refused: {}", text(&refused.stderr));
     assert_eq!(latest_verdicts(r, "shop.cart.01").len(), baseline, "a refusal writes nothing");
 
     let out = add("junit:skipped.xml", &[]);
@@ -237,7 +237,7 @@ fn a_bound_report_decides_the_verdict_of_a_single_scenario_add() {
     assert_eq!(latest_verdicts(r, "shop.cart.01").last().map(String::as_str), Some("not_applicable"));
 
     let refused = add("junit:failed.xml", &["--verdict", "faithful"]);
-    assert_eq!(refused.status.code(), Some(1), "{}", text(&refused.stderr));
+    assert_eq!(refused.status.code(), Some(2), "{}", text(&refused.stderr));
     let out = add("junit:failed.xml", &[]);
     assert!(out.status.success(), "{}", text(&out.stderr));
     assert_eq!(latest_verdicts(r, "shop.cart.01").last().map(String::as_str), Some("divergent"));
@@ -256,7 +256,7 @@ fn an_override_is_recorded_echoed_and_listed_by_status() {
         write(r, &format!(".canon/changes/{change}/brief.md"), "## Why\n\nSeeded, never answered.\n");
     }
     let refused = canon(r, &["evidence", "add", "--scenario", "shop.cart.01", "--report", "junit:a.xml", "--role", "implementer"]);
-    assert_eq!(refused.status.code(), Some(1), "{}", text(&refused.stderr));
+    assert_eq!(refused.status.code(), Some(2), "{}", text(&refused.stderr));
     let waived = canon(r, &["evidence", "add", "--scenario", "shop.cart.01", "--report", "junit:a.xml", "--role", "implementer", "--override-reason", "ship it", "--json"]);
     assert!(waived.status.success(), "{}{}", text(&waived.stdout), text(&waived.stderr));
     let report: Value = serde_json::from_str(&text(&waived.stdout)).unwrap();

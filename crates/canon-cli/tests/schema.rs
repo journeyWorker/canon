@@ -54,7 +54,7 @@ fn one_command_shows_options_with_their_shape() {
     assert_eq!(v["effect"], "write");
     assert!(opt("json")["flagOnly"] == true);
     let codes: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
-    for code in ["EVIDENCE_FABRICATED", "BRIEF_UNAPPROVED", "BRIEF_CHANGED_SINCE_APPROVAL", "EVIDENCE_INVALID_ARGUMENT", "USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE"] {
+    for code in ["EVIDENCE_NOTE_INVALID", "BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE", "EVIDENCE_INVALID_ARGUMENT", "USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE"] {
         assert!(codes.contains(&code), "{code} missing from {codes:?}");
     }
     assert!(!codes.contains(&"ARTIFACTS_STORE_FAILED"), "a sibling command's code leaked in: {codes:?}");
@@ -87,7 +87,7 @@ fn errors_lists_the_whole_registry() {
     assert_eq!(listed, registry);
     assert!(v["errors"].as_array().unwrap().iter().all(|e| !e["meaning"].as_str().unwrap().is_empty()));
     let human = canon(&["schema", "--errors"]);
-    assert!(human.status.success() && String::from_utf8_lossy(&human.stdout).contains("BRIEF_CHANGED_SINCE_APPROVAL"));
+    assert!(human.status.success() && String::from_utf8_lossy(&human.stdout).contains("BRIEF_APPROVAL_STALE"));
     assert_eq!(canon(&["schema", "--errors", "evidence", "add"]).status.code(), Some(2));
 }
 

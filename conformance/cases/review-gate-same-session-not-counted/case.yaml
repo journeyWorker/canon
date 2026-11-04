@@ -7,7 +7,7 @@ steps:
   - args: [review, scenario, cart.add.01, --project, root, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor, reviewer-2, --role, reviewer, --session, sess-impl]
     exit: 0
   - args: [subject, move, cart, --to, verifying]
-    exit: 1
+    exit: 2
   - args: [review, scenario, cart.add.01, --project, root, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor, reviewer-2, --role, reviewer, --session, sess-review]
     exit: 0
   - args: [subject, move, cart, --to, verifying]

@@ -324,3 +324,10 @@ fn atip_codenames_09_a_code_missing_from_the_registry_and_from_the_table_is_foun
     assert_eq!(missing, ["UNKNOWN_ROLE"], "a code that left without a row is named");
     assert!(codes_0_35().iter().any(|code| code == "HUMAN_ONLY"), "the fixture holds the 0.35 names");
 }
+
+/// atip.codenames.01: RETRIEVE_INVALID (it was `RETRIEVE_FAILED`, exit 2): a `--domain` that cannot make a regime key refuses the retrieval.
+#[test]
+fn atip_codenames_01_retrieve_with_a_domain_that_makes_no_regime_key_is_retrieve_invalid() {
+    let dir = repo();
+    fails(dir.path(), Some("implementer"), &["retrieve", "--for-role", "implementer", "--domain", ""], 2, "RETRIEVE_INVALID", None, None);
+}

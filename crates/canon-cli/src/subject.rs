@@ -317,7 +317,11 @@ fn report_subject_warning(
         // A preview marks itself: the subject as it would stand, plus `dryRun`.
         crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, meta);
     } else if verb == "move" {
-        let overrides = subject.status_override.iter().map(|waiver| crate::reports::Override { code: "SUBJECT_GATE_VIOLATION".to_string(), reason: waiver.reason.clone() }).collect();
+        let overrides = subject.status_override.iter().flat_map(|waiver| {
+            // One entry per distinct code of the refusals the waiver waived: the code each of them answers with.
+            let codes: std::collections::BTreeSet<&'static str> = waiver.waived.iter().filter_map(|waived| canon_gate::FailureClass::from_str_exact(&waived.class)).map(crate::gate_refusal::subject_code).collect();
+            codes.into_iter().map(|code| crate::reports::Override { code: code.to_string(), reason: waiver.reason.clone() }).collect::<Vec<_>>()
+        }).collect();
         crate::next::finish_with_meta(repo, "subject move", &scope, false, json, &SubjectMoveReport { subject, overrides }, meta);
     } else {
         crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), meta);
@@ -1018,7 +1022,7 @@ pub fn run_move(
         if let Some((closed, detail)) = crate::policy_approval::closed_failure(&repo) {
             let error = match closed {
                 crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
-                crate::policy_approval::Closed::Changed => CliError::failed("POLICY_CHANGED_SINCE_APPROVAL", detail).hint(crate::policy_approval::REAPPROVE_HINT),
+                crate::policy_approval::Closed::Changed => CliError::failed("POLICY_APPROVAL_STALE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
             };
             return error.emit("canon subject move", json);
         }
@@ -1108,7 +1112,6 @@ pub fn run_move(
     waivable.extend(brief_gap.iter().map(|gap| gap.violation.clone()));
 
     if !blocking.is_empty() {
-        let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
         let mut hints: Vec<String> = crate::reverify::hint(&repo, gate_context.as_ref(), &code_tree, &subject, &blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
         if let Some(ctx) = &gate_context {
             let divergent = divergent_cells(ctx, subject_id, &blocking);
@@ -1124,7 +1127,8 @@ pub fn run_move(
             hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
         }
         hints.extend(pending_note.iter().cloned());
-        return CliError::failed("SUBJECT_GATE_VIOLATION", lines).hint(hints.join("; ")).emit("canon subject move", json);
+        let causes = blocking.iter().chain(&waivable).map(|v| crate::gate_refusal::Cause { code: crate::gate_refusal::subject_code(v.class), message: v.line() }).collect();
+        return crate::gate_refusal::refusal(causes, &hints.join("; ")).emit("canon subject move", json);
     }
 
     // A waiver, a reopen note, and a transition reason belong to the
@@ -1135,7 +1139,6 @@ pub fn run_move(
     subject.status_reason = None;
     if !waivable.is_empty() {
         let Some(reason) = override_reason else {
-            let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
             let mut fixes: Vec<String> = Vec::new();
             if review_gaps && !waivable.iter().all(canon_gate::review_gate::is_reverify) {
                 fixes.push("record an independent review (`canon review scenario`) and close blocker findings".to_string());
@@ -1156,8 +1159,10 @@ pub fn run_move(
             } else if !reverify.is_empty() {
                 fixes.push("record evidence again for the scenarios named with `canon evidence add --project <root> --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`, one each (a review stays current while the verdicts and checks are the same)".to_string());
             }
-            return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
-                .hint(format!(
+            let causes = waivable.iter().map(|v| crate::gate_refusal::Cause { code: crate::gate_refusal::subject_code(v.class), message: v.line() }).collect();
+            return crate::gate_refusal::refusal(
+                causes,
+                &format!(
                     "{}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}{}",
                     fixes.join("; "),
                     if review_gaps { " and `canon gate check` keeps listing these gaps" } else { "" },

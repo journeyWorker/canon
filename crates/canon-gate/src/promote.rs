@@ -349,6 +349,20 @@ struct RecoveredCommit {
 /// This candidate's `(role, surface)` run_seq-partition key (module
 /// doc). `None` when neither a role nor a derivable surface exists —
 /// such a candidate cannot be promoted under this scheme.
+/// Whether promotion would refuse the evidence record `body` (the body a command stages), judged without writing anything: the
+/// checks `canon gate promote` makes of a staged evidence candidate (it reads as a record of its kind; it carries the `actor.role`
+/// and the scenario or task that give its `run_seq` partition). A batch that stages many records asks this of each before its first write.
+pub fn judge_evidence_body(body: &serde_json::Value) -> Result<(), Refused> {
+    if let Some(violation) = GitTier::staged_body_violation(RecordKind::Evidence, body) {
+        return Err(refuse(violation.subject, violation.detail));
+    }
+    match serde_json::from_value::<EvidenceRecord>(body.clone()) {
+        Ok(record) if partition_key(&record).is_some() => Ok(()),
+        Ok(record) => Err(refuse(subject_of(&record), "no derivable (role, surface) run_seq partition key: record carries no `actor.role`, or neither a `scenario_id` nor a `task_id`")),
+        Err(e) => Err(refuse("<staging>", format!("candidate re-parse failed after passing the staging read's own validation: {e}"))),
+    }
+}
+
 fn partition_key(record: &EvidenceRecord) -> Option<(RoleId, String)> {
     let role = record.envelope.actor.role.clone()?;
     let surface = record

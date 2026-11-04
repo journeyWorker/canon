@@ -115,7 +115,7 @@ fn dispatch_manifest_08_adapter_authorize_reports_execution_authorized_when_the_
 #[test]
 fn dispatch_manifest_09_adapter_authorize_denies_by_default_when_the_policy_declares_no_capability_budget() {
     let dir = repo();
-    let b = refused(dir.path(), &["adapter", "authorize", "--response", &adapter("omp.json")], 1, "ADAPTER_EXECUTION_NOT_AUTHORIZED");
+    let b = refused(dir.path(), &["adapter", "authorize", "--response", &adapter("omp.json")], 1, "ADAPTER_AUTHORIZATION_FAILED");
     let data = &b["data"];
     assert_eq!(data["executionAuthorized"], false);
     assert_eq!(data["executionPerformed"], false);
@@ -156,7 +156,7 @@ fn dispatch_manifest_11_adapter_validate_prints_the_normalized_summary_of_a_well
 fn dispatch_manifest_12_adapter_validate_rejects_a_response_whose_envelope_breaks_a_rule() {
     let dir = repo();
     let before = snapshot(dir.path());
-    let b = refused(dir.path(), &["adapter", "validate", "--response", &adapter("reject-negative-cost.json")], 1, "ADAPTER_RESPONSE_INVALID");
+    let b = refused(dir.path(), &["adapter", "validate", "--response", &adapter("reject-negative-cost.json")], 1, "ADAPTER_VALIDATION_FAILED");
     assert!(b["error"]["message"].as_str().unwrap().contains("telemetry.cost_usd"), "{b}");
     assert_eq!(snapshot(dir.path()), before);
 }
@@ -281,7 +281,7 @@ fn dispatch_manifest_22_prompt_add_refuses_different_content_under_an_already_re
     let first = ok(d, &["prompt", "add", "reviewer@v1", "--manifest", "pm.json"]);
     std::fs::write(d.join("other.md"), "different\n").unwrap();
     std::fs::write(d.join("pm2.json"), prompt_manifest("other.md")).unwrap();
-    refused(d, &["prompt", "add", "reviewer@v1", "--manifest", "pm2.json"], 1, "CONTEXT_OBJECT_CONFLICT");
+    refused(d, &["prompt", "add", "reviewer@v1", "--manifest", "pm2.json"], 2, "CONTEXT_OBJECT_CONFLICT");
     let shown = ok(d, &["prompt", "show", "reviewer@v1"]);
     assert_eq!(shown["data"]["digest"], first["data"]["digest"]);
 }
@@ -471,7 +471,7 @@ fn dispatch_manifest_31_adapter_authorize_on_a_response_whose_envelope_breaks_a_
     assert_eq!(snapshot(d), broken);
 
     std::fs::write(&policy, good).unwrap();
-    refused(d, &["adapter", "authorize", "--response", &adapter("omp.json")], 1, "ADAPTER_EXECUTION_NOT_AUTHORIZED");
+    refused(d, &["adapter", "authorize", "--response", &adapter("omp.json")], 1, "ADAPTER_AUTHORIZATION_FAILED");
 }
 
 #[test]
@@ -489,12 +489,12 @@ fn dispatch_manifest_32_schema_error_adapter_refused_states_the_exit_of_each_ada
         doc["data"]["errors"].as_array().unwrap_or_else(|| panic!("{doc}")).iter().map(|code| code.as_str().unwrap().to_string()).collect()
     };
     let authorize = errors(&["adapter", "authorize"]);
-    assert!(authorize.contains(&"ADAPTER_REFUSED".to_string()) && authorize.contains(&"ADAPTER_EXECUTION_NOT_AUTHORIZED".to_string()), "{authorize:?}");
+    assert!(authorize.contains(&"ADAPTER_REFUSED".to_string()) && authorize.contains(&"ADAPTER_AUTHORIZATION_FAILED".to_string()), "{authorize:?}");
     let validate = errors(&["adapter", "validate"]);
-    assert!(validate.contains(&"ADAPTER_REFUSED".to_string()) && validate.contains(&"ADAPTER_RESPONSE_INVALID".to_string()), "{validate:?}");
-    let not_authorized = body(&run(d, &["schema", "--error", "ADAPTER_EXECUTION_NOT_AUTHORIZED"]));
+    assert!(validate.contains(&"ADAPTER_REFUSED".to_string()) && validate.contains(&"ADAPTER_VALIDATION_FAILED".to_string()), "{validate:?}");
+    let not_authorized = body(&run(d, &["schema", "--error", "ADAPTER_AUTHORIZATION_FAILED"]));
     assert_eq!(not_authorized["data"]["error"]["exit"], 1, "{not_authorized}");
-    let invalid = body(&run(d, &["schema", "--error", "ADAPTER_RESPONSE_INVALID"]));
+    let invalid = body(&run(d, &["schema", "--error", "ADAPTER_VALIDATION_FAILED"]));
     assert_eq!(invalid["data"]["error"]["exit"], 1, "{invalid}");
     assert!(meaning.contains("adapter authorize") && meaning.contains("adapter validate") && meaning.contains("could not read the response file") && meaning.contains("policy file is broken"), "{meaning}");
     assert!(invalid["data"]["error"]["meaning"].as_str().unwrap().contains("breaks a rule of the envelope"), "{invalid}");

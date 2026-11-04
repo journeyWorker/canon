@@ -468,7 +468,7 @@ fn authoring_brief_check_22_kind_chore_in_the_frontmatter_makes_a_chore_and_its_
     assert!(names_chore, "the ship check reads the chore from the frontmatter: {error}");
     assert!(error.to_string().contains("cart.add.01"), "{error}");
     let (error, names_chore) = ship_check_after(&stripped);
-    assert_eq!(error["code"], "SUBJECT_GATE_VIOLATION", "the ship check ran: {error}");
+    assert_eq!(error["code"], "SUBJECT_APPROVAL_REQUIRED", "the ship check ran: {error}");
     assert!(!names_chore, "a brief without the frontmatter is no chore to the ship check: {error}");
 }
 
@@ -706,7 +706,7 @@ fn subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_
     // is refused by the gate for its own reasons (uncovered flows), never for the old format.
     let out = canon(r, &["subject", "move", "demo", "--to", "shipped", "--json"]);
     assert_ne!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT", "a change the subject does not answer for never blocks: {}", out_text(&out));
-    assert!(out_text(&out).contains("SUBJECT_GATE_VIOLATION"), "{}", out_text(&out));
+    assert!(out_text(&out).contains("SUBJECT_APPROVAL_REQUIRED"), "{}", out_text(&out));
     // Once the old brief carries an Approved line the subject answers for it: the ship is refused naming it, nothing moves.
     write_brief(r, "draft", &approved(&old_brief("D", false, "")));
     let before = tree(r);
@@ -961,7 +961,7 @@ fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second
     expected["pins"]["scenario_digest"] = Value::from(new_pin.as_str());
     assert_eq!(new_versions[0].1, expected, "every field but the pin is as before");
     assert!(!new_versions[0].0.contains("archive") && old_versions[0].0.contains("archive"), "{versions:?}");
-    // Approved briefs read approved, with no BRIEF_CHANGED_SINCE_APPROVAL; the waived brief has no blocker.
+    // Approved briefs read approved, with no BRIEF_APPROVAL_STALE; the waived brief has no blocker.
     for change in ["a", "c", "d", "p"] {
         let shown = json(&ok(r, &["brief", "show", change, "--json"]));
         assert_ne!(shown["data"]["state"], "changed-since-approval", "{change}: {shown}");

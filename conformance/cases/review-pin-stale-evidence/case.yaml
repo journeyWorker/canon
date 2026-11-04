@@ -11,4 +11,4 @@ steps:
   - args: [gate, check]
     exit: 1
   - args: [subject, move, cart, --to, shipped]
-    exit: 1
+    exit: 2

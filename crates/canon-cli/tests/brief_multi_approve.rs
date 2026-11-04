@@ -151,11 +151,13 @@ fn skills_install_70_a_blocked_a_missing_and_an_unclosed_brief_refuse_all_and_wr
     let out = run(repo, &[&["brief", "approve", "d", "b", "ghost", "c", "--json"][..], &ANSWER].concat());
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let doc: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
-    let refused: Vec<(&str, &str)> = doc["data"]["refused"].as_array().unwrap().iter().map(|r| (r["changeId"].as_str().unwrap(), r["code"].as_str().unwrap())).collect();
+    assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
+    let details = doc["error"]["details"].as_array().unwrap_or_else(|| panic!("several refused ids list every cause: {doc}"));
+    let refused: Vec<(&str, &str)> = details.iter().map(|r| (r["message"].as_str().unwrap().split('`').nth(1).unwrap(), r["code"].as_str().unwrap())).collect();
     assert_eq!(refused, [("d", "BRIEF_APPROVE_REFUSED"), ("ghost", "BRIEF_NOT_FOUND"), ("c", "BRIEF_INVALID")], "{doc}");
+    assert_eq!(doc["error"]["code"], refused[0].1, "the error is the first refused id: {doc}");
     let message = doc["error"]["message"].as_str().unwrap();
-    assert!(message.contains("`d`") && message.contains("`ghost`") && message.contains("`c`") && !message.contains("`b`"), "{message}");
+    assert!(message.starts_with("`d`") && !message.contains("`b`"), "{message}");
 
     let after: Vec<String> = ["a", "b", "c", "d"].iter().map(|c| std::fs::read_to_string(brief_path(repo, c)).unwrap()).collect();
     assert_eq!(before, after, "no brief changed, not even the approvable ones");
@@ -279,9 +281,9 @@ fn skills_install_72_a_write_failure_keeps_earlier_ids_and_skips_the_rest() {
     let refused = run(repo, &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
     assert_eq!(refused.status.code(), Some(2), "{}", stdout(&refused));
     let doc: Value = serde_json::from_str(&stdout(&refused)).unwrap();
-    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
-    assert_eq!(doc["data"]["refused"][0]["changeId"], "b", "{doc}");
-    assert_eq!(doc["data"]["refused"][0]["code"], "WRITE_UNAVAILABLE", "{doc}");
+    assert_eq!(doc["error"]["code"], "WRITE_UNAVAILABLE", "{doc}");
+    assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
+    assert!(doc["error"]["message"].as_str().unwrap().starts_with("`b`"), "{doc}");
     for change in ["a", "b", "c"] {
         assert!(!std::fs::read_to_string(brief_path(repo, change)).unwrap().contains("Approved:"), "{change}: nothing was written");
     }

@@ -10,7 +10,7 @@
       "command": "adapter authorize",
       "effect": "read",
       "errors": [
-        "ADAPTER_EXECUTION_NOT_AUTHORIZED",
+        "ADAPTER_AUTHORIZATION_FAILED",
         "ADAPTER_REFUSED",
         "INTERNAL",
         "ROLE_INVALID",
@@ -170,7 +170,7 @@
       "effect": "read",
       "errors": [
         "ADAPTER_REFUSED",
-        "ADAPTER_RESPONSE_INVALID",
+        "ADAPTER_VALIDATION_FAILED",
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE"
@@ -4443,13 +4443,13 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONTEXT_GIT_UNAVAILABLE",
+        "CONTEXT_GIT_REQUIRED",
         "CONTEXT_INPUT_INVALID",
         "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
+        "CONTEXT_PACK_CORRUPT",
         "CONTEXT_PACK_NOT_FOUND",
-        "CONTEXT_PACK_TAMPERED",
         "CONTEXT_PATH_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -5261,13 +5261,13 @@
       "command": "context-pack show",
       "effect": "read",
       "errors": [
-        "CONTEXT_GIT_UNAVAILABLE",
+        "CONTEXT_GIT_REQUIRED",
         "CONTEXT_INPUT_INVALID",
         "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
+        "CONTEXT_PACK_CORRUPT",
         "CONTEXT_PACK_NOT_FOUND",
-        "CONTEXT_PACK_TAMPERED",
         "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
@@ -5660,13 +5660,14 @@
       "command": "context-pack verify",
       "effect": "read",
       "errors": [
-        "CONTEXT_GIT_UNAVAILABLE",
+        "CONTEXT_GIT_REQUIRED",
         "CONTEXT_INPUT_INVALID",
         "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
+        "CONTEXT_PACK_CORRUPT",
         "CONTEXT_PACK_NOT_FOUND",
-        "CONTEXT_PACK_TAMPERED",
+        "CONTEXT_PACK_VERIFY_FAILED",
         "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
@@ -5752,7 +5753,7 @@
               "type": "string"
             },
             "verified": {
-              "description": "Always `true`: a pack that fails verification is the `CONTEXT_PACK_TAMPERED` error.",
+              "description": "`true` when the pack verifies; `false` in the `data` of the failure `CONTEXT_PACK_VERIFY_FAILED` (a pack that cannot be read at all is the refusal `CONTEXT_PACK_CORRUPT` or `CONTEXT_PACK_NOT_FOUND`, with no `data`).",
               "type": "boolean"
             }
           },
@@ -5784,10 +5785,10 @@
         "BRIEF_PAGE_STALE",
         "CONFIG_INVALID",
         "DASHBOARD_FAILED",
-        "DASHBOARD_NOT_BUILT",
-        "DASHBOARD_PORT_IN_USE",
+        "DASHBOARD_PORT_UNAVAILABLE",
         "DASHBOARD_REQUEST_DENIED",
         "DASHBOARD_REQUEST_INVALID",
+        "DASHBOARD_UNSUPPORTED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -6824,12 +6825,12 @@
         "BATCH_INCOMPLETE",
         "DISPATCH_ALREADY_ENDED",
         "DISPATCH_ARGUMENT_INVALID",
-        "DISPATCH_END_IN_PROGRESS",
         "DISPATCH_MANIFEST_MISMATCH",
         "DISPATCH_MANIFEST_UNREADABLE",
         "DISPATCH_NOT_RUNNING",
         "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
+        "DISPATCH_RUN_UNAVAILABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -7851,12 +7852,12 @@
         "BATCH_INCOMPLETE",
         "DISPATCH_ALREADY_ENDED",
         "DISPATCH_ARGUMENT_INVALID",
-        "DISPATCH_END_IN_PROGRESS",
         "DISPATCH_MANIFEST_MISMATCH",
         "DISPATCH_MANIFEST_UNREADABLE",
         "DISPATCH_NOT_RUNNING",
         "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
+        "DISPATCH_RUN_UNAVAILABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -9867,7 +9868,7 @@
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
-        "DIVERGENCE_REFUSED",
+        "DIVERGENCE_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -10777,7 +10778,7 @@
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
-        "DIVERGENCE_REFUSED",
+        "DIVERGENCE_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -11495,32 +11496,35 @@
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
-        "BRIEF_CHANGED_SINCE_APPROVAL",
-        "BRIEF_UNAPPROVED",
+        "BRIEF_APPROVAL_REQUIRED",
+        "BRIEF_APPROVAL_STALE",
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
-        "EVIDENCE_BATCH_REFUSED",
         "EVIDENCE_BIND_REFUSED",
-        "EVIDENCE_CONTRACT_MISMATCH",
-        "EVIDENCE_FABRICATED",
+        "EVIDENCE_CONTRACT_CONFLICT",
         "EVIDENCE_INVALID_ARGUMENT",
+        "EVIDENCE_NOTE_INVALID",
         "EVIDENCE_REFUSED",
-        "EVIDENCE_REPORT_CONTRADICTION",
-        "GATE_TASK_EVIDENCE_INVALID",
+        "EVIDENCE_REPORT_CONFLICT",
+        "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LAYOUT_MIGRATION_REQUIRED",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
-        "PROMOTE_REFUSED",
+        "PROMOTION_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
+        "SUBJECT_APPROVAL_REQUIRED",
+        "SUBJECT_INVALID",
+        "TASK_EVIDENCE_INVALID",
         "TYPED_ATOMS_INVALID",
         "USAGE",
         "WRITE_FAILED",
@@ -12570,7 +12574,7 @@
           "description": "A refusal that `--override-reason` waived (0.28 D12): the error code the\ncommand would have refused with, and the reason given. Listed in\n`data.overrides[]` of every command that accepts the option, and recorded\non the record the waiver let through.",
           "properties": {
             "code": {
-              "description": "The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).",
+              "description": "The code of the waived refusal (`BRIEF_APPROVAL_REQUIRED`, `SUBJECT_INVALID`, …).",
               "type": "string"
             },
             "reason": {
@@ -12962,32 +12966,35 @@
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
-        "BRIEF_CHANGED_SINCE_APPROVAL",
-        "BRIEF_UNAPPROVED",
+        "BRIEF_APPROVAL_REQUIRED",
+        "BRIEF_APPROVAL_STALE",
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
-        "EVIDENCE_BATCH_REFUSED",
         "EVIDENCE_BIND_REFUSED",
-        "EVIDENCE_CONTRACT_MISMATCH",
-        "EVIDENCE_FABRICATED",
+        "EVIDENCE_CONTRACT_CONFLICT",
         "EVIDENCE_INVALID_ARGUMENT",
+        "EVIDENCE_NOTE_INVALID",
         "EVIDENCE_REFUSED",
-        "EVIDENCE_REPORT_CONTRADICTION",
-        "GATE_TASK_EVIDENCE_INVALID",
+        "EVIDENCE_REPORT_CONFLICT",
+        "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LAYOUT_MIGRATION_REQUIRED",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
-        "PROMOTE_REFUSED",
+        "PROMOTION_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
+        "SUBJECT_APPROVAL_REQUIRED",
+        "SUBJECT_INVALID",
+        "TASK_EVIDENCE_INVALID",
         "TYPED_ATOMS_INVALID",
         "USAGE",
         "WRITE_FAILED",
@@ -13955,7 +13962,7 @@
           "description": "A refusal that `--override-reason` waived (0.28 D12): the error code the\ncommand would have refused with, and the reason given. Listed in\n`data.overrides[]` of every command that accepts the option, and recorded\non the record the waiver let through.",
           "properties": {
             "code": {
-              "description": "The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).",
+              "description": "The code of the waived refusal (`BRIEF_APPROVAL_REQUIRED`, `SUBJECT_INVALID`, …).",
               "type": "string"
             },
             "reason": {
@@ -18386,15 +18393,21 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_UNREADABLE",
+        "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LAYOUT_MIGRATION_REQUIRED",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
-        "PROMOTE_REFUSED",
+        "PROMOTION_INVALID",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
+        "SUBJECT_APPROVAL_REQUIRED",
+        "SUBJECT_INVALID",
+        "TASK_EVIDENCE_INVALID",
+        "TYPED_ATOMS_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -18540,7 +18553,7 @@
           "type": "object"
         },
         "BatchGatePromoteReportGatePromoteReport": {
-          "description": "`canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.",
+          "description": "`canon gate promote`: what left staging. A refusal (`PROMOTION_INVALID`, exit 2) carries no `data`.",
           "properties": {
             "dryRun": {
               "type": "boolean"
@@ -18784,7 +18797,7 @@
           "type": "object"
         },
         "GatePromoteReport": {
-          "description": "`canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.",
+          "description": "`canon gate promote`: what left staging. A refusal (`PROMOTION_INVALID`, exit 2) carries no `data`.",
           "properties": {
             "dryRun": {
               "type": "boolean"
@@ -18935,7 +18948,7 @@
         "BATCH_INCOMPLETE",
         "CONFIG_REQUIRED",
         "INGEST_FAILED",
-        "INGEST_SOURCE_UNUSABLE",
+        "INGEST_SOURCE_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -19430,13 +19443,6 @@
               "minimum": 1,
               "type": "integer"
             },
-            "nonCleanSources": {
-              "description": "Every source this pass flagged non-clean (s18 spec) — the CLI\nlayer (`main.rs::run_ingest_plans`) prints an unconditional\nstderr WARN per entry and exits non-zero whenever this is\nnon-empty. Empty for an ordinary clean/partial-success pass.",
-              "items": {
-                "$ref": "#/schemas/NonCleanSource"
-              },
-              "type": "array"
-            },
             "sources": {
               "items": {
                 "$ref": "#/schemas/PlanSourceSummary"
@@ -19481,8 +19487,7 @@
             "tasksPersisted",
             "duplicateChangeId",
             "unwrittenChanges",
-            "unwrittenTasks",
-            "nonCleanSources"
+            "unwrittenTasks"
           ],
           "title": "PlansOutcome",
           "type": "object"
@@ -19534,28 +19539,6 @@
           "required": [
             "path",
             "reason"
-          ],
-          "type": "object"
-        },
-        "NonCleanSource": {
-          "description": "One configured source this pass found `malformed > 0` AND persisted\nZERO records for (`changes_persisted == 0 && tasks_persisted == 0`)\n— s18 `loud-plan-import-diagnostics` spec's \"A malformed-nonzero,\nzero-persisted source makes canon ingest plans non-clean at the\nprocess level\". Never flagged for a legitimately empty/fresh source\n(`malformed == 0`) or a partial success (`persisted > 0`) — see\n[`run`]'s own flagging logic.",
-          "properties": {
-            "dialect": {
-              "type": "string"
-            },
-            "malformed": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "root": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "dialect",
-            "root",
-            "malformed"
           ],
           "type": "object"
         },
@@ -19671,13 +19654,6 @@
                 "null"
               ]
             },
-            "nonCleanSources": {
-              "description": "Every source this pass flagged non-clean (s18 spec) — the CLI\nlayer (`main.rs::run_ingest_plans`) prints an unconditional\nstderr WARN per entry and exits non-zero whenever this is\nnon-empty. Empty for an ordinary clean/partial-success pass.",
-              "items": {
-                "$ref": "#/schemas/NonCleanSource"
-              },
-              "type": "array"
-            },
             "sources": {
               "items": {
                 "$ref": "#/schemas/PlanSourceSummary"
@@ -19710,8 +19686,7 @@
             "tasksPersisted",
             "duplicateChangeId",
             "unwrittenChanges",
-            "unwrittenTasks",
-            "nonCleanSources"
+            "unwrittenTasks"
           ],
           "type": "object"
         },
@@ -25018,13 +24993,13 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONTEXT_GIT_UNAVAILABLE",
+        "CONTEXT_GIT_REQUIRED",
         "CONTEXT_INPUT_INVALID",
         "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
+        "CONTEXT_PACK_CORRUPT",
         "CONTEXT_PACK_NOT_FOUND",
-        "CONTEXT_PACK_TAMPERED",
         "CONTEXT_PATH_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -25582,13 +25557,13 @@
       "command": "prompt show",
       "effect": "read",
       "errors": [
-        "CONTEXT_GIT_UNAVAILABLE",
+        "CONTEXT_GIT_REQUIRED",
         "CONTEXT_INPUT_INVALID",
         "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
+        "CONTEXT_PACK_CORRUPT",
         "CONTEXT_PACK_NOT_FOUND",
-        "CONTEXT_PACK_TAMPERED",
         "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
@@ -27591,8 +27566,8 @@
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
+        "REPORT_CHECK_FAILED",
         "REPORT_FAILED",
-        "REPORT_STALE",
         "ROLE_INVALID",
         "USAGE"
       ],
@@ -34213,10 +34188,10 @@
       "errors": [
         "CONFIG_UNREADABLE",
         "INTERNAL",
-        "LEARN_EVALUATION_REJECTED",
         "REPO_UNREADABLE",
         "ROLE_INVALID",
         "STRATEGY_DEMOTION_FAILED",
+        "STRATEGY_EVALUATION_INVALID",
         "STRATEGY_FILE_INVALID",
         "STRATEGY_NOT_FOUND",
         "USAGE"
@@ -34412,15 +34387,16 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "LEARN_PROMOTION_BLOCKED",
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
+        "STOPPED_MIDWAY",
         "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_FILE_INVALID",
+        "STRATEGY_PROMOTION_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -35580,7 +35556,6 @@
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
-        "SUBJECT_GATE_VIOLATION",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -36285,21 +36260,25 @@
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
         "CONFIG_REQUIRED",
+        "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LAYOUT_MIGRATION_REQUIRED",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
+        "POLICY_APPROVAL_STALE",
         "POLICY_APPROVAL_UNREADABLE",
-        "POLICY_CHANGED_SINCE_APPROVAL",
+        "PROMOTION_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
+        "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_ARGUMENT_INVALID",
         "SUBJECT_CONFLICT",
-        "SUBJECT_GATE_VIOLATION",
+        "SUBJECT_INVALID",
         "SUBJECT_NOT_FOUND",
         "SUBJECT_REASON_REQUIRED",
         "USAGE",
@@ -36746,7 +36725,7 @@
           "description": "A refusal that `--override-reason` waived (0.28 D12): the error code the\ncommand would have refused with, and the reason given. Listed in\n`data.overrides[]` of every command that accepts the option, and recorded\non the record the waiver let through.",
           "properties": {
             "code": {
-              "description": "The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).",
+              "description": "The code of the waived refusal (`BRIEF_APPROVAL_REQUIRED`, `SUBJECT_INVALID`, …).",
               "type": "string"
             },
             "reason": {
@@ -37226,7 +37205,6 @@
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_ARGUMENT_INVALID",
         "SUBJECT_EXISTS",
-        "SUBJECT_GATE_VIOLATION",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -38012,7 +37990,6 @@
         "REPO_UNREADABLE",
         "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
-        "SUBJECT_GATE_VIOLATION",
         "SUBJECT_NOT_FOUND",
         "USAGE"
       ],
@@ -38384,7 +38361,6 @@
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
-        "SUBJECT_GATE_VIOLATION",
         "SUBJECT_UNADOPT_REFUSED",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -39088,17 +39064,17 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_UNREADABLE",
-        "GATE_TASK_BLOCKED",
-        "GATE_TASK_EVIDENCE_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "PROMOTE_FAILED",
-        "PROMOTE_REFUSED",
+        "PROMOTION_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
+        "TASK_EVIDENCE_INVALID",
+        "TASK_EVIDENCE_REQUIRED",
         "TASK_ID_INVALID",
         "TASK_NOT_FOUND",
         "TASK_ROW_NOT_FOUND",
@@ -40157,10 +40133,10 @@
       "retryable": false
     },
     {
-      "code": "ADAPTER_EXECUTION_NOT_AUTHORIZED",
+      "code": "ADAPTER_AUTHORIZATION_FAILED",
       "exit": 1,
       "fix": "Have the adapter return a response that authorizes execution, or do not run the command through this adapter.",
-      "meaning": "the adapter response did not authorize execution",
+      "meaning": "`adapter authorize` read the response and its answer is that execution is not authorized: the check's negative answer, its result in data",
       "retryable": false
     },
     {
@@ -40171,7 +40147,7 @@
       "retryable": false
     },
     {
-      "code": "ADAPTER_RESPONSE_INVALID",
+      "code": "ADAPTER_VALIDATION_FAILED",
       "exit": 1,
       "fix": "Fix the response envelope the message names, then run `canon adapter validate` again.",
       "meaning": "`adapter validate` read the response and it breaks a rule of the envelope: the check's negative answer",
@@ -40220,17 +40196,24 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_APPROVAL_REQUIRED",
+      "exit": 2,
+      "fix": "Have the human approve the subject's brief with `canon brief approve` before attesting.",
+      "meaning": "an attestation was refused because the subject's brief has no human approval",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_APPROVAL_STALE",
+      "exit": 2,
+      "fix": "Review the edited brief and have the human run `canon brief approve` again.",
+      "meaning": "the brief was edited after the human approved it, so it reads as not approved until approved again",
+      "retryable": false
+    },
+    {
       "code": "BRIEF_APPROVE_REFUSED",
       "exit": 2,
       "fix": "Resolve what each refused id names (`canon brief check` lists blocker findings), then ask the human to approve again.",
       "meaning": "`brief approve` was refused because a brief has blocker findings, or, for several ids, because at least one id was refused (a blocker, no brief, a brief that cannot carry the line); data.refused names each with its own code; nothing was written",
-      "retryable": false
-    },
-    {
-      "code": "BRIEF_CHANGED_SINCE_APPROVAL",
-      "exit": 1,
-      "fix": "Review the edited brief and have the human run `canon brief approve` again.",
-      "meaning": "the brief was edited after the human approved it, so it reads as not approved until approved again",
       "retryable": false
     },
     {
@@ -40273,13 +40256,6 @@
       "exit": 2,
       "fix": "Reload the dashboard page to see the current brief, then approve it again.",
       "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
-      "retryable": false
-    },
-    {
-      "code": "BRIEF_UNAPPROVED",
-      "exit": 1,
-      "fix": "Have the human approve the subject's brief with `canon brief approve` before attesting.",
-      "meaning": "an attestation was refused because the subject's brief has no human approval",
       "retryable": false
     },
     {
@@ -40381,8 +40357,8 @@
       "retryable": false
     },
     {
-      "code": "CONTEXT_GIT_UNAVAILABLE",
-      "exit": 1,
+      "code": "CONTEXT_GIT_REQUIRED",
+      "exit": 2,
       "fix": "Run the command inside a git checkout with a resolvable HEAD and git on the PATH.",
       "meaning": "a context pack needs a git identity that is not available",
       "retryable": false
@@ -40417,9 +40393,16 @@
     },
     {
       "code": "CONTEXT_OBJECT_CONFLICT",
-      "exit": 1,
+      "exit": 2,
       "fix": "Do not overwrite the immutable context object; build a new pack from the current inputs.",
       "meaning": "an immutable context object already holds different bytes",
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_PACK_CORRUPT",
+      "exit": 2,
+      "fix": "Discard the stale or altered pack and build a new one.",
+      "meaning": "a context pack that a command other than `context-pack verify` reads is stale or was changed after it was created",
       "retryable": false
     },
     {
@@ -40430,10 +40413,10 @@
       "retryable": false
     },
     {
-      "code": "CONTEXT_PACK_TAMPERED",
+      "code": "CONTEXT_PACK_VERIFY_FAILED",
       "exit": 1,
-      "fix": "Discard the stale or altered pack and build a new one.",
-      "meaning": "a context pack is stale or was changed after it was created",
+      "fix": "Discard the stale or altered pack and build a new one with `canon context-pack add`.",
+      "meaning": "`context-pack verify` read the pack and its answer is that the pack does not verify: it is stale or was changed after it was created",
       "retryable": false
     },
     {
@@ -40475,15 +40458,8 @@
       "retryable": false
     },
     {
-      "code": "DASHBOARD_NOT_BUILT",
-      "exit": 1,
-      "fix": "Use a canon binary that embeds the dashboard app, or build the dashboard into the repo.",
-      "meaning": "this canon binary embeds no dashboard app and the repo holds no build of canon's own",
-      "retryable": false
-    },
-    {
-      "code": "DASHBOARD_PORT_IN_USE",
-      "exit": 1,
+      "code": "DASHBOARD_PORT_UNAVAILABLE",
+      "exit": 2,
       "fix": "Stop the process holding the port or choose another port, then start the dashboard again.",
       "meaning": "the dashboard's port is already bound by another process",
       "retryable": true
@@ -40500,6 +40476,13 @@
       "exit": 2,
       "fix": "Send requests only through the briefs page the dashboard serves.",
       "meaning": "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_UNSUPPORTED",
+      "exit": 2,
+      "fix": "Use a canon binary that embeds the dashboard app, or build the dashboard into the repo.",
+      "meaning": "this canon binary embeds no dashboard app and the repo holds no build of canon's own",
       "retryable": false
     },
     {
@@ -40522,13 +40505,6 @@
       "fix": "Remove the conflicting dispatch flags; see `canon schema` for the command's options.",
       "meaning": "a dispatch flag combination is invalid",
       "retryable": false
-    },
-    {
-      "code": "DISPATCH_END_IN_PROGRESS",
-      "exit": 1,
-      "fix": "Wait a moment and run `canon dispatch end` again.",
-      "meaning": "another process is closing the run; retry",
-      "retryable": true
     },
     {
       "code": "DISPATCH_MANIFEST_MISMATCH",
@@ -40566,6 +40542,13 @@
       "retryable": false
     },
     {
+      "code": "DISPATCH_RUN_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Wait a moment and run `canon dispatch end` again.",
+      "meaning": "another process is closing the run; retry",
+      "retryable": true
+    },
+    {
       "code": "DIVERGENCE_ACCEPT_REFUSED",
       "exit": 2,
       "fix": "Accept only divergent evidence as a reviewer whose actor and session did not attest it; `canon divergence list` shows candidates.",
@@ -40580,10 +40563,10 @@
       "retryable": false
     },
     {
-      "code": "DIVERGENCE_REFUSED",
-      "exit": 1,
+      "code": "DIVERGENCE_INVALID",
+      "exit": 2,
       "fix": "Resolve the gate rule the error names, then run `canon gate promote --kind divergence` again.",
-      "meaning": "a divergence candidate was refused by a gate rule",
+      "meaning": "a divergence candidate breaks a rule of the gate; nothing was written",
       "retryable": false
     },
     {
@@ -40606,13 +40589,6 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_BATCH_REFUSED",
-      "exit": 1,
-      "fix": "Fix the entry the error names and submit the whole batch again; nothing was kept.",
-      "meaning": "a batch attestation was refused by the gate while its records were being promoted; every record and blob the run wrote was removed",
-      "retryable": false
-    },
-    {
       "code": "EVIDENCE_BIND_REFUSED",
       "exit": 2,
       "fix": "Pass a --report or --file that exists inside the repository and passes the binding rules named in the error.",
@@ -40620,17 +40596,10 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_CONTRACT_MISMATCH",
-      "exit": 1,
+      "code": "EVIDENCE_CONTRACT_CONFLICT",
+      "exit": 2,
       "fix": "Record evidence whose kind and ref match the task's typed evidence contract.",
       "meaning": "the record's kind and ref differ from the task's typed evidence contract",
-      "retryable": false
-    },
-    {
-      "code": "EVIDENCE_FABRICATED",
-      "exit": 1,
-      "fix": "Rewrite the note to state only what was actually run, without fabrication markers or unsupported verified claims.",
-      "meaning": "the note carries a fabrication marker or an unsupported verified claim",
       "retryable": false
     },
     {
@@ -40641,6 +40610,13 @@
       "retryable": false
     },
     {
+      "code": "EVIDENCE_NOTE_INVALID",
+      "exit": 2,
+      "fix": "Rewrite the note to state only what was actually run, without fabrication markers or unsupported verified claims.",
+      "meaning": "the note carries a fabrication marker or an unsupported verified claim",
+      "retryable": false
+    },
+    {
       "code": "EVIDENCE_REFUSED",
       "exit": 2,
       "fix": "Satisfy the evidence rule named in the error, then attest again.",
@@ -40648,8 +40624,8 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_REPORT_CONTRADICTION",
-      "exit": 1,
+      "code": "EVIDENCE_REPORT_CONFLICT",
+      "exit": 2,
       "fix": "Re-run the check so the report supports the verdict, or change the verdict to match the report.",
       "meaning": "the bound report contradicts the verdict",
       "retryable": false
@@ -40659,6 +40635,13 @@
       "exit": 2,
       "fix": "Run `canon inventory sync` so the scenario is indexed, or pass the id of a scenario the spec root declares.",
       "meaning": "`evidence approval-payload` names a scenario the scenario index does not hold, so there are no bytes to sign",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_STALE",
+      "exit": 2,
+      "fix": "Record the evidence again (`canon evidence add`), then run the command again.",
+      "meaning": "the evidence a review or an approval rests on is out of date: the spec, the code or the report changed since it was recorded; nothing was written",
       "retryable": false
     },
     {
@@ -40760,20 +40743,6 @@
       "retryable": false
     },
     {
-      "code": "GATE_TASK_BLOCKED",
-      "exit": 1,
-      "fix": "Attach the evidence the task requires, then run `canon task done` again.",
-      "meaning": "`task done` refused to flip the task: its evidence does not support it",
-      "retryable": false
-    },
-    {
-      "code": "GATE_TASK_EVIDENCE_INVALID",
-      "exit": 1,
-      "fix": "Correct the task's evidence or typed atom named in the error, then run `canon task done` again.",
-      "meaning": "the evidence or typed atom for the task is invalid",
-      "retryable": false
-    },
-    {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 1,
       "fix": "Check that the hook file and its directory are writable, then run `canon gate install-hooks` again.",
@@ -40795,8 +40764,8 @@
       "retryable": false
     },
     {
-      "code": "INGEST_SOURCE_UNUSABLE",
-      "exit": 1,
+      "code": "INGEST_SOURCE_INVALID",
+      "exit": 2,
       "fix": "Fix the malformed plan source under its configured root, then run `canon ingest plans` again.",
       "meaning": "an `ingest plans` source was malformed and persisted nothing; check its root",
       "retryable": false
@@ -40926,22 +40895,8 @@
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",
       "exit": 2,
-      "fix": "Run `canon migrate` to move the spec root to the current layout.",
+      "fix": "Run `canon migrate` to preview the move, then apply it as the preview says.",
       "meaning": "the spec root uses a pre-0.17 layout; run `canon migrate`",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_EVALUATION_REJECTED",
-      "exit": 1,
-      "fix": "Supply an evaluation file that fits the candidate strategy, then run `canon strategy promote` again.",
-      "meaning": "the promotion evaluation does not fit the candidate strategy",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_PROMOTION_BLOCKED",
-      "exit": 1,
-      "fix": "Resolve what the promotion gate reports for this strategy, then run `canon strategy promote` again.",
-      "meaning": "the promotion gate blocks this strategy",
       "retryable": false
     },
     {
@@ -41085,17 +41040,17 @@
       "retryable": false
     },
     {
+      "code": "POLICY_APPROVAL_STALE",
+      "exit": 2,
+      "fix": "Restore `.canon/policy.yaml` to the approved bytes, or have the human run `canon policy approve` again.",
+      "meaning": "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it",
+      "retryable": false
+    },
+    {
       "code": "POLICY_APPROVAL_UNREADABLE",
       "exit": 1,
       "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
       "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 1), and `--override-reason` does not waive it",
-      "retryable": false
-    },
-    {
-      "code": "POLICY_CHANGED_SINCE_APPROVAL",
-      "exit": 1,
-      "fix": "Restore `.canon/policy.yaml` to the approved bytes, or have the human run `canon policy approve` again.",
-      "meaning": "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it",
       "retryable": false
     },
     {
@@ -41106,10 +41061,10 @@
       "retryable": false
     },
     {
-      "code": "PROMOTE_REFUSED",
-      "exit": 1,
-      "fix": "Fix each record listed in data.refused, then run `canon gate promote` again.",
-      "meaning": "`gate promote` refused one or more staged records; data.refused names each",
+      "code": "PROMOTION_INVALID",
+      "exit": 2,
+      "fix": "Fix each record error.details names (the error itself when it names one), then run `canon gate promote` again.",
+      "meaning": "`gate promote` refused one or more staged records, which stay staged; error.details names each when there are several",
       "retryable": false
     },
     {
@@ -41148,17 +41103,24 @@
       "retryable": false
     },
     {
+      "code": "REPORT_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Read data, then run `canon report build` or `canon report snapshot` to refresh the report.",
+      "meaning": "`report check` ran and its answer is that the report is not what it should be; the result is in data",
+      "reasons": [
+        {
+          "fix": "Run `canon report build` or `canon report snapshot` to refresh the report.",
+          "meaning": "`report check` found the report missing or out of date",
+          "reason": "STALE"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "REPORT_FAILED",
       "exit": 1,
       "fix": "Read the error message, fix its cause, then run `canon report build` or `canon report check` again.",
       "meaning": "the report could not be built or checked",
-      "retryable": false
-    },
-    {
-      "code": "REPORT_STALE",
-      "exit": 1,
-      "fix": "Run `canon report build` or `canon report snapshot` to refresh the report.",
-      "meaning": "`report check` found the report missing or out of date",
       "retryable": false
     },
     {
@@ -41343,9 +41305,19 @@
       "meaning": "a command that works in steps stopped after an earlier step made its effects, because a later step met what the command refuses before its work; `reason` is the code of that refusal, and the message and `meta.next` say what was already done",
       "reasons": [
         {
+          "fix": "Read what was done (`canon status`), fix the record the message names, then run `canon gate promote`; the refused record is still staged, so do not add it again.",
+          "meaning": "a command staged a record and the gate then refused to promote it, so the record stays staged and was not committed",
+          "reason": "PROMOTION_INVALID"
+        },
+        {
           "fix": "Read what init wrote (`canon status`), fix the skill source or the `skills:` section the message names, then run `canon skills install`; do not run `canon init` again.",
           "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md, or the providers or the `skills:` section are invalid: what `canon skills install` refuses before it starts",
           "reason": "SKILLS_INVALID_ARGUMENT"
+        },
+        {
+          "fix": "Read what was done (`canon status`, `canon strategy promote <id> --dry-run`), then record the evidence the gate asks for (`canon ingest records`).",
+          "meaning": "`canon strategy promote` demoted an active strategy because a contradicting trajectory turned it off, and then the promotion gate blocked the promotion, so the strategy stays demoted",
+          "reason": "STRATEGY_PROMOTION_INVALID"
         }
       ],
       "retryable": false
@@ -41365,6 +41337,13 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_EVALUATION_INVALID",
+      "exit": 2,
+      "fix": "Supply an evaluation file that fits the candidate strategy, then run `canon strategy promote` again.",
+      "meaning": "the promotion evaluation does not fit the candidate strategy",
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_FILE_INVALID",
       "exit": 2,
       "fix": "Fix the evaluation or approval file so it parses and matches its schema.",
@@ -41379,10 +41358,24 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_PROMOTION_INVALID",
+      "exit": 2,
+      "fix": "Resolve what the promotion gate reports for this strategy, then run `canon strategy promote` again.",
+      "meaning": "the promotion gate blocks this strategy; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "SUBJECT_ADOPT_REFUSED",
       "exit": 2,
       "fix": "Fix the problem the error names, then run `canon subject adopt` again.",
       "meaning": "the change could not be adopted by the subject",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_APPROVAL_REQUIRED",
+      "exit": 2,
+      "fix": "Get what error.details names (a human's approval of the brief, an independent review, evidence for the scenario), then run `canon subject move` again.",
+      "meaning": "the status transition needs an approval, a review or evidence the subject does not have; error.details names each cause when there are several, and nothing was written",
       "retryable": false
     },
     {
@@ -41414,10 +41407,10 @@
       "retryable": false
     },
     {
-      "code": "SUBJECT_GATE_VIOLATION",
-      "exit": 1,
-      "fix": "Fix each gate violation reported, then run `canon subject move` again.",
-      "meaning": "the status transition is blocked by gate violations",
+      "code": "SUBJECT_INVALID",
+      "exit": 2,
+      "fix": "Fix each cause error.details names (the error itself when it names one), then run `canon subject move` again.",
+      "meaning": "the status transition breaks a rule of the gate that is not a missing approval, review or evidence; error.details names each cause when there are several",
       "retryable": false
     },
     {
@@ -41439,6 +41432,20 @@
       "exit": 2,
       "fix": "Leave the change adopted, or remove its approved brief and the `@flow:<change>.*` scenario tags first.",
       "meaning": "the change carries an approved brief, or a scenario the subject owns is tagged `@flow:<change>.*`, so it stays adopted",
+      "retryable": false
+    },
+    {
+      "code": "TASK_EVIDENCE_INVALID",
+      "exit": 2,
+      "fix": "Correct the task's evidence or typed atom named in the error, then run `canon task done` again.",
+      "meaning": "the evidence or typed atom for the task is invalid",
+      "retryable": false
+    },
+    {
+      "code": "TASK_EVIDENCE_REQUIRED",
+      "exit": 2,
+      "fix": "Attach the evidence the task requires, then run `canon task done` again.",
+      "meaning": "`task done` refused to flip the task: its evidence does not support it",
       "retryable": false
     },
     {

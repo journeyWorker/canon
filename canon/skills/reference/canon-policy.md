@@ -117,7 +117,7 @@ unreviewed-promotion policy — policy changed since approval: .canon/policy.yam
 ```
 
 `canon gate check` exits `1`; `canon subject move` (the ship guard and
-the reopen) refuses with `POLICY_CHANGED_SINCE_APPROVAL`, or
+the reopen) refuses with `POLICY_APPROVAL_STALE`, or
 `POLICY_APPROVAL_UNREADABLE` for an unreadable approval, and
 `--override-reason` does not waive either. A policy never approved stays
 an advisory. `canon status` prints the same text as a `warning:` line (and

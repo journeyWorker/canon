@@ -518,7 +518,7 @@ Feature: evidence add
   Scenario: A fabrication marker is refused the way every other gate-red refusal of evidence add is
     Given a summary holding "TBD" and a command result reading "n/a"
     When evidence is added with them
-    Then the command exits 1 with the code EVIDENCE_FABRICATED and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
+    Then the command exits 1 with the code EVIDENCE_NOTE_INVALID and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
     And nothing is staged or committed
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -598,7 +598,7 @@ Feature: evidence add
     Given a verifying subject with an approved change A, a scenario tagged @flow:A.F1, an untagged scenario, and a task of A, then a draft change B adopted
     When evidence is added for each of them, and for a new scenario tagged @flow:B.F1
     Then the adoption warns, and the untagged scenario, the A-tagged scenario and A's task are accepted
-    And the B-tagged scenario is refused BRIEF_UNAPPROVED naming B's brief.md, and moving the subject to shipped still refuses on B
+    And the B-tagged scenario is refused BRIEF_APPROVAL_REQUIRED naming B's brief.md, and moving the subject to shipped still refuses on B
     And once B is approved the B-tagged scenario is accepted
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:37Z","actor":{"agent_id":"canon-impl-025"}}
@@ -608,7 +608,7 @@ Feature: evidence add
   Scenario: A subject whose only change is unapproved, or whose approval was edited, still refuses evidence
     Given a verifying subject whose only change has a brief.md with no "Approved:" line, or an approved one edited since
     When evidence is added for an untagged scenario and for one tagged @flow: with that change
-    Then each add exits 1 with BRIEF_UNAPPROVED, or BRIEF_CHANGED_SINCE_APPROVAL for the edited approval, naming that brief.md
+    Then each add exits 1 with BRIEF_APPROVAL_REQUIRED, or BRIEF_APPROVAL_STALE for the edited approval, naming that brief.md
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:42Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:evidence-attestation
@@ -619,7 +619,7 @@ Feature: evidence add
     When evidence is added again for an evidenced untagged scenario, and for one that was never evidenced
     Then the evidenced one is accepted, being existing behavior attested before any approved scope and before the subject adopted its first change
     And evidence recorded only after that adoption, for example while the subject was specced, does not exempt the scenario
-    And the never-evidenced one is refused BRIEF_UNAPPROVED naming the draft change's brief.md
+    And the never-evidenced one is refused BRIEF_APPROVAL_REQUIRED naming the draft change's brief.md
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:00Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:evidence-attestation
@@ -850,7 +850,7 @@ Feature: evidence add
   Scenario: A tagged scenario's evidence waits only for its tagged changes and a scenario whose tag was removed reads as untagged
     Given a building subject owning a scenario tagged @flow:a.F1 and another tagged @flow:b.F1, with a approved and b's brief edited after its approval
     When evidence is added for each scenario
-    Then the scenario tagged for a is attested and the one tagged for b is refused BRIEF_CHANGED_SINCE_APPROVAL naming b's brief.md
+    Then the scenario tagged for a is attested and the one tagged for b is refused BRIEF_APPROVAL_STALE naming b's brief.md
     And a scenario whose tags were removed is read as untagged and answers to every approved change instead
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:26Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
@@ -861,7 +861,7 @@ Feature: evidence add
   Scenario: An untagged scenario's evidence is refused when an approved governing change was edited since its approval
     Given a building subject owning a scenario with no @flow tag, adopting an approved change whose brief was edited after its approval
     When evidence is added for that scenario
-    Then it exits 1 with BRIEF_CHANGED_SINCE_APPROVAL naming that brief.md and nothing is staged
+    Then it exits 1 with BRIEF_APPROVAL_STALE naming that brief.md and nothing is staged
     And once the brief is approved again the same add succeeds
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:28Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

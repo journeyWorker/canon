@@ -22,12 +22,13 @@ fn run_adapter_validate(response: &std::path::Path, repo: &std::path::Path, json
             // A missing or unreadable file is a refusal (2); an envelope that does not validate is the check's finding (1).
             let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
             let message = error.to_string();
-            let error = if refused {
-                CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
-            } else {
-                CliError::failed("ADAPTER_RESPONSE_INVALID", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
-            };
-            return ExitCode::from(error.emit("canon adapter validate", json));
+            if refused {
+                let error = CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it");
+                return ExitCode::from(error.emit("canon adapter validate", json));
+            }
+            // The failure keeps the result in `data`.
+            let failed = CliError::failed("ADAPTER_VALIDATION_FAILED", message.clone()).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it");
+            return ExitCode::from(failed.emit_with_data("canon adapter validate", json, &crate::adapter::ValidationFailure { valid: false, problem: message }));
         }
     };
 
@@ -63,7 +64,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
     let result = match crate::adapter::authorize_response(response, repo) {
         Ok(result) => result,
         Err(error) => {
-            // Every refusal of `authorize` is exit 2: a response that cannot be read or validated, or a policy file that is broken. Exit 1 stays with ADAPTER_EXECUTION_NOT_AUTHORIZED.
+            // Every refusal of `authorize` is exit 2: a response that cannot be read or validated, or a policy file that is broken. Exit 1 stays with ADAPTER_AUTHORIZATION_FAILED.
             let hint = match error {
                 crate::adapter::AdapterError::Io { .. } => "check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it",
                 crate::adapter::AdapterError::Policy(_) => "fix the policy file `.canon/policy.yaml` (its adapter_capabilities section), then run `canon adapter authorize` again",
@@ -77,7 +78,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
         crate::json_out::data("adapter authorize", &result);
     } else if json {
         // The failure keeps the result in `data`.
-        let error = CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --approver <name>`, or drop it from the response");
+        let error = CliError::failed("ADAPTER_AUTHORIZATION_FAILED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --approver <name>`, or drop it from the response");
         return ExitCode::from(error.emit_with_data("canon adapter authorize", true, &result));
     } else {
         println!("execution_authorized: {}", result.execution_authorized);
@@ -88,7 +89,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
     if result.execution_authorized {
         ExitCode::SUCCESS
     } else {
-        ExitCode::from(CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --approver <name>`, or drop it from the response").emit("canon adapter authorize", false))
+        ExitCode::from(CliError::failed("ADAPTER_AUTHORIZATION_FAILED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --approver <name>`, or drop it from the response").emit("canon adapter authorize", false))
     }
 }
 

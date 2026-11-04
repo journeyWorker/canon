@@ -1,6 +1,6 @@
 //! `canon context-pack` — the handlers of the group.
 
-use crate::cli_error::CliErrorExt as _;
+use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::cli::context_pack::{ContextPackCommand, ContextPackShowArgs, ContextPackVerifyArgs, ContextPackAddArgs};
 use std::process::ExitCode;
 
@@ -63,6 +63,11 @@ fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> Exit
                 println!("context pack {id} verified");
             }
             ExitCode::SUCCESS
+        }
+        // The check's negative answer: the pack was read and does not verify. `data` says so; a pack that cannot be read at all is a refusal.
+        Err(error @ crate::context_pack::ContextPackError::Tampered { .. }) => {
+            let failed = CliError::failed("CONTEXT_PACK_VERIFY_FAILED", error.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack add`");
+            ExitCode::from(failed.emit_with_data("canon context-pack verify", json, &crate::context_pack::VerifyReport { id: id.to_string(), verified: false }))
         }
         Err(error) => {
             ExitCode::from(error.to_cli_error().emit("canon context-pack verify", json))

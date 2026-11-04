@@ -15,7 +15,7 @@
 //!    `CANON_DASHBOARD_DIST` at build time, `build.rs`), stored gzip-compressed:
 //!    sent as is to a browser that accepts gzip, decompressed for one that
 //!    does not.
-//! 3. Neither: `DASHBOARD_NOT_BUILT`.
+//! 3. Neither: `DASHBOARD_UNSUPPORTED`.
 //!
 //! Neither source serves `/snapshot/`: the app is built with a demo fixture
 //! there, and a served page must never show demo data as the repo's.
@@ -119,10 +119,10 @@ impl DashboardError {
     pub fn to_cli_error(&self) -> CliError {
         match self {
             DashboardError::Config(_) => CliError::refused("CONFIG_INVALID", self.to_string()).reason("DASHBOARD").hint("fix the dashboard settings in canon.yaml (`canon init --check` reports what is wrong)"),
-            DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_NOT_BUILT", self.to_string())
+            DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_UNSUPPORTED", self.to_string())
                 .hint("install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout"),
             DashboardError::RepoMissing(_) => CliError::refused("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
-            DashboardError::PortInUse(_) => CliError::failed("DASHBOARD_PORT_IN_USE", self.to_string()).hint("pass `--port <n>` to serve on another port, or `--port 0` for any free one"),
+            DashboardError::PortInUse(_) => CliError::failed("DASHBOARD_PORT_UNAVAILABLE", self.to_string()).hint("pass `--port <n>` to serve on another port, or `--port 0` for any free one"),
             DashboardError::Io(_) => CliError::failed("DASHBOARD_FAILED", self.to_string()).hint("the message names the cause: fix it (check that the repository is readable), then run `canon dashboard` again"),
         }
     }
@@ -319,8 +319,9 @@ fn prepare_with(repo: &Path, snapshot: Option<&Path>, port: u16, embedded: &'sta
     let (repo, inputs) = resolve_inputs(repo)?;
     let app = resolve_app(&repo, embedded)?;
     let snapshot_dir = resolve_snapshot_dir(&repo, snapshot);
-    let state = ensure_snapshot(&inputs, &snapshot_dir, snapshot.is_some());
+    // The port is taken before the snapshot is written: a command that cannot start (`DASHBOARD_PORT_UNAVAILABLE`, exit 2) has written nothing.
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| if e.kind() == std::io::ErrorKind::AddrInUse { DashboardError::PortInUse(port) } else { e.into() })?;
+    let state = ensure_snapshot(&inputs, &snapshot_dir, snapshot.is_some());
     Ok(BoundDashboard { listener, repo, app, snapshot_dir, snapshot: state })
 }
 

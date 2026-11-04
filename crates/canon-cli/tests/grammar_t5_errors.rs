@@ -55,7 +55,8 @@ fn live_sources(dir: &Path, out: &mut Vec<(String, String)>) {
     }
 }
 
-/// Every string literal a source hands to `CliError::refused(` / `::failed(` (the constructors of a coded error).
+/// Every string literal a source hands to `CliError::refused(` / `::failed(` (the constructors of a coded error), to a local `refuse(` helper
+/// (`brief_approve.rs`) and to the `Cause { code: … }` of a gate's refusal (`gate_refusal.rs`, `run/ingest.rs`).
 #[test]
 fn every_code_a_source_builds_is_registered() {
     let registry: BTreeSet<&str> = all_codes().iter().map(|i| i.code).collect();
@@ -63,7 +64,7 @@ fn every_code_a_source_builds_is_registered() {
     live_sources(&repo_root().join("crates/canon-cli/src"), &mut sources);
     let (mut seen, mut problems) = (0, Vec::new());
     for (file, text) in &sources {
-        for needle in ["CliError::refused(\"", "CliError::failed(\"", "refused(\"", "failed(\""] {
+        for needle in ["CliError::refused(\"", "CliError::failed(\"", "refused(\"", "failed(\"", "refuse(\"", "Cause { code: \""] {
             for (at, _) in text.match_indices(needle) {
                 let rest = &text[at + needle.len()..];
                 let code: String = rest.chars().take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_').collect();
@@ -181,5 +182,26 @@ fn atip_contract11_06_a_registry_option_the_other_registry_owns_or_does_not_know
         args.push("--json");
         let document = run(&args);
         assert_eq!(document["error"]["code"], "USAGE", "{args:?}: {document}");
+    }
+}
+
+/// atip.codeexit.12: the scan above reads a `refuse("CODE", …)` helper call and a `Cause { code: "CODE", … }`, so a typo in either is found.
+#[test]
+fn atip_codeexit_12_the_scan_reads_the_refuse_helper_and_the_cause_literal() {
+    let registry: BTreeSet<&str> = all_codes().iter().map(|i| i.code).collect();
+    let needles = ["refuse(\"", "Cause { code: \""];
+    for (text, code) in [("return refuse(\"BRIEF_INVALID\", &message);", "BRIEF_INVALID"), ("Cause { code: \"INGEST_SOURCE_INVALID\", message }", "INGEST_SOURCE_INVALID")] {
+        let read: Vec<String> = needles
+            .iter()
+            .flat_map(|needle| text.match_indices(needle).map(move |(at, _)| text[at + needle.len()..].chars().take_while(|c| c.is_ascii_uppercase() || *c == '_').collect::<String>()))
+            .collect();
+        assert_eq!(read, [code], "{text}");
+        assert!(registry.contains(code));
+    }
+    // And the real sources hold at least one call of each shape: the scan is not reading nothing.
+    let mut sources = Vec::new();
+    live_sources(&repo_root().join("crates/canon-cli/src"), &mut sources);
+    for needle in needles {
+        assert!(sources.iter().any(|(_, text)| text.contains(needle)), "no source holds `{needle}`: the scan has nothing to read");
     }
 }

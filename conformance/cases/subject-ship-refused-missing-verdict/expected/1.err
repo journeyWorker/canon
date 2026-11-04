@@ -1,3 +1,4 @@
 canon subject move: advisory: checkout's brief is not approved — checkout adopts no change, so there is no brief to answer and shipping is not refused
-canon: SUBJECT_GATE_VIOLATION: uncovered-cell checkout.pay.02 — verifying → shipped: no ledger verdict for this linked scenario
+canon: SUBJECT_APPROVAL_REQUIRED: uncovered-cell checkout.pay.02 — verifying → shipped: no ledger verdict for this linked scenario
   hint: fix each violation above (`canon gate check` lists them with their causes), then run this transition again
+  problem: : uncovered-cell checkout.pay.02 — verifying → shipped: no ledger verdict for this linked scenario
