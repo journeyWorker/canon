@@ -8,7 +8,7 @@
 //! committed file differs from what the binary says.
 //!
 //! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.1.0`) and canon runs it once, in the
-//! CI job `atip` and in `just atip`: `atip check --level L2 --contract 1.2 --deep` on the canon binary and this fixture. No test of canon runs the checker.
+//! CI job `atip` and in `just atip-deep`: `atip check --level L2 --contract 1.2 --deep` on the canon binary and this fixture (`just atip` runs it without `--deep`). No test of canon runs the checker.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

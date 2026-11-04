@@ -40,10 +40,10 @@ Feature: atip canon claim l2: canon declares atip/1 1.2 and L2, and the CI jobs 
   @case:happy
   @flow:canon-0-35-claim-l2.F3
   @atip.claiml2.07
-  Scenario: just atip and the CI job atip run canon at L2 with --contract 1.2 and --deep, and just ci includes the recipe
+  Scenario: just atip-deep and the CI job atip run canon at L2 with --contract 1.2 and --deep, just atip runs it without --deep, and just ci includes atip-deep
     Given the justfile and the workflow of the repository
-    When the recipe atip and the job atip are read
-    Then the recipe and the job run the installed checker once on the canon binary at L2 with --contract 1.2, --deep and the canon fixture, both build canon only, the jobs atip-l0, atip-l1, atip-l2 and atip-check-tests are gone because the L2 report holds every L0 and L1 row and the checker's tests are the atip repository's, and the recipe ci lists atip
+    When the recipes atip-deep and atip and the job atip are read
+    Then the recipe atip-deep and the job run the installed checker once on the canon binary at L2 with --contract 1.2, --deep and the canon fixture, both build canon only, the recipe atip runs the same check without --deep, the jobs atip-l0, atip-l1, atip-l2 and atip-check-tests are gone because the L2 report holds every L0 and L1 row and the checker's tests are the atip repository's, and the recipe ci lists atip-deep
 
   # canon: {"schema":1,"at":"2026-11-02T21:09:34Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract

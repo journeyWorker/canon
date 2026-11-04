@@ -101,4 +101,4 @@ atip-deep:
     atip check --bin {{ target }}/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # Every CI check that needs no docker.
-ci: release-check lint test gate launcher platformer atip
+ci: release-check lint test gate launcher platformer atip-deep
