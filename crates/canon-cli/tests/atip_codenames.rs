@@ -276,19 +276,26 @@ fn codes_0_35() -> Vec<String> {
     std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/codes-0.35.txt")).unwrap().lines().map(str::to_string).collect()
 }
 
-/// The rows of the replacement table of the CHANGELOG's Unreleased section: `(old, new)`.
+/// The rows of the replacement table of the CHANGELOG's Unreleased section: `(old, new)`. A cell may name several codes (a code split by
+/// condition names each new code; two old codes may share one row): every backticked code name of the cell counts, other backticked text
+/// (an option, a reason) does not.
 fn changelog_rows(changelog: &str) -> Vec<(String, String)> {
     let start = changelog.find("\n## Unreleased").expect("an Unreleased section");
     let rest = &changelog[start + 1..];
     let end = rest[3..].find("\n## ").map_or(rest.len(), |n| n + 3);
+    let codes = |cell: &str| -> Vec<String> {
+        cell.split('`').skip(1).step_by(2).filter(|c| !c.is_empty() && c.chars().all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')).map(str::to_string).collect()
+    };
     rest[..end]
         .lines()
-        .filter_map(|line| {
+        .flat_map(|line| {
             let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-            let code = |cell: &str| cell.strip_prefix('`').and_then(|c| c.strip_suffix('`')).filter(|c| !c.is_empty() && c.chars().all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')).map(str::to_string);
             match cells.as_slice() {
-                ["", old, new, ..] => Some((code(old)?, code(new)?)),
-                _ => None,
+                ["", old, new, ..] => {
+                    let (olds, news) = (codes(old), codes(new));
+                    olds.iter().flat_map(|o| news.iter().map(move |n| (o.clone(), n.clone()))).collect::<Vec<_>>()
+                }
+                _ => Vec::new(),
             }
         })
         .collect()

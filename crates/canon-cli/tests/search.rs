@@ -832,7 +832,7 @@ fn search_trace_04_an_unknown_id_an_ambiguous_sha_prefix_and_an_unrecognized_sha
     assert!(search_in(r, &["loop"]).status.success());
     let outside_index = |r: &Path| tree(r).into_iter().filter(|(path, _)| !path.starts_with(".canon/index")).collect::<Vec<_>>();
     let before = outside_index(r);
-    for (operand, code) in [("deadbeefdead", "TRACE_NOT_FOUND"), ("abcdef0", "TRACE_NOT_FOUND"), ("01ARZ3NDEKTSV4RRFFQ69G5FAV", "TRACE_NOT_FOUND"), ("loop-change_9_9", "TRACE_NOT_FOUND"), ("not a shape!", "TRACE_OPERAND_INVALID"), ("abc", "TRACE_OPERAND_INVALID"), ("", "TRACE_OPERAND_INVALID")] {
+    for (operand, code) in [("deadbeefdead", "TRACE_NOT_FOUND"), ("abcdef0", "TRACE_CONFLICT"), ("01ARZ3NDEKTSV4RRFFQ69G5FAV", "TRACE_NOT_FOUND"), ("loop-change_9_9", "TRACE_NOT_FOUND"), ("not a shape!", "TRACE_OPERAND_INVALID"), ("abc", "TRACE_OPERAND_INVALID"), ("", "TRACE_OPERAND_INVALID")] {
         let out = trace_in(r, operand);
         assert_eq!(out.status.code(), Some(2), "{operand}: {}", text(&out));
         let doc = json_of(&out);

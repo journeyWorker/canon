@@ -586,7 +586,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
 /// approved scope. An unlinked pair writes nothing and exits `0`.
 pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> u8 {
     match unadopt_change(repo, change_id, subject_id, dry_run) {
-        Ok(UnadoptOutcome::Refused(message, hint)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message).hint(hint).emit("canon subject unadopt", json),
+        Ok(UnadoptOutcome::Refused(reason, message, hint)) => CliError::refused("SUBJECT_CONFLICT", message).reason(reason).hint(hint).emit("canon subject unadopt", json),
         Ok(UnadoptOutcome::Failed(error)) => error.emit("canon subject unadopt", json),
         Ok(UnadoptOutcome::Done(subject, wrote)) => {
             let human = if wrote {
@@ -599,15 +599,15 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dr
             report_subject(repo, &subject, "unadopt", (!dry_run).then_some(wrote), json, &human);
             0
         }
-        Err(e) => CliError::refused("SUBJECT_ADOPT_REFUSED", e).hint("fix what the message names, then run `canon subject unadopt` again").emit("canon subject unadopt", json),
+        Err(e) => e.emit("canon subject unadopt", json),
     }
 }
 
 enum UnadoptOutcome {
     /// The subject as it now stands, and whether anything was written.
     Done(Box<Subject>, bool),
-    /// The refusal message and its hint.
-    Refused(String, String),
+    /// The reason of the `SUBJECT_CONFLICT`, the refusal message and its hint.
+    Refused(&'static str, String, String),
     /// A failure or refusal that is already a [`CliError`]: a store the write would land in
     /// cannot be written (nothing changed), or the unlink stopped between its two records.
     Failed(CliError),
@@ -623,19 +623,16 @@ fn unadopt_change(
     change_id: &ChangeId,
     subject_id: &SubjectId,
     dry_run: bool,
-) -> Result<UnadoptOutcome, String> {
-    let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
+) -> Result<UnadoptOutcome, CliError> {
+    let hint = "fix what the message names, then run `canon subject unadopt` again";
+    let unreadable = |message: String| CliError::refused("REPO_UNREADABLE", message).hint(hint);
+    let unwritten = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint(hint);
+    let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(unreadable)?;
     let Some(mut subject) = subject else {
-        return Err(format!(
-            "subject `{}` does not exist (author it with `canon subject new` first)",
-            subject_id.as_str()
-        ));
+        return Err(CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).hint(hint));
     };
     let Some(mut change) = change else {
-        return Err(format!(
-            "change `{}` does not exist (import it with `canon ingest plans` first)",
-            change_id.as_str()
-        ));
+        return Err(CliError::refused("CHANGE_NOT_FOUND", format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())).hint(hint));
     };
     let on_subject = subject.change_ids.contains(change_id);
     let on_change = change.subject_ids.contains(subject_id);
@@ -648,6 +645,7 @@ fn unadopt_change(
             .is_ok_and(|text| canon_ingest::markdown::field(&text, "Approved:").is_some());
         if approved {
             return Ok(UnadoptOutcome::Refused(
+                "APPROVED_BRIEF",
                 format!(
                     "change `{}` has an approved brief ({}), so it is subject `{}`'s approved scope and cannot be unadopted",
                     change_id.as_str(),
@@ -661,9 +659,10 @@ fn unadopt_change(
             ));
         }
     }
-    let tagged = tagged_scenarios(&resolved, subject_id, change_id)?;
+    let tagged = tagged_scenarios(&resolved, subject_id, change_id).map_err(unreadable)?;
     if !tagged.is_empty() {
         return Ok(UnadoptOutcome::Refused(
+            "FLOW_TAGGED",
             format!(
                 "scenario(s) {} owned by subject `{}` carry a `@flow:{}.*` tag; unadopting the change would make them fall back to an older approval",
                 tagged.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", "),
@@ -675,7 +674,7 @@ fn unadopt_change(
     }
     let canon_yaml_path = resolve_canon_yaml(&resolved);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| unreadable(e.to_string()))?;
     // Both sides must be writable before either is: a refusal here changes nothing.
     let sides: Vec<RecordKind> = [(on_subject, RecordKind::Subject), (on_change, RecordKind::Change)].into_iter().filter_map(|(carries, kind)| carries.then_some(kind)).collect();
     if let Err(error) = crate::write_mode::check_kinds_writable(&canon_yaml_path, &sides) {
@@ -686,11 +685,11 @@ fn unadopt_change(
         subject.change_ids.retain(|id| id != change_id);
         subject.envelope.at = now;
         if dry_run {
-            registry.check_persist::<Subject>().map_err(|e| format!("failed to record the unadoption: {e}; nothing was written"))?;
+            registry.check_persist::<Subject>().map_err(|e| unwritten(format!("failed to record the unadoption: {e}; nothing was written")))?;
         } else {
             registry
                 .persist(&subject)
-                .map_err(|e| format!("failed to record the unadoption: {e}; nothing was written"))?;
+                .map_err(|e| unwritten(format!("failed to record the unadoption: {e}; nothing was written")))?;
         }
     }
     if on_change {
@@ -705,7 +704,7 @@ fn unadopt_change(
                 let message = format!("subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `{repair}`", subject_id.as_str(), change_id.as_str());
                 return Ok(UnadoptOutcome::Failed(CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the unlink: run `{repair}`"))));
             }
-            return Err(format!("failed to record the unadoption: {e}; nothing was written"));
+            return Err(unwritten(format!("failed to record the unadoption: {e}; nothing was written")));
         }
     }
     Ok(UnadoptOutcome::Done(Box::new(subject), true))
@@ -736,20 +735,20 @@ fn quoted_list(ids: &[SubjectId]) -> String {
 }
 
 /// Look up, then write, an adoption: `canon subject adopt`'s whole
-/// effect. Refuses (`SUBJECT_ADOPT_REFUSED`, the operator-facing message with
+/// effect. Refuses (`SUBJECT_NOT_FOUND` or `CHANGE_NOT_FOUND`, the operator-facing message with
 /// no command prefix) when either record is absent, or `WRITE_UNAVAILABLE`
 /// when a store it would write cannot be; see [`persist_adoption`] for
 /// the write. `Ok` carries the subject, every subject the change now
 /// belongs to ([`change_owners`]), and whether anything was written
 /// (`false`: both sides already carried the link).
 pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool) -> Result<(Subject, Vec<SubjectId>, bool), CliError> {
-    let refused = |message: String| CliError::refused("SUBJECT_ADOPT_REFUSED", message).hint("fix what the message names, then run `canon subject adopt` again");
-    let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(refused)?;
+    let refused = |code: &'static str, message: String| CliError::refused(code, message).hint("fix what the message names, then run `canon subject adopt` again");
+    let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(|message| refused("REPO_UNREADABLE", message))?;
     let Some(subject) = subject else {
-        return Err(refused(format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())));
+        return Err(refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())));
     };
     let Some(change) = change else {
-        return Err(refused(format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())));
+        return Err(refused("CHANGE_NOT_FOUND", format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())));
     };
     let adopted = if dry_run { preview_adoption(repo, change, subject) } else { persist_adoption(repo, change, subject) };
     let (subject, change, wrote) = adopted.map_err(|e| {
@@ -762,7 +761,7 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
         if e.subject_written {
             CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
         } else {
-            refused(message)
+            refused("WRITE_UNAVAILABLE", message)
         }
     })?;
     // The write is done; an owner list that cannot be read falls back to

@@ -84,7 +84,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/adapter.rs", &[]),
     ("run/context_pack.rs", &[]),
     ("run/ingest.rs", &[]),
-    ("run/inventory.rs", &[]),
+    ("run/inventory.rs", &["inventory sync"]),
+    // `refusal_code`: the code a refused response file or policy takes, emitted by both commands.
+    ("adapter.rs", &["adapter validate", "adapter authorize"]),
     ("run/plugin.rs", &[]),
     ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
     ("run/tier.rs", &[]),
@@ -92,8 +94,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("migrate_briefs.rs", &["migrate"]),
     // `refusal` builds the error for the command that judges the brief.
     ("old_briefs.rs", &["evidence add", "evidence audit", "subject move", "subject adopt", "scenario new", "review change"]),
-    // Every code is next to its emit.
-    ("migrate_names.rs", &[]),
+    // `run_revert` builds the revert's refusals with its own `refused` closure.
+    ("migrate_names.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
     ("paging.rs", &["query", "finding list", "divergence list", "export"]),
     // `ScopeError::to_cli_error`, emitted by `query`.
@@ -132,7 +134,7 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("SCENARIO_INDEX_REQUIRED", "evidence approval-payload")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
@@ -305,9 +307,9 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
             table.get_mut(leaf.path).expect("leaf has a row").insert("BATCH_INCOMPLETE");
         }
     }
-    // `OLD_LAYOUT` (`old_layout::refuse_write`, run by `main` before the command): every leaf that writes records.
+    // `LAYOUT_MIGRATION_REQUIRED` (`old_layout::refuse_write`, run by `main` before the command): every leaf that writes records.
     for leaf in META.iter().filter(|m| canon_cli::old_layout::refuses_in_old_layout(m.path)) {
-        table.get_mut(leaf.path).expect("leaf has a row").insert("OLD_LAYOUT");
+        table.get_mut(leaf.path).expect("leaf has a row").insert("LAYOUT_MIGRATION_REQUIRED");
     }
     // The human-only refusal (`run::human_only`) is emitted for its caller's leaf.
     for leaf in HUMAN_ONLY_LEAVES {

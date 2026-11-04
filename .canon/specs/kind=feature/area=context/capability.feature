@@ -465,7 +465,7 @@ Feature: context capability
   Scenario: Brief show of a change with no brief, or in a repo with no briefs, is refused with exit 2
     Given a repo with a subject and no change, and then two changes that each have a brief
     When canon brief show runs with no change in the first repo state, with the change nope, and with no change once two changes exist
-    Then the first exits 2 with NO_BRIEF, the second exits 2 with BRIEF_NOT_FOUND naming .canon/changes/nope/brief.md, and the third exits 2 with CHANGE_REQUIRED
+    Then the first exits 2 with BRIEF_REQUIRED, the second exits 2 with BRIEF_NOT_FOUND naming .canon/changes/nope/brief.md, and the third exits 2 with CHANGE_REQUIRED
     And no file in the repo changed
 
   # canon: {"schema":1,"at":"2026-10-26T11:42:45Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}

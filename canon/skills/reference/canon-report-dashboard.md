@@ -161,8 +161,8 @@ the sha256 of the file the page read, and records exactly what `canon brief
 approve <id>+ --approver <name> --note <text>` records, the `Approved:` line
 bound to the brief digest and the policy approval, for each. A brief that
 changed after the page loaded (`BRIEF_PAGE_STALE`) or that has
-blockers refuses the whole request (409 `BRIEF_APPROVE_REFUSED`, naming each
-refused brief): nothing is written and the page says to read it again. A request
+blockers refuses the whole request (409, the first refused brief's own code such as `BRIEF_INVALID`, with an
+`error.details` entry for each refused brief): nothing is written and the page says to read it again. A request
 naming one brief the old way (`changeId`, `sha256`) is still accepted. The server is localhost only and
 refuses requests from other origins (`DASHBOARD_REQUEST_DENIED`).
 

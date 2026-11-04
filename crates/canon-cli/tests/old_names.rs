@@ -170,7 +170,7 @@ fn atip_midway_11_no_consumer_spells_a_code_that_moved_to_stopped_midway() {
 /// atip.midway.11: the check catches a moved code that comes back, and does not take a longer name for it.
 #[test]
 fn atip_midway_11_the_check_catches_a_moved_code_that_comes_back() {
-    assert_eq!(moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_INVALID_ARGUMENT"), Vec::<&str>::new());
+    assert_eq!(moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_SOURCE_NOT_FOUND"), Vec::<&str>::new());
     assert_eq!(moved_names_in("run again: INIT_SKILL_INSTALL_FAILED"), ["INIT_SKILL_INSTALL_FAILED"]);
     assert_eq!(moved_names_in(r#"{"code": "INIT_SKILL_INSTALL_FAILED", "exit": 1}"#), ["INIT_SKILL_INSTALL_FAILED"]);
     assert_eq!(moved_names_in("MY_INIT_SKILL_INSTALL_FAILED_TOO is another name"), Vec::<&str>::new());

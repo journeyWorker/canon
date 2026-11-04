@@ -183,7 +183,7 @@ fn skills_install_dry_run_refuses_like_the_real_run() {
     std::fs::create_dir_all(&target).unwrap();
     assert_eq!(
         bad_preview(&["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "bogus"], tmp.path(), &[tmp.path()]),
-        "SKILLS_INVALID_ARGUMENT"
+        "SKILLS_ARGUMENT_INVALID"
     );
 }
 
@@ -201,7 +201,7 @@ fn gate_install_hooks_dry_run_refuses_like_the_real_run() {
     let dir = repo_with(LOCAL_TIER);
     // A file where the settings directory must go: the write cannot happen.
     std::fs::write(dir.path().join(".claude"), "not a directory").unwrap();
-    assert_eq!(bad_preview(&["gate", "install-hooks"], dir.path(), &[dir.path()]), "HOOKS_INSTALL_REFUSED");
+    assert_eq!(bad_preview(&["gate", "install-hooks"], dir.path(), &[dir.path()]), "HOOKS_FILE_CONFLICT");
 }
 
 // ── inventory sync ──
@@ -217,7 +217,7 @@ fn inventory_sync_dry_run_counts_the_records_it_would_write() {
 #[test]
 fn inventory_sync_dry_run_refuses_like_the_real_run() {
     let dir = repo_with(&format!("{LOCAL_TIER}specs: 5\n"));
-    assert_eq!(bad_preview(&["inventory", "sync"], dir.path(), &[dir.path()]), "INVENTORY_REFUSED");
+    assert_eq!(bad_preview(&["inventory", "sync"], dir.path(), &[dir.path()]), "CONFIG_INVALID");
 }
 
 // ── plugin sync ──
@@ -258,7 +258,7 @@ fn plugin_sync_dry_run_counts_the_overlays_it_would_write() {
 #[test]
 fn plugin_sync_dry_run_refuses_like_the_real_run() {
     let dir = porting_repo();
-    assert_eq!(bad_preview(&["plugin", "sync", "nosuch"], dir.path(), &[dir.path()]), "PLUGIN_SYNC_FAILED");
+    assert_eq!(bad_preview(&["plugin", "sync", "nosuch"], dir.path(), &[dir.path()]), "PLUGIN_REQUIRED");
 }
 
 // ── ingest records ──
@@ -383,7 +383,7 @@ fn export_dry_run_leaves_no_output_file() {
 #[test]
 fn export_dry_run_refuses_like_the_real_run() {
     let dir = export_repo();
-    assert_eq!(bad_preview(&["export", "--kind", "change", "--include-sensitive"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_REFUSED");
+    assert_eq!(bad_preview(&["export", "--kind", "change", "--include-sensitive"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_DENIED");
     assert_eq!(bad_preview(&["export", "--kind", "change", "--output", "missing-dir/out.json"], dir.path(), &[dir.path()]), "WRITE_UNAVAILABLE");
 }
 
@@ -424,7 +424,7 @@ fn subject_adopt_dry_run_records_no_link() {
 #[test]
 fn subject_adopt_dry_run_refuses_like_the_real_run() {
     let dir = subject_repo(&[]);
-    assert_eq!(bad_preview(&["subject", "adopt", "nosuch", "--change", "2026-10-01-demo"], dir.path(), &[dir.path()]), "SUBJECT_ADOPT_REFUSED");
+    assert_eq!(bad_preview(&["subject", "adopt", "nosuch", "--change", "2026-10-01-demo"], dir.path(), &[dir.path()]), "SUBJECT_NOT_FOUND");
 }
 
 #[test]

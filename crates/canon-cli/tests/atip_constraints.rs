@@ -487,7 +487,7 @@ fn atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_
     // The human's own answer has a code of its own, and no domain claims one code for both paths.
     let brief = leaf("brief approve");
     assert!(validator_of(brief, &["approver", "note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
-    assert!(validator_of(leaf("policy approve"), &["approver"]).is_some_and(|validator| validator["code"] == "POLICY_APPROVAL_REFUSED"));
+    assert!(validator_of(leaf("policy approve"), &["approver"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
     for (command, argument) in [("brief approve", "approver"), ("brief approve", "note"), ("policy approve", "approver")] {
         assert!(harness::option(leaf(command), argument).expect("the option").get("domain").is_none(), "`{command}` --{argument} has a domain");
     }
@@ -518,7 +518,7 @@ fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refuse
     }
     check("canon brief approve add-login --approver \" \" --note ok", &[], "APPROVAL_INVALID", "--approver");
     check("canon brief approve add-login --approver alice --note \" \"", &[], "APPROVAL_INVALID", "--note");
-    check("canon policy approve --approver \" \"", &[], "POLICY_APPROVAL_REFUSED", "--approver");
+    check("canon policy approve --approver \" \"", &[], "APPROVAL_INVALID", "--approver");
     check("canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok", &[], "USAGE", "--relayed-via");
     check("canon divergence accept auth.login.01 --actor alice --reason why --tracking t --relayed-via ask --approver alice --note ok", &[], "USAGE", "--relayed-via");
 }
@@ -566,8 +566,8 @@ fn atip_constraints_16_the_shape_of_input_is_the_parsers_and_no_document_declare
     }
 }
 
-/// atip.constraints.17: `EVIDENCE_APPROVAL_INVALID` is one code with two reasons, both exit 2: `MALFORMED` from the arguments alone (before
-/// any state is read), `SIGNATURE_MISMATCH` from what reading the signature decides.
+/// atip.constraints.17: a member of the four approval options that is missing is `EVIDENCE_APPROVAL_REQUIRED`; `EVIDENCE_APPROVAL_INVALID` is one code
+/// with two reasons, both exit 2: `MALFORMED` from the arguments alone (before any state is read), `SIGNATURE_MISMATCH` from what reading the signature decides.
 #[test]
 fn atip_constraints_17_one_approval_code_has_a_reason_for_the_arguments_and_one_for_the_signature() {
     let registry = run(&["schema", "--error", "EVIDENCE_APPROVAL_INVALID"]);
@@ -577,15 +577,15 @@ fn atip_constraints_17_one_approval_code_has_a_reason_for_the_arguments_and_one_
     assert_eq!(registry.body["data"]["error"]["exit"], 2);
     // The arguments alone, in an empty directory: each member of the four missing, and a blank approver.
     let add = "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer";
-    for (extra, field) in [
-        ("--approver alice", "--approval-role"),
-        ("--approver alice --approval-role human", "--signature-file"),
-        ("--approver alice --approval-role human --signature-file nope.sig", "--approval-at"),
-        ("--approval-role human --signature-file nope.sig --approval-at 2030-01-01T00:00:00Z", "--approver"),
-        ("--approver \" \" --approval-role human --signature-file nope.sig --approval-at 2030-01-01T00:00:00Z", "--approver"),
+    for (extra, code, reason, field) in [
+        ("--approver alice", "EVIDENCE_APPROVAL_REQUIRED", None, "--approval-role"),
+        ("--approver alice --approval-role human", "EVIDENCE_APPROVAL_REQUIRED", None, "--signature-file"),
+        ("--approver alice --approval-role human --signature-file nope.sig", "EVIDENCE_APPROVAL_REQUIRED", None, "--approval-at"),
+        ("--approval-role human --signature-file nope.sig --approval-at 2030-01-01T00:00:00Z", "EVIDENCE_APPROVAL_REQUIRED", None, "--approver"),
+        ("--approver \" \" --approval-role human --signature-file nope.sig --approval-at 2030-01-01T00:00:00Z", "EVIDENCE_APPROVAL_INVALID", Some("MALFORMED"), "--approver"),
     ] {
         let outcome = rule_support::run_empty(&words(&format!("{add} {extra}")), None);
-        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.reason.as_deref(), outcome.field.as_deref()), (2, Some("EVIDENCE_APPROVAL_INVALID"), Some("MALFORMED"), Some(field)), "{extra}: {outcome:?}");
+        assert_eq!((outcome.exit, outcome.code.as_deref(), outcome.reason.as_deref(), outcome.field.as_deref()), (2, Some(code), reason, Some(field)), "{extra}: {outcome:?}");
         assert!(outcome.changed.is_empty());
     }
     // A well-formed set whose signature file is not there: the precondition, in the repository.
@@ -617,11 +617,11 @@ fn atip_constraints_18_a_declared_domain_or_rule_answers_before_any_state_is_rea
         ("canon finding close add-login --round 1 --seq 1 --disposition rejected --actor a", "FINDING_REASON_REQUIRED", "--reason"),
         ("canon finding close add-login --round 0 --seq 1 --disposition fixed --actor a", "FINDING_ARGUMENT_INVALID", "--round"),
         ("canon divergence add auth.login.01 --state deferred --actor a --reason r", "DIVERGENCE_ARGUMENT_INVALID", "--expiry"),
-        ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt", "EVIDENCE_INVALID_ARGUMENT", "--summary"),
-        ("canon evidence audit auth.login.01 --ref r --evaluator e --evaluator-version 1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --report-case x", "EVIDENCE_INVALID_ARGUMENT", "--report"),
-        ("canon evidence approval-payload --rev HEAD --approver alice --approval-at 2030-01-01T00:00:00Z", "EVIDENCE_REFUSED", "--task"),
-        ("canon evidence add --task add-login#1 --class test-run --ref r --report-case x", "EVIDENCE_INVALID_ARGUMENT", "--report"),
-        ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt --signature-file nosuch", "EVIDENCE_INVALID_ARGUMENT", "--summary"),
+        ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt", "EVIDENCE_ARGUMENT_REQUIRED", "--summary"),
+        ("canon evidence audit auth.login.01 --ref r --evaluator e --evaluator-version 1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --report-case x", "EVIDENCE_ARGUMENT_REQUIRED", "--report"),
+        ("canon evidence approval-payload --rev HEAD --approver alice --approval-at 2030-01-01T00:00:00Z", "EVIDENCE_REQUIRED", "--task"),
+        ("canon evidence add --task add-login#1 --class test-run --ref r --report-case x", "EVIDENCE_ARGUMENT_REQUIRED", "--report"),
+        ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt --signature-file nosuch", "EVIDENCE_ARGUMENT_REQUIRED", "--summary"),
     ] {
         assert_refused(&empty(line, implementer), code, field);
     }
@@ -632,8 +632,8 @@ fn atip_constraints_18_a_declared_domain_or_rule_answers_before_any_state_is_rea
     // The order: a domain before a constraint before a validator, whichever code each has.
     assert_refused(&empty("canon finding add --change add-login --round 0 --seq 1 --severity note --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_ARGUMENT_INVALID", "--round");
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity blocker --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_ARGUMENT_INVALID", "--introduced-rev");
-    assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class test-run --ref r", implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
-    assert_refused(&empty("canon evidence add --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class audit --ref r --summary s", implementer), "EVIDENCE_INVALID_ARGUMENT", "--class");
+    assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class test-run --ref r", implementer), "EVIDENCE_ARGUMENT_CONFLICT", "--scenario");
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class audit --ref r --summary s", implementer), "EVIDENCE_ARGUMENT_INVALID", "--class");
     // The field is the first argument of the rule in the rule's own order, not the order on the command line.
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-unknown --introduced-rev r", implementer), "FINDING_ARGUMENT_INVALID", "--introduced-rev");
     assert_refused(&empty("canon init --policy strict --check", None), "USAGE", "--check");
@@ -735,7 +735,7 @@ fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_
 fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and_the_constraints() {
     let implementer = Some("implementer");
     // A broken constraint (the four approval options go together) and an impossible date: the constraint answers.
-    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30", implementer), "EVIDENCE_APPROVAL_INVALID", "--approval-role");
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30", implementer), "EVIDENCE_APPROVAL_REQUIRED", "--approval-role");
     // A broken domain (the shape of a time) before the calendar, a calendar when nothing else is broken.
     assert_refused(&empty("canon query --kind change --since tomorrow", None), "USAGE", "--since");
     let shape = empty("canon query --kind change --since tomorrow", None);
@@ -753,7 +753,7 @@ fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self --introduced-unknown", implementer), "FINDING_ARGUMENT_INVALID", "--introduced-rev");
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self", implementer), "USAGE", "--introduced-rev");
     // `--surface-ref` on `evidence add` beside `--all-scenarios --scenario`: the constraint first; alone, the form.
-    assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --class test-run --ref r --surface-ref /etc/passwd", implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
+    assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --class test-run --ref r --surface-ref /etc/passwd", implementer), "EVIDENCE_ARGUMENT_CONFLICT", "--scenario");
     assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --surface-ref /etc/passwd", implementer), "USAGE", "--surface-ref");
     // A batch refuses them in preflight too.
     let (outcome, changed) = run_in_copy(&["finding", "add", "--input", r#"[{"change":"add-login","round":1,"seq":5,"severity":"note","actor":"a","summary":"ok"},{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"a","summary":"x","introducedRev":"self"}]"#]);

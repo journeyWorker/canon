@@ -265,7 +265,7 @@ pub(crate) fn run_trace(args: TraceArgs) -> ExitCode {
         let error = match refusal {
             trace::TraceError::Unrecognized => CliError::refused("TRACE_OPERAND_INVALID", format!("`{id}` is none of the three things canon trace takes; it takes {shapes}")).hint("pass a review id, a commit sha or a finding key"),
             trace::TraceError::NotFound => CliError::refused("TRACE_NOT_FOUND", format!("no record says `{id}`; it takes {shapes}")).hint("pass an id a record carries: `canon query --kind finding` shows finding keys, `canon query --kind review --json` review ids"),
-            trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_NOT_FOUND", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).hint("pass more characters of the sha"),
+            trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_CONFLICT", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).expected(shas.clone()).hint("pass more characters of the sha"),
         };
         ExitCode::from(error.field("ID").emit("canon trace", json))
     };

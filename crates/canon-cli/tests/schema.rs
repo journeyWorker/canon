@@ -54,7 +54,7 @@ fn one_command_shows_options_with_their_shape() {
     assert_eq!(v["effect"], "write");
     assert!(opt("json")["flagOnly"] == true);
     let codes: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
-    for code in ["EVIDENCE_NOTE_INVALID", "BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE", "EVIDENCE_INVALID_ARGUMENT", "USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE"] {
+    for code in ["EVIDENCE_NOTE_INVALID", "BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE", "EVIDENCE_ARGUMENT_REQUIRED", "USAGE", "INPUT_INVALID", "BATCH_INCOMPLETE"] {
         assert!(codes.contains(&code), "{code} missing from {codes:?}");
     }
     assert!(!codes.contains(&"ARTIFACTS_STORE_FAILED"), "a sibling command's code leaked in: {codes:?}");

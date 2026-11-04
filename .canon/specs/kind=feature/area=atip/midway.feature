@@ -26,10 +26,10 @@ Feature: atip: STOPPED_MIDWAY, the code of a command that stopped after its earl
   @case:happy
   @flow:canon-0-35-canon-stopped-midway.F1
   @atip.midway.03
-  Scenario: canon init stops midway with STOPPED_MIDWAY and the reason SKILLS_INVALID_ARGUMENT when the skill install meets a refusal after its writes
+  Scenario: canon init stops midway with STOPPED_MIDWAY and the reason SKILLS_SOURCE_NOT_FOUND when the skill install meets a refusal after its writes
     Given a fresh repository holding .pi and CANON_SKILLS_SOURCE naming a directory that does not exist
     When canon init --json runs
-    Then it exits 1 with STOPPED_MIDWAY, reason SKILLS_INVALID_ARGUMENT, not retryable, and canon.yaml, the policy and AGENTS.md stay written
+    Then it exits 1 with STOPPED_MIDWAY, reason SKILLS_SOURCE_NOT_FOUND, not retryable, and canon.yaml, the policy and AGENTS.md stay written
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:07Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:atip-contract
@@ -59,7 +59,7 @@ Feature: atip: STOPPED_MIDWAY, the code of a command that stopped after its earl
   Scenario: A refusal with no effect is exit 2 with the refusal's own code, never STOPPED_MIDWAY
     Given a repository holding .pi and a skill source that does not exist
     When canon init --dry-run --json runs, and canon init --providers with an unknown harness runs
-    Then the first exits 2 with SKILLS_INVALID_ARGUMENT and the second with INIT_ARGUMENT_INVALID, neither is STOPPED_MIDWAY and nothing is written
+    Then the first exits 2 with SKILLS_SOURCE_NOT_FOUND and the second with INIT_ARGUMENT_INVALID, neither is STOPPED_MIDWAY and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:24Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:atip-contract
@@ -79,7 +79,7 @@ Feature: atip: STOPPED_MIDWAY, the code of a command that stopped after its earl
   Scenario: A batch element that stops midway is failed with STOPPED_MIDWAY and its reason, the elements after it are skipped and the batch is BATCH_INCOMPLETE
     Given a batch of two canon init elements in a fresh repository whose skill source does not exist, and a child failure envelope carrying STOPPED_MIDWAY and a reason
     When the batch runs and the child's error becomes the item error
-    Then the first element is failed with STOPPED_MIDWAY and the reason SKILLS_INVALID_ARGUMENT in its item, the second is skipped, the batch is BATCH_INCOMPLETE with exit 1 and what the first element wrote stays
+    Then the first element is failed with STOPPED_MIDWAY and the reason SKILLS_SOURCE_NOT_FOUND in its item, the second is skipped, the batch is BATCH_INCOMPLETE with exit 1 and what the first element wrote stays
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:37Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:evidence-attestation

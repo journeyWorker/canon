@@ -563,7 +563,17 @@
       "retryable": false
     },
     {
-      "code": "ADAPTER_REFUSED",
+      "code": "ADAPTER_FILE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -578,7 +588,7 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_MOVE_REFUSED",
+      "code": "ARTIFACTS_BLOB_CORRUPT",
       "exit": 2,
       "retryable": false
     },
@@ -591,6 +601,11 @@
       "code": "ARTIFACTS_STORE_UNREACHABLE",
       "exit": 2,
       "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_TIER_INVALID",
+      "exit": 2,
+      "retryable": false
     },
     {
       "code": "ARTIFACTS_VERIFY_FAILED",
@@ -613,11 +628,6 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_APPROVE_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "BRIEF_CHECK_FAILED",
       "exit": 1,
       "reasons": [
@@ -629,8 +639,14 @@
       "code": "BRIEF_INVALID",
       "exit": 2,
       "reasons": [
+        "BLOCKERS",
         "UNAPPROVABLE"
       ],
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_MIGRATION_REQUIRED",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -640,6 +656,11 @@
     },
     {
       "code": "BRIEF_PAGE_STALE",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -665,6 +686,11 @@
     },
     {
       "code": "CHANGE_EXISTS",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -697,7 +723,10 @@
       "code": "CONFIG_INVALID",
       "exit": 2,
       "reasons": [
-        "DASHBOARD"
+        "DASHBOARD",
+        "POLICY",
+        "SKILLS",
+        "SPECS"
       ],
       "retryable": false
     },
@@ -800,13 +829,17 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_ALREADY_ENDED",
+      "code": "DISPATCH_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DISPATCH_ARGUMENT_INVALID",
+      "code": "DISPATCH_CONFLICT",
       "exit": 2,
+      "reasons": [
+        "ALREADY_ENDED",
+        "NOT_RUNNING"
+      ],
       "retryable": false
     },
     {
@@ -816,11 +849,6 @@
     },
     {
       "code": "DISPATCH_MANIFEST_UNREADABLE",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "DISPATCH_NOT_RUNNING",
       "exit": 2,
       "retryable": false
     },
@@ -840,13 +868,25 @@
       "retryable": true
     },
     {
-      "code": "DIVERGENCE_ACCEPT_REFUSED",
+      "code": "DIVERGENCE_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DIVERGENCE_ARGUMENT_INVALID",
+      "code": "DIVERGENCE_CONFLICT",
       "exit": 2,
+      "reasons": [
+        "NOT_DIVERGENT"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_DENIED",
+      "exit": 2,
+      "reasons": [
+        "NOT_REVIEWER",
+        "SELF_ATTESTED"
+      ],
       "retryable": false
     },
     {
@@ -864,7 +904,42 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_BIND_REFUSED",
+      "code": "EVIDENCE_APPROVAL_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_CONFLICT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_STALE",
       "exit": 2,
       "retryable": false
     },
@@ -874,7 +949,7 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_INVALID_ARGUMENT",
+      "code": "EVIDENCE_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -884,17 +959,12 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "EVIDENCE_REPORT_CONFLICT",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "EVIDENCE_SCENARIO_NOT_INDEXED",
+      "code": "EVIDENCE_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -974,12 +1044,22 @@
       "retryable": false
     },
     {
+      "code": "HOOKS_FILE_CONFLICT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "HOOKS_FILE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "HOOKS_INSTALL_REFUSED",
+      "code": "HOOKS_REPO_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1049,9 +1129,9 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_REFUSED",
+      "code": "INVENTORY_INDEX_UNAVAILABLE",
       "exit": 2,
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",
@@ -1060,11 +1140,6 @@
     },
     {
       "code": "LEARN_PROMOTION_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_ROLLBACK_FAILED",
       "exit": 1,
       "retryable": false
     },
@@ -1094,11 +1169,6 @@
       "retryable": false
     },
     {
-      "code": "MIGRATE_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "MIGRATE_STOPPED",
       "exit": 1,
       "retryable": false
@@ -1109,17 +1179,12 @@
       "retryable": false
     },
     {
-      "code": "NO_BRIEF",
+      "code": "MIGRATION_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "OLD_BRIEF_FORMAT",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "OLD_LAYOUT",
+      "code": "MIGRATION_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1139,23 +1204,18 @@
       "retryable": false
     },
     {
+      "code": "PLUGIN_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "PLUGIN_SYNC_ERRORS",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "PLUGIN_SYNC_FAILED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "POLICY_APPROVAL_FAILED",
       "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "POLICY_APPROVAL_REFUSED",
-      "exit": 2,
       "retryable": false
     },
     {
@@ -1166,6 +1226,16 @@
     {
       "code": "POLICY_APPROVAL_UNREADABLE",
       "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "POLICY_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "POLICY_REQUIRED",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -1227,13 +1297,13 @@
       "retryable": true
     },
     {
-      "code": "RETENTION_EXPORT_FAILED",
-      "exit": 1,
+      "code": "RETENTION_EXPORT_DENIED",
+      "exit": 2,
       "retryable": false
     },
     {
-      "code": "RETENTION_EXPORT_REFUSED",
-      "exit": 2,
+      "code": "RETENTION_EXPORT_FAILED",
+      "exit": 1,
       "retryable": false
     },
     {
@@ -1242,9 +1312,14 @@
       "retryable": false
     },
     {
-      "code": "RETENTION_PURGE_REFUSED",
+      "code": "RETENTION_TIERS_INVALID",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "RETRIEVE_INVALID",
@@ -1257,12 +1332,22 @@
       "retryable": false
     },
     {
-      "code": "REVIEW_ARTIFACT_REFUSED",
+      "code": "REVIEW_ARTIFACT_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "REVIEW_SCENARIO_NOT_INDEXED",
+      "code": "REVIEW_ARTIFACT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_STALE",
       "exit": 2,
       "retryable": false
     },
@@ -1273,6 +1358,11 @@
     },
     {
       "code": "SCAFFOLD_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_INDEX_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1307,6 +1397,11 @@
       "retryable": false
     },
     {
+      "code": "SKILLS_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "SKILLS_CHECK_FAILED",
       "exit": 1,
       "reasons": [
@@ -1320,7 +1415,7 @@
       "retryable": false
     },
     {
-      "code": "SKILLS_INVALID_ARGUMENT",
+      "code": "SKILLS_SOURCE_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -1343,8 +1438,10 @@
       "code": "STOPPED_MIDWAY",
       "exit": 1,
       "reasons": [
+        "CONFIG_INVALID",
         "PROMOTION_INVALID",
-        "SKILLS_INVALID_ARGUMENT",
+        "SKILLS_ARGUMENT_INVALID",
+        "SKILLS_SOURCE_NOT_FOUND",
         "STRATEGY_PROMOTION_INVALID"
       ],
       "retryable": false
@@ -1380,7 +1477,12 @@
       "retryable": false
     },
     {
-      "code": "SUBJECT_ADOPT_REFUSED",
+      "code": "STRATEGY_ROLLBACK_FAILED",
+      "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1398,6 +1500,8 @@
       "code": "SUBJECT_CONFLICT",
       "exit": 2,
       "reasons": [
+        "APPROVED_BRIEF",
+        "FLOW_TAGGED",
         "TRANSITION"
       ],
       "retryable": false
@@ -1419,11 +1523,6 @@
     },
     {
       "code": "SUBJECT_REASON_REQUIRED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_UNADOPT_REFUSED",
       "exit": 2,
       "retryable": false
     },
@@ -1460,6 +1559,11 @@
     {
       "code": "TIER_FAILED",
       "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "TRACE_CONFLICT",
+      "exit": 2,
       "retryable": false
     },
     {

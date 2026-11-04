@@ -23,7 +23,8 @@ fn run_adapter_validate(response: &std::path::Path, repo: &std::path::Path, json
             let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
             let message = error.to_string();
             if refused {
-                let error = CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it");
+                let (code, _) = error.refusal_code();
+                let error = CliError::refused(code, message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it");
                 return ExitCode::from(error.emit("canon adapter validate", json));
             }
             // The failure keeps the result in `data`.
@@ -70,7 +71,12 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
                 crate::adapter::AdapterError::Policy(_) => "fix the policy file `.canon/policy.yaml` (its adapter_capabilities section), then run `canon adapter authorize` again",
                 _ => "fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it",
             };
-            let error = CliError::refused("ADAPTER_REFUSED", error.to_string()).hint(hint);
+            let (code, reason) = error.refusal_code();
+            let refusal = CliError::refused(code, error.to_string()).hint(hint);
+            let error = match reason {
+                Some(reason) => refusal.reason(reason),
+                None => refusal,
+            };
             return ExitCode::from(error.emit("canon adapter authorize", json));
         }
     };

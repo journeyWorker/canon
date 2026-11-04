@@ -101,7 +101,7 @@ fn registry_problems(rows: &[CodeInfo]) -> Vec<String> {
 /// Reasons a registry must not hold under `STOPPED_MIDWAY`.
 static NOT_A_CODE: [ReasonInfo; 1] = [ReasonInfo { reason: "NOT_A_CODE", meaning: "m", fix: "f" }];
 static AN_EXIT_1_CODE: [ReasonInfo; 1] = [ReasonInfo { reason: "WRITE_FAILED", meaning: "m", fix: "f" }];
-static UNSORTED: [ReasonInfo; 2] = [ReasonInfo { reason: "WRITE_UNAVAILABLE", meaning: "m", fix: "f" }, ReasonInfo { reason: "SKILLS_INVALID_ARGUMENT", meaning: "m", fix: "f" }];
+static UNSORTED: [ReasonInfo; 2] = [ReasonInfo { reason: "WRITE_UNAVAILABLE", meaning: "m", fix: "f" }, ReasonInfo { reason: "SKILLS_SOURCE_NOT_FOUND", meaning: "m", fix: "f" }];
 
 /// The registry with the reasons of its `STOPPED_MIDWAY` row replaced by `reasons`.
 fn with_reasons(reasons: &'static [ReasonInfo]) -> Vec<CodeInfo> {
@@ -138,7 +138,7 @@ fn atip_midway_01_stopped_midway_is_registered_with_its_reasons_and_both_schema_
     let row = code_info("STOPPED_MIDWAY").expect("registered");
     assert_eq!((row.exit, row.retryable), (1, false));
     let names: Vec<&str> = row.reasons.iter().map(|reason| reason.reason).collect();
-    assert_eq!(names, ["PROMOTION_INVALID", "SKILLS_INVALID_ARGUMENT", "STRATEGY_PROMOTION_INVALID"], "the refusals a later step of canon meets after an earlier step wrote (a record staged and then refused by the gate, a strategy demoted and then blocked, skills refused after init wrote); an I/O category (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`) is not a reason");
+    assert_eq!(names, ["CONFIG_INVALID", "PROMOTION_INVALID", "SKILLS_ARGUMENT_INVALID", "SKILLS_SOURCE_NOT_FOUND", "STRATEGY_PROMOTION_INVALID"], "the refusals a later step of canon meets after an earlier step wrote (a record staged and then refused by the gate, a strategy demoted and then blocked, skills refused after init wrote); an I/O category (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`) is not a reason");
     for reason in row.reasons {
         let refusal = code_info(reason.reason).expect("a registered code");
         assert_ne!(reason.fix, refusal.fix, "{}: the fix says what to do once the caller has read what was done, not the refusal's own fix", reason.reason);
@@ -176,8 +176,8 @@ fn atip_midway_02_a_reason_that_is_not_a_registered_exit_2_code_fails() {
     assert!(!registry_problems(&retryable).is_empty());
 
     // A reason the registry does not hold under the code fails where the error is rendered (a debug build asserts it).
-    let held = CliError::failed("STOPPED_MIDWAY", "m").reason("SKILLS_INVALID_ARGUMENT");
-    assert_eq!(held.body().reason.as_deref(), Some("SKILLS_INVALID_ARGUMENT"));
+    let held = CliError::failed("STOPPED_MIDWAY", "m").reason("SKILLS_SOURCE_NOT_FOUND");
+    assert_eq!(held.body().reason.as_deref(), Some("SKILLS_SOURCE_NOT_FOUND"));
     assert_eq!((held.exit, held.retryable), (1, false), "the exit and retryability come from the row");
     let made_up = CliError::failed("STOPPED_MIDWAY", "m").reason("MADE_UP");
     assert!(code_info("STOPPED_MIDWAY").expect("row").find_reason("MADE_UP").is_none());
@@ -189,7 +189,7 @@ fn atip_midway_02_a_reason_that_is_not_a_registered_exit_2_code_fails() {
 // ------------------------------------------------------------------ the moved command: init
 
 /// atip.midway.03: `canon init` writes canon.yaml, then its last step meets a skill source that `canon skills install` refuses before
-/// its work: exit 1, `STOPPED_MIDWAY`, reason `SKILLS_INVALID_ARGUMENT`, not retryable, and what was written stays.
+/// its work: exit 1, `STOPPED_MIDWAY`, reason `SKILLS_SOURCE_NOT_FOUND`, not retryable, and what was written stays.
 #[test]
 fn atip_midway_03_init_stops_midway_when_the_skill_install_meets_a_refusal_after_the_writes() {
     let dir = tempfile::tempdir().expect("a temp dir");
@@ -199,7 +199,7 @@ fn atip_midway_03_init_stops_midway_when_the_skill_install_meets_a_refusal_after
     let envelope = document(&out);
     assert_eq!(envelope["ok"], false);
     let error = &envelope["error"];
-    assert_eq!((error["code"].clone(), error["reason"].clone(), error["retryable"].clone()), (Value::from("STOPPED_MIDWAY"), Value::from("SKILLS_INVALID_ARGUMENT"), Value::Bool(false)), "{envelope}");
+    assert_eq!((error["code"].clone(), error["reason"].clone(), error["retryable"].clone()), (Value::from("STOPPED_MIDWAY"), Value::from("SKILLS_SOURCE_NOT_FOUND"), Value::Bool(false)), "{envelope}");
     assert!(error["message"].as_str().is_some_and(|message| message.contains("canon.yaml") && message.contains("did not install")), "the message says what was done: {error}");
     assert!(atip::envelope_problems(&envelope).is_empty(), "{envelope}");
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).expect("canon.yaml stays").ends_with("skills:\n  providers: [pi]\n"));
@@ -259,7 +259,7 @@ fn atip_midway_06_a_refusal_with_no_effect_is_exit_2_with_the_refusals_own_code(
     let out = canon(&repo, &["init", "--dry-run", "--json"], &dir.path().join("missing"));
     assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
     let envelope = document(&out);
-    assert_eq!(envelope["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{envelope}");
+    assert_eq!(envelope["error"]["code"], "SKILLS_SOURCE_NOT_FOUND", "{envelope}");
     assert!(envelope["error"].get("reason").is_none());
     assert!(!repo.join("canon.yaml").exists(), "a preview writes nothing");
     assert_eq!(std::fs::read_dir(&repo).expect("the repo").count(), 1, "only the .pi directory the test made");
@@ -317,7 +317,7 @@ fn atip_midway_08_a_batch_element_that_stops_midway_is_failed_with_its_reason_an
     assert_eq!(envelope["error"]["code"], "BATCH_INCOMPLETE", "{envelope}");
     let items = envelope["data"]["items"].as_array().expect("items");
     assert_eq!(items[0]["status"], "failed", "{envelope}");
-    assert_eq!((items[0]["error"]["code"].clone(), items[0]["error"]["reason"].clone()), (Value::from("STOPPED_MIDWAY"), Value::from("SKILLS_INVALID_ARGUMENT")), "{envelope}");
+    assert_eq!((items[0]["error"]["code"].clone(), items[0]["error"]["reason"].clone()), (Value::from("STOPPED_MIDWAY"), Value::from("SKILLS_SOURCE_NOT_FOUND")), "{envelope}");
     assert_eq!(items[1]["status"], "skipped", "{envelope}");
     assert!(repo.join("canon.yaml").is_file(), "the element's effects stay");
 }
@@ -366,13 +366,13 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("GATE_CHECK_FAILED", Class::Keep(Why::Answer), "`gate check`'s findings"),
     ("HOOKS_INSTALL_FAILED", Class::Keep(Why::Io), "a hook file could not be written after the install began"),
     ("INGEST_FAILED", Class::Keep(Why::Io), "an ingest read or write failed"),
-    ("INIT_SKILL_INSTALL_FAILED", Class::Move("SKILLS_INVALID_ARGUMENT"), "moved: `init` wrote canon.yaml, then its last step met what `canon skills install` refuses before its work (the skill source or `skills:` section: SKILLS_INVALID_ARGUMENT); an unwritable target is WRITE_FAILED and any other failure SKILLS_FAILED, which keep their names"),
+    ("INIT_SKILL_INSTALL_FAILED", Class::Move("SKILLS_SOURCE_NOT_FOUND"), "moved: `init` wrote canon.yaml, then its last step met what `canon skills install` refuses before its work (the skill source or `skills:` section: SKILLS_SOURCE_NOT_FOUND); an unwritable target is WRITE_FAILED and any other failure SKILLS_FAILED, which keep their names"),
     ("INTERNAL", Class::Keep(Why::Internal), "a bug of canon"),
     ("INVENTORY_ABORTED", Class::Keep(Why::Answer), "`inventory sync`'s findings"),
     ("INVENTORY_FAILED", Class::Keep(Why::Io), "the record store failed while the index was read or written"),
     ("STRATEGY_DEMOTION_FAILED", Class::Keep(Why::Io), "the demotion's write failed"),
     ("LEARN_PROMOTION_FAILED", Class::Keep(Why::Io), "the strategy store or file could not be written"),
-    ("LEARN_ROLLBACK_FAILED", Class::Keep(Why::Io), "the rollback could not be recorded"),
+    ("STRATEGY_ROLLBACK_FAILED", Class::Keep(Why::Io), "the rollback could not be recorded"),
     ("LEDGER_COMPACT_FAILED", Class::Keep(Why::Io), "a version could not be moved to the archive"),
     ("MIGRATE_INDEX_FAILED", Class::Keep(Why::Io), "the index rebuild failed after the files moved"),
     ("MIGRATE_PINS_FAILED", Class::Keep(Why::Io), "the pins could not be written after the files moved"),
@@ -566,7 +566,7 @@ fn atip_midway_10_the_io_failure_codes_keep_their_names_exits_and_retryability()
 /// registry that holds them as 0.34 did passes it.
 #[test]
 fn atip_midway_13_an_io_failure_code_that_moves_or_is_absorbed_fails_the_check() {
-    static A_REASON: [ReasonInfo; 1] = [ReasonInfo { reason: "SKILLS_INVALID_ARGUMENT", meaning: "m", fix: "f" }];
+    static A_REASON: [ReasonInfo; 1] = [ReasonInfo { reason: "SKILLS_SOURCE_NOT_FOUND", meaning: "m", fix: "f" }];
     static WRITE_FAILED_AS_REASON: [ReasonInfo; 1] = [ReasonInfo { reason: "WRITE_FAILED", meaning: "m", fix: "f" }];
     let changed = |code: &str, with: &dyn Fn(&CodeInfo) -> CodeInfo| -> Vec<CodeInfo> { all_codes().iter().map(|row| if row.code == code { with(row) } else { *row }).collect() };
     assert!(io_problems(all_codes()).is_empty(), "the registry as it stands holds the I/O codes as 0.34 did");

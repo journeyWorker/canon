@@ -45,17 +45,17 @@ fn atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before
 
 #[test]
 fn atip_constraints_07_evidence_add_class_audit_is_refused_before_any_state_is_read() {
-    refused_in_an_empty_directory("evidence add", &["class"], "EVIDENCE_INVALID_ARGUMENT");
+    refused_in_an_empty_directory("evidence add", &["class"], "EVIDENCE_ARGUMENT_INVALID");
 }
 
 #[test]
 fn atip_constraints_07_evidence_add_an_artifact_scope_is_refused_before_any_state_is_read() {
-    refused_in_an_empty_directory("evidence add", &["artifact", "scenario", "all-scenarios"], "EVIDENCE_INVALID_ARGUMENT");
+    refused_in_an_empty_directory("evidence add", &["artifact", "scenario", "all-scenarios"], "EVIDENCE_ARGUMENT_CONFLICT");
 }
 
 #[test]
 fn atip_constraints_07_evidence_audit_an_artifact_scope_is_refused_before_any_state_is_read() {
-    refused_in_an_empty_directory("evidence audit", &["artifact", "scenario"], "EVIDENCE_INVALID_ARGUMENT");
+    refused_in_an_empty_directory("evidence audit", &["artifact", "scenario"], "EVIDENCE_ARGUMENT_CONFLICT");
 }
 
 #[test]

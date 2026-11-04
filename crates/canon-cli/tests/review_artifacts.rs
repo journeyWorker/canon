@@ -202,15 +202,15 @@ fn an_unbindable_review_artifact_is_refused_and_nothing_is_written() {
     let before = store_snapshot(repo);
     assert_eq!(before.len(), 1, "{before:?}");
 
-    for (args, expected) in [
-        (vec!["--artifact", outside.path().to_str().unwrap()], "is outside the repository"),
-        (vec!["--artifact", "reports/none.png"], "reports/none.png"),
-        (vec!["--artifact", "reports/big.webm", "--max-artifact-mib", "1"], "over the artifact store's limit of 1048576 bytes; raise it with --max-artifact-mib"),
-        (vec!["--artifact", "reports/title.png", "--artifact", "reports/none.png"], "reports/none.png"),
+    for (args, code, expected) in [
+        (vec!["--artifact", outside.path().to_str().unwrap()], "REVIEW_ARTIFACT_DENIED", "is outside the repository"),
+        (vec!["--artifact", "reports/none.png"], "REVIEW_ARTIFACT_NOT_FOUND", "reports/none.png"),
+        (vec!["--artifact", "reports/big.webm", "--max-artifact-mib", "1"], "REVIEW_ARTIFACT_INVALID", "over the artifact store's limit of 1048576 bytes; raise it with --max-artifact-mib"),
+        (vec!["--artifact", "reports/title.png", "--artifact", "reports/none.png"], "REVIEW_ARTIFACT_NOT_FOUND", "reports/none.png"),
     ] {
         let out = review(repo, "reviewer-2", &args);
         assert_eq!(out.status.code(), Some(2), "{args:?}: {}", text(&out));
-        assert!(text(&out).starts_with("canon: REVIEW_ARTIFACT_REFUSED: ") && text(&out).contains("\n  field: --artifact\n") && text(&out).contains(expected), "{args:?}: {}", text(&out));
+        assert!(text(&out).starts_with(&format!("canon: {code}: ")) && text(&out).contains("\n  field: --artifact\n") && text(&out).contains(expected), "{args:?}: {}", text(&out));
         assert_eq!(store_snapshot(repo), before, "{args:?}: a refused review add stores no bytes at all");
     }
     assert!(reviews(repo).is_empty(), "a refused review add writes nothing");

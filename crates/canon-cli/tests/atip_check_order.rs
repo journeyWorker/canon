@@ -540,9 +540,9 @@ fn atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_al
     assert_answer(&both, "USAGE", "--relayed-via");
     let flipped = empty("canon brief approve add-login --actor impl --note ok --approver \" \"", &[]);
     assert_answer(&flipped, "USAGE", "--relayed-via");
-    // policy approve: the same shape with the validator POLICY_APPROVAL_REFUSED.
+    // policy approve: the same shape with the validator APPROVAL_INVALID.
     let validator = empty("canon policy approve --approver \" \"", &[]);
-    assert_answer(&validator, "POLICY_APPROVAL_REFUSED", "--approver");
+    assert_answer(&validator, "APPROVAL_INVALID", "--approver");
     let both = empty("canon policy approve --approver \" \" --actor impl", &[]);
     assert_answer(&both, "USAGE", "--relayed-via");
 }
@@ -597,8 +597,8 @@ fn atip_checkorder_11_the_field_of_each_kind_of_rule_follows_the_contracts_table
     assert_answer(&empty("canon ingest plans --dialect openspec", &[]), "USAGE", "--plan-source");
     assert_answer(&empty("canon migrate --note x", &implementer), "USAGE", "--relayed-via");
     // forbids: the first name of `then` the call gives, in the rule's order, not the call's.
-    assert_answer(&empty("canon evidence add --all-scenarios --report junit:r.xml --task add-login#1 --scenario auth.login.01 --class test-run --ref r", &implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
-    assert_answer(&empty("canon evidence add --all-scenarios --report junit:r.xml --scenario auth.login.01 --task add-login#1 --class test-run --ref r", &implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
+    assert_answer(&empty("canon evidence add --all-scenarios --report junit:r.xml --task add-login#1 --scenario auth.login.01 --class test-run --ref r", &implementer), "EVIDENCE_ARGUMENT_CONFLICT", "--scenario");
+    assert_answer(&empty("canon evidence add --all-scenarios --report junit:r.xml --scenario auth.login.01 --task add-login#1 --class test-run --ref r", &implementer), "EVIDENCE_ARGUMENT_CONFLICT", "--scenario");
     // atMostOne: the first of the names the call gives, in the rule's order.
     assert_answer(&empty("canon schema --error X --errors", &[]), "USAGE", "--errors");
     assert_answer(&empty("canon schema --errors --error X", &[]), "USAGE", "--errors");
@@ -612,8 +612,8 @@ fn atip_checkorder_11_the_field_of_each_kind_of_rule_follows_the_contracts_table
     // atLeastOne: the first name of the rule when the call gives none of them.
     assert_answer(&empty("canon evidence add --scenario auth.login.01", &implementer), "USAGE", "--class");
     assert_answer(&empty("canon evidence add --scenario auth.login.01 --class test-run", &implementer), "USAGE", "--ref");
-    assert_answer(&empty("canon evidence add --class test-run --ref r", &implementer), "EVIDENCE_INVALID_ARGUMENT", "--task");
-    assert_answer(&empty("canon evidence approval-payload --approver a --approval-at 2030-01-01", &implementer), "EVIDENCE_REFUSED", "--task");
+    assert_answer(&empty("canon evidence add --class test-run --ref r", &implementer), "EVIDENCE_REQUIRED", "--task");
+    assert_answer(&empty("canon evidence approval-payload --approver a --approval-at 2030-01-01", &implementer), "EVIDENCE_REQUIRED", "--task");
 }
 
 /// atip.checkorder.12 (every rule): the answer for each rule of each command is the code of the rule and the field the table names for

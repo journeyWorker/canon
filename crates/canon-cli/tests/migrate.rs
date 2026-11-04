@@ -350,7 +350,7 @@ fn authoring_migrate_04_an_existing_destination_is_refused() {
     let out = canon(repo, &["migrate"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon: MIGRATE_REFUSED: spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
+        text(&out).contains("canon: MIGRATION_INVALID: spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
         "{}",
         text(&out)
     );
@@ -482,7 +482,7 @@ fn authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused() {
     let out = commit(repo);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon: MIGRATE_REFUSED: could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
+        text(&out).contains("canon: CONFIG_INVALID: could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
         "{}",
         text(&out)
     );
@@ -588,7 +588,7 @@ fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_
     set_mode(&repo.join("openspec/changes/add-cart"), 0o755);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon: MIGRATE_REFUSED: openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
+        text(&out).contains("canon: MIGRATION_INVALID: openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
         "{}",
         text(&out)
     );

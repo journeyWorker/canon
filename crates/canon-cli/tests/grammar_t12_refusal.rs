@@ -87,7 +87,7 @@ const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789
 /// `USAGE` row would be a leaf with nothing else to refuse; there is none.
 #[rustfmt::skip]
 const REFUSALS: &[Row] = &[
-    lit("artifacts move", &["artifacts", "move", "--tier", "cold"], "ARTIFACTS_MOVE_REFUSED"),
+    lit("artifacts move", &["artifacts", "move", "--tier", "cold"], "ARTIFACTS_TIER_INVALID"),
     lit("artifacts store", &["artifacts", "store"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("brief approve", &["brief", "approve", "no-such-change", "--approver", "alice", "--note", "ok"], "BRIEF_NOT_FOUND"),
     lit("change new", &["change", "new", "add-login", "--subject", "demo", "--title", "Again"], "CHANGE_EXISTS"),
@@ -102,24 +102,24 @@ const REFUSALS: &[Row] = &[
     example("divergence add", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
     example("divergence defer", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
     example("divergence resolve", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
-    lit("evidence add", &["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BIND_REFUSED"),
-    lit("evidence audit", &["evidence", "audit", "auth.login.01", "--ref", "audit-report.json", "--evaluator", "eval-1", "--evaluator-version", "2.1", "--evaluator-digest", DIGEST, "--audit-result", "confirmed", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BIND_REFUSED"),
+    lit("evidence add", &["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BINDING_NOT_FOUND"),
+    lit("evidence audit", &["evidence", "audit", "auth.login.01", "--ref", "audit-report.json", "--evaluator", "eval-1", "--evaluator-version", "2.1", "--evaluator-digest", DIGEST, "--audit-result", "confirmed", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BINDING_NOT_FOUND"),
     lit("export", &["export", "--kind", "evidence", "--output", "missing-dir/out.json"], "WRITE_UNAVAILABLE"),
     lit("feature new", &["feature", "new", "auth.login", "--title", "Again"], "FEATURE_EXISTS"),
     lit("finding add", &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "alice", "--summary", "Again"], "FINDING_EXISTS"),
     lit("finding close", &["finding", "close", "add-login", "--round", "9", "--seq", "9", "--disposition", "rejected", "--reason", "no such finding"], "FINDING_NOT_FOUND"),
     // `.claude/settings.json` is written first: a refusal on the second file must leave the first alone.
-    lit("gate install-hooks", &["gate", "install-hooks"], "HOOKS_INSTALL_REFUSED").setup(HOOKS_JSON_IS_A_DIRECTORY),
+    lit("gate install-hooks", &["gate", "install-hooks"], "HOOKS_FILE_CONFLICT").setup(HOOKS_JSON_IS_A_DIRECTORY),
     lit("gate promote", &["gate", "promote"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("ingest plans", &["ingest", "plans", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("ingest records", &["ingest", "records", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("ingest sessions", &["ingest", "sessions", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("init", &["init", "--providers", "bogus", "--repo", "@empty"], "INIT_ARGUMENT_INVALID"),
-    lit("inventory sync", &["inventory", "sync"], "INVENTORY_REFUSED").setup(BROKEN_CONFIG),
+    lit("inventory sync", &["inventory", "sync"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("ledger compact", &["ledger", "compact", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("migrate", &["migrate", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
-    lit("plugin sync", &["plugin", "sync", "no-such-plugin"], "PLUGIN_SYNC_FAILED"),
-    lit("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"], "POLICY_APPROVAL_REFUSED").setup(NO_POLICY),
+    lit("plugin sync", &["plugin", "sync", "no-such-plugin"], "PLUGIN_REQUIRED"),
+    lit("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"], "POLICY_REQUIRED").setup(NO_POLICY),
     lit("prompt add", &["prompt", "add", "reviewer@v1", "--manifest", "missing.json"], "CONTEXT_INPUT_NOT_FOUND"),
     lit("purge", &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("report build", &["report", "build"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
@@ -128,13 +128,13 @@ const REFUSALS: &[Row] = &[
     example("review change", &[], "REVIEW_ARGUMENT_INVALID"),
     example("review scenario", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
     lit("scenario new", &["scenario", "new", "auth.login.02", "--title", "Again", "--feature", FEATURE], "SCENARIO_TAG_EXISTS"),
-    lit("skills install", &["skills", "install", "--providers", "bogus"], "SKILLS_INVALID_ARGUMENT"),
+    lit("skills install", &["skills", "install", "--providers", "bogus"], "SKILLS_ARGUMENT_INVALID"),
     lit("strategy promote", &["strategy", "promote", "01ARZ3NDEKTSV4RRFFQ69G5FAV"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("strategy rollback", &["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason", "regressed", "--actor", "alice", "--signature-file", "missing.sig", "--approval-at", "2030-01-01T00:00:00Z"], "STRATEGY_NOT_FOUND"),
-    lit("subject adopt", &["subject", "adopt", "no-such", "--change", "add-login"], "SUBJECT_ADOPT_REFUSED"),
+    lit("subject adopt", &["subject", "adopt", "no-such", "--change", "add-login"], "SUBJECT_NOT_FOUND"),
     lit("subject move", &["subject", "move", "demo", "--to", "shipped"], "SUBJECT_CONFLICT"),
     lit("subject new", &["subject", "new", "demo", "--domain", "dev", "--title", "Again"], "SUBJECT_EXISTS"),
-    lit("subject unadopt", &["subject", "unadopt", "no-such", "--change", "add-login"], "SUBJECT_ADOPT_REFUSED"),
+    lit("subject unadopt", &["subject", "unadopt", "no-such", "--change", "add-login"], "SUBJECT_NOT_FOUND"),
     lit("task done", &["task", "done", "add-login#1"], "TASK_NOT_FOUND"),
     lit("tier age", &["tier", "age", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
 ];
@@ -371,8 +371,8 @@ fn a_refused_write_leaves_the_tree_and_git_status_unchanged() {
 
 /// A read leaf's refusal: the leaf, its command line (no `canon`, no `--json`), and the code it refuses with.
 const READ_REFUSALS: &[(&str, &[&str], &str)] = &[
-    ("evidence approval-payload", &["evidence", "approval-payload", "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], "EVIDENCE_REFUSED"),
-    ("evidence approval-payload", &["evidence", "approval-payload", "--scenario", "nosuch.scenario.01", "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], "EVIDENCE_SCENARIO_NOT_INDEXED"),
+    ("evidence approval-payload", &["evidence", "approval-payload", "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], "EVIDENCE_REQUIRED"),
+    ("evidence approval-payload", &["evidence", "approval-payload", "--scenario", "nosuch.scenario.01", "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], "SCENARIO_INDEX_REQUIRED"),
     ("evidence approval-payload", &["evidence", "approval-payload", "--scenario", "auth.login.01", "--approver", "alice", "--approval-at", "yesterday"], "USAGE"),
     ("brief show", &["brief", "show", "no-such-change"], "BRIEF_NOT_FOUND"),
     ("brief check", &["brief", "check", "no-such-change"], "BRIEF_NOT_FOUND"),
@@ -385,7 +385,7 @@ const READ_REFUSALS: &[(&str, &[&str], &str)] = &[
     ("retrieve", &["retrieve", "--for-role", "reviewer"], "USAGE"),
     ("status", &["status", "--fields", "nosuch"], "USAGE"),
     ("gate check", &["gate", "check", "--repo", "@missing"], "CONFIG_REQUIRED"),
-    ("adapter validate", &["adapter", "validate", "--response", "missing.json"], "ADAPTER_REFUSED"),
+    ("adapter validate", &["adapter", "validate", "--response", "missing.json"], "ADAPTER_FILE_NOT_FOUND"),
 ];
 
 /// A refusal of a leaf that only reads leaves the repository as it was, `.git` included: the code tree of the

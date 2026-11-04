@@ -1290,7 +1290,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let repo = resolve_repo_root(repo);
     if !repo.is_dir() {
         let what = if repo.exists() { "is not a directory" } else { "does not exist" };
-        return CliError::refused("HOOKS_INSTALL_REFUSED", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+        return CliError::refused("HOOKS_REPO_INVALID", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
     }
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -1311,7 +1311,8 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
             }
             Ok(_) => {}
             Err(e) => {
-                return CliError::refused("HOOKS_INSTALL_REFUSED", e.to_string()).hint("check that the hook file under .claude / .codex is a readable JSON file and that its directory can be created, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+                let code = if matches!(e.kind(), std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem) { "HOOKS_FILE_DENIED" } else { "HOOKS_FILE_CONFLICT" };
+                return CliError::refused(code, e.to_string()).hint("check that the hook file under .claude / .codex is a readable JSON file and that its directory can be created, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
             }
         }
     }

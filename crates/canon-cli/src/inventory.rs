@@ -428,6 +428,10 @@ fn sync_repo(repo: &Path, spec_root: Option<&Path>, dry_run: bool) -> Result<Syn
             crate::write_mode::check_writable(&target).map_err(|cause| InventoryError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
         }
     }
+    // A `specs:` section that is wrong is refused before the lock file exists: a refused call writes nothing. The roots are read again under the lock.
+    if !dry_run {
+        ctx.spec_roots(spec_root)?;
+    }
     let _lock = if dry_run { None } else { Some(lock_index(&ctx.repo)?) };
     sync_with_ctx(&ctx, spec_root, dry_run)
 }

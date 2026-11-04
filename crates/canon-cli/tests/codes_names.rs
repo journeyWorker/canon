@@ -6,47 +6,22 @@ use atip::Minor;
 
 /// The codes that do not follow the rule yet, and the change of 0.36 that renames each.
 const NOT_YET_RENAMED: &[&str] = &[
-    "ADAPTER_REFUSED",
-    "ARTIFACTS_MOVE_REFUSED",
     "ARTIFACTS_STORE_UNREACHABLE",
-    "BRIEF_APPROVE_REFUSED",
     "BRIEF_UNREADABLE",
     "CONFIG_UNREADABLE",
-    "DISPATCH_ALREADY_ENDED",
     "DISPATCH_MANIFEST_MISMATCH",
     "DISPATCH_MANIFEST_UNREADABLE",
-    "DISPATCH_NOT_RUNNING",
-    "DIVERGENCE_ACCEPT_REFUSED",
-    "EVIDENCE_BIND_REFUSED",
-    "EVIDENCE_INVALID_ARGUMENT",
-    "EVIDENCE_REFUSED",
-    "EVIDENCE_SCENARIO_NOT_INDEXED",
-    "HOOKS_INSTALL_REFUSED",
     "INVENTORY_ABORTED",
-    "INVENTORY_REFUSED",
     "LEARN_SIGNATURE_UNREADABLE",
     "LEDGER_ARCHIVE_UNAVAILABLE",
-    "MIGRATE_REFUSED",
     "MIGRATE_STOPPED",
-    "NO_BRIEF",
-    "OLD_BRIEF_FORMAT",
-    "OLD_LAYOUT",
     "PLAN_CORPUS_UNREADABLE",
     "PLUGIN_SYNC_ERRORS",
-    "PLUGIN_SYNC_FAILED",
-    "POLICY_APPROVAL_REFUSED",
     "POLICY_APPROVAL_UNREADABLE",
     "REPO_UNREADABLE",
     "REPO_WRITE_BUSY",
-    "RETENTION_EXPORT_REFUSED",
-    "RETENTION_PURGE_REFUSED",
-    "REVIEW_ARTIFACT_REFUSED",
-    "REVIEW_SCENARIO_NOT_INDEXED",
-    "SKILLS_INVALID_ARGUMENT",
     "SPEC_ROOTS_UNREADABLE",
     "STOPPED_MIDWAY",
-    "SUBJECT_ADOPT_REFUSED",
-    "SUBJECT_UNADOPT_REFUSED",
     "WRITE_UNAVAILABLE",
 ];
 
@@ -54,35 +29,6 @@ const NOT_YET_RENAMED: &[&str] = &[
 /// meaning, moved to another exit, merged into another code or renamed with a reason (issue #135). The name check does not see them, so they are
 /// listed. Each of those changes deletes its codes from this list; `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
 const NOT_YET_RECLASSIFIED: &[&str] = &[
-    // canon-0-36-codes-refusals
-    "ADAPTER_REFUSED",
-    "ARTIFACTS_MOVE_REFUSED",
-    "BRIEF_APPROVE_REFUSED",
-    "DISPATCH_ALREADY_ENDED",
-    "DISPATCH_NOT_RUNNING",
-    "DIVERGENCE_ACCEPT_REFUSED",
-    "EVIDENCE_APPROVAL_INVALID",
-    "EVIDENCE_BIND_REFUSED",
-    "EVIDENCE_INVALID_ARGUMENT",
-    "EVIDENCE_REFUSED",
-    "EVIDENCE_SCENARIO_NOT_INDEXED",
-    "HOOKS_INSTALL_REFUSED",
-    "INVENTORY_REFUSED",
-    "LEARN_ROLLBACK_FAILED",
-    "MIGRATE_REFUSED",
-    "NO_BRIEF",
-    "OLD_BRIEF_FORMAT",
-    "OLD_LAYOUT",
-    "PLUGIN_SYNC_FAILED",
-    "POLICY_APPROVAL_REFUSED",
-    "RETENTION_EXPORT_REFUSED",
-    "RETENTION_PURGE_REFUSED",
-    "REVIEW_ARTIFACT_REFUSED",
-    "REVIEW_SCENARIO_NOT_INDEXED",
-    "SKILLS_INVALID_ARGUMENT",
-    "SUBJECT_ADOPT_REFUSED",
-    "SUBJECT_UNADOPT_REFUSED",
-    "TRACE_NOT_FOUND",
     // canon-0-36-codes-stored
     "ARTIFACTS_STORE_UNREACHABLE",
     "BRIEF_UNREADABLE",
@@ -228,8 +174,78 @@ fn atip_codenames_03_each_renamed_code_has_the_exit_and_reason_of_the_table() {
         assert_eq!((i64::from(info.exit), info.retryable), (*exit, false), "{code}");
         assert_eq!(problem(info), None, "{code}");
         match reason {
-            Some(reason) => assert_eq!(info.reasons.iter().map(|r| r.reason).collect::<Vec<_>>(), [*reason], "{code}: the reason is registered"),
+            Some(reason) => assert!(info.reasons.iter().any(|r| r.reason == *reason), "{code}: the reason is registered"),
             None => assert!(info.reasons.is_empty(), "{code}"),
+        }
+    }
+}
+
+/// The codes `canon-0-36-codes-refusals` registers: each with its exit, retryable and the reasons registered under it (the brief's table).
+const SPLIT: &[(&str, i64, bool, &[&str])] = &[
+    ("ADAPTER_FILE_DENIED", 2, false, &[]),
+    ("ADAPTER_FILE_INVALID", 2, false, &[]),
+    ("ADAPTER_FILE_NOT_FOUND", 2, false, &[]),
+    ("ARTIFACTS_BLOB_CORRUPT", 2, false, &[]),
+    ("ARTIFACTS_TIER_INVALID", 2, false, &[]),
+    ("BRIEF_MIGRATION_REQUIRED", 2, false, &[]),
+    ("BRIEF_REQUIRED", 2, false, &[]),
+    ("CHANGE_NOT_FOUND", 2, false, &[]),
+    ("CONFIG_INVALID", 2, false, &["DASHBOARD", "POLICY", "SKILLS", "SPECS"]),
+    ("DISPATCH_CONFLICT", 2, false, &["ALREADY_ENDED", "NOT_RUNNING"]),
+    ("DIVERGENCE_CONFLICT", 2, false, &["NOT_DIVERGENT"]),
+    ("DIVERGENCE_DENIED", 2, false, &["NOT_REVIEWER", "SELF_ATTESTED"]),
+    ("EVIDENCE_APPROVAL_INVALID", 2, false, &["MALFORMED", "SIGNATURE_MISMATCH"]),
+    ("EVIDENCE_APPROVAL_REQUIRED", 2, false, &[]),
+    ("EVIDENCE_ARGUMENT_CONFLICT", 2, false, &[]),
+    ("EVIDENCE_ARGUMENT_INVALID", 2, false, &[]),
+    ("EVIDENCE_ARGUMENT_REQUIRED", 2, false, &[]),
+    ("EVIDENCE_BINDING_DENIED", 2, false, &[]),
+    ("EVIDENCE_BINDING_INVALID", 2, false, &[]),
+    ("EVIDENCE_BINDING_NOT_FOUND", 2, false, &[]),
+    ("EVIDENCE_BINDING_STALE", 2, false, &[]),
+    ("EVIDENCE_INVALID", 2, false, &[]),
+    ("EVIDENCE_REQUIRED", 2, false, &[]),
+    ("HOOKS_FILE_CONFLICT", 2, false, &[]),
+    ("HOOKS_FILE_DENIED", 2, false, &[]),
+    ("HOOKS_REPO_INVALID", 2, false, &[]),
+    ("INVENTORY_INDEX_UNAVAILABLE", 2, true, &[]),
+    ("LAYOUT_MIGRATION_REQUIRED", 2, false, &[]),
+    ("MIGRATION_DENIED", 2, false, &[]),
+    ("MIGRATION_INVALID", 2, false, &[]),
+    ("PLUGIN_REQUIRED", 2, false, &[]),
+    ("POLICY_INVALID", 2, false, &[]),
+    ("POLICY_REQUIRED", 2, false, &[]),
+    ("RETENTION_EXPORT_DENIED", 2, false, &[]),
+    ("RETENTION_TIERS_INVALID", 2, false, &[]),
+    ("RETENTION_TIERS_UNAVAILABLE", 2, true, &[]),
+    ("REVIEW_ARTIFACT_DENIED", 2, false, &[]),
+    ("REVIEW_ARTIFACT_INVALID", 2, false, &[]),
+    ("REVIEW_ARTIFACT_NOT_FOUND", 2, false, &[]),
+    ("REVIEW_ARTIFACT_STALE", 2, false, &[]),
+    ("SCENARIO_INDEX_REQUIRED", 2, false, &[]),
+    ("SKILLS_ARGUMENT_INVALID", 2, false, &[]),
+    ("SKILLS_SOURCE_NOT_FOUND", 2, false, &[]),
+    ("STRATEGY_ROLLBACK_FAILED", 1, false, &[]),
+    ("STRATEGY_SIGNATURE_INVALID", 2, false, &[]),
+    ("SUBJECT_CONFLICT", 2, false, &["APPROVED_BRIEF", "FLOW_TAGGED", "TRANSITION"]),
+    ("TRACE_CONFLICT", 2, false, &[]),
+    ("TRACE_NOT_FOUND", 2, false, &[]),
+];
+
+/// atip.codesplit.01: each code the split registers has the exit, retryable and reasons of the table and follows the name rule; none of the 28
+/// old names is in the registry.
+#[test]
+fn atip_codesplit_01_each_code_of_the_split_is_registered_as_the_table_says_and_no_old_name_remains() {
+    for (code, exit, retryable, reasons) in SPLIT {
+        let info = canon_cli::cli_error::all_codes().iter().find(|info| info.code == *code).unwrap_or_else(|| panic!("`{code}` is not in the registry"));
+        assert_eq!((i64::from(info.exit), info.retryable), (*exit, *retryable), "{code}");
+        assert_eq!(problem(info), None, "{code}");
+        assert_eq!(info.reasons.iter().map(|r| r.reason).collect::<Vec<_>>(), *reasons, "{code}");
+    }
+    for old in include_str!("fixtures/codes-0.35.txt").lines() {
+        let gone = ["ADAPTER_REFUSED", "ARTIFACTS_MOVE_REFUSED", "BRIEF_APPROVE_REFUSED", "DISPATCH_ALREADY_ENDED", "DISPATCH_NOT_RUNNING", "DIVERGENCE_ACCEPT_REFUSED", "EVIDENCE_BIND_REFUSED", "EVIDENCE_INVALID_ARGUMENT", "EVIDENCE_REFUSED", "EVIDENCE_SCENARIO_NOT_INDEXED", "HOOKS_INSTALL_REFUSED", "INVENTORY_REFUSED", "LEARN_ROLLBACK_FAILED", "MIGRATE_REFUSED", "NO_BRIEF", "OLD_BRIEF_FORMAT", "OLD_LAYOUT", "PLUGIN_SYNC_FAILED", "POLICY_APPROVAL_REFUSED", "RETENTION_EXPORT_REFUSED", "RETENTION_PURGE_REFUSED", "REVIEW_ARTIFACT_REFUSED", "REVIEW_SCENARIO_NOT_INDEXED", "SKILLS_INVALID_ARGUMENT", "SUBJECT_ADOPT_REFUSED", "SUBJECT_UNADOPT_REFUSED"];
+        if gone.contains(&old) {
+            assert!(canon_cli::cli_error::code_info(old).is_none(), "`{old}` is still registered");
         }
     }
 }

@@ -185,7 +185,7 @@ fn skills_install_07_an_unknown_provider_is_refused_before_anything_is_written()
     assert_eq!(out.status.code(), Some(2), "an unknown provider is an invalid argument, a refusal: {}", text(&out));
     let body = json(&out);
     assert_eq!(body["ok"], false, "{body}");
-    assert_eq!(body["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{body}");
+    assert_eq!(body["error"]["code"], "SKILLS_ARGUMENT_INVALID", "{body}");
     assert_eq!(body["error"]["received"], "gemini", "the provider is named: {body}");
     assert_eq!(body["error"]["field"], "--providers", "{body}");
     assert_eq!(tree(repo), before, "no projection and no lock were written");

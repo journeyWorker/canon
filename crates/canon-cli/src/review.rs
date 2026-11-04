@@ -121,6 +121,16 @@ pub fn parse_runtime_label(s: &str) -> Result<String, RuntimeLabelError> {
     Ok(s.to_string())
 }
 
+/// The code of a refused artifact binding: the file is not usable (`INVALID`), is not there (`NOT_FOUND`) or may not be bound (`DENIED`).
+fn artifact_code(kind: crate::evidence_attach::BindKind) -> &'static str {
+    use crate::evidence_attach::BindKind;
+    match kind {
+        BindKind::Invalid => "REVIEW_ARTIFACT_INVALID",
+        BindKind::NotFound => "REVIEW_ARTIFACT_NOT_FOUND",
+        BindKind::Denied => "REVIEW_ARTIFACT_DENIED",
+    }
+}
+
 /// `canon review scenario` / `canon review change`'s arguments (one library
 /// path, two leaves: a change review sets `change`). `upstream_ref` /
 /// `original_spec_ref` are the raw `--upstream-ref` / `--original-spec-ref`
@@ -267,14 +277,14 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     if !missing.is_empty() {
         let ids = missing.iter().map(|(id, _)| format!("`{}`", id.as_str())).collect::<Vec<_>>().join(", ");
         let nothing = if scenario_ids.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
-        return CliError::refused("REVIEW_SCENARIO_NOT_INDEXED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
+        return CliError::refused("SCENARIO_INDEX_REQUIRED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
             args.project_id.as_str()
         )).hint(format!("run `canon inventory sync`, then run `{cmd}` again")).emit(&cmd, args.json);
     }
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
-            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).hint("`canon schema review` lists the artifact options and their limits");
+            let refusal = CliError::refused(artifact_code(e.kind()), e.message().to_string()).hint("`canon schema review` lists the artifact options and their limits");
             let refusal = match e.hint() {
                 Some(hint) => refusal.hint(hint),
                 None => refusal,
@@ -462,7 +472,7 @@ fn write_reviews(
     }
     let held = crate::evidence_attach::store_files_held(repo, files).map_err(|(file, e)| {
         let code = match &e {
-            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => "REVIEW_ARTIFACT_REFUSED",
+            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => "REVIEW_ARTIFACT_STALE",
             _ if crate::artifacts::before_first_write(&e) => "ARTIFACTS_STORE_UNREACHABLE",
             _ => "ARTIFACTS_STORE_FAILED",
         };

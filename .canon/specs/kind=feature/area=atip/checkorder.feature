@@ -179,7 +179,7 @@ Feature: ATIP: the order of the stateless checks
   Scenario: A constraint broken beside a validator's fault is the constraint's, each alone keeps its own code
     Given a built canon and no role in the environment
     When canon brief approve and canon policy approve run with a blank approver alone, with --actor and no --relayed-via alone, and with both written in either order
-    Then the validator alone answers APPROVAL_INVALID or POLICY_APPROVAL_REFUSED on --approver, the constraint alone and both together answer USAGE on --relayed-via
+    Then the validator alone answers APPROVAL_INVALID on --approver, the constraint alone and both together answer USAGE on --relayed-via
 
   # canon: {"schema":1,"at":"2026-11-03T04:58:31Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
   @subject:atip-schema

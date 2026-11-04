@@ -354,7 +354,7 @@ fn migrate_refuses_a_corrupt_local_blob_and_changes_nothing() {
     let run = repo.canon(&["artifacts", "move", "--tier", "cold", "--json"]);
     assert_eq!(run.status.code(), Some(2), "{}", text(&run));
     let body = stdout_json(&run);
-    assert_eq!(body["error"]["code"], "ARTIFACTS_MOVE_REFUSED");
+    assert_eq!(body["error"]["code"], "ARTIFACTS_BLOB_CORRUPT");
     assert!(body["error"]["message"].as_str().unwrap().contains(&sha(b"what it should hold")), "{body}");
     assert!(repo.local_blob(V1).exists() && bad.exists(), "nothing is removed");
     assert_eq!(repo.canon_yaml(), yaml, "canon.yaml is unchanged");
@@ -366,7 +366,7 @@ fn migrate_refuses_a_target_that_is_not_an_s3_tier_and_never_rewrites_a_block_it
     let repo = new_repo(None);
     let hot = repo.canon(&["artifacts", "move", "--tier", "hot"]);
     assert_eq!(hot.status.code(), Some(2), "{}", text(&hot));
-    assert!(text(&hot).contains("ARTIFACTS_MOVE_REFUSED") && text(&hot).contains("not an object store"), "{}", text(&hot));
+    assert!(text(&hot).contains("ARTIFACTS_TIER_INVALID") && text(&hot).contains("not an object store"), "{}", text(&hot));
 
     let explicit = new_repo(Some("artifact_store:\n  backend: local\n"));
     let out = explicit.canon(&["artifacts", "move", "--tier", "cold"]);

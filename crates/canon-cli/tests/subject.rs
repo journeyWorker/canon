@@ -998,7 +998,7 @@ fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     );
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("canon: REVIEW_SCENARIO_NOT_INDEXED: no scenario record for `world.demo.99` in spec root `demo`"), "{err}");
+    assert!(err.contains("canon: SCENARIO_INDEX_REQUIRED: no scenario record for `world.demo.99` in spec root `demo`"), "{err}");
     assert!(err.contains("(`canon inventory sync`)"), "the refusal must name the repair: {err}");
     assert!(!dir.path().join(".canon/ledger/kind=review").exists(), "a refused review add writes nothing");
 }

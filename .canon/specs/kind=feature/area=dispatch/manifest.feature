@@ -103,7 +103,7 @@ Feature: dispatch manifest
   Scenario: adapter authorize on a missing response file is refused as a fixable invocation
     Given a repo and a --response path that names no file
     When canon adapter authorize --response names that path
-    Then it exits 2 with ADAPTER_REFUSED naming the unreadable path
+    Then it exits 2 with ADAPTER_FILE_NOT_FOUND naming the unreadable path
     And no file is created or changed in the repo
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:02Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -125,7 +125,7 @@ Feature: dispatch manifest
   Scenario: adapter validate rejects a response whose envelope breaks a rule
     Given an adapter response whose telemetry cost is negative
     When canon adapter validate --response names that file
-    Then it exits 1 with ADAPTER_REFUSED and a message naming telemetry.cost_usd
+    Then it exits 1 with ADAPTER_VALIDATION_FAILED and a message naming telemetry.cost_usd
     And no file is created or changed in the repo
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:02Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -136,7 +136,7 @@ Feature: dispatch manifest
   Scenario: adapter validate on a missing response file is refused as a fixable invocation
     Given a --response path that names no file
     When canon adapter validate --response names that path
-    Then it exits 2 with ADAPTER_REFUSED naming the unreadable path
+    Then it exits 2 with ADAPTER_FILE_NOT_FOUND naming the unreadable path
     And no file is created or changed in the repo
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:02Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -276,7 +276,7 @@ Feature: dispatch manifest
   Scenario: dispatch end on an already ended run is refused and the manifest is unchanged
     Given a run that canon dispatch end already closed as succeeded
     When canon dispatch end runs again for that run with --run-outcome failed
-    Then it exits 2 with DISPATCH_ALREADY_ENDED
+    Then it exits 2 with DISPATCH_CONFLICT
     And the run's manifest is byte-identical to before the second call
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:05Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -331,7 +331,7 @@ Feature: dispatch manifest
   Scenario: adapter authorize on a response whose envelope breaks a rule is refused as a fixable invocation
     Given an adapter response whose telemetry cost is negative, and a policy file that is not valid YAML
     When canon adapter authorize --response names that file, then runs with the broken policy
-    Then each exits 2 with ADAPTER_REFUSED, the first naming telemetry.cost_usd and the second hinting to fix the policy file
+    Then the first exits 2 with ADAPTER_FILE_INVALID naming telemetry.cost_usd and the second with CONFIG_INVALID and the reason POLICY, hinting to fix the policy file
     And authorize still exits 1 with ADAPTER_AUTHORIZATION_FAILED for a policy that sets no budget
     And no file is created or changed in the repo
 
@@ -340,8 +340,8 @@ Feature: dispatch manifest
   @case:edge
   @flow:canon-0-31-fixes.F5
   @dispatch.manifest.32
-  Scenario: schema --error ADAPTER_REFUSED states the exit of each adapter call
+  Scenario: schema --error ADAPTER_FILE_INVALID states the exit of each adapter call
     Given any directory
-    When canon schema --error ADAPTER_REFUSED runs, and canon schema adapter authorize lists its exit codes
+    When canon schema --error ADAPTER_FILE_INVALID runs, and canon schema adapter authorize lists its exit codes
     Then the error table gives validate a rule-breaking envelope exit 1, and an unreadable response file or any authorize refusal exit 2
-    And the authorize exit table says exit 1 is only ADAPTER_AUTHORIZATION_FAILED and exit 2 includes ADAPTER_REFUSED
+    And the authorize exit table says exit 1 is only ADAPTER_AUTHORIZATION_FAILED and exit 2 includes ADAPTER_FILE_INVALID

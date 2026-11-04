@@ -93,7 +93,7 @@ exit 2
 --- stdout
 
 --- stderr
-canon evidence approval-payload: EVIDENCE_REFUSED — --task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding
+canon evidence approval-payload: EVIDENCE_INVALID — --task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding
 hint: fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)
 
 $ canon evidence audit demo.login.01 --project root --ref audit.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --actor impl-1 --session s-2 --json
@@ -197,7 +197,7 @@ exit 0
 $ canon divergence accept demo.login.01 --project root --actor alice --session s-4 --reason the engine drops the event --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer --json
 exit 2
 --- stdout
-{"ok":false,"error":{"code":"DIVERGENCE_ACCEPT_REFUSED","message":"demo.login.01's latest evidence is not divergent (faithful): there is no gap to accept","suggestions":[],"hint":"an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest","retryable":false},"meta":{"command":"divergence accept","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+{"ok":false,"error":{"code":"DIVERGENCE_CONFLICT","message":"demo.login.01's latest evidence is not divergent (faithful): there is no gap to accept","suggestions":[],"hint":"an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest","retryable":false},"meta":{"command":"divergence accept","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
 
 --- stderr
 

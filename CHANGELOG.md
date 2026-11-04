@@ -104,6 +104,40 @@ An evidence batch (`evidence add --all-scenarios`) judges the promotion gate of 
 
 The rows whose last column starts `1 → 2` or `1 or 2 → 2` are the codes that changed from exit 1 to exit 2: 21 old codes (`CONTEXT_OBJECT_CONFLICT` keeps its name and changes its exit; `CONTEXT_PACK_TAMPERED` changes for every reader but `context-pack verify`). A script that waited for exit 1 from `subject move`, `gate promote`, `task done`, `evidence add`, `brief approve`, `strategy promote`, `ingest plans`, `dashboard` or `context-pack add` reads exit 2 now; the shipped pre-commit hook, the npm launcher and the eval scripts treat every non-zero exit alike and need no change. `POLICY_CHANGED_SINCE_APPROVAL` is a warning's name and stays; only the error is `POLICY_APPROVAL_STALE`. `DASHBOARD_PORT_UNAVAILABLE` and `DISPATCH_RUN_UNAVAILABLE` are retryable; the other codes of this table are not.
 
+**Twenty-six `*_REFUSED`, `*_INVALID_ARGUMENT` and like codes are split by condition** (`canon-0-36-codes-refusals`, scenarios `atip.codesplit.01-…`). A code that said several refusals with one name says each with the code of its condition, and the reason names what differs inside one condition. A refusal is exit 2 and carries no `data`; the one exit that changes is `strategy rollback`'s signature refusal (1 → 2). The code tells the caller what to do: fix a value (`INVALID`), supply one (`REQUIRED`), read the state (`CONFLICT`), hand the decision to a person (`DENIED`), check a name (`NOT_FOUND`), or wait (`UNAVAILABLE`). A constraint's code follows its kind: `requires` and `atLeastOne` are `REQUIRED`, `forbids` and `atMostOne` are `CONFLICT`, a value that is wrong or empty is `INVALID`. `brief approve` that refuses several ids answers with the first refused id's code and one `error.details` entry for each id; `data.refused` no longer exists, and the dashboard page reads `error.details`.
+
+| 0.35 | 0.36 | reason |
+|---|---|---|
+| `ADAPTER_REFUSED` | `ADAPTER_FILE_NOT_FOUND`, `ADAPTER_FILE_DENIED`, `ADAPTER_FILE_INVALID` (the response file); `CONFIG_INVALID` (a broken adapter policy) | `POLICY` |
+| `ARTIFACTS_MOVE_REFUSED` | `ARTIFACTS_TIER_INVALID` (the target is not an s3 tier); `ARTIFACTS_BLOB_CORRUPT` (a local blob does not match its name, or the store holds a bad copy) | |
+| `BRIEF_APPROVE_REFUSED` | the first refused id's own code (`BRIEF_NOT_FOUND`, `BRIEF_INVALID`) with `error.details` | `BLOCKERS`, `UNAPPROVABLE` |
+| `DISPATCH_ALREADY_ENDED` | `DISPATCH_CONFLICT` | `ALREADY_ENDED` |
+| `DISPATCH_NOT_RUNNING` | `DISPATCH_CONFLICT` | `NOT_RUNNING` |
+| `DIVERGENCE_ACCEPT_REFUSED` | `DIVERGENCE_DENIED` (not a reviewer, attested by the acceptor); `DIVERGENCE_CONFLICT` (the evidence is not divergent) | `NOT_REVIEWER`, `SELF_ATTESTED`; `NOT_DIVERGENT` |
+| `EVIDENCE_APPROVAL_INVALID` | `EVIDENCE_APPROVAL_REQUIRED` (a member of the four approval options is missing); `EVIDENCE_APPROVAL_INVALID` (malformed or the signature does not verify) | `MALFORMED`, `SIGNATURE_MISMATCH` |
+| `EVIDENCE_BIND_REFUSED` | `EVIDENCE_BINDING_STALE`, `EVIDENCE_BINDING_INVALID`, `EVIDENCE_BINDING_NOT_FOUND`, `EVIDENCE_BINDING_DENIED` (outside the repository) | |
+| `EVIDENCE_INVALID_ARGUMENT` | `EVIDENCE_ARGUMENT_INVALID`, `EVIDENCE_ARGUMENT_REQUIRED`, `EVIDENCE_ARGUMENT_CONFLICT`; `EVIDENCE_REQUIRED` when neither `--task` nor `--scenario` is given | |
+| `EVIDENCE_REFUSED` | `EVIDENCE_REQUIRED`, `EVIDENCE_INVALID`, `EVIDENCE_ARGUMENT_INVALID` | |
+| `EVIDENCE_SCENARIO_NOT_INDEXED`, `REVIEW_SCENARIO_NOT_INDEXED` | `SCENARIO_INDEX_REQUIRED` | |
+| `HOOKS_INSTALL_REFUSED` | `HOOKS_REPO_INVALID`, `HOOKS_FILE_CONFLICT`, `HOOKS_FILE_DENIED` | |
+| `INVENTORY_REFUSED` | `CONFIG_INVALID` (a malformed `specs:` section); `CONFIG_UNREADABLE`; `INVENTORY_INDEX_UNAVAILABLE` (another process holds the index lock; retryable) | `SPECS` |
+| `LEARN_ROLLBACK_FAILED` | `STRATEGY_SIGNATURE_INVALID` (exit 2, nothing recorded); `STRATEGY_ROLLBACK_FAILED` (exit 1) | |
+| `MIGRATE_REFUSED` | `MIGRATION_INVALID`, `MIGRATION_CONFLICT`, `MIGRATION_DENIED` (the scratch directory); `CONFIG_INVALID` (a config that cannot be moved) | |
+| `NO_BRIEF` | `BRIEF_REQUIRED` | |
+| `OLD_BRIEF_FORMAT` | `BRIEF_MIGRATION_REQUIRED` | |
+| `OLD_LAYOUT` | `LAYOUT_MIGRATION_REQUIRED` | |
+| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`; `CONFIG_INVALID` (`specs:`); `CONFIG_UNREADABLE`; `INVENTORY_INDEX_UNAVAILABLE` | `SPECS` |
+| `POLICY_APPROVAL_REFUSED` | `POLICY_REQUIRED`, `POLICY_INVALID`, `APPROVAL_INVALID` (a blank approver) | |
+| `RETENTION_EXPORT_REFUSED` | `RETENTION_EXPORT_DENIED`; `RETENTION_TIERS_UNAVAILABLE` (retryable); `RETENTION_TIERS_INVALID` | |
+| `RETENTION_PURGE_REFUSED` | `RETENTION_TIERS_UNAVAILABLE` (retryable); `RETENTION_TIERS_INVALID`. A preview exits 0 and is no refusal | |
+| `REVIEW_ARTIFACT_REFUSED` | `REVIEW_ARTIFACT_STALE`, `REVIEW_ARTIFACT_INVALID`, `REVIEW_ARTIFACT_NOT_FOUND`, `REVIEW_ARTIFACT_DENIED` | |
+| `SKILLS_INVALID_ARGUMENT` | `SKILLS_ARGUMENT_INVALID` (a provider); `SKILLS_SOURCE_NOT_FOUND` (`--skills-source`); `CONFIG_INVALID` (the `skills:` section) | `SKILLS` |
+| `SUBJECT_ADOPT_REFUSED` | `SUBJECT_NOT_FOUND`, `CHANGE_NOT_FOUND`; `WRITE_UNAVAILABLE`; `REPO_UNREADABLE` | |
+| `SUBJECT_UNADOPT_REFUSED` | `SUBJECT_CONFLICT` | `APPROVED_BRIEF`, `FLOW_TAGGED` |
+| `TRACE_NOT_FOUND` | `TRACE_NOT_FOUND` (no record); `TRACE_CONFLICT` (a sha prefix that fits several commits; `expected` lists them) | |
+
+`CHANGE_NOT_FOUND` is new: the table of the brief had no code for an adopt of a change that does not exist, and a name that is not found is `NOT_FOUND`. `EVIDENCE_CONFLICT` of the brief's table is not registered: no call site refuses an evidence record for contradicting evidence already recorded. `ADAPTER_FILE_INVALID` names `canon adapter validate` in its `fix`, which answers the same situation with exit 1 and its result in `data`; `ARTIFACTS_BLOB_CORRUPT` names `canon artifacts verify` the same way. The skills, the scenarios and the dashboard say the new names.
+
 **`--help --json` and `--version --json` are refused** (`canon-0-36-help-json`, scenarios `atip.helpjson.01-09`, atip/1 spec 4.4.1). `--help` is text for people and `canon schema` is the machine description, so a call that asks for JSON and for help or the version no longer gets text: it gets the failure envelope, exit 2, `USAGE`, and a `hint` that names what to run. The path is resolved first, so an unknown word still answers `UNKNOWN_COMMAND`, wherever the flag sits. The rule does not wait for the 1.4 declaration: a 1.2 tool may answer `--help --json` with the `schema` document or with a refusal (4.4.1).
 
 | Call | 0.35 | now |

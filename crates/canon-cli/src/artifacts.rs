@@ -74,13 +74,13 @@ pub(crate) fn before_first_write(e: &ArtifactStoreError) -> bool {
 }
 
 /// The code `evidence add` reports when binding or storing a bound file fails:
-/// `EVIDENCE_BIND_REFUSED` for a file that changed since it was bound,
+/// `EVIDENCE_BINDING_STALE` for a file that changed since it was bound,
 /// `EVIDENCE_STORE_UNAVAILABLE` (exit 2) when the store could not be used
 /// before anything was written, `EVIDENCE_STORE_FAILED` (exit 1) when a write
 /// to it failed.
 pub(crate) fn evidence_store_code(e: &ArtifactStoreError) -> &'static str {
     match e {
-        ArtifactStoreError::Changed { .. } => "EVIDENCE_BIND_REFUSED",
+        ArtifactStoreError::Changed { .. } => "EVIDENCE_BINDING_STALE",
         _ if before_first_write(e) => "EVIDENCE_STORE_UNAVAILABLE",
         _ => "EVIDENCE_STORE_FAILED",
     }
@@ -318,7 +318,7 @@ struct MovePlan<'a> {
 /// run previews the uploads and removals; `--commit` does exactly that plan.
 pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) -> u8 {
     const CMD: &str = "canon artifacts move";
-    let refuse = |message: String, hint: &str| CliError::refused("ARTIFACTS_MOVE_REFUSED", message).hint(hint.to_string()).emit("canon artifacts move", json);
+    let refuse = |code: &'static str, message: String, hint: &str| CliError::refused(code, message).hint(hint.to_string()).emit("canon artifacts move", json);
     let repo = resolve_repo_root(repo);
 
     let current = match artifacts_config(&repo) {
@@ -352,20 +352,21 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             return 0;
         }
         return refuse(
+            "ARTIFACTS_TIER_INVALID",
             "moving artifact bytes back from an object store to `local` is not supported".to_string(),
             "the bytes stay in the store; to read them again, keep `artifact_store.backend` as it is",
         );
     }
     let (target, new_yaml) = match resolve_target(&repo, to) {
         Ok(resolved) => resolved,
-        Err(message) => return refuse(message, "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)"),
+        Err(message) => return refuse("ARTIFACTS_TIER_INVALID", message, "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)"),
     };
     let store = match ArtifactStore::from_config(target) {
         Ok(store) => store,
         Err(e) => return store_error(&e).emit("canon artifacts move", json),
     };
     let ArtifactStore::Object(object) = &store else {
-        return refuse(format!("`{to}` is not an object-store tier"), "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)");
+        return refuse("ARTIFACTS_TIER_INVALID", format!("`{to}` is not an object-store tier"), "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)");
     };
     // A commit rewrites canon.yaml and .gitignore after its uploads: refuse a read-only one before anything is uploaded.
     if matches!(mode, Mode::Commit(_)) {
@@ -420,6 +421,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             crate::say!(json, "  problem {line}");
         }
         return refuse(
+            "ARTIFACTS_BLOB_CORRUPT",
             format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), problems.join("; ")),
             "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again; nothing was removed and canon.yaml is unchanged",
         );
@@ -454,7 +456,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     let _lock = if commit {
         match StoreLock::acquire(&repo) {
             Ok(lock) => Some(lock),
-            Err(e) => return refuse(e.to_string(), e.hint()),
+            Err(e) => return store_error(&e).emit("canon artifacts move", json),
         }
     } else {
         None
@@ -485,7 +487,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
                 problems.push(format!("{}: its bytes changed while being read (now {actual}); it is not moved", blob.digest));
                 continue;
             }
-            Err(e) => return refuse(format!("could not move {}: {e}", blob.digest), e.hint()),
+            Err(e) => return CliError::refused(store_error(&e).code, format!("could not move {}: {e}", blob.digest)).hint(e.hint()).emit("canon artifacts move", json),
         };
         match outcome {
             StoreOutcome::Stored => uploaded += 1,
@@ -508,6 +510,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             crate::say!(json, "  problem {line}");
         }
         return refuse(
+            "ARTIFACTS_BLOB_CORRUPT",
             format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), problems.join("; ")),
             "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again; nothing was removed and canon.yaml is unchanged",
         );

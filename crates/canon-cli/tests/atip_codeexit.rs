@@ -217,7 +217,7 @@ fn atip_codeexit_07_a_check_command_that_cannot_start_is_exit_2_and_not_failed()
     let dir = git_repo();
     let d = dir.path();
     ok(d, &["init", "--providers", "none"], None);
-    let b = refused(d, None, &["adapter", "validate", "--response", "no-such-response.json"], "ADAPTER_REFUSED", false);
+    let b = refused(d, None, &["adapter", "validate", "--response", "no-such-response.json"], "ADAPTER_FILE_NOT_FOUND", false);
     assert!(!b["error"]["code"].as_str().unwrap().ends_with("_FAILED"), "{b}");
     let out = canon(d, &["report", "check", "--repo", "/no/such/repo"], None);
     assert_eq!(out.status.code(), Some(2), "{}", body(&out));

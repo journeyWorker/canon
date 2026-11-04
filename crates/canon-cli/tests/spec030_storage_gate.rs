@@ -209,7 +209,7 @@ fn evidence_add_119_artifacts_move_refuses_a_tier_that_is_no_object_store_or_a_m
     let hot = repo.canon(&["artifacts", "move", "--tier", "hot", "--json"]);
     assert_eq!(hot.status.code(), Some(2), "{}", text(&hot));
     let body = stdout_json(&hot);
-    assert_eq!(body["error"]["code"], "ARTIFACTS_MOVE_REFUSED", "{body}");
+    assert_eq!(body["error"]["code"], "ARTIFACTS_TIER_INVALID", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("not an object store"), "{body}");
     assert_eq!(snapshot(repo.path()), before, "a refused tier changes nothing");
 
@@ -289,13 +289,13 @@ fn evidence_add_130_an_approval_payload_for_a_scenario_the_index_does_not_hold_i
     let human = repo.canon(&args);
     assert_eq!(human.status.code(), Some(2), "{}", text(&human));
     assert!(human.stdout.is_empty(), "no bytes to sign: {}", text(&human));
-    assert!(text(&human).contains("EVIDENCE_SCENARIO_NOT_INDEXED") && text(&human).contains("canon inventory sync"), "{}", text(&human));
+    assert!(text(&human).contains("SCENARIO_INDEX_REQUIRED") && text(&human).contains("canon inventory sync"), "{}", text(&human));
     let mut json_args = args.to_vec();
     json_args.push("--json");
     let json = repo.canon(&json_args);
     assert_eq!(json.status.code(), Some(2));
     let body = stdout_json(&json);
-    assert_eq!(body["error"]["code"], "EVIDENCE_SCENARIO_NOT_INDEXED", "{body}");
+    assert_eq!(body["error"]["code"], "SCENARIO_INDEX_REQUIRED", "{body}");
     let message = body["error"]["message"].as_str().unwrap();
     assert!(message.contains("game.run.99") && message.contains("spec root `root`"), "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("canon inventory sync"), "{body}");
@@ -316,7 +316,7 @@ fn evidence_add_122_an_approval_payload_is_refused_without_a_task_or_scenario_or
 
     let no_target = repo.canon(&["evidence", "approval-payload", "--approver", "alice", "--approval-at", AT, "--json"]);
     assert_eq!(no_target.status.code(), Some(2), "{}", text(&no_target));
-    assert_eq!(stdout_json(&no_target)["error"]["code"], "EVIDENCE_REFUSED");
+    assert_eq!(stdout_json(&no_target)["error"]["code"], "EVIDENCE_REQUIRED");
 
     let bad_time = repo.canon(&["evidence", "approval-payload", "--scenario", "game.run.01", "--project", "root", "--approver", "alice", "--approval-at", "yesterday"]);
     assert_eq!(bad_time.status.code(), Some(2), "{}", text(&bad_time));
@@ -520,7 +520,7 @@ fn tier_storage_15_export_refuses_sensitive_records_without_policy_permission_an
     let sensitive = repo.canon(&["export", "--kind", "scenario", "--include-sensitive", "--output", "manifest.json", "--json"]);
     assert_eq!(sensitive.status.code(), Some(2), "{}", text(&sensitive));
     let body = stdout_json(&sensitive);
-    assert_eq!(body["error"]["code"], "RETENTION_EXPORT_REFUSED", "{body}");
+    assert_eq!(body["error"]["code"], "RETENTION_EXPORT_DENIED", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("query.allow_sensitive"), "{body}");
     assert!(!repo.path().join("manifest.json").exists(), "no file is written");
 
@@ -687,7 +687,7 @@ fn gate_check_107_gate_install_hooks_refuses_a_repo_that_is_no_directory_and_an_
     let not_dir = canon_in(repo, &["gate", "install-hooks", "--repo", "afile", "--json"]);
     assert_eq!(not_dir.status.code(), Some(2), "{}", text(&not_dir));
     let body = stdout_json(&not_dir);
-    assert_eq!(body["error"]["code"], "HOOKS_INSTALL_REFUSED", "{body}");
+    assert_eq!(body["error"]["code"], "HOOKS_REPO_INVALID", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("is not a directory"), "{body}");
 
     for dry in [&[][..], &["--dry-run"][..]] {
@@ -695,7 +695,7 @@ fn gate_check_107_gate_install_hooks_refuses_a_repo_that_is_no_directory_and_an_
         args.extend_from_slice(dry);
         let missing = canon_in(repo, &args);
         assert_eq!(missing.status.code(), Some(2), "{}", text(&missing));
-        assert_eq!(stdout_json(&missing)["error"]["code"], "HOOKS_INSTALL_REFUSED");
+        assert_eq!(stdout_json(&missing)["error"]["code"], "HOOKS_REPO_INVALID");
         assert!(!repo.join("nowhere").exists(), "the missing directory is not created");
     }
 
@@ -803,11 +803,11 @@ fn plugin_overlay_10_plugin_sync_refuses_a_plugin_id_with_no_installed_manifest_
     let out = canon_in(repo, &["plugin", "sync", "nope", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let body = stdout_json(&out);
-    assert_eq!(body["error"]["code"], "PLUGIN_SYNC_FAILED", "{body}");
+    assert_eq!(body["error"]["code"], "PLUGIN_REQUIRED", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("has no installed manifest"), "{body}");
     let human = canon_in(repo, &["plugin", "sync", "nope"]);
     assert_eq!(human.status.code(), Some(2), "{}", text(&human));
-    assert!(text(&human).contains("PLUGIN_SYNC_FAILED"), "{}", text(&human));
+    assert!(text(&human).contains("PLUGIN_REQUIRED"), "{}", text(&human));
 
     let none = canon_in(repo, &["plugin", "sync"]);
     assert_eq!(none.status.code(), Some(2), "{}", text(&none));

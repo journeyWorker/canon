@@ -630,7 +630,7 @@ fn skills_install_55_a_missing_skills_source_is_refused_with_exit_two() {
         let output = canon(&["skills", command, "--providers", "claude", "--json"], &missing, &target);
         assert_eq!(output.status.code(), Some(2), "{command}: {}", String::from_utf8_lossy(&output.stdout));
         let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(doc["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{command}: {doc}");
+        assert_eq!(doc["error"]["code"], "SKILLS_SOURCE_NOT_FOUND", "{command}: {doc}");
         assert_eq!(doc["error"]["field"], "--skills-source", "{command}: {doc}");
     }
     assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "nothing is written");
@@ -927,7 +927,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
             let output = canon(&["skills", command], &source, &target);
             let err = String::from_utf8_lossy(&output.stderr);
             assert_eq!(output.status.code(), Some(2), "{command} {section:?}: {err}");
-            assert!(err.contains("SKILLS_INVALID_ARGUMENT"), "{command} {section:?}: {err}");
+            assert!(err.contains("CONFIG_INVALID"), "{command} {section:?}: {err}");
             assert!(err.contains(needle), "{command} {section:?}: {err}");
         }
         for command in ["install", "check", "doctor"] {

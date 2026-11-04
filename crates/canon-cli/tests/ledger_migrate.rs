@@ -317,12 +317,12 @@ fn advisory_kinds(doc: &Value) -> Vec<String> {
     doc["data"]["advisories"].as_array().map(|a| a.iter().filter_map(|v| v["kind"].as_str().map(str::to_string)).collect()).unwrap_or_default()
 }
 
-/// A write the 0.29 layout refuses: not `ok`, not a success exit, code `OLD_LAYOUT`, the hint names `canon migrate`.
+/// A write the 0.29 layout refuses: not `ok`, not a success exit, code `LAYOUT_MIGRATION_REQUIRED`, the hint names `canon migrate`.
 fn assert_old_layout_refusal(repo: &Repo, args: &[&str]) {
     let (doc, out) = repo.json(args);
     assert!(!out.status.success(), "`canon {args:?}` exited 0 in a 0.29 repo: {doc}");
     assert_eq!(doc["ok"], false, "`canon {args:?}`: {doc}");
-    assert_eq!(doc["error"]["code"], "OLD_LAYOUT", "`canon {args:?}`: {doc}");
+    assert_eq!(doc["error"]["code"], "LAYOUT_MIGRATION_REQUIRED", "`canon {args:?}`: {doc}");
     let hint = doc["error"]["hint"].as_str().unwrap_or_default();
     assert!(hint.contains("canon migrate"), "`canon {args:?}` hint does not name `canon migrate`: {hint}");
 }
@@ -430,7 +430,7 @@ fn ledger_migrate_01b_no_old_named_file_counts_toward_a_verdict() {
 // ---------------------------------------------------------------------------
 // ledger.migrate.02
 
-/// ledger.migrate.02 -- Then: `canon evidence add` is refused OLD_LAYOUT with the `canon migrate`
+/// ledger.migrate.02 -- Then: `canon evidence add` is refused LAYOUT_MIGRATION_REQUIRED with the `canon migrate`
 /// hint and the tree is byte-identical afterwards; no file in the new name appears beside the old ones.
 #[test]
 fn ledger_migrate_02_evidence_add_is_refused_and_writes_nothing() {
@@ -452,7 +452,7 @@ fn ledger_migrate_02b_the_human_refusal_names_the_code_and_the_hint() {
     let out = repo.run(&args);
     assert!(!out.status.success());
     let all = combined(&out);
-    assert!(all.contains("OLD_LAYOUT") && all.contains("canon migrate"), "{all}");
+    assert!(all.contains("LAYOUT_MIGRATION_REQUIRED") && all.contains("canon migrate"), "{all}");
     assert_unchanged(&before, &repo, "the refused `canon evidence add`");
 }
 
@@ -1159,7 +1159,7 @@ fn ledger_migrate_12b_canon_never_writes_the_old_key() {
 // ledger.migrate.14 / .15
 
 /// ledger.migrate.14 -- Then: `canon scenario new` and `canon feature new` are each refused
-/// OLD_LAYOUT with the `canon migrate` hint and write no file.
+/// LAYOUT_MIGRATION_REQUIRED with the `canon migrate` hint and write no file.
 #[test]
 fn ledger_migrate_14_scenario_and_feature_authoring_is_refused() {
     let repo = Repo::old();
@@ -1172,7 +1172,7 @@ fn ledger_migrate_14_scenario_and_feature_authoring_is_refused() {
 }
 
 /// ledger.migrate.15 -- Then: `canon divergence add` and `canon gate promote` are each refused
-/// OLD_LAYOUT with the `canon migrate` hint and stage or commit nothing.
+/// LAYOUT_MIGRATION_REQUIRED with the `canon migrate` hint and stage or commit nothing.
 #[test]
 fn ledger_migrate_15_divergence_writes_and_promotion_are_refused() {
     let repo = Repo::old();

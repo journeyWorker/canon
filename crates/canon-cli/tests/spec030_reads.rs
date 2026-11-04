@@ -246,8 +246,8 @@ fn learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_ma
     assert_eq!(unreadable.status.code(), Some(2));
     assert_eq!(error_code(&unreadable), "LEARN_SIGNATURE_UNREADABLE");
     let bad_signature = rollback(&id, "bad.sig", "2030-01-01T00:00:00Z");
-    assert_eq!(bad_signature.status.code(), Some(1));
-    assert_eq!(error_code(&bad_signature), "LEARN_ROLLBACK_FAILED");
+    assert_eq!(bad_signature.status.code(), Some(2));
+    assert_eq!(error_code(&bad_signature), "STRATEGY_SIGNATURE_INVALID");
     let message = json(&bad_signature)["error"]["message"].as_str().unwrap().to_string();
     assert!(message.contains("ssh signature verification failed"), "{message}");
     let bad_time = rollback(&id, "bad.sig", "yesterday");
@@ -285,7 +285,7 @@ fn context_capability_45_brief_show_of_a_change_with_no_brief_or_in_a_repo_with_
     let repo = repo_with_subject();
     let none = canon(repo.path(), &["brief", "show", "--json"]);
     assert_eq!(none.status.code(), Some(2));
-    assert_eq!(error_code(&none), "NO_BRIEF");
+    assert_eq!(error_code(&none), "BRIEF_REQUIRED");
 
     assert!(canon(repo.path(), &["change", "new", "a", "--subject", "demo", "--title", "A"]).status.success());
     assert!(canon(repo.path(), &["change", "new", "b", "--subject", "demo", "--title", "B"]).status.success());
@@ -366,7 +366,7 @@ fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_si
         assert!(json(&out)["error"]["message"].as_str().unwrap().contains(UNKNOWN_STRATEGY));
     }
     let existing = canon(repo, &["strategy", "rollback", &candidate.id.to_string(), "--reason", "regressed", "--actor", "alice", "--signature-file", "bad.sig", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
-    assert_eq!(existing.status.code(), Some(1));
-    assert_eq!(error_code(&existing), "LEARN_ROLLBACK_FAILED");
+    assert_eq!(existing.status.code(), Some(2));
+    assert_eq!(error_code(&existing), "STRATEGY_SIGNATURE_INVALID");
     assert_eq!(tree(repo), before, "a refused rollback writes nothing");
 }

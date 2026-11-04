@@ -311,8 +311,7 @@ impl DispatchError {
             Self::NoPlanSources { .. } => "PLAN_SOURCES_REQUIRED",
             Self::PlanCorpus { .. } => "PLAN_CORPUS_UNREADABLE",
             Self::NoSuchRun { .. } => "DISPATCH_RUN_NOT_FOUND",
-            Self::AlreadyEnded { .. } => "DISPATCH_ALREADY_ENDED",
-            Self::NotRunning { .. } => "DISPATCH_NOT_RUNNING",
+            Self::AlreadyEnded { .. } | Self::NotRunning { .. } => "DISPATCH_CONFLICT",
             Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_MISMATCH",
             Self::EndInProgress { .. } => "DISPATCH_RUN_UNAVAILABLE",
             Self::Unreadable { .. } => "DISPATCH_MANIFEST_UNREADABLE",
@@ -340,6 +339,11 @@ impl DispatchError {
         }
         if matches!(self, Self::SkillDigestWithoutId) {
             error = error.field("--skill");
+        }
+        match self {
+            Self::AlreadyEnded { .. } => error = error.reason("ALREADY_ENDED"),
+            Self::NotRunning { .. } => error = error.reason("NOT_RUNNING"),
+            _ => {}
         }
         error
     }

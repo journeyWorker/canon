@@ -41,6 +41,19 @@ pub enum RetentionError {
     Tiers(#[from] tiers::TierCliError),
 }
 
+/// The code of a purge or export that could not open or read the tiers before it began: a backend that is down or unreachable
+/// can be tried again (`RETENTION_TIERS_UNAVAILABLE`); a policy, routing entry or config the caller wrote that cannot be used cannot
+/// (`RETENTION_TIERS_INVALID`).
+fn tiers_code(error: &RetentionError) -> &'static str {
+    use canon_store::tier::StoreError;
+    let unavailable = |store: &StoreError| matches!(store, StoreError::TierUnavailable { .. } | StoreError::BackendUnattached { .. } | StoreError::Io(_) | StoreError::Sql(_) | StoreError::ObjectStore(_) | StoreError::Parquet(_));
+    match error {
+        RetentionError::Store(store) | RetentionError::Tiers(tiers::TierCliError::Store(store)) if unavailable(store) => "RETENTION_TIERS_UNAVAILABLE",
+        RetentionError::Io(_) | RetentionError::Tiers(tiers::TierCliError::ReadCanonYaml { .. }) => "RETENTION_TIERS_UNAVAILABLE",
+        _ => "RETENTION_TIERS_INVALID",
+    }
+}
+
 fn actor() -> String {
     std::env::var("CANON_ACTOR")
         .ok()
@@ -354,7 +367,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
                 let _ = append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted);
             }
             // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, a failure is a failure during the work (exit 1).
-            let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { "RETENTION_PURGE_REFUSED" };
+            let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { tiers_code(&err) };
             let error = CliError::refused(code, err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
@@ -491,7 +504,10 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         // names the file; otherwise the manifest, which is what a text-mode run prints or writes to the file.
         let answer = if dry_run { "ExportPreviewReport" } else if json_output && out.is_some() { "ExportWrittenReport" } else { "ExportReport" };
         let chosen = crate::fields::choose_output("export", Some(answer), fields, None).map_err(ExportFailure::Refused)?;
-        ensure_sensitive(repo, include_sensitive)?;
+        ensure_sensitive(repo, include_sensitive).map_err(|error| match error {
+            RetentionError::Message(message) => ExportFailure::Refused(CliError::refused("RETENTION_EXPORT_DENIED", message).hint("ask the human to set `query.allow_sensitive: true` in .canon/policy.yaml, or export without --include-sensitive")),
+            other => ExportFailure::from(other),
+        })?;
         let (_, registry) = loaded_registry(repo, kind, true)?;
         let mut query = TierQuery::kind(kind);
         if let Some(after) = after { query = query.since(after); }
@@ -601,7 +617,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         }
         Err(ExportFailure::Retention(err)) => {
             // The ledger is read and the destination is checked before anything is written (exit 2); once the manifest is being written the same errors are a failure during the work (exit 1).
-            let code = if writing { "RETENTION_EXPORT_FAILED" } else { "RETENTION_EXPORT_REFUSED" };
+            let code = if writing { "RETENTION_EXPORT_FAILED" } else { tiers_code(&err) };
             CliError::refused(code, err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
         }
     }

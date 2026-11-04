@@ -21,7 +21,7 @@ Feature: ledger migrate
   Scenario: A write command is refused in a 0.29 repo with the same hint and writes nothing
     Given a 0.29 fixture repo
     When `canon evidence add` runs
-    Then it is refused OLD_LAYOUT with the `canon migrate` hint, and the tree is byte-identical afterwards
+    Then it is refused LAYOUT_MIGRATION_REQUIRED with the `canon migrate` hint, and the tree is byte-identical afterwards
     And no file in the new name appears beside the old ones
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:28Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
@@ -149,7 +149,7 @@ Feature: ledger migrate
   Scenario: Scenario and feature authoring is refused in a 0.29 repo
     Given a 0.29 fixture repo
     When `canon scenario new` and `canon feature new` run
-    Then each is refused OLD_LAYOUT with the `canon migrate` hint and writes no file
+    Then each is refused LAYOUT_MIGRATION_REQUIRED with the `canon migrate` hint and writes no file
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:47Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:divergence-lifecycle
@@ -159,7 +159,7 @@ Feature: ledger migrate
   Scenario: Divergence writes are refused in a 0.29 repo
     Given a 0.29 fixture repo
     When `canon divergence add` and `canon gate promote` run
-    Then each is refused OLD_LAYOUT with the `canon migrate` hint and stages or commits nothing
+    Then each is refused LAYOUT_MIGRATION_REQUIRED with the `canon migrate` hint and stages or commits nothing
 
   # canon: {"schema":1,"at":"2026-10-26T18:12:42Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
   @subject:review-attestation

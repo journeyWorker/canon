@@ -102,6 +102,6 @@ Feature: plugin overlay
   Scenario: Plugin sync refuses a plugin id with no installed manifest and writes nothing
     Given a repo with a canon.yaml and no plugin manifest under .canon/plugins
     When canon plugin sync is run with a plugin id that has no installed manifest, with and without --json
-    Then it exits 2 with PLUGIN_SYNC_FAILED saying the plugin has no installed manifest
+    Then it exits 2 with PLUGIN_REQUIRED saying the plugin has no installed manifest
     And running it with no plugin id exits 2 as a usage error
     And the tree is unchanged after each refusal

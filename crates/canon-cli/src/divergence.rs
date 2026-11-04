@@ -382,7 +382,8 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
             .emit(CMD, args.json)
     };
     if args.role.as_str() != "reviewer" {
-        return CliError::refused("DIVERGENCE_ACCEPT_REFUSED", format!("accepting a divergence is a reviewer step, not `{}`", args.role.as_str()))
+        return CliError::refused("DIVERGENCE_DENIED", format!("accepting a divergence is a reviewer step, not `{}`", args.role.as_str()))
+            .reason("NOT_REVIEWER")
             .field("--role")
             .hint("pass --role reviewer (or declare --as reviewer)")
             .emit(CMD, args.json);
@@ -430,15 +431,20 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
             .hint("run `canon inventory sync`, then accept again")
             .emit(CMD, args.json);
     }
-    let refusals: Vec<String> = scenarios
+    let refusals: Vec<canon_gate::acceptance::Refusal> = scenarios
         .iter()
         .filter_map(|scenario| canon_gate::acceptance::refusal(&context, scenario, &args.reviewer, &args.actor_id, args.session_id.as_ref()))
         .collect();
     if !refusals.is_empty() {
         let nothing = if scenarios.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
-        return CliError::refused("DIVERGENCE_ACCEPT_REFUSED", format!("{}{nothing}", refusals.join("; ")))
-            .hint("an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest")
-            .emit(CMD, args.json);
+        let hint = "an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest";
+        let error = |refusal: &canon_gate::acceptance::Refusal, message: String| match refusal.kind {
+            canon_gate::acceptance::RefusalKind::NotDivergent => CliError::refused("DIVERGENCE_CONFLICT", message).reason("NOT_DIVERGENT").hint(hint),
+            canon_gate::acceptance::RefusalKind::SelfAttested => CliError::refused("DIVERGENCE_DENIED", message).reason("SELF_ATTESTED").hint(hint),
+        };
+        let first = error(&refusals[0], format!("{}{nothing}", refusals[0].message));
+        let all: Vec<CliError> = refusals.iter().map(|r| error(r, r.message.clone())).collect();
+        return if refusals.len() > 1 { first.details(all).emit(CMD, args.json) } else { first.emit(CMD, args.json) };
     }
 
     let mut actor = Actor::new(&args.actor_id, args.role.clone());

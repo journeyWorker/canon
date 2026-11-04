@@ -310,31 +310,31 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let names = match migrate_names::plan(&repo, &text) {
         Ok(names) => names,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("MIGRATION_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let renamed_config = match migrate_names::rewrite_config(&text) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("CONFIG_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let plan = match plan(&repo, &renamed_config) {
         Ok(plan) => plan,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("MIGRATION_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let config = match render_config(&renamed_config, &plan, plan.roots.len(), plan.drop_source.is_some()) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("CONFIG_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     // The renamed ledger is judged in a scratch copy (the review pins, the chore reviews of the briefs).
     let world = match names.renames().then(|| migrate_names::scratch(&repo, &renamed_config, &names)).transpose() {
         Ok(world) => world,
-        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("check that the system temp directory is writable, then run `canon migrate` again").emit("canon migrate", json),
+        Err(e) => return CliError::refused("MIGRATION_DENIED", e).hint("check that the system temp directory is writable, then run `canon migrate` again").emit("canon migrate", json),
     };
     let view = world.as_ref().map_or(repo.as_path(), |w| w.path());
     // 0.31 `brief-format`: the briefs in the 0.30 format, and the approvals and review pins their rewrite re-binds.
@@ -350,7 +350,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let view_ledger = world.as_ref().map_or_else(|| real_ledger.clone(), |w| w.ledger_root().to_path_buf());
     let briefs = match migrate_briefs::plan(&repo, &view_ledger, &ledger_prefix) {
         Ok(briefs) => briefs,
-        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
+        Err(e) => return CliError::refused("MIGRATION_INVALID", e).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
     };
     if git {
         let mut moved_paths = plan.moved_paths.clone();

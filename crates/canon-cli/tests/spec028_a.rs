@@ -452,7 +452,7 @@ fn review_scenario_94_one_invalid_or_unindexed_element_writes_nothing() {
     // A scenario no record carries is refused for the whole call.
     let unindexed = f.run(&["review", "scenario", "--input", &review_doc(&["auth.login.01", "auth.login.77"]).to_string(), "--json"]);
     assert_eq!(unindexed.status.code(), Some(2), "{}", text(&unindexed.stdout));
-    assert_eq!(json_of(&unindexed)["error"]["code"], "REVIEW_SCENARIO_NOT_INDEXED");
+    assert_eq!(json_of(&unindexed)["error"]["code"], "SCENARIO_INDEX_REQUIRED");
     assert!(committed(r, "review").is_empty(), "no review is written for any of them");
 }
 

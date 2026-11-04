@@ -11,7 +11,10 @@
       "effect": "read",
       "errors": [
         "ADAPTER_AUTHORIZATION_FAILED",
-        "ADAPTER_REFUSED",
+        "ADAPTER_FILE_DENIED",
+        "ADAPTER_FILE_INVALID",
+        "ADAPTER_FILE_NOT_FOUND",
+        "CONFIG_INVALID",
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE"
@@ -169,8 +172,11 @@
       "command": "adapter validate",
       "effect": "read",
       "errors": [
-        "ADAPTER_REFUSED",
+        "ADAPTER_FILE_DENIED",
+        "ADAPTER_FILE_INVALID",
+        "ADAPTER_FILE_NOT_FOUND",
         "ADAPTER_VALIDATION_FAILED",
+        "CONFIG_INVALID",
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE"
@@ -440,12 +446,13 @@
       ],
       "effect": "destructive",
       "errors": [
-        "ARTIFACTS_MOVE_REFUSED",
+        "ARTIFACTS_BLOB_CORRUPT",
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_TIER_INVALID",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "EVIDENCE_BIND_REFUSED",
+        "EVIDENCE_BINDING_STALE",
         "EVIDENCE_STORE_FAILED",
         "EVIDENCE_STORE_UNAVAILABLE",
         "INPUT_CONFLICT",
@@ -733,7 +740,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -1228,11 +1235,13 @@
       "command": "artifacts verify",
       "effect": "read",
       "errors": [
+        "ARTIFACTS_BLOB_CORRUPT",
         "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_TIER_INVALID",
         "ARTIFACTS_VERIFY_FAILED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "EVIDENCE_BIND_REFUSED",
+        "EVIDENCE_BINDING_STALE",
         "EVIDENCE_STORE_FAILED",
         "EVIDENCE_STORE_UNAVAILABLE",
         "INTERNAL",
@@ -1414,9 +1423,9 @@
         "ACTOR_DENIED",
         "APPROVAL_INVALID",
         "BATCH_INCOMPLETE",
-        "BRIEF_APPROVE_REFUSED",
         "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
+        "BRIEF_REQUIRED",
         "BRIEF_UNREADABLE",
         "BRIEF_WRITE_FAILED",
         "CHANGE_REQUIRED",
@@ -1426,9 +1435,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_BRIEF",
         "POLICY_APPROVAL_FAILED",
-        "POLICY_APPROVAL_REFUSED",
         "RELAY_DIGEST_STALE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -2244,12 +2251,12 @@
       "errors": [
         "BRIEF_CHECK_FAILED",
         "BRIEF_NOT_FOUND",
+        "BRIEF_REQUIRED",
         "BRIEF_UNREADABLE",
         "CHANGE_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
-        "NO_BRIEF",
         "ROLE_INVALID",
         "SPEC_ROOTS_UNREADABLE",
         "USAGE"
@@ -2545,12 +2552,12 @@
       "effect": "read",
       "errors": [
         "BRIEF_NOT_FOUND",
+        "BRIEF_REQUIRED",
         "BRIEF_UNREADABLE",
         "CHANGE_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
-        "NO_BRIEF",
         "ROLE_INVALID",
         "SPEC_ROOTS_UNREADABLE",
         "USAGE"
@@ -2801,7 +2808,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -5779,7 +5786,6 @@
       "effectNote": "prints one report, then serves until signalled; regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
       "errors": [
         "APPROVAL_INVALID",
-        "BRIEF_APPROVE_REFUSED",
         "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
         "BRIEF_PAGE_STALE",
@@ -6823,11 +6829,10 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "DISPATCH_ALREADY_ENDED",
         "DISPATCH_ARGUMENT_INVALID",
+        "DISPATCH_CONFLICT",
         "DISPATCH_MANIFEST_MISMATCH",
         "DISPATCH_MANIFEST_UNREADABLE",
-        "DISPATCH_NOT_RUNNING",
         "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
         "DISPATCH_RUN_UNAVAILABLE",
@@ -6835,7 +6840,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_REQUIRED",
         "REPO_WRITE_BUSY",
@@ -7850,11 +7855,10 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "DISPATCH_ALREADY_ENDED",
         "DISPATCH_ARGUMENT_INVALID",
+        "DISPATCH_CONFLICT",
         "DISPATCH_MANIFEST_MISMATCH",
         "DISPATCH_MANIFEST_UNREADABLE",
-        "DISPATCH_NOT_RUNNING",
         "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
         "DISPATCH_RUN_UNAVAILABLE",
@@ -7862,7 +7866,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_REQUIRED",
         "REPO_WRITE_BUSY",
@@ -8407,13 +8411,14 @@
         "BATCH_INCOMPLETE",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
+        "DIVERGENCE_CONFLICT",
+        "DIVERGENCE_DENIED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
@@ -9146,13 +9151,14 @@
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
+        "DIVERGENCE_CONFLICT",
+        "DIVERGENCE_DENIED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTE_FAILED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -9867,14 +9873,15 @@
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
+        "DIVERGENCE_CONFLICT",
+        "DIVERGENCE_DENIED",
         "DIVERGENCE_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
@@ -10498,8 +10505,9 @@
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "CURSOR_INVALID",
-        "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
+        "DIVERGENCE_CONFLICT",
+        "DIVERGENCE_DENIED",
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE",
@@ -10777,14 +10785,15 @@
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_ARGUMENT_INVALID",
+        "DIVERGENCE_CONFLICT",
+        "DIVERGENCE_DENIED",
         "DIVERGENCE_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
@@ -11381,7 +11390,7 @@
           "rule": "atLeastOne"
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_REQUIRED",
           "help": "A record needs a coverage subject: a task, a scenario, or one record per scenario of a report.",
           "names": [
             "task",
@@ -11391,7 +11400,7 @@
           "rule": "atLeastOne"
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_CONFLICT",
           "help": "--all-scenarios writes one record per scenario its report owns, so it names no single subject.",
           "if": {
             "name": "all-scenarios"
@@ -11408,7 +11417,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_REQUIRED",
           "help": "--all-scenarios splits a --report by the scenario each case belongs to.",
           "if": {
             "name": "all-scenarios"
@@ -11419,7 +11428,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_REQUIRED",
           "help": "--report-case names a case of a --report.",
           "if": {
             "name": "report-case"
@@ -11430,7 +11439,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_REQUIRED",
           "help": "The captured output backs a --summary.",
           "if": {
             "name": "command-result"
@@ -11441,7 +11450,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_APPROVAL_INVALID",
+          "code": "EVIDENCE_APPROVAL_REQUIRED",
           "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
           "if": {
             "name": "approver"
@@ -11454,7 +11463,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_APPROVAL_INVALID",
+          "code": "EVIDENCE_APPROVAL_REQUIRED",
           "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
           "if": {
             "name": "approval-role"
@@ -11467,7 +11476,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_APPROVAL_INVALID",
+          "code": "EVIDENCE_APPROVAL_REQUIRED",
           "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
           "if": {
             "name": "signature-file"
@@ -11480,7 +11489,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_APPROVAL_INVALID",
+          "code": "EVIDENCE_APPROVAL_REQUIRED",
           "help": "The four approval options (`--approver`, `--approval-role`, `--signature-file`, `--approval-at`) go together: giving one needs the other three.",
           "if": {
             "name": "approval-at"
@@ -11499,24 +11508,29 @@
         "BATCH_INCOMPLETE",
         "BRIEF_APPROVAL_REQUIRED",
         "BRIEF_APPROVAL_STALE",
+        "BRIEF_MIGRATION_REQUIRED",
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
-        "EVIDENCE_BIND_REFUSED",
+        "EVIDENCE_APPROVAL_REQUIRED",
+        "EVIDENCE_ARGUMENT_CONFLICT",
+        "EVIDENCE_ARGUMENT_INVALID",
+        "EVIDENCE_ARGUMENT_REQUIRED",
+        "EVIDENCE_BINDING_DENIED",
+        "EVIDENCE_BINDING_INVALID",
+        "EVIDENCE_BINDING_NOT_FOUND",
         "EVIDENCE_CONTRACT_CONFLICT",
-        "EVIDENCE_INVALID_ARGUMENT",
+        "EVIDENCE_INVALID",
         "EVIDENCE_NOTE_INVALID",
-        "EVIDENCE_REFUSED",
         "EVIDENCE_REPORT_CONFLICT",
+        "EVIDENCE_REQUIRED",
         "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "OLD_BRIEF_FORMAT",
-        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
         "REPO_UNREADABLE",
@@ -12659,7 +12673,7 @@
           "arguments": [
             "class"
           ],
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_INVALID",
           "description": "`--class audit` is refused: an external evaluator's re-audit is `canon evidence audit`.",
           "rejects": [
             "canon evidence add --scenario auth.login.01 --class audit --ref \"npm test\" --role implementer"
@@ -12671,7 +12685,7 @@
             "scenario",
             "all-scenarios"
           ],
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_CONFLICT",
           "description": "An `--artifact` binds to one record. Without `--all-scenarios` a scoped `--artifact <scenario-id>=<path>` must name the record's own `--scenario`; with `--all-scenarios` every `--artifact` must be scoped (a bare path would bind to every record of the batch). The part before the first `=` is a scope only when it is shaped like a scenario id.",
           "rejects": [
             "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact auth.login.02=shot.png",
@@ -12689,7 +12703,7 @@
       "command": "evidence approval-payload",
       "constraints": [
         {
-          "code": "EVIDENCE_REFUSED",
+          "code": "EVIDENCE_REQUIRED",
           "help": "An approval is for a task or a scenario.",
           "names": [
             "task",
@@ -12703,11 +12717,12 @@
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "EVIDENCE_INVALID_ARGUMENT",
-        "EVIDENCE_REFUSED",
-        "EVIDENCE_SCENARIO_NOT_INDEXED",
+        "EVIDENCE_ARGUMENT_INVALID",
+        "EVIDENCE_ARGUMENT_REQUIRED",
+        "EVIDENCE_REQUIRED",
         "INTERNAL",
         "ROLE_INVALID",
+        "SCENARIO_INDEX_REQUIRED",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED"
@@ -12942,7 +12957,7 @@
           "rule": "atMostOne"
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_REQUIRED",
           "help": "--report-case names a case of a --report.",
           "if": {
             "name": "report-case"
@@ -12953,7 +12968,7 @@
           ]
         },
         {
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_REQUIRED",
           "help": "The captured output backs a --summary.",
           "if": {
             "name": "command-result"
@@ -12970,24 +12985,29 @@
         "BATCH_INCOMPLETE",
         "BRIEF_APPROVAL_REQUIRED",
         "BRIEF_APPROVAL_STALE",
+        "BRIEF_MIGRATION_REQUIRED",
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
-        "EVIDENCE_BIND_REFUSED",
+        "EVIDENCE_APPROVAL_REQUIRED",
+        "EVIDENCE_ARGUMENT_CONFLICT",
+        "EVIDENCE_ARGUMENT_INVALID",
+        "EVIDENCE_ARGUMENT_REQUIRED",
+        "EVIDENCE_BINDING_DENIED",
+        "EVIDENCE_BINDING_INVALID",
+        "EVIDENCE_BINDING_NOT_FOUND",
         "EVIDENCE_CONTRACT_CONFLICT",
-        "EVIDENCE_INVALID_ARGUMENT",
+        "EVIDENCE_INVALID",
         "EVIDENCE_NOTE_INVALID",
-        "EVIDENCE_REFUSED",
         "EVIDENCE_REPORT_CONFLICT",
+        "EVIDENCE_REQUIRED",
         "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "OLD_BRIEF_FORMAT",
-        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
         "REPO_UNREADABLE",
@@ -14027,7 +14047,7 @@
             "artifact",
             "scenario"
           ],
-          "code": "EVIDENCE_INVALID_ARGUMENT",
+          "code": "EVIDENCE_ARGUMENT_CONFLICT",
           "description": "An `--artifact` binds to one record: a scoped `--artifact <scenario-id>=<path>` must name the audited scenario. The part before the first `=` is a scope only when it is shaped like a scenario id.",
           "rejects": [
             "canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact auth.login.02=shot.png"
@@ -14061,10 +14081,11 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "RETENTION_EXPORT_DENIED",
         "RETENTION_EXPORT_FAILED",
-        "RETENTION_EXPORT_REFUSED",
         "RETENTION_PURGE_FAILED",
-        "RETENTION_PURGE_REFUSED",
+        "RETENTION_TIERS_INVALID",
+        "RETENTION_TIERS_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -15048,7 +15069,6 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "SPEC_ROOT_REQUIRED",
@@ -15622,7 +15642,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
@@ -16601,7 +16621,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
@@ -17884,8 +17904,10 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "HOOKS_FILE_CONFLICT",
+        "HOOKS_FILE_DENIED",
         "HOOKS_INSTALL_FAILED",
-        "HOOKS_INSTALL_REFUSED",
+        "HOOKS_REPO_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -18404,7 +18426,6 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
         "REPO_WRITE_BUSY",
@@ -18959,7 +18980,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "USAGE",
@@ -19823,7 +19844,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "USAGE",
@@ -20551,7 +20572,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "USAGE",
@@ -21555,6 +21576,7 @@
         "BATCH_INCOMPLETE",
         "CONFIG_CHECK_FAILED",
         "CONFIG_EXISTS",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
         "INIT_AGENTS_MD_CONFLICT",
         "INIT_ARGUMENT_INVALID",
@@ -21565,8 +21587,9 @@
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
-        "SKILLS_INVALID_ARGUMENT",
+        "SKILLS_SOURCE_NOT_FOUND",
         "STOPPED_MIDWAY",
         "USAGE",
         "WRITE_FAILED",
@@ -22181,15 +22204,17 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
+        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "INVENTORY_ABORTED",
         "INVENTORY_FAILED",
-        "INVENTORY_REFUSED",
-        "OLD_LAYOUT",
+        "INVENTORY_INDEX_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "USAGE",
@@ -22754,9 +22779,9 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LAYOUT_MIGRATION_REQUIRED",
         "LEDGER_ARCHIVE_UNAVAILABLE",
         "LEDGER_COMPACT_FAILED",
-        "OLD_LAYOUT",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -23114,6 +23139,7 @@
       "effect": "destructive",
       "errors": [
         "ACTOR_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
@@ -23122,9 +23148,10 @@
         "INTERNAL",
         "MIGRATE_INDEX_FAILED",
         "MIGRATE_PINS_FAILED",
-        "MIGRATE_REFUSED",
         "MIGRATE_STOPPED",
         "MIGRATION_CONFLICT",
+        "MIGRATION_DENIED",
+        "MIGRATION_INVALID",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -23610,14 +23637,17 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
+        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "INVENTORY_INDEX_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "PLUGIN_REQUIRED",
         "PLUGIN_SYNC_ERRORS",
-        "PLUGIN_SYNC_FAILED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "USAGE",
@@ -24195,6 +24225,7 @@
       "effect": "write",
       "errors": [
         "ACTOR_DENIED",
+        "APPROVAL_INVALID",
         "BATCH_INCOMPLETE",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
@@ -24203,7 +24234,8 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "POLICY_APPROVAL_FAILED",
-        "POLICY_APPROVAL_REFUSED",
+        "POLICY_INVALID",
+        "POLICY_REQUIRED",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "USAGE",
@@ -24794,7 +24826,7 @@
           "arguments": [
             "approver"
           ],
-          "code": "POLICY_APPROVAL_REFUSED",
+          "code": "APPROVAL_INVALID",
           "description": "The human's name (`--approver`) is not blank once trimmed (a blank name under `--relayed-via` is the relayed validator's, `USAGE`).",
           "rejects": [
             "canon policy approve --approver \" \""
@@ -25792,11 +25824,13 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
+        "RETENTION_EXPORT_DENIED",
         "RETENTION_PURGE_FAILED",
-        "RETENTION_PURGE_REFUSED",
+        "RETENTION_TIERS_INVALID",
+        "RETENTION_TIERS_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -28328,6 +28362,7 @@
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
         "BATCH_INCOMPLETE",
+        "BRIEF_MIGRATION_REQUIRED",
         "COMMIT_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
@@ -28335,12 +28370,13 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_BRIEF_FORMAT",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "REVIEW_ARGUMENT_INVALID",
-        "REVIEW_ARTIFACT_REFUSED",
-        "REVIEW_SCENARIO_NOT_INDEXED",
+        "REVIEW_ARTIFACT_DENIED",
+        "REVIEW_ARTIFACT_INVALID",
+        "REVIEW_ARTIFACT_NOT_FOUND",
+        "REVIEW_ARTIFACT_STALE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
@@ -29150,11 +29186,13 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_WRITE_BUSY",
         "REVIEW_ARGUMENT_INVALID",
-        "REVIEW_ARTIFACT_REFUSED",
-        "REVIEW_SCENARIO_NOT_INDEXED",
+        "REVIEW_ARTIFACT_DENIED",
+        "REVIEW_ARTIFACT_INVALID",
+        "REVIEW_ARTIFACT_NOT_FOUND",
+        "REVIEW_ARTIFACT_STALE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
@@ -29954,6 +29992,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "BRIEF_MIGRATION_REQUIRED",
         "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "FEATURE_PATH_INVALID",
@@ -29962,8 +30001,6 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "OLD_BRIEF_FORMAT",
-        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -32316,11 +32353,13 @@
       "command": "skills check",
       "effect": "read",
       "errors": [
+        "CONFIG_INVALID",
         "INTERNAL",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_CHECK_FAILED",
         "SKILLS_FAILED",
-        "SKILLS_INVALID_ARGUMENT",
+        "SKILLS_SOURCE_NOT_FOUND",
         "USAGE"
       ],
       "examples": [
@@ -32546,10 +32585,12 @@
       "command": "skills doctor",
       "effect": "read",
       "errors": [
+        "CONFIG_INVALID",
         "INTERNAL",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
-        "SKILLS_INVALID_ARGUMENT",
+        "SKILLS_SOURCE_NOT_FOUND",
         "USAGE"
       ],
       "examples": [
@@ -32661,14 +32702,16 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
-        "SKILLS_INVALID_ARGUMENT",
+        "SKILLS_SOURCE_NOT_FOUND",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -34393,9 +34436,9 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LAYOUT_MIGRATION_REQUIRED",
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
-        "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "STOPPED_MIDWAY",
@@ -34933,15 +34976,16 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "LEARN_ROLLBACK_FAILED",
+        "LAYOUT_MIGRATION_REQUIRED",
         "LEARN_SIGNATURE_UNREADABLE",
-        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
         "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_NOT_FOUND",
+        "STRATEGY_ROLLBACK_FAILED",
+        "STRATEGY_SIGNATURE_INVALID",
         "TRAJECTORY_NOT_FOUND",
         "USAGE",
         "WRITE_UNAVAILABLE"
@@ -35551,17 +35595,19 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "BRIEF_MIGRATION_REQUIRED",
         "CHANGE_ADOPTION_INCOMPLETE",
+        "CHANGE_NOT_FOUND",
         "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_BRIEF_FORMAT",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
-        "SUBJECT_ADOPT_REFUSED",
+        "SUBJECT_NOT_FOUND",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -36264,7 +36310,9 @@
       "effectNote": "refreshes stale scenario-index records once the transition is allowed; a refused call writes nothing",
       "errors": [
         "BATCH_INCOMPLETE",
+        "BRIEF_MIGRATION_REQUIRED",
         "CHANGE_ADOPTION_INCOMPLETE",
+        "CHANGE_NOT_FOUND",
         "CONFIG_REQUIRED",
         "EVIDENCE_STALE",
         "INPUT_CONFLICT",
@@ -36272,15 +36320,12 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "OLD_BRIEF_FORMAT",
-        "OLD_LAYOUT",
         "POLICY_APPROVAL_STALE",
         "POLICY_APPROVAL_UNREADABLE",
         "PROMOTION_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
-        "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_ARGUMENT_INVALID",
         "SUBJECT_CONFLICT",
@@ -37199,18 +37244,19 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
+        "CHANGE_NOT_FOUND",
         "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
-        "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_ARGUMENT_INVALID",
         "SUBJECT_EXISTS",
+        "SUBJECT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -37991,13 +38037,14 @@
       "effectNote": "refreshes the stale scenario-index cache once the subject is found; a refused call writes nothing",
       "errors": [
         "CHANGE_ADOPTION_INCOMPLETE",
+        "CHANGE_NOT_FOUND",
         "CONFIG_REQUIRED",
         "INTERNAL",
         "REPO_UNREADABLE",
         "ROLE_INVALID",
-        "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_NOT_FOUND",
-        "USAGE"
+        "USAGE",
+        "WRITE_UNAVAILABLE"
       ],
       "examples": [
         "canon subject show demo --json"
@@ -38358,16 +38405,18 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
+        "CHANGE_NOT_FOUND",
         "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
-        "SUBJECT_ADOPT_REFUSED",
-        "SUBJECT_UNADOPT_REFUSED",
+        "SUBJECT_CONFLICT",
+        "SUBJECT_NOT_FOUND",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -39560,7 +39609,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "OLD_LAYOUT",
+        "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
         "ROLE_INVALID",
@@ -39814,6 +39863,7 @@
         "INTERNAL",
         "ROLE_INVALID",
         "SEARCH_INDEX_FAILED",
+        "TRACE_CONFLICT",
         "TRACE_NOT_FOUND",
         "TRACE_OPERAND_INVALID",
         "USAGE"
@@ -40147,10 +40197,24 @@
       "retryable": false
     },
     {
-      "code": "ADAPTER_REFUSED",
+      "code": "ADAPTER_FILE_DENIED",
       "exit": 2,
-      "fix": "Fix the response file, or the policy file `.canon/policy.yaml` when the message names it, then run the command again; `adapter validate` re-checks a response.",
-      "meaning": "`adapter validate` could not read the response file, or `adapter authorize` refused: its response is unreadable, breaks a rule, or the policy file is broken",
+      "fix": "Make the --response file readable by this user, then run the command again.",
+      "meaning": "the adapter response file exists but this user may not read it",
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_INVALID",
+      "exit": 2,
+      "fix": "Run `canon adapter validate --response <file>` to see which rule the response breaks, fix the response, then run the command again.",
+      "meaning": "the adapter response file cannot be used as a response: it is not a file or not UTF-8 text, or (for `adapter authorize`) it breaks a rule of the response envelope",
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass --response naming an existing response file.",
+      "meaning": "the adapter response file does not exist",
       "retryable": false
     },
     {
@@ -40168,10 +40232,10 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_MOVE_REFUSED",
+      "code": "ARTIFACTS_BLOB_CORRUPT",
       "exit": 2,
-      "fix": "Target an s3 tier, restore any local blob whose content does not match its name, and replace the bad object-store copy named in the error.",
-      "meaning": "`artifacts move` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
+      "fix": "Run `canon artifacts verify` to see which blobs differ, restore or delete any local blob whose content does not match its name, replace the bad object-store copy the error names, then run the command again.",
+      "meaning": "a local artifact blob does not match its name, changed while it was read, or the object store holds a bad copy of it; the bytes canon wrote are damaged, and nothing was moved",
       "retryable": false
     },
     {
@@ -40187,6 +40251,13 @@
       "fix": "Check the artifact store tier's endpoint and credentials in canon.yaml, then run the command again.",
       "meaning": "the artifact store cannot be opened, attached or reached before any blob is written, so no blob can be verified or uploaded",
       "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_TIER_INVALID",
+      "exit": 2,
+      "fix": "Pass --tier naming an `s3` tier of canon.yaml `tiers:` (for example `cold`).",
+      "meaning": "`artifacts move` was asked to move to a target that is not an s3 tier of canon.yaml (`local` cannot take bytes back from an object store)",
+      "retryable": false
     },
     {
       "code": "ARTIFACTS_VERIFY_FAILED",
@@ -40217,13 +40288,6 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_APPROVE_REFUSED",
-      "exit": 2,
-      "fix": "Resolve what each refused id names (`canon brief check` lists blocker findings), then ask the human to approve again.",
-      "meaning": "`brief approve` was refused because a brief has blocker findings, or, for several ids, because at least one id was refused (a blocker, no brief, a brief that cannot carry the line); data.refused names each with its own code; nothing was written",
-      "retryable": false
-    },
-    {
       "code": "BRIEF_CHECK_FAILED",
       "exit": 1,
       "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
@@ -40240,15 +40304,27 @@
     {
       "code": "BRIEF_INVALID",
       "exit": 2,
-      "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
-      "meaning": "the brief cannot be approved as it stands",
+      "fix": "Resolve the blocker findings (`canon brief check` lists them) or close the open code fence in the brief text, then approve again.",
+      "meaning": "the brief cannot be approved as it stands: it has blocker findings, or its text cannot take an `Approved:` line",
       "reasons": [
+        {
+          "fix": "Resolve every blocker finding (`canon brief check` lists them), then ask the human to approve again.",
+          "meaning": "the brief has blocker findings, so the human cannot approve it yet",
+          "reason": "BLOCKERS"
+        },
         {
           "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
           "meaning": "the brief's text cannot take an `Approved:` line (for example an open code fence)",
           "reason": "UNAPPROVABLE"
         }
       ],
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_MIGRATION_REQUIRED",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the rewrite; the human runs `canon migrate --commit --plan-digest <digest>` when the plan re-binds an `Approved:` line.",
+      "meaning": "a command that writes and judges a change brief was refused because that brief is in the format canon 0.30 and earlier wrote (`canon:` comments or shipped Korean headings); nothing was written",
       "retryable": false
     },
     {
@@ -40263,6 +40339,13 @@
       "exit": 2,
       "fix": "Reload the dashboard page to see the current brief, then approve it again.",
       "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_REQUIRED",
+      "exit": 2,
+      "fix": "Run `canon change new` to create a change with a brief.",
+      "meaning": "no live change has a brief",
       "retryable": false
     },
     {
@@ -40298,6 +40381,13 @@
       "exit": 2,
       "fix": "Choose a different slug for the new change, or work on the existing one.",
       "meaning": "a change (or its archive) already uses that slug",
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of a change that exists; `canon ingest plans` imports a change from its plan document.",
+      "meaning": "the named change has no record",
       "retryable": false
     },
     {
@@ -40338,13 +40428,28 @@
     {
       "code": "CONFIG_INVALID",
       "exit": 2,
-      "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
-      "meaning": "a section of canon.yaml is present but unusable",
+      "fix": "Fix the section the reason names (`DASHBOARD`: the dashboard section of canon.yaml; `POLICY`: the adapter policy in .canon/policy.yaml; `SPECS`: the `specs:` section; `SKILLS`: the `skills:` section), then run the command again.",
+      "meaning": "a section of canon.yaml or a policy file is present but unusable; the reason names which",
       "reasons": [
         {
           "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
           "meaning": "the dashboard's canon.yaml section is present but unusable",
           "reason": "DASHBOARD"
+        },
+        {
+          "fix": "Fix the policy file the message names, then run the command again.",
+          "meaning": "the adapter policy in `.canon/policy.yaml` (its `adapter_capabilities` section) is present but unusable",
+          "reason": "POLICY"
+        },
+        {
+          "fix": "Make the `skills:` section a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), or pass --providers.",
+          "meaning": "the `skills:` section of canon.yaml is present but malformed",
+          "reason": "SKILLS"
+        },
+        {
+          "fix": "Fix the `specs:` section the message names, then run the command again.",
+          "meaning": "the `specs:` section of canon.yaml is present but malformed",
+          "reason": "SPECS"
         }
       ],
       "retryable": false
@@ -40408,7 +40513,7 @@
     {
       "code": "CONTEXT_PACK_CORRUPT",
       "exit": 2,
-      "fix": "Discard the stale or altered pack and build a new one.",
+      "fix": "Discard the stale or altered pack and build a new one with `canon context-pack add`. `canon context-pack verify` answers the same condition as a check result with CONTEXT_PACK_VERIFY_FAILED (exit 1).",
       "meaning": "a context pack that a command other than `context-pack verify` reads is stale or was changed after it was created",
       "retryable": false
     },
@@ -40422,7 +40527,7 @@
     {
       "code": "CONTEXT_PACK_VERIFY_FAILED",
       "exit": 1,
-      "fix": "Discard the stale or altered pack and build a new one with `canon context-pack add`.",
+      "fix": "Discard the stale or altered pack and build a new one with `canon context-pack add`. Every other command that reads the pack refuses the same condition with CONTEXT_PACK_CORRUPT (exit 2).",
       "meaning": "`context-pack verify` read the pack and its answer is that the pack does not verify: it is stale or was changed after it was created",
       "retryable": false
     },
@@ -40500,17 +40605,29 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_ALREADY_ENDED",
-      "exit": 2,
-      "fix": "Nothing to do: the run is already ended; start a new dispatch run if more work is needed.",
-      "meaning": "the dispatch run was already ended",
-      "retryable": false
-    },
-    {
       "code": "DISPATCH_ARGUMENT_INVALID",
       "exit": 2,
       "fix": "Remove the conflicting dispatch flags; see `canon schema` for the command's options.",
       "meaning": "a dispatch flag combination is invalid",
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_CONFLICT",
+      "exit": 2,
+      "fix": "Start a new run with `canon dispatch begin` if more work is needed.",
+      "meaning": "the dispatch run is in a state that cannot take this command: it was already ended, or it is not running",
+      "reasons": [
+        {
+          "fix": "Nothing to do: the run is closed; start a new run with `canon dispatch begin` if more work is needed.",
+          "meaning": "the dispatch run was already ended; ending it again would rewrite the provenance of its end",
+          "reason": "ALREADY_ENDED"
+        },
+        {
+          "fix": "Close only runs whose recorded status is running; inspect the manifest for the run's status.",
+          "meaning": "the run's recorded status is not running, so it cannot be ended",
+          "reason": "NOT_RUNNING"
+        }
+      ],
       "retryable": false
     },
     {
@@ -40525,13 +40642,6 @@
       "exit": 2,
       "fix": "Restore the dispatch manifest as a readable run record.",
       "meaning": "the dispatch manifest is not a readable run record",
-      "retryable": false
-    },
-    {
-      "code": "DISPATCH_NOT_RUNNING",
-      "exit": 2,
-      "fix": "Close only runs whose recorded status is running; inspect the manifest for this run's status.",
-      "meaning": "the run's recorded status cannot be closed",
       "retryable": false
     },
     {
@@ -40556,17 +40666,43 @@
       "retryable": true
     },
     {
-      "code": "DIVERGENCE_ACCEPT_REFUSED",
-      "exit": 2,
-      "fix": "Accept only divergent evidence as a reviewer whose actor and session did not attest it; `canon divergence list` shows candidates.",
-      "meaning": "a divergence acceptance was refused: not a reviewer, the evidence is not divergent, or it was attested by the accepting actor or session",
-      "retryable": false
-    },
-    {
       "code": "DIVERGENCE_ARGUMENT_INVALID",
       "exit": 2,
       "fix": "Correct the divergence flag value; see `canon schema` for the command's options.",
       "meaning": "a divergence flag value is invalid",
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_CONFLICT",
+      "exit": 2,
+      "fix": "Accept only divergent evidence; `canon divergence list` shows candidates.",
+      "meaning": "the evidence is not divergent, so there is no gap to accept",
+      "reasons": [
+        {
+          "fix": "Accept only a scenario whose latest evidence is divergent; `canon divergence list` shows candidates.",
+          "meaning": "the scenario's latest evidence is not divergent (or there is none), so there is no gap to accept",
+          "reason": "NOT_DIVERGENT"
+        }
+      ],
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_DENIED",
+      "exit": 2,
+      "fix": "Have an independent reviewer, in a session that did not attest the evidence, accept the divergence.",
+      "meaning": "this actor may not accept the divergence: the step is not a reviewer's, or the actor or session attested the evidence itself",
+      "reasons": [
+        {
+          "fix": "Pass --role reviewer (or declare --as reviewer).",
+          "meaning": "the step is not a reviewer's: only a reviewer step accepts a divergence",
+          "reason": "NOT_REVIEWER"
+        },
+        {
+          "fix": "Have an independent reviewer, in a session that did not attest the evidence, accept the divergence.",
+          "meaning": "the accepting actor or session attested the evidence itself",
+          "reason": "SELF_ATTESTED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -40580,11 +40716,11 @@
       "code": "EVIDENCE_APPROVAL_INVALID",
       "exit": 2,
       "fix": "Attach a well-formed human approval that verifies against the brief.",
-      "meaning": "the human approval attached to an attestation is missing, malformed or fails verification",
+      "meaning": "the human approval attached to an attestation is malformed or fails verification",
       "reasons": [
         {
-          "fix": "Pass `--approver`, `--approval-role human`, `--signature-file` and `--approval-at` together, the approver one trimmed line.",
-          "meaning": "the approval arguments are incomplete or not well formed (a missing member of the four, a blank or multi-line approver, a role that is not human): raised from the arguments alone, before any state is read",
+          "fix": "Give the approver as one trimmed line, `--approval-role human` and an RFC 3339 `--approval-at`.",
+          "meaning": "the approval arguments are not well formed (a blank or multi-line approver, a role that is not human, a timestamp that is not RFC 3339): raised from the arguments alone, before any state is read",
           "reason": "MALFORMED"
         },
         {
@@ -40596,10 +40732,59 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_BIND_REFUSED",
+      "code": "EVIDENCE_APPROVAL_REQUIRED",
       "exit": 2,
-      "fix": "Pass a --report or --file that exists inside the repository and passes the binding rules named in the error.",
-      "meaning": "a --report or --file binding was refused",
+      "fix": "Pass `--approver`, `--approval-role human`, `--signature-file` and `--approval-at` together.",
+      "meaning": "an attestation that needs a human approval was given none, or only part of the four approval options",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_CONFLICT",
+      "exit": 2,
+      "fix": "Drop one of the arguments the error names; `canon schema evidence add` lists the combinations.",
+      "meaning": "two `evidence add` arguments contradict each other: one forbids the other",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Correct the argument the error names; `canon schema evidence add` lists the accepted forms.",
+      "meaning": "an `evidence add` argument value is empty, malformed or outside its form",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_REQUIRED",
+      "exit": 2,
+      "fix": "Pass the argument the error names; `canon schema evidence add` lists the arguments.",
+      "meaning": "an `evidence add` argument that another needs, or one of a set that needs at least one, is missing",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_DENIED",
+      "exit": 2,
+      "fix": "Copy the file anywhere under the repository (or make it readable) and bind that path.",
+      "meaning": "a --report or --file to bind lies outside the repository, or this user may not read it",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_INVALID",
+      "exit": 2,
+      "fix": "Pass a file the binding rules in the error accept; `canon schema evidence add` lists the options and their limits.",
+      "meaning": "a --report or --file to bind cannot be bound: it is not a file, is too large, is not the report format named, or names no case",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass a --report or --file that exists inside the repository.",
+      "meaning": "a --report or --file to bind does not exist",
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_STALE",
+      "exit": 2,
+      "fix": "Bind the file again so the digest is taken from its current bytes.",
+      "meaning": "a bound file changed after it was bound, so its bytes no longer match the digest taken first",
       "retryable": false
     },
     {
@@ -40610,10 +40795,10 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_INVALID_ARGUMENT",
+      "code": "EVIDENCE_INVALID",
       "exit": 2,
-      "fix": "Correct the `canon evidence add` arguments so none is empty, malformed or contradictory.",
-      "meaning": "an `evidence add` argument is empty, malformed or contradicts another",
+      "fix": "Satisfy the evidence rule named in the error, then attest again.",
+      "meaning": "an evidence rule refuses the record: it breaks a rule of what evidence may say",
       "retryable": false
     },
     {
@@ -40624,13 +40809,6 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_REFUSED",
-      "exit": 2,
-      "fix": "Satisfy the evidence rule named in the error, then attest again.",
-      "meaning": "an attestation was refused by an evidence rule",
-      "retryable": false
-    },
-    {
       "code": "EVIDENCE_REPORT_CONFLICT",
       "exit": 2,
       "fix": "Re-run the check so the report supports the verdict, or change the verdict to match the report.",
@@ -40638,10 +40816,10 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_SCENARIO_NOT_INDEXED",
+      "code": "EVIDENCE_REQUIRED",
       "exit": 2,
-      "fix": "Run `canon inventory sync` so the scenario is indexed, or pass the id of a scenario the spec root declares.",
-      "meaning": "`evidence approval-payload` names a scenario the scenario index does not hold, so there are no bytes to sign",
+      "fix": "Pass --task, --scenario, or both.",
+      "meaning": "an approval or attestation names neither a task nor a scenario, so there is no evidence subject",
       "retryable": false
     },
     {
@@ -40750,6 +40928,20 @@
       "retryable": false
     },
     {
+      "code": "HOOKS_FILE_CONFLICT",
+      "exit": 2,
+      "fix": "Move aside whatever occupies the hook path (a directory where the file belongs, a file where its directory belongs), then run the install again.",
+      "meaning": "a hook file under `.claude` or `.codex`, or the directory it needs, conflicts with what the install must write there; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "HOOKS_FILE_DENIED",
+      "exit": 2,
+      "fix": "Make the hook files and their directories readable and writable by this user, then run the install again.",
+      "meaning": "a hook file under `.claude` or `.codex` cannot be read or created by this user; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 1,
       "fix": "Check that the hook file and its directory are writable, then run `canon gate install-hooks` again.",
@@ -40757,10 +40949,10 @@
       "retryable": false
     },
     {
-      "code": "HOOKS_INSTALL_REFUSED",
+      "code": "HOOKS_REPO_INVALID",
       "exit": 2,
-      "fix": "Pass --repo naming an existing directory and check that the hook files under .claude and .codex are valid JSON, then run the install again.",
-      "meaning": "a hook install could not start: --repo is not an existing directory, or a hook file is unreadable or conflicting; nothing was written",
+      "fix": "Pass --repo naming an existing directory.",
+      "meaning": "--repo of `gate install-hooks` is not an existing directory; nothing was written",
       "retryable": false
     },
     {
@@ -40893,17 +41085,17 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_REFUSED",
+      "code": "INVENTORY_INDEX_UNAVAILABLE",
       "exit": 2,
-      "fix": "Fix the `specs:` section or canon.yaml the error names, or wait for the other canon process, then run `canon inventory sync` again.",
-      "meaning": "`inventory sync` could not start: the `specs:` section or canon.yaml is unusable, or another process holds the index lock; nothing was written",
-      "retryable": false
+      "fix": "Wait for the other canon process, then run `canon inventory sync` again.",
+      "meaning": "`inventory sync` could not take the scenario-index lock because another canon process holds it; nothing was written",
+      "retryable": true
     },
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",
       "exit": 2,
       "fix": "Run `canon migrate` to preview the move, then apply it as the preview says.",
-      "meaning": "the spec root uses a pre-0.17 layout; run `canon migrate`",
+      "meaning": "the spec root uses a pre-0.17 layout, or a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written; `canon migrate` moves it",
       "retryable": false
     },
     {
@@ -40911,13 +41103,6 @@
       "exit": 1,
       "fix": "Read the error message, fix its cause, then run `canon strategy promote` again.",
       "meaning": "the strategy could not be promoted",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_ROLLBACK_FAILED",
-      "exit": 1,
-      "fix": "Read the error message, fix its cause (sign the rollback again if the signature failed), then run `canon strategy rollback` again.",
-      "meaning": "the strategy exists but could not be rolled back: its signature does not verify, or the rollback could not be recorded",
       "retryable": false
     },
     {
@@ -40956,13 +41141,6 @@
       "retryable": false
     },
     {
-      "code": "MIGRATE_REFUSED",
-      "exit": 2,
-      "fix": "Fix the layout or config problem the error names, then run `canon migrate` again.",
-      "meaning": "`migrate` refused: the repository's layout or config cannot be moved safely",
-      "retryable": false
-    },
-    {
       "code": "MIGRATE_STOPPED",
       "exit": 1,
       "fix": "Run `canon migrate` again to finish the rest.",
@@ -40977,24 +41155,17 @@
       "retryable": false
     },
     {
-      "code": "NO_BRIEF",
+      "code": "MIGRATION_DENIED",
       "exit": 2,
-      "fix": "Run `canon change new` to create a change with a brief.",
-      "meaning": "no live change has a brief",
+      "fix": "Make the system temporary directory writable by this user, then run `canon migrate` again.",
+      "meaning": "`migrate` cannot use the scratch directory its preview needs, so it cannot judge the renamed ledger; nothing was written",
       "retryable": false
     },
     {
-      "code": "OLD_BRIEF_FORMAT",
+      "code": "MIGRATION_INVALID",
       "exit": 2,
-      "fix": "Run `canon migrate --json` to preview the rewrite; the human runs `canon migrate --commit --plan-digest <digest>` when the plan re-binds an `Approved:` line.",
-      "meaning": "a command that writes and judges a change brief was refused because that brief is in the format canon 0.30 and earlier wrote (`canon:` comments or shipped Korean headings); nothing was written",
-      "retryable": false
-    },
-    {
-      "code": "OLD_LAYOUT",
-      "exit": 2,
-      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
-      "meaning": "a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written",
+      "fix": "Fix the layout problem the error names, then run `canon migrate` again.",
+      "meaning": "`migrate` cannot move the repository: its layout, a change directory or a record is not one it can move safely; nothing was written",
       "retryable": false
     },
     {
@@ -41019,6 +41190,13 @@
       "retryable": false
     },
     {
+      "code": "PLUGIN_REQUIRED",
+      "exit": 2,
+      "fix": "Install the plugin and check that it declares an overlay, then run `canon plugin sync` again.",
+      "meaning": "`plugin sync` needs a plugin that is installed under `.canon/plugins/`, has an overlay source registered for it and declares an overlay; one of these is missing and nothing was written (a candidate that cannot be written is PLUGIN_SYNC_ERRORS)",
+      "retryable": false
+    },
+    {
       "code": "PLUGIN_SYNC_ERRORS",
       "exit": 1,
       "fix": "Fix each error listed in data.roots, then run `canon plugin sync` again.",
@@ -41026,24 +41204,10 @@
       "retryable": false
     },
     {
-      "code": "PLUGIN_SYNC_FAILED",
-      "exit": 2,
-      "fix": "Check that the plugin is installed and declares an overlay, and that canon.yaml parses, then run `canon plugin sync` again.",
-      "meaning": "`plugin sync` could not start: canon.yaml or its `specs:` section is unusable, the plugin is not installed under `.canon/plugins/`, no overlay source is registered for it, or it declares no overlay; nothing was written (a candidate that cannot be written is PLUGIN_SYNC_ERRORS)",
-      "retryable": false
-    },
-    {
       "code": "POLICY_APPROVAL_FAILED",
       "exit": 1,
       "fix": "Check that .canon is writable, then have the human run `canon policy approve` again.",
       "meaning": "the policy approval could not be written: the write of `.canon/policy.approval.json` failed",
-      "retryable": false
-    },
-    {
-      "code": "POLICY_APPROVAL_REFUSED",
-      "exit": 2,
-      "fix": "Write a policy with `canon init`, make `.canon/policy.yaml` readable, and pass --approver <name>, then have the human run `canon policy approve` again.",
-      "meaning": "`policy approve` could not start: there is no policy file, the policy cannot be read, or --approver is blank; nothing was written",
       "retryable": false
     },
     {
@@ -41058,6 +41222,20 @@
       "exit": 1,
       "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
       "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 1), and `--override-reason` does not waive it",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_INVALID",
+      "exit": 2,
+      "fix": "Make `.canon/policy.yaml` a readable, valid policy, then have the human run `canon policy approve` again.",
+      "meaning": "`policy approve` cannot read the policy file or it is not a policy; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_REQUIRED",
+      "exit": 2,
+      "fix": "Write a policy with `canon init`, then have the human run `canon policy approve` again.",
+      "meaning": "`policy approve` found no policy file to approve; nothing was written",
       "retryable": false
     },
     {
@@ -41145,17 +41323,17 @@
       "retryable": true
     },
     {
+      "code": "RETENTION_EXPORT_DENIED",
+      "exit": 2,
+      "fix": "Ask the human to set `query.allow_sensitive` in the policy, or export without --include-sensitive.",
+      "meaning": "the export asked for sensitive records (`--include-sensitive`) and the policy does not allow them; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "RETENTION_EXPORT_FAILED",
       "exit": 1,
       "fix": "Check that the export destination is writable and has space, then run the export again.",
       "meaning": "the export failed once it started writing: the output file or the access audit line could not be written",
-      "retryable": false
-    },
-    {
-      "code": "RETENTION_EXPORT_REFUSED",
-      "exit": 2,
-      "fix": "Check that the ledger is readable and the tiers resolve, then run the export again.",
-      "meaning": "the export could not start: the ledger or its tiers could not be read, `--include-sensitive` was not allowed; nothing was written",
       "retryable": false
     },
     {
@@ -41166,11 +41344,18 @@
       "retryable": false
     },
     {
-      "code": "RETENTION_PURGE_REFUSED",
+      "code": "RETENTION_TIERS_INVALID",
       "exit": 2,
-      "fix": "Fix the tier or ledger problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
-      "meaning": "the purge could not start, or it was only a preview: the tiers could not be opened or read, nothing was deleted",
+      "fix": "Fix the tier or policy problem the error names in canon.yaml, then run the command again.",
+      "meaning": "the tiers cannot be used for a purge or export: the policy, a routing entry or the learn retention config is malformed; nothing was deleted or written",
       "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Check that the ledger and the tier backends are reachable, then run the command again.",
+      "meaning": "the tiers could not be opened or read for a purge or export (a backend is down or unreachable); nothing was deleted or written",
+      "retryable": true
     },
     {
       "code": "RETRIEVE_INVALID",
@@ -41187,17 +41372,31 @@
       "retryable": false
     },
     {
-      "code": "REVIEW_ARTIFACT_REFUSED",
+      "code": "REVIEW_ARTIFACT_DENIED",
       "exit": 2,
-      "fix": "Bind an artifact that exists inside the repository and passes the rules named in the error.",
-      "meaning": "a review's artifact binding was refused",
+      "fix": "Copy the file anywhere under the repository (or make it readable) and bind that path.",
+      "meaning": "a review artifact lies outside the repository, or this user may not read it",
       "retryable": false
     },
     {
-      "code": "REVIEW_SCENARIO_NOT_INDEXED",
+      "code": "REVIEW_ARTIFACT_INVALID",
       "exit": 2,
-      "fix": "Run `canon inventory sync`, then review the scenario again.",
-      "meaning": "a reviewed scenario has no indexed record; run `canon inventory sync`",
+      "fix": "Bind a file the rules in the error accept; `canon schema review` lists the artifact options and their limits.",
+      "meaning": "a review artifact cannot be bound: it is not a file or is over the size limit",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_NOT_FOUND",
+      "exit": 2,
+      "fix": "Bind an artifact that exists inside the repository.",
+      "meaning": "a review artifact does not exist",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_STALE",
+      "exit": 2,
+      "fix": "Bind the file again so the digest is taken from its current bytes.",
+      "meaning": "a review artifact changed after it was bound, so its bytes no longer match the digest taken first",
       "retryable": false
     },
     {
@@ -41212,6 +41411,13 @@
       "exit": 2,
       "fix": "Correct the scaffold argument named in the error.",
       "meaning": "a scaffold argument is invalid",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_INDEX_REQUIRED",
+      "exit": 2,
+      "fix": "Run `canon inventory sync` so the scenario is indexed, or pass the id of a scenario the spec root declares.",
+      "meaning": "an evidence or review call names a scenario that the scenario index does not hold; no record was written",
       "retryable": false
     },
     {
@@ -41257,6 +41463,13 @@
       "retryable": false
     },
     {
+      "code": "SKILLS_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Name providers from claude, codex, omp, pi (or none).",
+      "meaning": "a skill provider is unknown",
+      "retryable": false
+    },
+    {
       "code": "SKILLS_CHECK_FAILED",
       "exit": 1,
       "fix": "Run `canon skills install` to refresh the installed skills.",
@@ -41278,10 +41491,10 @@
       "retryable": false
     },
     {
-      "code": "SKILLS_INVALID_ARGUMENT",
+      "code": "SKILLS_SOURCE_NOT_FOUND",
       "exit": 2,
-      "fix": "Name providers from claude, codex, omp, pi (or none), and keep the canon.yaml `skills:` section a mapping whose `providers` is a list of those names.",
-      "meaning": "a skill provider is unknown, the `skills:` section of canon.yaml is malformed, or the `--skills-source` directory does not exist",
+      "fix": "Point --skills-source at a directory that holds SKILL.src.md, or drop it to use the text built into canon.",
+      "meaning": "the `--skills-source` directory does not exist or holds no SKILL.src.md",
       "retryable": false
     },
     {
@@ -41312,14 +41525,24 @@
       "meaning": "a command that works in steps stopped after an earlier step made its effects, because a later step met what the command refuses before its work; `reason` is the code of that refusal, and the message and `meta.next` say what was already done",
       "reasons": [
         {
+          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)",
+          "reason": "CONFIG_INVALID"
+        },
+        {
           "fix": "Read what was done (`canon status`), fix the record the message names, then run `canon gate promote`; the refused record is still staged, so do not add it again.",
           "meaning": "a command staged a record and the gate then refused to promote it, so the record stays staged and was not committed",
           "reason": "PROMOTION_INVALID"
         },
         {
-          "fix": "Read what init wrote (`canon status`), fix the skill source or the `skills:` section the message names, then run `canon skills install`; do not run `canon init` again.",
-          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md, or the providers or the `skills:` section are invalid: what `canon skills install` refuses before it starts",
-          "reason": "SKILLS_INVALID_ARGUMENT"
+          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown",
+          "reason": "SKILLS_ARGUMENT_INVALID"
+        },
+        {
+          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md",
+          "reason": "SKILLS_SOURCE_NOT_FOUND"
         },
         {
           "fix": "Read what was done (`canon status`, `canon strategy promote <id> --dry-run`), then record the evidence the gate asks for (`canon ingest records`).",
@@ -41372,10 +41595,17 @@
       "retryable": false
     },
     {
-      "code": "SUBJECT_ADOPT_REFUSED",
+      "code": "STRATEGY_ROLLBACK_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon strategy rollback` again.",
+      "meaning": "the strategy exists and its signature verified, but the rollback could not be recorded",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_INVALID",
       "exit": 2,
-      "fix": "Fix the problem the error names, then run `canon subject adopt` again.",
-      "meaning": "the change could not be adopted by the subject",
+      "fix": "Sign the rollback again with a key the policy lists, then run `canon strategy rollback` again.",
+      "meaning": "the detached signature of a strategy rollback does not verify; nothing was recorded",
       "retryable": false
     },
     {
@@ -41395,9 +41625,19 @@
     {
       "code": "SUBJECT_CONFLICT",
       "exit": 2,
-      "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
-      "meaning": "the requested change conflicts with the subject's state",
+      "fix": "Check the subject with `canon subject show` and request what its state allows.",
+      "meaning": "the requested change conflicts with the subject's state: a status transition that is not allowed, an unadopt of an approved or flow-tagged change",
       "reasons": [
+        {
+          "fix": "Leave the change adopted, or unadopt only a change nobody approved.",
+          "meaning": "the change carries an approved brief, which is the subject's approved scope, so it stays adopted",
+          "reason": "APPROVED_BRIEF"
+        },
+        {
+          "fix": "Remove or retag the `@flow:<change>.*` tags on those scenarios first, then unadopt again.",
+          "meaning": "a scenario the subject owns is tagged `@flow:<change>.*`, so unadopting the change would make it fall back to an older approval",
+          "reason": "FLOW_TAGGED"
+        },
         {
           "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
           "meaning": "the status change is not an allowed transition",
@@ -41432,13 +41672,6 @@
       "exit": 2,
       "fix": "Pass --reason when reopening a shipped subject with `canon subject move`.",
       "meaning": "reopening a shipped subject needs --reason",
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_UNADOPT_REFUSED",
-      "exit": 2,
-      "fix": "Leave the change adopted, or remove its approved brief and the `@flow:<change>.*` scenario tags first.",
-      "meaning": "the change carries an approved brief, or a scenario the subject owns is tagged `@flow:<change>.*`, so it stays adopted",
       "retryable": false
     },
     {
@@ -41491,10 +41724,17 @@
       "retryable": false
     },
     {
+      "code": "TRACE_CONFLICT",
+      "exit": 2,
+      "fix": "Pass more characters of the commit sha; `expected` lists the candidates.",
+      "meaning": "the sha prefix `trace` was given is the start of more than one commit",
+      "retryable": false
+    },
+    {
       "code": "TRACE_NOT_FOUND",
       "exit": 2,
       "fix": "Pass the key of a finding (`canon query --kind finding`), a review id a review printed, or enough characters of a commit sha to name one commit.",
-      "meaning": "no record says the id `trace` was given, or the sha prefix fits more than one commit",
+      "meaning": "no record says the id `trace` was given",
       "retryable": false
     },
     {
@@ -44236,7 +44476,7 @@
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",
       "fix": "Run `canon migrate` to move the spec root to the current layout.",
-      "meaning": "the spec root uses a pre-0.17 layout; run `canon migrate`"
+      "meaning": "the spec root uses a pre-0.17 layout, or a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written; `canon migrate` moves it"
     },
     {
       "code": "LEDGER_KIND_ROUTED_AWAY",

@@ -151,7 +151,7 @@ fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
         ("MIGRATE_PINS_FAILED", 1),
         // only before the work: exit 2.
         ("LEDGER_ARCHIVE_UNAVAILABLE", 2),
-        ("PLUGIN_SYNC_FAILED", 2),
+        ("PLUGIN_REQUIRED", 2),
         ("RETRIEVE_INVALID", 2),
     ];
     for (code, exit) in decided {
@@ -163,15 +163,15 @@ fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
 /// two exits and now have one code each, and `WRITE_FAILED`/`WRITE_UNAVAILABLE`.
 #[test]
 fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
-    let partners: [(&str, u8); 18] = [
+    let partners: [(&str, u8); 17] = [
         ("EVIDENCE_STORE_UNAVAILABLE", 2),
-        ("HOOKS_INSTALL_REFUSED", 2),
-        ("INVENTORY_REFUSED", 2),
-        ("POLICY_APPROVAL_REFUSED", 2),
-        ("RETENTION_EXPORT_REFUSED", 2),
-        ("RETENTION_PURGE_REFUSED", 2),
+        ("HOOKS_FILE_CONFLICT", 2),
+        ("INVENTORY_INDEX_UNAVAILABLE", 2),
+        ("POLICY_REQUIRED", 2),
+        ("RETENTION_EXPORT_DENIED", 2),
+        ("RETENTION_TIERS_UNAVAILABLE", 2),
         // `ADAPTER_REFUSED` was exit 1 and 2.
-        ("ADAPTER_REFUSED", 2),
+        ("ADAPTER_FILE_NOT_FOUND", 2),
         ("ADAPTER_VALIDATION_FAILED", 1),
         // `EVIDENCE_BATCH_REFUSED` was exit 1 (a refused promotion) and 2 (a preflight, a write failure); 0.36 judges the gate before the first write, so the refusal is `PROMOTION_INVALID`.
         ("PROMOTION_INVALID", 2),
@@ -185,7 +185,6 @@ fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
         // `brief approve` computed the exit of these; the registry row is the exit now.
         ("BRIEF_UNREADABLE", 2),
         ("BRIEF_WRITE_FAILED", 1),
-        ("BRIEF_APPROVE_REFUSED", 2),
         ("BRIEF_INVALID", 2),
     ];
     for (code, exit) in partners {

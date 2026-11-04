@@ -26,7 +26,7 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::status::{NextStep, StepActor};
 
 /// The code of the refusal.
-pub const CODE: &str = "OLD_BRIEF_FORMAT";
+pub const CODE: &str = "BRIEF_MIGRATION_REQUIRED";
 
 /// One old-format brief.
 #[derive(Debug, Clone, PartialEq, Eq)]

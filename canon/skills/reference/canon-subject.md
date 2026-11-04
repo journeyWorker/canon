@@ -422,7 +422,7 @@ canon subject unadopt <S> --change <change> --json
 
 Removes the link on both records and keeps the change and its brief, so the
 draft can be adopted elsewhere (a `proposed` holding subject, say) while the
-live subject keeps shipping. It is refused with `SUBJECT_UNADOPT_REFUSED`
+live subject keeps shipping. It is refused with `SUBJECT_CONFLICT` (reason `APPROVED_BRIEF` or `FLOW_TAGGED`)
 for a change whose brief carries an `Approved:` line, and while a scenario
 the subject owns carries a `@flow:<change>.*` tag (it would fall back to an
 older approval; remove or retag those scenarios first, the hint names them);
@@ -509,8 +509,8 @@ same answer and one timestamp on every brief and on the policy approval
 (0.31). Every slug is checked before anything is written (a brief that
 exists and reads, no blocker, a one-line name and answer, a body that does not
 end inside an open code fence); one refused slug refuses the call, exit 2
-`BRIEF_APPROVE_REFUSED` naming each refused slug with its own code, and
-nothing is written. A repeated slug counts once. With one slug the output is as
+with the first refused slug's own code (`BRIEF_INVALID`, `BRIEF_NOT_FOUND`) and an
+`error.details` entry for each refused slug, and nothing is written. A repeated slug counts once. With one slug the output is as
 before; with several, `--json` carries one entry per slug (`written`,
 `unchanged`, `failed`, `skipped`). A disk error while writing exits 1 and
 leaves the slugs already written approved. The call is human-only for every
@@ -524,7 +524,7 @@ before. A brief with `<!-- canon:… -->` comments or Korean headings is in the
 0.30 format: `brief check` gives it one blocker (`brief.old-format`) and
 `canon migrate` rewrites it; `status`, `gate check`, `context` and `brief show`
 warn, and a command that writes and judges it is refused
-(`OLD_BRIEF_FORMAT`).
+(`BRIEF_MIGRATION_REQUIRED`).
 
 - **Blockers (structure, `brief.*`)**: a missing, duplicated or
   out-of-order section; a flow with no steps or a duplicate step id;

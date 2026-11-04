@@ -154,7 +154,7 @@ fn skills_install_70_a_blocked_a_missing_and_an_unclosed_brief_refuse_all_and_wr
     assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
     let details = doc["error"]["details"].as_array().unwrap_or_else(|| panic!("several refused ids list every cause: {doc}"));
     let refused: Vec<(&str, &str)> = details.iter().map(|r| (r["message"].as_str().unwrap().split('`').nth(1).unwrap(), r["code"].as_str().unwrap())).collect();
-    assert_eq!(refused, [("d", "BRIEF_APPROVE_REFUSED"), ("ghost", "BRIEF_NOT_FOUND"), ("c", "BRIEF_INVALID")], "{doc}");
+    assert_eq!(refused, [("d", "BRIEF_INVALID"), ("ghost", "BRIEF_NOT_FOUND"), ("c", "BRIEF_INVALID")], "{doc}");
     assert_eq!(doc["error"]["code"], refused[0].1, "the error is the first refused id: {doc}");
     let message = doc["error"]["message"].as_str().unwrap();
     assert!(message.starts_with("`d`") && !message.contains("`b`"), "{message}");
@@ -166,7 +166,7 @@ fn skills_install_70_a_blocked_a_missing_and_an_unclosed_brief_refuse_all_and_wr
     // The human text names them too.
     let human = run(repo, &[&["brief", "approve", "d", "ghost", "c"][..], &ANSWER].concat());
     assert_eq!(human.status.code(), Some(2));
-    assert!(stderr(&human).contains("BRIEF_APPROVE_REFUSED") && stderr(&human).contains("`ghost`"), "{}", stderr(&human));
+    assert!(stderr(&human).contains("BRIEF_INVALID") && stderr(&human).contains("`ghost`"), "{}", stderr(&human));
 }
 
 /// skills.install.71: with several ids the call is human-only for every agent

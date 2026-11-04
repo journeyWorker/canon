@@ -153,6 +153,23 @@ pub enum AdapterError {
     Policy(String),
 }
 
+impl AdapterError {
+    /// The code of a refusal to run `adapter validate`/`authorize` for this error, and the reason it carries: a response file that is
+    /// not there, that this user may not read, or that cannot be used is a refusal of the file; a broken policy is the config's
+    /// (`CONFIG_INVALID`, reason `POLICY`).
+    pub(crate) fn refusal_code(&self) -> (&'static str, Option<&'static str>) {
+        match self {
+            AdapterError::Io { source, .. } => match source.kind() {
+                std::io::ErrorKind::NotFound => ("ADAPTER_FILE_NOT_FOUND", None),
+                std::io::ErrorKind::PermissionDenied => ("ADAPTER_FILE_DENIED", None),
+                _ => ("ADAPTER_FILE_INVALID", None),
+            },
+            AdapterError::Policy(_) => ("CONFIG_INVALID", Some("POLICY")),
+            AdapterError::Json(_) | AdapterError::Validation(_) | AdapterError::Timestamp { .. } => ("ADAPTER_FILE_INVALID", None),
+        }
+    }
+}
+
 impl TryFrom<RawAdapterResponse> for AdapterResponse {
     type Error = AdapterError;
 

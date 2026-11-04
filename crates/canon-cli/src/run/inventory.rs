@@ -49,8 +49,19 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
                 return ExitCode::from(error.emit("canon inventory sync", json));
             }
             // The specs config, canon.yaml and the index lock are resolved before any record is read or written (exit 2); a store error comes while the sync works (exit 1).
-            let code = if matches!(err, crate::inventory::InventoryError::Store(_)) { "INVENTORY_FAILED" } else { "INVENTORY_REFUSED" };
-            ExitCode::from(CliError::refused(code, err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again").emit("canon inventory sync", json))
+            let (code, reason) = match &err {
+                crate::inventory::InventoryError::Store(_) => ("INVENTORY_FAILED", None),
+                crate::inventory::InventoryError::Config(_) => ("CONFIG_INVALID", Some("SPECS")),
+                crate::inventory::InventoryError::CanonYaml(_) => ("CONFIG_UNREADABLE", None),
+                crate::inventory::InventoryError::Locked(_) => ("INVENTORY_INDEX_UNAVAILABLE", None),
+                crate::inventory::InventoryError::Unavailable(_) => ("WRITE_UNAVAILABLE", None),
+            };
+            let error = CliError::refused(code, err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again");
+            let error = match reason {
+                Some(reason) => error.reason(reason),
+                None => error,
+            };
+            ExitCode::from(error.emit("canon inventory sync", json))
         }
     }
 }

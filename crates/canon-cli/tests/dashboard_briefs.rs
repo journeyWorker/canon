@@ -404,7 +404,7 @@ fn report_dashboard_08_refuses_a_brief_with_blockers() {
     let policy_before = policy_approval(dir.path());
     let reply = post_approval(&live, &approval_request(&live, "blocked"));
     assert_eq!(reply.code, 409, "{}", reply.body);
-    assert_eq!(reply.json()["error"]["code"], "BRIEF_APPROVE_REFUSED");
+    assert_eq!(reply.json()["error"]["code"], "BRIEF_INVALID");
     assert!(reply.json()["error"]["hint"].as_str().unwrap().len() > 10);
     assert_eq!(std::fs::read(brief_path(dir.path(), "blocked")).unwrap(), before);
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
@@ -480,10 +480,10 @@ fn report_dashboard_14_a_selected_brief_edited_after_the_page_read_it_refuses_al
     let reply = post_approval(&live, &request);
     assert_eq!(reply.code, 409, "{}", reply.body);
     let doc = reply.json();
-    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
+    assert_eq!(doc["error"]["code"], "BRIEF_PAGE_STALE", "{doc}");
     assert!(doc["error"]["message"].as_str().unwrap().contains("`ready2`") && doc["error"]["hint"].as_str().unwrap().contains("reload"), "{doc}");
-    let refused: Vec<(&str, &str)> = doc["data"]["refused"].as_array().unwrap().iter().map(|r| (r["changeId"].as_str().unwrap(), r["code"].as_str().unwrap())).collect();
-    assert_eq!(refused, [("ready2", "BRIEF_PAGE_STALE")], "{doc}");
+    assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
+    assert!(doc["error"].get("details").is_none(), "one stale brief is the refusal itself, with no per-id entries: {doc}");
     assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before[0]);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), edited, "the edited brief is as its editor left it");
     assert_eq!(std::fs::read(brief_path(dir.path(), "ready3")).unwrap(), before[2]);
@@ -503,8 +503,8 @@ fn report_dashboard_15_a_request_that_includes_a_blocked_brief_refuses_all_of_th
     let reply = post_approval(&live, &request);
     assert_eq!(reply.code, 409, "{}", reply.body);
     let doc = reply.json();
-    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED");
-    assert_eq!(doc["data"]["refused"][0]["changeId"], "blocked", "{doc}");
+    assert_eq!(doc["error"]["code"], "BRIEF_INVALID");
+    assert!(doc["error"]["message"].as_str().unwrap().contains("`blocked`"), "{doc}");
     assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before);
     assert_eq!(policy_approval(dir.path()), policy_before);
 

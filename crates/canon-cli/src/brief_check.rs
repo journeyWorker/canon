@@ -1763,7 +1763,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         .collect();
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     match live.len() {
-        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
+        0 => Err(CliError::failed("BRIEF_REQUIRED", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_REQUIRED",

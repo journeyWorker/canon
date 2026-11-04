@@ -128,7 +128,7 @@ fn dispatch_manifest_09_adapter_authorize_denies_by_default_when_the_policy_decl
 fn dispatch_manifest_10_adapter_authorize_on_a_missing_response_file_is_refused_as_a_fixable_invocation() {
     let dir = repo();
     let before = snapshot(dir.path());
-    let b = refused(dir.path(), &["adapter", "authorize", "--response", "nope.json"], 2, "ADAPTER_REFUSED");
+    let b = refused(dir.path(), &["adapter", "authorize", "--response", "nope.json"], 2, "ADAPTER_FILE_NOT_FOUND");
     assert!(b["error"]["message"].as_str().unwrap().contains("nope.json"), "{b}");
     assert_eq!(snapshot(dir.path()), before);
 }
@@ -165,7 +165,7 @@ fn dispatch_manifest_12_adapter_validate_rejects_a_response_whose_envelope_break
 fn dispatch_manifest_13_adapter_validate_on_a_missing_response_file_is_refused_as_a_fixable_invocation() {
     let dir = repo();
     let before = snapshot(dir.path());
-    let b = refused(dir.path(), &["adapter", "validate", "--response", "nope.json"], 2, "ADAPTER_REFUSED");
+    let b = refused(dir.path(), &["adapter", "validate", "--response", "nope.json"], 2, "ADAPTER_FILE_NOT_FOUND");
     assert!(b["error"]["message"].as_str().unwrap().contains("nope.json"), "{b}");
     assert_eq!(snapshot(dir.path()), before);
 }
@@ -340,7 +340,7 @@ fn dispatch_manifest_26_dispatch_end_on_an_already_ended_run_is_refused_and_the_
     let run_id = begin(d);
     ok(d, &["dispatch", "end", &run_id, "--run-outcome", "succeeded"]);
     let before = manifest(d, &run_id);
-    refused(d, &["dispatch", "end", &run_id, "--run-outcome", "failed"], 2, "DISPATCH_ALREADY_ENDED");
+    refused(d, &["dispatch", "end", &run_id, "--run-outcome", "failed"], 2, "DISPATCH_CONFLICT");
     assert_eq!(manifest(d, &run_id), before);
 }
 
@@ -458,7 +458,7 @@ fn dispatch_manifest_31_adapter_authorize_on_a_response_whose_envelope_breaks_a_
     let dir = repo();
     let d = dir.path();
     let before = snapshot(d);
-    let b = refused(d, &["adapter", "authorize", "--response", &adapter("reject-negative-cost.json")], 2, "ADAPTER_REFUSED");
+    let b = refused(d, &["adapter", "authorize", "--response", &adapter("reject-negative-cost.json")], 2, "ADAPTER_FILE_INVALID");
     assert!(b["error"]["message"].as_str().unwrap().contains("telemetry.cost_usd"), "{b}");
     assert_eq!(snapshot(d), before);
 
@@ -466,7 +466,7 @@ fn dispatch_manifest_31_adapter_authorize_on_a_response_whose_envelope_breaks_a_
     let good = std::fs::read_to_string(&policy).unwrap();
     std::fs::write(&policy, "adapter_capabilities: [unclosed\n").unwrap();
     let broken = snapshot(d);
-    let b = refused(d, &["adapter", "authorize", "--response", &adapter("omp.json")], 2, "ADAPTER_REFUSED");
+    let b = refused(d, &["adapter", "authorize", "--response", &adapter("omp.json")], 2, "CONFIG_INVALID");
     assert!(b["error"]["hint"].as_str().unwrap().contains("policy file"), "{b}");
     assert_eq!(snapshot(d), broken);
 
@@ -475,10 +475,10 @@ fn dispatch_manifest_31_adapter_authorize_on_a_response_whose_envelope_breaks_a_
 }
 
 #[test]
-fn dispatch_manifest_32_schema_error_adapter_refused_states_the_exit_of_each_adapter_call() {
+fn dispatch_manifest_32_schema_error_adapter_file_invalid_states_the_exit_of_each_adapter_call() {
     let dir = TempDir::new().unwrap();
     let d = dir.path();
-    let err = body(&run(d, &["schema", "--error", "ADAPTER_REFUSED"]));
+    let err = body(&run(d, &["schema", "--error", "ADAPTER_FILE_INVALID"]));
     let meaning = err["data"]["error"]["meaning"].as_str().unwrap();
     assert_eq!(err["data"]["error"]["exit"], 2, "{err}");
     // The exit of a command's code is the registry's: the command lists the codes, the registry says what each exits.
@@ -489,13 +489,13 @@ fn dispatch_manifest_32_schema_error_adapter_refused_states_the_exit_of_each_ada
         doc["data"]["errors"].as_array().unwrap_or_else(|| panic!("{doc}")).iter().map(|code| code.as_str().unwrap().to_string()).collect()
     };
     let authorize = errors(&["adapter", "authorize"]);
-    assert!(authorize.contains(&"ADAPTER_REFUSED".to_string()) && authorize.contains(&"ADAPTER_AUTHORIZATION_FAILED".to_string()), "{authorize:?}");
+    assert!(authorize.contains(&"ADAPTER_FILE_INVALID".to_string()) && authorize.contains(&"ADAPTER_AUTHORIZATION_FAILED".to_string()), "{authorize:?}");
     let validate = errors(&["adapter", "validate"]);
-    assert!(validate.contains(&"ADAPTER_REFUSED".to_string()) && validate.contains(&"ADAPTER_VALIDATION_FAILED".to_string()), "{validate:?}");
+    assert!(validate.contains(&"ADAPTER_FILE_NOT_FOUND".to_string()) && validate.contains(&"ADAPTER_VALIDATION_FAILED".to_string()), "{validate:?}");
     let not_authorized = body(&run(d, &["schema", "--error", "ADAPTER_AUTHORIZATION_FAILED"]));
     assert_eq!(not_authorized["data"]["error"]["exit"], 1, "{not_authorized}");
     let invalid = body(&run(d, &["schema", "--error", "ADAPTER_VALIDATION_FAILED"]));
     assert_eq!(invalid["data"]["error"]["exit"], 1, "{invalid}");
-    assert!(meaning.contains("adapter authorize") && meaning.contains("adapter validate") && meaning.contains("could not read the response file") && meaning.contains("policy file is broken"), "{meaning}");
+    assert!(meaning.contains("adapter authorize") && meaning.contains("breaks a rule of the response envelope") && err["data"]["error"]["fix"].as_str().unwrap().contains("canon adapter validate"), "{meaning}");
     assert!(invalid["data"]["error"]["meaning"].as_str().unwrap().contains("breaks a rule of the envelope"), "{invalid}");
 }

@@ -462,10 +462,9 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Err(error) => {
-            CliError::failed("LEARN_ROLLBACK_FAILED", error.to_string()).hint("the message names the cause; fix it and run `canon strategy rollback` again").emit("canon strategy rollback", json);
-            ExitCode::from(1)
-        }
+        // The signature, the approver and the verifier are judged before anything is recorded (exit 2); a failure of the record is a failure of the work (exit 1).
+        Err(error @ canon_learn::LearnError::InvalidPromotionEvidence(_)) => ExitCode::from(CliError::refused("STRATEGY_SIGNATURE_INVALID", error.to_string()).hint("sign the rollback again with a key the policy's allowed_signers lists for the actor, then run `canon strategy rollback` again; nothing was recorded").emit("canon strategy rollback", json)),
+        Err(error) => ExitCode::from(CliError::failed("STRATEGY_ROLLBACK_FAILED", error.to_string()).hint("the message names the cause; fix it and run `canon strategy rollback` again").emit("canon strategy rollback", json)),
     }
 }
 

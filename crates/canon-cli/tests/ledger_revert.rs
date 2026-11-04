@@ -187,7 +187,7 @@ fn a_repo_no_migrate_ran_in_refuses_the_revert() {
     let dir = fixture_repo();
     let out = canon(dir.path(), &["migrate", "--revert", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
-    assert!(text(&out).contains("MIGRATE_REFUSED"), "{}", text(&out));
+    assert!(text(&out).contains("MIGRATION_INVALID"), "{}", text(&out));
     let named = canon(dir.path(), &["migrate", "--revert", "--backup", ".canon/migrate-backup/none", "--json"]);
     assert_eq!(named.status.code(), Some(2), "{}", text(&named));
     // `--backup` is only a revert's option.

@@ -227,7 +227,7 @@ Accepting a scenario whose latest evidence is `divergent` as a known gap
 limited by something outside the change is a human-only act: with a role
 declared (`--as`, `CANON_ROLE`) the leaf is refused with `ACTOR_DENIED`. It is
 never a way to skip a fix.
-Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is
+Refused (`DIVERGENCE_CONFLICT` when the evidence is not divergent, `DIVERGENCE_DENIED` when the actor or session attested it) unless the latest verdict is
 divergent and the session and actor differ from the evidence's. The record
 pins that evidence: new evidence for the scenario, or `--expiry` passing,
 ends it. While it holds, the ship guard counts the cell covered and
@@ -517,8 +517,9 @@ report (a JUnit test case's `[[ATTACHMENT|path]]` lines, which Playwright's
 JUnit reporter writes; a Cucumber JSON embedding), so a test's screenshot
 stays with its scenario. A file the report does not name goes with
 `--artifact <scenario-id>=<path>`; a bare `--artifact <path>` in a batch is
-refused (`EVIDENCE_INVALID_ARGUMENT`). A report attachment that is missing,
-outside the repo or oversized is refused.
+refused (`EVIDENCE_ARGUMENT_CONFLICT`). A report attachment that is missing,
+outside the repo or oversized is refused (`EVIDENCE_BINDING_NOT_FOUND`,
+`EVIDENCE_BINDING_DENIED`, `EVIDENCE_BINDING_INVALID`).
 
 It is all or nothing: a claimed `faithful` verdict over a failed case,
 a fabrication marker in `--summary`, an unapproved brief for any
