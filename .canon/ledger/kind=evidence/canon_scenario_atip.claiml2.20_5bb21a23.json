@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-flowfix-036",
+    "role": "implementer",
+    "session_id": "s-0-36-flowfix"
+  },
+  "at": "2026-11-04T18:35:32.154522Z",
+  "attachments": [
+    {
+      "case": "atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_4",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7eadc87ea27bd205d08cd8ad95272d5bc5a9d9ecf6710aab54a574956335589a"
+    }
+  ],
+  "code_tree": "1a4b9e6c3c6d893d3ee046015816857f27417fa0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/tmp/flowfix/wt/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "0087d142aa539bd7dda9687996ea533a9953d9f2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 305,
+  "scenario_id": "atip.claiml2.20",
+  "schema": 1,
+  "staging_id": "4bc342a8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
