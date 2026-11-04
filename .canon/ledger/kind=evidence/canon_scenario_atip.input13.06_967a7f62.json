@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T03:11:40.070866Z",
+  "attachments": [
+    {
+      "case": "atip_input13_06_every_item_is_one_entry_of_the_report_in_the_order_submitted",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "77681cdc9de998571ea22e5795a6ef27aaaed9993cae4e9db6e908807aa91831"
+    }
+  ],
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 19,
+  "scenario_id": "atip.input13.06",
+  "schema": 1,
+  "staging_id": "798cf5c3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

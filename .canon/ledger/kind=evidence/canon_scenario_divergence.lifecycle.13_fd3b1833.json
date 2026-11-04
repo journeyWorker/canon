@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T03:11:40.070866Z",
+  "attachments": [
+    {
+      "case": "divergence_lifecycle_13_list_refuses_an_invalid_timestamp_a_zero_limit_or_a_cursor_canon_did_not_issue_with_exit_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "77681cdc9de998571ea22e5795a6ef27aaaed9993cae4e9db6e908807aa91831"
+    }
+  ],
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 116,
+  "scenario_id": "divergence.lifecycle.13",
+  "schema": 1,
+  "staging_id": "67ab8ca5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T03:11:40.070866Z",
+  "attachments": [
+    {
+      "case": "context_capability_45_brief_show_of_a_change_with_no_brief_or_in_a_repo_with_no_briefs_is_refused_with_exit_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "77681cdc9de998571ea22e5795a6ef27aaaed9993cae4e9db6e908807aa91831"
+    }
+  ],
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 705,
+  "scenario_id": "context.capability.45",
+  "schema": 1,
+  "staging_id": "bf0337ac",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T03:11:40.070866Z",
+  "attachments": [
+    {
+      "case": "gate_check_98_a_fixed_blocker_naming_no_scenario_still_asks_every_evidenced_scenario",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "77681cdc9de998571ea22e5795a6ef27aaaed9993cae4e9db6e908807aa91831"
+    }
+  ],
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 427,
+  "scenario_id": "gate.check.98",
+  "schema": 1,
+  "staging_id": "f039872e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
