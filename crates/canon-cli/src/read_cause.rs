@@ -183,7 +183,7 @@ pub(crate) fn brief_unreadable(error: CliError) -> CliError {
 
 /// The error of a brief.md the system could not read: [`brief_code`] of the cause, with [`brief_unreadable`]'s reason.
 pub(crate) fn brief_read_error(e: &std::io::Error, message: impl Into<String>) -> CliError {
-    brief_unreadable(CliError::failed(brief_code(e), message))
+    brief_unreadable(CliError::failed(brief_code(e), message).hint("check that the change's brief.md is a UTF-8 text file the user can read, then run the command again"))
 }
 
 /// The code of a detached signature file that cannot be read: the caller named it with `--signature-file`, so a path that is not there
