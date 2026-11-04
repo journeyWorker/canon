@@ -165,9 +165,12 @@ fn an_unknown_flag_with_json_is_a_usage_error_on_stdout_and_without_it_clap_spea
     assert_eq!(out.status.code(), Some(2));
     assert!(stdout(&out).is_empty() && stderr(&out).contains("--no-such-flag"), "{}", stderr(&out));
 
-    // Help is not an error, with or without --json.
-    let out = run(dir.path(), &["status", "--help", "--json"]);
+    // Help is text for people: without --json it exits 0, and with --json it is refused (atip_helpjson_*).
+    let out = run(dir.path(), &["status", "--help"]);
     assert_eq!(out.status.code(), Some(0));
+    let out = run(dir.path(), &["status", "--help", "--json"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(json_error(&out)["field"], "--help");
 }
 
 #[test]

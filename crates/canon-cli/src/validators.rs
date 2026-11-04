@@ -31,6 +31,10 @@ pub fn parse(command: &clap::Command, args: Vec<std::ffi::OsString>) -> Result<c
     let first = match relaxed.clone().try_get_matches_from(args.clone()) {
         Ok(matches) => matches,
         Err(error) => {
+            // `--help --json` and `--version --json` answer a refusal, after the path is resolved (spec 4.4.1).
+            if let Some(code) = crate::run::entry::help_json_refusal(&relaxed, &args, &error) {
+                return Err(code);
+            }
             // The failure that comes first on the line answers, though clap judged a value later than it (`--seq x --bogus`).
             let error = crate::arg_rules::relaxed::earlier_failure(&relaxed, &args, &error).unwrap_or(error);
             return Err(crate::run::entry::usage_error(&error));

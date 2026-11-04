@@ -54,6 +54,44 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
     ExitCode::from(usage.emit(&format!("canon {path}"), json))
 }
 
+/// `--help` or `--version` with `--json` (spec 4.4.1, a 1.4 rule canon applies at every minor): the answer is the failure
+/// envelope, never text. `--help` is text for people and `canon schema` is the machine description, so the call is refused with
+/// `USAGE` (`field` `--help`, the `hint` naming the `schema` call of the path the call named) and `--version` with `field`
+/// `--version`, `hint` `canon --version`. The path is resolved first, with the help or version request left out: a word that is no
+/// command still answers `UNKNOWN_COMMAND`, wherever the flag sits. `args` are the words clap parsed (`--json` already
+/// moved, a `canon help <command>` call without it); `None` is any other parse failure, or a call that did not ask for JSON, which
+/// clap prints as it always did.
+pub(crate) fn help_json_refusal(root: &clap::Command, args: &[std::ffi::OsString], error: &clap::Error) -> Option<ExitCode> {
+    use clap::error::ErrorKind;
+    let (field, hint_of): (&str, fn(&str) -> String) = match error.kind() {
+        ErrorKind::DisplayHelp => ("--help", |joined| if joined.is_empty() { "canon schema --json".to_string() } else { format!("canon schema {joined} --json") }),
+        ErrorKind::DisplayVersion => ("--version", |_| "canon --version".to_string()),
+        _ => return None,
+    };
+    let end = args.iter().skip(1).position(|arg| arg == "--").map_or(args.len(), |at| at + 1);
+    if !args.get(1..end)?.iter().any(|arg| arg == "--json") {
+        return None;
+    }
+    let without_request: Vec<std::ffi::OsString> = args.iter().enumerate().filter(|(at, arg)| *at == 0 || *at >= end || !matches!(arg.to_str(), Some("--help" | "-h" | "--version" | "-V"))).map(|(_, arg)| arg.clone()).collect();
+    let path: Vec<String> = match root.clone().try_get_matches_from(&without_request) {
+        Ok(matches) => {
+            let mut path = Vec::new();
+            let mut at = &matches;
+            while let Some((name, inner)) = at.subcommand() {
+                path.push(name.to_string());
+                at = inner;
+            }
+            path
+        }
+        Err(unresolved) if unresolved.kind() == ErrorKind::InvalidSubcommand => return Some(usage_error(&unresolved)),
+        Err(other) => command_path(&other, root),
+    };
+    let joined = path.join(" ");
+    let at = format!("canon {joined}").trim().to_string();
+    let message = if field == "--help" { format!("`--help` prints text for people and is refused with `--json`; `{}` describes `{at}` for a program", hint_of(&joined)) } else { "`--version` prints text for people and is refused with `--json`; the version is `meta.toolVersion` of every answer".to_string() };
+    Some(ExitCode::from(CliError::refused("USAGE", message).field(field).hint(hint_of(&joined)).emit(&at, true)))
+}
+
 /// The command path and the error a clap parse failure becomes: the refused
 /// argument (`field`, `received`), what would have parsed (`expected`), the
 /// nearest valid words (`suggestions`), and a working invocation (`hint`), all

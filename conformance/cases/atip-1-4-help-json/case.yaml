@@ -1,0 +1,27 @@
+description: "atip/1 4.4.1 (0.36): `--help` and `--version` with `--json` are refused with USAGE (`field` `--help` or `--version`) and a hint that points at `schema` or at `canon --version`, after the path is resolved: the root, a group and a command, the short spellings and `--json` before or after, an unknown word answering UNKNOWN_COMMAND; the text help and version without `--json` are unchanged"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [--help, --json]
+    exit: 2
+  - args: [finding, --help, --json]
+    exit: 2
+  - args: [finding, close, --help, --json]
+    exit: 2
+  - args: [-h, --json, finding, close]
+    exit: 2
+  - args: [nosuch, --help, --json]
+    exit: 2
+  - args: [finding, nosuch, --help, --json]
+    exit: 2
+  - args: [--version, --json]
+    exit: 2
+  - args: [-V, --json]
+    exit: 2
+  - args: [nosuch, --version, --json]
+    exit: 2
+  - args: [search, --, --help, --json]
+    exit: 2
+  - args: [--version]
+    exit: 0
+  - args: [finding, close, --help]
+    exit: 0

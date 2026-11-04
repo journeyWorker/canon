@@ -13,6 +13,22 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 - Gone with the crates: `just test-atip`, the nextest profile `atip` and the default profile's filter that left `atip-check` out, and the `--exclude atip-check` of `just test`, of the job `offline` and of `scripts/check-witness.sh`. `just test` is `cargo test --workspace --locked`: the tests of the crate and of the checker run in the atip repository.
 - The tests of canon that tested the checker rather than canon are gone, and so are their scenarios: the 204 `atip-check` scenarios that spoke of the checker alone, the 43 scenarios of the crate features (`atip.crate12`, `atip.cratecursor`, `atip.crateplan`, `atip.crateshell`) and the two that spoke of the vendored schema copies (`atip.contract11.02`, `atip.l0.07`). `atip_check.rs` and `atip_claiml2.rs` no longer run the checker in process: the runs on canon (`atip_check_41`, `atip_check_42`, `atip_check_75`, `atip_check_98`, `atip_checkl1_31`, `atip_checkl1_34`, `atip_claiml2_03`, `_04`, `_05`, `_08`, `_10`) are the CI job `atip`. What stays is canon's own conformance: the fixture `canon.fixture.json` against `canon schema` (`atip_check_39`, `_40`), the test of the job and the recipe (`atip_check_43`, `atip_claiml2_07`) and every other test of canon. The subject `atip-check` keeps the three scenarios that are canon's (`atip.check.39`, `.40`, `.43`).
 
+### Breaking
+
+**`--help --json` and `--version --json` are refused** (`canon-0-36-help-json`, scenarios `atip.helpjson.01-09`, atip/1 spec 4.4.1). `--help` is text for people and `canon schema` is the machine description, so a call that asks for JSON and for help or the version no longer gets text: it gets the failure envelope, exit 2, `USAGE`, and a `hint` that names what to run. The path is resolved first, so an unknown word still answers `UNKNOWN_COMMAND`, wherever the flag sits. The rule does not wait for the 1.4 declaration: a 1.2 tool may answer `--help --json` with the `schema` document or with a refusal (4.4.1).
+
+| Call | 0.35 | now |
+|---|---|---|
+| `canon finding close --help --json` (or `-h`, with `--json` before or after) | the text help on stdout, exit 0 | exit 2, `USAGE`, `field` `--help`, `hint` `canon schema finding close --json`, `meta.command` `finding close` |
+| `canon finding --help --json` | the text help, exit 0 | `field` `--help`, `hint` `canon schema finding --json` |
+| `canon --help --json` | the text help, exit 0 | `field` `--help`, `hint` `canon schema --json` |
+| `canon --version --json` (or `-V`; also after a group or a command) | `canon 0.35.0`, exit 0 | exit 2, `USAGE`, `field` `--version`, `hint` `canon --version` |
+| `canon nosuch --help --json`, `canon nosuch --version --json` | `UNKNOWN_COMMAND` | `UNKNOWN_COMMAND`, unchanged |
+| `canon --help`, `canon -h`, `canon --version`, `canon -V`, `canon help finding` (no `--json`) | text, exit 0 | unchanged |
+| `canon search -- --help --json` (the words after `--` are values) | no help request | unchanged |
+
+**Upgrade note:** a caller that read the machine description from `--help --json` read text. Run the `hint` instead: `canon schema <command> --json`. The version is `meta.toolVersion` of every answer. Nothing else prints differently, and the text help keeps its first line (`canon schema --json` and `canon skills show`). The guides, the website and the eval scripts never recommended `--help --json`; `atip.helpjson.09` fails if one starts to.
+
 ## 0.35.0 — 2026-11-04
 
 canon adopts atip/1 1.2 and meets its L2: the batch, plan, cursor and check-order rules of the contract, `atip check` runs the L2 checks, and the `atip` crate gains `cursor`, `plan`, `given`, `jcs` and `validate`.

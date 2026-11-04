@@ -1,0 +1,5 @@
+canon: USAGE: unexpected argument '--json' found
+  field: --json
+  expected: --kind, --expand, --limit, --repo, --json
+  suggestions: --json
+  hint: a working call: canon search timeout --kind finding; `canon schema search --json` lists every argument; `canon search` takes only: --kind --expand --limit --repo --json (and the global --as)
