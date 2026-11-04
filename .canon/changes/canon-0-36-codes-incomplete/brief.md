@@ -40,14 +40,14 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3.
 ## Desired outcome
 
 - 앞 단계가 효과를 낸 뒤 멈춘 명령은 `<SUBJECT>_INCOMPLETE`로 답한다. 종료 값 1이고 `meta.next`의 첫 항목이 한 일을 읽는 명령이다.
-- ==**하나가 통째로 실패하거나 모두 되돌려진 명령만 `*_FAILED`로 낸다.**==
-- `STOPPED_MIDWAY`는 레지스트리와 소스에서 없어진다. `canon init`의 중단은 `INIT_INCOMPLETE`이고 이유가 그 거절의 코드이다.
+- 하나가 통째로 실패하거나 모두 되돌려진 명령만 `*_FAILED`로 낸다.
+- ==**이 변경 뒤 `STOPPED_MIDWAY`는 레지스트리에 없고 어떤 소스도 내지 않는다.**== 방출하던 곳은 `canon init`, 기록을 스테이징한 뒤 승격이 거절되는 네 명령, 전략 승격이다. 각자 대상의 `<SUBJECT>_INCOMPLETE`로 답하고 이유가 그 거절의 코드이다.
 - 재시도 값은 레지스트리가 정한다. 같은 호출을 반복해도 안전하면 예이고, 반복하면 `PLAN_STALE`을 만나는 확정 명령은 아니오이다.
 - 대상마다 `_INCOMPLETE`는 하나이다. 도구 전체의 중단은 명령 이름을 쓴다.
 
 ## User flow
 
-1. F1 에이전트는 `canon init`이 설정을 쓴 뒤 스킬 설치에서 멈춘 응답을 읽는다 → `INIT_INCOMPLETE`와 이유(거절의 코드)가 온다 → ==**반복하기 전에 한 일을 읽는다.**==
+1. F1 에이전트는 `canon init`이나 기록 명령이나 `strategy promote`가 효과를 낸 뒤 멈춘 응답을 읽는다 → 대상의 `INIT_INCOMPLETE`, `EVIDENCE_INCOMPLETE`, `FINDING_INCOMPLETE`, `DIVERGENCE_INCOMPLETE`, `STRATEGY_INCOMPLETE`와 이유(거절의 코드)가 온다 → ==**반복하기 전에 한 일을 읽는다.**==
 2. F2 에이전트는 확정 명령이 일부를 한 뒤 멈춘 응답을 읽는다 → `MIGRATION_INCOMPLETE`, `LEDGER_COMPACT_INCOMPLETE`, `RETENTION_PURGE_INCOMPLETE` 같은 코드가 재시도 값 아니오로 온다 → 남은 것을 새 미리보기로 다시 계획한다.
 3. F3 에이전트는 이어서 하면 되는 저장 명령이 멈춘 응답을 읽는다 → `ARTIFACTS_STORE_INCOMPLETE`가 재시도 값 예로 온다 → 같은 호출을 반복해 이어 간다.
 4. F4 에이전트는 쓰기 하나가 통째로 실패한 응답을 읽는다 → `WRITE_FAILED`나 `*_FAILED`가 온다 → 재시도 값대로 다시 한다.
@@ -64,10 +64,22 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3.
 
 ### F2 STOPPED_MIDWAY의 퇴장
 
-- `STOPPED_MIDWAY`는 등록에서 빠지고 소스의 모든 방출 지점이 새 코드를 쓴다. 지금 방출하는 곳은 `canon init`의 스킬 설치 단계이다. 이 단계가 쓴 뒤 거절을 만나면 `INIT_INCOMPLETE`이고 이유가 그 거절의 코드이다.
-- `INIT_INCOMPLETE`의 이유는 스킬 단계가 만날 수 있는 종료 값 2의 코드이다: `SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID`. 이유는 거절의 코드 하나이고 그 거절의 이유는 싣지 않는다. 각 이유는 레지스트리에 등록한다.
-- 배치 항목이 이렇게 멈추면 그 항목은 `failed`이고 오류가 `INIT_INCOMPLETE`이다. 배치는 `BATCH_INCOMPLETE`이다.
-- `meta.next`의 첫 항목은 한 일을 읽는 명령이다. 반복 명령이 아니다.
+- `STOPPED_MIDWAY`는 등록에서 빠지고 소스의 모든 방출 지점이 자기 대상의 `<SUBJECT>_INCOMPLETE`를 쓴다. 대상마다 하나이고, 이유는 그 단계가 만난 거절의 코드 하나이다. 그 거절의 이유는 싣지 않는다. 계약 8.3.2가 그렇게 정한다.
+- 방출 지점은 넷이다. 구현자가 소스에서 모든 `STOPPED_MIDWAY` 문자열을 찾아 감사표에 싣는다.
+
+| 방출 지점 | 앞 단계가 낸 효과 | 새 코드 | 이유가 되는 거절 |
+|---|---|---|---|
+| `canon init`의 스킬 설치 | 설정과 그 옆 파일을 씀 | `INIT_INCOMPLETE` | `SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID` |
+| `evidence add`의 스테이징 뒤 승격 | 증거 기록을 스테이징에 씀 | `EVIDENCE_INCOMPLETE` | 승격 게이트의 거절 코드 |
+| `finding add`와 `finding close`의 스테이징 뒤 승격 | 발견 기록을 스테이징에 씀 | `FINDING_INCOMPLETE` | 승격 게이트의 거절 코드 |
+| `divergence add`의 스테이징 뒤 승격 | 발산 기록을 스테이징에 씀 | `DIVERGENCE_INCOMPLETE` | 발산 게이트의 거절 코드 |
+| `strategy promote`의 강등 뒤 승격 | 전략을 강등함 | `STRATEGY_INCOMPLETE` | 전략 승격 게이트의 거절 코드 |
+
+- 승격 쪽 이유는 `canon-0-36-codes-exit`가 정한 게이트 거절 코드이다. 승인이 없으면 `<대상>_APPROVAL_REQUIRED`, 근거가 낡았으면 `EVIDENCE_STALE`, 그 밖이면 `<대상>_INVALID`이다. 각 코드는 자기가 실제로 내는 이유만 등록한다. 이름이 겹쳐도 각 `_INCOMPLETE` 코드가 자기 목록을 따로 갖는다.
+- 스테이징한 기록은 스테이징에 남는다. `meta.next`의 첫 항목은 기록이 어디에 있는지 읽는 명령이다. 승격을 되풀이하는 명령이 아니다. 강등한 전략은 강등된 채이다.
+- 이 변경 뒤의 `gate promote` 거절은 아무것도 쓰기 전의 거절이므로 `canon-0-36-codes-exit`의 종료 값 2 코드이고, 여기서 다루지 않는다. 스테이징 뒤 승격이 거절되는 것만 `_INCOMPLETE`이다.
+- 배치 항목이 이렇게 멈추면 그 항목은 `failed`이고 오류가 그 항목의 `_INCOMPLETE` 코드이다. 배치는 `BATCH_INCOMPLETE`이다.
+- 같은 대상이 다른 이유로 멈추면 이유로 가른다. 대상마다 `_INCOMPLETE` 코드는 하나이다.
 
 ### F3 확정 명령의 중단
 
@@ -102,10 +114,10 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3.
 | `PLUGIN_SYNC_ERRORS` | 1 | `PLUGIN_SYNC_INCOMPLETE` |  | 1 | 아니오 |
 | `PROMOTE_FAILED` | 1 | `PROMOTION_FAILED` |  | 1 | 아니오 |
 | `RETENTION_PURGE_FAILED` | 1 | `RETENTION_PURGE_INCOMPLETE` |  | 1 | 아니오 |
-| `STOPPED_MIDWAY` | 1 | `INIT_INCOMPLETE` | 거절의 코드 | 1 | 아니오 |
+| `STOPPED_MIDWAY` | 1 | `INIT_INCOMPLETE` · `EVIDENCE_INCOMPLETE` · `FINDING_INCOMPLETE` · `DIVERGENCE_INCOMPLETE` · `STRATEGY_INCOMPLETE` | 거절의 코드 | 1 | 아니오 |
 | `TIER_FAILED` | 1 | `TIER_INCOMPLETE` · `TIER_FAILED` |  | 1 | 아니오 |
 
-- 소비자 이동, 시나리오 문장(20개와 `atip.midway.*` 14개의 개정), conformance, CHANGELOG 행은 `canon-0-36-codes-rename`과 같은 규칙으로 한다. 시험 `stopped_midway`는 새 코드로 다시 쓴다. 옛 이름 모음에 `STOPPED_MIDWAY`와 이 변경이 없앤 이름을 더한다.
+- 소비자 이동, 시나리오 문장(20개와 `atip.midway.*` 14개의 개정, 승격 거절을 말하는 증거와 발견과 발산과 전략의 시나리오), conformance, CHANGELOG 행은 `canon-0-36-codes-rename`과 같은 규칙으로 한다. 시험 `stopped_midway`는 새 코드로 다시 쓴다. 옛 이름 모음에 `STOPPED_MIDWAY`와 이 변경이 없앤 이름을 더한다.
 
 ## Acceptance
 
@@ -114,7 +126,11 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3.
   - 실패 경로: 표에 없는 종료 값 1 코드가 있으면 시험이 실패한다. 이름이 `_INCOMPLETE`로 끝나는데 부분 효과가 남지 않는 호출은 실패한다.
 - F2:
   - `canon init`이 스킬 설치에서 거절을 만나게 하면 종료 값 1, `INIT_INCOMPLETE`, 이유(거절의 코드), 한 일을 읽는 `meta.next[0]`이 온다. 설정 파일과 그 옆의 파일은 쓰여 있다.
-  - 실패 경로: 효과가 없는 상태의 같은 거절은 종료 값 2와 거절의 코드이다. 등록되지 않은 이유를 내는 시험은 실패한다.
+  - 기록을 스테이징한 뒤 승격 게이트가 거절하는 호출이 `evidence add`는 `EVIDENCE_INCOMPLETE`, `finding add`와 `finding close`는 `FINDING_INCOMPLETE`, `divergence add`는 `DIVERGENCE_INCOMPLETE`로 답한다. 모두 종료 값 1, 재시도 값 아니오, 이유가 게이트의 거절 코드이다. 기록은 스테이징에 남는다.
+  - `strategy promote`가 강등한 뒤 승격 게이트가 막으면 종료 값 1, `STRATEGY_INCOMPLETE`, 이유가 거절의 코드이고 전략은 강등된 채이다.
+  - 방출 지점마다 `meta.next[0]`이 한 일을 읽는 명령이고 반복 명령이 아니다. 배치 항목이 이렇게 멈추면 항목은 `failed`와 자기 `_INCOMPLETE` 오류이고 배치는 `BATCH_INCOMPLETE`이다.
+  - `canon schema --errors --json`에 `STOPPED_MIDWAY`가 없고 소스 어디에도 그 문자열을 내는 곳이 없다. 소스 검색 시험이 이를 확인하고 되살리면 실패한다.
+  - 실패 경로: 효과가 없는 상태의 같은 거절은 종료 값 2와 거절의 코드이다. 스테이징 전에 게이트가 거절하는 호출은 `_INCOMPLETE`가 아니다. 등록되지 않은 이유를 내는 시험은 실패한다. 한 대상에 `_INCOMPLETE` 코드가 둘 있으면 레지스트리 시험이 실패한다.
 - F3:
   - ==**확정이 일부를 한 뒤 멈추면 종료 값 1, `<SUBJECT>_INCOMPLETE`, 재시도 값 아니오이고, 같은 호출을 반복하면 `PLAN_STALE`이다.**==
   - 실패 경로: 아무것도 하기 전의 거절은 종료 값 2이다. 위반으로 중단한 `inventory sync`는 앞 루트의 색인이 남고 `data.roots`가 그렇게 말한다.
@@ -125,7 +141,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.2.3, 8.3.
   - 훅, 보존 삭제, 장부 압축, 계층 이동이 일부를 한 뒤 멈추는 시험이 각자의 `*_INCOMPLETE`와 남은 효과를 확인한다.
   - 실패 경로: 쓰기 하나가 실패하면 `WRITE_FAILED`이고 `INCOMPLETE`가 아니다.
 - F6:
-  - `canon schema --errors --json`에 `STOPPED_MIDWAY`가 없고 `*_INCOMPLETE` 코드마다 이유가 있다. 표의 옛 이름은 모든 곳에 없다.
+  - `*_INCOMPLETE` 코드마다 이유가 있다. 표의 옛 이름은 모든 곳에 없다.
   - 실패 경로: 옛 이름을 되살리면 옛 이름 시험이 실패한다. 종료 값을 덮어쓰는 호출이 있으면 종료 값 시험이 실패한다.
 - `cargo test --workspace`, conformance, 생성 문서 drift 시험이 통과한다.
 
