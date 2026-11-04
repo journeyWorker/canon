@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T07:25:41.770300Z",
+  "change_id": "canon-0-36-codes-stored",
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4ea21af84a4cad334690b6662e01ba946daace8b",
+  "reviewer": "rev-0-36-stored",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.02"
+  ],
+  "schema": 2,
+  "seq": 9,
+  "severity": "note",
+  "summary": "[standards] RETENTION_TIERS_UNAVAILABLE (retryable true) is still the answer for `StoreError::BackendUnattached` and `TierUnavailable` ('not attached', the env variable that names the credentials is unset) and for `StoreError::Parquet` (a stored object that does not decode), in `tiers_code` (retention.rs). A repeat cannot pass either; the same reasoning made the artifact store's unattached tier ARTIFACTS_STORE_REQUIRED. There is no RETENTION_TIERS_REQUIRED and the owner approved no such code, so this is a decision (accept as 'down or unreachable', or add the code). Also: the doc comment of NOT_YET_RECLASSIFIED in codes_names.rs still says refusals and stored 'still change' codes; only codes-incomplete is left on the list.",
+  "worktree_dirty": false
+}

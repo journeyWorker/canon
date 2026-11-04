@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T07:25:39.364782Z",
+  "change_id": "canon-0-36-codes-stored",
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4ea21af84a4cad334690b6662e01ba946daace8b",
+  "reviewer": "rev-0-36-stored",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.01"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[standards] Three edge cases of a path in the wrong state, driven by hand: (a) canon.yaml is a directory -> CONFIG_REQUIRED 'no canon.yaml in ...' (EISDIR should be CONFIG_INVALID by the rule that a wrong path is INVALID; the F1 failure path of the brief says a directory in place of a file is _INVALID), found in `require_config`, not touched by this change; (b) the change directory at mode 000 -> `brief show` and `brief check` answer BRIEF_NOT_FOUND 'no brief at ...' because `resolve_change` asks `exists()` (false on EACCES); it is BRIEF_DENIED; (c) `canon artifacts verify` with a store directory that is a directory-in-place of a blob or at mode 000 exits 0 (working-tree-only counts as stored), unrelated to the codes but worth knowing when reading atip.codestored.07.",
+  "worktree_dirty": false
+}
