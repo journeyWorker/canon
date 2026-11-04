@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:42.063502Z",
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "kind": "review",
+  "pin": "401ecbcad1607f3d3352b54c9f12e88a52b63fe1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:skills_install_55_a_malformed_skills_section_fails_loud",
+          "junit:skills_install_55_a_missing_skills_source_is_refused_with_exit_two",
+          "junit:skills_install_55_an_unknown_provider_on_the_flag_is_an_invalid_argument"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "951ac26933420d9565ec5ec11504ccd032b1755380dd0c9bfae859e146d9935d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
+  },
+  "review_id": "01M6K2ES8FXF5VMVE0MA02T1GE",
+  "reviewer": "rev-0-36-refusals",
+  "scenario_id": "skills.install.55",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:36.012876Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/run/plugin.rs:41",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "resolution_sha": "56499ba18041cda113a7cf2dcff93d6b13026848",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "4983b3208c9177bded50efe00dc90220c03fe49f",
+  "reviewer": "rev-0-36-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[standards] `plugin sync` has a dead arm: `PluginSyncError::Inventory(_)` -> INVENTORY_INDEX_UNAVAILABLE with the hint 'another canon process holds the scenario index'. `plugin_sync::run_sync` never takes the index lock (it calls only SyncCtx::from_repo and spec_roots, so the only reachable Inventory variants are Config and CanonYaml, both matched above). The registry nevertheless lists INVENTORY_INDEX_UNAVAILABLE under `plugin sync`, and the CHANGELOG row of PLUGIN_SYNC_FAILED names it. If a lock is ever added, a Store or Unavailable variant would be mislabelled retryable. Match the variants exhaustively (unreachable for the rest), drop the code from plugin sync's declared errors and from the CHANGELOG row.",
+  "worktree_dirty": false
+}

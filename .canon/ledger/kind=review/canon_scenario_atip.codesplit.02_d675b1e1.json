@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:42.063502Z",
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "kind": "review",
+  "pin": "401ecbcad1607f3d3352b54c9f12e88a52b63fe1",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:artifacts::tests::atip_codesplit_02_a_bound_file_that_changed_is_evidence_binding_stale",
+          "junit:atip_codesplit_02_a_file_to_bind_is_refused_by_its_condition_and_nothing_is_written",
+          "junit:review::tests::atip_codesplit_02_a_bound_file_that_changed_is_review_artifact_stale"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b8887e165672975002efcd00170b51b1f954444ff3a689c121e07e9280b8016b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
+  },
+  "review_id": "01M6K2ES8FXF5VMVE0MA02T1GE",
+  "reviewer": "rev-0-36-refusals",
+  "scenario_id": "atip.codesplit.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

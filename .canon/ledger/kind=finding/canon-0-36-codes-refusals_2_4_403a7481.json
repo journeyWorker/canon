@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:28.532273Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/read_cause.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "401ecbcad1607f3d3352b54c9f12e88a52b63fe1",
+  "reviewer": "rev-0-36-refusals",
+  "round": 2,
+  "scenario_ids": [
+    "atip.codestored.11"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] Adequacy of the proof for the 14 `_UNAVAILABLE` codes (481ea88d): the committed tests only drive the pure helpers (`brief_code(&eio())`, `config_error(text-with-EIO)`, ...) and a few mapping fns on constructed errors, so they prove the classification but not that each call site routes its read error through the helper. I closed that gap by hand with real calls: a DYLD_INSERT_LIBRARIES shim (outside the repo, /Volumes/External/tmp/rev-refusals-b/eio) that returns EIO from open() on a path pattern, for the real debug `canon`: BRIEF_UNAVAILABLE (brief show, brief check), CONFIG_UNAVAILABLE (inventory sync), POLICY_UNAVAILABLE (policy approve), HOOKS_FILE_UNAVAILABLE (gate install-hooks), ADAPTER_FILE_UNAVAILABLE (adapter validate), RETENTION_TIERS_UNAVAILABLE (export), EVIDENCE_BINDING_UNAVAILABLE (--artifact and --report), REVIEW_ARTIFACT_UNAVAILABLE (review scenario --artifact), DISPATCH_MANIFEST_UNAVAILABLE (dispatch end), REPO_UNAVAILABLE (subject show): all exit 2, retryable true, no data. Not driven (a directory read, a mkdir or a strategy store needed): SPEC_ROOT, MIGRATION, PLAN_CORPUS, POLICY_APPROVAL, STRATEGY_SIGNATURE, DISPATCH_RUN and DISPATCH_DIFF_RECORDS. Verdict: adequate for the classification (pure, exhaustive over kinds), not by itself for the wiring; the wiring holds for the ten driven; a committed `DYLD`/LD_PRELOAD-free seam (like CANON_TEST_INDEX_LOCK_WAIT_MS, debug-only) that makes one read fail with EIO would let a test drive the other seven. Related: `EVIDENCE_BINDING_STALE` and `REVIEW_ARTIFACT_STALE` are a race between two reads of one file and are proved only by a unit test of the mapping on a constructed `ArtifactStoreError::Changed`; accepted, since the scenario text now says so.",
+  "worktree_dirty": false
+}
