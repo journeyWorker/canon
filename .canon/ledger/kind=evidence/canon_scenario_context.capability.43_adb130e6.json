@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-evidence-audit",
+    "role": "implementer",
+    "session_id": "s-0-36-evidence-audit"
+  },
+  "at": "2026-11-04T18:01:11.907833Z",
+  "attachments": [
+    {
+      "case": "a_misspelt_role_runs_and_warns_with_the_closest_known_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "a_known_role_and_a_policy_named_role_do_not_warn",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "an_unknown_role_with_nothing_close_still_runs_and_warns_without_a_suggestion",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-36 evidence audit: the scenario's cases re-bound to the workspace nextest run (3793 passed) from a clean worktree at 1419794e5"
+  },
+  "evidence_sha": "1419794e5b88c9fb9b35ad22588e1da48e3cb240",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1222,
+  "scenario_id": "context.capability.43",
+  "schema": 1,
+  "staging_id": "7bac9462",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

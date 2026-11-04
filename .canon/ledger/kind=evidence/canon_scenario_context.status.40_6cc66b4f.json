@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-evidence-audit",
+    "role": "implementer",
+    "session_id": "s-0-36-evidence-audit"
+  },
+  "at": "2026-11-04T18:03:54.733Z",
+  "attachments": [
+    {
+      "case": "a_repo_without_a_policy_gets_no_approval_advisory",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "approve_refuses_a_repo_with_no_policy",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "approve_records_the_policy_digest_the_approver_the_time_and_the_note",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "approve_refuses_an_empty_approver",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "the_approval_file_is_never_ignored",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "gate_check_and_status_advise_until_the_current_policy_is_approved",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-36 evidence audit: the scenario's cases re-bound to the workspace nextest run (3793 passed) from a clean worktree at 1419794e5"
+  },
+  "evidence_sha": "1419794e5b88c9fb9b35ad22588e1da48e3cb240",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 705,
+  "scenario_id": "context.status.40",
+  "schema": 1,
+  "staging_id": "0e52591b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

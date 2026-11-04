@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-evidence-audit",
+    "role": "implementer",
+    "session_id": "s-0-36-evidence-audit"
+  },
+  "at": "2026-11-04T18:15:36.743973Z",
+  "attachments": [
+    {
+      "case": "ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-36 evidence audit: the scenario's cases re-bound to the workspace nextest run (3793 passed) from a clean worktree at 1419794e5"
+  },
+  "evidence_sha": "1419794e5b88c9fb9b35ad22588e1da48e3cb240",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 134,
+  "scenario_id": "ingest.sessions.16",
+  "schema": 1,
+  "staging_id": "59aa8368",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
