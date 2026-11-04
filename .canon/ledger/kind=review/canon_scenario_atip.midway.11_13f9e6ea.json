@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:39:07.368361Z",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "kind": "review",
+  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_midway_11_no_consumer_spells_a_code_that_moved_or_was_replaced_by_an_incomplete_code",
+          "junit:atip_midway_11_the_check_catches_a_moved_code_that_comes_back"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "a92afabd60c3820e7b07792fc8a2d82f0a05a9c8c88709cab496cea0bdb6e143",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
+  },
+  "review_id": "01M6K5P378NS9Y2CZSPM6JSR1X",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "atip.midway.11",
+  "schema": 2,
+  "worktree_dirty": false
+}

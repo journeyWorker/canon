@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:38:53.826813Z",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "kind": "review",
+  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_incomplete_04_a_hook_install_that_stops_after_the_first_file_is_incomplete_and_one_that_wrote_nothing_is_write_failed"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "19caa4d27c411b3fbd39f3d5f782a2560c411605d5aaad170c0eaae20a93f019",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
+  },
+  "review_id": "01M6K5NP02SR1SM0J656B8CE9E",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "atip.incomplete.04",
+  "schema": 2,
+  "worktree_dirty": false
+}

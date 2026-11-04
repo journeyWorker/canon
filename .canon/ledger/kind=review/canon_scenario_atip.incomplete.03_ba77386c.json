@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:38:53.826813Z",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "kind": "review",
+  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_incomplete_03_an_artifact_store_that_stops_after_a_blob_is_incomplete_and_the_same_call_finishes"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "36d8aef04ada89f3a4a426d4038adf1fa4aa419de88251465de55796ccd39a37",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
+  },
+  "review_id": "01M6K5NP02SR1SM0J656B8CE9E",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "atip.incomplete.03",
+  "schema": 2,
+  "worktree_dirty": false
+}
