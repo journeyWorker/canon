@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-help-json",
+    "role": "implementer",
+    "session_id": "s-0-36-help-json"
+  },
+  "at": "2026-11-04T01:29:25.271791Z",
+  "attachments": [
+    {
+      "case": "atip_helpjson_07_the_refusal_reads_nothing_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "1dbbccd7b7f1cb6c6f57783b8461f817089fad47bfc520e4d09938b7f683ae47"
+    }
+  ],
+  "code_tree": "a051996d33b1d66fe93a6b5a766d868b8310b9c4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "e227038356dd6286733ab14f9deea1905e47ee38",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "atip.helpjson.07",
+  "schema": 1,
+  "staging_id": "c99afa92",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

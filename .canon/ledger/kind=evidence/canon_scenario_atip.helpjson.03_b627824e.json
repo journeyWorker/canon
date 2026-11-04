@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-help-json",
+    "role": "implementer",
+    "session_id": "s-0-36-help-json"
+  },
+  "at": "2026-11-04T01:29:15.090882Z",
+  "attachments": [
+    {
+      "case": "atip_helpjson_03_a_word_after_the_end_of_options_is_no_request_and_text_help_is_text",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "1dbbccd7b7f1cb6c6f57783b8461f817089fad47bfc520e4d09938b7f683ae47"
+    }
+  ],
+  "code_tree": "a051996d33b1d66fe93a6b5a766d868b8310b9c4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "e227038356dd6286733ab14f9deea1905e47ee38",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "atip.helpjson.03",
+  "schema": 1,
+  "staging_id": "7cacabb5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
