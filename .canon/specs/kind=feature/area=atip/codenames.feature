@@ -36,10 +36,10 @@ Feature: atip: error code names, <SUBJECT>_<CONDITION>
   @case:failure
   @flow:canon-0-36-codes-rename.F2
   @atip.codenames.04
-  Scenario: A code on the list still to rename that follows the rule, and a name that breaks the rule, fail the registry test
-    Given the list of codes still to rename, a code on it that follows the rule, and a name that does not end in a condition
+  Scenario: A name that breaks the rule fails the registry test, and no list exempts a code
+    Given a name that does not end in a condition, a name with the wrong exit, and the registry with no list of codes that do not follow the rule yet
     When the registry test and the name rule run
-    Then the listed code that follows the rule fails the test, and the name without a condition or with the wrong exit is refused
+    Then the name without a condition or with the wrong exit is refused, and every code of the registry follows the rule with nothing exempt
 
   # canon: {"schema":1,"at":"2026-11-04T01:33:07Z","actor":{"agent_id":"impl-codes-rename","role":"implementer","session_id":"s-0-36-codes-rename"}}
   @subject:atip-contract

@@ -45265,7 +45265,7 @@
     {
       "code": "POLICY_APPROVAL_UNREADABLE",
       "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
-      "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 1), and `--override-reason` does not waive it"
+      "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 2), and `--override-reason` does not waive it"
     },
     {
       "code": "POLICY_CHANGED_SINCE_APPROVAL",

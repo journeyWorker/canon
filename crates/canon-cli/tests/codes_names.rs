@@ -1,55 +1,20 @@
-//! `canon-0-36-codes-rename`: the registry's names follow the contract's `<SUBJECT>_<CONDITION>` rule (spec 7.2,
-//! `atip::code_name_problem` at 1.3). The codes a later change of 0.36 still renames are listed here; each such change takes
-//! its codes out of the list, and `canon-0-36-codes-table` checks that the list is empty.
+//! `canon-0-36-codes-rename`, `canon-0-36-codes-table`: the registry's names follow the contract's `<SUBJECT>_<CONDITION>` rule (spec 7.2,
+//! `atip::code_name_problem` at 1.3). Every code of the registry follows it: the contract's core codes pass the rule by its own exemption, and
+//! canon lists no other exception. The lists of codes still to rename or reclassify that the first changes of 0.36 kept are gone.
 
 use atip::Minor;
 
-/// The codes that do not follow the rule yet: none. `canon-0-36-codes-incomplete` renamed the last four (`INVENTORY_ABORTED`, `MIGRATE_STOPPED`,
-/// `PLUGIN_SYNC_ERRORS` and the reserved midway code) into `<SUBJECT>_INCOMPLETE` codes; `canon-0-36-codes-table` checks that the list stays empty.
-const NOT_YET_RENAMED: &[&str] = &[];
-
-/// The codes that pass the name rule and that a change of 0.36 still reclassifies: none. `canon-0-36-codes-incomplete` took the exit-1 codes that say a
-/// failure after work started into one `*_INCOMPLETE` per subject (or its `*_FAILED` when nothing was kept), and left nothing here (issue #135).
-/// `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
-const NOT_YET_RECLASSIFIED: &[&str] = &[];
-
-/// atip.codenames.04: every code of the second list is in the registry (a code a change already renamed is taken off), and none of the
-/// `canon-0-36-codes-exit` codes is on either list.
-#[test]
-fn atip_codenames_04_the_list_of_codes_still_to_reclassify_holds_only_registered_codes() {
-    let all: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
-    for listed in NOT_YET_RECLASSIFIED {
-        assert!(all.contains(listed), "`{listed}` is on NOT_YET_RECLASSIFIED but not in the registry: take it off");
-    }
-    let mut sorted_unique: Vec<&&str> = NOT_YET_RECLASSIFIED.iter().collect();
-    sorted_unique.sort_unstable();
-    sorted_unique.dedup();
-    assert_eq!(sorted_unique.len(), NOT_YET_RECLASSIFIED.len(), "a code is listed twice");
-    for exit_code in ["BRIEF_APPROVAL_REQUIRED", "BRIEF_APPROVAL_STALE", "SUBJECT_INVALID", "PROMOTION_INVALID", "REPORT_CHECK_FAILED", "CONTEXT_PACK_VERIFY_FAILED"] {
-        assert!(!NOT_YET_RECLASSIFIED.contains(&exit_code) && !NOT_YET_RENAMED.contains(&exit_code), "`{exit_code}` was settled by codes-exit");
-    }
-}
+mod old_codes;
 
 fn problem(info: &atip::CodeInfo) -> Option<String> {
     atip::code_name_problem(Minor::V1_3, info.code, Some(i64::from(info.exit)), Some(info.retryable))
 }
 
-/// atip.codenames.03: every code of the registry that is not listed follows the rule.
+/// atip.codenames.03: every code of the registry follows the rule, with its exit and retryable, and no list exempts one.
 #[test]
-fn atip_codenames_03_every_code_but_the_listed_ones_follows_the_name_rule() {
-    let bad: Vec<String> = canon_cli::cli_error::all_codes().iter().filter(|info| !NOT_YET_RENAMED.contains(&info.code)).filter_map(problem).collect();
-    assert!(bad.is_empty(), "a code breaks the name rule and is not on the list of codes still to rename: {bad:#?}");
-    let all: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
-    for listed in NOT_YET_RENAMED {
-        assert!(all.contains(listed), "`{listed}` is on the list but not in the registry: take it off");
-    }
-}
-
-/// atip.codenames.04: a listed code that follows the rule is taken off the list.
-#[test]
-fn atip_codenames_04_a_listed_code_that_follows_the_rule_fails_the_test() {
-    let passing: Vec<&str> = canon_cli::cli_error::all_codes().iter().filter(|info| NOT_YET_RENAMED.contains(&info.code) && problem(info).is_none()).map(|info| info.code).collect();
-    assert!(passing.is_empty(), "these codes follow the rule: take them off NOT_YET_RENAMED: {passing:?}");
+fn atip_codenames_03_every_code_follows_the_name_rule() {
+    let bad: Vec<String> = canon_cli::cli_error::all_codes().iter().filter_map(problem).collect();
+    assert!(bad.is_empty(), "a code breaks the name rule: {bad:#?}");
 }
 
 /// atip.codenames.04 (failure case): a name that does not end in a condition is refused by the rule the tests use.
@@ -195,7 +160,7 @@ fn atip_codesplit_01_each_code_of_the_split_is_registered_as_the_table_says_and_
         assert_eq!(problem(info), None, "{code}");
         assert_eq!(info.reasons.iter().map(|r| r.reason).collect::<Vec<_>>(), *reasons, "{code}");
     }
-    for old in include_str!("fixtures/codes-0.35.txt").lines() {
+    for old in old_codes::codes_0_35().iter().copied() {
         let gone = ["ADAPTER_REFUSED", "ARTIFACTS_MOVE_REFUSED", "BRIEF_APPROVE_REFUSED", "DISPATCH_ALREADY_ENDED", "DISPATCH_NOT_RUNNING", "DIVERGENCE_ACCEPT_REFUSED", "EVIDENCE_BIND_REFUSED", "EVIDENCE_INVALID_ARGUMENT", "EVIDENCE_REFUSED", "EVIDENCE_SCENARIO_NOT_INDEXED", "HOOKS_INSTALL_REFUSED", "INVENTORY_REFUSED", "LEARN_ROLLBACK_FAILED", "MIGRATE_REFUSED", "NO_BRIEF", "OLD_BRIEF_FORMAT", "OLD_LAYOUT", "PLUGIN_SYNC_FAILED", "POLICY_APPROVAL_REFUSED", "RETENTION_EXPORT_REFUSED", "RETENTION_PURGE_REFUSED", "REVIEW_ARTIFACT_REFUSED", "REVIEW_SCENARIO_NOT_INDEXED", "SKILLS_INVALID_ARGUMENT", "SUBJECT_ADOPT_REFUSED", "SUBJECT_UNADOPT_REFUSED"];
         if gone.contains(&old) {
             assert!(canon_cli::cli_error::code_info(old).is_none(), "`{old}` is still registered");

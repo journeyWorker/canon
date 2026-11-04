@@ -6,157 +6,225 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ### Breaking
 
+**The replacement table of every error code of 0.35** (`canon-0-36-codes-table`, scenarios `atip.codestable.01-12`; atip/1 spec 15.3: a release that renames a code moves every caller in one release, lists the old and the new names in its change record, and keeps no alias). This is the one place that spells the old names. The 0.35 registry held 179 codes and the table has one row for each of them; a code that keeps its name is `kept`, a code that took a new name is `renamed`, a code that said several conditions and now says each with its own code is `split` (the new cell lists every code a caller can meet in its place), several old codes that became one code are `merged`, and a code that no longer exists is `gone`. `exit` and `retryable` read `before → after`; where the new codes differ, the cell lists each value they have (`1 → 1, 2`). `reason` is the `error.reason` the new code carries to tell the old situations apart. `why` says what the change was. The stage sections below keep what each change did and proved; the table is the replacement list of all of them, and `crates/canon-cli/tests/atip_codestable.rs` reads it against the registry, so a row that is missing, a new name that is not registered or an exit that is not the registry's fails a test. Every code of the registry is in the table, as a new name or as a name that stayed: the codes with no 0.35 name (`ARTIFACTS_STORE_DENIED`, `RETENTION_TIERS_CORRUPT`, the `*_UNAVAILABLE` codes and the rest) are listed in the new cell of the old code they came from.
+
+| 0.35 | 0.36 | kind | exit | retryable | `reason` | why |
+|---|---|---|---|---|---|---|
+| `ADAPTER_EXECUTION_NOT_AUTHORIZED` | `ADAPTER_AUTHORIZATION_FAILED` | renamed | 1 → 1 | no → no |  | a check command's negative answer stays exit 1; named by the condition |
+| `ADAPTER_REFUSED` | `ADAPTER_FILE_NOT_FOUND`, `ADAPTER_FILE_DENIED`, `ADAPTER_FILE_INVALID`, `CONFIG_INVALID`, `ADAPTER_FILE_UNAVAILABLE` | split | 2 → 2 | no → no, yes | `POLICY` | one code said several refusals (it was exit 1 at some call sites); each condition has its own code |
+| `ADAPTER_RESPONSE_INVALID` | `ADAPTER_VALIDATION_FAILED` | renamed | 1 → 1 | no → no |  | a check command's negative answer stays exit 1; named by the condition |
+| `APPROVAL_INCOMPLETE` | `APPROVAL_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `ARTIFACTS_MOVE_REFUSED` | `ARTIFACTS_TIER_INVALID`, `ARTIFACTS_BLOB_CORRUPT`, `ARTIFACTS_BLOB_DENIED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `ARTIFACTS_STORE_FAILED` | `ARTIFACTS_STORE_INCOMPLETE`, `ARTIFACTS_STORE_FAILED` | split | 1 → 1 | yes → yes |  | a write that stopped after blobs were stored is `ARTIFACTS_STORE_INCOMPLETE`; `ARTIFACTS_STORE_FAILED` stays for a write that kept nothing |
+| `ARTIFACTS_STORE_UNREACHABLE` | `ARTIFACTS_STORE_UNAVAILABLE`, `ARTIFACTS_STORE_REQUIRED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_DENIED`, `ARTIFACTS_DIGEST_INVALID`, `CONFIG_INVALID` | split | 2 → 2 | yes → no, yes | `ARTIFACT_STORE` | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+| `ARTIFACTS_VERIFY_FAILED` | `ARTIFACTS_VERIFY_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `BATCH_INCOMPLETE` | `BATCH_INCOMPLETE` | kept | 1 → 1 | no → no |  | unchanged |
+| `BRIEF_APPROVE_REFUSED` | `BRIEF_NOT_FOUND`, `BRIEF_INVALID` | split | 2 → 2 | no → no | `BLOCKERS`, `UNAPPROVABLE` | a batch refusal is the first refused id's own code with every refusal in `error.details` |
+| `BRIEF_CHANGED_SINCE_APPROVAL` | `BRIEF_APPROVAL_STALE` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `BRIEF_CHANGED_SINCE_PAGE_LOAD` | `BRIEF_PAGE_STALE` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `BRIEF_HAS_BLOCKERS` | `BRIEF_CHECK_FAILED` | renamed | 1 → 1 | no → no | `BLOCKERS` | the name follows `<SUBJECT>_<CONDITION>` |
+| `BRIEF_NOT_FOUND` | `BRIEF_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `BRIEF_UNAPPROVABLE` | `BRIEF_INVALID` | renamed | 2 → 2 | no → no | `UNAPPROVABLE` | the name follows `<SUBJECT>_<CONDITION>` |
+| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `BRIEF_UNREADABLE` | `BRIEF_DENIED`, `BRIEF_INVALID`, `BRIEF_NOT_FOUND`, `BRIEF_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+| `BRIEF_WRITE_FAILED` | `BRIEF_WRITE_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `CHANGE_ADOPTION_INCOMPLETE` | `CHANGE_ADOPTION_INCOMPLETE` | kept | 1 → 1 | no → no |  | unchanged |
+| `CHANGE_AMBIGUOUS` | `CHANGE_REQUIRED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `CHANGE_EXISTS` | `CHANGE_EXISTS` | kept | 2 → 2 | no → no |  | unchanged |
+| `CHANGE_INVALID_ARGUMENT` | `CHANGE_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `COMMAND_REQUIRED` | `COMMAND_REQUIRED` | kept | 2 → 2 | no → no |  | unchanged |
+| `CONFIG_CHECK_FAILED` | `CONFIG_CHECK_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `CONFIG_MISSING` | `CONFIG_REQUIRED` | renamed | 2 → 2 | no → no |  | the error is `CONFIG_REQUIRED`; the warning of `canon status` keeps the name `CONFIG_MISSING` |
+| `CONFIG_UNREADABLE` | `CONFIG_INVALID`, `CONFIG_DENIED`, `CONFIG_REQUIRED`, `CONFIG_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | the error says its cause; the warning of the same situation keeps the name |
+| `CONTEXT_GIT_UNAVAILABLE` | `CONTEXT_GIT_REQUIRED` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `CONTEXT_INPUT_MISSING` | `CONTEXT_INPUT_NOT_FOUND` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `CONTEXT_MANIFEST_INVALID` | `CONTEXT_MANIFEST_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `CONTEXT_OBJECT_CONFLICT` | `CONTEXT_OBJECT_CONFLICT` | kept | 1 → 2 | no → no |  | the name stays; a refusal is exit 2 |
+| `CONTEXT_PACK_NOT_FOUND` | `CONTEXT_PACK_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `CONTEXT_PACK_TAMPERED` | `CONTEXT_PACK_VERIFY_FAILED`, `CONTEXT_PACK_CORRUPT` | split | 1 → 1, 2 | no → no |  | `context-pack verify` answers exit 1; every other reader of the pack refuses with exit 2 |
+| `CONTEXT_SECRET_DETECTED` | `CONTEXT_INPUT_INVALID` | renamed | 2 → 2 | no → no | `SECRET` | the name follows `<SUBJECT>_<CONDITION>` |
+| `CONTEXT_UNSAFE_PATH` | `CONTEXT_PATH_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `CURSOR_INVALID` | `CURSOR_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `DASHBOARD_BAD_REQUEST` | `DASHBOARD_REQUEST_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `DASHBOARD_CONFIG_INVALID` | `CONFIG_INVALID` | renamed | 2 → 2 | no → no | `DASHBOARD` | the name follows `<SUBJECT>_<CONDITION>` |
+| `DASHBOARD_FAILED` | `DASHBOARD_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `DASHBOARD_NOT_BUILT` | `DASHBOARD_UNSUPPORTED` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `DASHBOARD_ORIGIN_REFUSED` | `DASHBOARD_REQUEST_DENIED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `DASHBOARD_PORT_IN_USE` | `DASHBOARD_PORT_UNAVAILABLE` | renamed | 1 → 2 | yes → yes |  | a condition that a repeat can pass is the subject's `_UNAVAILABLE`, retryable, exit 2 |
+| `DEMO_NOT_INITIALIZED` | `DEMO_REQUIRED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `DISPATCH_ALREADY_ENDED` | `DISPATCH_CONFLICT` | merged | 2 → 2 | no → no | `ALREADY_ENDED` | one code said several refusals; each condition has its own code |
+| `DISPATCH_END_IN_PROGRESS` | `DISPATCH_RUN_UNAVAILABLE` | renamed | 1 → 2 | yes → yes |  | a condition that a repeat can pass is the subject's `_UNAVAILABLE`, retryable, exit 2 |
+| `DISPATCH_INVALID_ARGUMENT` | `DISPATCH_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `DISPATCH_MANIFEST_MISMATCH` | `DISPATCH_MANIFEST_CORRUPT` | renamed | 2 → 2 | no → no |  | the error says its cause; the warning of the same situation keeps the name |
+| `DISPATCH_MANIFEST_UNREADABLE` | `DISPATCH_MANIFEST_CORRUPT`, `DISPATCH_MANIFEST_DENIED`, `DISPATCH_MANIFEST_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | the error says its cause; the warning of the same situation keeps the name |
+| `DISPATCH_NOT_RUNNING` | `DISPATCH_CONFLICT` | merged | 2 → 2 | no → no | `NOT_RUNNING` | one code said several refusals; each condition has its own code |
+| `DISPATCH_ROLE_REGIME_MISMATCH` | `DISPATCH_ROLE_CONFLICT` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `DISPATCH_RUN_NOT_FOUND` | `DISPATCH_RUN_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `DIVERGENCE_ACCEPT_REFUSED` | `DIVERGENCE_DENIED`, `DIVERGENCE_CONFLICT` | split | 2 → 2 | no → no | `NOT_REVIEWER`, `SELF_ATTESTED`, `NOT_DIVERGENT` | one code said several refusals; each condition has its own code |
+| `DIVERGENCE_INVALID_ARGUMENT` | `DIVERGENCE_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `DIVERGENCE_REFUSED` | `DIVERGENCE_INVALID` | renamed | 1 → 2 | no → no |  | a refusal of the gate is exit 2, by the condition of the violation |
+| `EVIDENCE_APPROVAL_INVALID` | `EVIDENCE_APPROVAL_REQUIRED`, `EVIDENCE_APPROVAL_INVALID` | split | 2 → 2 | no → no | `MALFORMED`, `SIGNATURE_MISMATCH` | a missing approval member is `EVIDENCE_APPROVAL_REQUIRED`; the name stays for a malformed approval or a signature that does not verify |
+| `EVIDENCE_BATCH_REFUSED` | `PROMOTION_INVALID` | renamed | 1 → 2 | no → no |  | the gate judges every record before the first write; the refused record is `PROMOTION_INVALID`, `field` `/<index>` |
+| `EVIDENCE_BIND_REFUSED` | `EVIDENCE_BINDING_STALE`, `EVIDENCE_BINDING_INVALID`, `EVIDENCE_BINDING_NOT_FOUND`, `EVIDENCE_BINDING_DENIED`, `EVIDENCE_BINDING_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `EVIDENCE_CONTRACT_MISMATCH` | `EVIDENCE_CONTRACT_CONFLICT` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `EVIDENCE_FABRICATED` | `EVIDENCE_NOTE_INVALID` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `EVIDENCE_INVALID_ARGUMENT` | `EVIDENCE_ARGUMENT_INVALID`, `EVIDENCE_ARGUMENT_REQUIRED`, `EVIDENCE_ARGUMENT_CONFLICT`, `EVIDENCE_REQUIRED` | split | 2 → 2 | no → no |  | one code said several refusals; each condition has its own code |
+| `EVIDENCE_REFUSED` | `EVIDENCE_REQUIRED`, `EVIDENCE_ARGUMENT_INVALID`, `TASK_NOT_FOUND`, `REPO_INVALID` | split | 2 → 2 | no → no |  | one code said several refusals; each condition has its own code |
+| `EVIDENCE_REPORT_CONTRADICTION` | `EVIDENCE_REPORT_CONFLICT` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `EVIDENCE_SCENARIO_NOT_INDEXED` | `SCENARIO_INDEX_REQUIRED` | merged | 2 → 2 | no → no |  | one code for a scenario that has no index entry |
+| `EVIDENCE_STORE_FAILED` | `ARTIFACTS_STORE_FAILED` | merged | 1 → 1 | yes → yes |  | merged into `ARTIFACTS_STORE_FAILED`: the record or batch is rolled back, retryable |
+| `EVIDENCE_STORE_UNAVAILABLE` | `ARTIFACTS_STORE_UNAVAILABLE`, `ARTIFACTS_STORE_REQUIRED`, `CONFIG_INVALID` | split | 2 → 2 | yes → no, yes | `ARTIFACT_STORE` | the cause of the store failure is the code; the store is the artifact store |
+| `FEATURE_EXISTS` | `FEATURE_EXISTS` | kept | 2 → 2 | no → no |  | unchanged |
+| `FEATURE_OUTSIDE_SPEC_ROOTS` | `FEATURE_PATH_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `FINDING_INTRODUCED_REQUIRED` | `FINDING_INTRODUCED_REQUIRED` | kept | 2 → 2 | no → no |  | unchanged |
+| `FINDING_INVALID_ARGUMENT` | `FINDING_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `FINDING_NOT_FOUND` | `FINDING_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `FINDING_REASON_REQUIRED` | `FINDING_REASON_REQUIRED` | kept | 2 → 2 | no → no |  | unchanged |
+| `FINDING_RESOLUTION_REV_UNEXPECTED` | `FINDING_RESOLUTION_REV_CONFLICT` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `FINDING_REVIEW_NOT_FOUND` | `FINDING_REVIEW_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `FINDING_SEQ_OCCUPIED` | `FINDING_EXISTS` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `FINDING_STAGED` | `FINDING_CONFLICT` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `FINDING_UNKNOWN_SCENARIO` | `SCENARIO_NOT_FOUND` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `FORMAT_VIOLATIONS` | `FORMAT_CHECK_FAILED` | renamed | 1 → 1 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `GATE_TASK_BLOCKED` | `TASK_EVIDENCE_REQUIRED` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `GATE_TASK_EVIDENCE_INVALID` | `TASK_EVIDENCE_INVALID` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `GATE_TASK_INVALID_ARGUMENT` | `TASK_ID_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `GATE_TASK_UNSUPPORTED` | `TASK_UNSUPPORTED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `GATE_VIOLATIONS` | `GATE_CHECK_FAILED` | renamed | 1 → 1 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `HOOKS_INSTALL_FAILED` | `HOOKS_INSTALL_INCOMPLETE`, `WRITE_FAILED` | split | 1 → 1 | no → no |  | the stop after work began is the subject's `_INCOMPLETE` code |
+| `HOOKS_INSTALL_REFUSED` | `HOOKS_REPO_INVALID`, `HOOKS_FILE_CONFLICT`, `HOOKS_FILE_DENIED`, `HOOKS_FILE_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `HUMAN_ONLY` | `ACTOR_DENIED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `INGEST_FAILED` | `INGEST_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `INGEST_SOURCE_UNUSABLE` | `INGEST_SOURCE_INVALID` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `INIT_AGENTS_MD_CONFLICT` | `INIT_AGENTS_MD_CONFLICT` | kept | 2 → 2 | no → no |  | unchanged |
+| `INIT_CONFIG_EXISTS` | `CONFIG_EXISTS` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `INIT_INVALID_ARGUMENT` | `INIT_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `INPUT_CONFLICT` | `INPUT_CONFLICT` | kept | 2 → 2 | no → no |  | unchanged |
+| `INPUT_INVALID` | `INPUT_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `INPUT_TOO_LARGE` | `INPUT_TOO_LARGE` | kept | 2 → 2 | no → no |  | unchanged |
+| `INTERNAL` | `INTERNAL` | kept | 1 → 1 | no → no |  | unchanged |
+| `INVENTORY_ABORTED` | `INVENTORY_INCOMPLETE`, `INVENTORY_INVALID` | split | 1 → 1, 2 | no → no | `INVENTORY_INVALID`, `INVENTORY_FAILED` | the stop after work began is the subject's `_INCOMPLETE` code |
+| `INVENTORY_FAILED` | `INVENTORY_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `INVENTORY_REFUSED` | `CONFIG_INVALID`, `CONFIG_DENIED`, `INVENTORY_INDEX_UNAVAILABLE` | split | 2 → 2 | no → no, yes | `SPECS` | one code said several refusals; each condition has its own code |
+| `LAYOUT_MIGRATION_REQUIRED` | `LAYOUT_MIGRATION_REQUIRED` | kept | 2 → 2 | no → no |  | unchanged |
+| `LEARN_DEMOTION_FAILED` | `STRATEGY_DEMOTION_FAILED` | renamed | 1 → 1 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `LEARN_EVALUATION_REJECTED` | `STRATEGY_EVALUATION_INVALID` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `LEARN_INVALID_ARGUMENT` | `STRATEGY_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `LEARN_INVALID_INPUT` | `STRATEGY_FILE_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `LEARN_PROMOTION_BLOCKED` | `STRATEGY_PROMOTION_INVALID` | renamed | 1 → 2 | no → no |  | a refusal before work began is exit 2 |
+| `LEARN_PROMOTION_FAILED` | `STRATEGY_PROMOTION_FAILED` | renamed | 1 → 1 | no → no |  | nothing of the promotion is kept: `_FAILED`, named for its subject |
+| `LEARN_ROLLBACK_FAILED` | `STRATEGY_ARGUMENT_INVALID`, `STRATEGY_VERIFIER_REQUIRED`, `CONFIG_DENIED`, `CONFIG_UNAVAILABLE`, `CONFIG_INVALID`, `STRATEGY_SIGNER_DENIED`, `STRATEGY_SIGNATURE_REQUIRED`, `STRATEGY_SIGNATURE_INVALID`, `STRATEGY_ROLLBACK_FAILED` | split | 1 → 1, 2 | no → no, yes | `POLICY` | one code said several refusals; each condition has its own code |
+| `LEARN_SIGNATURE_UNREADABLE` | `STRATEGY_SIGNATURE_NOT_FOUND`, `STRATEGY_SIGNATURE_DENIED`, `STRATEGY_SIGNATURE_INVALID`, `STRATEGY_SIGNATURE_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+| `LEARN_STRATEGY_NOT_FOUND` | `STRATEGY_NOT_FOUND` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `LEARN_TRAJECTORY_NOT_FOUND` | `TRAJECTORY_NOT_FOUND` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `LEDGER_ARCHIVE_UNAVAILABLE` | `LEDGER_ARCHIVE_INVALID` | renamed | 2 → 2 | no → no |  | an archive that does not read as an archive is invalid; a repeat does not pass it |
+| `LEDGER_COMPACT_FAILED` | `LEDGER_COMPACT_INCOMPLETE`, `REPO_DENIED`, `REPO_UNAVAILABLE`, `REPO_INVALID`, `WRITE_FAILED` | split | 1 → 1, 2 | no → no, yes |  | the stop after work began is the subject's `_INCOMPLETE` code |
+| `MIGRATE_INDEX_FAILED` | `MIGRATION_INCOMPLETE` | merged | 1 → 1 | no → no | `INDEX` | the stop after work began is the subject's `_INCOMPLETE` code |
+| `MIGRATE_PINS_FAILED` | `MIGRATION_INCOMPLETE` | merged | 1 → 1 | no → no | `PINS` | the stop after work began is the subject's `_INCOMPLETE` code |
+| `MIGRATE_REFUSED` | `MIGRATION_INVALID`, `MIGRATION_CONFLICT`, `MIGRATION_DENIED`, `CONFIG_INVALID`, `MIGRATION_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `MIGRATE_STOPPED` | `MIGRATION_INCOMPLETE` | merged | 1 → 1 | no → no | `STOPPED` | the stop after work began is the subject's `_INCOMPLETE` code |
+| `MIGRATE_UNCOMMITTED` | `MIGRATION_CONFLICT` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `NO_BRIEF` | `BRIEF_REQUIRED` | renamed | 2 → 2 | no → no |  | a refusal says its condition: a brief is required |
+| `NO_COMMIT` | `COMMIT_REQUIRED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `OLD_BRIEF_FORMAT` | `BRIEF_MIGRATION_REQUIRED` | renamed | 2 → 2 | no → no |  | a refusal says its condition: the brief must be migrated first |
+| `OLD_LAYOUT` | `LAYOUT_MIGRATION_REQUIRED` | merged | 2 → 2 | no → no |  | a refusal says its condition: the layout must be migrated first; it is the code `LAYOUT_MIGRATION_REQUIRED` already had |
+| `PLAN_CORPUS_UNREADABLE` | `PLAN_CORPUS_INVALID`, `PLAN_CORPUS_DENIED`, `PLAN_CORPUS_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+| `PLAN_SOURCES_MISSING` | `PLAN_SOURCES_REQUIRED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `PLAN_STALE` | `PLAN_STALE` | kept | 2 → 2 | no → no |  | unchanged |
+| `PLUGIN_SYNC_ERRORS` | `PLUGIN_SYNC_INCOMPLETE`, `WRITE_FAILED`, `REPO_INVALID` | split | 1 → 1, 2 | no → no |  | the stop after work began is the subject's `_INCOMPLETE` code |
+| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`, `CONFIG_INVALID`, `CONFIG_DENIED` | split | 2 → 2 | no → no | `SPECS` | one code said several refusals; each condition has its own code |
+| `POLICY_APPROVAL_FAILED` | `POLICY_APPROVAL_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `POLICY_APPROVAL_REFUSED` | `POLICY_REQUIRED`, `POLICY_INVALID`, `POLICY_DENIED`, `APPROVAL_INVALID`, `POLICY_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `POLICY_APPROVAL_UNREADABLE` | `POLICY_APPROVAL_CORRUPT`, `POLICY_APPROVAL_DENIED`, `POLICY_APPROVAL_UNAVAILABLE` | split | 1 → 2 | no → no, yes |  | the error says its cause (exit 2, was exit 1); the warning of the same situation keeps the name |
+| `POLICY_CHANGED_SINCE_APPROVAL` | `POLICY_APPROVAL_STALE` | renamed | 1 → 2 | no → no |  | the error is `POLICY_APPROVAL_STALE`; the warning of `canon status` keeps the name |
+| `PROMOTE_FAILED` | `PROMOTION_FAILED` | renamed | 1 → 1 | no → no |  | the promotion failed and nothing names a refusal as its reason: `_FAILED`, named for its subject |
+| `PROMOTE_REFUSED` | `PROMOTION_INVALID`, `EVIDENCE_STALE` | split | 1 → 2 | no → no |  | a refusal of the gate is exit 2, by the condition of the violation |
+| `PROMPT_BUNDLE_INVALID` | `PROMPT_BUNDLE_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `QUERY_FAILED` | `QUERY_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `QUERY_INVALID_ARGUMENT` | `QUERY_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `REGIME_KEY_INVALID` | `REGIME_KEY_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `RELAY_DIGEST_MISMATCH` | `RELAY_DIGEST_STALE` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `REPORT_FAILED` | `REPORT_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `REPORT_STALE` | `REPORT_CHECK_FAILED` | renamed | 1 → 1 | no → no | `STALE` | `report --check` answers drift as `REPORT_CHECK_FAILED`, exit 1, reason `STALE` |
+| `REPO_UNREADABLE` | `REPO_DENIED`, `REPO_INVALID`, `CONFIG_INVALID`, `REPO_UNAVAILABLE` | split | 2 → 2 | no → no, yes | `TIERS` | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+| `REPO_WRITE_BUSY` | `REPO_LOCK_UNAVAILABLE` | renamed | 2 → 2 | yes → yes |  | a condition a repeat can pass is the subject's `_UNAVAILABLE`, retryable |
+| `RETENTION_EXPORT_FAILED` | `RETENTION_EXPORT_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `RETENTION_EXPORT_REFUSED` | `RETENTION_EXPORT_DENIED`, `RETENTION_TIERS_DENIED`, `RETENTION_TIERS_UNAVAILABLE`, `RETENTION_TIERS_INVALID`, `RETENTION_TIERS_REQUIRED`, `RETENTION_TIERS_CORRUPT` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `RETENTION_PURGE_FAILED` | `RETENTION_PURGE_INCOMPLETE` | renamed | 1 → 1 | no → no |  | the stop after work began is the subject's `_INCOMPLETE` code |
+| `RETENTION_PURGE_REFUSED` | `RETENTION_TIERS_UNAVAILABLE`, `RETENTION_TIERS_INVALID`, `RETENTION_TIERS_REQUIRED`, `RETENTION_TIERS_CORRUPT` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `RETRIEVE_FAILED` | `RETRIEVE_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `REVIEW_ARTIFACT_REFUSED` | `REVIEW_ARTIFACT_STALE`, `REVIEW_ARTIFACT_INVALID`, `REVIEW_ARTIFACT_NOT_FOUND`, `REVIEW_ARTIFACT_DENIED`, `REVIEW_ARTIFACT_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | one code said several refusals; each condition has its own code |
+| `REVIEW_INVALID_ARGUMENT` | `REVIEW_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `REVIEW_SCENARIO_NOT_INDEXED` | `SCENARIO_INDEX_REQUIRED` | merged | 2 → 2 | no → no |  | one code for a scenario that has no index entry |
+| `SCAFFOLD_INVALID_ARGUMENT` | `SCAFFOLD_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `SCENARIO_TAG_EXISTS` | `SCENARIO_TAG_EXISTS` | kept | 2 → 2 | no → no |  | unchanged |
+| `SEARCH_INDEX_FAILED` | `SEARCH_INDEX_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `SEARCH_QUERY_EMPTY` | `SEARCH_QUERY_REQUIRED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `SELFTEST_FAILED` | `SELFTEST_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `SERIALIZE_FAILED` | `SERIALIZE_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `SKILLS_DRIFT` | `SKILLS_CHECK_FAILED` | renamed | 1 → 1 | no → no | `DRIFT` | the name follows `<SUBJECT>_<CONDITION>` |
+| `SKILLS_FAILED` | `SKILLS_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `SKILLS_INVALID_ARGUMENT` | `SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID` | split | 2 → 2 | no → no | `SKILLS` | one code said several refusals; each condition has its own code |
+| `SPEC_ROOTS_UNREADABLE` | `SPEC_ROOT_INVALID`, `SPEC_ROOT_DENIED`, `SPEC_ROOT_UNAVAILABLE` | split | 2 → 2 | no → no, yes |  | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+| `SPEC_ROOT_UNRESOLVED` | `SPEC_ROOT_REQUIRED` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `STOPPED_MIDWAY` | `INIT_INCOMPLETE`, `EVIDENCE_INCOMPLETE`, `FINDING_INCOMPLETE`, `DIVERGENCE_INCOMPLETE`, `STRATEGY_INCOMPLETE`, `ARTIFACTS_MOVE_INCOMPLETE` | gone | 1 → 1 | no → no |  | the reserved code is gone; each subject says its stop with its own `_INCOMPLETE` code and `reason` names the refusal that stopped it |
+| `SUBJECT_ADOPT_REFUSED` | `SUBJECT_NOT_FOUND`, `CHANGE_NOT_FOUND`, `WRITE_DENIED`, `WRITE_INVALID`, `REPO_DENIED`, `REPO_INVALID` | split | 2 → 2 | no → no |  | one code said several refusals; each condition has its own code |
+| `SUBJECT_EXISTS` | `SUBJECT_EXISTS` | kept | 2 → 2 | no → no |  | unchanged |
+| `SUBJECT_GATE_VIOLATION` | `SUBJECT_APPROVAL_REQUIRED`, `EVIDENCE_STALE`, `LAYOUT_MIGRATION_REQUIRED`, `SUBJECT_INVALID` | split | 1 → 2 | no → no |  | a refusal of the gate is exit 2, by the condition of the violation |
+| `SUBJECT_INVALID_ARGUMENT` | `SUBJECT_ARGUMENT_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `SUBJECT_INVALID_TRANSITION` | `SUBJECT_CONFLICT` | merged | 2 → 2 | no → no | `TRANSITION` | the name follows `<SUBJECT>_<CONDITION>` |
+| `SUBJECT_NOT_FOUND` | `SUBJECT_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `SUBJECT_REASON_REQUIRED` | `SUBJECT_REASON_REQUIRED` | kept | 2 → 2 | no → no |  | unchanged |
+| `SUBJECT_UNADOPT_REFUSED` | `SUBJECT_CONFLICT` | merged | 2 → 2 | no → no | `APPROVED_BRIEF`, `FLOW_TAGGED` | one code said several refusals; each condition has its own code |
+| `TASK_NOT_FOUND` | `TASK_NOT_FOUND` | kept | 2 → 2 | no → no |  | unchanged |
+| `TASK_ROW_NOT_FOUND` | `PLAN_DOCUMENT_INVALID` | renamed | 2 → 2 | no → no |  | a plan document whose task row cannot be used is `PLAN_DOCUMENT_INVALID` |
+| `TIER_FAILED` | `TIER_INCOMPLETE`, `TIER_FAILED` | split | 1 → 1 | no → no |  | records moved before it stopped is `TIER_INCOMPLETE`; `TIER_FAILED` stays for a run that failed before a record left its tier |
+| `TRACE_NOT_FOUND` | `TRACE_NOT_FOUND`, `TRACE_CONFLICT` | split | 2 → 2 | no → no |  | a sha prefix that fits several commits is `TRACE_CONFLICT`; the name stays for no record |
+| `TRACE_OPERAND_INVALID` | `TRACE_OPERAND_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `TYPED_ATOMS_INVALID` | `TYPED_ATOMS_INVALID` | kept | 2 → 2 | no → no |  | unchanged |
+| `UNKNOWN_COMMAND` | `UNKNOWN_COMMAND` | kept | 2 → 2 | no → no |  | unchanged |
+| `UNKNOWN_ROLE` | `ROLE_INVALID` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `UNKNOWN_SPEC_ROOT` | `SPEC_ROOT_NOT_FOUND` | renamed | 2 → 2 | no → no |  | the name follows `<SUBJECT>_<CONDITION>` |
+| `UNVERIFIABLE` | `UNVERIFIABLE` | kept | 1 → 1 | no → no |  | unchanged |
+| `USAGE` | `USAGE` | kept | 2 → 2 | no → no |  | unchanged |
+| `WRITE_FAILED` | `WRITE_FAILED` | kept | 1 → 1 | no → no |  | unchanged |
+| `WRITE_UNAVAILABLE` | `WRITE_DENIED`, `WRITE_INVALID` | split | 2 → 2 | no → no |  | the cause of the failure (denied, invalid, not found, unavailable) is the code, not `_UNREADABLE` |
+
+Four lists gather the rows by what a caller does about them. Each is generated from the table's `kind`, `exit` and `0.36` cells and a test compares them.
+
+- **Exit 1 → 2** (21 codes whose every new code is exit 2): `BRIEF_CHANGED_SINCE_APPROVAL`, `BRIEF_UNAPPROVED`, `CONTEXT_GIT_UNAVAILABLE`, `CONTEXT_OBJECT_CONFLICT`, `DASHBOARD_NOT_BUILT`, `DASHBOARD_PORT_IN_USE`, `DISPATCH_END_IN_PROGRESS`, `DIVERGENCE_REFUSED`, `EVIDENCE_BATCH_REFUSED`, `EVIDENCE_CONTRACT_MISMATCH`, `EVIDENCE_FABRICATED`, `EVIDENCE_REPORT_CONTRADICTION`, `GATE_TASK_BLOCKED`, `GATE_TASK_EVIDENCE_INVALID`, `INGEST_SOURCE_UNUSABLE`, `LEARN_EVALUATION_REJECTED`, `LEARN_PROMOTION_BLOCKED`, `POLICY_APPROVAL_UNREADABLE`, `POLICY_CHANGED_SINCE_APPROVAL`, `PROMOTE_REFUSED`, `SUBJECT_GATE_VIOLATION`. Five more codes change for some of their new codes only, because the new code of a refusal is exit 2 and the new code of a stop or of a check's answer is exit 1: `CONTEXT_PACK_TAMPERED`, `INVENTORY_ABORTED`, `LEARN_ROLLBACK_FAILED`, `LEDGER_COMPACT_FAILED`, `PLUGIN_SYNC_ERRORS`.
+- **Merged** (the old names on the right are one code now; read `reason` of the new code to tell them apart where the table gives one): `ARTIFACTS_STORE_FAILED` ← `EVIDENCE_STORE_FAILED`; `DISPATCH_CONFLICT` ← `DISPATCH_ALREADY_ENDED`, `DISPATCH_NOT_RUNNING`; `LAYOUT_MIGRATION_REQUIRED` ← `OLD_LAYOUT`; `MIGRATION_INCOMPLETE` ← `MIGRATE_INDEX_FAILED`, `MIGRATE_PINS_FAILED`, `MIGRATE_STOPPED`; `SCENARIO_INDEX_REQUIRED` ← `EVIDENCE_SCENARIO_NOT_INDEXED`, `REVIEW_SCENARIO_NOT_INDEXED`; `SUBJECT_CONFLICT` ← `SUBJECT_INVALID_TRANSITION`, `SUBJECT_UNADOPT_REFUSED`.
+- **Split** (one old code is several codes; branch on each new code of its row): `ADAPTER_REFUSED`, `ARTIFACTS_MOVE_REFUSED`, `ARTIFACTS_STORE_FAILED`, `ARTIFACTS_STORE_UNREACHABLE`, `BRIEF_APPROVE_REFUSED`, `BRIEF_UNREADABLE`, `CONFIG_UNREADABLE`, `CONTEXT_PACK_TAMPERED`, `DISPATCH_MANIFEST_UNREADABLE`, `DIVERGENCE_ACCEPT_REFUSED`, `EVIDENCE_APPROVAL_INVALID`, `EVIDENCE_BIND_REFUSED`, `EVIDENCE_INVALID_ARGUMENT`, `EVIDENCE_REFUSED`, `EVIDENCE_STORE_UNAVAILABLE`, `HOOKS_INSTALL_FAILED`, `HOOKS_INSTALL_REFUSED`, `INVENTORY_ABORTED`, `INVENTORY_REFUSED`, `LEARN_ROLLBACK_FAILED`, `LEARN_SIGNATURE_UNREADABLE`, `LEDGER_COMPACT_FAILED`, `MIGRATE_REFUSED`, `PLAN_CORPUS_UNREADABLE`, `PLUGIN_SYNC_ERRORS`, `PLUGIN_SYNC_FAILED`, `POLICY_APPROVAL_REFUSED`, `POLICY_APPROVAL_UNREADABLE`, `PROMOTE_REFUSED`, `REPO_UNREADABLE`, `RETENTION_EXPORT_REFUSED`, `RETENTION_PURGE_REFUSED`, `REVIEW_ARTIFACT_REFUSED`, `SKILLS_INVALID_ARGUMENT`, `SPEC_ROOTS_UNREADABLE`, `SUBJECT_ADOPT_REFUSED`, `SUBJECT_GATE_VIOLATION`, `TIER_FAILED`, `TRACE_NOT_FOUND`, `WRITE_UNAVAILABLE`.
+- **Gone**: `STOPPED_MIDWAY` (the reserved midway code; its stops are the `_INCOMPLETE` code of each subject: `INIT_INCOMPLETE`, `EVIDENCE_INCOMPLETE`, `FINDING_INCOMPLETE`, `DIVERGENCE_INCOMPLETE`, `STRATEGY_INCOMPLETE`, `ARTIFACTS_MOVE_INCOMPLETE`).
+
+**Upgrade note: a script, hook, guide or dashboard that branches on an error code or an exit.** There is no alias: a branch on an old name matches nothing in 0.36, so every caller below is moved by the table above before it runs against 0.36.
+
+- **Scripts and CI that read `error.code`.** Replace each old name with the new one of its row. A `renamed` row changes only the name (and the exit where the row says so). A `merged` row is one code now: a script that told two old codes apart reads `reason` (`DISPATCH_CONFLICT` with `ALREADY_ENDED` or `NOT_RUNNING`, `SUBJECT_CONFLICT` with `TRANSITION`, `APPROVED_BRIEF` or `FLOW_TAGGED`, `MIGRATION_INCOMPLETE` with `INDEX`, `PINS` or `STOPPED`). A `split` row is several codes: branch on each one the row lists, by what to do about it (fix a value `INVALID`, supply one `REQUIRED`, read the state `CONFLICT`, hand it to a person `DENIED`, check a name `NOT_FOUND`, wait `UNAVAILABLE`). A branch on `*_INVALID_ARGUMENT` reads `*_ARGUMENT_INVALID`; `HUMAN_ONLY` is `ACTOR_DENIED`; `UNKNOWN_ROLE` is `ROLE_INVALID`; `NO_COMMIT` is `COMMIT_REQUIRED`. A script that matched `STOPPED_MIDWAY`, which is gone, matches the `_INCOMPLETE` code of the command and reads `reason` as before, then `meta.next[0]` before it repeats anything. A script that ran `canon schema --error <old name>` gets `USAGE`, as for any name canon does not have.
+- **Scripts and hooks that read the exit.** The 21 codes of the first list above are exit 2 now, because a command that refuses to start, or a gate that refuses a record or a transition, changed nothing: exit 2 is a refusal, exit 1 is a failure, a stop after work began (`<SUBJECT>_INCOMPLETE`) or a check command's negative answer (`GATE_CHECK_FAILED`, `FORMAT_CHECK_FAILED`, `BRIEF_CHECK_FAILED`, `SKILLS_CHECK_FAILED`, `REPORT_CHECK_FAILED`, `ADAPTER_AUTHORIZATION_FAILED`, `ADAPTER_VALIDATION_FAILED`, `CONTEXT_PACK_VERIFY_FAILED`, with the result in `data`). A script that waited for exit 1 from `subject move`, `gate promote`, `task done`, `evidence add`, `brief approve`, `strategy promote`, `ingest plans`, `dashboard` or `context-pack add` waits for exit 2; the five codes of the mixed list are read by the new code, not by the old exit. A retry loop reads `retryable` of the new code: the `_UNAVAILABLE` codes are retryable (`DASHBOARD_PORT_UNAVAILABLE`, `DISPATCH_RUN_UNAVAILABLE`, `REPO_LOCK_UNAVAILABLE` and the rest), `ARTIFACTS_STORE_INCOMPLETE` is, and `EVIDENCE_STORE_FAILED`'s successor `ARTIFACTS_STORE_FAILED` is. A hook that treats every non-zero exit alike needs no change: the pre-commit hook `canon gate install-hooks` writes, the npm launcher and the eval scripts are of this kind.
+- **Refusals carry `error.details`, not `data`.** A refusal has no `data`. The list it used to put in `data.refused` or in the lines of its message is `error.details[]`, one entry for each cause with its own `code`, the error itself being the first cause (a single cause has no `details`): `gate promote` (`data.refused`, one entry for each refused record), `subject move` and `task done` (the gate's causes, once lines of the message, now each with its code), `brief approve a b` (`data.refused`, one entry for each refused id) and an `evidence add --all-scenarios` batch (the record the gate refuses is `PROMOTION_INVALID` at `field` `/<index>`, and nothing is written). A script that read `data.refused` or `data.violations` of these refusals reads `error.details[]`; `gate check` and `format` stay exit 1 and keep `data.violations`.
+- **Agent guides and prompts.** The guides of the binary (`canon skills show`), the skills it projects (`canon skills install`, `canon init`) and the reference documents say the new names and say exit 2 where a refusal is meant. A copy of a guide in a repository, and a prompt or `AGENTS.md` that quotes a code or says "exit 1 means the gate refused", is replaced by the table: a role reads the code's last words to know what to do (an `INVALID` value is fixed, a `REQUIRED` one supplied, an `UNAVAILABLE` one retried).
+- **The dashboard and what reads its API.** The dashboard's pages and the code they read say the new names (`BRIEF_PAGE_STALE`, `DASHBOARD_REQUEST_INVALID`, `DASHBOARD_REQUEST_DENIED`, `BRIEF_CHECK_FAILED` with `BLOCKERS`, `BRIEF_INVALID` with `UNAPPROVABLE`); a client of its HTTP API that branches on `error.code` moves by the same rows. `DASHBOARD_PORT_UNAVAILABLE` is exit 2 and retryable, and `DASHBOARD_UNSUPPORTED` replaces `DASHBOARD_NOT_BUILT`.
+- **Warnings keep their names.** `CONFIG_MISSING`, `CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE`, `POLICY_APPROVAL_UNREADABLE` and `POLICY_CHANGED_SINCE_APPROVAL` are also names of warnings in `meta.warnings` (spec 7.2.1 applies a condition to `error.code` only); the table's rows are the errors.
+
 **Fifty error codes take the name `<SUBJECT>_<CONDITION>`** (`canon-0-36-codes-rename`, scenarios `atip.codenames.01-09`). The contract's rule (atip/1 spec 7.2, `L1.code-names` for a tool that declares 1.3 or later) names a code by what it is about and the condition it reports, so a caller that meets a code it does not know reads the exit and the next action from the name's last words. These codes change their name only: the exit, `retryable`, meaning, `field` and fix of each are the ones it had, and the old name is in no registry view, no output and no guide (there is no alias). A call that raised the old name raises the new one. Where several old codes became one new code, or the old name says a situation, the situation is the `reason` of the new code (registered under it, and printed in `error.reason`). `canon schema --error <old name>` is refused as any unknown name is: `USAGE`, `field` `--error`.
 
-| 0.35 | 0.36 | `reason` |
-|---|---|---|
-| `APPROVAL_INCOMPLETE` | `APPROVAL_INVALID` |  |
-| `BRIEF_CHANGED_SINCE_PAGE_LOAD` | `BRIEF_PAGE_STALE` |  |
-| `BRIEF_HAS_BLOCKERS` | `BRIEF_CHECK_FAILED` | `BLOCKERS` |
-| `BRIEF_UNAPPROVABLE` | `BRIEF_INVALID` | `UNAPPROVABLE` |
-| `CHANGE_AMBIGUOUS` | `CHANGE_REQUIRED` |  |
-| `CHANGE_INVALID_ARGUMENT` | `CHANGE_ARGUMENT_INVALID` |  |
-| `CONFIG_MISSING` | `CONFIG_REQUIRED` |  |
-| `CONTEXT_INPUT_MISSING` | `CONTEXT_INPUT_NOT_FOUND` |  |
-| `CONTEXT_SECRET_DETECTED` | `CONTEXT_INPUT_INVALID` | `SECRET` |
-| `CONTEXT_UNSAFE_PATH` | `CONTEXT_PATH_INVALID` |  |
-| `DASHBOARD_BAD_REQUEST` | `DASHBOARD_REQUEST_INVALID` |  |
-| `DASHBOARD_CONFIG_INVALID` | `CONFIG_INVALID` | `DASHBOARD` |
-| `DASHBOARD_ORIGIN_REFUSED` | `DASHBOARD_REQUEST_DENIED` |  |
-| `DEMO_NOT_INITIALIZED` | `DEMO_REQUIRED` |  |
-| `DISPATCH_INVALID_ARGUMENT` | `DISPATCH_ARGUMENT_INVALID` |  |
-| `DISPATCH_ROLE_REGIME_MISMATCH` | `DISPATCH_ROLE_CONFLICT` |  |
-| `DIVERGENCE_INVALID_ARGUMENT` | `DIVERGENCE_ARGUMENT_INVALID` |  |
-| `FEATURE_OUTSIDE_SPEC_ROOTS` | `FEATURE_PATH_INVALID` |  |
-| `FINDING_INVALID_ARGUMENT` | `FINDING_ARGUMENT_INVALID` |  |
-| `FINDING_RESOLUTION_REV_UNEXPECTED` | `FINDING_RESOLUTION_REV_CONFLICT` |  |
-| `FINDING_SEQ_OCCUPIED` | `FINDING_EXISTS` |  |
-| `FINDING_STAGED` | `FINDING_CONFLICT` |  |
-| `FINDING_UNKNOWN_SCENARIO` | `SCENARIO_NOT_FOUND` |  |
-| `FORMAT_VIOLATIONS` | `FORMAT_CHECK_FAILED` |  |
-| `GATE_TASK_INVALID_ARGUMENT` | `TASK_ID_INVALID` |  |
-| `GATE_TASK_UNSUPPORTED` | `TASK_UNSUPPORTED` |  |
-| `GATE_VIOLATIONS` | `GATE_CHECK_FAILED` |  |
-| `HUMAN_ONLY` | `ACTOR_DENIED` |  |
-| `INIT_CONFIG_EXISTS` | `CONFIG_EXISTS` |  |
-| `INIT_INVALID_ARGUMENT` | `INIT_ARGUMENT_INVALID` |  |
-| `LEARN_DEMOTION_FAILED` | `STRATEGY_DEMOTION_FAILED` |  |
-| `LEARN_INVALID_ARGUMENT` | `STRATEGY_ARGUMENT_INVALID` |  |
-| `LEARN_INVALID_INPUT` | `STRATEGY_FILE_INVALID` |  |
-| `LEARN_STRATEGY_NOT_FOUND` | `STRATEGY_NOT_FOUND` |  |
-| `LEARN_TRAJECTORY_NOT_FOUND` | `TRAJECTORY_NOT_FOUND` |  |
-| `MIGRATE_UNCOMMITTED` | `MIGRATION_CONFLICT` |  |
-| `NO_COMMIT` | `COMMIT_REQUIRED` |  |
-| `PLAN_SOURCES_MISSING` | `PLAN_SOURCES_REQUIRED` |  |
-| `QUERY_INVALID_ARGUMENT` | `QUERY_ARGUMENT_INVALID` |  |
-| `RELAY_DIGEST_MISMATCH` | `RELAY_DIGEST_STALE` |  |
-| `RETRIEVE_FAILED` | `RETRIEVE_INVALID` |  |
-| `REVIEW_INVALID_ARGUMENT` | `REVIEW_ARGUMENT_INVALID` |  |
-| `SCAFFOLD_INVALID_ARGUMENT` | `SCAFFOLD_ARGUMENT_INVALID` |  |
-| `SEARCH_QUERY_EMPTY` | `SEARCH_QUERY_REQUIRED` |  |
-| `SKILLS_DRIFT` | `SKILLS_CHECK_FAILED` | `DRIFT` |
-| `SPEC_ROOT_UNRESOLVED` | `SPEC_ROOT_REQUIRED` |  |
-| `SUBJECT_INVALID_ARGUMENT` | `SUBJECT_ARGUMENT_INVALID` |  |
-| `SUBJECT_INVALID_TRANSITION` | `SUBJECT_CONFLICT` | `TRANSITION` |
-| `UNKNOWN_ROLE` | `ROLE_INVALID` |  |
-| `UNKNOWN_SPEC_ROOT` | `SPEC_ROOT_NOT_FOUND` |  |
-
-Not renamed here: the warning `CONFIG_MISSING` of `canon status` keeps its name (only the error `CONFIG_MISSING` is now `CONFIG_REQUIRED`). The other codes that do not follow the rule yet are renamed by the changes that follow in 0.36 (`codes-exit`, `codes-refusals`, `codes-stored`, `codes-incomplete`); `crates/canon-cli/tests/codes_names.rs` lists them, and the full table and the upgrade notes close the release in `canon-0-36-codes-table`.
+Not renamed here: the warning `CONFIG_MISSING` of `canon status` keeps its name (only the error `CONFIG_MISSING` is now `CONFIG_REQUIRED`). Every other code that did not follow the rule was renamed, split or reclassified by the changes below; the replacement table above has a row for each of the 179 codes of 0.35.
 
 A caller that branches on a code replaces the old name with the new one from the table; a caller that read the exit of the old name reads the same exit from the new one. The skills, the website pages (`cli`, in both languages), the dashboard sources, the eval scripts and the scenarios say the new names, and `atip_l0_27` and `atip_codenames_06` fail when one of them spells an old name.
 
-**21 codes changed from exit 1 to exit 2, and a refusal carries no `data`** (the count is the number of old codes in the table below whose exit column reads `1 → 2` or `1 or 2 → 2`; the brief said 20, and the table is the truth) (`canon-0-36-codes-exit`, scenarios `atip.codeexit.01-12`). A command that refuses to start, or a gate that refuses a record or a transition, changed nothing and says so with exit 2, the code of the condition, and no `data`. The list a refusal used to put in `data.violations` or `data.refused` is `error.details[]`, one entry for each cause with its own `code` (the error itself is the first cause; a single cause has no `details`). A gate names the condition, not the gate: a missing approval, review or evidence is `SUBJECT_APPROVAL_REQUIRED`, stale evidence is `EVIDENCE_STALE`, a ledger in an old layout is `LAYOUT_MIGRATION_REQUIRED`, and any other rule is `<TARGET>_INVALID` (`PROMOTION`, `STRATEGY_PROMOTION`, `DIVERGENCE`, `SUBJECT`). Only the codes canon raises are registered: `gate promote` meets only `malformed-evidence` records, so it has `PROMOTION_INVALID` and no `PROMOTION_APPROVAL_REQUIRED`; the strategy gate judges statistics, so it has `STRATEGY_PROMOTION_INVALID` and no `STRATEGY_APPROVAL_REQUIRED`; `DIVERGENCE_INVALID` has no `DIVERGENCE_APPROVAL_REQUIRED`.
+**21 codes changed from exit 1 to exit 2, and a refusal carries no `data`** (the count is the number of old codes in the replacement table above whose exit column reads `1 → 2`, and the table is the truth; the brief said 20) (`canon-0-36-codes-exit`, scenarios `atip.codeexit.01-12`). A command that refuses to start, or a gate that refuses a record or a transition, changed nothing and says so with exit 2, the code of the condition, and no `data`. The list a refusal used to put in `data.violations` or `data.refused` is `error.details[]`, one entry for each cause with its own `code` (the error itself is the first cause; a single cause has no `details`). A gate names the condition, not the gate: a missing approval, review or evidence is `SUBJECT_APPROVAL_REQUIRED`, stale evidence is `EVIDENCE_STALE`, a ledger in an old layout is `LAYOUT_MIGRATION_REQUIRED`, and any other rule is `<TARGET>_INVALID` (`PROMOTION`, `STRATEGY_PROMOTION`, `DIVERGENCE`, `SUBJECT`). Only the codes canon raises are registered: `gate promote` meets only `malformed-evidence` records, so it has `PROMOTION_INVALID` and no `PROMOTION_APPROVAL_REQUIRED`; the strategy gate judges statistics, so it has `STRATEGY_PROMOTION_INVALID` and no `STRATEGY_APPROVAL_REQUIRED`; `DIVERGENCE_INVALID` has no `DIVERGENCE_APPROVAL_REQUIRED`.
 
 A check command's negative answer stays exit 1 with its result in `data`: `adapter authorize` (`ADAPTER_AUTHORIZATION_FAILED`), `adapter validate` (`ADAPTER_VALIDATION_FAILED`, `data` is `{valid: false, problem}`), `report check` (`REPORT_CHECK_FAILED` with reason `STALE`), and `context-pack verify` (`CONTEXT_PACK_VERIFY_FAILED`, `data` is `{id, verified: false}`). A command that reads a changed pack and is not `verify` refuses with `CONTEXT_PACK_CORRUPT` (exit 2).
 
 An evidence batch (`evidence add --all-scenarios`) judges the promotion gate of every record before the first write: a record the gate refuses is exit 2, `PROMOTION_INVALID`, `field` `/<index>`, nothing written, and the stage-then-delete rollback is gone (`EVIDENCE_BATCH_REFUSED` no longer exists). A refusal found while the records are promoted, which the first judgement makes unexpected, is `BATCH_INCOMPLETE` (exit 1). `canon brief approve a b` that refuses several ids before any write is exit 2 with one `details` entry for each id, and one that stops after some ids were written is `BATCH_INCOMPLETE`. A command that staged a record and whose promotion the gate then refused is `STOPPED_MIDWAY` (exit 1, reason `PROMOTION_INVALID`; the record stays staged), and `canon strategy promote` that demoted a strategy and was then blocked is `STOPPED_MIDWAY` with reason `STRATEGY_PROMOTION_INVALID`. `canon ingest plans` judges every source before it persists: a source that holds malformed constructs and none that parses is exit 2, `INGEST_SOURCE_INVALID`, no `data` (`data.nonCleanSources` is gone), and nothing is written, not even by the well-formed sources of the same run.
 
-| 0.35 | 0.36 | exit |
-|---|---|---|
-| `ADAPTER_EXECUTION_NOT_AUTHORIZED` | `ADAPTER_AUTHORIZATION_FAILED` | 1 → 1 |
-| `ADAPTER_RESPONSE_INVALID` | `ADAPTER_VALIDATION_FAILED` | 1 → 1 |
-| `BRIEF_CHANGED_SINCE_APPROVAL` | `BRIEF_APPROVAL_STALE` | 1 → 2 |
-| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | 1 → 2 |
-| `CONTEXT_GIT_UNAVAILABLE` | `CONTEXT_GIT_REQUIRED` | 1 → 2 |
-| `DASHBOARD_NOT_BUILT` | `DASHBOARD_UNSUPPORTED` | 1 → 2 |
-| `DASHBOARD_PORT_IN_USE` | `DASHBOARD_PORT_UNAVAILABLE` | 1 → 2 |
-| `DISPATCH_END_IN_PROGRESS` | `DISPATCH_RUN_UNAVAILABLE` | 1 → 2 |
-| `EVIDENCE_CONTRACT_MISMATCH` | `EVIDENCE_CONTRACT_CONFLICT` | 1 → 2 |
-| `EVIDENCE_FABRICATED` | `EVIDENCE_NOTE_INVALID` | 1 → 2 |
-| `EVIDENCE_REPORT_CONTRADICTION` | `EVIDENCE_REPORT_CONFLICT` | 1 → 2 |
-| `GATE_TASK_BLOCKED` | `TASK_EVIDENCE_REQUIRED` | 1 → 2 |
-| `GATE_TASK_EVIDENCE_INVALID` | `TASK_EVIDENCE_INVALID` | 1 → 2 |
-| `INGEST_SOURCE_UNUSABLE` | `INGEST_SOURCE_INVALID` | 1 → 2 |
-| `LEARN_EVALUATION_REJECTED` | `STRATEGY_EVALUATION_INVALID` | 1 → 2 |
-| `POLICY_CHANGED_SINCE_APPROVAL` | `POLICY_APPROVAL_STALE` | 1 → 2 |
-| `REPORT_STALE` | `REPORT_CHECK_FAILED` | 1 → 1 (reason `STALE`) |
-| `PROMOTE_REFUSED` | `PROMOTION_INVALID` | 1 → 2 (by the condition of the violation) |
-| `SUBJECT_GATE_VIOLATION` | `SUBJECT_APPROVAL_REQUIRED` | 1 → 2 (by the condition of the violation) |
-| `SUBJECT_GATE_VIOLATION` | `EVIDENCE_STALE` | 1 → 2 (by the condition of the violation) |
-| `SUBJECT_GATE_VIOLATION` | `LAYOUT_MIGRATION_REQUIRED` | 1 → 2 (by the condition of the violation) |
-| `SUBJECT_GATE_VIOLATION` | `SUBJECT_INVALID` | 1 → 2 (by the condition of the violation) |
-| `DIVERGENCE_REFUSED` | `DIVERGENCE_INVALID` | 1 → 2 (by the condition of the violation) |
-| `LEARN_PROMOTION_BLOCKED` | `STRATEGY_PROMOTION_INVALID` | 1 → 2 |
-| `CONTEXT_OBJECT_CONFLICT` | `CONTEXT_OBJECT_CONFLICT` | 1 → 2 (the name stays; the exit changes) |
-| `CONTEXT_PACK_TAMPERED` | `CONTEXT_PACK_VERIFY_FAILED` | 1 → 1 (`context-pack verify`) |
-| `CONTEXT_PACK_TAMPERED` | `CONTEXT_PACK_CORRUPT` | 1 → 2 (every other reader of the pack) |
-| `EVIDENCE_BATCH_REFUSED` | `PROMOTION_INVALID` | 1 or 2 → 2 (the code of the record the gate refuses, `field` `/<index>`) |
-
-The rows whose last column starts `1 → 2` or `1 or 2 → 2` are the codes that changed from exit 1 to exit 2: 21 old codes (`CONTEXT_OBJECT_CONFLICT` keeps its name and changes its exit; `CONTEXT_PACK_TAMPERED` changes for every reader but `context-pack verify`). A script that waited for exit 1 from `subject move`, `gate promote`, `task done`, `evidence add`, `brief approve`, `strategy promote`, `ingest plans`, `dashboard` or `context-pack add` reads exit 2 now; the shipped pre-commit hook, the npm launcher and the eval scripts treat every non-zero exit alike and need no change. `POLICY_CHANGED_SINCE_APPROVAL` is a warning's name and stays; only the error is `POLICY_APPROVAL_STALE`. `DASHBOARD_PORT_UNAVAILABLE` and `DISPATCH_RUN_UNAVAILABLE` are retryable; the other codes of this table are not.
+The rows of the replacement table whose exit column reads `1 → 2` are the codes that changed from exit 1 to exit 2: 21 old codes (`CONTEXT_OBJECT_CONFLICT` keeps its name and changes its exit; `CONTEXT_PACK_TAMPERED` changes for every reader but `context-pack verify`; the table's list names them). A script that waited for exit 1 from `subject move`, `gate promote`, `task done`, `evidence add`, `brief approve`, `strategy promote`, `ingest plans`, `dashboard` or `context-pack add` reads exit 2 now; the shipped pre-commit hook, the npm launcher and the eval scripts treat every non-zero exit alike and need no change. `POLICY_CHANGED_SINCE_APPROVAL` is a warning's name and stays; only the error is `POLICY_APPROVAL_STALE`. `DASHBOARD_PORT_UNAVAILABLE` and `DISPATCH_RUN_UNAVAILABLE` are retryable; the other codes of this table are not.
 
 **Twenty-six `*_REFUSED`, `*_INVALID_ARGUMENT` and like codes are split by condition** (`canon-0-36-codes-refusals`, scenarios `atip.codesplit.01-…`). A code that said several refusals with one name says each with the code of its condition, and the reason names what differs inside one condition. A refusal is exit 2 and carries no `data`; the one exit that changes is `strategy rollback`'s signature refusal (1 → 2). The code tells the caller what to do: fix a value (`INVALID`), supply one (`REQUIRED`), read the state (`CONFLICT`), hand the decision to a person (`DENIED`), check a name (`NOT_FOUND`), or wait (`UNAVAILABLE`). A constraint's code follows its kind: `requires` and `atLeastOne` are `REQUIRED`, `forbids` and `atMostOne` are `CONFLICT`, a value that is wrong or empty is `INVALID`. `brief approve` that refuses several ids answers with the first refused id's code and one `error.details` entry for each id; `data.refused` no longer exists, and the dashboard page reads `error.details`.
-
-| 0.35 | 0.36 | reason |
-|---|---|---|
-| `ADAPTER_REFUSED` | `ADAPTER_FILE_NOT_FOUND`, `ADAPTER_FILE_DENIED`, `ADAPTER_FILE_INVALID` (the response file); `CONFIG_INVALID` (a broken adapter policy) | `POLICY` |
-| `ARTIFACTS_MOVE_REFUSED` | `ARTIFACTS_TIER_INVALID` (the target is not an s3 tier); `ARTIFACTS_BLOB_CORRUPT` (a local blob does not match its name, or the store holds a bad copy); `ARTIFACTS_BLOB_DENIED`, `ARTIFACTS_STORE_INVALID` or `ARTIFACTS_STORE_UNAVAILABLE` (a blob that cannot be read, or that changed while it was read) | |
-| `BRIEF_APPROVE_REFUSED` | the first refused id's own code (`BRIEF_NOT_FOUND`, `BRIEF_INVALID`) with `error.details` | `BLOCKERS`, `UNAPPROVABLE` |
-| `DISPATCH_ALREADY_ENDED` | `DISPATCH_CONFLICT` | `ALREADY_ENDED` |
-| `DISPATCH_NOT_RUNNING` | `DISPATCH_CONFLICT` | `NOT_RUNNING` |
-| `DIVERGENCE_ACCEPT_REFUSED` | `DIVERGENCE_DENIED` (not a reviewer, attested by the acceptor); `DIVERGENCE_CONFLICT` (the evidence is not divergent) | `NOT_REVIEWER`, `SELF_ATTESTED`; `NOT_DIVERGENT` |
-| `EVIDENCE_APPROVAL_INVALID` | `EVIDENCE_APPROVAL_REQUIRED` (a member of the four approval options is missing); `EVIDENCE_APPROVAL_INVALID` (malformed or the signature does not verify) | `MALFORMED`, `SIGNATURE_MISMATCH` |
-| `EVIDENCE_BIND_REFUSED` | `EVIDENCE_BINDING_STALE`, `EVIDENCE_BINDING_INVALID`, `EVIDENCE_BINDING_NOT_FOUND`, `EVIDENCE_BINDING_DENIED` (outside the repository) | |
-| `EVIDENCE_INVALID_ARGUMENT` | `EVIDENCE_ARGUMENT_INVALID`, `EVIDENCE_ARGUMENT_REQUIRED`, `EVIDENCE_ARGUMENT_CONFLICT`; `EVIDENCE_REQUIRED` when neither `--task` nor `--scenario` is given | |
-| `EVIDENCE_REFUSED` | `EVIDENCE_REQUIRED`, `EVIDENCE_ARGUMENT_INVALID` (a malformed `--surface-ref` or `--approver`, in `evidence add` and `evidence approval-payload` alike), `TASK_NOT_FOUND` (a `--task` that names no task, as in `evidence add`), `REPO_INVALID` (a commit whose changed paths git cannot derive) | |
-| `EVIDENCE_SCENARIO_NOT_INDEXED`, `REVIEW_SCENARIO_NOT_INDEXED` | `SCENARIO_INDEX_REQUIRED` | |
-| `HOOKS_INSTALL_REFUSED` | `HOOKS_REPO_INVALID`, `HOOKS_FILE_CONFLICT`, `HOOKS_FILE_DENIED` | |
-| `INVENTORY_REFUSED` | `CONFIG_INVALID` (a malformed `specs:` section or a canon.yaml that does not parse); `CONFIG_DENIED` (canon.yaml that this user may not read); `INVENTORY_INDEX_UNAVAILABLE` (another process holds the index lock; retryable) | `SPECS` |
-| `LEARN_ROLLBACK_FAILED` | `STRATEGY_ARGUMENT_INVALID` (a blank `--reason` or `--actor`), `STRATEGY_VERIFIER_REQUIRED` (the policy names no `approval.allowed_signers`), `CONFIG_DENIED` / `CONFIG_UNAVAILABLE` / `CONFIG_INVALID` with the reason POLICY (a policy or an allowed-signers file that cannot be used), `STRATEGY_SIGNER_DENIED` (the actor is not listed), `STRATEGY_SIGNATURE_REQUIRED` (an empty signature file), `STRATEGY_SIGNATURE_INVALID` (a signature that does not verify), each exit 2 with nothing recorded; `STRATEGY_ROLLBACK_FAILED` (exit 1) | `POLICY` |
-| `MIGRATE_REFUSED` | `MIGRATION_INVALID`, `MIGRATION_CONFLICT`, `MIGRATION_DENIED` (the scratch directory); `CONFIG_INVALID` (a config that cannot be moved) | |
-| `NO_BRIEF` | `BRIEF_REQUIRED` | |
-| `OLD_BRIEF_FORMAT` | `BRIEF_MIGRATION_REQUIRED` | |
-| `OLD_LAYOUT` | `LAYOUT_MIGRATION_REQUIRED` | |
-| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`; `CONFIG_INVALID` (`specs:`, or a canon.yaml that does not parse); `CONFIG_DENIED` | `SPECS` |
-| `POLICY_APPROVAL_REFUSED` | `POLICY_REQUIRED`, `POLICY_INVALID`, `POLICY_DENIED` (a policy this user may not read), `APPROVAL_INVALID` (a blank approver) | |
-| `RETENTION_EXPORT_REFUSED` | `RETENTION_EXPORT_DENIED`; `RETENTION_TIERS_DENIED` (a file the tiers need that this user may not read); `RETENTION_TIERS_UNAVAILABLE` (retryable: a backend down, or an operating-system error a repeat can pass); `RETENTION_TIERS_INVALID` | |
-| `RETENTION_PURGE_REFUSED` | `RETENTION_TIERS_UNAVAILABLE` (retryable); `RETENTION_TIERS_INVALID`. A preview exits 0 and is no refusal | |
-| `REVIEW_ARTIFACT_REFUSED` | `REVIEW_ARTIFACT_STALE`, `REVIEW_ARTIFACT_INVALID`, `REVIEW_ARTIFACT_NOT_FOUND`, `REVIEW_ARTIFACT_DENIED` | |
-| `SKILLS_INVALID_ARGUMENT` | `SKILLS_ARGUMENT_INVALID` (a provider); `SKILLS_SOURCE_NOT_FOUND` (`--skills-source`); `CONFIG_INVALID` (the `skills:` section) | `SKILLS` |
-| `SUBJECT_ADOPT_REFUSED` | `SUBJECT_NOT_FOUND`, `CHANGE_NOT_FOUND`; `WRITE_DENIED`, `WRITE_INVALID`; `REPO_DENIED`, `REPO_INVALID` | |
-| `SUBJECT_UNADOPT_REFUSED` | `SUBJECT_CONFLICT` | `APPROVED_BRIEF`, `FLOW_TAGGED` |
-| `TRACE_NOT_FOUND` | `TRACE_NOT_FOUND` (no record); `TRACE_CONFLICT` (a sha prefix that fits several commits; `expected` lists them) | |
 
 `CHANGE_NOT_FOUND` is new: the table of the brief had no code for an adopt of a change that does not exist, and a name that is not found is `NOT_FOUND`. `EVIDENCE_CONFLICT` of the brief's table is not registered: no call site refuses an evidence record for contradicting evidence already recorded. `ADAPTER_FILE_INVALID` names `canon adapter validate` in its `fix`, which answers the same situation with exit 1 and its result in `data`; `ARTIFACTS_BLOB_CORRUPT` names `canon artifacts verify` the same way. The skills, the scenarios and the dashboard say the new names.
 
 **Fifteen `*_UNREADABLE` and like codes say their cause** (`canon-0-36-codes-stored`, scenarios `atip.codestored.01-13`). A failure to read a file or state is told by what is wrong: the system refuses access (`DENIED`), a file a person edits is wrong or a path the caller gave is no file or no directory (`INVALID`), a path the caller named is not there (`NOT_FOUND`), state canon wrote is broken (`CORRUPT`), and only an operating-system error a repeat can pass is `UNAVAILABLE`, the one retryable code of these. A target that cannot be written is `WRITE_DENIED` (read-only, no permission) or `WRITE_INVALID` (its directory is missing or no directory), both known before anything changed. The one exit that changes is the policy approval file: `POLICY_APPROVAL_UNREADABLE` was exit 1, a broken one is `POLICY_APPROVAL_CORRUPT` and an unreadable one `POLICY_APPROVAL_DENIED`, both exit 2, and `--override-reason` still passes neither. `CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE` and `POLICY_APPROVAL_UNREADABLE` stay as the names of warnings; only the error has a new code. A ledger record that does not parse has no code: every reader skips it and `status` warns (`LEDGER_RECORDS_UNREADABLE`), so no command refuses on one.
-
-| 0.35 | 0.36 | reason |
-|---|---|---|
-| `ARTIFACTS_STORE_UNREACHABLE` | `ARTIFACTS_STORE_UNAVAILABLE` (the lock is held, the object store did not answer; retryable); `ARTIFACTS_STORE_REQUIRED` (the tier is not attached; not retryable); `ARTIFACTS_STORE_INVALID` (the store directory is a symlink, a regular file or no directory); `ARTIFACTS_STORE_DENIED` (this user may not read or enter it); `ARTIFACTS_DIGEST_INVALID`; `CONFIG_INVALID` (the `artifact_store:` section) | `ARTIFACT_STORE` |
-| `BRIEF_UNREADABLE` | `BRIEF_DENIED`, `BRIEF_INVALID` (not UTF-8, or a directory where the file belongs), `BRIEF_NOT_FOUND` | |
-| `CONFIG_UNREADABLE` | `CONFIG_INVALID` (canon.yaml or a policy file that does not parse), `CONFIG_DENIED` (this user may not read it), `CONFIG_REQUIRED` (no canon.yaml) | |
-| `DISPATCH_MANIFEST_MISMATCH` | `DISPATCH_MANIFEST_CORRUPT` | |
-| `DISPATCH_MANIFEST_UNREADABLE` | `DISPATCH_MANIFEST_CORRUPT`, `DISPATCH_MANIFEST_DENIED` | |
-| `EVIDENCE_STORE_UNAVAILABLE` | `ARTIFACTS_STORE_UNAVAILABLE`, `ARTIFACTS_STORE_REQUIRED`, `CONFIG_INVALID` | `ARTIFACT_STORE` |
-| `LEARN_SIGNATURE_UNREADABLE` | `STRATEGY_SIGNATURE_NOT_FOUND`, `STRATEGY_SIGNATURE_DENIED`, `STRATEGY_SIGNATURE_INVALID` | |
-| `LEDGER_ARCHIVE_UNAVAILABLE` | `LEDGER_ARCHIVE_INVALID` | |
-| `PLAN_CORPUS_UNREADABLE` | `PLAN_CORPUS_INVALID`, `PLAN_CORPUS_DENIED` | |
-| `POLICY_APPROVAL_UNREADABLE` (exit 1) | `POLICY_APPROVAL_CORRUPT`, `POLICY_APPROVAL_DENIED` (exit 2) | |
-| `REPO_UNREADABLE` | `REPO_DENIED`, `REPO_INVALID` (no repository there, or a tier that cannot be attached), `CONFIG_INVALID` (a record kind with no `routing:` entry, or a `tiers:` section that does not hold) | `TIERS` |
-| `REPO_WRITE_BUSY` | `REPO_LOCK_UNAVAILABLE` (retryable) | |
-| `SPEC_ROOTS_UNREADABLE` | `SPEC_ROOT_INVALID`, `SPEC_ROOT_DENIED` | |
-| `TASK_ROW_NOT_FOUND` | `PLAN_DOCUMENT_INVALID` | |
-| `WRITE_UNAVAILABLE` | `WRITE_DENIED`, `WRITE_INVALID` | |
 
 Also split by cause with this change: `ARTIFACTS_BLOB_CORRUPT` is only a stored blob whose content is broken (a blob that cannot be read is `ARTIFACTS_BLOB_DENIED`, `ARTIFACTS_STORE_INVALID` or `ARTIFACTS_STORE_UNAVAILABLE`; one that another process rewrites while it is uploaded is `STOPPED_MIDWAY` (reason `ARTIFACTS_BLOB_CORRUPT`) once blobs were uploaded and `ARTIFACTS_BLOB_CORRUPT` before any was, as the paragraph below says); `policy approve` on a policy this user may not read is `POLICY_DENIED`; a purge or export that cannot read a file the tiers need is `RETENTION_TIERS_DENIED`, a wrong path `RETENTION_TIERS_INVALID`, a tier that is not attached `RETENTION_TIERS_REQUIRED`, a stored object that does not decode `RETENTION_TIERS_CORRUPT`, and only a backend that is down or an error a repeat can pass is `RETENTION_TIERS_UNAVAILABLE`. A situation that gives a check's exit-1 answer in one command and a refusal in another (`ARTIFACTS_BLOB_CORRUPT` and `artifacts verify`, `CONTEXT_PACK_CORRUPT` and `context-pack verify`) is linked in the `fix` text of the refusal, not by a machine link. An operating-system error a repeat can pass is told by the subject's own `UNAVAILABLE` code, which the next paragraph lists.
 
@@ -255,23 +323,6 @@ A write target that cannot be written keeps `WRITE_DENIED` and `WRITE_INVALID`: 
 
 **A command that stopped after it did some of its work says so with its subject's one `<SUBJECT>_INCOMPLETE` code, and the reserved `STOPPED_MIDWAY` is gone** (`canon-0-36-codes-incomplete`, scenarios `atip.midway.01-14` and `atip.incomplete.01-12`; atip/1 spec 7.2.2, 7.2.3, 8.3.2; issue #135). 0.35 said a stop after an earlier step made its effects with the reserved `STOPPED_MIDWAY` and the refusal's code as its `reason`, and said a stop of the commands that move, delete, compact or index with names that ended in `_FAILED`, `_ABORTED`, `_ERRORS` or `_STOPPED` and exit 1 beside the same exit for a failure that kept nothing, so a caller could not tell whether to read what was done or to run the command again. Now `INCOMPLETE` is a command that ran, stopped with work left undone and kept what it did, and `FAILED` is a work that failed whole or was rolled back; every call site of an exit-1 code was read for what it leaves behind (the audit table of `tests/atip_incomplete.rs`). Each `_INCOMPLETE` code is exit 1 and leads `meta.next` with a command that reads what was done (`canon status --json`, `canon artifacts verify --json`, or the preview of the same call when the call writes nothing in a preview); it is retryable only where the same call resumes (`ARTIFACTS_STORE_INCOMPLETE`), and a commit that was planned (`artifacts move`, `purge`, `ledger compact`, `tier age`) answers `PLAN_STALE` to the same `--plan-digest` after it stopped: preview again. `schema --errors` does not list `STOPPED_MIDWAY` and no source says it.
 
-| 0.35 | 0.36 | `reason` | exit | retryable |
-|---|---|---|---|---|
-| `ARTIFACTS_STORE_FAILED` (a write that stopped after blobs were stored) | `ARTIFACTS_STORE_INCOMPLETE`; `ARTIFACTS_STORE_FAILED` stays for a write that kept nothing | `ARTIFACTS_STORE_FAILED`, `ARTIFACTS_STORE_UNAVAILABLE` (`ARTIFACTS_STORE_INCOMPLETE`) | 1 | yes |
-| `EVIDENCE_STORE_FAILED` | `ARTIFACTS_STORE_FAILED` (the record or batch is rolled back) | | 1 | yes |
-| `HOOKS_INSTALL_FAILED` | `HOOKS_INSTALL_INCOMPLETE` (the second hook file, or the pre-commit script after the hook files, failed after a file was written); a first file that fails is `WRITE_FAILED` | `WRITE_FAILED` | 1 | no |
-| `INVENTORY_ABORTED` | `INVENTORY_INCOMPLETE` (exit 1, `data.roots`) when this run indexed an earlier root before it stopped on a later one, reason `INVENTORY_INVALID` (or `INVENTORY_FAILED` when the store failed then); `INVENTORY_INVALID` (exit 2, nothing written, no `data`, each violation and duplicate in `error.details`) when nothing was indexed before it, and for every preview | `INVENTORY_INVALID`, `INVENTORY_FAILED` (`INVENTORY_INCOMPLETE`); `VIOLATIONS`, `DUPLICATE_SCENARIOS` (`INVENTORY_INVALID`) | 1 (`INVENTORY_INVALID`: 2) | no |
-| `LEARN_PROMOTION_FAILED` | `STRATEGY_PROMOTION_FAILED` (read at both sites: nothing of the promotion is kept) | | 1 | no |
-| `LEDGER_COMPACT_FAILED` | `LEDGER_COMPACT_INCOMPLETE` after at least one version moved; a read of the ledger that fails before the first move, and every preview, is the refusal of the read (`REPO_DENIED`, `REPO_UNAVAILABLE`, `REPO_INVALID`, exit 2), a move that fails with none moved is `WRITE_FAILED` | `REPO_DENIED`, `REPO_INVALID`, `REPO_UNAVAILABLE`, `WRITE_FAILED` | 1 | no |
-| `MIGRATE_INDEX_FAILED` | `MIGRATION_INCOMPLETE` | `INDEX` | 1 | no |
-| `MIGRATE_PINS_FAILED` | `MIGRATION_INCOMPLETE` | `PINS` | 1 | no |
-| `MIGRATE_STOPPED` | `MIGRATION_INCOMPLETE` | `STOPPED` | 1 | no |
-| `PLUGIN_SYNC_ERRORS` | `PLUGIN_SYNC_INCOMPLETE` when some candidates were written and others were not; `WRITE_FAILED` when none was written; a preview that cannot check a candidate is the refusal of the read (`REPO_INVALID`, exit 2) | `WRITE_FAILED` | 1 | no |
-| `PROMOTE_FAILED` | `PROMOTION_FAILED` (the promotion failed and there is no refusal of the gate to name as a reason; a refusal after the record was staged is the subject's INCOMPLETE code, and the staged record stays staged in both) | | 1 | no |
-| `RETENTION_PURGE_FAILED` | `RETENTION_PURGE_INCOMPLETE` after at least one record was deleted; a purge that fails before the first deletion is answered by its cause (`RETENTION_TIERS_*`, exit 2) | `WRITE_FAILED` | 1 | no |
-| `STOPPED_MIDWAY` | `INIT_INCOMPLETE` (`SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID`), `EVIDENCE_INCOMPLETE`, `FINDING_INCOMPLETE`, `DIVERGENCE_INCOMPLETE` (each: `PROMOTION_INVALID`, the gate's refusal of the record that was staged), `STRATEGY_INCOMPLETE` (`STRATEGY_PROMOTION_INVALID`, the strategy stays demoted), `ARTIFACTS_MOVE_INCOMPLETE` (`artifacts move --commit`: `ARTIFACTS_BLOB_CORRUPT`, `ARTIFACTS_STORE_DENIED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_REQUIRED`, `ARTIFACTS_STORE_UNAVAILABLE`) | the refusal's code | 1 | no |
-| `TIER_FAILED` | `TIER_INCOMPLETE` (records moved before it stopped); `TIER_FAILED` stays for a run that failed before a record left its tier | `WRITE_FAILED` (`TIER_INCOMPLETE`) | 1 | no |
-
 `CHANGE_ADOPTION_INCOMPLETE` and the batch's `BATCH_INCOMPLETE` keep their names (the former now carries the reason `WRITE_FAILED`). Every `_INCOMPLETE` code has reasons: the code of the refusal a later step met, or, where there is none to name, the code of the step that failed. One `_INCOMPLETE` code per subject: a command lists at most one of its own. A refusal of the gate before anything is written stays exit 2 (`PROMOTION_INVALID` of `gate promote`); only a refusal after the record was staged is `_INCOMPLETE`. A batch element that stops so is `failed` with its own `_INCOMPLETE` code and reason, and the batch is `BATCH_INCOMPLETE`.
 
 | Call | 0.35 | now |
@@ -284,7 +335,7 @@ A write target that cannot be written keeps `WRITE_DENIED` and `WRITE_INVALID`: 
 | `inventory sync` (or its `--dry-run`) on a corpus with violations, one root | `INVENTORY_ABORTED` (exit 1) | `INVENTORY_INVALID` (exit 2, the violations in `error.details`): nothing was indexed, so nothing is incomplete; with an earlier root indexed by the commit, `INVENTORY_INCOMPLETE` |
 | `tier age --commit` | `TIER_FAILED` for every failure | `TIER_INCOMPLETE` when records already moved (the plan's moves are counted again), `TIER_FAILED` when none did |
 
-**Upgrade note:** a script that matched `STOPPED_MIDWAY` matches the `_INCOMPLETE` code of the command now and reads `reason` as before; a script that matched a `*_FAILED`, `*_ABORTED`, `*_ERRORS` or `*_STOPPED` name of the table reads `meta.next[0]` (the read of what was done) before it repeats anything, and treats the `retryable` of the registry as the answer to whether to repeat it.
+**Upgrade note:** a script that matched `STOPPED_MIDWAY` matches the `_INCOMPLETE` code of the command now and reads `reason` as before; a script that matched a `*_FAILED`, `*_ABORTED`, `*_ERRORS` or `*_STOPPED` name of the replacement table reads `meta.next[0]` (the read of what was done) before it repeats anything, and treats the `retryable` of the registry as the answer to whether to repeat it.
 
 **A reason belongs to one code, is registered under it, and never changes the exit or `retryable`** (`canon-0-36-code-reasons`, scenarios `atip.reasons.01-14`; atip/1 spec 7.6 and 15.3, the contract author's 1.3 rules, issue #135 section 5). Where several next actions share one code, the `reason` says which: `{reason, meaning, fix}`, registered under the code, upper-case words and underscores, unique inside the code, and the same name may stand under another code (`BLOCKERS` is a reason of both `BRIEF_CHECK_FAILED` and `BRIEF_INVALID`). A `reason` is never in the place of a code and never changes the exit or `retryable` of its code (a different `retryable` is a different code: `ARTIFACTS_STORE_UNAVAILABLE` is retryable, `ARTIFACTS_STORE_REQUIRED` is not; `PROMOTION_INVALID` is exit 2, `PROMOTION_FAILED` exit 1). The names the contract resolved by namespace stay: `EXPIRED` (`CURSOR_INVALID`), `STALE` (`REPORT_CHECK_FAILED`), `UNREADABLE` (`INPUT_INVALID`). A debug build refuses to answer a `reason` its code does not register, or an exit or `retryable` that is not the registry row's, so every test that runs the binary proves both. `canon schema --error <CODE> --json` lists the reasons of a code with the `fix` of each.
 
@@ -322,6 +373,8 @@ The reasons of the brief's table that `canon-0-36-code-reasons` settled differen
 **`canon schema` lists every code a command can emit** (`canon-0-36-code-reasons`, scenario `atip.reasons.13`). `canon schema evidence approval-payload` and `canon schema evidence add` did not list `TASK_NOT_FOUND`, `PLAN_SOURCES_REQUIRED` and the three `PLAN_CORPUS_*` codes, because the scan that derives the lists did not follow `error.to_cli_error()` of the plan-corpus admission of `--task`; the table of calls it cannot follow (`CALL_SITES` in `tests/schema_codes.rs`) names them for both commands, and a test calls each command with the failures and checks that the code it answered is in `canon schema <command>`.
 
 ### Contributors
+
+**The tests of the code renaming read one table** (`canon-0-36-codes-table`). `crates/canon-cli/tests/atip_codestable.rs` reads the replacement table above (`old_codes::replacement_table`) against `tests/fixtures/codes-0.35.tsv`, the 0.35 registry kept as data (name, exit, retryable of each of its 179 codes: the old names are in no registry view, so the data is the one place that has them) and against the registry of 0.36. The lists of codes still to rename or reclassify (`NOT_YET_RENAMED`, `NOT_YET_RECLASSIFIED` in `tests/codes_names.rs`) and the per-stage lists of old names in `old_names.rs` and `atip_l0.rs` are gone: the old-names guard derives the names no consumer may spell from the fixture and the registry (a name the error registry or the warning registry still holds is not searched for). The guard reads the skills, the website in both languages, the dashboard, the launcher, the eval scripts, the conformance cases, the design documents, the generated command documents, the scenarios outside `area=atip`, the README, ARCHITECTURE and the sources of every crate. The table of the scenarios whose sentence changed in 0.36 is `.canon/changes/canon-0-36-codes-table/scenario-diff.md`: 117 rows, each `name only` or `meaning`, for the reviewers who review them again.
 
 **The `atip` crate and the checker (`atip check`) are the atip repository's** (`canon-0-36-atip-dep`, https://github.com/journeyWorker/atip, issue #134). Nothing canon prints changes: the stdout and the exit status of every command, every `canon schema` answer (`--json`, `--errors`, `--warnings`, each command and each code), `docs/cli/canon.cli.json` and the conformance corpus are byte for byte the 0.35.0 ones.
 

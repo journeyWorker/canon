@@ -77,6 +77,15 @@ redacted `export` for sharing a sanitized extract, and an access audit log at
 (nothing is written where there is no `canon.yaml`). These controls do not delete the source
 transcripts read by adapters or rewrite Git history; manage those separately.
 
+`purge` previews by default: run without `--commit` it prints the removal set
+and a `planDigest` and deletes nothing, and `--commit --plan-digest <planDigest>`
+deletes (if the set changed in between, the call is refused with `PLAN_STALE`):
+
+```bash
+canon purge --kind session --before 2020-01-01T00:00:00Z
+canon purge --kind session --before 2020-01-01T00:00:00Z --commit --plan-digest 0123456789abcdef
+```
+
 
 ## Project-scoped vs all-workspaces
 

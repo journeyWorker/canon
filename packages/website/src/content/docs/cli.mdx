@@ -545,7 +545,9 @@ an unknown value is `ROLE_INVALID`. A role is guidance, not enforcement:
 `canon schema` lists the role's commands, `canon status` and `meta.next` keep
 only the role's steps and count the rest in `data.waitingOn` (the orchestrator also
 sees the human's steps), and `--role` on `evidence add` and `review scenario`
-defaults to it. Unset, every command behaves as before.
+defaults to it. Unset, every command behaves as before. `CANON_ROLE` never
+filters or fails `schema`, `context` or `skills show` (a bad value is only a
+warning).
 
 The guide is split the same way: a short shared core (`canon skills show
 canon`) plus one reference per role (`canon skills show role-implementer`, and
@@ -556,6 +558,19 @@ orchestrator starts each role with `CANON_ROLE` set and runs the reviewer as a
 separate process with its own session id. `--fields` (on `status`, `export`,
 `divergence list`, `context`, `query`, `finding list`) keeps an agent's context
 small.
+
+`brief approve`, `policy approve`, `divergence accept` and `migrate --commit`,
+which binds the `Approved:` line again, are a human's decision: an agent role is
+refused with `retryable: false` unless it passes `--relayed-via <tool>`, and the
+hint names the relay steps first (show the brief with `canon brief show <change>
+--body`, ask through the harness's question tool, count only an explicit
+approval, record it with `--relayed-via`) and then the command for the human to
+type. A relayed record keeps the human's name and answer, the relaying agent's
+role and actor, and the tool used to ask, and `approval: { relay: deny }` in
+`canon.yaml` turns it off (then the refusal is `ACTOR_DENIED`). The only option
+for going past a refusal is `--override-reason <TEXT>` (there is no `--force`);
+the reason you pass is recorded and shown in `data.overrides[]` and `canon
+status`.
 
 ### Destructive commands preview first
 

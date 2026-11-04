@@ -13,6 +13,9 @@ use canon_cli::cli_error::{CliError, CliErrorExt as _};
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod old_codes;
+use old_codes::{gone_codes, word_in};
+
 /// The members `meta` may hold: the contract's, and canon's `x-canon` (spec 6.6).
 const META_MEMBERS: &[&str] = &["schemaVersion", "tool", "toolVersion", "command", "contract", "contractVersion", "output", "context", "next", "warnings", "coverage", "page", "fields", "truncated", "x-canon"];
 
@@ -420,7 +423,7 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
         assert_eq!(rows.get(code).copied(), Some((exit, false)), "{code} carries the contract's exit and retryable");
     }
     assert!(!rows.contains_key("OPERATION_REUSED"), "canon has no --operation");
-    for old in OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES) {
+    for old in OLD_CODES.iter().chain(gone_codes()) {
         assert!(!rows.contains_key(old), "`{old}` is gone from the registry");
     }
     // Every row conforms to the contract's registry-entry schema.
@@ -437,8 +440,12 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     assert!(files.len() > 100, "the scan found {} files", files.len());
     let mut hits = Vec::new();
     for file in &files {
+        // The scenarios of `area=atip` name the gone codes to say they are gone.
+        if file.components().any(|part| part.as_os_str() == "area=atip") {
+            continue;
+        }
         let text = std::fs::read_to_string(file).unwrap();
-        for old in OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES) {
+        for old in OLD_CODES.iter().chain(gone_codes()) {
             if word_in(&text, old) {
                 hits.push(format!("{} spells {old}", file.strip_prefix(&root).unwrap().display()));
             }
@@ -447,26 +454,8 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     assert!(hits.is_empty(), "{hits:#?}");
 }
 
-/// Error codes 0.36 renamed (`canon-0-36-codes-rename`; each has a replacement in the CHANGELOG's table). `CONFIG_MISSING` is not here:
-/// the error is `CONFIG_REQUIRED`, but the warning of `status` keeps the name `CONFIG_MISSING`.
-const RENAMED_CODES: &[&str] = &["APPROVAL_INCOMPLETE", "BRIEF_CHANGED_SINCE_PAGE_LOAD", "BRIEF_HAS_BLOCKERS", "BRIEF_UNAPPROVABLE", "CHANGE_AMBIGUOUS", "CHANGE_INVALID_ARGUMENT", "CONTEXT_INPUT_MISSING", "CONTEXT_SECRET_DETECTED", "CONTEXT_UNSAFE_PATH", "DASHBOARD_BAD_REQUEST", "DASHBOARD_CONFIG_INVALID", "DASHBOARD_ORIGIN_REFUSED", "DEMO_NOT_INITIALIZED", "DISPATCH_INVALID_ARGUMENT", "DISPATCH_ROLE_REGIME_MISMATCH", "DIVERGENCE_INVALID_ARGUMENT", "FEATURE_OUTSIDE_SPEC_ROOTS", "FINDING_INVALID_ARGUMENT", "FINDING_RESOLUTION_REV_UNEXPECTED", "FINDING_SEQ_OCCUPIED", "FINDING_STAGED", "FINDING_UNKNOWN_SCENARIO", "FORMAT_VIOLATIONS", "GATE_TASK_INVALID_ARGUMENT", "GATE_TASK_UNSUPPORTED", "GATE_VIOLATIONS", "HUMAN_ONLY", "INIT_CONFIG_EXISTS", "INIT_INVALID_ARGUMENT", "LEARN_DEMOTION_FAILED", "LEARN_INVALID_ARGUMENT", "LEARN_INVALID_INPUT", "LEARN_STRATEGY_NOT_FOUND", "LEARN_TRAJECTORY_NOT_FOUND", "MIGRATE_UNCOMMITTED", "NO_COMMIT", "PLAN_SOURCES_MISSING", "QUERY_INVALID_ARGUMENT", "RELAY_DIGEST_MISMATCH", "RETRIEVE_FAILED", "REVIEW_INVALID_ARGUMENT", "SCAFFOLD_INVALID_ARGUMENT", "SEARCH_QUERY_EMPTY", "SKILLS_DRIFT", "SPEC_ROOT_UNRESOLVED", "SUBJECT_INVALID_ARGUMENT", "SUBJECT_INVALID_TRANSITION", "UNKNOWN_ROLE", "UNKNOWN_SPEC_ROOT"];
-
-/// Error codes `canon-0-36-codes-exit` renamed or removed (each has a replacement in the CHANGELOG's table). `POLICY_CHANGED_SINCE_APPROVAL` is not here:
-/// the error is `POLICY_APPROVAL_STALE`, but the warning of `status` keeps the name.
-const RENAMED_EXIT_CODES: &[&str] = &["ADAPTER_EXECUTION_NOT_AUTHORIZED", "ADAPTER_RESPONSE_INVALID", "BRIEF_CHANGED_SINCE_APPROVAL", "BRIEF_UNAPPROVED", "CONTEXT_GIT_UNAVAILABLE", "DASHBOARD_NOT_BUILT", "DASHBOARD_PORT_IN_USE", "DISPATCH_END_IN_PROGRESS", "EVIDENCE_CONTRACT_MISMATCH", "EVIDENCE_FABRICATED", "EVIDENCE_REPORT_CONTRADICTION", "GATE_TASK_BLOCKED", "GATE_TASK_EVIDENCE_INVALID", "INGEST_SOURCE_UNUSABLE", "LEARN_EVALUATION_REJECTED", "REPORT_STALE", "PROMOTE_REFUSED", "SUBJECT_GATE_VIOLATION", "DIVERGENCE_REFUSED", "LEARN_PROMOTION_BLOCKED", "CONTEXT_PACK_TAMPERED", "EVIDENCE_BATCH_REFUSED"];
-
 /// The error codes 0.33 deletes (the CHANGELOG's replacement table lists them).
 const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATCH_UNSUPPORTED", "INPUT_INVALID_TYPE", "INPUT_UNKNOWN_FIELD", "INPUT_UNREADABLE", "INPUT_STDIN_TTY", "INPUT_STDIN_CONFLICT", "INPUT_MISSING", "INVALID_CURSOR", "UNKNOWN_FIELD"];
-
-/// `word` in `text` as a whole identifier (so `CONTEXT_INPUT_NOT_FOUND` is not `INPUT_MISSING`).
-fn word_in(text: &str, word: &str) -> bool {
-    text.match_indices(word).any(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + word.len()..].chars().next();
-        let part = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
-        !part(before) && !part(after)
-    })
-}
 
 fn collect(dir: &Path, ext: &str, out: &mut Vec<std::path::PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };

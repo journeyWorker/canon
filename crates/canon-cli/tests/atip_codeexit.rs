@@ -9,6 +9,8 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod old_codes;
+
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
@@ -314,47 +316,43 @@ const EXIT_TABLE: &[(&str, &[&str], u8)] = &[
     ("SUBJECT_GATE_VIOLATION", &["SUBJECT_APPROVAL_REQUIRED", "EVIDENCE_STALE", "SUBJECT_INVALID", "LAYOUT_MIGRATION_REQUIRED"], 2),
 ];
 
-/// The rows of the CHANGELOG's exit table: `(old code, new code, exit before, exit after)`, read from the rows whose third cell starts with `<n> → <m>`
-/// (or `1 or 2 → 2`).
-fn changelog_exit_rows(changelog: &str) -> Vec<(String, String, u8, u8)> {
-    let start = changelog.find("\n## Unreleased").expect("an Unreleased section");
-    let rest = &changelog[start + 1..];
-    let end = rest[3..].find("\n## ").map_or(rest.len(), |n| n + 3);
-    rest[..end]
-        .lines()
-        .filter_map(|line| {
-            let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-            let ["", old, new, exit, ..] = cells.as_slice() else { return None };
-            let code = |cell: &str| cell.strip_prefix('`').and_then(|c| c.strip_suffix('`')).map(str::to_string);
-            let (before, after) = exit.split_once(" → ")?;
-            let before = u8::try_from(before.chars().next()?.to_digit(10)?).ok()?;
-            let after = u8::try_from(after.chars().next()?.to_digit(10)?).ok()?;
-            Some((code(old)?, code(new)?, before, after))
-        })
-        .collect()
+/// The rows of the CHANGELOG's replacement table: `(old code, new codes, exit before, exits after)`.
+fn changelog_exit_rows(changelog: &str) -> Vec<(String, Vec<String>, u8, Vec<u8>)> {
+    old_codes::replacement_table(changelog).expect("the replacement table reads").into_iter().map(|row| (row.old, row.new, row.exit_before, row.exit_after)).collect()
 }
 
-/// atip.codeexit.10: every row of the CHANGELOG's exit table is the registry's: each new code exists with the exit the row ends in, an old code
-/// that is not also a new one is gone, the rows hold every code of the brief's table, and the headline counts the rows that moved from 1 to 2.
+/// atip.codeexit.10: every row of the CHANGELOG's replacement table is the registry's: each new code exists and the exits of the row are the exits of its
+/// new codes, an old code that is not also a new one is gone, the rows hold every code of the brief's table, and the headline counts the old codes
+/// whose every new code moved from exit 1 to exit 2.
 #[test]
 fn atip_codeexit_10_every_row_of_the_exit_table_is_the_registrys() {
     let all = canon_cli::cli_error::all_codes();
     let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
     let rows = changelog_exit_rows(&changelog);
-    assert!(rows.len() > 25, "the exit table was found: {} rows", rows.len());
-    for (old, new, _, after) in &rows {
-        let info = all.iter().find(|info| info.code == new).unwrap_or_else(|| panic!("the row `{old}` → `{new}` names a code the registry lacks"));
-        assert_eq!(info.exit, *after, "`{new}` (row of `{old}`) exits {} in the registry, the row says {after}", info.exit);
-        if old != new {
+    assert_eq!(rows.len(), 179, "the replacement table has a row for each code of 0.35");
+    for (old, news, _, after) in &rows {
+        let mut registry: Vec<u8> = news.iter().map(|new| all.iter().find(|info| info.code == new).unwrap_or_else(|| panic!("the row of `{old}` names `{new}`, which the registry lacks")).exit).collect();
+        registry.sort_unstable();
+        registry.dedup();
+        let mut stated = after.clone();
+        stated.sort_unstable();
+        stated.dedup();
+        assert_eq!(registry, stated, "the row of `{old}` says exits {after:?} after, the registry says {registry:?}");
+        if !news.contains(old) {
             assert!(!all.iter().any(|info| info.code == old), "`{old}` is still registered");
         }
     }
     // Every old code of the brief's table has a row.
-    for (old, _, _) in EXIT_TABLE {
-        assert!(rows.iter().any(|(o, ..)| o == old), "the CHANGELOG has no row for `{old}`");
+    for (old, news, _) in EXIT_TABLE {
+        let row = rows.iter().find(|(o, ..)| o == old).unwrap_or_else(|| panic!("the CHANGELOG has no row for `{old}`"));
+        let mut stated = row.1.clone();
+        stated.sort_unstable();
+        let mut expected: Vec<String> = news.iter().map(|code| (*code).to_string()).collect();
+        expected.sort_unstable();
+        assert_eq!(stated, expected, "the row of `{old}` names the codes of the brief's table");
     }
     // The headline counts the old codes whose exit moved from 1 to 2.
-    let mut moved: Vec<&str> = rows.iter().filter(|(_, _, before, after)| *before == 1 && *after == 2).map(|(old, ..)| old.as_str()).collect();
+    let mut moved: Vec<&str> = rows.iter().filter(|(_, _, before, after)| *before == 1 && after.iter().all(|exit| *exit == 2)).map(|(old, ..)| old.as_str()).collect();
     moved.sort_unstable();
     moved.dedup();
     assert!(changelog.contains(&format!("**{} codes changed from exit 1 to exit 2", moved.len())), "the headline says {} codes: {moved:?}", moved.len());
@@ -366,11 +364,14 @@ fn atip_codeexit_10_every_row_of_the_exit_table_is_the_registrys() {
 /// atip.codeexit.10 (failure case): a row whose exit disagrees with the registry, or whose count is wrong, is found.
 #[test]
 fn atip_codeexit_10_a_row_that_disagrees_with_the_registry_is_found() {
-    let table = "\n## Unreleased\n\n| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | 1 → 1 |\n| `NO_COMMIT` | `COMMIT_REQUIRED` | 1 → 2 (a note) |\n\n## 0.35.0\n";
-    let rows = changelog_exit_rows(table);
-    assert_eq!(rows, [("BRIEF_UNAPPROVED".to_string(), "BRIEF_APPROVAL_REQUIRED".to_string(), 1, 1), ("NO_COMMIT".to_string(), "COMMIT_REQUIRED".to_string(), 1, 2)]);
+    let table = format!(
+        "\n## Unreleased\n\n{}\n|---|---|---|---|---|---|---|\n| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | renamed | 1 → 1 | no → no |  | a note |\n| `NO_COMMIT` | `COMMIT_REQUIRED` | renamed | 1 → 2 | no → no |  | a note |\n\n## 0.35.0\n",
+        old_codes::TABLE_HEADER
+    );
+    let rows = changelog_exit_rows(&table);
+    assert_eq!(rows, [("BRIEF_UNAPPROVED".to_string(), vec!["BRIEF_APPROVAL_REQUIRED".to_string()], 1, vec![1]), ("NO_COMMIT".to_string(), vec!["COMMIT_REQUIRED".to_string()], 1, vec![2])]);
     let registry = canon_cli::cli_error::all_codes().iter().find(|i| i.code == "BRIEF_APPROVAL_REQUIRED").unwrap().exit;
-    assert_ne!(registry, rows[0].3, "the first row says exit 1 where the registry says {registry}: the test above fails on it");
+    assert_ne!(vec![registry], rows[0].3, "the first row says exit 1 where the registry says {registry}: the test above fails on it");
 }
 
 /// atip.codeexit.11: the branches on a canon exit that canon ships (the pre-commit hook, the npm launcher, the eval scripts) treat every non-zero

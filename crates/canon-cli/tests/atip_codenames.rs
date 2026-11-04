@@ -13,6 +13,8 @@ use chrono::Utc;
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod old_codes;
+
 /// The old name and the new one of each code `canon-0-36-codes-rename` renames (the brief's table).
 const RENAMED: &[(&str, &str)] = &[
     ("APPROVAL_INCOMPLETE", "APPROVAL_INVALID"),
@@ -271,9 +273,9 @@ fn atip_codenames_05_schema_error_refuses_each_old_name_as_an_unknown_code() {
     }
 }
 
-/// The 0.35 code names of the registry (`tests/fixtures/codes-0.35.txt`).
+/// The 0.35 code names of the registry (`tests/fixtures/codes-0.35.tsv`).
 fn codes_0_35() -> Vec<String> {
-    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/codes-0.35.txt")).unwrap().lines().map(str::to_string).collect()
+    old_codes::codes_0_35().iter().map(|code| (*code).to_string()).collect()
 }
 
 /// The rows of the replacement table of the CHANGELOG's Unreleased section: `(old, new)`. A cell may name several codes (a code split by
