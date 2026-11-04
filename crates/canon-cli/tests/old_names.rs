@@ -16,6 +16,11 @@ const RENAMED_CODES: &[&str] = &["APPROVAL_INCOMPLETE", "BRIEF_CHANGED_SINCE_PAG
 /// the error is `POLICY_APPROVAL_STALE`, but the warning of `status` keeps the name.
 const RENAMED_EXIT_CODES: &[&str] = &["ADAPTER_EXECUTION_NOT_AUTHORIZED", "ADAPTER_RESPONSE_INVALID", "BRIEF_CHANGED_SINCE_APPROVAL", "BRIEF_UNAPPROVED", "CONTEXT_GIT_UNAVAILABLE", "DASHBOARD_NOT_BUILT", "DASHBOARD_PORT_IN_USE", "DISPATCH_END_IN_PROGRESS", "EVIDENCE_CONTRACT_MISMATCH", "EVIDENCE_FABRICATED", "EVIDENCE_REPORT_CONTRADICTION", "GATE_TASK_BLOCKED", "GATE_TASK_EVIDENCE_INVALID", "INGEST_SOURCE_UNUSABLE", "LEARN_EVALUATION_REJECTED", "REPORT_STALE", "PROMOTE_REFUSED", "SUBJECT_GATE_VIOLATION", "DIVERGENCE_REFUSED", "LEARN_PROMOTION_BLOCKED", "CONTEXT_PACK_TAMPERED", "EVIDENCE_BATCH_REFUSED"];
 
+/// Error codes `canon-0-36-codes-stored` renamed or split by cause (each has a replacement in the CHANGELOG's table). `CONFIG_UNREADABLE`,
+/// `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE` and `POLICY_APPROVAL_UNREADABLE` are not here: the error is renamed, but the
+/// warning of the same situation keeps the name (spec 7.2.1: a condition applies only to `error.code`).
+const RENAMED_STORED_CODES: &[&str] = &["ARTIFACTS_STORE_UNREACHABLE", "BRIEF_UNREADABLE", "EVIDENCE_STORE_UNAVAILABLE", "LEARN_SIGNATURE_UNREADABLE", "LEDGER_ARCHIVE_UNAVAILABLE", "PLAN_CORPUS_UNREADABLE", "REPO_UNREADABLE", "REPO_WRITE_BUSY", "SPEC_ROOTS_UNREADABLE", "TASK_ROW_NOT_FOUND", "WRITE_UNAVAILABLE"];
+
 /// Error codes 0.35 moved to `STOPPED_MIDWAY` (`atip.midway`; each has a replacement in the CHANGELOG's table).
 const MOVED_CODES: &[&str] = &["INIT_SKILL_INSTALL_FAILED"];
 
@@ -66,7 +71,7 @@ fn word_in(text: &str, word: &str) -> bool {
 /// `meta.canonVersion` is gone), which a guide shows when it prints that report.
 fn old_names_in(text: &str) -> Vec<&'static str> {
     let text = text.replace("\"canonVersion\"", "\"statusReportMember\"");
-    OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
+    OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES).chain(RENAMED_STORED_CODES).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
 }
 
 fn collect(dir: &Path, extensions: &[&str], skip: &[&str], out: &mut Vec<PathBuf>) {
@@ -186,7 +191,7 @@ fn atip_codenames_06_no_consumer_spells_a_renamed_code() {
     let mut hits = Vec::new();
     for file in &files {
         let Ok(text) = std::fs::read_to_string(file) else { continue };
-        for old in RENAMED_CODES.iter().chain(RENAMED_EXIT_CODES).filter(|old| word_in(&text, old)) {
+        for old in RENAMED_CODES.iter().chain(RENAMED_EXIT_CODES).chain(RENAMED_STORED_CODES).filter(|old| word_in(&text, old)) {
             hits.push(format!("{} spells `{old}`", file.strip_prefix(repo_root()).unwrap_or(file).display()));
         }
     }

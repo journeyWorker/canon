@@ -136,7 +136,8 @@ fn hint_for(code: &str) -> &'static str {
     match code {
         "APPROVAL_INVALID" => "pass --approver <name> and --note <the human's answer>, each one non-empty line",
         "BRIEF_INVALID" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
-        "BRIEF_UNREADABLE" => "check that brief.md is a readable UTF-8 file, then run `canon brief approve` again",
+        "BRIEF_DENIED" => "make brief.md readable by this user, then run `canon brief approve` again",
+        "BRIEF_NOT_FOUND" => "check that the change has a brief.md, then run `canon brief approve` again",
         "RELAY_DIGEST_STALE" => "run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw",
         "POLICY_APPROVAL_FAILED" => "check that .canon/policy.yaml is readable and writable, then run `canon brief approve` again",
         _ => "check that the change's brief.md is writable, then run `canon brief approve` again",
@@ -206,7 +207,7 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
         .reason("BLOCKERS")
         .hint("run `canon brief check`, clear the blockers it lists, then ask the human to approve"));
     }
-    let text = std::fs::read_to_string(&path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{}`: {e}", checked.brief)))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{}`: {e}", checked.brief)))?;
     if let Some(expected) = item.expected_sha256 {
         verify_bytes(&checked.brief, Some(text.as_bytes()), expected)?;
     }
@@ -219,7 +220,7 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
         let approval_file = repo.join(canon_model::paths::POLICY_APPROVAL_FILE);
         let targets: Vec<&Path> = if policy_approved { vec![approval_file.as_path(), path.as_path()] } else { vec![path.as_path()] };
         for target in targets {
-            crate::write_mode::check_writable(target).map_err(|e| crate::write_mode::unavailable(target, &e))?;
+            crate::write_mode::check_writable(target).map_err(|e| crate::write_mode::unwritable(target, &e))?;
         }
     }
     Ok(Checked { change: checked.change, brief: checked.brief, path, text, unchanged })
@@ -231,7 +232,7 @@ fn verify_shown(change: &ChangeId, brief: &str, path: &Path, shown: &BTreeMap<St
     let Some(digest) = shown.get(change.as_str()) else {
         return Err(CliError::refused("USAGE", format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", change.as_str())).field("--digest").hint(hint_for("RELAY_DIGEST_STALE")));
     };
-    let text = std::fs::read_to_string(path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{brief}`: {e}")))?;
+    let text = std::fs::read_to_string(path).map_err(|e| refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{brief}`: {e}")))?;
     let now = approval_digest(&text);
     if digest.eq_ignore_ascii_case(&now) {
         return Ok(());

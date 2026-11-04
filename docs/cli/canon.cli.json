@@ -447,25 +447,29 @@
       "effect": "destructive",
       "errors": [
         "ARTIFACTS_BLOB_CORRUPT",
+        "ARTIFACTS_BLOB_DENIED",
+        "ARTIFACTS_DIGEST_INVALID",
         "ARTIFACTS_STORE_FAILED",
-        "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "ARTIFACTS_TIER_INVALID",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "EVIDENCE_BINDING_STALE",
         "EVIDENCE_STORE_FAILED",
-        "EVIDENCE_STORE_UNAVAILABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "PLAN_STALE",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon artifacts move --tier cold --json"
@@ -731,21 +735,25 @@
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
         "ARTIFACTS_STORE_FAILED",
-        "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon artifacts store --json"
@@ -1236,14 +1244,18 @@
       "effect": "read",
       "errors": [
         "ARTIFACTS_BLOB_CORRUPT",
-        "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_BLOB_DENIED",
+        "ARTIFACTS_DIGEST_INVALID",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "ARTIFACTS_TIER_INVALID",
         "ARTIFACTS_VERIFY_FAILED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "EVIDENCE_BINDING_STALE",
         "EVIDENCE_STORE_FAILED",
-        "EVIDENCE_STORE_UNAVAILABLE",
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE"
@@ -1423,25 +1435,29 @@
         "ACTOR_DENIED",
         "APPROVAL_INVALID",
         "BATCH_INCOMPLETE",
+        "BRIEF_DENIED",
         "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
         "BRIEF_REQUIRED",
-        "BRIEF_UNREADABLE",
         "BRIEF_WRITE_FAILED",
         "CHANGE_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "POLICY_APPROVAL_FAILED",
+        "POLICY_REQUIRED",
         "RELAY_DIGEST_STALE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
-        "SPEC_ROOTS_UNREADABLE",
+        "SPEC_ROOT_DENIED",
+        "SPEC_ROOT_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon brief approve add-search --approver alice --note \"approved as written\" --json"
@@ -2250,15 +2266,18 @@
       "effect": "read",
       "errors": [
         "BRIEF_CHECK_FAILED",
+        "BRIEF_DENIED",
+        "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
         "BRIEF_REQUIRED",
-        "BRIEF_UNREADABLE",
         "CHANGE_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INTERNAL",
         "ROLE_INVALID",
-        "SPEC_ROOTS_UNREADABLE",
+        "SPEC_ROOT_DENIED",
+        "SPEC_ROOT_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -2551,15 +2570,18 @@
       "command": "brief show",
       "effect": "read",
       "errors": [
+        "BRIEF_DENIED",
+        "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
         "BRIEF_REQUIRED",
-        "BRIEF_UNREADABLE",
         "CHANGE_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INTERNAL",
         "ROLE_INVALID",
-        "SPEC_ROOTS_UNREADABLE",
+        "SPEC_ROOT_DENIED",
+        "SPEC_ROOT_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -2802,20 +2824,24 @@
         "CHANGE_ADOPTION_INCOMPLETE",
         "CHANGE_ARGUMENT_INVALID",
         "CHANGE_EXISTS",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SUBJECT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon change new add-search --subject demo --title \"Add search\" --json"
@@ -4463,12 +4489,14 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon context-pack add --manifest .canon/context-manifest.json --json"
@@ -5278,7 +5306,8 @@
         "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
-        "REPO_UNREADABLE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "USAGE"
@@ -5678,7 +5707,8 @@
         "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
-        "REPO_UNREADABLE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "USAGE"
@@ -5799,11 +5829,13 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon dashboard --json"
@@ -6006,8 +6038,9 @@
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon demo init --repo canon-demo --json"
@@ -6418,8 +6451,9 @@
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon demo review --json"
@@ -6831,8 +6865,8 @@
         "BATCH_INCOMPLETE",
         "DISPATCH_ARGUMENT_INVALID",
         "DISPATCH_CONFLICT",
-        "DISPATCH_MANIFEST_MISMATCH",
-        "DISPATCH_MANIFEST_UNREADABLE",
+        "DISPATCH_MANIFEST_CORRUPT",
+        "DISPATCH_MANIFEST_DENIED",
         "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
         "DISPATCH_RUN_UNAVAILABLE",
@@ -6841,15 +6875,17 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PLAN_CORPUS_UNREADABLE",
+        "PLAN_CORPUS_DENIED",
+        "PLAN_CORPUS_INVALID",
         "PLAN_SOURCES_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer --json"
@@ -7857,8 +7893,8 @@
         "BATCH_INCOMPLETE",
         "DISPATCH_ARGUMENT_INVALID",
         "DISPATCH_CONFLICT",
-        "DISPATCH_MANIFEST_MISMATCH",
-        "DISPATCH_MANIFEST_UNREADABLE",
+        "DISPATCH_MANIFEST_CORRUPT",
+        "DISPATCH_MANIFEST_DENIED",
         "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
         "DISPATCH_RUN_UNAVAILABLE",
@@ -7867,15 +7903,17 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PLAN_CORPUS_UNREADABLE",
+        "PLAN_CORPUS_DENIED",
+        "PLAN_CORPUS_INVALID",
         "PLAN_SOURCES_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded --json"
@@ -8409,8 +8447,9 @@
       "errors": [
         "ACTOR_DENIED",
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_CONFLICT",
         "DIVERGENCE_DENIED",
@@ -8419,12 +8458,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer --json"
@@ -9149,8 +9189,9 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_CONFLICT",
         "DIVERGENCE_DENIED",
@@ -9160,13 +9201,14 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTE_FAILED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "STOPPED_MIDWAY",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon divergence add auth.login.01 --actor alice --role reviewer --json"
@@ -9871,8 +9913,9 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_CONFLICT",
         "DIVERGENCE_DENIED",
@@ -9882,12 +9925,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon divergence defer auth.login.01 --actor alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer --json"
@@ -10502,8 +10546,9 @@
       ],
       "effect": "read",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "CURSOR_INVALID",
         "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_CONFLICT",
@@ -10511,7 +10556,9 @@
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_FAILED"
+        "WRITE_DENIED",
+        "WRITE_FAILED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon divergence list --as-of 2030-01-01 --json"
@@ -10783,8 +10830,9 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_CONFLICT",
         "DIVERGENCE_DENIED",
@@ -10794,12 +10842,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon divergence resolve auth.login.01 --actor alice --role reviewer --json"
@@ -11505,13 +11554,18 @@
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "BATCH_INCOMPLETE",
         "BRIEF_APPROVAL_REQUIRED",
         "BRIEF_APPROVAL_STALE",
         "BRIEF_MIGRATION_REQUIRED",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
         "EVIDENCE_APPROVAL_REQUIRED",
         "EVIDENCE_ARGUMENT_CONFLICT",
@@ -11531,10 +11585,12 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "LEDGER_CORRUPT",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "STOPPED_MIDWAY",
@@ -11543,8 +11599,9 @@
         "TASK_EVIDENCE_INVALID",
         "TYPED_ATOMS_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --json"
@@ -12715,8 +12772,9 @@
       "effect": "read",
       "errors": [
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "EVIDENCE_ARGUMENT_INVALID",
         "EVIDENCE_ARGUMENT_REQUIRED",
         "EVIDENCE_REQUIRED",
@@ -12982,13 +13040,18 @@
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "BATCH_INCOMPLETE",
         "BRIEF_APPROVAL_REQUIRED",
         "BRIEF_APPROVAL_STALE",
         "BRIEF_MIGRATION_REQUIRED",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
         "EVIDENCE_APPROVAL_REQUIRED",
         "EVIDENCE_ARGUMENT_CONFLICT",
@@ -13008,10 +13071,12 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "LEDGER_CORRUPT",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "STOPPED_MIDWAY",
@@ -13020,8 +13085,9 @@
         "TASK_EVIDENCE_INVALID",
         "TYPED_ATOMS_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json"
@@ -14084,11 +14150,13 @@
         "RETENTION_EXPORT_DENIED",
         "RETENTION_EXPORT_FAILED",
         "RETENTION_PURGE_FAILED",
+        "RETENTION_TIERS_DENIED",
         "RETENTION_TIERS_INVALID",
         "RETENTION_TIERS_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon export --kind evidence --output evidence.json --json"
@@ -15061,20 +15129,22 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "FEATURE_EXISTS",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_REQUIRED",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon feature new billing.invoice --title Invoices --json"
@@ -15631,8 +15701,9 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "FINDING_ARGUMENT_INVALID",
         "FINDING_EXISTS",
         "FINDING_INTRODUCED_REQUIRED",
@@ -15643,15 +15714,18 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "LEDGER_CORRUPT",
         "PROMOTE_FAILED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SCENARIO_NOT_FOUND",
         "STOPPED_MIDWAY",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary \"Token is logged\" --json"
@@ -16609,8 +16683,9 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "FINDING_ARGUMENT_INVALID",
         "FINDING_CONFLICT",
         "FINDING_INTRODUCED_REQUIRED",
@@ -16622,14 +16697,17 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "LEDGER_CORRUPT",
         "PROMOTE_FAILED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "STOPPED_MIDWAY",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \"works as designed\" --json"
@@ -17357,13 +17435,18 @@
       ],
       "effect": "read",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "CURSOR_INVALID",
         "INTERNAL",
-        "REPO_UNREADABLE",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
-        "USAGE"
+        "USAGE",
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon finding list --change add-login --json"
@@ -17591,11 +17674,13 @@
       "command": "format",
       "effect": "read",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "FORMAT_CHECK_FAILED",
         "INTERNAL",
-        "REPO_UNREADABLE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "UNVERIFIABLE",
         "USAGE"
@@ -17732,11 +17817,14 @@
       "command": "gate check",
       "effect": "read",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "GATE_CHECK_FAILED",
         "INTERNAL",
-        "REPO_UNREADABLE",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "UNVERIFIABLE",
         "USAGE"
@@ -17912,11 +18000,12 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon gate install-hooks --json"
@@ -18419,7 +18508,8 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_UNREADABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "EVIDENCE_STALE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -18428,7 +18518,7 @@
         "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "STOPPED_MIDWAY",
         "SUBJECT_APPROVAL_REQUIRED",
@@ -18436,7 +18526,8 @@
         "TASK_EVIDENCE_INVALID",
         "TYPED_ATOMS_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon gate promote --kind evidence --json"
@@ -18981,10 +19072,11 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon ingest plans --json"
@@ -19845,10 +19937,11 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon ingest records --json"
@@ -20565,18 +20658,20 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INGEST_FAILED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon ingest sessions --json"
@@ -21584,16 +21679,18 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
         "SKILLS_SOURCE_NOT_FOUND",
         "STOPPED_MIDWAY",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon init --json"
@@ -22204,9 +22301,9 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
         "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -22215,10 +22312,11 @@
         "INVENTORY_FAILED",
         "INVENTORY_INDEX_UNAVAILABLE",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon inventory sync --json"
@@ -22773,20 +22871,22 @@
       ],
       "effect": "destructive",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "LEDGER_ARCHIVE_UNAVAILABLE",
+        "LEDGER_ARCHIVE_INVALID",
         "LEDGER_COMPACT_FAILED",
         "PLAN_STALE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon ledger compact --json"
@@ -23139,9 +23239,9 @@
       "effect": "destructive",
       "errors": [
         "ACTOR_DENIED",
+        "CONFIG_DENIED",
         "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -23153,11 +23253,12 @@
         "MIGRATION_DENIED",
         "MIGRATION_INVALID",
         "PLAN_STALE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon migrate --json"
@@ -23637,9 +23738,9 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
         "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -23648,10 +23749,11 @@
         "LAYOUT_MIGRATION_REQUIRED",
         "PLUGIN_REQUIRED",
         "PLUGIN_SYNC_ERRORS",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon plugin sync my-plugin --json"
@@ -24227,19 +24329,22 @@
         "ACTOR_DENIED",
         "APPROVAL_INVALID",
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "POLICY_APPROVAL_FAILED",
+        "POLICY_DENIED",
         "POLICY_INVALID",
         "POLICY_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon policy approve --approver alice --note \"reviewed the starter policy\" --json"
@@ -25044,12 +25149,14 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json --json"
@@ -25605,7 +25712,8 @@
         "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
-        "REPO_UNREADABLE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "USAGE"
@@ -25826,14 +25934,16 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_STALE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "RETENTION_EXPORT_DENIED",
         "RETENTION_PURGE_FAILED",
+        "RETENTION_TIERS_DENIED",
         "RETENTION_TIERS_INVALID",
         "RETENTION_TIERS_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon purge --kind session --before 2020-01-01T00:00:00Z --json"
@@ -27210,8 +27320,9 @@
       "effectNote": "scratch files go under the system temp dir",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -27603,8 +27714,9 @@
       "effect": "read",
       "effectNote": "scratch files go under the system temp dir; writes no repo file",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INTERNAL",
         "REPORT_CHECK_FAILED",
         "REPORT_FAILED",
@@ -27700,8 +27812,9 @@
       "effectNote": "scratch files go under the system temp dir",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -28359,19 +28472,23 @@
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
         "ARTIFACTS_STORE_FAILED",
-        "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "BATCH_INCOMPLETE",
         "BRIEF_MIGRATION_REQUIRED",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "REVIEW_ARGUMENT_INVALID",
         "REVIEW_ARTIFACT_DENIED",
         "REVIEW_ARTIFACT_INVALID",
@@ -28380,8 +28497,9 @@
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md --json"
@@ -29176,18 +29294,22 @@
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
         "ARTIFACTS_STORE_FAILED",
-        "ARTIFACTS_STORE_UNREACHABLE",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
         "BATCH_INCOMPLETE",
         "COMMIT_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "REVIEW_ARGUMENT_INVALID",
         "REVIEW_ARTIFACT_DENIED",
         "REVIEW_ARTIFACT_INVALID",
@@ -29196,8 +29318,9 @@
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md --json"
@@ -29993,24 +30116,27 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "BRIEF_MIGRATION_REQUIRED",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "FEATURE_PATH_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SCAFFOLD_ARGUMENT_INVALID",
         "SCENARIO_TAG_EXISTS",
         "SPEC_ROOT_NOT_FOUND",
         "SPEC_ROOT_REQUIRED",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon scenario new auth.login.02 --title \"Sign out\" --feature .canon/specs/kind=feature/area=auth/login.feature --json"
@@ -31836,8 +31962,9 @@
       "effect": "read",
       "effectNote": "first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INTERNAL",
         "ROLE_INVALID",
         "SEARCH_INDEX_FAILED",
@@ -32707,13 +32834,14 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
         "SKILLS_SOURCE_NOT_FOUND",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon skills install --json"
@@ -34235,9 +34363,12 @@
       "command": "strategy approval-payload",
       "effect": "read",
       "errors": [
-        "CONFIG_UNREADABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "INTERNAL",
-        "REPO_UNREADABLE",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_EVALUATION_INVALID",
@@ -34431,23 +34562,27 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_UNREADABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "LEARN_PROMOTION_FAILED",
-        "LEARN_SIGNATURE_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "STOPPED_MIDWAY",
         "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_FILE_INVALID",
         "STRATEGY_PROMOTION_INVALID",
+        "STRATEGY_SIGNATURE_DENIED",
+        "STRATEGY_SIGNATURE_INVALID",
+        "STRATEGY_SIGNATURE_NOT_FOUND",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json"
@@ -34971,24 +35106,29 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_UNREADABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "LEARN_SIGNATURE_UNREADABLE",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_NOT_FOUND",
         "STRATEGY_ROLLBACK_FAILED",
+        "STRATEGY_SIGNATURE_DENIED",
         "STRATEGY_SIGNATURE_INVALID",
+        "STRATEGY_SIGNATURE_NOT_FOUND",
         "TRAJECTORY_NOT_FOUND",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json"
@@ -35604,12 +35744,15 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SUBJECT_NOT_FOUND",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon subject adopt demo --change add-login --json"
@@ -36320,11 +36463,14 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "LEDGER_CORRUPT",
+        "POLICY_APPROVAL_CORRUPT",
+        "POLICY_APPROVAL_DENIED",
         "POLICY_APPROVAL_STALE",
-        "POLICY_APPROVAL_UNREADABLE",
         "PROMOTION_INVALID",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_ARGUMENT_INVALID",
@@ -36333,8 +36479,9 @@
         "SUBJECT_NOT_FOUND",
         "SUBJECT_REASON_REQUIRED",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon subject move demo --to specced --json"
@@ -37251,15 +37398,18 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SUBJECT_ARGUMENT_INVALID",
         "SUBJECT_EXISTS",
         "SUBJECT_NOT_FOUND",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon subject new payments --domain dev --title Payments --json"
@@ -38040,11 +38190,14 @@
         "CHANGE_NOT_FOUND",
         "CONFIG_REQUIRED",
         "INTERNAL",
-        "REPO_UNREADABLE",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "ROLE_INVALID",
         "SUBJECT_NOT_FOUND",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon subject show demo --json"
@@ -38412,13 +38565,16 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "LEDGER_CORRUPT",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SUBJECT_CONFLICT",
         "SUBJECT_NOT_FOUND",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon subject unadopt demo --change add-login --json"
@@ -39118,27 +39274,33 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_UNREADABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "LEDGER_CORRUPT",
+        "PLAN_CORPUS_DENIED",
+        "PLAN_CORPUS_INVALID",
+        "PLAN_DOCUMENT_INVALID",
         "PROMOTE_FAILED",
         "PROMOTION_INVALID",
-        "REPO_UNREADABLE",
-        "REPO_WRITE_BUSY",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "STOPPED_MIDWAY",
         "TASK_EVIDENCE_INVALID",
         "TASK_EVIDENCE_REQUIRED",
         "TASK_ID_INVALID",
         "TASK_NOT_FOUND",
-        "TASK_ROW_NOT_FOUND",
         "TASK_UNSUPPORTED",
         "TYPED_ATOMS_INVALID",
         "USAGE",
+        "WRITE_DENIED",
         "WRITE_FAILED",
-        "WRITE_UNAVAILABLE"
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon task done add-login#1 --json"
@@ -39611,11 +39773,12 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_STALE",
-        "REPO_WRITE_BUSY",
+        "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "TIER_FAILED",
         "USAGE",
-        "WRITE_UNAVAILABLE"
+        "WRITE_DENIED",
+        "WRITE_INVALID"
       ],
       "examples": [
         "canon tier age --json"
@@ -39858,8 +40021,9 @@
       "effect": "read",
       "effectNote": "first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written",
       "errors": [
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
-        "CONFIG_UNREADABLE",
         "INTERNAL",
         "ROLE_INVALID",
         "SEARCH_INDEX_FAILED",
@@ -40234,8 +40398,22 @@
     {
       "code": "ARTIFACTS_BLOB_CORRUPT",
       "exit": 2,
-      "fix": "Run `canon artifacts verify` to see which blobs differ, restore or delete any local blob whose content does not match its name, replace the bad object-store copy the error names, then run the command again.",
-      "meaning": "a local artifact blob does not match its name, changed while it was read, or the object store holds a bad copy of it; the bytes canon wrote are damaged, and nothing was moved",
+      "fix": "Run `canon artifacts verify` to see which blobs differ, restore or delete any local blob whose content does not match its name, replace the bad object-store copy the error names, then run the command again. `canon artifacts verify` answers the same situation with exit 1.",
+      "meaning": "a local artifact blob does not match its name, or the object store holds a bad copy of it; the stored bytes canon wrote are damaged, and nothing was moved. A blob that cannot be read at all is ARTIFACTS_BLOB_DENIED, ARTIFACTS_STORE_INVALID or ARTIFACTS_STORE_UNAVAILABLE",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_BLOB_DENIED",
+      "exit": 2,
+      "fix": "Make the local blob the error names readable by this user, then run the command again.",
+      "meaning": "a local artifact blob exists but this user may not read it, so it can be neither verified nor moved; nothing was moved",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_DIGEST_INVALID",
+      "exit": 2,
+      "fix": "A recorded digest must be 64 lowercase hex characters; fix or re-create the record, then run the command again.",
+      "meaning": "a digest an artifact record carries is not 64 lowercase hex characters, so no path was built and nothing was stored",
       "retryable": false
     },
     {
@@ -40246,10 +40424,24 @@
       "retryable": true
     },
     {
-      "code": "ARTIFACTS_STORE_UNREACHABLE",
+      "code": "ARTIFACTS_STORE_INVALID",
       "exit": 2,
-      "fix": "Check the artifact store tier's endpoint and credentials in canon.yaml, then run the command again.",
-      "meaning": "the artifact store cannot be opened, attached or reached before any blob is written, so no blob can be verified or uploaded",
+      "fix": "Replace `.canon/artifacts/sha256` with a real directory, then run the command again.",
+      "meaning": "the local artifact store directory (`.canon/artifacts/sha256`) exists but is not a real directory (a symlink, for example), so writing through it could land outside the store; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_REQUIRED",
+      "exit": 2,
+      "fix": "Set CANON_S3_ENDPOINT, CANON_S3_ACCESS_KEY, CANON_S3_SECRET_KEY and the tier's bucket variable, or set `artifact_store: { backend: local }` in canon.yaml, then run the command again.",
+      "meaning": "the object-store tier `artifact_store.backend` names cannot be attached because its endpoint, credentials or bucket are not set; nothing was written, and waiting does not help",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Wait for the other canon process or for the object store to answer, then run the command again.",
+      "meaning": "the artifact store could not be opened or reached before any blob was written: another canon process holds the store lock, the object store did not answer, or the system failed the open in a way a repeat can pass; nothing was written",
       "retryable": true
     },
     {
@@ -40302,10 +40494,17 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_DENIED",
+      "exit": 2,
+      "fix": "Make brief.md readable by this user, then run the command again.",
+      "meaning": "the brief file exists but this user may not read it",
+      "retryable": false
+    },
+    {
       "code": "BRIEF_INVALID",
       "exit": 2,
-      "fix": "Resolve the blocker findings (`canon brief check` lists them) or close the open code fence in the brief text, then approve again.",
-      "meaning": "the brief cannot be approved as it stands: it has blocker findings, or its text cannot take an `Approved:` line",
+      "fix": "Make brief.md a UTF-8 text file, resolve the blocker findings (`canon brief check` lists them) or close the open code fence in the brief text, then run the command again.",
+      "meaning": "the brief cannot be used as it stands: a path that is no file or text that is not UTF-8 stands where brief.md belongs, it has blocker findings, or its text cannot take an `Approved:` line",
       "reasons": [
         {
           "fix": "Resolve every blocker finding (`canon brief check` lists them), then ask the human to approve again.",
@@ -40346,13 +40545,6 @@
       "exit": 2,
       "fix": "Run `canon change new` to create a change with a brief.",
       "meaning": "no live change has a brief",
-      "retryable": false
-    },
-    {
-      "code": "BRIEF_UNREADABLE",
-      "exit": 2,
-      "fix": "Check that the brief file exists and is readable, then run the command again.",
-      "meaning": "the brief file could not be read",
       "retryable": false
     },
     {
@@ -40419,6 +40611,13 @@
       "retryable": false
     },
     {
+      "code": "CONFIG_DENIED",
+      "exit": 2,
+      "fix": "Make the file the error names readable by this user, then run the command again.",
+      "meaning": "canon.yaml or a policy file exists but this user may not read it",
+      "retryable": false
+    },
+    {
       "code": "CONFIG_EXISTS",
       "exit": 2,
       "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it, or `canon demo init` in a directory without one.",
@@ -40428,9 +40627,14 @@
     {
       "code": "CONFIG_INVALID",
       "exit": 2,
-      "fix": "Fix the section the reason names (`DASHBOARD`: the dashboard section of canon.yaml; `POLICY`: the adapter policy in .canon/policy.yaml; `SPECS`: the `specs:` section; `SKILLS`: the `skills:` section), then run the command again.",
-      "meaning": "a section of canon.yaml or a policy file is present but unusable; the reason names which",
+      "fix": "Fix canon.yaml (`canon init --check` names the problem), or the section the reason names (`ARTIFACT_STORE`: the `artifact_store:` section; `DASHBOARD`: the dashboard section of canon.yaml; `POLICY`: the adapter policy in .canon/policy.yaml; `SPECS`: the `specs:` section; `SKILLS`: the `skills:` section), then run the command again.",
+      "meaning": "canon.yaml or a policy file a person edits is present but unusable: it does not parse, or a section of it is malformed (the reason, when there is one, names which); a file this user may not read is CONFIG_DENIED",
       "reasons": [
+        {
+          "fix": "Fix the `artifact_store:` section of canon.yaml (`canon init --check` names the problem), or set `artifact_store: { backend: local }`, then run the command again.",
+          "meaning": "the `artifact_store:` section of canon.yaml (or the tier it names) is present but unusable",
+          "reason": "ARTIFACT_STORE"
+        },
         {
           "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
           "meaning": "the dashboard's canon.yaml section is present but unusable",
@@ -40459,13 +40663,6 @@
       "exit": 2,
       "fix": "Run `canon init` or pass --repo <DIR> to a directory holding canon.yaml.",
       "meaning": "canon.yaml does not exist",
-      "retryable": false
-    },
-    {
-      "code": "CONFIG_UNREADABLE",
-      "exit": 2,
-      "fix": "Fix the canon.yaml, policy or setting named in the error, then run `canon init --check` to confirm.",
-      "meaning": "canon.yaml, policy or a setting it carries could not be read or is invalid",
       "retryable": false
     },
     {
@@ -40631,17 +40828,17 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_MANIFEST_MISMATCH",
+      "code": "DISPATCH_MANIFEST_CORRUPT",
       "exit": 2,
-      "fix": "Rename the manifest to match its run id, or correct the run id inside it.",
-      "meaning": "the manifest's run id differs from its file name",
+      "fix": "Restore the dispatch manifest as a readable run record, or rename it to match its run id, then run the command again.",
+      "meaning": "a dispatch manifest canon wrote is not a readable run record, or its run id differs from its file name; the same manifest is a warning when a command only lists runs",
       "retryable": false
     },
     {
-      "code": "DISPATCH_MANIFEST_UNREADABLE",
+      "code": "DISPATCH_MANIFEST_DENIED",
       "exit": 2,
-      "fix": "Restore the dispatch manifest as a readable run record.",
-      "meaning": "the dispatch manifest is not a readable run record",
+      "fix": "Make the manifest the error names readable by this user, then run the command again.",
+      "meaning": "a dispatch manifest exists but this user may not read it",
       "retryable": false
     },
     {
@@ -40834,13 +41031,6 @@
       "exit": 1,
       "fix": "Check the artifact store is reachable and writable, then run the command again.",
       "meaning": "a bound file could not be written to the artifact store after the store was opened; the batch or record was rolled back",
-      "retryable": true
-    },
-    {
-      "code": "EVIDENCE_STORE_UNAVAILABLE",
-      "exit": 2,
-      "fix": "Check the artifact store tier's endpoint and credentials in canon.yaml, or wait for the other canon process, then run the command again.",
-      "meaning": "the artifact store could not be used for a bound file before anything was written: the tier is not attached, the `artifact_store:` block is unusable, or another process holds the store lock",
       "retryable": true
     },
     {
@@ -41106,14 +41296,7 @@
       "retryable": false
     },
     {
-      "code": "LEARN_SIGNATURE_UNREADABLE",
-      "exit": 2,
-      "fix": "Pass the path of a readable detached signature file.",
-      "meaning": "the detached signature file could not be read",
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_ARCHIVE_UNAVAILABLE",
+      "code": "LEDGER_ARCHIVE_INVALID",
       "exit": 2,
       "fix": "Point --ledger-root at a directory named `ledger`, or rename the ledger directory so it has an archive.",
       "meaning": "`ledger compact` found no archive: the ledger root is not a directory named `ledger`",
@@ -41124,6 +41307,13 @@
       "exit": 1,
       "fix": "Fix the file-system problem the error names, then run `canon ledger compact` again to move the rest.",
       "meaning": "a superseded version could not be moved to the archive; what moved stays moved",
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_CORRUPT",
+      "exit": 2,
+      "fix": "Run `canon gate check` to name the broken records, then restore them from git or write them again.",
+      "meaning": "a ledger record canon wrote cannot be parsed or does not agree with the others, so the repository state cannot be read; `canon gate check` answers the same situation with exit 1 and names the records",
       "retryable": false
     },
     {
@@ -41169,10 +41359,24 @@
       "retryable": false
     },
     {
-      "code": "PLAN_CORPUS_UNREADABLE",
+      "code": "PLAN_CORPUS_DENIED",
       "exit": 2,
-      "fix": "Fix the plan sources configured in canon.yaml so every document can be read.",
-      "meaning": "the plan corpus could not be read to resolve a task",
+      "fix": "Make the plan document the error names readable by this user, then run the command again.",
+      "meaning": "a plan document the plan sources name exists but this user may not read it",
+      "retryable": false
+    },
+    {
+      "code": "PLAN_CORPUS_INVALID",
+      "exit": 2,
+      "fix": "Fix the plan sources configured in canon.yaml so every document is a readable text file.",
+      "meaning": "a plan document the plan sources name cannot be used to resolve the task: it is not a file or not UTF-8 text",
+      "retryable": false
+    },
+    {
+      "code": "PLAN_DOCUMENT_INVALID",
+      "exit": 2,
+      "fix": "Restore the task's row in its plan document, then run `canon task done` again.",
+      "meaning": "the plan document has no row for the task, so there is nothing to flip; the plan document is a file people edit",
       "retryable": false
     },
     {
@@ -41204,6 +41408,20 @@
       "retryable": false
     },
     {
+      "code": "POLICY_APPROVAL_CORRUPT",
+      "exit": 2,
+      "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
+      "meaning": "`.canon/policy.approval.json` cannot be parsed, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused, and `--override-reason` does not waive it",
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_DENIED",
+      "exit": 2,
+      "fix": "Make `.canon/policy.approval.json` readable by this user, then run the command again.",
+      "meaning": "`.canon/policy.approval.json` exists but this user may not read it, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused, and `--override-reason` does not waive it",
+      "retryable": false
+    },
+    {
       "code": "POLICY_APPROVAL_FAILED",
       "exit": 1,
       "fix": "Check that .canon is writable, then have the human run `canon policy approve` again.",
@@ -41218,17 +41436,17 @@
       "retryable": false
     },
     {
-      "code": "POLICY_APPROVAL_UNREADABLE",
-      "exit": 1,
-      "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
-      "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject is refused as a closed gate (exit 1), and `--override-reason` does not waive it",
+      "code": "POLICY_DENIED",
+      "exit": 2,
+      "fix": "Make `.canon/policy.yaml` readable by this user, then have the human run `canon policy approve` again.",
+      "meaning": "`policy approve` found `.canon/policy.yaml` but this user may not read it; nothing was written",
       "retryable": false
     },
     {
       "code": "POLICY_INVALID",
       "exit": 2,
-      "fix": "Make `.canon/policy.yaml` a readable, valid policy, then have the human run `canon policy approve` again.",
-      "meaning": "`policy approve` cannot read the policy file or it is not a policy; nothing was written",
+      "fix": "Make `.canon/policy.yaml` a valid policy file, then have the human run `canon policy approve` again.",
+      "meaning": "`policy approve` found a policy file that is no policy, or a path that is no file, where `.canon/policy.yaml` belongs; nothing was written. A policy file this user may not read is POLICY_DENIED",
       "retryable": false
     },
     {
@@ -41309,14 +41527,21 @@
       "retryable": false
     },
     {
-      "code": "REPO_UNREADABLE",
+      "code": "REPO_DENIED",
       "exit": 2,
-      "fix": "Check that --repo points at a readable repository and that the named input file exists.",
-      "meaning": "the repository, its ledger or an input file could not be read",
+      "fix": "Make the repository directory the error names readable by this user, or pass --repo <path> for another root.",
+      "meaning": "the repository or its ledger exists but this user may not read it",
       "retryable": false
     },
     {
-      "code": "REPO_WRITE_BUSY",
+      "code": "REPO_INVALID",
+      "exit": 2,
+      "fix": "Check that --repo points at a directory that holds canon.yaml, then run the command again.",
+      "meaning": "the path given as the repository is not a repository canon can read: it is missing or not a directory",
+      "retryable": false
+    },
+    {
+      "code": "REPO_LOCK_UNAVAILABLE",
       "exit": 2,
       "fix": "A canon command that writes or commits is still running in this repository: run the same command again in a moment.",
       "meaning": "another canon process held the repository write lock for the whole wait, so this command, which writes or commits, started nothing",
@@ -41344,17 +41569,24 @@
       "retryable": false
     },
     {
+      "code": "RETENTION_TIERS_DENIED",
+      "exit": 2,
+      "fix": "Make the file the error names readable by this user, then run the command again.",
+      "meaning": "a file the tiers of a purge or export need (canon.yaml, a ledger directory) exists but this user may not read it; nothing was deleted or written",
+      "retryable": false
+    },
+    {
       "code": "RETENTION_TIERS_INVALID",
       "exit": 2,
       "fix": "Fix the tier or policy problem the error names in canon.yaml, then run the command again.",
-      "meaning": "the tiers cannot be used for a purge or export: the policy, a routing entry or the learn retention config is malformed; nothing was deleted or written",
+      "meaning": "the tiers cannot be used for a purge or export: the policy, a routing entry or the learn retention config is malformed, or a path they name is missing or no directory; nothing was deleted or written",
       "retryable": false
     },
     {
       "code": "RETENTION_TIERS_UNAVAILABLE",
       "exit": 2,
       "fix": "Check that the ledger and the tier backends are reachable, then run the command again.",
-      "meaning": "the tiers could not be opened or read for a purge or export (a backend is down or unreachable); nothing was deleted or written",
+      "meaning": "the tiers could not be opened or read for a purge or export because a backend is down or unreachable, or the system failed the read in a way a repeat can pass; nothing was deleted or written",
       "retryable": true
     },
     {
@@ -41498,10 +41730,17 @@
       "retryable": false
     },
     {
-      "code": "SPEC_ROOTS_UNREADABLE",
+      "code": "SPEC_ROOT_DENIED",
       "exit": 2,
-      "fix": "Make the scenario files the brief's flow steps point at readable, or correct the paths.",
-      "meaning": "the scenario files a brief's flow steps point at could not be read",
+      "fix": "Make the scenario file the error names readable by this user, then run the command again.",
+      "meaning": "a scenario file a brief's flow steps point at exists but this user may not read it",
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOT_INVALID",
+      "exit": 2,
+      "fix": "Fix the scenario path the brief's flow steps give so it names a text file.",
+      "meaning": "a scenario file a brief's flow steps point at cannot be used: it is not a file or not UTF-8 text",
       "retryable": false
     },
     {
@@ -41602,10 +41841,24 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_SIGNATURE_DENIED",
+      "exit": 2,
+      "fix": "Make the --signature file readable by this user, then run the command again.",
+      "meaning": "the detached signature file exists but this user may not read it",
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_SIGNATURE_INVALID",
       "exit": 2,
       "fix": "Sign the rollback again with a key the policy lists, then run `canon strategy rollback` again.",
       "meaning": "the detached signature of a strategy rollback does not verify; nothing was recorded",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass --signature naming an existing detached signature file.",
+      "meaning": "the detached signature file does not exist",
       "retryable": false
     },
     {
@@ -41703,13 +41956,6 @@
       "retryable": false
     },
     {
-      "code": "TASK_ROW_NOT_FOUND",
-      "exit": 2,
-      "fix": "Restore the task's row in its plan document, then run `canon task done` again.",
-      "meaning": "the task's row is missing from its plan document",
-      "retryable": false
-    },
-    {
       "code": "TASK_UNSUPPORTED",
       "exit": 2,
       "fix": "Mark the task done by hand in the plan document; this plan dialect cannot be flipped by canon.",
@@ -41780,6 +42026,13 @@
       "retryable": false
     },
     {
+      "code": "WRITE_DENIED",
+      "exit": 2,
+      "fix": "Make the target writable (its permissions, a read-only mount), then run the command again.",
+      "meaning": "a target the command writes is read-only or this user may not write it, known before anything was changed; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "WRITE_FAILED",
       "exit": 1,
       "fix": "Check that the target path is writable and has space, then run the command again.",
@@ -41787,10 +42040,10 @@
       "retryable": false
     },
     {
-      "code": "WRITE_UNAVAILABLE",
+      "code": "WRITE_INVALID",
       "exit": 2,
-      "fix": "Make the target writable (its permissions, a mounted volume, a missing parent), then run the command again.",
-      "meaning": "a target the command writes cannot be written, known before anything was changed: it is read-only, its directory is missing or not a directory; nothing was written",
+      "fix": "Create the missing directory or name a directory that exists, then run the command again.",
+      "meaning": "a target the command writes cannot be a target: its directory is missing or is not a directory, known before anything was changed; nothing was written",
       "retryable": false
     }
   ],

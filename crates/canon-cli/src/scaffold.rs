@@ -349,7 +349,7 @@ struct Planner {
 
 impl Planner {
     fn new(repo_root: &Path) -> Result<Self, CliError> {
-        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
+        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| crate::read_cause::config_error(e.to_string()))?;
         let corpus = roots.iter().map(|root| corpus_tags(&root.root)).collect();
         Ok(Self { repo_root: repo_root.to_path_buf(), roots, corpus, flows: HashMap::new() })
     }
@@ -424,7 +424,7 @@ impl Planner {
         }
 
         let existing = if feature_path.exists() {
-            fs::read_to_string(&feature_path).map_err(|e| CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", feature_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root"))?
+            fs::read_to_string(&feature_path).map_err(|e| crate::read_cause::repo_io_error(format!("failed to read `{}`: {e}", feature_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root"))?
         } else {
             String::new()
         };
@@ -461,7 +461,7 @@ fn stage(pending: &mut Vec<Pending>, planned: Planned, spec: &ScenarioSpec, prov
 /// before the first write, so an unwritable one refuses with nothing written.
 fn write_pending(pending: &[Pending]) -> Result<(), CliError> {
     for file in pending {
-        crate::write_mode::check_writable(&file.path).map_err(|e| crate::write_mode::unavailable(&file.path, &e))?;
+        crate::write_mode::check_writable(&file.path).map_err(|e| crate::write_mode::unwritable(&file.path, &e))?;
     }
     for file in pending {
         if let Some(parent) = file.path.parent() {
@@ -588,7 +588,7 @@ pub fn run_feature_new(
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon feature new", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon feature new", json);
         }
     };
     let root = match resolve_spec_root("canon feature new", &roots, project) {

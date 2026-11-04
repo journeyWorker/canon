@@ -593,12 +593,32 @@
       "retryable": false
     },
     {
+      "code": "ARTIFACTS_BLOB_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_DIGEST_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "ARTIFACTS_STORE_FAILED",
       "exit": 1,
       "retryable": true
     },
     {
-      "code": "ARTIFACTS_STORE_UNREACHABLE",
+      "code": "ARTIFACTS_STORE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_UNAVAILABLE",
       "exit": 2,
       "retryable": true
     },
@@ -636,6 +656,11 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "BRIEF_INVALID",
       "exit": 2,
       "reasons": [
@@ -661,11 +686,6 @@
     },
     {
       "code": "BRIEF_REQUIRED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "BRIEF_UNREADABLE",
       "exit": 2,
       "retryable": false
     },
@@ -715,6 +735,11 @@
       "retryable": false
     },
     {
+      "code": "CONFIG_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "CONFIG_EXISTS",
       "exit": 2,
       "retryable": false
@@ -723,6 +748,7 @@
       "code": "CONFIG_INVALID",
       "exit": 2,
       "reasons": [
+        "ARTIFACT_STORE",
         "DASHBOARD",
         "POLICY",
         "SKILLS",
@@ -732,11 +758,6 @@
     },
     {
       "code": "CONFIG_REQUIRED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "CONFIG_UNREADABLE",
       "exit": 2,
       "retryable": false
     },
@@ -843,12 +864,12 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_MANIFEST_MISMATCH",
+      "code": "DISPATCH_MANIFEST_CORRUPT",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DISPATCH_MANIFEST_UNREADABLE",
+      "code": "DISPATCH_MANIFEST_DENIED",
       "exit": 2,
       "retryable": false
     },
@@ -976,11 +997,6 @@
     {
       "code": "EVIDENCE_STORE_FAILED",
       "exit": 1,
-      "retryable": true
-    },
-    {
-      "code": "EVIDENCE_STORE_UNAVAILABLE",
-      "exit": 2,
       "retryable": true
     },
     {
@@ -1144,18 +1160,18 @@
       "retryable": false
     },
     {
-      "code": "LEARN_SIGNATURE_UNREADABLE",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_ARCHIVE_UNAVAILABLE",
+      "code": "LEDGER_ARCHIVE_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "LEDGER_COMPACT_FAILED",
       "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "LEDGER_CORRUPT",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -1189,7 +1205,17 @@
       "retryable": false
     },
     {
-      "code": "PLAN_CORPUS_UNREADABLE",
+      "code": "PLAN_CORPUS_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "PLAN_CORPUS_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "PLAN_DOCUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1214,6 +1240,16 @@
       "retryable": false
     },
     {
+      "code": "POLICY_APPROVAL_CORRUPT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "POLICY_APPROVAL_FAILED",
       "exit": 1,
       "retryable": false
@@ -1224,8 +1260,8 @@
       "retryable": false
     },
     {
-      "code": "POLICY_APPROVAL_UNREADABLE",
-      "exit": 1,
+      "code": "POLICY_DENIED",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -1287,12 +1323,17 @@
       "retryable": false
     },
     {
-      "code": "REPO_UNREADABLE",
+      "code": "REPO_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "REPO_WRITE_BUSY",
+      "code": "REPO_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REPO_LOCK_UNAVAILABLE",
       "exit": 2,
       "retryable": true
     },
@@ -1309,6 +1350,11 @@
     {
       "code": "RETENTION_PURGE_FAILED",
       "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_DENIED",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -1420,7 +1466,12 @@
       "retryable": false
     },
     {
-      "code": "SPEC_ROOTS_UNREADABLE",
+      "code": "SPEC_ROOT_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1482,7 +1533,17 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_SIGNATURE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_SIGNATURE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -1547,11 +1608,6 @@
       "retryable": false
     },
     {
-      "code": "TASK_ROW_NOT_FOUND",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "TASK_UNSUPPORTED",
       "exit": 2,
       "retryable": false
@@ -1602,12 +1658,17 @@
       "retryable": false
     },
     {
+      "code": "WRITE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "WRITE_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "WRITE_UNAVAILABLE",
+      "code": "WRITE_INVALID",
       "exit": 2,
       "retryable": false
     }

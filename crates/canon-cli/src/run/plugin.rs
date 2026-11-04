@@ -37,7 +37,7 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
             let error = match &err {
                 crate::plugin_sync::PluginSyncError::Unavailable(error) => error.clone(),
                 crate::plugin_sync::PluginSyncError::Inventory(crate::inventory::InventoryError::Config(_)) => CliError::refused("CONFIG_INVALID", err.to_string()).reason("SPECS").hint("fix the `specs:` section of canon.yaml, then run `canon plugin sync` again"),
-                crate::plugin_sync::PluginSyncError::Inventory(crate::inventory::InventoryError::CanonYaml(_)) => CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run `canon plugin sync` again"),
+                crate::plugin_sync::PluginSyncError::Inventory(crate::inventory::InventoryError::CanonYaml(_)) => crate::read_cause::config_error(err.to_string()),
                 crate::plugin_sync::PluginSyncError::Inventory(_) => CliError::refused("INVENTORY_INDEX_UNAVAILABLE", err.to_string()).hint("another canon process holds the scenario index; wait for it, then run `canon plugin sync` again"),
                 crate::plugin_sync::PluginSyncError::UnknownSource(_) | crate::plugin_sync::PluginSyncError::UnresolvedPlugin(_) | crate::plugin_sync::PluginSyncError::NoOverlay(_) => CliError::refused("PLUGIN_REQUIRED", err.to_string()).hint("check that the plugin is installed under `.canon/plugins/` and declares an overlay, then run `canon plugin sync` again"),
             };

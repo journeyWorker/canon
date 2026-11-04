@@ -163,7 +163,7 @@ pub enum PlansError {
     #[error(transparent)]
     Store(#[from] StoreError),
     /// A store the import writes cannot be written, known before anything was
-    /// changed (`WRITE_UNAVAILABLE`).
+    /// changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
     /// A source yields nothing usable: it holds malformed constructs and not one that parses. Known before anything is persisted

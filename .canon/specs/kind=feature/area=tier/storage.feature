@@ -140,7 +140,7 @@ Feature: tier storage
     When canon ledger compact is run with --commit and the old digest
     Then it exits 2 with PLAN_STALE and nothing moved
     And --commit without --plan-digest exits 2 naming --plan-digest and nothing moved
-    And a repo whose ledger root is a custom directory exits 2 with LEDGER_ARCHIVE_UNAVAILABLE
+    And a repo whose ledger root is a custom directory exits 2 with LEDGER_ARCHIVE_INVALID
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
   @subject:tier-storage

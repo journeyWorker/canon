@@ -256,7 +256,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     }) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
+            return crate::read_cause::config_error(e.clone()).emit(&args.full(), args.json);
         }
     };
     if let Some(error) = args.change.as_ref().and_then(|change| crate::old_briefs::refusal_among(&repo, std::slice::from_ref(change))) {
@@ -463,20 +463,20 @@ fn write_reviews(
     write: &mut dyn FnMut(&GitTier, &Review) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
 ) -> Result<(usize, Vec<(String, bool)>), CliError> {
     const WRITE_HINT: &str = "check that the path is writable and the disk has room, then run the command again";
-    let unwritable = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint("make the review directory writable, then run the command again; nothing was written");
+    let unwritable = |code: &'static str, message: String| CliError::refused(code, message).hint("make the review directory writable, then run the command again; nothing was written");
     let dir = ledger_root.join(format!("kind={}", RecordKind::Review.as_str()));
     match std::fs::create_dir_all(&dir).and_then(|()| std::fs::metadata(&dir)) {
-        Ok(meta) if meta.permissions().readonly() => return Err(unwritable(format!("{} is read-only", dir.display()))),
+        Ok(meta) if meta.permissions().readonly() => return Err(unwritable("WRITE_DENIED", format!("{} is read-only", dir.display()))),
         Ok(_) => {}
-        Err(e) => return Err(unwritable(format!("cannot prepare {}: {e}", dir.display()))),
+        Err(e) => return Err(unwritable(crate::read_cause::write_code_of_text(&e.to_string()), format!("cannot prepare {}: {e}", dir.display()))),
     }
     let held = crate::evidence_attach::store_files_held(repo, files).map_err(|(file, e)| {
-        let code = match &e {
-            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => "REVIEW_ARTIFACT_STALE",
-            _ if crate::artifacts::before_first_write(&e) => "ARTIFACTS_STORE_UNREACHABLE",
-            _ => "ARTIFACTS_STORE_FAILED",
-        };
-        CliError::refused(code, format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint())).hint(e.hint())
+        let message = format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint());
+        match &e {
+            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => CliError::refused("REVIEW_ARTIFACT_STALE", message).hint(e.hint()),
+            _ if crate::artifacts::before_first_write(&e) => crate::artifacts::store_refusal(&e, message),
+            _ => CliError::refused("ARTIFACTS_STORE_FAILED", message).hint(e.hint()),
+        }
     })?;
     // Every refusal is behind us (an unwritable directory and a blob that cannot be stored are two): the index refresh this writer owes happens with the first review.
     crate::inventory::refresh_stale_index(repo, command);
@@ -723,7 +723,7 @@ mod tests {
         let refused = write_reviews(dir.path(), "canon review scenario", &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
         std::fs::set_permissions(&review_dir, original).unwrap();
         let refused = refused.unwrap_err();
-        assert_eq!((refused.code, refused.exit), ("WRITE_UNAVAILABLE", 2));
+        assert_eq!((refused.code, refused.exit), ("WRITE_DENIED", 2));
         assert!(refused.message.contains("is read-only"));
         assert_eq!(blobs(), 0);
 

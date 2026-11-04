@@ -394,7 +394,7 @@ pub enum ArtifactIngestError {
     #[error("canon.yaml artifacts config: {0}")]
     ConfigXor(String),
     /// A store the pass writes cannot be written, known before anything was
-    /// changed (`WRITE_UNAVAILABLE`).
+    /// changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
     /// `--run <RunId>` (s42 (`close-the-open-loops`) task 3.2) names a
@@ -2537,7 +2537,7 @@ fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifa
         // The trajectory and strategy stores are local files: refused before the first write, nothing changed.
         if !dry_run && !matches!(plan, PersistPlan::SkipDuplicate) {
             for target in [learn_root.join("trajectories"), learn_root.join("strategies")] {
-                crate::write_mode::check_writable(&target).map_err(|cause| ArtifactIngestError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
+                crate::write_mode::check_writable(&target).map_err(|cause| ArtifactIngestError::Unavailable(crate::write_mode::unwritable(&target, &cause)))?;
             }
         }
         let (trajectory, superseded) = match plan {

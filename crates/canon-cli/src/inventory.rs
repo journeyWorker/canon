@@ -91,7 +91,7 @@ pub enum InventoryError {
     #[error("{0}")]
     Locked(String),
     /// A store the sync writes cannot be written, known before anything was
-    /// changed (`WRITE_UNAVAILABLE`).
+    /// changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
 }
@@ -198,13 +198,12 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
 /// is keyed `(project_id, scenario_id)`), and no command removes one
 /// record, so the id is checked before anything is written. The hint
 /// names the configured roots, and with one root the exact flag to use.
-/// An unreadable `canon.yaml` is `CONFIG_UNREADABLE`, as everywhere else.
+/// An unreadable `canon.yaml` is `CONFIG_INVALID`, as everywhere else.
 /// Read-only queries are not checked: a filter on an id no root carries
 /// matches nothing and writes nothing.
 pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
-    use crate::cli_error::{CliError, CliErrorExt as _};
     let roots = load_spec_roots(&repo.join("canon.yaml")).map_err(|e| {
-        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
+        crate::read_cause::config_error(e.to_string())
     })?;
     check_spec_root(&roots, project_id)
 }
@@ -241,7 +240,7 @@ pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static
     let roots = match load_spec_roots(&repo.join("canon.yaml")) {
         Ok(roots) => roots,
         Err(e) => {
-            return Err(CliError::refused("CONFIG_UNREADABLE", e.to_string())
+            return Err(crate::read_cause::config_error(e.to_string())
                 .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
                 .emit(command, json));
         }
@@ -425,7 +424,7 @@ fn sync_repo(repo: &Path, spec_root: Option<&Path>, dry_run: bool) -> Result<Syn
     if !dry_run {
         // The first things a sync writes: the index lock, then the scenario records. Refused before either.
         for target in [ctx.repo.join(paths::SCENARIO_INDEX_LOCK_FILE), ctx.ledger_root.join(format!("kind={}", RecordKind::Scenario.as_str()))] {
-            crate::write_mode::check_writable(&target).map_err(|cause| InventoryError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
+            crate::write_mode::check_writable(&target).map_err(|cause| InventoryError::Unavailable(crate::write_mode::unwritable(&target, &cause)))?;
         }
     }
     // A `specs:` section that is wrong is refused before the lock file exists: a refused call writes nothing. The roots are read again under the lock.

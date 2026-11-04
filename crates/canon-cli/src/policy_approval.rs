@@ -375,9 +375,10 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&App
         }
         Err(e) => {
             // A missing or unreadable policy and a blank approver are refused before anything is written; a failed write of the approval is a failure during the work.
-            let code = match e {
+            let code = match &e {
                 PolicyApprovalError::WriteApproval { .. } => "POLICY_APPROVAL_FAILED",
                 PolicyApprovalError::NoPolicy { .. } => "POLICY_REQUIRED",
+                PolicyApprovalError::ReadPolicy { source, .. } if crate::read_cause::of_io(source) == crate::read_cause::Cause::Denied => "POLICY_DENIED",
                 PolicyApprovalError::ReadPolicy { .. } => "POLICY_INVALID",
                 PolicyApprovalError::BlankApprover => "APPROVAL_INVALID",
             };

@@ -35,12 +35,12 @@ use crate::context::resolve_repo_root;
 /// outcome, in kind order. `Err` is the refusal or failure to report.
 pub fn compact(repo: &Path, dry_run: bool) -> Result<Vec<KindCompaction>, CliError> {
     let ctx = GateCtx::from_repo(repo).map_err(|e| {
-        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
+        crate::read_cause::config_error(e.to_string())
     })?;
     let tier = GitTier::new(&ctx.ledger_root);
     if tier.archive_root().is_none() {
         return Err(CliError::refused(
-            "LEDGER_ARCHIVE_UNAVAILABLE",
+            "LEDGER_ARCHIVE_INVALID",
             format!("the ledger root `{}` is not a directory named `ledger`, so it has no archive beside it and keeps every version", ctx.ledger_root.display()),
         )
         .hint("name the local tier's root `<dir>/ledger` in canon.yaml (`tiers.local.root`, default `.canon/ledger`) to archive superseded versions"));
@@ -133,7 +133,7 @@ fn effects(repo: &Path, kinds: &[KindCompaction]) -> Vec<Effect> {
 pub fn migrate_effects(repo: &Path) -> Result<Vec<Effect>, CliError> {
     match compact(repo, true) {
         Ok(kinds) => Ok(effects(repo, &kinds)),
-        Err(e) if e.code == "LEDGER_ARCHIVE_UNAVAILABLE" => Ok(Vec::new()),
+        Err(e) if e.code == "LEDGER_ARCHIVE_INVALID" => Ok(Vec::new()),
         Err(e) => Err(e),
     }
 }
@@ -229,7 +229,7 @@ pub fn migrate_lines(repo: &Path, dry_run: bool) -> Result<Vec<String>, CliError
     match compact(repo, dry_run) {
         Ok(kinds) if kinds.iter().all(|k| k.superseded == 0) => Ok(Vec::new()),
         Ok(kinds) => Ok(lines(repo, dry_run, &kinds)),
-        Err(e) if e.code == "LEDGER_ARCHIVE_UNAVAILABLE" => Ok(Vec::new()),
+        Err(e) if e.code == "LEDGER_ARCHIVE_INVALID" => Ok(Vec::new()),
         Err(e) => Err(e),
     }
 }

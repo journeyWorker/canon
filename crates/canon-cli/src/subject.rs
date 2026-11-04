@@ -507,7 +507,7 @@ pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon subject new", json);
         }
     };
 
@@ -517,7 +517,7 @@ pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
+            return crate::read_cause::repo_error(e.clone()).emit("canon subject new", json);
         }
     }
 
@@ -625,8 +625,8 @@ fn unadopt_change(
     dry_run: bool,
 ) -> Result<UnadoptOutcome, CliError> {
     let hint = "fix what the message names, then run `canon subject unadopt` again";
-    let unreadable = |message: String| CliError::refused("REPO_UNREADABLE", message).hint(hint);
-    let unwritten = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint(hint);
+    let unreadable = |message: String| crate::read_cause::repo_error(message).hint(hint);
+    let unwritten = |message: String| CliError::refused(crate::read_cause::write_code_of_text(&message), message).hint(hint);
     let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(unreadable)?;
     let Some(mut subject) = subject else {
         return Err(CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).hint(hint));
@@ -736,14 +736,14 @@ fn quoted_list(ids: &[SubjectId]) -> String {
 
 /// Look up, then write, an adoption: `canon subject adopt`'s whole
 /// effect. Refuses (`SUBJECT_NOT_FOUND` or `CHANGE_NOT_FOUND`, the operator-facing message with
-/// no command prefix) when either record is absent, or `WRITE_UNAVAILABLE`
+/// no command prefix) when either record is absent, or `WRITE_DENIED` / `WRITE_INVALID`
 /// when a store it would write cannot be; see [`persist_adoption`] for
 /// the write. `Ok` carries the subject, every subject the change now
 /// belongs to ([`change_owners`]), and whether anything was written
 /// (`false`: both sides already carried the link).
 pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool) -> Result<(Subject, Vec<SubjectId>, bool), CliError> {
     let refused = |code: &'static str, message: String| CliError::refused(code, message).hint("fix what the message names, then run `canon subject adopt` again");
-    let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(|message| refused("REPO_UNREADABLE", message))?;
+    let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(|message| crate::read_cause::repo_error(message).hint("fix what the message names, then run `canon subject adopt` again"))?;
     let Some(subject) = subject else {
         return Err(refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())));
     };
@@ -761,7 +761,7 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
         if e.subject_written {
             CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
         } else {
-            refused("WRITE_UNAVAILABLE", message)
+            refused(crate::read_cause::write_code_of_text(&message), message)
         }
     })?;
     // The write is done; an owner list that cannot be read falls back to
@@ -820,7 +820,7 @@ pub(crate) struct AdoptionWriteError {
     #[source]
     source: Box<dyn std::error::Error + Send + Sync>,
     /// Set when a store the write lands in cannot be written: the refusal
-    /// made before either record was written (`WRITE_UNAVAILABLE`).
+    /// made before either record was written (`WRITE_DENIED` or `WRITE_INVALID`).
     pub(crate) unavailable: Option<CliError>,
 }
 
@@ -977,7 +977,7 @@ pub fn run_move(
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon subject move", json);
         }
     };
 
@@ -987,7 +987,7 @@ pub fn run_move(
             return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject move", json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+            return crate::read_cause::repo_error(e.clone()).emit("canon subject move", json);
         }
     };
 
@@ -1020,7 +1020,10 @@ pub fn run_move(
     if ships || reopens {
         if let Some((closed, detail)) = crate::policy_approval::closed_failure(&repo) {
             let error = match closed {
-                crate::policy_approval::Closed::Unreadable => CliError::failed("POLICY_APPROVAL_UNREADABLE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
+                crate::policy_approval::Closed::Unreadable => {
+                    let code = if crate::read_cause::of_text(&detail) == crate::read_cause::Cause::Denied { "POLICY_APPROVAL_DENIED" } else { "POLICY_APPROVAL_CORRUPT" };
+                    CliError::failed(code, detail).hint(crate::policy_approval::REAPPROVE_HINT)
+                }
                 crate::policy_approval::Closed::Changed => CliError::failed("POLICY_APPROVAL_STALE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
             };
             return error.emit("canon subject move", json);
@@ -1042,7 +1045,7 @@ pub fn run_move(
                 Some(ctx)
             }
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+                return crate::read_cause::repo_error(e.clone()).emit("canon subject move", json);
             }
         }
     } else {
@@ -1224,12 +1227,12 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> u8 {
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
+        Err(e) => return crate::read_cause::repo_error(e.to_string()).emit("canon subject show", json),
     };
     let subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
         Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject show", json),
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
+        Err(e) => return crate::read_cause::repo_error(e.clone()).emit("canon subject show", json),
     };
     // The cache effect `effectNote` declares, after every refusal: a subject that does not exist leaves the index as it was (spec 12.2).
     crate::inventory::refresh_stale_index(&repo, "canon subject show");

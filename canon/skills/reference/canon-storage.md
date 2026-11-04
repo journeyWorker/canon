@@ -395,7 +395,7 @@ so a killed commit never leaves it held, and the file is removed only by a
 call that made it to take the lock and then ended refused (a refusal leaves
 no file and no `.git/info/exclude` line behind). A
 command that waited 30 s for it starts nothing: it exits `2` with
-`REPO_WRITE_BUSY` (retryable; run it again in a moment). The first
+`REPO_LOCK_UNAVAILABLE` (retryable; run it again in a moment). The first
 call that needs the lock makes the file, in any repository.
 
 ## What `canon init` keeps out of git

@@ -244,7 +244,7 @@ fn learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_ma
     };
     let unreadable = rollback(&id, "missing.sig", "2030-01-01T00:00:00Z");
     assert_eq!(unreadable.status.code(), Some(2));
-    assert_eq!(error_code(&unreadable), "LEARN_SIGNATURE_UNREADABLE");
+    assert_eq!(error_code(&unreadable), "STRATEGY_SIGNATURE_NOT_FOUND");
     let bad_signature = rollback(&id, "bad.sig", "2030-01-01T00:00:00Z");
     assert_eq!(bad_signature.status.code(), Some(2));
     assert_eq!(error_code(&bad_signature), "STRATEGY_SIGNATURE_INVALID");

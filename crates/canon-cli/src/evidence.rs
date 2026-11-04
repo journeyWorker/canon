@@ -876,7 +876,7 @@ fn ensure_scenario_indexed(repo: &Path, args: &ApprovalPayloadArgs) -> Result<()
     let (Some(scenario), Some(project)) = (&args.scenario_id, &args.project_id) else {
         return Ok(());
     };
-    let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::NotIndexed(CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root")))?;
+    let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::NotIndexed(crate::read_cause::repo_error(e.clone())))?;
     if canon_gate::spec_coverage::latest_scenarios(&context).iter().any(|s| &s.project_id == project && &s.scenario_id == scenario) {
         return Ok(());
     }
@@ -909,7 +909,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
+            return crate::read_cause::config_error(error.to_string()).emit(&args.full(), args.json);
         }
     };
 
@@ -1051,7 +1051,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     let mut gate_context = match load_gate_context_refreshed(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
+            return crate::read_cause::repo_error(e.clone()).emit(&args.full(), args.json);
         }
     };
     let refusals = match brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref())) {
@@ -1212,7 +1212,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
         Ok(stored) => stored,
         Err((file, e)) => {
-            return CliError::refused(crate::artifacts::evidence_store_code(&e), format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit(&args.full(), args.json);
+            let (code, reason) = crate::artifacts::evidence_store_code(&e);
+            return with_reason(CliError::refused(code, format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()), reason).emit(&args.full(), args.json);
         }
     };
     if !bound.files.is_empty() {
@@ -1475,7 +1476,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     let mut gate_context = match load_gate_context_refreshed(repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence add", args.json);
+            return crate::read_cause::repo_error(e.clone()).emit("canon evidence add", args.json);
         }
     };
     let mut indexed: Vec<&ScenarioId> =
@@ -1688,7 +1689,7 @@ fn land_batch_inner(
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
     stopped: &mut Option<Stopped>,
 ) -> Result<LandedBatch, CliError> {
-    let rolled_back = |code: &'static str, message: String| CliError::refused(code, message).hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed");
+    let rolled_back = |code: (&'static str, Option<&'static str>), message: String| with_reason(CliError::refused(code.0, message).hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed"), code.1);
     if promote {
         for (index, body) in bodies.iter().enumerate() {
             if let Err(refused) = canon_gate::promote::judge_evidence_body(body) {
@@ -1706,11 +1707,11 @@ fn land_batch_inner(
     }
     for dir in &destinations {
         let writable = std::fs::create_dir_all(dir).and_then(|()| std::fs::metadata(dir)).map(|m| !m.permissions().readonly());
-        let unwritable = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint("make the evidence directory writable, then run the command again; nothing was written");
+        let unwritable = |code: &'static str, message: String| CliError::refused(code, message).hint("make the evidence directory writable, then run the command again; nothing was written");
         match writable {
             Ok(true) => {}
-            Ok(false) => return Err(unwritable(format!("{} is read-only", dir.display()))),
-            Err(e) => return Err(unwritable(format!("cannot prepare {}: {e}", dir.display()))),
+            Ok(false) => return Err(unwritable("WRITE_DENIED", format!("{} is read-only", dir.display()))),
+            Err(e) => return Err(unwritable(crate::read_cause::write_code_of_text(&e.to_string()), format!("cannot prepare {}: {e}", dir.display()))),
         }
     }
 
@@ -1738,7 +1739,7 @@ fn land_batch_inner(
             Err(e) => {
                 let error = format!("staging record {} of the batch failed: {e}", locations.len() + 1);
                 rollback(&locations, held);
-                return Err(rolled_back("WRITE_FAILED", error));
+                return Err(rolled_back(("WRITE_FAILED", None), error));
             }
         }
     }
@@ -1899,7 +1900,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     }) {
         Ok(gate_context) => gate_context,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts store", json);
+            return crate::read_cause::config_error(e.clone()).emit("canon artifacts store", json);
         }
     };
     let files: std::collections::BTreeSet<(String, String)> = gate_context
@@ -1927,13 +1928,13 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     let lock = match (!files.is_empty() && !dry_run).then(|| StoreLock::acquire(&repo)).transpose() {
         Ok(lock) => lock,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon artifacts store", json);
+            return crate::artifacts::store_error(&e).emit("canon artifacts store", json);
         }
     };
     // Read under the lock, like every writer (`store_files_held`).
     let store = match ArtifactStore::open(&repo) {
         Ok(store) => store,
-        Err(e) => return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon artifacts store", json),
+        Err(e) => return crate::artifacts::store_refusal(&e, format!("the artifact store cannot be used: {e}")).emit("canon artifacts store", json),
     };
     // The lock guards the local store only; an object store is not held
     // against other writers for the length of its uploads.
@@ -1942,7 +1943,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
         let observed = store.observe(&repo, sha256, false);
         if let Observed::Unavailable(why) = &observed {
             // Nothing written yet: the store is a prerequisite that is not there; after a blob was written it is a failure during the work.
-            let code = if !dry_run && !stored.is_empty() { "ARTIFACTS_STORE_FAILED" } else { "ARTIFACTS_STORE_UNREACHABLE" };
+            let code = if !dry_run && !stored.is_empty() { "ARTIFACTS_STORE_FAILED" } else { "ARTIFACTS_STORE_UNAVAILABLE" };
             return CliError::refused(code, format!("could not check {}: {why}", store.display(sha256)))
                 .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
                 .emit("canon artifacts store", json);
@@ -2046,6 +2047,14 @@ fn verdict_slug(verdict: EvidenceVerdict) -> &'static str {
         EvidenceVerdict::Faithful => "faithful",
         EvidenceVerdict::NotApplicable => "not-applicable",
         EvidenceVerdict::Divergent => "divergent",
+    }
+}
+
+/// `error` with `reason`, when there is one.
+fn with_reason(error: CliError, reason: Option<&'static str>) -> CliError {
+    match reason {
+        Some(reason) => error.reason(reason),
+        None => error,
     }
 }
 
@@ -2432,7 +2441,7 @@ mod tests {
         std::fs::set_permissions(&staging_kind, readonly).unwrap();
         let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
         std::fs::set_permissions(&staging_kind, original).unwrap();
-        assert!(matches!(&outcome, Err((e, _)) if e.code == "WRITE_UNAVAILABLE" && e.exit == 2 && e.message.contains("is read-only")), "{:?}", outcome.as_ref().err());
+        assert!(matches!(&outcome, Err((e, _)) if e.code == "WRITE_DENIED" && e.exit == 2 && e.message.contains("is read-only")), "{:?}", outcome.as_ref().err());
         assert_eq!(blobs(), 0);
 
         let landed = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write)).unwrap();

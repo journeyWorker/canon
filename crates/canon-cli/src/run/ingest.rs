@@ -74,7 +74,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
             }
             Err(err) => {
                 let error = match &err {
-                    crate::ingest::IngestError::Config(message) => CliError::refused("CONFIG_UNREADABLE", message.clone()).hint("fix the `ingest:` section of canon.yaml the message names, then run the command again"),
+                    crate::ingest::IngestError::Config(message) => crate::read_cause::config_error(message.clone()).hint("fix the `ingest:` section of canon.yaml the message names, then run the command again"),
                     crate::ingest::IngestError::Unavailable(error) => error.clone(),
                     _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
                 };

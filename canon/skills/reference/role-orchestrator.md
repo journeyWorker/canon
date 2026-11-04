@@ -536,7 +536,7 @@ dropping `--as`) to get past a refusal is the same act under another label.
 implementer before `canon brief show <slug>` reports `state: approved`.
 Never approve it yourself and never edit the policy to pass the gate. A
 policy that no longer matches the approval fails closed
-(`POLICY_APPROVAL_STALE`, or `POLICY_APPROVAL_UNREADABLE`): the ship
+(`POLICY_APPROVAL_STALE`, or `POLICY_APPROVAL_CORRUPT`): the ship
 guard and the reopen refuse, and `--override-reason` does not waive it. Run
 `canon policy show`, then show the policy to the human, ask them to re-approve
 and record their explicit answer (`canon policy approve --approver <their name>
@@ -630,7 +630,7 @@ digits, over the effects and what the plan read, so a file or record the plan
 read that changed since is `PLAN_STALE` too, and `meta.next[0]` is the preview
 to run again. A commit holds the repository write lock for its whole run:
 another command that writes waits for it, and one that waited 30 seconds
-answers `REPO_WRITE_BUSY` (exit 2, retryable): run it again. A document passed
+answers `REPO_LOCK_UNAVAILABLE` (exit 2, retryable): run it again. A document passed
 with `--input` never carries `--commit` or `--plan-digest`, and these five
 leaves take one object only (`INPUT_INVALID`).
 

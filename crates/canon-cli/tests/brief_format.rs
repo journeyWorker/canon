@@ -566,7 +566,7 @@ fn context_status_87_the_readers_warn_and_lead_with_canon_migrate() {
         assert!(warnings.iter().any(|w| w["message"].as_str().unwrap().contains("0.30") && w["message"].as_str().unwrap().contains("canon migrate") && w["code"].is_string()), "{args:?}: {warnings:?}");
         assert_eq!(doc["meta"]["next"][0]["command"], "canon migrate --json", "{args:?}: {}", doc["meta"]);
         assert_eq!(doc["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--json"]), "{args:?}: {}", doc["meta"]);
-        assert!(doc["error"].is_null() || doc["error"]["code"] != "CONFIG_UNREADABLE", "{args:?}: {doc}");
+        assert!(doc["error"].is_null() || doc["error"]["code"] != "CONFIG_INVALID", "{args:?}: {doc}");
     }
     // An approved old brief whose digest matches still reads approved.
     let status = json(&ok(r, &["status", "--json"]));

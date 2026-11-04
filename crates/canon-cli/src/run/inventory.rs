@@ -52,9 +52,9 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             let (code, reason) = match &err {
                 crate::inventory::InventoryError::Store(_) => ("INVENTORY_FAILED", None),
                 crate::inventory::InventoryError::Config(_) => ("CONFIG_INVALID", Some("SPECS")),
-                crate::inventory::InventoryError::CanonYaml(_) => ("CONFIG_UNREADABLE", None),
+                crate::inventory::InventoryError::CanonYaml(_) => (crate::read_cause::config_error(err.to_string()).code, None),
                 crate::inventory::InventoryError::Locked(_) => ("INVENTORY_INDEX_UNAVAILABLE", None),
-                crate::inventory::InventoryError::Unavailable(_) => ("WRITE_UNAVAILABLE", None),
+                crate::inventory::InventoryError::Unavailable(error) => (error.code, None),
             };
             let error = CliError::refused(code, err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again");
             let error = match reason {

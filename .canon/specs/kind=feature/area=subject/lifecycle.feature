@@ -627,4 +627,4 @@ Feature: subject lifecycle
     Given a repo whose canon.yaml has no approval key, and a fresh canon init
     When a relayed brief approval runs, and the written canon.yaml is read
     Then the approval is recorded, and the init template carries approval: and relay: allow | deny as comments
-    And a malformed approval section is refused CONFIG_UNREADABLE rather than read as allow
+    And a malformed approval section is refused CONFIG_INVALID rather than read as allow

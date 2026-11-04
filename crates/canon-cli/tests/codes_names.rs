@@ -6,45 +6,16 @@ use atip::Minor;
 
 /// The codes that do not follow the rule yet, and the change of 0.36 that renames each.
 const NOT_YET_RENAMED: &[&str] = &[
-    "ARTIFACTS_STORE_UNREACHABLE",
-    "BRIEF_UNREADABLE",
-    "CONFIG_UNREADABLE",
-    "DISPATCH_MANIFEST_MISMATCH",
-    "DISPATCH_MANIFEST_UNREADABLE",
     "INVENTORY_ABORTED",
-    "LEARN_SIGNATURE_UNREADABLE",
-    "LEDGER_ARCHIVE_UNAVAILABLE",
     "MIGRATE_STOPPED",
-    "PLAN_CORPUS_UNREADABLE",
     "PLUGIN_SYNC_ERRORS",
-    "POLICY_APPROVAL_UNREADABLE",
-    "REPO_UNREADABLE",
-    "REPO_WRITE_BUSY",
-    "SPEC_ROOTS_UNREADABLE",
     "STOPPED_MIDWAY",
-    "WRITE_UNAVAILABLE",
 ];
 
 /// The codes that pass the name rule (or are listed above) and that `canon-0-36-codes-refusals`, `-stored` or `-incomplete` still change: split by
 /// meaning, moved to another exit, merged into another code or renamed with a reason (issue #135). The name check does not see them, so they are
 /// listed. Each of those changes deletes its codes from this list; `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
 const NOT_YET_RECLASSIFIED: &[&str] = &[
-    // canon-0-36-codes-stored
-    "ARTIFACTS_STORE_UNREACHABLE",
-    "BRIEF_UNREADABLE",
-    "CONFIG_UNREADABLE",
-    "DISPATCH_MANIFEST_MISMATCH",
-    "DISPATCH_MANIFEST_UNREADABLE",
-    "EVIDENCE_STORE_UNAVAILABLE",
-    "LEARN_SIGNATURE_UNREADABLE",
-    "LEDGER_ARCHIVE_UNAVAILABLE",
-    "PLAN_CORPUS_UNREADABLE",
-    "POLICY_APPROVAL_UNREADABLE",
-    "REPO_UNREADABLE",
-    "REPO_WRITE_BUSY",
-    "SPEC_ROOTS_UNREADABLE",
-    "TASK_ROW_NOT_FOUND",
-    "WRITE_UNAVAILABLE",
     // canon-0-36-codes-incomplete
     "ARTIFACTS_STORE_FAILED",
     "EVIDENCE_STORE_FAILED",
@@ -190,7 +161,7 @@ const SPLIT: &[(&str, i64, bool, &[&str])] = &[
     ("BRIEF_MIGRATION_REQUIRED", 2, false, &[]),
     ("BRIEF_REQUIRED", 2, false, &[]),
     ("CHANGE_NOT_FOUND", 2, false, &[]),
-    ("CONFIG_INVALID", 2, false, &["DASHBOARD", "POLICY", "SKILLS", "SPECS"]),
+    ("CONFIG_INVALID", 2, false, &["ARTIFACT_STORE", "DASHBOARD", "POLICY", "SKILLS", "SPECS"]),
     ("DISPATCH_CONFLICT", 2, false, &["ALREADY_ENDED", "NOT_RUNNING"]),
     ("DIVERGENCE_CONFLICT", 2, false, &["NOT_DIVERGENT"]),
     ("DIVERGENCE_DENIED", 2, false, &["NOT_REVIEWER", "SELF_ATTESTED"]),

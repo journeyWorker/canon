@@ -483,7 +483,7 @@ fn atip_planjcs_07_a_wait_that_runs_out_refuses_and_a_killed_holder_releases_the
     let out = canon_in(root, &commit_args(&args, &digest), &[("CANON_TEST_REPO_LOCK_WAIT_MS".to_string(), "300".to_string())]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let body = json_of(&out);
-    assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some("REPO_WRITE_BUSY"), Some(true)), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some("REPO_LOCK_UNAVAILABLE"), Some(true)), "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("again in a moment"), "{body}");
     assert_eq!(tree(root), before, "a commit that waited in vain started nothing");
     drop(held);
@@ -513,10 +513,10 @@ fn atip_planjcs_08_only_a_run_that_writes_takes_the_lock() {
     preview.push("--json".to_string());
     for (what, call) in [("a read", words(&["status", "--json"])), ("a preview", preview), ("a dry run", words(&["inventory", "sync", "--dry-run", "--json"])), ("init --check", words(&["init", "--check", "--json"]))] {
         let out = canon_in(root, &call, &short);
-        assert_ne!(json_of(&out)["error"]["code"], "REPO_WRITE_BUSY", "{what} does not wait for the lock: {}", text(&out));
+        assert_ne!(json_of(&out)["error"]["code"], "REPO_LOCK_UNAVAILABLE", "{what} does not wait for the lock: {}", text(&out));
     }
     let writer = canon_in(root, &words(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]), &short);
-    assert_eq!(json_of(&writer)["error"]["code"], "REPO_WRITE_BUSY", "a writer waits for the lock: {}", text(&writer));
+    assert_eq!(json_of(&writer)["error"]["code"], "REPO_LOCK_UNAVAILABLE", "a writer waits for the lock: {}", text(&writer));
     assert_eq!(writer.status.code(), Some(2));
     assert!(!root.join(".canon/ledger/kind=subject").exists(), "and wrote nothing");
     drop(_held);

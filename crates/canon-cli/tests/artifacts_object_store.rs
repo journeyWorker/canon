@@ -225,7 +225,7 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
     let verify = repo.canon_s3(&["artifacts", "verify", "--json"], &env);
     assert_eq!(verify.status.code(), Some(2), "{}", text(&verify));
     let body = stdout_json(&verify);
-    assert_eq!(body["error"]["code"], "ARTIFACTS_STORE_UNREACHABLE");
+    assert_eq!(body["error"]["code"], "ARTIFACTS_STORE_UNAVAILABLE");
     assert!(body["error"]["hint"].as_str().unwrap().contains("CANON_S3_ACCESS_KEY"), "{body}");
 
     // A write refuses and records nothing.
@@ -247,7 +247,7 @@ fn an_artifacts_block_naming_no_s3_tier_is_refused_where_it_is_used() {
     write_report(&repo, V1);
     let add = repo.attest(&["--artifact", "reports/smoke.json"]);
     assert_eq!(add.status.code(), Some(2), "{}", text(&add));
-    assert!(text(&add).contains("EVIDENCE_STORE_UNAVAILABLE") && text(&add).contains("which is not an object store"), "{}", text(&add));
+    assert!(text(&add).contains("CONFIG_INVALID") && text(&add).contains("which is not an object store"), "{}", text(&add));
     assert!(text(&add).contains("`artifact_store: { backend: local }`"), "the hint names the way out: {}", text(&add));
 }
 
@@ -399,4 +399,90 @@ fn commit_all(repo: &std::path::Path) {
     for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
         assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
     }
+}
+
+/// atip.codestored.07: an artifact store that cannot be used before anything is written is told by its cause: a tier whose credentials are not
+/// set is `ARTIFACTS_STORE_REQUIRED` (not retryable: waiting does not set them), an object store that does not answer is
+/// `ARTIFACTS_STORE_UNAVAILABLE` (retryable), a store directory that is a symlink is `ARTIFACTS_STORE_INVALID`, and an `artifact_store:` section
+/// that names no object-store tier is `CONFIG_INVALID` with the reason `ARTIFACT_STORE`; each exits 2 and records nothing.
+#[test]
+fn atip_codestored_07_an_artifact_store_that_cannot_be_used_is_told_by_its_cause() {
+    let refusal = |out: &Output, code: &str, retryable: bool| {
+        let body = stdout_json(out);
+        assert_eq!(out.status.code(), Some(2), "{}", text(out));
+        assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some(code), Some(retryable)), "{body}");
+        assert!(body.get("data").is_none(), "a refusal carries no data: {body}");
+        body
+    };
+
+    let repo = new_repo(Some(ARTIFACTS_COLD));
+    write_report(&repo, V1);
+    assert!(repo.attest(&["--artifact", "reports/smoke.json"]).status.success());
+
+    // No bucket configured: the tier cannot be attached, and waiting does not set it.
+    let verify = repo.canon_s3(&["artifacts", "verify", "--json"], &[("CANON_S3_ENDPOINT", "http://127.0.0.1:9")]);
+    let body = refusal(&verify, "ARTIFACTS_STORE_REQUIRED", false);
+    assert!(body["error"]["hint"].as_str().unwrap().contains("CANON_S3_ACCESS_KEY"), "{body}");
+
+    // A bucket, but nothing listens: a repeat can pass.
+    let env = [("CANON_S3_ENDPOINT", "http://127.0.0.1:9"), ("CANON_R2_BUCKET", "evidence")];
+    let verify = repo.canon_s3(&["artifacts", "verify", "--json"], &env);
+    refusal(&verify, "ARTIFACTS_STORE_UNAVAILABLE", true);
+
+    // An `artifact_store:` section that names no object-store tier is the user's: CONFIG_INVALID, reason ARTIFACT_STORE.
+    let bad = new_repo(Some("artifact_store:\n  backend: hot\n"));
+    write_report(&bad, V1);
+    let before = std::fs::read_dir(bad.path().join(".canon/ledger/kind=evidence")).map_or(0, Iterator::count);
+    let add = bad.canon(&["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/smoke.json", "--json"]);
+    let body = refusal(&add, "CONFIG_INVALID", false);
+    assert_eq!(body["error"]["reason"], "ARTIFACT_STORE", "{body}");
+    assert_eq!(std::fs::read_dir(bad.path().join(".canon/ledger/kind=evidence")).map_or(0, Iterator::count), before, "no record was written");
+
+    // The local store directory is a symlink: writing through it could land outside the store.
+    let local = new_repo(None);
+    write_report(&local, V1);
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(local.path().join(".canon/artifacts")).unwrap();
+    std::os::unix::fs::symlink(outside.path(), local.path().join(".canon/artifacts/sha256")).unwrap();
+    let add = local.canon(&["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/smoke.json", "--json"]);
+    refusal(&add, "ARTIFACTS_STORE_INVALID", false);
+    assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0, "nothing was written through the link");
+}
+
+/// atip.codestored.07 (the blobs `artifacts move` cannot read): `ARTIFACTS_BLOB_CORRUPT` is only a blob whose content is broken; a local blob the
+/// system refuses is `ARTIFACTS_BLOB_DENIED` (exit 2, not retryable, nothing moved); the same call passes once the blob is readable.
+#[test]
+fn atip_codestored_07_a_local_blob_that_cannot_be_read_is_denied_and_only_a_broken_one_is_corrupt() {
+    use std::os::unix::fs::PermissionsExt;
+    let repo = new_repo(None);
+    write_report(&repo, V1);
+    assert!(repo.attest(&["--artifact", "reports/smoke.json"]).status.success());
+    let blob = repo.local_blob(V1);
+    let original = std::fs::read(&blob).unwrap();
+    let code_of = |out: &Output| {
+        let body = stdout_json(out);
+        assert_eq!(out.status.code(), Some(2), "{}", text(out));
+        assert_eq!(body["error"]["retryable"], false, "{body}");
+        body["error"]["code"].as_str().unwrap().to_string()
+    };
+    let preview = || repo.canon(&["artifacts", "move", "--tier", "cold", "--json"]);
+
+    // Broken content stays CORRUPT.
+    std::fs::write(&blob, b"not the bytes of its name").unwrap();
+    assert_eq!(code_of(&preview()), "ARTIFACTS_BLOB_CORRUPT");
+    std::fs::write(&blob, &original).unwrap();
+
+    // The system refuses the read: DENIED, not CORRUPT.
+    let mode = std::fs::metadata(&blob).unwrap().permissions();
+    let mut closed = mode.clone();
+    closed.set_mode(0o200);
+    std::fs::set_permissions(&blob, closed).unwrap();
+    if std::fs::File::open(&blob).is_err() {
+        assert_eq!(code_of(&preview()), "ARTIFACTS_BLOB_DENIED");
+    } else {
+        eprintln!("skipped: this process can read a blob whose mode is 200 (running as root?), so a refused read cannot be shown");
+    }
+    std::fs::set_permissions(&blob, mode).unwrap();
+
+    assert!(preview().status.success(), "the blob back in place, the same call passes");
 }

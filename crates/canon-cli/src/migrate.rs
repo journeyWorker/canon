@@ -341,7 +341,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let real_ledger = match canon_gate::GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string())
+            return crate::read_cause::config_error(e.to_string())
                 .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run `canon migrate` again")
                 .emit("canon migrate", json)
         }

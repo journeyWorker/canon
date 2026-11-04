@@ -268,9 +268,7 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
     for info in canon_cli::cli_error::all_codes() {
         assert!(matches!(info.exit, 1 | 2), "{} declares exit {} (only 1 and 2 are errors)", info.code, info.exit);
         assert!(!info.meaning.trim().is_empty(), "{} has no meaning", info.code);
-        // `POLICY_APPROVAL_UNREADABLE` is the decided exception: a closed gate answers exit 1 (0.33).
-        let closed_gate = info.code == "POLICY_APPROVAL_UNREADABLE";
-        if !closed_gate && (info.code.ends_with("_NOT_FOUND") || info.code.ends_with("_UNREADABLE") || info.code.ends_with("_INVALID_ARGUMENT")) {
+        if info.code.ends_with("_NOT_FOUND") || info.code.ends_with("_UNREADABLE") || info.code.ends_with("_INVALID_ARGUMENT") {
             assert_eq!(info.exit, 2, "{} names a missing, unreadable or invalid input, so it is a refusal (exit 2)", info.code);
         }
     }
@@ -280,7 +278,7 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
     assert_eq!(exit_of("GATE_CHECK_FAILED"), 1);
     assert_eq!(exit_of("CONFIG_REQUIRED"), 2);
     assert_eq!(exit_of("USAGE"), 2);
-    assert_eq!(exit_of("POLICY_APPROVAL_UNREADABLE"), 1, "an unreadable approval is a closed gate, not a refused run");
+    assert_eq!(exit_of("POLICY_APPROVAL_CORRUPT"), 2, "a broken approval refuses the ship before it runs (codes-stored): exit 2, like every refusal");
     assert!(canon_cli::cli_error::code_info("DISPATCH_RUN_UNAVAILABLE").unwrap().retryable, "a concurrent close is the retryable case");
     assert!(!canon_cli::cli_error::code_info("USAGE").unwrap().retryable);
 }

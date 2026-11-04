@@ -477,7 +477,7 @@ fn tier_storage_13_ledger_compact_refuses_a_plan_that_changed_a_commit_without_a
     std::fs::write(custom.path().join("canon.yaml"), LEDGER_YAML.replace(".canon/ledger", "records")).unwrap();
     let refused = canon_in(custom.path(), &["ledger", "compact", "--json"]);
     assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
-    assert_eq!(stdout_json(&refused)["error"]["code"], "LEDGER_ARCHIVE_UNAVAILABLE");
+    assert_eq!(stdout_json(&refused)["error"]["code"], "LEDGER_ARCHIVE_INVALID");
 }
 
 // ───────────────────────── export ─────────────────────────

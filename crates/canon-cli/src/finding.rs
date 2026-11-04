@@ -606,7 +606,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return crate::read_cause::config_error(error.to_string()).emit("canon finding add", args.json);
         }
     };
 
@@ -676,7 +676,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon finding add", args.json);
         }
     };
     if let Some(review_id) = args.review_id {
@@ -689,7 +689,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
                     .emit("canon finding add", args.json);
             }
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding add", args.json);
+                return crate::read_cause::repo_error(e.to_string()).emit("canon finding add", args.json);
             }
         }
     }
@@ -723,7 +723,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding add", args.json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon finding add", args.json);
         }
     }
 
@@ -859,7 +859,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return crate::read_cause::config_error(error.to_string()).emit("canon finding close", args.json);
         }
     };
 
@@ -910,7 +910,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon finding close", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -932,7 +932,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding close", args.json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon finding close", args.json);
         }
     }
 
@@ -944,7 +944,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
             )).hint("`canon finding list` shows the committed findings; author a new one with `canon finding add`").emit("canon finding close", args.json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding close", args.json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon finding close", args.json);
         }
     };
 
@@ -1113,7 +1113,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding list", args.json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon finding list", args.json);
         }
     };
     let read = current_findings(&GitTier::new(&ledger_root), &args.change_id)
@@ -1121,7 +1121,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
     let (mut findings, staged) = match read {
         Ok(read) => read,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding list", args.json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon finding list", args.json);
         }
     };
     if args.open {
@@ -1300,7 +1300,7 @@ fn occupied_by(natural_key: &str, staging: &GitTier, committed: &GitTier) -> Res
 /// be evidenced. Matched by id across spec roots, as the finding keys it.
 fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError> {
     let unreadable = |e: String| {
-        CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
+        crate::read_cause::config_error(e)
     };
     let ctx = GateCtx::from_repo(repo).map_err(|e| unreadable(e.to_string()))?;
     let context = canon_gate::GateContext::load(ctx, &canon_policy::SchemaRegistry::load(), Utc::now()).map_err(|e| unreadable(e.to_string()))?;

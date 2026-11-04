@@ -754,7 +754,7 @@ fn report_dashboard_02_a_missing_repo_is_refused_and_not_created() {
     let out = canon(dir.path(), &["dashboard", "--repo", missing.to_str().unwrap(), "--port", "0", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
     let error: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(error["error"]["code"], "REPO_UNREADABLE");
+    assert_eq!(error["error"]["code"], "REPO_INVALID");
     assert!(error["error"]["message"].as_str().unwrap().contains("does not exist"));
     assert!(error["error"]["hint"].as_str().unwrap().contains("--repo"));
     assert!(!missing.exists(), "the refused repo was created");

@@ -339,7 +339,7 @@ output: canon subject move: demo-subject → verifying — written directly; not
   reopen moves the subject back to fix its gaps; shipping again runs
   it`). `verifying → shipped` afterwards runs every guard above again.
 - A policy that fails closed (`POLICY_APPROVAL_STALE`,
-  `POLICY_APPROVAL_UNREADABLE`: see `canon-policy`) refuses the reopen and
+  `POLICY_APPROVAL_CORRUPT`, `POLICY_APPROVAL_DENIED`: see `canon-policy`) refuses the reopen and
   the ship, and `--override-reason` does not waive it.
 - `canon change new` on a shipped subject prints the reopen command
   (`canon subject move <id> --to verifying --reason "<why it reopens>"`)

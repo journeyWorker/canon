@@ -73,10 +73,10 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @case:failure
   @flow:canon-0-35-plan-jcs.F2
   @atip.planjcs.07
-  Scenario: A commit that waits for the lock past its time starts nothing and answers REPO_WRITE_BUSY, exit 2, retryable; a killed holder releases the lock and the lock file stays
+  Scenario: A commit that waits for the lock past its time starts nothing and answers REPO_LOCK_UNAVAILABLE, exit 2, retryable; a killed holder releases the lock and the lock file stays
     Given a repo whose lock is held by another process and a commit whose wait is a few hundred milliseconds
     When the commit is run, and then a holder is killed with SIGKILL and the commit is run again
-    Then the first is exit 2 REPO_WRITE_BUSY, retryable, with a hint to run it again and the tree of the repository the same, and after the kill the commit proceeds and the lock file is still there
+    Then the first is exit 2 REPO_LOCK_UNAVAILABLE, retryable, with a hint to run it again and the tree of the repository the same, and after the kill the commit proceeds and the lock file is still there
 
   # canon: {"schema":1,"at":"2026-11-02T15:04:29Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
   @subject:atip-contract

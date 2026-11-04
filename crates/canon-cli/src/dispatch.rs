@@ -145,7 +145,7 @@ pub enum DispatchError {
     SkillDigestWithoutId,
 
     /// A directory the run is written into cannot be written, known before
-    /// anything was changed (`WRITE_UNAVAILABLE`).
+    /// anything was changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(CliError),
 
@@ -252,9 +252,13 @@ pub enum DispatchError {
     )]
     EndInProgress { run_id: String, lock_path: String },
 
-    /// The manifest exists but does not deserialize as a `Run`.
+    /// The manifest exists but does not deserialize as a `Run`: state canon wrote that is broken (`DISPATCH_MANIFEST_CORRUPT`).
     #[error("the dispatch manifest at {path} is not a readable Run record: {detail}")]
     Unreadable { path: String, detail: String },
+
+    /// The manifest exists but the system refuses this user the read (`DISPATCH_MANIFEST_DENIED`).
+    #[error("the dispatch manifest at {path} cannot be read: {detail}")]
+    Denied { path: String, detail: String },
 }
 
 impl DispatchError {
@@ -284,6 +288,7 @@ impl DispatchError {
             | Self::NotRunning { .. }
             | Self::RunIdMismatch { .. }
             | Self::Unreadable { .. }
+            | Self::Denied { .. }
             | Self::ContextPack(ContextPackError::UnsafePath(_)
                 | ContextPackError::MissingInput(_)
                 | ContextPackError::SecretDetected(_)
@@ -305,16 +310,18 @@ impl DispatchError {
             Self::SkillDigestWithoutId => "DISPATCH_ARGUMENT_INVALID",
             Self::Io(_) => "WRITE_FAILED",
             Self::Serialize(_) => "SERIALIZE_FAILED",
-            Self::Unavailable(_) => "WRITE_UNAVAILABLE",
+            Self::Unavailable(inner) => inner.code,
             Self::ContextPack(inner) => inner.to_cli_error().code,
             Self::TaskNotFound { .. } => "TASK_NOT_FOUND",
             Self::NoPlanSources { .. } => "PLAN_SOURCES_REQUIRED",
-            Self::PlanCorpus { .. } => "PLAN_CORPUS_UNREADABLE",
+            Self::PlanCorpus { detail, .. } if crate::read_cause::of_text(detail) == crate::read_cause::Cause::Denied => "PLAN_CORPUS_DENIED",
+            Self::PlanCorpus { .. } => "PLAN_CORPUS_INVALID",
             Self::NoSuchRun { .. } => "DISPATCH_RUN_NOT_FOUND",
             Self::AlreadyEnded { .. } | Self::NotRunning { .. } => "DISPATCH_CONFLICT",
-            Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_MISMATCH",
+            Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_CORRUPT",
             Self::EndInProgress { .. } => "DISPATCH_RUN_UNAVAILABLE",
-            Self::Unreadable { .. } => "DISPATCH_MANIFEST_UNREADABLE",
+            Self::Unreadable { .. } => "DISPATCH_MANIFEST_CORRUPT",
+            Self::Denied { .. } => "DISPATCH_MANIFEST_DENIED",
         };
         let hint = match self {
             Self::RoleRegimeMismatch { .. } => "pass --role equal to the leading segment of --regime (`canon regime show` prints a regime key)".to_string(),
@@ -332,6 +339,7 @@ impl DispatchError {
             Self::RunIdMismatch { .. } => "the manifest under .canon was edited or misplaced: restore it from version control, or start a new run with `canon dispatch begin`".to_string(),
             Self::EndInProgress { .. } => "another process is closing this run; wait a moment, then run `canon dispatch end` again".to_string(),
             Self::Unreadable { .. } => "restore the manifest from version control, or start a new run with `canon dispatch begin`".to_string(),
+            Self::Denied { .. } => "make the manifest readable by this user, then run the command again".to_string(),
         };
         let mut error = if self.is_usage() { CliError::refused(code, self.to_string()).hint(hint) } else { CliError::failed(code, self.to_string()).hint(hint) };
         if let Self::RoleRegimeMismatch { regime_role, .. } = self {
@@ -771,7 +779,7 @@ pub fn begin(
     }
     // The manifest directory must take the run before the context pack or the manifest is written.
     let dispatch_dir = repo.join(DISPATCH_DIR);
-    crate::write_mode::check_writable(&dispatch_dir).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unavailable(&dispatch_dir, &cause)))?;
+    crate::write_mode::check_writable(&dispatch_dir).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unwritable(&dispatch_dir, &cause)))?;
     let store = open_strategy_store(&repo);
     let guidance = retrieve_guidance(&store, role, regime_key, None);
     // Capture guidance inside the immutable pack before minting the run. A
@@ -1131,6 +1139,9 @@ pub(crate) fn read_dispatched_manifest(manifest_path: &Path, run_id: RunId) -> R
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
         }
+        Err(e) if crate::read_cause::of_io(&e) == crate::read_cause::Cause::Denied => {
+            return Err(DispatchError::Denied { path: manifest_path.display().to_string(), detail: e.to_string() });
+        }
         Err(e) => return Err(DispatchError::Io(e)),
     };
     let run: Run = serde_json::from_str(&text)
@@ -1334,7 +1345,7 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
     }
     // The close rewrites the manifest (a temp file beside it, then a rename) and takes a lock beside it: the directory and the manifest must take them.
     for target in [repo.join(DISPATCH_DIR), manifest_path.clone()] {
-        crate::write_mode::check_writable(&target).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
+        crate::write_mode::check_writable(&target).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unwritable(&target, &cause)))?;
     }
     let _lock = EndLock::acquire(&manifest_path, run_id)?;
 

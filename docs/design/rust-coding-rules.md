@@ -228,7 +228,7 @@ for library errors (MS M-ERRORS-CANONICAL-STRUCTS) do not apply.
 
 - **User mistakes are `CliError`s.** A bad flag, an unreadable config, a
   refused transition reach the user as `canon_cli::cli_error::CliError` with
-  a stable code (`USAGE`, `CONFIG_UNREADABLE`, …) and the JSON envelope. A
+  a stable code (`USAGE`, `CONFIG_INVALID`, …) and the JSON envelope. A
   Rust error type never carries a user mistake past the CLI boundary
   unmapped.
 - **Rust error types are for everything else:** I/O, malformed ledger

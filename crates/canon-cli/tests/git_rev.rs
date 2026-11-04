@@ -140,7 +140,7 @@ fn exclude_defaults_and_malformed_config() {
     let dir = init();
     assert_eq!(code_exclude(dir.path()).unwrap(), ["docs/**", "*.md"]);
     write(dir.path(), "canon.yaml", "code:\n  exclude: 5\n");
-    assert_eq!(code_exclude(dir.path()).unwrap_err().code, "CONFIG_UNREADABLE");
+    assert_eq!(code_exclude(dir.path()).unwrap_err().code, "CONFIG_INVALID");
 }
 
 #[test]

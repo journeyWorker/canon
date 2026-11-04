@@ -73,14 +73,14 @@ fn a_policy_weakened_after_approval_fails_the_gate_and_the_ship_guard() {
 }
 
 #[test]
-fn an_unreadable_approval_fails_closed_too() {
+fn a_broken_approval_refuses_the_ship_with_exit_2_the_way_a_stale_one_does() {
     let dir = approved_repo(POLICY_WITH_REVIEW);
     let repo = dir.path();
     std::fs::write(repo.join(".canon/policy.approval.json"), "{ not json").unwrap();
     assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1));
     let out = canon(repo, &["subject", "move", "checkout", "--to", "shipped", "--json"]);
-    assert_eq!(out.status.code(), Some(1));
-    assert_eq!(err_of(&out)["code"], "POLICY_APPROVAL_UNREADABLE");
+    assert_eq!(out.status.code(), Some(2), "a refusal before the move runs is exit 2, like the stale approval (codes-stored)");
+    assert_eq!(err_of(&out)["code"], "POLICY_APPROVAL_CORRUPT");
 }
 
 #[test]

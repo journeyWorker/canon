@@ -101,7 +101,7 @@ fn registry_problems(rows: &[CodeInfo]) -> Vec<String> {
 /// Reasons a registry must not hold under `STOPPED_MIDWAY`.
 static NOT_A_CODE: [ReasonInfo; 1] = [ReasonInfo { reason: "NOT_A_CODE", meaning: "m", fix: "f" }];
 static AN_EXIT_1_CODE: [ReasonInfo; 1] = [ReasonInfo { reason: "WRITE_FAILED", meaning: "m", fix: "f" }];
-static UNSORTED: [ReasonInfo; 2] = [ReasonInfo { reason: "WRITE_UNAVAILABLE", meaning: "m", fix: "f" }, ReasonInfo { reason: "SKILLS_SOURCE_NOT_FOUND", meaning: "m", fix: "f" }];
+static UNSORTED: [ReasonInfo; 2] = [ReasonInfo { reason: "WRITE_DENIED", meaning: "m", fix: "f" }, ReasonInfo { reason: "SKILLS_SOURCE_NOT_FOUND", meaning: "m", fix: "f" }];
 
 /// The registry with the reasons of its `STOPPED_MIDWAY` row replaced by `reasons`.
 fn with_reasons(reasons: &'static [ReasonInfo]) -> Vec<CodeInfo> {
@@ -357,7 +357,7 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("BATCH_INCOMPLETE", Class::Keep(Why::Batch), "the batch's own reserved code; an element that stops midway is its item error"),
     ("BRIEF_CHECK_FAILED", Class::Keep(Why::Answer), "`brief check`'s findings"),
     ("BRIEF_WRITE_FAILED", Class::Keep(Why::Io), "the brief file could not be written"),
-    ("CHANGE_ADOPTION_INCOMPLETE", Class::Keep(Why::Io), "judged: the only cause is the second record's store write failing after the first was written, which is the I/O category (`WRITE_UNAVAILABLE` before the work, `WRITE_FAILED` during it, spec 8.3), not a refusal of an argument; a tool keeps a code of its own for it until it chooses to move (migration guide 7)"),
+    ("CHANGE_ADOPTION_INCOMPLETE", Class::Keep(Why::Io), "judged: the only cause is the second record's store write failing after the first was written, which is the I/O category (`WRITE_DENIED` or `WRITE_INVALID` before the work, `WRITE_FAILED` during it, spec 8.3), not a refusal of an argument; a tool keeps a code of its own for it until it chooses to move (migration guide 7)"),
     ("CONFIG_CHECK_FAILED", Class::Keep(Why::Answer), "`init --check` found a section that fails its loader"),
     ("CONTEXT_PACK_VERIFY_FAILED", Class::Keep(Why::Answer), "`context-pack verify` found the pack changed: the check's negative answer"),
     ("DASHBOARD_FAILED", Class::Keep(Why::Io), "the dashboard could not start (an I/O failure)"),
@@ -379,7 +379,6 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("MIGRATE_STOPPED", Class::Keep(Why::Io), "judged: every site is a write, move, remove or re-import that failed after `migrate` began changing the repo; the one re-check of a destination at apply time repeats a plan-time refusal that only a concurrent writer can make true, which no test can build"),
     ("PLUGIN_SYNC_ERRORS", Class::Keep(Why::Io), "some candidates could not be written"),
     ("POLICY_APPROVAL_FAILED", Class::Keep(Why::Io), "the approval file could not be written"),
-    ("POLICY_APPROVAL_UNREADABLE", Class::Keep(Why::Answer), "the closed policy gate's verdict"),
     ("PROMOTE_FAILED", Class::Keep(Why::Io), "judged: the staged record was written, then the ledger write failed (an I/O failure of the work)"),
     ("QUERY_FAILED", Class::Keep(Why::Io), "the ledger could not be read"),
     ("REPORT_FAILED", Class::Keep(Why::Io), "the report could not be built or checked"),

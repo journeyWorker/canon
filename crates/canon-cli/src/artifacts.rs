@@ -55,12 +55,47 @@ const GITIGNORE_LINE: &str = ".canon/artifacts/";
 
 /// A refusal for a store that cannot be opened (an unusable `artifact_store:`
 /// block) or attached; the caller emits it under its own command.
-fn store_error(e: &ArtifactStoreError) -> CliError {
-    let code = match e {
-        ArtifactStoreError::Config(_) => "CONFIG_UNREADABLE",
-        _ => "ARTIFACTS_STORE_UNREACHABLE",
-    };
-    CliError::refused(code, e.to_string()).hint(e.hint())
+pub(crate) fn store_error(e: &ArtifactStoreError) -> CliError {
+    store_refusal(e, e.to_string())
+}
+
+/// The refusal for `e` with `message`: the code and reason [`store_code`] gives it and its own hint.
+pub(crate) fn store_refusal(e: &ArtifactStoreError, message: impl Into<String>) -> CliError {
+    let (code, reason) = store_code(e);
+    let error = CliError::refused(code, message).hint(e.hint());
+    match reason {
+        Some(reason) => error.reason(reason),
+        None => error,
+    }
+}
+
+/// The code (and reason) of an artifact store that cannot be used before anything is written, by what is wrong:
+/// - an `artifact_store:` section that is unusable is the config's (`CONFIG_INVALID`, reason `ARTIFACT_STORE`; `CONFIG_DENIED`
+///   when canon.yaml may not be read): the user wrote it;
+/// - a tier that cannot be attached (its endpoint, credentials or bucket are unset) is `ARTIFACTS_STORE_REQUIRED`: waiting does
+///   not set them;
+/// - a store directory that is not a real directory, or that the system refuses, is `ARTIFACTS_STORE_INVALID`;
+/// - a digest that is not 64 lowercase hex characters is `ARTIFACTS_DIGEST_INVALID`;
+/// - a store lock another process holds, an object store that did not answer, an operating-system error a repeat can pass is
+///   `ARTIFACTS_STORE_UNAVAILABLE`, the one retryable code of these.
+///
+/// A file that changed since it was bound is the caller's own code (`EVIDENCE_BINDING_STALE`, `REVIEW_ARTIFACT_STALE`).
+pub(crate) fn store_code(e: &ArtifactStoreError) -> (&'static str, Option<&'static str>) {
+    use crate::read_cause::{of_io, Cause};
+    use canon_gate::artifact_store::ArtifactConfigError;
+    match e {
+        ArtifactStoreError::Changed { .. } => ("EVIDENCE_BINDING_STALE", None),
+        ArtifactStoreError::Config(ArtifactConfigError::Read { source, .. }) if of_io(source) == Cause::Denied => ("CONFIG_DENIED", None),
+        ArtifactStoreError::Config(_) => ("CONFIG_INVALID", Some("ARTIFACT_STORE")),
+        ArtifactStoreError::Unattached { .. } => ("ARTIFACTS_STORE_REQUIRED", None),
+        ArtifactStoreError::UnsafeStoreDir => ("ARTIFACTS_STORE_INVALID", None),
+        ArtifactStoreError::InvalidDigest(_) => ("ARTIFACTS_DIGEST_INVALID", None),
+        ArtifactStoreError::Locked(_) | ArtifactStoreError::Remote { .. } => ("ARTIFACTS_STORE_UNAVAILABLE", None),
+        ArtifactStoreError::Io(io) => match of_io(io) {
+            Cause::Denied | Cause::WrongPath => ("ARTIFACTS_STORE_INVALID", None),
+            _ => ("ARTIFACTS_STORE_UNAVAILABLE", None),
+        },
+    }
 }
 
 /// Whether `e` is what the artifact store reports before it has written
@@ -74,27 +109,53 @@ pub(crate) fn before_first_write(e: &ArtifactStoreError) -> bool {
 }
 
 /// The code `evidence add` reports when binding or storing a bound file fails:
-/// `EVIDENCE_BINDING_STALE` for a file that changed since it was bound,
-/// `EVIDENCE_STORE_UNAVAILABLE` (exit 2) when the store could not be used
-/// before anything was written, `EVIDENCE_STORE_FAILED` (exit 1) when a write
-/// to it failed.
-pub(crate) fn evidence_store_code(e: &ArtifactStoreError) -> &'static str {
+/// `EVIDENCE_BINDING_STALE` for a file that changed since it was bound, the code of [`store_code`] (exit 2) when the store could
+/// not be used before anything was written, `EVIDENCE_STORE_FAILED` (exit 1) when a write to it failed; the reason is the one
+/// [`store_code`] gives.
+pub(crate) fn evidence_store_code(e: &ArtifactStoreError) -> (&'static str, Option<&'static str>) {
     match e {
-        ArtifactStoreError::Changed { .. } => "EVIDENCE_BINDING_STALE",
-        _ if before_first_write(e) => "EVIDENCE_STORE_UNAVAILABLE",
-        _ => "EVIDENCE_STORE_FAILED",
+        ArtifactStoreError::Changed { .. } => ("EVIDENCE_BINDING_STALE", None),
+        _ if before_first_write(e) => store_code(e),
+        _ => ("EVIDENCE_STORE_FAILED", None),
     }
 }
 
 /// What a store of bound files writes first: the repo's artifact-store lock and,
 /// for the local store, the blob directory. An object store has no local
-/// directory; reaching it is [`store_error`]'s `ARTIFACTS_STORE_UNREACHABLE`.
+/// directory; reaching it is [`store_error`]'s `ARTIFACTS_STORE_UNAVAILABLE`.
 pub(crate) fn store_targets(repo: &Path) -> Vec<PathBuf> {
     let mut targets = vec![repo.join(canon_model::paths::ARTIFACT_STORE_LOCK_FILE)];
     if ArtifactStore::open(repo).is_ok_and(|store| store.is_local()) {
         targets.push(store_dir(repo));
     }
     targets
+}
+
+/// The code of a local blob that cannot be read: the system refuses it (`ARTIFACTS_BLOB_DENIED`), it is no file
+/// (`ARTIFACTS_STORE_INVALID`), or the system failed in a way a repeat can pass (`ARTIFACTS_STORE_UNAVAILABLE`).
+fn unreadable_blob_code(e: &std::io::Error) -> &'static str {
+    use crate::read_cause::{of_io, Cause};
+    match of_io(e) {
+        Cause::Denied => "ARTIFACTS_BLOB_DENIED",
+        Cause::Unavailable => "ARTIFACTS_STORE_UNAVAILABLE",
+        Cause::NotFound | Cause::WrongPath | Cause::Other => "ARTIFACTS_STORE_INVALID",
+    }
+}
+
+/// The one code a refusal that found several blob problems carries: a blob whose content is broken (`ARTIFACTS_BLOB_CORRUPT`) outranks one that
+/// cannot be read at all, because repeating or re-permitting cannot mend it; then the system's refusal, a path that is no file, a repeat.
+fn blob_problem_code(problems: &[(&'static str, String)]) -> &'static str {
+    ["ARTIFACTS_BLOB_CORRUPT", "ARTIFACTS_BLOB_DENIED", "ARTIFACTS_STORE_INVALID", "ARTIFACTS_STORE_UNAVAILABLE"].into_iter().find(|code| problems.iter().any(|(c, _)| c == code)).unwrap_or("ARTIFACTS_BLOB_CORRUPT")
+}
+
+/// What to do about the blob problem [`blob_problem_code`] chose.
+fn blob_hint(code: &str) -> &'static str {
+    match code {
+        "ARTIFACTS_BLOB_DENIED" => "make the local blob the problem line names readable by this user, then run the command again",
+        "ARTIFACTS_STORE_INVALID" => "something that is no file stands where a blob belongs under .canon/artifacts/sha256: remove it, then run the command again",
+        "ARTIFACTS_STORE_UNAVAILABLE" => "run the command again: the system failed the read, or another process changed a blob while it was uploaded",
+        _ => "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again",
+    }
 }
 
 /// `canon artifacts verify`.
@@ -104,7 +165,7 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> u8 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts verify", json);
+            return crate::read_cause::config_error(e).emit("canon artifacts verify", json);
         }
     };
     let store = match ArtifactStore::open(&repo) {
@@ -116,7 +177,7 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> u8 {
     }
     let checks = check_bound_files(&gate_context, &store, full);
     if let Some(Observed::Unavailable(why)) = checks.iter().map(|c| &c.blob).find(|b| matches!(b, Observed::Unavailable(_))) {
-        return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("the artifact store could not be asked about {} bound file(s): {why}", checks.len())).hint(OBJECT_STORE_HINT).emit("canon artifacts verify", json);
+        return CliError::refused("ARTIFACTS_STORE_UNAVAILABLE", format!("the artifact store could not be asked about {} bound file(s): {why}", checks.len())).hint(OBJECT_STORE_HINT).emit("canon artifacts verify", json);
     }
     let stored = checks.iter().filter(|c| c.status == FileStatus::Stored).count();
     let tree_only = checks.iter().filter(|c| c.status == FileStatus::WorkingTreeOnly).count();
@@ -387,22 +448,26 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
 
     let (blobs, skipped) = match local_blobs(&repo) {
         Ok(listing) => listing,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("cannot read the local artifact store: {e}")).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again").emit("canon artifacts move", json),
+        Err(e) => {
+            let message = format!("cannot read the local artifact store: {e}");
+            return store_refusal(&ArtifactStoreError::Io(e), message).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again").emit("canon artifacts move", json);
+        }
     };
 
     // The plan: read-only. Every blob is hashed (one that does not match its
     // name is never moved) and the store is asked about its digest.
-    let mut problems: Vec<String> = Vec::new();
+    let mut problems: Vec<(&'static str, String)> = Vec::new();
     let mut moving = MovePlan { effects: Vec::new(), verified: Vec::new(), already: 0 };
     for blob in &blobs {
         let local = match std::fs::File::open(&blob.path).and_then(sha256_reader) {
             Ok(actual) if actual == blob.digest => actual,
             Ok(actual) => {
-                problems.push(format!("{}: its bytes hash to {actual}, not its name; it is not moved", blob.digest));
+                problems.push(("ARTIFACTS_BLOB_CORRUPT", format!("{}: its bytes hash to {actual}, not its name; it is not moved", blob.digest)));
                 continue;
             }
             Err(e) => {
-                problems.push(format!("{}: cannot be read: {e}", blob.digest));
+                // A blob that cannot be read says nothing about its content: the system refuses it (DENIED), it is no file (INVALID), or a repeat can pass.
+                problems.push((unreadable_blob_code(&e), format!("{}: cannot be read: {e}", blob.digest)));
                 continue;
             }
         };
@@ -411,19 +476,21 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
                 moving.already += 1;
                 moving.effects.push(Effect::record("skip", blob.digest.as_str()).detail("already in the store"));
             }
-            Observed::Unavailable(why) => return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("could not ask {}: {why}", store.display(&local))).hint(OBJECT_STORE_HINT).emit("canon artifacts move", json),
+            Observed::Unavailable(why) => return CliError::refused("ARTIFACTS_STORE_UNAVAILABLE", format!("could not ask {}: {why}", store.display(&local))).hint(OBJECT_STORE_HINT).emit("canon artifacts move", json),
             _ => moving.effects.push(Effect::record("upload", blob.digest.as_str()).detail(format!("to {}", store.display(&blob.digest)))),
         }
         moving.verified.push(blob);
     }
     if !problems.is_empty() {
-        for line in &problems {
+        for (_, line) in &problems {
             crate::say!(json, "  problem {line}");
         }
+        let lines: Vec<&str> = problems.iter().map(|(_, line)| line.as_str()).collect();
+        let code = blob_problem_code(&problems);
         return refuse(
-            "ARTIFACTS_BLOB_CORRUPT",
-            format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), problems.join("; ")),
-            "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again; nothing was removed and canon.yaml is unchanged",
+            code,
+            format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), lines.join("; ")),
+            &format!("{}; nothing was removed and canon.yaml is unchanged", blob_hint(code)),
         );
     }
     let relative = |blob: &LocalBlob| blob.path.strip_prefix(&repo).unwrap_or(&blob.path).display().to_string();
@@ -484,7 +551,8 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
                     .emit("canon artifacts move", json);
             }
             Err(ArtifactStoreError::Changed { actual, .. }) => {
-                problems.push(format!("{}: its bytes changed while being read (now {actual}); it is not moved", blob.digest));
+                // Another process changed the blob while it was uploaded: nothing is known to be broken, and the next action is to run the command again once that process is done.
+                problems.push(("ARTIFACTS_STORE_UNAVAILABLE", format!("{}: its bytes changed while being read (now {actual}); it is not moved", blob.digest)));
                 continue;
             }
             Err(e) => return CliError::refused(store_error(&e).code, format!("could not move {}: {e}", blob.digest)).hint(e.hint()).emit("canon artifacts move", json),
@@ -497,7 +565,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
                 match store.observe(&repo, &blob.digest, true) {
                     Observed::Sha256(_) => already += 1,
                     other => {
-                        problems.push(format!("{}: the object already in the store does not verify ({}); it is not moved", blob.digest, other.as_str()));
+                        problems.push(("ARTIFACTS_BLOB_CORRUPT", format!("{}: the object already in the store does not verify ({}); it is not moved", blob.digest, other.as_str())));
                         continue;
                     }
                 }
@@ -506,13 +574,15 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
         uploads.push(blob);
     }
     if !problems.is_empty() {
-        for line in &problems {
+        for (_, line) in &problems {
             crate::say!(json, "  problem {line}");
         }
+        let lines: Vec<&str> = problems.iter().map(|(_, line)| line.as_str()).collect();
+        let code = blob_problem_code(&problems);
         return refuse(
-            "ARTIFACTS_BLOB_CORRUPT",
-            format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), problems.join("; ")),
-            "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again; nothing was removed and canon.yaml is unchanged",
+            code,
+            format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), lines.join("; ")),
+            &format!("{}; nothing was removed and canon.yaml is unchanged", blob_hint(code)),
         );
     }
 

@@ -109,7 +109,7 @@ The rows whose last column starts `1 → 2` or `1 or 2 → 2` are the codes that
 | 0.35 | 0.36 | reason |
 |---|---|---|
 | `ADAPTER_REFUSED` | `ADAPTER_FILE_NOT_FOUND`, `ADAPTER_FILE_DENIED`, `ADAPTER_FILE_INVALID` (the response file); `CONFIG_INVALID` (a broken adapter policy) | `POLICY` |
-| `ARTIFACTS_MOVE_REFUSED` | `ARTIFACTS_TIER_INVALID` (the target is not an s3 tier); `ARTIFACTS_BLOB_CORRUPT` (a local blob does not match its name, or the store holds a bad copy) | |
+| `ARTIFACTS_MOVE_REFUSED` | `ARTIFACTS_TIER_INVALID` (the target is not an s3 tier); `ARTIFACTS_BLOB_CORRUPT` (a local blob does not match its name, or the store holds a bad copy); `ARTIFACTS_BLOB_DENIED`, `ARTIFACTS_STORE_INVALID` or `ARTIFACTS_STORE_UNAVAILABLE` (a blob that cannot be read, or that changed while it was read) | |
 | `BRIEF_APPROVE_REFUSED` | the first refused id's own code (`BRIEF_NOT_FOUND`, `BRIEF_INVALID`) with `error.details` | `BLOCKERS`, `UNAPPROVABLE` |
 | `DISPATCH_ALREADY_ENDED` | `DISPATCH_CONFLICT` | `ALREADY_ENDED` |
 | `DISPATCH_NOT_RUNNING` | `DISPATCH_CONFLICT` | `NOT_RUNNING` |
@@ -120,23 +120,45 @@ The rows whose last column starts `1 → 2` or `1 or 2 → 2` are the codes that
 | `EVIDENCE_REFUSED` | `EVIDENCE_REQUIRED`, `EVIDENCE_INVALID`, `EVIDENCE_ARGUMENT_INVALID` | |
 | `EVIDENCE_SCENARIO_NOT_INDEXED`, `REVIEW_SCENARIO_NOT_INDEXED` | `SCENARIO_INDEX_REQUIRED` | |
 | `HOOKS_INSTALL_REFUSED` | `HOOKS_REPO_INVALID`, `HOOKS_FILE_CONFLICT`, `HOOKS_FILE_DENIED` | |
-| `INVENTORY_REFUSED` | `CONFIG_INVALID` (a malformed `specs:` section); `CONFIG_UNREADABLE`; `INVENTORY_INDEX_UNAVAILABLE` (another process holds the index lock; retryable) | `SPECS` |
+| `INVENTORY_REFUSED` | `CONFIG_INVALID` (a malformed `specs:` section or a canon.yaml that does not parse); `CONFIG_DENIED` (canon.yaml that this user may not read); `INVENTORY_INDEX_UNAVAILABLE` (another process holds the index lock; retryable) | `SPECS` |
 | `LEARN_ROLLBACK_FAILED` | `STRATEGY_SIGNATURE_INVALID` (exit 2, nothing recorded); `STRATEGY_ROLLBACK_FAILED` (exit 1) | |
 | `MIGRATE_REFUSED` | `MIGRATION_INVALID`, `MIGRATION_CONFLICT`, `MIGRATION_DENIED` (the scratch directory); `CONFIG_INVALID` (a config that cannot be moved) | |
 | `NO_BRIEF` | `BRIEF_REQUIRED` | |
 | `OLD_BRIEF_FORMAT` | `BRIEF_MIGRATION_REQUIRED` | |
 | `OLD_LAYOUT` | `LAYOUT_MIGRATION_REQUIRED` | |
-| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`; `CONFIG_INVALID` (`specs:`); `CONFIG_UNREADABLE`; `INVENTORY_INDEX_UNAVAILABLE` | `SPECS` |
-| `POLICY_APPROVAL_REFUSED` | `POLICY_REQUIRED`, `POLICY_INVALID`, `APPROVAL_INVALID` (a blank approver) | |
-| `RETENTION_EXPORT_REFUSED` | `RETENTION_EXPORT_DENIED`; `RETENTION_TIERS_UNAVAILABLE` (retryable); `RETENTION_TIERS_INVALID` | |
+| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`; `CONFIG_INVALID` (`specs:`, or a canon.yaml that does not parse); `CONFIG_DENIED`; `INVENTORY_INDEX_UNAVAILABLE` | `SPECS` |
+| `POLICY_APPROVAL_REFUSED` | `POLICY_REQUIRED`, `POLICY_INVALID`, `POLICY_DENIED` (a policy this user may not read), `APPROVAL_INVALID` (a blank approver) | |
+| `RETENTION_EXPORT_REFUSED` | `RETENTION_EXPORT_DENIED`; `RETENTION_TIERS_DENIED` (a file the tiers need that this user may not read); `RETENTION_TIERS_UNAVAILABLE` (retryable: a backend down, or an operating-system error a repeat can pass); `RETENTION_TIERS_INVALID` | |
 | `RETENTION_PURGE_REFUSED` | `RETENTION_TIERS_UNAVAILABLE` (retryable); `RETENTION_TIERS_INVALID`. A preview exits 0 and is no refusal | |
 | `REVIEW_ARTIFACT_REFUSED` | `REVIEW_ARTIFACT_STALE`, `REVIEW_ARTIFACT_INVALID`, `REVIEW_ARTIFACT_NOT_FOUND`, `REVIEW_ARTIFACT_DENIED` | |
 | `SKILLS_INVALID_ARGUMENT` | `SKILLS_ARGUMENT_INVALID` (a provider); `SKILLS_SOURCE_NOT_FOUND` (`--skills-source`); `CONFIG_INVALID` (the `skills:` section) | `SKILLS` |
-| `SUBJECT_ADOPT_REFUSED` | `SUBJECT_NOT_FOUND`, `CHANGE_NOT_FOUND`; `WRITE_UNAVAILABLE`; `REPO_UNREADABLE` | |
+| `SUBJECT_ADOPT_REFUSED` | `SUBJECT_NOT_FOUND`, `CHANGE_NOT_FOUND`; `WRITE_DENIED`, `WRITE_INVALID`; `REPO_DENIED`, `REPO_INVALID`, `LEDGER_CORRUPT` | |
 | `SUBJECT_UNADOPT_REFUSED` | `SUBJECT_CONFLICT` | `APPROVED_BRIEF`, `FLOW_TAGGED` |
 | `TRACE_NOT_FOUND` | `TRACE_NOT_FOUND` (no record); `TRACE_CONFLICT` (a sha prefix that fits several commits; `expected` lists them) | |
 
 `CHANGE_NOT_FOUND` is new: the table of the brief had no code for an adopt of a change that does not exist, and a name that is not found is `NOT_FOUND`. `EVIDENCE_CONFLICT` of the brief's table is not registered: no call site refuses an evidence record for contradicting evidence already recorded. `ADAPTER_FILE_INVALID` names `canon adapter validate` in its `fix`, which answers the same situation with exit 1 and its result in `data`; `ARTIFACTS_BLOB_CORRUPT` names `canon artifacts verify` the same way. The skills, the scenarios and the dashboard say the new names.
+
+**Fifteen `*_UNREADABLE` and like codes say their cause** (`canon-0-36-codes-stored`, scenarios `atip.codestored.01-10`). A failure to read a file or state is told by what is wrong: the system refuses access (`DENIED`), a file a person edits is wrong or a path the caller gave is no file or no directory (`INVALID`), a path the caller named is not there (`NOT_FOUND`), state canon wrote is broken (`CORRUPT`), and only an operating-system error a repeat can pass is `UNAVAILABLE`, the one retryable code of these. A target that cannot be written is `WRITE_DENIED` (read-only, no permission) or `WRITE_INVALID` (its directory is missing or no directory), both known before anything changed. The one exit that changes is the policy approval file: `POLICY_APPROVAL_UNREADABLE` was exit 1, a broken one is `POLICY_APPROVAL_CORRUPT` and an unreadable one `POLICY_APPROVAL_DENIED`, both exit 2, and `--override-reason` still passes neither. `CONFIG_UNREADABLE`, `DISPATCH_MANIFEST_MISMATCH`, `DISPATCH_MANIFEST_UNREADABLE` and `POLICY_APPROVAL_UNREADABLE` stay as the names of warnings; only the error has a new code.
+
+| 0.35 | 0.36 | reason |
+|---|---|---|
+| `ARTIFACTS_STORE_UNREACHABLE` | `ARTIFACTS_STORE_UNAVAILABLE` (the lock is held, the object store did not answer; retryable); `ARTIFACTS_STORE_REQUIRED` (the tier is not attached; not retryable); `ARTIFACTS_STORE_INVALID` (the store directory is a symlink or refused); `ARTIFACTS_DIGEST_INVALID`; `CONFIG_INVALID` (the `artifact_store:` section) | `ARTIFACT_STORE` |
+| `BRIEF_UNREADABLE` | `BRIEF_DENIED`, `BRIEF_INVALID` (not UTF-8, or a directory where the file belongs), `BRIEF_NOT_FOUND` | |
+| `CONFIG_UNREADABLE` | `CONFIG_INVALID` (canon.yaml or a policy file that does not parse), `CONFIG_DENIED` (this user may not read it), `CONFIG_REQUIRED` (no canon.yaml) | |
+| `DISPATCH_MANIFEST_MISMATCH` | `DISPATCH_MANIFEST_CORRUPT` | |
+| `DISPATCH_MANIFEST_UNREADABLE` | `DISPATCH_MANIFEST_CORRUPT`, `DISPATCH_MANIFEST_DENIED` | |
+| `EVIDENCE_STORE_UNAVAILABLE` | `ARTIFACTS_STORE_UNAVAILABLE`, `ARTIFACTS_STORE_REQUIRED`, `CONFIG_INVALID` | `ARTIFACT_STORE` |
+| `LEARN_SIGNATURE_UNREADABLE` | `STRATEGY_SIGNATURE_NOT_FOUND`, `STRATEGY_SIGNATURE_DENIED`, `STRATEGY_SIGNATURE_INVALID` | |
+| `LEDGER_ARCHIVE_UNAVAILABLE` | `LEDGER_ARCHIVE_INVALID` | |
+| `PLAN_CORPUS_UNREADABLE` | `PLAN_CORPUS_INVALID`, `PLAN_CORPUS_DENIED` | |
+| `POLICY_APPROVAL_UNREADABLE` (exit 1) | `POLICY_APPROVAL_CORRUPT`, `POLICY_APPROVAL_DENIED` (exit 2) | |
+| `REPO_UNREADABLE` | `REPO_DENIED`, `REPO_INVALID` (no repository there, or a tier that cannot be attached), `LEDGER_CORRUPT` (a record that does not parse) | |
+| `REPO_WRITE_BUSY` | `REPO_LOCK_UNAVAILABLE` (retryable) | |
+| `SPEC_ROOTS_UNREADABLE` | `SPEC_ROOT_INVALID`, `SPEC_ROOT_DENIED` | |
+| `TASK_ROW_NOT_FOUND` | `PLAN_DOCUMENT_INVALID` | |
+| `WRITE_UNAVAILABLE` | `WRITE_DENIED`, `WRITE_INVALID` | |
+
+Also split by cause with this change: `ARTIFACTS_BLOB_CORRUPT` is only a stored blob whose content is broken (a blob that cannot be read is `ARTIFACTS_BLOB_DENIED`, `ARTIFACTS_STORE_INVALID` or `ARTIFACTS_STORE_UNAVAILABLE`, and one that changed while it was read is `ARTIFACTS_STORE_UNAVAILABLE`, because the next action is to run the command again once the other process is done); `policy approve` on a policy this user may not read is `POLICY_DENIED`; a purge or export that cannot read a file the tiers need is `RETENTION_TIERS_DENIED`, a wrong path `RETENTION_TIERS_INVALID`, and only a backend that is down or an error a repeat can pass is `RETENTION_TIERS_UNAVAILABLE`. A situation that gives a check's exit-1 answer in one command and a refusal in another (`LEDGER_CORRUPT` and `gate check`, `ARTIFACTS_BLOB_CORRUPT` and `artifacts verify`, `CONTEXT_PACK_CORRUPT` and `context-pack verify`) is linked in the `fix` text of the refusal, not by a machine link. An operating-system error a repeat can pass is told only where the registry has an `UNAVAILABLE` code for the subject (the artifact store, the repository write lock, the retention tiers); elsewhere it is `INVALID`.
 
 **`--help --json` and `--version --json` are refused** (`canon-0-36-help-json`, scenarios `atip.helpjson.01-09`, atip/1 spec 4.4.1). `--help` is text for people and `canon schema` is the machine description, so a call that asks for JSON and for help or the version no longer gets text: it gets the failure envelope, exit 2, `USAGE`, and a `hint` that names what to run. The path is resolved first, so an unknown word still answers `UNKNOWN_COMMAND`, wherever the flag sits. The rule does not wait for the 1.4 declaration: a 1.2 tool may answer `--help --json` with the `schema` document or with a refusal (4.4.1).
 

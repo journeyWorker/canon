@@ -85,7 +85,7 @@ pub enum IngestError {
     #[error("{0}")]
     Config(String),
     /// A local store the pass writes cannot be written, known before
-    /// anything was changed (`WRITE_UNAVAILABLE`).
+    /// anything was changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
 }

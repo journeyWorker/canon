@@ -44,12 +44,21 @@ pub enum RetentionError {
 /// The code of a purge or export that could not open or read the tiers before it began: a backend that is down or unreachable
 /// can be tried again (`RETENTION_TIERS_UNAVAILABLE`); a policy, routing entry or config the caller wrote that cannot be used cannot
 /// (`RETENTION_TIERS_INVALID`).
+///
+/// An operating-system error is told by its cause (`read_cause`): a read the system refuses is `RETENTION_TIERS_DENIED`, a path that is
+/// not there or is no file or directory (the caller's wrong path) is `RETENTION_TIERS_INVALID`, and only an error a repeat can pass
+/// (`EIO`, an interrupted or timed-out call) is `RETENTION_TIERS_UNAVAILABLE`, like a backend that is down.
 fn tiers_code(error: &RetentionError) -> &'static str {
+    use crate::read_cause::{of_io, Cause};
     use canon_store::tier::StoreError;
-    let unavailable = |store: &StoreError| matches!(store, StoreError::TierUnavailable { .. } | StoreError::BackendUnattached { .. } | StoreError::Io(_) | StoreError::Sql(_) | StoreError::ObjectStore(_) | StoreError::Parquet(_));
+    let by_cause = |io: &std::io::Error| match of_io(io) {
+        Cause::Denied => "RETENTION_TIERS_DENIED",
+        Cause::Unavailable => "RETENTION_TIERS_UNAVAILABLE",
+        Cause::NotFound | Cause::WrongPath | Cause::Other => "RETENTION_TIERS_INVALID",
+    };
     match error {
-        RetentionError::Store(store) | RetentionError::Tiers(tiers::TierCliError::Store(store)) if unavailable(store) => "RETENTION_TIERS_UNAVAILABLE",
-        RetentionError::Io(_) | RetentionError::Tiers(tiers::TierCliError::ReadCanonYaml { .. }) => "RETENTION_TIERS_UNAVAILABLE",
+        RetentionError::Store(StoreError::Io(io)) | RetentionError::Io(io) | RetentionError::Tiers(tiers::TierCliError::Store(StoreError::Io(io)) | tiers::TierCliError::ReadCanonYaml { source: io, .. }) => by_cause(io),
+        RetentionError::Store(store) | RetentionError::Tiers(tiers::TierCliError::Store(store)) if matches!(store, StoreError::TierUnavailable { .. } | StoreError::BackendUnattached { .. } | StoreError::Sql(_) | StoreError::ObjectStore(_) | StoreError::Parquet(_)) => "RETENTION_TIERS_UNAVAILABLE",
         _ => "RETENTION_TIERS_INVALID",
     }
 }
@@ -312,7 +321,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
                 targets.extend(learn.map(|config| yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(repo).join(&config.root).join("trajectories")));
             }
             for target in &targets {
-                crate::write_mode::check_writable(target).map_err(|cause| RetentionError::Refusal(Box::new(crate::write_mode::unavailable(target, &cause))))?;
+                crate::write_mode::check_writable(target).map_err(|cause| RetentionError::Refusal(Box::new(crate::write_mode::unwritable(target, &cause))))?;
             }
         }
         deleting.set(commit);
@@ -550,11 +559,11 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         };
         // The destination is checked before anything is written, for a preview as for a run: an output that cannot be created refuses with nothing written and no audit line.
         if let Some(path) = out.filter(|path| !fs::read(path).is_ok_and(|held| held == encoded)) {
-            crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(path, &e)))?;
+            crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unwritable(path, &e)))?;
         }
         // A real run appends one audit line; a repo whose audit file cannot take it is refused the same way. A preview appends none.
         if let Some(path) = audit_path(repo).filter(|_| !dry_run) {
-            crate::write_mode::check_writable(&path).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(&path, &e)))?;
+            crate::write_mode::check_writable(&path).map_err(|e| ExportFailure::Refused(crate::write_mode::unwritable(&path, &e)))?;
         }
         if dry_run {
             if json_output {

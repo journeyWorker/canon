@@ -70,7 +70,7 @@ fn status_of(code: &str) -> u16 {
         "BRIEF_NOT_FOUND" => 404,
         "BRIEF_INVALID" | CHANGED_SINCE_PAGE_LOAD => 409,
         // Another canon process holds the repository write lock: the page may ask again.
-        "REPO_WRITE_BUSY" => 503,
+        "REPO_LOCK_UNAVAILABLE" => 503,
         _ => 500,
     }
 }

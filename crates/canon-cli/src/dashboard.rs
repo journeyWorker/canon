@@ -121,7 +121,7 @@ impl DashboardError {
             DashboardError::Config(_) => CliError::refused("CONFIG_INVALID", self.to_string()).reason("DASHBOARD").hint("fix the dashboard settings in canon.yaml (`canon init --check` reports what is wrong)"),
             DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_UNSUPPORTED", self.to_string())
                 .hint("install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout"),
-            DashboardError::RepoMissing(_) => CliError::refused("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
+            DashboardError::RepoMissing(_) => crate::read_cause::repo_io_error(self.to_string()),
             DashboardError::PortInUse(_) => CliError::failed("DASHBOARD_PORT_UNAVAILABLE", self.to_string()).hint("pass `--port <n>` to serve on another port, or `--port 0` for any free one"),
             DashboardError::Io(_) => CliError::failed("DASHBOARD_FAILED", self.to_string()).hint("the message names the cause: fix it (check that the repository is readable), then run `canon dashboard` again"),
         }

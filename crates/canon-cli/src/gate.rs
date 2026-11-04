@@ -150,7 +150,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate check", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon gate check", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -163,7 +163,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     let mut gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate check", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon gate check", json);
         }
     };
 
@@ -520,14 +520,15 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let document = match std::fs::read_to_string(&document_path) {
         Ok(d) => d,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
+            let code = if crate::read_cause::of_io(&e) == crate::read_cause::Cause::Denied { "PLAN_CORPUS_DENIED" } else { "PLAN_CORPUS_INVALID" };
+            return CliError::refused(code, format!("cannot read {}: {e}", document_path.display())).hint("make the plan document a readable text file, then run the command again").emit("canon task done", json);
         }
     };
 
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon task done", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon task done", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -538,7 +539,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon task done", json);
         }
     };
 
@@ -548,7 +549,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::Evidence) {
         Ok(read) => read.records,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon task done", json);
         }
     };
 
@@ -598,7 +599,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let flip = match write_back.flip_task(&document, &task_id, approved_note.as_deref().unwrap_or("")) {
         Ok(o) => o,
         Err(e @ WriteBackError::RowNotFound(_)) => {
-            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon task done", json);
+            return CliError::failed("PLAN_DOCUMENT_INVALID", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon task done", json);
         }
         // Gate-red, not usage (the variant's own doc): the offending
         // text came from an already-COMMITTED ledger record's approved
@@ -976,7 +977,7 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate promote", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon gate promote", json);
         }
     };
     // Something staged is about to move into the ledger: both directories must take it before the first record moves. An empty staging area writes nothing and is not refused.
@@ -1306,7 +1307,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         match install_into(path, &entry, true) {
             Ok(InstallOutcome::Installed) => {
                 if let Err(e) = crate::write_mode::check_writable(path) {
-                    return crate::write_mode::unavailable(path, &e).emit("canon gate install-hooks", json);
+                    return crate::write_mode::unwritable(path, &e).emit("canon gate install-hooks", json);
                 }
             }
             Ok(_) => {}
@@ -1318,7 +1319,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     }
     if writes_script {
         if let Err(e) = crate::write_mode::check_creatable(&script_path, true).and_then(|()| crate::write_mode::check_writable(&script_path)) {
-            return crate::write_mode::unavailable(&script_path, &e).emit("canon gate install-hooks", json);
+            return crate::write_mode::unwritable(&script_path, &e).emit("canon gate install-hooks", json);
         }
     }
 

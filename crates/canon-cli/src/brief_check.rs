@@ -1751,7 +1751,14 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
     if let Some(change) = requested {
         return crate::brief::canon_brief(repo, change)
             .map(|path| (change.clone(), path))
-            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject <id> --title <title>`"));
+            .ok_or_else(|| {
+                let at = format!("{}/{}/brief.md", paths::CHANGES_DIR, change.as_str());
+                // Something stands where the brief belongs but it is no file (a directory): the person's to fix, not a missing brief.
+                if repo.join(&at).exists() {
+                    return CliError::failed("BRIEF_INVALID", format!("`{at}` is not a file")).hint("replace it with the change's brief.md, a UTF-8 text file, then run the command again");
+                }
+                CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {at}")).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject <id> --title <title>`")
+            });
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
@@ -1775,17 +1782,17 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
 /// Reads and judges the brief of `requested` (or the only live change).
 pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliError> {
     let (change, path) = resolve_change(repo, requested)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"))?;
+    let text = std::fs::read_to_string(&path).map_err(|e| CliError::failed(crate::read_cause::brief_code(&e), format!("cannot read `{}`: {e}", rel(repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"))?;
     check_text(repo, change, &path, &text)
 }
 
 /// Judges `text`, the brief of `change` read from `path`: [`check`] for a
 /// caller that has already read the file and must judge those same bytes.
 pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Result<Checked, CliError> {
-    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
+    let resolved = crate::language::for_brief(repo, text).map_err(|e| crate::read_cause::config_error(e.to_string()))?;
     let phase = phase_of(repo, &change, text);
     let flows = match phase {
-        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), then run the command again"))?),
+        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed(crate::read_cause::spec_root_code(&e.to_string()), format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), then run the command again"))?),
         _ => None,
     };
     let evaluation = evaluate(text, &resolved, flows.as_ref());
@@ -2107,10 +2114,10 @@ pub fn run_body(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     };
     let bytes = match std::fs::read(&path) {
         Ok(bytes) => bytes,
-        Err(e) => return fail("canon brief show", json, &CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(&repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again")),
+        Err(e) => return fail("canon brief show", json, &CliError::failed(crate::read_cause::brief_code(&e), format!("cannot read `{}`: {e}", rel(&repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again")),
     };
     let Ok(text) = String::from_utf8(bytes) else {
-        return fail("canon brief show", json, &CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: it is not UTF-8", rel(&repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"));
+        return fail("canon brief show", json, &CliError::failed("BRIEF_INVALID", format!("cannot read `{}`: it is not UTF-8", rel(&repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"));
     };
     let digest = crate::brief_approve::approval_digest(&text);
     if json {

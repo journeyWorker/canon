@@ -143,7 +143,7 @@ fn load_corpus(command: &str, repo: &std::path::Path, json: bool) -> Result<Corp
     let corpus: Corpus = match inputs::load(repo) {
         Ok(corpus) => corpus,
         Err(InputError::Config(why)) => {
-            return Err(ExitCode::from(CliError::refused("CONFIG_UNREADABLE", why).hint("fix canon.yaml so it parses and names usable spec roots (`canon init --check` reports what is wrong), then run the command again").emit(command, json)));
+            return Err(ExitCode::from(crate::read_cause::config_error(why).hint("fix canon.yaml so it parses and names usable spec roots (`canon init --check` reports what is wrong), then run the command again").emit(command, json)));
         }
         Err(InputError::Unreadable(why)) => {
             return Err(ExitCode::from(CliError::failed("SEARCH_INDEX_FAILED", format!("the records the index is built from cannot be read: {why}")).hint("fix or restore what the message names, then run the command again; `canon gate check` shows the state of the ledger").emit(command, json)));

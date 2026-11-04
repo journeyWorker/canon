@@ -281,7 +281,7 @@ fn skills_install_72_a_write_failure_keeps_earlier_ids_and_skips_the_rest() {
     let refused = run(repo, &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
     assert_eq!(refused.status.code(), Some(2), "{}", stdout(&refused));
     let doc: Value = serde_json::from_str(&stdout(&refused)).unwrap();
-    assert_eq!(doc["error"]["code"], "WRITE_UNAVAILABLE", "{doc}");
+    assert_eq!(doc["error"]["code"], "WRITE_DENIED", "{doc}");
     assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
     assert!(doc["error"]["message"].as_str().unwrap().starts_with("`b`"), "{doc}");
     for change in ["a", "b", "c"] {

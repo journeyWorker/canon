@@ -229,7 +229,7 @@ Feature: ATIP L0 output contract
   Scenario: A target that cannot be written refuses with exit 2 before anything changes and a failure after the first write is exit 1
     Given a directory that cannot be written, and a store that fails after its first write
     When a command writes into the first, and a write fails after the first record in the second
-    Then the first exits 2 with WRITE_UNAVAILABLE and changes nothing, and the second exits 1 with WRITE_FAILED
+    Then the first exits 2 with WRITE_DENIED (WRITE_INVALID when its directory is missing) and changes nothing, and the second exits 1 with WRITE_FAILED
 
   # canon: {"schema":1,"at":"2026-10-31T11:36:24Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract

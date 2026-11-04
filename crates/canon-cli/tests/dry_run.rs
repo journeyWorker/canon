@@ -350,7 +350,7 @@ fn ingest_sessions_dry_run_refuses_like_the_real_run() {
     std::fs::write(root.join("canon.yaml"), "tiers: [unclosed\n").unwrap();
     assert_eq!(
         bad_preview(&["ingest", "sessions", "--home", home.path().to_str().unwrap(), "--all-workspaces"], root, &[root, home.path()]),
-        "CONFIG_UNREADABLE"
+        "CONFIG_INVALID"
     );
 }
 
@@ -384,7 +384,7 @@ fn export_dry_run_leaves_no_output_file() {
 fn export_dry_run_refuses_like_the_real_run() {
     let dir = export_repo();
     assert_eq!(bad_preview(&["export", "--kind", "change", "--include-sensitive"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_DENIED");
-    assert_eq!(bad_preview(&["export", "--kind", "change", "--output", "missing-dir/out.json"], dir.path(), &[dir.path()]), "WRITE_UNAVAILABLE");
+    assert_eq!(bad_preview(&["export", "--kind", "change", "--output", "missing-dir/out.json"], dir.path(), &[dir.path()]), "WRITE_INVALID");
 }
 
 // ── subject adopt / unadopt ──

@@ -30,7 +30,7 @@
 //! A file the repository already had is never touched, and a call that succeeds keeps what it made: it was a writer.
 //!
 //! **Order.** This lock is the outermost one: taken before the scenario-index lock and the artifact-store lock, never while
-//! holding either, so two processes cannot wait for each other. A wait that runs out is `REPO_WRITE_BUSY` (exit 2, retryable):
+//! holding either, so two processes cannot wait for each other. A wait that runs out is `REPO_LOCK_UNAVAILABLE` (exit 2, retryable):
 //! nothing was started.
 
 use std::cell::RefCell;
@@ -228,16 +228,22 @@ pub enum Refused {
 }
 
 impl Refused {
-    /// The refusal a command answers with: `REPO_WRITE_BUSY` (exit 2, retryable) or `WRITE_UNAVAILABLE`.
+    /// The refusal a command answers with: `REPO_LOCK_UNAVAILABLE` (exit 2, retryable), or `WRITE_DENIED` / `WRITE_INVALID` for a lock file that cannot be made.
     pub fn error(&self) -> CliError {
         match self {
             Refused::Busy(waited) => CliError::refused(
-                "REPO_WRITE_BUSY",
+                "REPO_LOCK_UNAVAILABLE",
                 format!("another canon process has held {PLAN_LOCK} (`{REPO_WRITE_LOCK_FILE}`) for the whole {}s wait; nothing was started", waited.as_secs()),
             )
             .hint("a canon command that writes or commits is still running in this repository: run the same command again in a moment"),
-            Refused::Io(file, cause) => CliError::refused("WRITE_UNAVAILABLE", format!("cannot lock `{}`: {cause}", file.display()))
-                .hint("make the lock file readable (its permissions, a mounted volume), then run the command again; nothing was changed"),
+            Refused::Io(file, cause) => {
+                let message = format!("cannot lock `{}`: {cause}", file.display());
+                match crate::read_cause::of_io(cause) {
+                    crate::read_cause::Cause::Denied => CliError::refused("WRITE_DENIED", message).hint("make the lock file writable (its permissions, a read-only mount), then run the command again; nothing was changed"),
+                    crate::read_cause::Cause::Unavailable => CliError::refused("REPO_LOCK_UNAVAILABLE", message).hint("the system failed the lock in a way a repeat can pass: run the same command again in a moment; nothing was changed"),
+                    _ => CliError::refused("WRITE_INVALID", message).hint("create the missing directory of the lock file, then run the command again; nothing was changed"),
+                }
+            }
         }
     }
 }
@@ -484,7 +490,7 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let _held = FileLock::acquire(&dir.path().join(REPO_WRITE_LOCK_FILE), Duration::ZERO).unwrap();
         let error = hold_within(dir.path(), Duration::from_millis(80)).unwrap_err().error();
-        assert_eq!((error.code, error.exit, error.retryable), ("REPO_WRITE_BUSY", 2, true));
+        assert_eq!((error.code, error.exit, error.retryable), ("REPO_LOCK_UNAVAILABLE", 2, true));
     }
 
     #[test]

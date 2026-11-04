@@ -376,7 +376,7 @@ pub enum SkillsError {
         source: std::io::Error,
     },
     /// A file or directory the install writes cannot be written, known before
-    /// anything was changed (`WRITE_UNAVAILABLE`).
+    /// anything was changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
 }
@@ -1664,7 +1664,7 @@ pub fn install_canonical(
         for target in targets {
             let directory = target.parent().filter(|parent| !parent.as_os_str().is_empty()).map(Path::to_path_buf);
             for path in std::iter::once(target).chain(directory) {
-                crate::write_mode::check_writable(&path).map_err(|cause| SkillsError::Unavailable(crate::write_mode::unavailable(&path, &cause)))?;
+                crate::write_mode::check_writable(&path).map_err(|cause| SkillsError::Unavailable(crate::write_mode::unwritable(&path, &cause)))?;
             }
         }
         for (path, bytes) in writes {

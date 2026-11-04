@@ -578,7 +578,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
 }
 
 /// What a failed skill install of a fresh `init` is. `canon skills install` says of the same error a refusal before its work
-/// (`SKILLS_SOURCE_NOT_FOUND`: the skill source, `SKILLS_ARGUMENT_INVALID`: the providers, `CONFIG_INVALID`: the `skills:` section; `WRITE_UNAVAILABLE`: a target that
+/// (`SKILLS_SOURCE_NOT_FOUND`: the skill source, `SKILLS_ARGUMENT_INVALID`: the providers, `CONFIG_INVALID`: the `skills:` section; `WRITE_DENIED` or `WRITE_INVALID`: a target that
 /// cannot be written) or a failure (`SKILLS_FAILED`), and `init` says the same with what its step order changes (spec 8.3,
 /// 8.3.2): by this step the run has written `canon.yaml` and the files beside it, so nothing can be an exit 2 any more.
 /// - the refusal of an argument (`SKILLS_SOURCE_NOT_FOUND`, `SKILLS_ARGUMENT_INVALID`, `CONFIG_INVALID`) is `STOPPED_MIDWAY` with that code as its reason;
@@ -592,7 +592,7 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
     if dry_run {
         let hint = format!("fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset), then run the command again", skills::CANONICAL_SOURCE_ENV);
         return match said {
-            code @ ("CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" | "WRITE_UNAVAILABLE") => CliError::refused(code, error.to_string()).hint(hint),
+            code @ ("CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" | "WRITE_DENIED" | "WRITE_INVALID") => CliError::refused(code, error.to_string()).hint(hint),
             _ => CliError::failed("SKILLS_FAILED", error.to_string()).hint(hint),
         };
     }
@@ -616,7 +616,7 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
     let hint = format!("read what init wrote with `canon status`, fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset; the skill directories must be writable), then run `canon skills install`; it follows skills.providers", skills::CANONICAL_SOURCE_ENV);
     match said {
         "CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => CliError::failed("STOPPED_MIDWAY", message).hint(hint).reason(said),
-        "WRITE_UNAVAILABLE" => CliError::failed("WRITE_FAILED", message).hint(hint),
+        "WRITE_DENIED" | "WRITE_INVALID" => CliError::failed("WRITE_FAILED", message).hint(hint),
         _ => CliError::failed("SKILLS_FAILED", message).hint(hint),
     }
 }
@@ -724,7 +724,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             Ok(text) => Some(text),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(log.command(), json);
+                return crate::read_cause::repo_io_error(format!("failed to read `{}`: {e}", agents_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(log.command(), json);
             }
         };
         match merge_agents_md(existing.as_deref()) {

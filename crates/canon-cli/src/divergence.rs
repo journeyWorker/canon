@@ -175,13 +175,13 @@ pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate:
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return crate::read_cause::config_error(error.to_string()).emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon divergence add", json);
         }
     };
     let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
@@ -301,7 +301,7 @@ fn run_commit(verb: &str, status: DivergenceStatus, args: CommitArgs<'_>) -> u8 
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
+            return crate::read_cause::config_error(e.to_string()).emit(&format!("canon divergence {verb}"), json);
         }
     };
     let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
@@ -414,7 +414,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         ctx
     }) {
         Ok(context) => context,
-        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
+        Err(e) => return crate::read_cause::config_error(e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
     let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
     let mut scenarios = Vec::new();
@@ -532,7 +532,7 @@ pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &cr
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence list", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon divergence list", json);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);

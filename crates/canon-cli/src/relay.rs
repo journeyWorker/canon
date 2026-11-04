@@ -207,7 +207,7 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
                 .hint(format!("the human runs `{human_call}` in their own shell, or sets `{CONFIG_KEY}: allow` in canon.yaml; never remove your role to run it yourself")));
         }
         Err(e) => {
-            return Err(CliError::refused("CONFIG_UNREADABLE", e).hint("fix the `approval:` section of canon.yaml (`canon init --check` names the problem), then run the call again"));
+            return Err(crate::read_cause::config_error(e).hint("fix the `approval:` section of canon.yaml (`canon init --check` names the problem), then run the call again"));
         }
     }
     check_actor_of(&call)?;

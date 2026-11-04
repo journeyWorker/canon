@@ -29,7 +29,31 @@ const EMIT_WINDOW: usize = 6;
 /// is emitted by `run::entry` for every command that needs canon state (see
 /// [`needs_config_leaves`]); `input.rs`, whose INPUT_* codes `derive` attributes to every
 /// leaf that takes `--input`.
-const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "input.rs", "old_layout.rs"];
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "input.rs", "old_layout.rs", "read_cause.rs"];
+
+/// The helpers that choose a code by the cause of a failure (`read_cause.rs`, `artifacts::store_code`): a call of one is a site of every code
+/// the helper can answer, attributed to the command whose `emit("canon …")` follows it like a literal code is. `read_cause.rs` itself builds
+/// the codes and is not an error site.
+const HELPER_SITES: &[(&str, &[&str])] = &[
+    ("read_cause::config_error(", &["CONFIG_DENIED", "CONFIG_INVALID"]),
+    ("read_cause::repo_error(", &["LEDGER_CORRUPT", "REPO_DENIED", "REPO_INVALID"]),
+    ("read_cause::repo_io_error(", &["REPO_DENIED", "REPO_INVALID"]),
+    ("read_cause::brief_code(", &["BRIEF_DENIED", "BRIEF_INVALID", "BRIEF_NOT_FOUND"]),
+    ("read_cause::spec_root_code(", &["SPEC_ROOT_DENIED", "SPEC_ROOT_INVALID"]),
+    ("read_cause::write_code_of_text(", &["WRITE_DENIED", "WRITE_INVALID"]),
+    ("read_cause::signature_code(", &["STRATEGY_SIGNATURE_DENIED", "STRATEGY_SIGNATURE_INVALID", "STRATEGY_SIGNATURE_NOT_FOUND"]),
+    ("artifacts::store_refusal(", ARTIFACT_STORE_CODES),
+    ("artifacts::store_error(", ARTIFACT_STORE_CODES),
+    ("artifacts::evidence_store_code(", ARTIFACT_STORE_CODES),
+];
+
+/// What `artifacts::store_code` answers for a store that cannot be used before anything is written.
+const ARTIFACT_STORE_CODES: &[&str] = &["ARTIFACTS_DIGEST_INVALID", "ARTIFACTS_STORE_INVALID", "ARTIFACTS_STORE_REQUIRED", "ARTIFACTS_STORE_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID"];
+
+/// Whether `line` calls a helper that can answer `code`.
+fn helper_answers(line: &str, code: &str) -> bool {
+    HELPER_SITES.iter().any(|(marker, codes)| line.contains(marker) && codes.contains(&code))
+}
 
 /// Codes registered ahead of the commands that emit them (none: every code is emitted).
 const AWAITING_WIRING: &[&str] = &[];
@@ -134,7 +158,7 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("SCENARIO_INDEX_REQUIRED", "evidence approval-payload")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("SCENARIO_INDEX_REQUIRED", "evidence approval-payload"), ("POLICY_APPROVAL_CORRUPT", "subject move"), ("POLICY_APPROVAL_DENIED", "subject move")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
@@ -250,7 +274,7 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
         for (i, line) in lines.iter().enumerate() {
             // A warning call may wrap: the code literal is then alone on the line after `warn_err!(`.
             let wrapped = i > 0 && lines[i - 1].trim_end().ends_with('(') && WARNING_SITES.iter().any(|marker| lines[i - 1].contains(marker));
-            for code in codes.iter().filter(|c| line.contains(&format!("\"{c}\""))) {
+            for code in codes.iter().filter(|c| line.contains(&format!("\"{c}\"")) || helper_answers(line, c)) {
                 if wrapped || WARNING_SITES.iter().any(|marker| line.contains(marker)) {
                     warned.insert(code);
                     continue;

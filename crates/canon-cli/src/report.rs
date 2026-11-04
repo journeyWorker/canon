@@ -111,7 +111,7 @@ pub fn build(inputs: &ReportInputs, report_path: &Path) -> Result<String, BuildE
         return Ok(content);
     }
     // The report is about to be written: a target that cannot take it is refused before the write.
-    crate::write_mode::check_writable(report_path).map_err(|cause| BuildError::Unavailable(crate::write_mode::unavailable(report_path, &cause)))?;
+    crate::write_mode::check_writable(report_path).map_err(|cause| BuildError::Unavailable(crate::write_mode::unwritable(report_path, &cause)))?;
     let write = || -> std::io::Result<()> {
         if let Some(parent) = report_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -125,7 +125,7 @@ pub fn build(inputs: &ReportInputs, report_path: &Path) -> Result<String, BuildE
 /// Why [`build`] wrote no report.
 #[derive(Debug, thiserror::Error)]
 pub enum BuildError {
-    /// The report file cannot be written, known before anything was changed (`WRITE_UNAVAILABLE`).
+    /// The report file cannot be written, known before anything was changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
     /// The report could not be built or written.
