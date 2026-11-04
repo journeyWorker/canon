@@ -192,12 +192,12 @@ fn atip_codestable_03_a_table_that_loses_a_row_or_misnames_or_misstates_one_fail
     let wrong_reason = changelog.replacen(&reason, &reason.replace("`STALE`", "`DRIFTED`"), 1);
     assert!(table_problems(&wrong_reason).iter().any(|p| p.contains("the reason `DRIFTED`")), "{:?}", table_problems(&wrong_reason));
     // A table that is no table.
-    assert_eq!(table_problems("\n## Unreleased\n\nno table here\n\n## 0.35.0\n"), ["the Unreleased section has no replacement table"]);
+    assert_eq!(table_problems("\n## 0.36.0\n\nno table here\n\n## 0.35.0\n"), ["the Unreleased section has no replacement table"]);
 }
 
 /// The backticked code names of the bullet of `changelog` that starts with `bullet`.
 fn bullet_codes(changelog: &str, bullet: &str) -> BTreeSet<String> {
-    let start = changelog.find("\n## Unreleased").expect("an Unreleased section");
+    let start = changelog.find("\n## 0.36.0").expect("an Unreleased section");
     let section = &changelog[start..];
     let line = section.lines().find(|line| line.starts_with(bullet)).unwrap_or_else(|| panic!("no list that starts `{bullet}`"));
     line.split('`').skip(1).step_by(2).filter(|name| !name.starts_with('_') && name.contains('_') && name.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')).map(str::to_string).collect()
@@ -433,9 +433,9 @@ fn atip_codestable_10_no_guide_says_exit_1_for_a_refusal() {
     assert!(hits.is_empty(), "a refusal said as exit 1: {hits:#?}");
 }
 
-/// The `## Unreleased` section of the CHANGELOG.
+/// The `## 0.36.0` section of the CHANGELOG.
 fn unreleased(changelog: &str) -> &str {
-    let start = changelog.find("\n## Unreleased").expect("an Unreleased section");
+    let start = changelog.find("\n## 0.36.0").expect("an Unreleased section");
     let rest = &changelog[start + 1..];
     &rest[..rest[3..].find("\n## ").map_or(rest.len(), |at| at + 3)]
 }

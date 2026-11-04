@@ -874,7 +874,7 @@ fn heading_level(line: &str) -> usize {
 fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<String> {
     let mut found = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
-    let Some(start) = lines.iter().position(|line| line.trim_end() == "## Unreleased") else { return vec!["there is no `## Unreleased` section".to_string()] };
+    let Some(start) = lines.iter().position(|line| line.starts_with("## 0.36.0")) else { return vec!["there is no `## 0.36.0` section".to_string()] };
     let end = lines.iter().enumerate().skip(start + 1).find(|(_, line)| line.starts_with("## ")).map_or(lines.len(), |(index, _)| index);
     let section = &lines[start + 1..end];
     let headings: Vec<usize> = section.iter().enumerate().filter(|(_, line)| (line.starts_with('#') || line.starts_with("**")) && line.contains(ENTRY_HEADING)).map(|(index, _)| index).collect();
@@ -970,7 +970,7 @@ fn live_sizes(dir: &Path) -> BTreeMap<String, Vec<usize>> {
 /// A complete entry in the format the check reads, stating `live` sizes, a 1.3 size 1000 bytes larger for each command and one byte smaller
 /// for the tree (which grew), so that every sum is smaller.
 fn complete_entry(live: &BTreeMap<String, Vec<usize>>) -> String {
-    let mut text = String::from("# Changelog\n\n## Unreleased\n\n### Added\n\n#### canon declares atip/1 1.4\n\nThe schema answer is the call surface.\n\n| | 0.35 | 0.36 |\n|---|---|---|\n| declaration | atip/1 1.2, L2 | atip/1 1.4, L2 |\n| `schema` tree | commands only | commands and shared options |\n| `schema <group>` | with `path` | without `path` |\n| `schema <command>` | schemas inline | call surface only |\n| `--schemas` | none | schemas, `Input`, `rejects` |\n| `--help --json` | text | refused |\n\n| answer | 0.35 bytes | 0.36 bytes |\n|---|---|---|\n");
+    let mut text = String::from("# Changelog\n\n## 0.36.0\n\n### Added\n\n#### canon declares atip/1 1.4\n\nThe schema answer is the call surface.\n\n| | 0.35 | 0.36 |\n|---|---|---|\n| declaration | atip/1 1.2, L2 | atip/1 1.4, L2 |\n| `schema` tree | commands only | commands and shared options |\n| `schema <group>` | with `path` | without `path` |\n| `schema <command>` | schemas inline | call surface only |\n| `--schemas` | none | schemas, `Input`, `rejects` |\n| `--help --json` | text | refused |\n\n| answer | 0.35 bytes | 0.36 bytes |\n|---|---|---|\n");
     let thousands = |number: usize| number.to_string().as_bytes().rchunks(3).rev().map(|digits| std::str::from_utf8(digits).unwrap()).collect::<Vec<_>>().join(",");
     let tree_after = live[TREE_ROW][0];
     let tree_before = tree_after - 1;
@@ -1595,8 +1595,8 @@ fn atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_caller
     assert!(!changelog_problems(&reasoned, &live).iter().any(|problem| problem.contains("gives no reason")), "a grown sum with its reason is accepted");
     let words = complete.replace(ENTRY_HEADING, "canon declares something");
     assert_found("an entry without the heading", &changelog_problems(&words, &live), "not one");
-    let outside = complete.replace("## Unreleased", "## 0.99.0");
-    assert_found("an entry outside `Unreleased`", &changelog_problems(&outside, &live), "Unreleased");
+    let outside = complete.replace("## 0.36.0", "## 0.99.0");
+    assert_found("an entry outside `Unreleased`", &changelog_problems(&outside, &live), "0.36.0");
     let bold = complete.replace("#### canon declares atip/1 1.4", "**canon declares atip/1 1.4**").replace("Callers that", "**Callers** that");
     assert_eq!(changelog_problems(&bold, &live), Vec::<String>::new(), "an entry that starts with a bold line passes:\n{bold}");
 

@@ -282,7 +282,7 @@ fn codes_0_35() -> Vec<String> {
 /// condition names each new code; two old codes may share one row): every backticked code name of the cell counts, other backticked text
 /// (an option, a reason) does not.
 fn changelog_rows(changelog: &str) -> Vec<(String, String)> {
-    let start = changelog.find("\n## Unreleased").expect("an Unreleased section");
+    let start = changelog.find("\n## 0.36.0").expect("an Unreleased section");
     let rest = &changelog[start + 1..];
     let end = rest[3..].find("\n## ").map_or(rest.len(), |n| n + 3);
     let codes = |cell: &str| -> Vec<String> {
@@ -333,7 +333,7 @@ fn atip_codenames_08_the_changelog_holds_a_row_for_each_code_that_left_the_regis
 /// atip.codenames.09 (failure case): a code of 0.35 that is not in the registry and not in the table is found; so is a row that names a code the registry lacks.
 #[test]
 fn atip_codenames_09_a_code_missing_from_the_registry_and_from_the_table_is_found() {
-    let table = "\n## Unreleased\n\n| 0.35 | 0.36 | `reason` |\n|---|---|---|\n| `HUMAN_ONLY` | `ACTOR_DENIED` | |\n| `NO_COMMIT` | `NO_SUCH_CODE` | |\n\n## 0.35.0\n";
+    let table = "\n## 0.36.0\n\n| 0.35 | 0.36 | `reason` |\n|---|---|---|\n| `HUMAN_ONLY` | `ACTOR_DENIED` | |\n| `NO_COMMIT` | `NO_SUCH_CODE` | |\n\n## 0.35.0\n";
     let rows = changelog_rows(table);
     assert_eq!(rows, [("HUMAN_ONLY".to_string(), "ACTOR_DENIED".to_string()), ("NO_COMMIT".to_string(), "NO_SUCH_CODE".to_string())]);
     let registered: BTreeSet<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();

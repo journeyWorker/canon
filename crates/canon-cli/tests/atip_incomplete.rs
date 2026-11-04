@@ -2553,13 +2553,13 @@ fn atip_incomplete_09_a_store_failure_after_an_earlier_root_was_indexed_is_incom
 
 // ------------------------------------------------------------------ the CHANGELOG
 
-/// The `## Unreleased` section of the CHANGELOG.
+/// The `## 0.36.0` section of the CHANGELOG.
 fn unreleased() -> String {
     let changelog =
         std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md"))
             .expect("the CHANGELOG");
     let start = changelog
-        .find("\n## Unreleased")
+        .find("\n## 0.36.0")
         .expect("the CHANGELOG has an Unreleased section");
     let end = changelog[start + 1..]
         .find("\n## 0.")

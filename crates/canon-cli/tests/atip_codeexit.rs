@@ -365,7 +365,7 @@ fn atip_codeexit_10_every_row_of_the_exit_table_is_the_registrys() {
 #[test]
 fn atip_codeexit_10_a_row_that_disagrees_with_the_registry_is_found() {
     let table = format!(
-        "\n## Unreleased\n\n{}\n|---|---|---|---|---|---|---|\n| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | renamed | 1 → 1 | no → no |  | a note |\n| `NO_COMMIT` | `COMMIT_REQUIRED` | renamed | 1 → 2 | no → no |  | a note |\n\n## 0.35.0\n",
+        "\n## 0.36.0\n\n{}\n|---|---|---|---|---|---|---|\n| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | renamed | 1 → 1 | no → no |  | a note |\n| `NO_COMMIT` | `COMMIT_REQUIRED` | renamed | 1 → 2 | no → no |  | a note |\n\n## 0.35.0\n",
         old_codes::TABLE_HEADER
     );
     let rows = changelog_exit_rows(&table);

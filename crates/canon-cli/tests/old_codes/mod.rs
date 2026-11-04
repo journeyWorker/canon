@@ -91,9 +91,9 @@ fn yes_no(word: &str) -> Result<bool, String> {
 /// The header of the replacement table.
 pub const TABLE_HEADER: &str = "| 0.35 | 0.36 | kind | exit | retryable | `reason` | why |";
 
-/// The rows of the replacement table of the `## Unreleased` section of `changelog`. A row that does not read is an error naming it.
+/// The rows of the replacement table of the `## 0.36.0` section of `changelog`. A row that does not read is an error naming it.
 pub fn replacement_table(changelog: &str) -> Result<Vec<Row>, String> {
-    let start = changelog.find("\n## Unreleased").ok_or("the CHANGELOG has no Unreleased section")?;
+    let start = changelog.find("\n## 0.36.0").ok_or("the CHANGELOG has no Unreleased section")?;
     let rest = &changelog[start + 1..];
     let section = &rest[..rest[3..].find("\n## ").map_or(rest.len(), |at| at + 3)];
     let mut lines = section.lines().skip_while(|line| *line != TABLE_HEADER);

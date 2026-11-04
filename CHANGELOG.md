@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.36.0 — 2026-11-05
+
+canon declares atip/1 1.4 and meets its L2, renames its 179 error codes after `<SUBJECT>_<CONDITION>` (the table is below), and takes the `atip` crate and the checker from the atip repository as git dependencies.
+
 ### Breaking
 
 **The replacement table of every error code of 0.35** (`canon-0-36-codes-table`, scenarios `atip.codestable.01-12`; atip/1 spec 15.3: a release that renames a code moves every caller in one release, lists the old and the new names in its change record, and keeps no alias). This is the one place that spells the old names. The 0.35 registry held 179 codes and the table has one row for each of them; a code that keeps its name is `kept`, a code that took a new name is `renamed`, a code that said several conditions and now says each with its own code is `split` (the new cell lists every code a caller can meet in its place), several old codes that became one code are `merged`, and a code that no longer exists is `gone`. `exit` and `retryable` read `before → after`; where the new codes differ, the cell lists each value they have (`1 → 1, 2`). `reason` is the `error.reason` the new code carries to tell the old situations apart. `why` says what the change was. The stage sections below keep what each change did and proved; the table is the replacement list of all of them, and `crates/canon-cli/tests/atip_codestable.rs` reads it against the registry, so a row that is missing, a new name that is not registered or an exit that is not the registry's fails a test. Every code of the registry is in the table, as a new name or as a name that stayed: the codes with no 0.35 name (`ARTIFACTS_STORE_DENIED`, `RETENTION_TIERS_CORRUPT`, the `*_UNAVAILABLE` codes and the rest) are listed in the new cell of the old code they came from.
