@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-04T00:43:52.929002Z",
+  "change_ids": [
+    "canon-0-33-atip-check",
+    "canon-0-34-atip-check-1-1",
+    "canon-0-34-atip-check-l1",
+    "canon-0-35-check-findings",
+    "canon-0-35-check-fixture",
+    "canon-0-35-check-1-2",
+    "canon-0-35-check-l2-input",
+    "canon-0-35-check-l2-safety",
+    "canon-0-35-check-l2-guides",
+    "canon-0-35-claim-l2",
+    "canon-0-35-split-atip-check",
+    "canon-0-36-atip-dep"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "retired",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-36-orch"
+    },
+    "reason": "the checker lives in the atip repo (canon-0-36-atip-dep); its remaining scenarios atip.check.39, .40, .43 moved to atip-contract"
+  },
+  "subject_id": "atip-check",
+  "summary": "A binary that runs a tool's built binary and checks it against atip/1",
+  "title": "ATIP: the atip check conformance checker"
+}
