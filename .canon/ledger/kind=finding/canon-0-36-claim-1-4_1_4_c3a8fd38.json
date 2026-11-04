@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:04:34.704047Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=atip/claim14.feature (atip.claim14.15 Then)",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.15"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The Then of atip.claim14.15 says 'each stated 1.4 size equals the measure and is smaller than its 1.3 size'. The amended brief lets the tree grow, and it does (22,209 -> 26,847), and the bound test exempts the 'schema (tree)' row (changelog_problems: name != \"schema (tree)\"). The sentence is false as written and the test is not faithful to it, only to the brief. Reword: 'each stated 1.4 size equals the measure; each command row is smaller than its 1.3 size; the tree row may be larger; the tree plus one command row is smaller than its 1.3 sum' (and, with finding 3, per command). The reworded scenario is then re-reviewed by another actor; this review therefore leaves atip.claim14.15 unsigned.",
+  "worktree_dirty": false
+}

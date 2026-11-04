@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:04:42.870487Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_claiml2.rs (tests 01, 02, 07, 09)",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.01",
+    "atip.claiml2.02",
+    "atip.claiml2.07",
+    "atip.claiml2.09"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards] The bodies assert 1.4 but the function names still say 1_2 or 1_1 (atip_claiml2_01_every_envelope_declares_1_2..., _02_no_consumer_spells_canons_declaration_as_1_1, _07_..._deep_at_1_2, _09_the_fixture_claims_1_2...), and the junit case names are the evidence identity. Renaming changes the binding, so do it only together with a rebind in round 2 (or leave); no sentence is wrong, the names mislead a reader of the junit.",
+  "worktree_dirty": false
+}

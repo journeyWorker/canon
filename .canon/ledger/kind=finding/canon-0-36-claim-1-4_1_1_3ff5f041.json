@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:04:26.239265Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/spec.rs (reserved_standard); crates/canon-cli/src/cli (the --commit and --plan-digest help); canon/skills/reference/role-orchestrator.md",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.03"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] (open question 2, owner ruling) canon overrides the help and clears the value name of --commit and --plan-digest in the model (spec.rs reserved_standard) so the schema document names them bare, while --help keeps canon's own wording: --commit 'Act on the previewed plan; needs --plan-digest' against the standard 'Make the change; without it the command only previews.', --plan-digest <DIGEST> against the standard 'The digest of the preview this commit carries out.' with the default value name PLAN_DIGEST. The override leaks: the generated role-orchestrator guide now reads '--plan-digest <VALUE>' on five usage lines (artifacts move, ledger compact, migrate, purge, tier age) while the comment under each still says <DIGEST>, and the human 'canon schema purge' text lists '--plan-digest string' with no placeholder. Per the owner's ruling, put the standard texts (and the default value name PLAN_DIGEST) in the clap definitions of --commit and --plan-digest, so --help, the schema document, the guides and the human text agree, then delete reserved_standard and regenerate (just docs, the cli spec, conformance if a help line shows). Note the other reserved options (dry-run, limit, cursor, all) already keep canon's wording through a tree definition, which is the crate's sanctioned way; only commit and plan-digest need the standard text because the brief wants them listed by name on the five commands.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:04:29.201368Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/canon-authoring.md:117; canon-gate.md:539-540; canon-review.md:123-124; canon-subject.md:73-74; role-implementer.md:256",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.11"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] F5 acceptance 'no guide sentence states an old-form member': five guide references still say that 'canon schema <command> --json shows `input`: the schema of one document and a complete `example`' (canon-authoring, canon-gate, canon-review, canon-subject, role-implementer). In the 1.4 document `input` holds maxBytes, batch, maxItems, example and an optional argumentsRef and no schema; the schema of one document is `Input` in 'canon schema <command> --schemas --json' (SKILL.src.md line 295 already says so correctly). An agent following these five lines looks for a schema in the command document and does not find it. Reword to 'shows `input` (the limits and a complete `example`); `--schemas --json` gives `Input`, the schema of one document'. The consumer scan of atip.claim14.11 matches member names (input.schemaRef...) and so missed the prose; extend it with a needle for 'schema of one document' beside 'shows `input`' (and a seeded case in atip.claim14.12) so the sentence cannot return.",
+  "worktree_dirty": false
+}

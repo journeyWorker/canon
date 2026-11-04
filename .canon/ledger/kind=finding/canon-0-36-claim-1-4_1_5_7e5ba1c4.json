@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:04:37.403472Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md (sizes: 'measured on the 0.35.0 build')",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.15"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] The '0.35 bytes' column is not what the 0.35.0 tag prints: v0.35.0 gives finding close 16,212, finding list 3,998, purge 7,656, skills show 2,384, tree 22,209. The stated figures (16,336, 4,094, 7,842, 2,384, 22,209) are those of main before this change (844bbb4fc), which already holds the 0.36 code renames that lengthened the errors lists. Say 'main before this change (844bbb4fc)' or use the tag's figures; the header '0.35 (declares 1.2)' of the first table is right for the declaration.",
+  "worktree_dirty": false
+}
