@@ -1,0 +1,73 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:58:51.193417Z",
+  "attachments": [
+    {
+      "case": "read_cause::tests::atip_codestored_02_a_cause_is_read_from_the_os_error_in_the_error_or_its_text",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "read_cause::tests::atip_codestored_02_the_helpers_give_the_code_of_the_cause",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "atip_codestored_02_a_plan_document_that_cannot_be_read_is_denied_and_one_without_the_row_is_invalid",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "atip_codestored_02_a_spec_root_on_disk_is_denied_or_invalid_and_a_malformed_specs_section_is_the_configs",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "atip_codestored_02_a_config_is_told_by_its_cause",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "atip_codestored_02_sync_retention_and_policy_approve_tell_a_refused_read_from_a_broken_file",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "atip_codestored_02_a_detached_signature_that_cannot_be_read_is_denied_invalid_or_not_found_by_its_cause",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    }
+  ],
+  "code_tree": "50b56872df3bf2fa8e8bec57fd6ef23d8422a8c0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "f26f96942d4c8e1d01117b718d9ff823dc363642",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 64,
+  "scenario_id": "atip.codestored.02",
+  "schema": 1,
+  "staging_id": "4a8f6cfd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
