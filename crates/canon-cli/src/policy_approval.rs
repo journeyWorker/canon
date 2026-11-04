@@ -378,8 +378,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&App
             let code = match &e {
                 PolicyApprovalError::WriteApproval { .. } => "POLICY_APPROVAL_FAILED",
                 PolicyApprovalError::NoPolicy { .. } => "POLICY_REQUIRED",
-                PolicyApprovalError::ReadPolicy { source, .. } if crate::read_cause::of_io(source) == crate::read_cause::Cause::Denied => "POLICY_DENIED",
-                PolicyApprovalError::ReadPolicy { .. } => "POLICY_INVALID",
+                PolicyApprovalError::ReadPolicy { source, .. } => crate::read_cause::policy_code(source),
                 PolicyApprovalError::BlankApprover => "APPROVAL_INVALID",
             };
             let refusal = CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again");

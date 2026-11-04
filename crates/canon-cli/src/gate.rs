@@ -520,7 +520,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let document = match std::fs::read_to_string(&document_path) {
         Ok(d) => d,
         Err(e) => {
-            let code = if crate::read_cause::of_io(&e) == crate::read_cause::Cause::Denied { "PLAN_CORPUS_DENIED" } else { "PLAN_CORPUS_INVALID" };
+            let code = crate::read_cause::plan_corpus_code(&e);
             return CliError::refused(code, format!("cannot read {}: {e}", document_path.display())).hint("make the plan document a readable text file, then run the command again").emit("canon task done", json);
         }
     };
@@ -1312,7 +1312,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
             }
             Ok(_) => {}
             Err(e) => {
-                let code = if matches!(e.kind(), std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem) { "HOOKS_FILE_DENIED" } else { "HOOKS_FILE_CONFLICT" };
+                let code = crate::read_cause::hooks_file_code(&e);
                 return CliError::refused(code, e.to_string()).hint("check that the hook file under .claude / .codex is a readable JSON file and that its directory can be created, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
             }
         }

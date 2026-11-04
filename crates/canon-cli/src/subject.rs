@@ -1021,8 +1021,9 @@ pub fn run_move(
         if let Some((closed, detail)) = crate::policy_approval::closed_failure(&repo) {
             let error = match closed {
                 crate::policy_approval::Closed::Unreadable => {
-                    let code = if crate::read_cause::of_text(&detail) == crate::read_cause::Cause::Denied { "POLICY_APPROVAL_DENIED" } else { "POLICY_APPROVAL_CORRUPT" };
-                    CliError::failed(code, detail).hint(crate::policy_approval::REAPPROVE_HINT)
+                    let code = crate::read_cause::policy_approval_code_of_text(&detail);
+                    let hint = if code == "POLICY_APPROVAL_UNAVAILABLE" { "the system failed the read of the approval in a way a repeat can pass: wait a moment, then run `canon subject move` again" } else { crate::policy_approval::REAPPROVE_HINT };
+                    CliError::failed(code, detail).hint(hint)
                 }
                 crate::policy_approval::Closed::Changed => CliError::failed("POLICY_APPROVAL_STALE", detail).hint(crate::policy_approval::REAPPROVE_HINT),
             };

@@ -249,6 +249,7 @@ fn binding_code(kind: crate::evidence_attach::BindKind) -> &'static str {
         BindKind::Invalid => "EVIDENCE_BINDING_INVALID",
         BindKind::NotFound => "EVIDENCE_BINDING_NOT_FOUND",
         BindKind::Denied => "EVIDENCE_BINDING_DENIED",
+        BindKind::Unavailable => "EVIDENCE_BINDING_UNAVAILABLE",
     }
 }
 

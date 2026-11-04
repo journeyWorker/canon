@@ -35,6 +35,16 @@ impl Repo {
             .expect("spawn canon")
     }
 
+    /// [`Repo::canon`] with extra environment variables.
+    fn canon_env(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+        command.args(args).env("CANON_ACTOR", "canon").env("CANON_R2_LOCAL_ROOT", self.store.path()).current_dir(self.path());
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        command.output().expect("spawn canon")
+    }
+
     /// `canon` with the substitute store removed and a real-looking S3
     /// configuration instead (what a release binary always uses).
     fn canon_s3(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
@@ -485,4 +495,115 @@ fn atip_codestored_07_a_local_blob_that_cannot_be_read_is_denied_and_only_a_brok
     std::fs::set_permissions(&blob, mode).unwrap();
 
     assert!(preview().status.success(), "the blob back in place, the same call passes");
+}
+
+/// The refusal `out` is: exit 2, the code, not retryable, no data.
+fn assert_refusal(out: &Output, code: &str) -> serde_json::Value {
+    let body = stdout_json(out);
+    assert_eq!(out.status.code(), Some(2), "{}", text(out));
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some(code), Some(false)), "{body}");
+    assert!(body.get("data").is_none(), "a refusal carries no data: {body}");
+    body
+}
+
+/// atip.codestored.07 (`artifacts move` and its store directory): a store directory that is a symlink or no directory is
+/// `ARTIFACTS_STORE_INVALID`, one this user may not enter is `ARTIFACTS_STORE_DENIED` (a permission problem is DENIED); never the retryable
+/// `ARTIFACTS_STORE_UNAVAILABLE`, which only an error a repeat can pass is. The preview and the commit refuse alike and move nothing; the same
+/// call passes once the directory is mended.
+#[test]
+fn atip_codestored_07_a_store_directory_in_the_wrong_state_is_invalid_or_denied_never_unavailable() {
+    use std::os::unix::fs::PermissionsExt;
+    let repo = new_repo(None);
+    write_report(&repo, V1);
+    assert!(repo.attest(&["--artifact", "reports/smoke.json"]).status.success());
+    let yaml = repo.canon_yaml();
+    let store = repo.path().join(".canon/artifacts/sha256");
+    let real = repo.path().join(".canon/artifacts/sha256.real");
+    let zeros = format!("sha256:{}", "0".repeat(64));
+    let both = |code: &str| {
+        assert_refusal(&repo.canon(&["artifacts", "move", "--tier", "cold", "--json"]), code);
+        assert_refusal(&repo.canon(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &zeros, "--json"]), code);
+        assert!(repo.object(V1).parent().is_none_or(|dir| !dir.exists() || std::fs::read_dir(dir).unwrap().count() == 0), "nothing was uploaded");
+        assert_eq!(repo.canon_yaml(), yaml, "canon.yaml is unchanged");
+    };
+
+    // A symlink where the store directory belongs: writing through it could land outside the store.
+    std::fs::rename(&store, &real).unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(outside.path(), &store).unwrap();
+    both("ARTIFACTS_STORE_INVALID");
+    std::fs::remove_file(&store).unwrap();
+
+    // A regular file where it belongs.
+    std::fs::write(&store, "not a directory").unwrap();
+    both("ARTIFACTS_STORE_INVALID");
+    std::fs::remove_file(&store).unwrap();
+    std::fs::rename(&real, &store).unwrap();
+
+    // A directory this user may not enter.
+    let closed = std::fs::metadata(&store).unwrap().permissions();
+    let mut shut = closed.clone();
+    shut.set_mode(0o000);
+    std::fs::set_permissions(&store, shut).unwrap();
+    if std::fs::read_dir(&store).is_err() {
+        both("ARTIFACTS_STORE_DENIED");
+    } else {
+        eprintln!("skipped: this process can read a directory whose mode is 000 (running as root?), so a refused read cannot be shown");
+    }
+    std::fs::set_permissions(&store, closed).unwrap();
+
+    assert!(repo.canon(&["artifacts", "move", "--tier", "cold", "--json"]).status.success(), "the directory mended, the same call passes");
+}
+
+/// atip.codestored.07 (`artifacts move --commit` and a blob that changes under it): a blob another process rewrites after the plan was made, once
+/// blobs have been uploaded, is `STOPPED_MIDWAY` (exit 1, not retryable, reason `ARTIFACTS_BLOB_CORRUPT`, `data` what was uploaded, `meta.next` the
+/// read of the state): the uploads stay, no local blob is removed, canon.yaml is unchanged, and the same `--plan-digest` is stale; one rewritten
+/// before anything was uploaded is the refusal `ARTIFACTS_BLOB_CORRUPT` (exit 2). The rewrite is the debug seam `CANON_TEST_BLOB_RACE_AFTER`.
+#[test]
+fn atip_codestored_07_a_blob_rewritten_after_uploads_began_is_stopped_midway_and_before_any_is_a_refusal() {
+    let repo = new_repo(None);
+    let blobs: [&[u8]; 3] = [V1, br#"{"at":"2026-10-10T15:00:00Z","checks":15}"#, br#"{"at":"2026-10-10T16:00:00Z","checks":14}"#];
+    for (index, bytes) in blobs.iter().enumerate() {
+        let name = format!("reports/r{index}.json");
+        std::fs::create_dir_all(repo.path().join("reports")).unwrap();
+        std::fs::write(repo.path().join(&name), bytes).unwrap();
+        assert!(repo.attest(&["--artifact", &name]).status.success());
+    }
+    let yaml = repo.canon_yaml();
+    let preview = stdout_json(&repo.ok(&["artifacts", "move", "--tier", "cold", "--json"]));
+    let digest = preview["data"]["planDigest"].as_str().unwrap().to_string();
+    let commit = |env: &[(&str, &str)]| repo.canon_env(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &digest, "--json"], env);
+
+    // The second blob is rewritten once one blob has been uploaded.
+    let out = commit(&[("CANON_TEST_BLOB_RACE_AFTER", "1")]);
+    let body = stdout_json(&out);
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["retryable"].as_bool()), (Some("STOPPED_MIDWAY"), Some("ARTIFACTS_BLOB_CORRUPT"), Some(false)), "{body}");
+    assert_eq!((body["data"]["uploaded"].as_u64(), body["data"]["removedLocal"].as_u64(), body["data"]["configWritten"].as_bool()), (Some(2), Some(0), Some(false)), "data says what was uploaded: {body}");
+    assert!(body["meta"]["next"][0]["command"].as_str().is_some_and(|command| command.starts_with("canon artifacts move --tier cold")), "the first next step reads the state: {body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("uploads stay"), "{body}");
+    assert_eq!(blobs.iter().filter(|bytes| repo.object(bytes).exists()).count(), 2, "the uploads stay");
+    assert_eq!(blobs.iter().filter(|bytes| std::fs::read(repo.local_blob(bytes)).unwrap() != **bytes).count(), 1, "the rewritten blob is not moved");
+    assert!(blobs.iter().all(|bytes| repo.local_blob(bytes).exists()), "no local blob was removed");
+    assert_eq!(repo.canon_yaml(), yaml, "canon.yaml is unchanged");
+
+    // Whatever rewrote the blob puts its bytes back and goes away. The same invocation, unchanged, still cannot pass: the uploads turned the plan's
+    // `upload` effects into `skip`.
+    for bytes in blobs {
+        std::fs::write(repo.local_blob(bytes), bytes).unwrap();
+    }
+    assert_refusal(&commit(&[]), "PLAN_STALE");
+
+    // A new plan moves what is left.
+    let moved = stdout_json(&repo.move_to("cold"));
+    assert_eq!((moved["data"]["uploaded"].as_u64(), moved["data"]["alreadyInStore"].as_u64(), moved["data"]["removedLocal"].as_u64()), (Some(1), Some(2), Some(3)), "{moved}");
+
+    // Rewritten before anything was uploaded: nothing was written, so a refusal.
+    let single = new_repo(None);
+    write_report(&single, V1);
+    assert!(single.attest(&["--artifact", "reports/smoke.json"]).status.success());
+    let digest = stdout_json(&single.ok(&["artifacts", "move", "--tier", "cold", "--json"]))["data"]["planDigest"].as_str().unwrap().to_string();
+    let out = single.canon_env(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &digest, "--json"], &[("CANON_TEST_BLOB_RACE_AFTER", "0")]);
+    assert_refusal(&out, "ARTIFACTS_BLOB_CORRUPT");
+    assert!(!single.object(V1).exists() && single.local_blob(V1).exists(), "nothing was uploaded or removed");
 }

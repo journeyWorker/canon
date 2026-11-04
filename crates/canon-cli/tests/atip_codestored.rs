@@ -171,10 +171,10 @@ fn atip_codestored_01_an_unreadable_brief_is_denied_invalid_or_not_found_by_its_
 }
 
 /// atip.codestored.02: canon.yaml that cannot be read is `CONFIG_DENIED` (the system refuses) or `CONFIG_INVALID` (it does not parse: a file the
-/// user edits is a value the user gave); a detached signature is `STRATEGY_SIGNATURE_NOT_FOUND`, `_DENIED` or `_INVALID` by its cause; a scenario
-/// file of a brief's flow is `SPEC_ROOT_DENIED` or `SPEC_ROOT_INVALID`; each exits 2, is not retryable and writes nothing.
+/// user edits is a value the user gave); each exits 2, is not retryable and writes nothing. The signature file, the spec root and the plan
+/// document are the next tests.
 #[test]
-fn atip_codestored_02_a_config_a_signature_and_a_spec_file_are_told_by_their_cause() {
+fn atip_codestored_02_a_config_is_told_by_its_cause() {
     let dir = scratch_repo();
     let repo = dir.path();
 
@@ -195,6 +195,83 @@ fn atip_codestored_02_a_config_a_signature_and_a_spec_file_are_told_by_their_cau
         drop(guard);
     }
     ok(repo, &["inventory", "sync", "--json"]);
+}
+
+/// atip.codestored.02: a spec root directory of canon.yaml the system refuses is `SPEC_ROOT_DENIED` and one that is no directory
+/// `SPEC_ROOT_INVALID` (`brief check` of a building change reads it); a malformed `specs:` section is `CONFIG_INVALID` with the reason `SPECS`
+/// from `brief check` and from `inventory sync` alike, never a `SPEC_ROOT_*` code; each exits 2, is not retryable and writes nothing.
+#[test]
+fn atip_codestored_02_a_spec_root_on_disk_is_denied_or_invalid_and_a_malformed_specs_section_is_the_configs() {
+    let dir = approved_repo();
+    let repo = dir.path();
+    let check = ["brief", "check", "c-checkout", "--json"];
+    assert_eq!(json(&ok(repo, &check))["data"]["phase"], "building", "the brief is judged against its flow scenarios");
+    let before = listing(repo);
+    let specs = repo.join("specs");
+
+    // A spec root directory the system refuses is DENIED.
+    if enforces_modes() {
+        let guard = Mode::set(&specs, 0o000);
+        assert_refusal(&canon(repo, &check), "SPEC_ROOT_DENIED", false);
+        drop(guard);
+    }
+
+    // A file where the spec root directory belongs is INVALID (ENOTDIR), and a repeat cannot pass it.
+    let moved = repo.join("specs.moved");
+    fs::rename(&specs, &moved).unwrap();
+    fs::write(&specs, "not a directory").unwrap();
+    assert_refusal(&canon(repo, &check), "SPEC_ROOT_INVALID", false);
+    fs::remove_file(&specs).unwrap();
+    fs::rename(&moved, &specs).unwrap();
+    assert_eq!(listing(repo), before, "a refused read writes nothing");
+    ok(repo, &check);
+
+    // A malformed `specs:` section is the config's, from every command that reads it.
+    let canon_yaml = repo.join("canon.yaml");
+    let good = fs::read_to_string(&canon_yaml).unwrap();
+    assert!(good.contains("      root: specs"), "{good}");
+    fs::write(&canon_yaml, good.replace("      root: specs", "      root: [x]")).unwrap();
+    let before = listing(repo);
+    for args in [&check[..], &["inventory", "sync", "--json"][..]] {
+        let refusal = assert_refusal(&canon(repo, args), "CONFIG_INVALID", false);
+        assert_eq!(refusal["error"]["reason"], "SPECS", "{args:?}: {refusal}");
+    }
+    assert_eq!(listing(repo), before, "a refused read writes nothing");
+}
+
+/// atip.codestored.02: a plan document `task done` cannot read is `PLAN_CORPUS_DENIED` (the system refuses it); a plan document with no row for
+/// the task is `PLAN_DOCUMENT_INVALID`; each exits 2, is not retryable and writes nothing, and the same call passes the document check once the
+/// row is back (it goes on to its own check of the task's evidence).
+#[test]
+fn atip_codestored_02_a_plan_document_that_cannot_be_read_is_denied_and_one_without_the_row_is_invalid() {
+    let dir = TempDir::new().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: .\n").unwrap();
+    fs::create_dir_all(repo.join("openspec/changes/widget")).unwrap();
+    fs::write(repo.join("openspec/changes/widget/proposal.md"), "## Why\n\nWidgets.\n").unwrap();
+    let tasks = repo.join("openspec/changes/widget/tasks.md");
+    fs::write(&tasks, "- [ ] 1 wire it\n").unwrap();
+    let done = ["task", "done", "widget#1", "--json"];
+
+    // The row is there: the call gets past the document and asks for the task's evidence.
+    let first = canon(repo, &done);
+    assert_eq!(json(&first)["error"]["code"], "TASK_EVIDENCE_REQUIRED", "{}", text(&first));
+    let before = listing(repo);
+
+    // The document the system refuses is DENIED.
+    if enforces_modes() {
+        let guard = Mode::set(&tasks, 0o000);
+        assert_refusal(&canon(repo, &done), "PLAN_CORPUS_DENIED", false);
+        drop(guard);
+    }
+
+    // No row for the task is INVALID: the document is a file people edit.
+    fs::write(&tasks, "- [ ] 2 wire something else\n").unwrap();
+    assert_refusal(&canon(repo, &done), "PLAN_DOCUMENT_INVALID", false);
+    fs::write(&tasks, "- [ ] 1 wire it\n").unwrap();
+    assert_eq!(listing(repo), before, "a refused call writes nothing");
+    assert_eq!(json(&canon(repo, &done))["error"]["code"], "TASK_EVIDENCE_REQUIRED");
 }
 
 // ------------------------------------------------------------------ F2: state canon wrote
@@ -230,12 +307,31 @@ fn atip_codestored_03_a_broken_dispatch_manifest_is_corrupt_and_mending_it_lets_
     fs::write(&manifest, serde_json::to_vec(&other).unwrap()).unwrap();
     assert_refusal(&canon(repo, &["dispatch", "end", &run_id, "--run-outcome", "succeeded", "--json"]), "DISPATCH_MANIFEST_CORRUPT", false);
 
-    // A manifest the system refuses is DENIED.
+    // A manifest that is no run record in another way is CORRUPT too, judged before anything is written: bytes that are not UTF-8 text, a
+    // directory where the file belongs.
+    let end = ["dispatch", "end", &run_id, "--run-outcome", "succeeded", "--json"];
+    fs::write(&manifest, [0xff, 0xfe, 0x00, 0x41]).unwrap();
+    let before = listing(repo);
+    assert_refusal(&canon(repo, &end), "DISPATCH_MANIFEST_CORRUPT", false);
+    assert_eq!(listing(repo), before, "a refused end writes nothing");
+    fs::remove_file(&manifest).unwrap();
+    fs::create_dir(&manifest).unwrap();
+    assert_refusal(&canon(repo, &end), "DISPATCH_MANIFEST_CORRUPT", false);
+    fs::remove_dir(&manifest).unwrap();
+
+    // A manifest the system refuses is DENIED, not WRITE_DENIED: the read is judged before the writability of the manifest, whatever its mode
+    // (000 refuses the read and the write, 200 only the read), and so is a `.canon/dispatch` directory this user may not enter.
     fs::write(&manifest, &good).unwrap();
     if enforces_modes() {
-        let guard = Mode::set(&manifest, 0o200);
-        assert_refusal(&canon(repo, &["dispatch", "end", &run_id, "--run-outcome", "succeeded", "--json"]), "DISPATCH_MANIFEST_DENIED", false);
+        for mode in [0o000, 0o200] {
+            let guard = Mode::set(&manifest, mode);
+            assert_refusal(&canon(repo, &end), "DISPATCH_MANIFEST_DENIED", false);
+            drop(guard);
+        }
+        let guard = Mode::set(&repo.join(".canon/dispatch"), 0o000);
+        assert_refusal(&canon(repo, &end), "DISPATCH_MANIFEST_DENIED", false);
         drop(guard);
+        assert_eq!(fs::read(&manifest).unwrap(), good, "a refused end leaves the manifest as it was");
     }
 
     // The mended manifest ends the run.
@@ -300,8 +396,8 @@ fn atip_codestored_04_a_broken_policy_approval_refuses_the_ship_with_exit_2_and_
 }
 
 /// atip.codestored.05: a `--repo` that is no repository is `REPO_INVALID` and a ledger the system refuses `REPO_DENIED`; each exits 2, is not
-/// retryable and writes nothing. A record canon wrote that does not parse is `LEDGER_CORRUPT` (the unit test of `read_cause` proves the
-/// classification: a reader skips a record that does not parse, so no command meets one at the boundary).
+/// retryable and writes nothing. There is no code for a ledger record that does not parse: every reader skips such a record and `status` warns
+/// (`LEDGER_RECORDS_UNREADABLE`), so no command refuses on one, and the registry holds no `LEDGER_CORRUPT`.
 #[test]
 fn atip_codestored_05_a_repository_that_cannot_be_read_is_invalid_or_denied() {
     let dir = scratch_repo();
@@ -452,22 +548,27 @@ fn atip_codestored_09_the_registry_has_the_new_codes_and_not_the_old_names() {
         let out = canon(Path::new("."), &["schema", "--error", old, "--json"]);
         assert_eq!(out.status.code(), Some(2), "{old}: {}", text(&out));
     }
-    let table: [(&str, bool); 36] = [
+    let table: &[(&str, bool)] = &[
         ("ARTIFACTS_DIGEST_INVALID", false), ("ARTIFACTS_STORE_INVALID", false), ("ARTIFACTS_STORE_REQUIRED", false), ("ARTIFACTS_STORE_UNAVAILABLE", true), ("ARTIFACTS_BLOB_DENIED", false),
-        ("BRIEF_DENIED", false), ("BRIEF_INVALID", false), ("BRIEF_NOT_FOUND", false), ("CONFIG_DENIED", false), ("CONFIG_INVALID", false), ("DISPATCH_MANIFEST_CORRUPT", false),
-        ("DISPATCH_MANIFEST_DENIED", false), ("LEDGER_ARCHIVE_INVALID", false), ("LEDGER_CORRUPT", false), ("PLAN_CORPUS_DENIED", false), ("PLAN_CORPUS_INVALID", false),
+        ("ARTIFACTS_STORE_DENIED", false), ("BRIEF_DENIED", false), ("BRIEF_INVALID", false), ("BRIEF_NOT_FOUND", false), ("CONFIG_DENIED", false), ("CONFIG_INVALID", false),
+        ("DISPATCH_MANIFEST_CORRUPT", false), ("DISPATCH_MANIFEST_DENIED", false), ("LEDGER_ARCHIVE_INVALID", false), ("PLAN_CORPUS_DENIED", false), ("PLAN_CORPUS_INVALID", false),
         ("PLAN_DOCUMENT_INVALID", false), ("POLICY_APPROVAL_CORRUPT", false), ("POLICY_APPROVAL_DENIED", false), ("POLICY_DENIED", false), ("REPO_DENIED", false), ("REPO_INVALID", false),
-        ("REPO_LOCK_UNAVAILABLE", true), ("RETENTION_TIERS_DENIED", false), ("RETENTION_TIERS_INVALID", false), ("RETENTION_TIERS_UNAVAILABLE", true), ("SPEC_ROOT_DENIED", false),
-        ("SPEC_ROOT_INVALID", false), ("STRATEGY_SIGNATURE_DENIED", false), ("STRATEGY_SIGNATURE_INVALID", false), ("STRATEGY_SIGNATURE_NOT_FOUND", false), ("WRITE_DENIED", false),
-        ("WRITE_INVALID", false), ("CONTEXT_PACK_CORRUPT", false), ("ARTIFACTS_BLOB_CORRUPT", false), ("POLICY_REQUIRED", false),
+        ("REPO_LOCK_UNAVAILABLE", true), ("RETENTION_TIERS_CORRUPT", false), ("RETENTION_TIERS_DENIED", false), ("RETENTION_TIERS_INVALID", false), ("RETENTION_TIERS_REQUIRED", false),
+        ("RETENTION_TIERS_UNAVAILABLE", true), ("SPEC_ROOT_DENIED", false), ("SPEC_ROOT_INVALID", false), ("STRATEGY_SIGNATURE_DENIED", false), ("STRATEGY_SIGNATURE_INVALID", false),
+        ("STRATEGY_SIGNATURE_NOT_FOUND", false), ("WRITE_DENIED", false), ("WRITE_INVALID", false), ("CONTEXT_PACK_CORRUPT", false), ("ARTIFACTS_BLOB_CORRUPT", false), ("POLICY_REQUIRED", false),
+        // The sibling of each DENIED code a read can meet: the system failed the read in a way a repeat can pass (atip.codestored.11).
+        ("ADAPTER_FILE_UNAVAILABLE", true), ("BRIEF_UNAVAILABLE", true), ("CONFIG_UNAVAILABLE", true), ("DISPATCH_MANIFEST_UNAVAILABLE", true), ("EVIDENCE_BINDING_UNAVAILABLE", true),
+        ("HOOKS_FILE_UNAVAILABLE", true), ("MIGRATION_UNAVAILABLE", true), ("PLAN_CORPUS_UNAVAILABLE", true), ("POLICY_APPROVAL_UNAVAILABLE", true), ("POLICY_UNAVAILABLE", true),
+        ("REPO_UNAVAILABLE", true), ("REVIEW_ARTIFACT_UNAVAILABLE", true), ("SPEC_ROOT_UNAVAILABLE", true), ("STRATEGY_SIGNATURE_UNAVAILABLE", true),
     ];
-    for (code, retryable) in table {
+    assert!(code_info("LEDGER_CORRUPT").is_none(), "no reader refuses on a broken ledger record, so the code is not registered");
+    for &(code, retryable) in table {
         let info = code_info(code).unwrap_or_else(|| panic!("{code} is not registered"));
         assert_eq!((info.exit, info.retryable), (2, retryable), "{code}");
         assert_eq!(info.retryable, code.ends_with("_UNAVAILABLE"), "{code}: only an UNAVAILABLE code is retryable");
     }
     // The refusal of a situation a check answers with exit 1 names the check in its fix, not by a machine link.
-    for (code, check) in [("LEDGER_CORRUPT", "canon gate check"), ("ARTIFACTS_BLOB_CORRUPT", "canon artifacts verify"), ("CONTEXT_PACK_CORRUPT", "canon context-pack verify")] {
+    for (code, check) in [("ARTIFACTS_BLOB_CORRUPT", "canon artifacts verify"), ("CONTEXT_PACK_CORRUPT", "canon context-pack verify")] {
         let info = code_info(code).unwrap();
         assert!(info.fix.contains(check) || info.meaning.contains(check), "{code}: names {check}");
         assert!(info.reasons.is_empty(), "{code}: no machine link");
@@ -485,4 +586,97 @@ fn atip_codestored_10_the_changelog_replaces_every_old_name_with_its_new_codes()
         let columns: Vec<&str> = row.split('|').collect();
         assert!(columns.get(2).is_some_and(|new| new.contains("`")), "{old}: the row names its replacement: {row}");
     }
+    // Every code this change registers is named in the CHANGELOG, with what it replaced.
+    for code in [
+        "ARTIFACTS_STORE_DENIED", "RETENTION_TIERS_CORRUPT", "RETENTION_TIERS_REQUIRED", "ADAPTER_FILE_UNAVAILABLE", "BRIEF_UNAVAILABLE", "CONFIG_UNAVAILABLE",
+        "DISPATCH_MANIFEST_UNAVAILABLE", "EVIDENCE_BINDING_UNAVAILABLE", "HOOKS_FILE_UNAVAILABLE", "MIGRATION_UNAVAILABLE", "PLAN_CORPUS_UNAVAILABLE", "POLICY_APPROVAL_UNAVAILABLE",
+        "POLICY_UNAVAILABLE", "REPO_UNAVAILABLE", "REVIEW_ARTIFACT_UNAVAILABLE", "SPEC_ROOT_UNAVAILABLE", "STRATEGY_SIGNATURE_UNAVAILABLE",
+    ] {
+        assert!(unreleased.contains(&format!("`{code}`")), "the CHANGELOG does not name {code}");
+    }
+}
+
+// ------------------------------------------------------------------ a fault in canon.yaml, and a path in the wrong state
+
+/// atip.codestored.12: a fault in a section of the user-edited canon.yaml is the config's, never the repository's: a record kind with no
+/// `routing:` entry is `CONFIG_INVALID` with the reason `TIERS`; a canon.yaml that is a directory is `CONFIG_INVALID` (a wrong path is the file's to
+/// fix, not a missing file); a change directory this user may not enter is `BRIEF_DENIED`, not `BRIEF_NOT_FOUND`. Each exits 2, is not retryable
+/// and writes nothing.
+#[test]
+fn atip_codestored_12_a_fault_in_canon_yaml_is_the_configs_and_a_path_in_the_wrong_state_is_told_as_what_it_is() {
+    let dir = scratch_repo();
+    let repo = dir.path();
+    let canon_yaml = repo.join("canon.yaml");
+    let good = fs::read_to_string(&canon_yaml).unwrap();
+
+    // A record kind with no routing entry: the user's to add.
+    assert!(good.contains("\n  change: local\n"), "{good}");
+    fs::write(&canon_yaml, good.replace("\n  change: local\n", "\n")).unwrap();
+    let before = listing(repo);
+    let refusal = assert_refusal(&canon(repo, &["change", "new", "other", "--subject", "demo", "--title", "Other", "--json"]), "CONFIG_INVALID", false);
+    assert_eq!(refusal["error"]["reason"], "TIERS", "{refusal}");
+    assert!(refusal["error"]["message"].as_str().unwrap().contains("routing"), "{refusal}");
+    assert_eq!(listing(repo), before, "a refused call writes nothing");
+    fs::write(&canon_yaml, &good).unwrap();
+
+    // canon.yaml that is a directory.
+    fs::remove_file(&canon_yaml).unwrap();
+    fs::create_dir(&canon_yaml).unwrap();
+    for args in [&["subject", "show", "demo", "--json"][..], &["status", "--json"][..]] {
+        assert_refusal(&canon(repo, args), "CONFIG_INVALID", false);
+    }
+    fs::remove_dir(&canon_yaml).unwrap();
+    fs::write(&canon_yaml, &good).unwrap();
+    ok(repo, &["subject", "show", "demo", "--json"]);
+
+    // A change directory the system refuses: the brief is there, so the answer is DENIED.
+    if enforces_modes() {
+        let before = listing(repo);
+        let guard = Mode::set(&repo.join(".canon/changes/add-login"), 0o000);
+        for args in [&["brief", "show", "add-login", "--json"][..], &["brief", "check", "add-login", "--json"][..]] {
+            assert_refusal(&canon(repo, args), "BRIEF_DENIED", false);
+        }
+        drop(guard);
+        assert_eq!(listing(repo), before, "a refused read writes nothing");
+    }
+    ok(repo, &["brief", "show", "add-login", "--json"]);
+}
+
+// ------------------------------------------------------------------ the tiers of a purge or an export
+
+/// atip.codestored.13: a tier a purge or export needs that is not attached (its backend's credentials are unset) is `RETENTION_TIERS_REQUIRED`, not
+/// retryable: waiting does not set them; a stored Parquet object that does not decode is `RETENTION_TIERS_CORRUPT`; each exits 2 with a hint
+/// that says what to do and writes nothing.
+#[test]
+fn atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_does_not_decode_is_corrupt() {
+    let dir = scratch_repo();
+    let repo = dir.path();
+    let canon_yaml = repo.join("canon.yaml");
+    let good = fs::read_to_string(&canon_yaml).unwrap();
+
+    // The hot tier names a Postgres server whose DSN variable is unset.
+    let hot = "  hot:\n    backend: sqlite\n    path: .canon/hot.db\n";
+    assert!(good.contains(hot), "{good}");
+    fs::write(&canon_yaml, good.replace(hot, "  hot:\n    backend: postgres\n    dsn_env: CANON_PG_DSN\n    schema: canon_v1\n")).unwrap();
+    let before = listing(repo);
+    let export = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["export", "--kind", "session", "--output", "out.json", "--json"])
+        .current_dir(repo)
+        .env_remove("CANON_ROLE")
+        .env_remove("CANON_PG_DSN")
+        .env("CANON_ACTOR", "code-stored")
+        .output()
+        .unwrap();
+    let refusal = assert_refusal(&export, "RETENTION_TIERS_REQUIRED", false);
+    assert!(refusal["error"]["hint"].as_str().unwrap().contains("set the variables"), "{refusal}");
+    assert_eq!(listing(repo), before, "a refused export writes nothing");
+    fs::write(&canon_yaml, &good).unwrap();
+
+    // A trajectory file canon wrote that is not a Parquet file.
+    fs::create_dir_all(repo.join(".canon/learn/trajectories")).unwrap();
+    fs::write(repo.join(".canon/learn/trajectories/broken.parquet"), "not parquet").unwrap();
+    let before = listing(repo);
+    let refusal = assert_refusal(&canon(repo, &["purge", "--kind", "trajectory", "--before", "2099-01-01T00:00:00Z", "--json"]), "RETENTION_TIERS_CORRUPT", false);
+    assert!(refusal["error"]["hint"].as_str().unwrap().contains("restore the damaged object"), "{refusal}");
+    assert_eq!(listing(repo), before, "a refused purge writes nothing");
 }

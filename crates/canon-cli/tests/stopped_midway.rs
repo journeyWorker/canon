@@ -138,7 +138,7 @@ fn atip_midway_01_stopped_midway_is_registered_with_its_reasons_and_both_schema_
     let row = code_info("STOPPED_MIDWAY").expect("registered");
     assert_eq!((row.exit, row.retryable), (1, false));
     let names: Vec<&str> = row.reasons.iter().map(|reason| reason.reason).collect();
-    assert_eq!(names, ["CONFIG_INVALID", "PROMOTION_INVALID", "SKILLS_ARGUMENT_INVALID", "SKILLS_SOURCE_NOT_FOUND", "STRATEGY_PROMOTION_INVALID"], "the refusals a later step of canon meets after an earlier step wrote (a record staged and then refused by the gate, a strategy demoted and then blocked, skills refused after init wrote); an I/O category (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`) is not a reason");
+    assert_eq!(names, ["ARTIFACTS_BLOB_CORRUPT", "CONFIG_INVALID", "PROMOTION_INVALID", "SKILLS_ARGUMENT_INVALID", "SKILLS_SOURCE_NOT_FOUND", "STRATEGY_PROMOTION_INVALID"], "the refusals a later step of canon meets after an earlier step wrote (a record staged and then refused by the gate, a strategy demoted and then blocked, skills refused after init wrote, a blob that changed after others were uploaded); an I/O category (`WRITE_UNAVAILABLE`, whose code for the work is `WRITE_FAILED`) is not a reason");
     for reason in row.reasons {
         let refusal = code_info(reason.reason).expect("a registered code");
         assert_ne!(reason.fix, refusal.fix, "{}: the fix says what to do once the caller has read what was done, not the refusal's own fix", reason.reason);

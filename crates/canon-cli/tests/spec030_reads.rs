@@ -352,6 +352,43 @@ fn report_generation_14_snapshot_without_an_output_directory_is_refused_with_exi
     assert_eq!(tree(repo.path()), before, "a refused snapshot writes nothing");
 }
 
+/// atip.codestored.02 (the detached signature of a strategy rollback): a signature file the system refuses is `STRATEGY_SIGNATURE_DENIED`, a path
+/// that is no file (a directory) or bytes that are not UTF-8 text are `STRATEGY_SIGNATURE_INVALID`, a path that is not there is
+/// `STRATEGY_SIGNATURE_NOT_FOUND`; each exits 2, is not retryable and writes nothing (a test run as root, which ignores file modes, skips the
+/// refused read and says so).
+#[test]
+fn atip_codestored_02_a_detached_signature_that_cannot_be_read_is_denied_invalid_or_not_found_by_its_cause() {
+    use std::os::unix::fs::PermissionsExt;
+    let signing = Signing::new();
+    let repo = signing.repo.path();
+    let (candidate, _) = candidate_and_evaluation(repo);
+    let id = candidate.id.to_string();
+    let files = tempfile::TempDir::new().unwrap();
+    let (directory, not_utf8, closed) = (files.path().join("a-directory"), files.path().join("not-utf8.sig"), files.path().join("closed.sig"));
+    fs::create_dir(&directory).unwrap();
+    fs::write(&not_utf8, [0xff, 0xfe, 0x00, 0x41]).unwrap();
+    fs::write(&closed, "x").unwrap();
+    let before = tree(repo);
+    let rollback = |signature: &Path| {
+        let out = canon(repo, &["strategy", "rollback", &id, "--reason", "regressed", "--actor", "alice", "--signature-file", signature.to_str().unwrap(), "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+        assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
+        assert_eq!(json(&out)["error"]["retryable"], false);
+        assert!(json(&out).get("data").is_none(), "a refusal carries no data");
+        error_code(&out)
+    };
+    assert_eq!(rollback(&files.path().join("missing.sig")), "STRATEGY_SIGNATURE_NOT_FOUND");
+    assert_eq!(rollback(&directory), "STRATEGY_SIGNATURE_INVALID");
+    assert_eq!(rollback(&not_utf8), "STRATEGY_SIGNATURE_INVALID");
+    fs::set_permissions(&closed, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&closed).is_err() {
+        assert_eq!(rollback(&closed), "STRATEGY_SIGNATURE_DENIED");
+    } else {
+        eprintln!("skipped: this process can read a file whose mode is 000 (running as root?), so a refused read cannot be shown");
+    }
+    fs::set_permissions(&closed, fs::Permissions::from_mode(0o644)).unwrap();
+    assert_eq!(tree(repo), before, "a refused rollback writes nothing");
+}
+
 #[test]
 fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_signature_is_read_and_writes_nothing() {
     let signing = Signing::new();

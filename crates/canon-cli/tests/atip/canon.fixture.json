@@ -578,6 +578,11 @@
       "retryable": false
     },
     {
+      "code": "ADAPTER_FILE_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "ADAPTER_VALIDATION_FAILED",
       "exit": 1,
       "retryable": false
@@ -599,6 +604,11 @@
     },
     {
       "code": "ARTIFACTS_DIGEST_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_DENIED",
       "exit": 2,
       "retryable": false
     },
@@ -690,6 +700,11 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "BRIEF_WRITE_FAILED",
       "exit": 1,
       "retryable": false
@@ -752,7 +767,8 @@
         "DASHBOARD",
         "POLICY",
         "SKILLS",
-        "SPECS"
+        "SPECS",
+        "TIERS"
       ],
       "retryable": false
     },
@@ -760,6 +776,11 @@
       "code": "CONFIG_REQUIRED",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "CONFIG_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "CONTEXT_GIT_REQUIRED",
@@ -874,6 +895,11 @@
       "retryable": false
     },
     {
+      "code": "DISPATCH_MANIFEST_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "DISPATCH_ROLE_CONFLICT",
       "exit": 2,
       "retryable": false
@@ -963,6 +989,11 @@
       "code": "EVIDENCE_BINDING_STALE",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "EVIDENCE_CONTRACT_CONFLICT",
@@ -1070,6 +1101,11 @@
       "retryable": false
     },
     {
+      "code": "HOOKS_FILE_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 1,
       "retryable": false
@@ -1170,11 +1206,6 @@
       "retryable": false
     },
     {
-      "code": "LEDGER_CORRUPT",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "MIGRATE_INDEX_FAILED",
       "exit": 1,
       "retryable": false
@@ -1205,6 +1236,11 @@
       "retryable": false
     },
     {
+      "code": "MIGRATION_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "PLAN_CORPUS_DENIED",
       "exit": 2,
       "retryable": false
@@ -1213,6 +1249,11 @@
       "code": "PLAN_CORPUS_INVALID",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "PLAN_CORPUS_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "PLAN_DOCUMENT_INVALID",
@@ -1260,6 +1301,11 @@
       "retryable": false
     },
     {
+      "code": "POLICY_APPROVAL_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "POLICY_DENIED",
       "exit": 2,
       "retryable": false
@@ -1273,6 +1319,11 @@
       "code": "POLICY_REQUIRED",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "POLICY_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "PROMOTE_FAILED",
@@ -1338,6 +1389,11 @@
       "retryable": true
     },
     {
+      "code": "REPO_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "RETENTION_EXPORT_DENIED",
       "exit": 2,
       "retryable": false
@@ -1353,12 +1409,22 @@
       "retryable": false
     },
     {
+      "code": "RETENTION_TIERS_CORRUPT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "RETENTION_TIERS_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "RETENTION_TIERS_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1396,6 +1462,11 @@
       "code": "REVIEW_ARTIFACT_STALE",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "ROLE_INVALID",
@@ -1486,9 +1557,15 @@
       "retryable": false
     },
     {
+      "code": "SPEC_ROOT_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
       "code": "STOPPED_MIDWAY",
       "exit": 1,
       "reasons": [
+        "ARTIFACTS_BLOB_CORRUPT",
         "CONFIG_INVALID",
         "PROMOTION_INVALID",
         "SKILLS_ARGUMENT_INVALID",
@@ -1546,6 +1623,11 @@
       "code": "STRATEGY_SIGNATURE_NOT_FOUND",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "SUBJECT_APPROVAL_REQUIRED",

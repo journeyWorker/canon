@@ -77,7 +77,8 @@ const ENV_VARS: &[EnvVar] = &[
 /// a debug build panics at start, for the test of the `INTERNAL` error; `CANON_TEST_REPO_LOCK_WAIT_MS`: how long a debug
 /// build waits for the repository write lock, in milliseconds; `CANON_TEST_HOLD_AFTER_RUN_MS`: how long a debug build keeps
 /// the lock after its run; `CANON_TEST_PAUSE_AFTER_GATE_MS`: how long a debug build pauses between the check of a plan's
-/// digest and its first effect: the three seams of the test of the lock).
+/// digest and its first effect: the three seams of the test of the lock; `CANON_TEST_BLOB_RACE_AFTER`: a debug build rewrites,
+/// once, the blob `artifacts move --commit` is about to upload when this many blobs were uploaded, as another process would).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -86,6 +87,7 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_LEARN_ROOT",
     "CANON_R2_LOCAL_ROOT",
     "CANON_R2_ROOT",
+    "CANON_TEST_BLOB_RACE_AFTER",
     "CANON_TEST_HOLD_AFTER_RUN_MS",
     "CANON_TEST_PANIC",
     "CANON_TEST_PAUSE_AFTER_GATE_MS",

@@ -259,6 +259,10 @@ pub enum DispatchError {
     /// The manifest exists but the system refuses this user the read (`DISPATCH_MANIFEST_DENIED`).
     #[error("the dispatch manifest at {path} cannot be read: {detail}")]
     Denied { path: String, detail: String },
+
+    /// The manifest exists but the system failed the read in a way a repeat can pass (`EIO`; `DISPATCH_MANIFEST_UNAVAILABLE`).
+    #[error("the dispatch manifest at {path} cannot be read right now: {detail}")]
+    ManifestUnavailable { path: String, detail: String },
 }
 
 impl DispatchError {
@@ -289,6 +293,7 @@ impl DispatchError {
             | Self::RunIdMismatch { .. }
             | Self::Unreadable { .. }
             | Self::Denied { .. }
+            | Self::ManifestUnavailable { .. }
             | Self::ContextPack(ContextPackError::UnsafePath(_)
                 | ContextPackError::MissingInput(_)
                 | ContextPackError::SecretDetected(_)
@@ -314,14 +319,14 @@ impl DispatchError {
             Self::ContextPack(inner) => inner.to_cli_error().code,
             Self::TaskNotFound { .. } => "TASK_NOT_FOUND",
             Self::NoPlanSources { .. } => "PLAN_SOURCES_REQUIRED",
-            Self::PlanCorpus { detail, .. } if crate::read_cause::of_text(detail) == crate::read_cause::Cause::Denied => "PLAN_CORPUS_DENIED",
-            Self::PlanCorpus { .. } => "PLAN_CORPUS_INVALID",
+            Self::PlanCorpus { detail, .. } => crate::read_cause::plan_corpus_code_of_text(detail),
             Self::NoSuchRun { .. } => "DISPATCH_RUN_NOT_FOUND",
             Self::AlreadyEnded { .. } | Self::NotRunning { .. } => "DISPATCH_CONFLICT",
             Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_CORRUPT",
             Self::EndInProgress { .. } => "DISPATCH_RUN_UNAVAILABLE",
             Self::Unreadable { .. } => "DISPATCH_MANIFEST_CORRUPT",
             Self::Denied { .. } => "DISPATCH_MANIFEST_DENIED",
+            Self::ManifestUnavailable { .. } => "DISPATCH_MANIFEST_UNAVAILABLE",
         };
         let hint = match self {
             Self::RoleRegimeMismatch { .. } => "pass --role equal to the leading segment of --regime (`canon regime show` prints a regime key)".to_string(),
@@ -332,6 +337,7 @@ impl DispatchError {
             Self::ContextPack(inner) => inner.to_cli_error().hint_text().unwrap_or_default().to_string(),
             Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
             Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task can resolve against it".to_string(),
+            Self::PlanCorpus { detail, .. } if crate::read_cause::of_text(detail) == crate::read_cause::Cause::Unavailable => "the system failed the read of the plan document in a way a repeat can pass: wait a moment, then run the command again".to_string(),
             Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
             Self::NoSuchRun { .. } => "pass the run id `canon dispatch begin` printed for this repository".to_string(),
             Self::AlreadyEnded { .. } => "the run is closed; start a new one with `canon dispatch begin`".to_string(),
@@ -340,6 +346,7 @@ impl DispatchError {
             Self::EndInProgress { .. } => "another process is closing this run; wait a moment, then run `canon dispatch end` again".to_string(),
             Self::Unreadable { .. } => "restore the manifest from version control, or start a new run with `canon dispatch begin`".to_string(),
             Self::Denied { .. } => "make the manifest readable by this user, then run the command again".to_string(),
+            Self::ManifestUnavailable { .. } => "the system failed the read in a way a repeat can pass: wait a moment, then run the command again".to_string(),
         };
         let mut error = if self.is_usage() { CliError::refused(code, self.to_string()).hint(hint) } else { CliError::failed(code, self.to_string()).hint(hint) };
         if let Self::RoleRegimeMismatch { regime_role, .. } = self {
@@ -1114,9 +1121,12 @@ impl Drop for EndLock {
 ///
 /// 1. the file must be READABLE — only [`std::io::ErrorKind::NotFound`]
 ///    is [`DispatchError::NoSuchRun`] ("this repo never began that
-///    run"); a permission or I/O failure, and an entry that is a
-///    DIRECTORY rather than a file, are real failures
-///    ([`DispatchError::Io`]), never reported as an unknown run;
+///    run"); a read the system refuses (the manifest, or `.canon/dispatch`
+///    above it) is [`DispatchError::Denied`], one a repeat can pass is
+///    [`DispatchError::ManifestUnavailable`], and any other failure (bytes
+///    that are not UTF-8 text, an entry that is a DIRECTORY rather than a
+///    file) is a manifest that is no run record,
+///    [`DispatchError::Unreadable`]; none is reported as an unknown run;
 /// 2. its bytes must deserialize as a `Run`
 ///    ([`DispatchError::Unreadable`]) — a truncated, hand-edited or
 ///    foreign JSON document is not a dispatch record, however plausibly
@@ -1139,10 +1149,12 @@ pub(crate) fn read_dispatched_manifest(manifest_path: &Path, run_id: RunId) -> R
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
         }
-        Err(e) if crate::read_cause::of_io(&e) == crate::read_cause::Cause::Denied => {
-            return Err(DispatchError::Denied { path: manifest_path.display().to_string(), detail: e.to_string() });
-        }
-        Err(e) => return Err(DispatchError::Io(e)),
+        Err(e) => match crate::read_cause::of_io(&e) {
+            crate::read_cause::Cause::Denied => return Err(DispatchError::Denied { path: manifest_path.display().to_string(), detail: e.to_string() }),
+            crate::read_cause::Cause::Unavailable => return Err(DispatchError::ManifestUnavailable { path: manifest_path.display().to_string(), detail: e.to_string() }),
+            // Not UTF-8 text, a directory where the file belongs, a path that is no directory: a manifest canon wrote that cannot be read as a run record.
+            _ => return Err(DispatchError::Unreadable { path: manifest_path.display().to_string(), detail: e.to_string() }),
+        },
     };
     let run: Run = serde_json::from_str(&text)
         .map_err(|e| DispatchError::Unreadable { path: manifest_path.display().to_string(), detail: e.to_string() })?;
@@ -1332,17 +1344,13 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
     let manifest_path = repo.join(DISPATCH_DIR).join(format!("{run_id}.json"));
     // Probe BEFORE taking the lock, purely so an unknown run never
     // causes `.canon/dispatch/` (and a sidecar inside it) to be minted
-    // for a run that was never begun. Only ABSENCE is "no such run": a
-    // permission or I/O failure on a manifest that does exist stays a
-    // real failure (exit `1`), never reported as a run the operator
-    // never began.
-    match std::fs::metadata(&manifest_path) {
-        Ok(_) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });
-        }
-        Err(e) => return Err(DispatchError::Io(e)),
-    }
+    // for a run that was never begun, and before any writability check, so
+    // that a manifest that cannot be read is told as what it is. Only
+    // ABSENCE is "no such run": a manifest the system refuses is
+    // `DISPATCH_MANIFEST_DENIED`, one that is no run record
+    // (`DISPATCH_MANIFEST_CORRUPT`), and none is reported as a run the
+    // operator never began. The read that counts is the one under the lock.
+    read_dispatched_manifest(&manifest_path, run_id)?;
     // The close rewrites the manifest (a temp file beside it, then a rename) and takes a lock beside it: the directory and the manifest must take them.
     for target in [repo.join(DISPATCH_DIR), manifest_path.clone()] {
         crate::write_mode::check_writable(&target).map_err(|cause| DispatchError::Unavailable(crate::write_mode::unwritable(&target, &cause)))?;
@@ -2055,6 +2063,26 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    /// atip.codestored.11: a manifest or plan document the system fails to read in a way a repeat can pass is `*_UNAVAILABLE`, exit 2 and
+    /// retryable; a refused read keeps its `*_DENIED`.
+    #[test]
+    fn atip_codestored_11_a_manifest_or_plan_document_the_system_fails_to_read_is_unavailable() {
+        let eio = std::io::Error::from_raw_os_error(5);
+        let path = "run.json".to_string();
+        let unavailable = DispatchError::ManifestUnavailable { path: path.clone(), detail: eio.to_string() }.to_cli_error();
+        assert_eq!((unavailable.code, unavailable.exit, unavailable.retryable), ("DISPATCH_MANIFEST_UNAVAILABLE", 2, true));
+        let denied = DispatchError::Denied { path, detail: std::io::Error::from_raw_os_error(13).to_string() }.to_cli_error();
+        assert_eq!((denied.code, denied.exit, denied.retryable), ("DISPATCH_MANIFEST_DENIED", 2, false));
+        for (detail, code, retryable) in [
+            (eio.to_string(), "PLAN_CORPUS_UNAVAILABLE", true),
+            (std::io::Error::from_raw_os_error(13).to_string(), "PLAN_CORPUS_DENIED", false),
+            ("the plan has no table".to_string(), "PLAN_CORPUS_INVALID", false),
+        ] {
+            let error = DispatchError::PlanCorpus { task_id: "c1#1".to_string(), detail }.to_cli_error();
+            assert_eq!((error.code, error.exit, error.retryable), (code, 2, retryable));
+        }
+    }
 
     #[test]
     fn the_value_parsers_refuse_in_their_old_words() {

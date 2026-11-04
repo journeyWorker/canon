@@ -41,9 +41,23 @@ pub enum RetentionError {
     Tiers(#[from] tiers::TierCliError),
 }
 
-/// The code of a purge or export that could not open or read the tiers before it began: a backend that is down or unreachable
-/// can be tried again (`RETENTION_TIERS_UNAVAILABLE`); a policy, routing entry or config the caller wrote that cannot be used cannot
-/// (`RETENTION_TIERS_INVALID`).
+/// What to do about a refusal of [`tiers_code`].
+fn tiers_hint(code: &str) -> &'static str {
+    match code {
+        "RETENTION_TIERS_REQUIRED" => "set the variables the message names for the tier (or add its `tiers:` entry to canon.yaml)",
+        "RETENTION_TIERS_CORRUPT" => "restore the damaged object the message names from a copy, or remove it",
+        "RETENTION_TIERS_UNAVAILABLE" => "check that the tier backends are reachable (wait a moment if the system failed the read)",
+        "RETENTION_TIERS_DENIED" => "make the file the message names readable by this user",
+        _ => "fix the tier or policy problem the message names in canon.yaml",
+    }
+}
+
+/// The code of a purge or export that could not open or read the tiers before it began, by what is wrong:
+/// - a tier that is not attached or not configured (its endpoint or credentials are unset, or canon.yaml has no entry for it) is
+///   `RETENTION_TIERS_REQUIRED`: waiting does not set them;
+/// - a stored object that does not decode (a Parquet file canon wrote) is `RETENTION_TIERS_CORRUPT`;
+/// - a backend that is down or does not answer (a SQL or object-store error) is `RETENTION_TIERS_UNAVAILABLE`, which can be tried again;
+/// - a policy, routing entry or config the caller wrote that cannot be used is `RETENTION_TIERS_INVALID`.
 ///
 /// An operating-system error is told by its cause (`read_cause`): a read the system refuses is `RETENTION_TIERS_DENIED`, a path that is
 /// not there or is no file or directory (the caller's wrong path) is `RETENTION_TIERS_INVALID`, and only an error a repeat can pass
@@ -56,9 +70,18 @@ fn tiers_code(error: &RetentionError) -> &'static str {
         Cause::Unavailable => "RETENTION_TIERS_UNAVAILABLE",
         Cause::NotFound | Cause::WrongPath | Cause::Other => "RETENTION_TIERS_INVALID",
     };
+    let by_store = |store: &StoreError| match store {
+        StoreError::Io(io) => by_cause(io),
+        StoreError::TierUnavailable { .. } | StoreError::BackendUnattached { .. } => "RETENTION_TIERS_REQUIRED",
+        StoreError::Parquet(_) => "RETENTION_TIERS_CORRUPT",
+        StoreError::Sql(_) | StoreError::ObjectStore(_) => "RETENTION_TIERS_UNAVAILABLE",
+        _ => "RETENTION_TIERS_INVALID",
+    };
     match error {
-        RetentionError::Store(StoreError::Io(io)) | RetentionError::Io(io) | RetentionError::Tiers(tiers::TierCliError::Store(StoreError::Io(io)) | tiers::TierCliError::ReadCanonYaml { source: io, .. }) => by_cause(io),
-        RetentionError::Store(store) | RetentionError::Tiers(tiers::TierCliError::Store(store)) if matches!(store, StoreError::TierUnavailable { .. } | StoreError::BackendUnattached { .. } | StoreError::Sql(_) | StoreError::ObjectStore(_) | StoreError::Parquet(_)) => "RETENTION_TIERS_UNAVAILABLE",
+        RetentionError::Io(io) | RetentionError::Tiers(tiers::TierCliError::ReadCanonYaml { source: io, .. }) => by_cause(io),
+        RetentionError::Store(store) | RetentionError::Tiers(tiers::TierCliError::Store(store)) => by_store(store),
+        RetentionError::Learn(canon_learn::LearnError::Parquet(_)) => "RETENTION_TIERS_CORRUPT",
+        RetentionError::Learn(canon_learn::LearnError::Io(io)) => by_cause(io),
         _ => "RETENTION_TIERS_INVALID",
     }
 }
@@ -377,7 +400,8 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             }
             // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, a failure is a failure during the work (exit 1).
             let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { tiers_code(&err) };
-            let error = CliError::refused(code, err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
+            let hint = if deleting.get() { format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`") } else { format!("{}, then run `{base}` again and commit its plan with `--commit --plan-digest <planDigest>`", tiers_hint(code)) };
+            let error = CliError::refused(code, err.to_string()).hint(hint);
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
                     Some(partial_purge_report(kind, before, *matched, *deleted, &err.to_string()))
@@ -627,7 +651,8 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         Err(ExportFailure::Retention(err)) => {
             // The ledger is read and the destination is checked before anything is written (exit 2); once the manifest is being written the same errors are a failure during the work (exit 1).
             let code = if writing { "RETENTION_EXPORT_FAILED" } else { tiers_code(&err) };
-            CliError::refused(code, err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
+            let hint = if writing { "check that the destination is writable and the ledger is readable, then run `canon export` again".to_string() } else { format!("{}, then run `canon export` again", tiers_hint(code)) };
+            CliError::refused(code, err.to_string()).hint(hint).emit("canon export", json_output)
         }
     }
 }
@@ -656,6 +681,33 @@ pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// atip.codestored.13: the code of a refusal to open the tiers is told by what is wrong, and only a backend that does not answer or an error a
+    /// repeat can pass is retryable (`UNAVAILABLE`).
+    #[test]
+    fn atip_codestored_13_the_tiers_code_is_told_by_what_is_wrong() {
+        use canon_store::policy::{Backend, Rung};
+        use canon_store::tier::StoreError;
+        let store = |error: StoreError| RetentionError::Store(error);
+        for (error, code) in [
+            (store(StoreError::BackendUnattached { backend: Backend::Postgres, reason: "no live DSN".into() }), "RETENTION_TIERS_REQUIRED"),
+            (store(StoreError::tier_unavailable(Rung::Hot, Some(Backend::Postgres), "no live DSN")), "RETENTION_TIERS_REQUIRED"),
+            (store(StoreError::tier_unavailable(Rung::Cold, None, "no tiers.cold entry")), "RETENTION_TIERS_REQUIRED"),
+            (store(StoreError::Parquet("Invalid Parquet file. Corrupt footer".into())), "RETENTION_TIERS_CORRUPT"),
+            (RetentionError::Learn(canon_learn::LearnError::Parquet("Invalid Parquet file. Corrupt footer".into())), "RETENTION_TIERS_CORRUPT"),
+            (store(StoreError::Sql("connection refused".into())), "RETENTION_TIERS_UNAVAILABLE"),
+            (store(StoreError::ObjectStore("timed out".into())), "RETENTION_TIERS_UNAVAILABLE"),
+            (RetentionError::Io(std::io::Error::from_raw_os_error(5)), "RETENTION_TIERS_UNAVAILABLE"),
+            (store(StoreError::Io(std::io::Error::from_raw_os_error(13))), "RETENTION_TIERS_DENIED"),
+            (RetentionError::Learn(canon_learn::LearnError::Io(std::io::Error::from_raw_os_error(13))), "RETENTION_TIERS_DENIED"),
+            (RetentionError::Io(std::io::Error::from_raw_os_error(2)), "RETENTION_TIERS_INVALID"),
+            (RetentionError::Io(std::io::Error::from_raw_os_error(21)), "RETENTION_TIERS_INVALID"),
+            (store(StoreError::Policy("bad tier".into())), "RETENTION_TIERS_INVALID"),
+        ] {
+            assert_eq!(tiers_code(&error), code, "{error}");
+            assert_eq!(crate::cli_error::code_info(code).map(|info| info.retryable), Some(code.ends_with("_UNAVAILABLE")), "{code}");
+        }
+    }
 
     #[test]
     fn sensitive_export_requires_explicit_policy() {

@@ -12,9 +12,10 @@ const NOT_YET_RENAMED: &[&str] = &[
     "STOPPED_MIDWAY",
 ];
 
-/// The codes that pass the name rule (or are listed above) and that `canon-0-36-codes-refusals`, `-stored` or `-incomplete` still change: split by
-/// meaning, moved to another exit, merged into another code or renamed with a reason (issue #135). The name check does not see them, so they are
-/// listed. Each of those changes deletes its codes from this list; `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
+/// The codes that pass the name rule (or are listed above) and that `canon-0-36-codes-incomplete` still changes: the exit-1 codes that say a failure
+/// after work started, which that change merges into one `*_INCOMPLETE` per subject or renames with a reason (issue #135). `canon-0-36-codes-refusals`
+/// and `-stored` are done and left nothing here. The name check does not see these codes, so they are listed. `canon-0-36-codes-incomplete` deletes
+/// its codes from this list; `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
 const NOT_YET_RECLASSIFIED: &[&str] = &[
     // canon-0-36-codes-incomplete
     "ARTIFACTS_STORE_FAILED",
@@ -161,7 +162,7 @@ const SPLIT: &[(&str, i64, bool, &[&str])] = &[
     ("BRIEF_MIGRATION_REQUIRED", 2, false, &[]),
     ("BRIEF_REQUIRED", 2, false, &[]),
     ("CHANGE_NOT_FOUND", 2, false, &[]),
-    ("CONFIG_INVALID", 2, false, &["ARTIFACT_STORE", "DASHBOARD", "POLICY", "SKILLS", "SPECS"]),
+    ("CONFIG_INVALID", 2, false, &["ARTIFACT_STORE", "DASHBOARD", "POLICY", "SKILLS", "SPECS", "TIERS"]),
     ("DISPATCH_CONFLICT", 2, false, &["ALREADY_ENDED", "NOT_RUNNING"]),
     ("DIVERGENCE_CONFLICT", 2, false, &["NOT_DIVERGENT"]),
     ("DIVERGENCE_DENIED", 2, false, &["NOT_REVIEWER", "SELF_ATTESTED"]),

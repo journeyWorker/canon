@@ -334,7 +334,15 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     // The renamed ledger is judged in a scratch copy (the review pins, the chore reviews of the briefs).
     let world = match names.renames().then(|| migrate_names::scratch(&repo, &renamed_config, &names)).transpose() {
         Ok(world) => world,
-        Err(e) => return CliError::refused("MIGRATION_DENIED", e).hint("check that the system temp directory is writable, then run `canon migrate` again").emit("canon migrate", json),
+        Err(e) => {
+            let code = crate::read_cause::migration_code_of_text(&e);
+            let hint = match code {
+                "MIGRATION_DENIED" => "check that the system temp directory is writable, then run `canon migrate` again",
+                "MIGRATION_UNAVAILABLE" => "the system failed a call on the preview's files in a way a repeat can pass: wait a moment, then run `canon migrate` again; nothing was changed",
+                _ => "check that the system temp directory is a directory and that the ledger's files are valid, then run `canon migrate` again; nothing was changed",
+            };
+            return CliError::refused(code, e).hint(hint).emit("canon migrate", json);
+        }
     };
     let view = world.as_ref().map_or(repo.as_path(), |w| w.path());
     // 0.31 `brief-format`: the briefs in the 0.30 format, and the approvals and review pins their rewrite re-binds.

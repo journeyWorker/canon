@@ -111,22 +111,26 @@ pub enum BindError {
 }
 
 /// The condition of a refused binding (spec 7.2.2): the file is not what the binding needs (`INVALID`), is not there
-/// (`NOT_FOUND`), or is outside the repository or unreadable by this user (`DENIED`).
+/// (`NOT_FOUND`), is outside the repository or unreadable by this user (`DENIED`), or the system failed the read in a way a repeat can
+/// pass (`UNAVAILABLE`, the one retryable condition).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindKind {
     Invalid,
     NotFound,
     Denied,
+    Unavailable,
 }
 
 impl BindKind {
-    /// What a failed file operation says about the file: missing, not permitted, or in a form that cannot be used
-    /// (a directory where a file belongs, and the like).
+    /// What a failed file operation says about the file: missing, not permitted, failed for a repeat to pass, or in a form that cannot
+    /// be used (a directory where a file belongs, and the like).
     fn of_io(error: &std::io::Error) -> Self {
-        match error.kind() {
-            std::io::ErrorKind::NotFound => BindKind::NotFound,
-            std::io::ErrorKind::PermissionDenied => BindKind::Denied,
-            _ => BindKind::Invalid,
+        use crate::read_cause::{of_io, Cause};
+        match of_io(error) {
+            Cause::NotFound => BindKind::NotFound,
+            Cause::Denied => BindKind::Denied,
+            Cause::Unavailable => BindKind::Unavailable,
+            Cause::WrongPath | Cause::Other => BindKind::Invalid,
         }
     }
 }
@@ -1444,6 +1448,19 @@ fn issue_is_failure(issue: &serde_json::Value) -> bool {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    /// atip.codestored.11: a file the system fails to read in a way a repeat can pass is the `UNAVAILABLE` condition of a binding, whichever
+    /// file operation failed; the other causes keep their conditions.
+    #[test]
+    fn atip_codestored_11_a_binding_the_system_fails_to_read_is_unavailable() {
+        let eio = std::io::Error::from_raw_os_error(5);
+        assert_eq!(BindKind::of_io(&eio), BindKind::Unavailable);
+        assert_eq!(BindKind::of_io(&std::io::Error::from(std::io::ErrorKind::TimedOut)), BindKind::Unavailable);
+        assert_eq!(BindKind::of_io(&std::io::Error::from_raw_os_error(13)), BindKind::Denied);
+        assert_eq!(BindKind::of_io(&std::io::Error::from(std::io::ErrorKind::NotFound)), BindKind::NotFound);
+        assert_eq!(BindKind::of_io(&std::io::Error::from(std::io::ErrorKind::IsADirectory)), BindKind::Invalid);
+        assert_eq!(BindError::io("read x", "wait", &eio).kind(), BindKind::Unavailable);
+    }
 
     #[test]
     fn binding_refusals_read_as_before() {

@@ -155,14 +155,16 @@ pub enum AdapterError {
 
 impl AdapterError {
     /// The code of a refusal to run `adapter validate`/`authorize` for this error, and the reason it carries: a response file that is
-    /// not there, that this user may not read, or that cannot be used is a refusal of the file; a broken policy is the config's
-    /// (`CONFIG_INVALID`, reason `POLICY`).
+    /// not there, that this user may not read, that the system failed to read in a way a repeat can pass, or that cannot be used is a
+    /// refusal of the file; a broken policy is the config's (`CONFIG_INVALID`, reason `POLICY`).
     pub(crate) fn refusal_code(&self) -> (&'static str, Option<&'static str>) {
+        use crate::read_cause::{of_io, Cause};
         match self {
-            AdapterError::Io { source, .. } => match source.kind() {
-                std::io::ErrorKind::NotFound => ("ADAPTER_FILE_NOT_FOUND", None),
-                std::io::ErrorKind::PermissionDenied => ("ADAPTER_FILE_DENIED", None),
-                _ => ("ADAPTER_FILE_INVALID", None),
+            AdapterError::Io { source, .. } => match of_io(source) {
+                Cause::NotFound => ("ADAPTER_FILE_NOT_FOUND", None),
+                Cause::Denied => ("ADAPTER_FILE_DENIED", None),
+                Cause::Unavailable => ("ADAPTER_FILE_UNAVAILABLE", None),
+                Cause::WrongPath | Cause::Other => ("ADAPTER_FILE_INVALID", None),
             },
             AdapterError::Policy(_) => ("CONFIG_INVALID", Some("POLICY")),
             AdapterError::Json(_) | AdapterError::Validation(_) | AdapterError::Timestamp { .. } => ("ADAPTER_FILE_INVALID", None),
@@ -487,6 +489,26 @@ pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// atip.codestored.11: a response file the system fails to read in a way a repeat can pass is `ADAPTER_FILE_UNAVAILABLE` (retryable); a refused
+    /// read, a missing file and a directory in its place keep their codes.
+    #[test]
+    fn atip_codestored_11_a_response_file_the_system_fails_to_read_is_unavailable() {
+        use crate::cli_error::CliErrorExt as _;
+        let io = |source: std::io::Error| AdapterError::Io { path: "response.json".to_string(), source };
+        for (source, code) in [
+            (std::io::Error::from_raw_os_error(5), "ADAPTER_FILE_UNAVAILABLE"),
+            (std::io::Error::from(std::io::ErrorKind::TimedOut), "ADAPTER_FILE_UNAVAILABLE"),
+            (std::io::Error::from_raw_os_error(13), "ADAPTER_FILE_DENIED"),
+            (std::io::Error::from(std::io::ErrorKind::NotFound), "ADAPTER_FILE_NOT_FOUND"),
+            (std::io::Error::from(std::io::ErrorKind::IsADirectory), "ADAPTER_FILE_INVALID"),
+        ] {
+            let error = io(source);
+            assert_eq!(error.refusal_code(), (code, None), "{error}");
+            let refused = crate::cli_error::CliError::refused(code, error.to_string());
+            assert_eq!((refused.exit, refused.retryable), (2, code == "ADAPTER_FILE_UNAVAILABLE"), "{code}");
+        }
+    }
 
     #[test]
     fn a_bad_timestamp_reads_as_before_and_keeps_its_cause() {

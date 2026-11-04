@@ -2281,11 +2281,11 @@ fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), Art
         Err(DispatchError::Unreadable { path, detail }) => {
             return Err(ArtifactIngestError::UnreadableRunManifest { run_id: run_id.to_string(), path, detail });
         }
-        // `Io` — a directory at the manifest path, a permission failure —
-        // plus, exhaustively, any variant `read_dispatched_manifest` does
-        // not construct today. A manifest whose bytes cannot be turned
-        // into a `Run` is unusable for attribution however it failed, and
-        // the wrapped error carries the diagnosis verbatim.
+        // `Denied` and `ManifestUnavailable` — a permission failure, an error a
+        // repeat can pass — plus, exhaustively, any variant
+        // `read_dispatched_manifest` does not construct today. A manifest the
+        // run cannot be attributed from is unusable for attribution however
+        // it failed, and the wrapped error carries the diagnosis verbatim.
         Err(other) => {
             return Err(ArtifactIngestError::UnreadableRunManifest {
                 run_id: run_id.to_string(),

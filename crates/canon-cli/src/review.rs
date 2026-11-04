@@ -121,13 +121,15 @@ pub fn parse_runtime_label(s: &str) -> Result<String, RuntimeLabelError> {
     Ok(s.to_string())
 }
 
-/// The code of a refused artifact binding: the file is not usable (`INVALID`), is not there (`NOT_FOUND`) or may not be bound (`DENIED`).
+/// The code of a refused artifact binding: the file is not usable (`INVALID`), is not there (`NOT_FOUND`), may not be bound (`DENIED`) or
+/// could not be read right now (`UNAVAILABLE`).
 fn artifact_code(kind: crate::evidence_attach::BindKind) -> &'static str {
     use crate::evidence_attach::BindKind;
     match kind {
         BindKind::Invalid => "REVIEW_ARTIFACT_INVALID",
         BindKind::NotFound => "REVIEW_ARTIFACT_NOT_FOUND",
         BindKind::Denied => "REVIEW_ARTIFACT_DENIED",
+        BindKind::Unavailable => "REVIEW_ARTIFACT_UNAVAILABLE",
     }
 }
 
@@ -512,6 +514,15 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    /// atip.codestored.11: a review artifact whose read the system failed for a repeat to pass is `REVIEW_ARTIFACT_UNAVAILABLE` (retryable).
+    #[test]
+    fn atip_codestored_11_a_review_artifact_the_system_fails_to_read_is_unavailable() {
+        use crate::cli_error::CliErrorExt as _;
+        let code = artifact_code(crate::evidence_attach::BindKind::Unavailable);
+        let refused = CliError::refused(code, "x");
+        assert_eq!((code, refused.exit, refused.retryable), ("REVIEW_ARTIFACT_UNAVAILABLE", 2, true));
+    }
 
     #[test]
     fn the_value_parsers_refuse_in_their_old_words() {

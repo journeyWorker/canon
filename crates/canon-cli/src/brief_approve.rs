@@ -137,6 +137,7 @@ fn hint_for(code: &str) -> &'static str {
         "APPROVAL_INVALID" => "pass --approver <name> and --note <the human's answer>, each one non-empty line",
         "BRIEF_INVALID" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
         "BRIEF_DENIED" => "make brief.md readable by this user, then run `canon brief approve` again",
+        "BRIEF_UNAVAILABLE" => "the system failed the read of brief.md in a way a repeat can pass: wait a moment, then run `canon brief approve` again",
         "BRIEF_NOT_FOUND" => "check that the change has a brief.md, then run `canon brief approve` again",
         "RELAY_DIGEST_STALE" => "run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw",
         "POLICY_APPROVAL_FAILED" => "check that .canon/policy.yaml is readable and writable, then run `canon brief approve` again",

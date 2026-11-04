@@ -35,20 +35,26 @@ const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "inp
 /// the helper can answer, attributed to the command whose `emit("canon …")` follows it like a literal code is. `read_cause.rs` itself builds
 /// the codes and is not an error site.
 const HELPER_SITES: &[(&str, &[&str])] = &[
-    ("read_cause::config_error(", &["CONFIG_DENIED", "CONFIG_INVALID"]),
-    ("read_cause::repo_error(", &["LEDGER_CORRUPT", "REPO_DENIED", "REPO_INVALID"]),
-    ("read_cause::repo_io_error(", &["REPO_DENIED", "REPO_INVALID"]),
-    ("read_cause::brief_code(", &["BRIEF_DENIED", "BRIEF_INVALID", "BRIEF_NOT_FOUND"]),
-    ("read_cause::spec_root_code(", &["SPEC_ROOT_DENIED", "SPEC_ROOT_INVALID"]),
+    ("read_cause::config_error(", &["CONFIG_DENIED", "CONFIG_INVALID", "CONFIG_UNAVAILABLE"]),
+    ("read_cause::repo_error(", &["CONFIG_INVALID", "REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE"]),
+    ("read_cause::repo_io_error(", &["REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE"]),
+    ("read_cause::brief_code(", &["BRIEF_DENIED", "BRIEF_INVALID", "BRIEF_NOT_FOUND", "BRIEF_UNAVAILABLE"]),
+    ("read_cause::spec_root_dir_code(", &["SPEC_ROOT_DENIED", "SPEC_ROOT_INVALID", "SPEC_ROOT_UNAVAILABLE"]),
     ("read_cause::write_code_of_text(", &["WRITE_DENIED", "WRITE_INVALID"]),
-    ("read_cause::signature_code(", &["STRATEGY_SIGNATURE_DENIED", "STRATEGY_SIGNATURE_INVALID", "STRATEGY_SIGNATURE_NOT_FOUND"]),
+    ("read_cause::signature_code(", &["STRATEGY_SIGNATURE_DENIED", "STRATEGY_SIGNATURE_INVALID", "STRATEGY_SIGNATURE_NOT_FOUND", "STRATEGY_SIGNATURE_UNAVAILABLE"]),
+    ("read_cause::plan_corpus_code(", &["PLAN_CORPUS_DENIED", "PLAN_CORPUS_INVALID", "PLAN_CORPUS_UNAVAILABLE"]),
+    ("read_cause::plan_corpus_code_of_text(", &["PLAN_CORPUS_DENIED", "PLAN_CORPUS_INVALID", "PLAN_CORPUS_UNAVAILABLE"]),
+    ("read_cause::hooks_file_code(", &["HOOKS_FILE_CONFLICT", "HOOKS_FILE_DENIED", "HOOKS_FILE_UNAVAILABLE"]),
+    ("read_cause::policy_code(", &["POLICY_DENIED", "POLICY_INVALID", "POLICY_UNAVAILABLE"]),
+    ("read_cause::policy_approval_code_of_text(", &["POLICY_APPROVAL_CORRUPT", "POLICY_APPROVAL_DENIED", "POLICY_APPROVAL_UNAVAILABLE"]),
+    ("read_cause::migration_code_of_text(", &["MIGRATION_DENIED", "MIGRATION_INVALID", "MIGRATION_UNAVAILABLE"]),
     ("artifacts::store_refusal(", ARTIFACT_STORE_CODES),
     ("artifacts::store_error(", ARTIFACT_STORE_CODES),
     ("artifacts::evidence_store_code(", ARTIFACT_STORE_CODES),
 ];
 
 /// What `artifacts::store_code` answers for a store that cannot be used before anything is written.
-const ARTIFACT_STORE_CODES: &[&str] = &["ARTIFACTS_DIGEST_INVALID", "ARTIFACTS_STORE_INVALID", "ARTIFACTS_STORE_REQUIRED", "ARTIFACTS_STORE_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID"];
+const ARTIFACT_STORE_CODES: &[&str] = &["ARTIFACTS_DIGEST_INVALID", "ARTIFACTS_STORE_DENIED", "ARTIFACTS_STORE_INVALID", "ARTIFACTS_STORE_REQUIRED", "ARTIFACTS_STORE_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID", "CONFIG_UNAVAILABLE"];
 
 /// Whether `line` calls a helper that can answer `code`.
 fn helper_answers(line: &str, code: &str) -> bool {
