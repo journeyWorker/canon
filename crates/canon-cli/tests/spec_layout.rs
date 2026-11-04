@@ -170,7 +170,7 @@ fn format_corpus_10_format_refuses_the_pre_0_17_layout() {
 fn inventory_sync_48_sync_refuses_the_pre_0_17_layout() {
     let dir = pre_0_17_repo(false);
     let out = canon(dir.path(), &["inventory", "sync"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let text = stdout(&out);
     assert!(text.contains("canon inventory sync: root `root` ("), "{text}");
     assert!(text.contains("ABORTED, 1 violation(s), 0 sync error(s), 0 record(s) written"), "{text}");

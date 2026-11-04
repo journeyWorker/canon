@@ -41586,7 +41586,7 @@
     {
       "code": "INVENTORY_INVALID",
       "exit": 2,
-      "fix": "Fix each violation `error.details` names (`canon fmt` repairs what it can), then run `canon inventory sync` again.",
+      "fix": "Fix each violation `error.details` names (`canon format` repairs what it can), then run `canon inventory sync` again.",
       "meaning": "`inventory sync` (or its preview) indexed nothing because a spec root has format violations or declares a scenario twice; nothing was written and `error.details` names each violation and duplicate by root; a sync that indexed an earlier root first is INVENTORY_INCOMPLETE",
       "reasons": [
         {
@@ -41595,7 +41595,7 @@
           "reason": "DUPLICATE_SCENARIOS"
         },
         {
-          "fix": "Fix the violations `error.details` names (`canon fmt` repairs what it can), then run `canon inventory sync` again.",
+          "fix": "Fix the violations `error.details` names (`canon format` repairs what it can), then run `canon inventory sync` again.",
           "meaning": "a spec root's corpus has format violations and the sync indexed nothing (`error.details` names each one by root); nothing was written",
           "reason": "VIOLATIONS"
         }

@@ -49,18 +49,17 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
                 // A sync that indexed nothing (and every preview) refuses before its work (spec 7.2.2, 8.3): exit 2, no `data`, each violation and duplicate in `error.details`.
                 let hint = hint.replace("data.roots names each violation", "error.details names each violation");
                 let message = if outcome.dry_run { "a spec root would be left unindexed on violations or duplicate scenarios; this was a preview and nothing was written" } else { "a spec root has violations or duplicate scenarios, so the sync indexed nothing" };
-                let refused = |reason: &'static str, text: String| CliError::refused("INVENTORY_INVALID", text).reason(reason).hint(hint.clone());
+                let refused = |text: String| CliError::refused("INVENTORY_INVALID", text).hint(hint.clone());
                 let mut items: Vec<CliError> = Vec::new();
                 for root in &outcome.roots {
                     for v in &root.violations {
-                        items.push(refused("VIOLATIONS", format!("root `{}`: [{}] {} — {}", root.id, v.class.as_str(), v.path.display(), v.detail)));
+                        items.push(refused(format!("root `{}`: [{}] {} — {}", root.id, v.class.as_str(), v.path.display(), v.detail)).reason("VIOLATIONS"));
                     }
                     for e in &root.sync_errors {
-                        items.push(refused("DUPLICATE_SCENARIOS", format!("root `{}`: [duplicate-scenario] {e}", root.id)));
+                        items.push(refused(format!("root `{}`: [duplicate-scenario] {e}", root.id)).reason("DUPLICATE_SCENARIOS"));
                     }
                 }
-                let reason = if outcome.roots.iter().any(|root| !root.violations.is_empty()) { "VIOLATIONS" } else { "DUPLICATE_SCENARIOS" };
-                let top = refused(reason, message.to_string());
+                let top = if outcome.roots.iter().any(|root| !root.violations.is_empty()) { refused(message.to_string()).reason("VIOLATIONS") } else { refused(message.to_string()).reason("DUPLICATE_SCENARIOS") };
                 let mut all = vec![top.clone()];
                 all.extend(items);
                 let error = if all.len() > 1 { top.details(all) } else { top };

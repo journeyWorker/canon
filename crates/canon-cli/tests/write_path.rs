@@ -478,7 +478,7 @@ fn a_root_that_cannot_sync_marks_no_scenario_removed() {
     assert!(err.contains("canon artifacts store: found the scenario index stale for 1 changed feature file(s)"), "{err}");
     assert!(err.contains("and 1 scenario(s) no longer in any feature file (game.shop.01): 0 record(s) written; NOT refreshed: root `root`"), "{err}");
     let sync = canon(repo, &["inventory", "sync"]);
-    assert_eq!(sync.status.code(), Some(1), "{}", stdout(&sync));
+    assert_eq!(sync.status.code(), Some(2), "{}", stdout(&sync));
     let records = scenario_records(repo);
     assert_eq!(records.len(), 2, "no tombstone and no new generation: {records:?}");
     assert!(records.iter().all(|r| r.get("removed").is_none()), "{records:?}");
