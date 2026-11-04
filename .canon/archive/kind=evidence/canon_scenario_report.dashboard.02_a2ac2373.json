@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-4",
+    "role": "implementer",
+    "session_id": "s-0-36-claim-1-4"
+  },
+  "at": "2026-11-04T17:31:09.598911Z",
+  "attachments": [
+    {
+      "case": "report_dashboard_02_a_missing_repo_is_refused_and_not_created",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "37225a801748ea73e0265161ca465c554ba6850d9d56e7ff4a20f68ef36b00d3"
+    },
+    {
+      "case": "report_dashboard_02_no_app_is_refused_and_another_projects_dashboard_is_never_served",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "37225a801748ea73e0265161ca465c554ba6850d9d56e7ff4a20f68ef36b00d3"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "22d30144d79b96472c3b32a0eacc58fe66453ffa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 389,
+  "scenario_id": "report.dashboard.02",
+  "schema": 1,
+  "staging_id": "e29c94a0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

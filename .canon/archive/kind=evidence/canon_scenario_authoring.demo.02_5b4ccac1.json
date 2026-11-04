@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:18:47.822581Z",
+  "attachments": [
+    {
+      "case": "authoring_demo_02_demo_init_in_a_directory_that_already_has_a_canon_yaml_is_refused_and_changes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    },
+    {
+      "case": "authoring_demo_02_demo_init_refuses_a_config_whose_gitignore_has_no_canon_lines_and_keeps_the_policy",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    }
+  ],
+  "code_tree": "84454e6621e493af02ddc9c1cd5b2158249ee38a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "91a47e478825254994473672e759b11ec606c931",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 87,
+  "scenario_id": "authoring.demo.02",
+  "schema": 1,
+  "staging_id": "96da36db",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

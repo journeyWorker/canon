@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:24.165153Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/cli_error.rs:436",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "401ecbcad1607f3d3352b54c9f12e88a52b63fe1",
+  "reviewer": "rev-0-36-refusals",
+  "round": 2,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[standards] The EIO rule (a read the system fails for a repeat to pass is `_UNAVAILABLE`) is not applied to two ledger reads that stay FAILED, exit 1, not retryable. Driven with a real `canon` and an injected EIO on the ledger files (DYLD_INSERT_LIBRARIES shim returning EIO from open() for paths containing `kind=subject`/`ledger`): `canon query --kind subject` -> QUERY_FAILED 'io: Input/output error (os error 5)' retryable false; `canon migrate` -> LEDGER_COMPACT_FAILED 'io: Input/output error (os error 5)' retryable false; `canon subject show` on the same fault -> REPO_UNAVAILABLE retryable true. The same cause answers by command. Out of the brief's named list, so a note: route `QUERY_FAILED` and the migrate preview's compact read through `repo_error`, or say in the registry that a read in the middle of a query is a failure of the work.",
+  "worktree_dirty": false
+}

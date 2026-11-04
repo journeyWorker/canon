@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-refusals-fix",
+    "role": "implementer",
+    "session_id": "s-0-36-refusals-fix"
+  },
+  "at": "2026-11-04T09:02:21.075724Z",
+  "attachments": [
+    {
+      "case": "atip_schemadoc_04_an_unknown_path_word_names_the_field_command_and_expects_only_where_a_word_is_valid",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b44b2ddee3a618e932817939ef666ee1ed483fc89a8ae3c8ec174a68a20cae09"
+    },
+    {
+      "case": "atip_schemadoc_04_an_unknown_path_names_what_is_valid_and_overlapping_selectors_are_usage",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b44b2ddee3a618e932817939ef666ee1ed483fc89a8ae3c8ec174a68a20cae09"
+    }
+  ],
+  "code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "481ea88dee39886ba8142a97598a0074b5cdc9d5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 162,
+  "scenario_id": "atip.schemadoc.04",
+  "schema": 1,
+  "staging_id": "fbe49717",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

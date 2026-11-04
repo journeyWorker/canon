@@ -132,10 +132,10 @@ fn refused_calls() -> Vec<(&'static str, Vec<&'static str>, &'static str)> {
         ("subject move: no such subject", vec!["subject", "move", "nosuch", "--to", "specced", "--json"], "SUBJECT_NOT_FOUND"),
         ("subject move: not a transition", vec!["subject", "move", "demo", "--to", "shipped", "--json"], "SUBJECT_CONFLICT"),
         ("subject move: no reason", vec!["subject", "move", "demo", "--to", "specced", "--reason", "two\nlines", "--json"], "SUBJECT_ARGUMENT_INVALID"),
-        ("evidence add --all-scenarios: no case names a scenario", vec!["evidence", "add", "--project", "root", "--all-scenarios", "--class", "test-run", "--ref", "x", "--role", "implementer", "--report", "junit:reports/nomatch.xml", "--json"], "EVIDENCE_BIND_REFUSED"),
+        ("evidence add --all-scenarios: no case names a scenario", vec!["evidence", "add", "--project", "root", "--all-scenarios", "--class", "test-run", "--ref", "x", "--role", "implementer", "--report", "junit:reports/nomatch.xml", "--json"], "EVIDENCE_BINDING_INVALID"),
         ("evidence add: a revision that is not one", vec!["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "x", "--role", "implementer", "--verdict", "faithful", "--rev", "no-such-revision", "--json"], ""),
-        ("evidence audit: bad digest", vec!["evidence", "audit", "auth.login.01", "--ref", "x", "--audit-result", "confirmed", "--evaluator", "e", "--evaluator-version", "1", "--evaluator-digest", "sha256:00", "--role", "reviewer", "--json"], "EVIDENCE_INVALID_ARGUMENT"),
-        ("review scenario: scenario no feature declares", vec!["review", "scenario", "nosuch.x.01", "--actor", "alice", "--role", "reviewer", "--original-spec-ref", "docs/p.md", "--rev", "HEAD", "--json"], "REVIEW_SCENARIO_NOT_INDEXED"),
+        ("evidence audit: bad digest", vec!["evidence", "audit", "auth.login.01", "--ref", "x", "--audit-result", "confirmed", "--evaluator", "e", "--evaluator-version", "1", "--evaluator-digest", "sha256:00", "--role", "reviewer", "--json"], "EVIDENCE_ARGUMENT_INVALID"),
+        ("review scenario: scenario no feature declares", vec!["review", "scenario", "nosuch.x.01", "--actor", "alice", "--role", "reviewer", "--original-spec-ref", "docs/p.md", "--rev", "HEAD", "--json"], "SCENARIO_INDEX_REQUIRED"),
         ("divergence accept: scenario no feature declares", vec!["divergence", "accept", "nosuch.x.01", "--actor", "alice", "--reason", "r", "--tracking", "t", "--json"], "DIVERGENCE_ARGUMENT_INVALID"),
     ]
 }
@@ -365,7 +365,8 @@ fn atip_readwrites_06_dashboard_is_declared_a_server_that_serves_until_signalled
     assert_eq!(schema["data"]["effect"], "write", "{schema}");
     let outputs = schema["data"]["outputs"].as_array().expect("outputs");
     assert_eq!(outputs.len(), 1, "one output, no stream lines: {outputs:?}");
-    assert_eq!((outputs[0]["kind"].as_str(), outputs[0]["schemaRef"].as_str()), (Some("report"), Some("#/schemas/DashboardReport")), "{outputs:?}");
+    // `kind` is absent when it is the default (`report`) in the 1.4 form: a stream would say `kind: "stream"`.
+    assert_eq!((outputs[0].get("kind").is_none() || outputs[0]["kind"] == "report", outputs[0]["schemaRef"].as_str()), (true, Some("#/schemas/DashboardReport")), "{outputs:?}");
 }
 
 /// atip.readwrites.09 (the failure path of F5): a `dashboard` call that is refused (a port that is no integer, an option it does not

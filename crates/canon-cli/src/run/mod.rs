@@ -103,7 +103,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Retrieve(RetrieveArgs { for_role, regime, domain, subject_id, limit, repo, json }) => run_retrieve(&repo, &for_role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), limit, json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json, .. }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::Selftest(SelftestArgs { suite, json }) => crate::selftest::run_selftest(suite.as_deref(), json),
-        Command::Schema(SchemaArgs { path, json, errors, error, warnings, warning }) => ExitCode::from(crate::schema::run(&crate::cli::command(), &path, json, crate::schema::Registry { errors, error: error.as_deref(), warnings, warning: warning.as_deref() }, declared)),
+        Command::Schema(SchemaArgs { path, json, schemas, errors, error, warnings, warning }) => ExitCode::from(crate::schema::run(&crate::cli::command(), &path, json, crate::schema::Registry { errors, error: error.as_deref(), warnings, warning: warning.as_deref() }, schemas, declared)),
         Command::Completion(CompletionArgs { shell, json }) => run_completion(shell, json),
     }
 }

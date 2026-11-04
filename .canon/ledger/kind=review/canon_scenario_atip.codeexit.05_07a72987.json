@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T04:03:22.699603Z",
+  "code_tree": "e906ba7be5735b0a6898cedc4fcd13d5f52a4224",
+  "kind": "review",
+  "pin": "0c6d83f54c2462e367e49ce7165a5675f1bb62b6",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:evidence::tests::atip_codeexit_05_a_batch_whose_second_record_the_gate_refuses_writes_nothing",
+          "junit:evidence::tests::atip_codeexit_05_a_refusal_found_while_promoting_is_batch_incomplete_with_the_place_it_stopped"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b7da76ca9565edd06a26f3ec2c2563224f0d8a9e2f8a3f6d099793ecda820f60",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-exit/brief.md"
+  },
+  "review_id": "01M6JBKKEB18KREDM52D2D8BXB",
+  "reviewer": "rev-0-36-exit",
+  "scenario_id": "atip.codeexit.05",
+  "schema": 2,
+  "worktree_dirty": false
+}

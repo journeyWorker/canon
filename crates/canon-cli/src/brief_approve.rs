@@ -13,7 +13,7 @@
 //! for an empty `--approver`/`--note`; exit 1 for an operational error. It takes
 //! one or more change ids (0.31): one name and answer for all, every id checked
 //! before any is written ([`approve_all`]), and one refused id refuses the call
-//! (`BRIEF_APPROVE_REFUSED`, naming each). Existing
+//! (the first refused id's code, with `details` for each). Existing
 //! `Approved:` lines are replaced, so re-approving leaves exactly one.
 //! Canon cannot tell a human from an agent running this command: the
 //! skill makes it a human stop, and `--note` carries their words.
@@ -131,31 +131,14 @@ pub struct ApprovedMany {
 
 impl Report for ApprovedMany {}
 
-/// A refused id of a call with several: the data of `BRIEF_APPROVE_REFUSED`.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Refusal {
-    pub change_id: String,
-    pub code: String,
-    pub message: String,
-}
-
-/// The data of a `BRIEF_APPROVE_REFUSED` over several ids.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Refused {
-    pub refused: Vec<Refusal>,
-}
-
-impl Report for Refused {}
-
 /// The next step for each code [`approve`] refuses with.
 fn hint_for(code: &str) -> &'static str {
     match code {
         "APPROVAL_INVALID" => "pass --approver <name> and --note <the human's answer>, each one non-empty line",
-        "BRIEF_APPROVE_REFUSED" => "run `canon brief check`, clear the blockers it lists, then ask the human to approve",
         "BRIEF_INVALID" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
-        "BRIEF_UNREADABLE" => "check that brief.md is a readable UTF-8 file, then run `canon brief approve` again",
+        "BRIEF_DENIED" => "make brief.md readable by this user, then run `canon brief approve` again",
+        "BRIEF_UNAVAILABLE" => "the system failed the read of brief.md in a way a repeat can pass: wait a moment, then run `canon brief approve` again",
+        "BRIEF_NOT_FOUND" => "check that the change has a brief.md, then run `canon brief approve` again",
         "RELAY_DIGEST_STALE" => "run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw",
         "POLICY_APPROVAL_FAILED" => "check that .canon/policy.yaml is readable and writable, then run `canon brief approve` again",
         _ => "check that the change's brief.md is writable, then run `canon brief approve` again",
@@ -219,11 +202,13 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
     if !blockers.is_empty() {
         let listed = blockers.iter().map(|f| format!("{} line {}", f.rule, f.line)).collect::<Vec<_>>().join(", ");
         return Err(refuse(
-            "BRIEF_APPROVE_REFUSED",
+            "BRIEF_INVALID",
             &format!("{} has {} blocker finding(s): {listed}; `canon brief check` shows them, and the human approves a brief only once they are cleared", checked.brief, blockers.len()),
-        ));
+        )
+        .reason("BLOCKERS")
+        .hint("run `canon brief check`, clear the blockers it lists, then ask the human to approve"));
     }
-    let text = std::fs::read_to_string(&path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{}`: {e}", checked.brief)))?;
+    let text = canon_store::eio::read_to_string(&path).map_err(|e| crate::read_cause::brief_unreadable(refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{}`: {e}", checked.brief))))?;
     if let Some(expected) = item.expected_sha256 {
         verify_bytes(&checked.brief, Some(text.as_bytes()), expected)?;
     }
@@ -236,7 +221,7 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
         let approval_file = repo.join(canon_model::paths::POLICY_APPROVAL_FILE);
         let targets: Vec<&Path> = if policy_approved { vec![approval_file.as_path(), path.as_path()] } else { vec![path.as_path()] };
         for target in targets {
-            crate::write_mode::check_writable(target).map_err(|e| crate::write_mode::unavailable(target, &e))?;
+            crate::write_mode::check_writable(target).map_err(|e| crate::write_mode::unwritable(target, &e))?;
         }
     }
     Ok(Checked { change: checked.change, brief: checked.brief, path, text, unchanged })
@@ -248,7 +233,7 @@ fn verify_shown(change: &ChangeId, brief: &str, path: &Path, shown: &BTreeMap<St
     let Some(digest) = shown.get(change.as_str()) else {
         return Err(CliError::refused("USAGE", format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", change.as_str())).field("--digest").hint(hint_for("RELAY_DIGEST_STALE")));
     };
-    let text = std::fs::read_to_string(path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{brief}`: {e}")))?;
+    let text = canon_store::eio::read_to_string(path).map_err(|e| crate::read_cause::brief_unreadable(refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{brief}`: {e}"))))?;
     let now = approval_digest(&text);
     if digest.eq_ignore_ascii_case(&now) {
         return Ok(());
@@ -309,16 +294,20 @@ fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
     write_one(repo, checked, &by, &note, &when, policy_approved, None).map(|approved| (approved, false))
 }
 
-/// The error of a call with several ids when any is refused (0.31): one
-/// `BRIEF_APPROVE_REFUSED` naming every refused id with its own code and
-/// reason; nothing was written.
-fn refused_many(refused: Vec<(String, CliError)>, total: usize) -> (CliError, Refused) {
-    let named = refused.iter().map(|(id, e)| format!("`{id}` ({}: {})", e.code, e.message)).collect::<Vec<_>>().join("; ");
-    let error = refuse("BRIEF_APPROVE_REFUSED", &format!("{} of {total} briefs refused, so none was approved and nothing was written: {named}", refused.len())).hint(
-        "fix what each refused id names (`canon brief check` lists blocker findings, a missing brief needs `canon change new`, an unclosed fence needs closing), then ask the human to approve again",
-    );
-    let data = Refused { refused: refused.into_iter().map(|(change_id, e)| Refusal { change_id, code: e.code.to_string(), message: e.message }).collect() };
-    (error, data)
+/// The error of a call with several ids when any is refused (0.31): the first refused id's own code and reason, with an
+/// `error.details` entry for each refused id (spec 7.2.2); no `data`, and nothing was written.
+fn refused_many(refused: Vec<(String, CliError)>) -> CliError {
+    let hint = "fix what each refused id names (`canon brief check` lists blocker findings, a missing brief needs `canon change new`, an unclosed fence needs closing), then ask the human to approve again";
+    let named = |id: &str, e: &CliError| {
+        let error = CliError::refused(e.code, format!("`{id}`: {}", e.message)).hint(hint);
+        match e.reason_name() {
+            Some(reason) => error.reason(reason),
+            None => error,
+        }
+    };
+    let all: Vec<CliError> = refused.iter().map(|(id, e)| named(id, e)).collect();
+    let first = all[0].clone();
+    first.details(all)
 }
 
 /// What [`approve_all`] recorded, id by id, in the order given.
@@ -334,18 +323,18 @@ pub struct Many {
 
 /// Approves every id of `items` with one name and one answer, at one time,
 /// all or nothing on refusals (0.31): every id is checked before any is
-/// written, and one refused id refuses the call with `BRIEF_APPROVE_REFUSED`
-/// naming each refused id. Then the ids are written in the order given,
+/// written, and one refused id refuses the call with the first refused id's code
+/// with `details` for each refused id. Then the ids are written in the order given,
 /// exactly as one id is; a write failure (exit 1) leaves the ids already
 /// written approved and skips the rest. A repeated id counts once.
-pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Result<Many, (CliError, Option<Refused>)> {
+pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Result<Many, CliError> {
     approve_all_with(repo, items, by, note, Opts::default())
 }
 
 /// [`approve_all`] with [`Opts`]: a relayed call (0.32) writes the marker and
 /// refuses an id whose shown digest is missing or differs.
-pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, opts: Opts<'_>) -> Result<Many, (CliError, Option<Refused>)> {
-    let (by, note) = answer(by, note).map_err(|e| (e, None))?;
+pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, opts: Opts<'_>) -> Result<Many, CliError> {
+    let (by, note) = answer(by, note)?;
     let mut distinct: Vec<Item<'_>> = Vec::new();
     for item in items {
         if item.change.is_none() || !distinct.iter().any(|seen| seen.change == item.change) {
@@ -363,11 +352,10 @@ pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, o
     }
     if distinct.len() == 1 {
         if let Some((_, e)) = refused.pop() {
-            return Err((e, None));
+            return Err(e);
         }
     } else if !refused.is_empty() {
-        let (error, data) = refused_many(refused, distinct.len());
-        return Err((error, Some(data)));
+        return Err(refused_many(refused));
     }
     let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let mut entries: Vec<(ApprovalEntry, Option<Approved>)> = Vec::new();
@@ -456,16 +444,7 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
     let opts = Opts { relay, shown: relay.map(|_| shown) };
     let many = match approve_all_with(&repo, &items, by, note, opts) {
         Ok(many) => many,
-        // Several ids refused before the first write: a refusal with no `data`, whose `error.details` hold one entry for each refused id with its own code.
-        Err((e, Some(data))) => {
-            let causes = data
-                .refused
-                .iter()
-                .map(|refused| crate::gate_refusal::Cause { code: crate::cli_error::code_info(&refused.code).map_or("BRIEF_APPROVE_REFUSED", |info| info.code), message: format!("`{}`: {}", refused.change_id, refused.message) })
-                .collect();
-            return crate::gate_refusal::refusal(causes, e.hint_text().unwrap_or_default()).emit("canon brief approve", json);
-        }
-        Err((e, None)) => return e.emit("canon brief approve", json),
+        Err(e) => return e.emit("canon brief approve", json),
     };
     if let [(_, Some(approved))] = many.entries.as_slice() {
         let unchanged = many.entries[0].0.outcome == Outcome::Unchanged;

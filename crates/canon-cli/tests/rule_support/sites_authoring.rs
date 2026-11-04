@@ -18,10 +18,11 @@ pub const SITES: &[Site] = &[
     // strategies
     site("learn.rs:run_promote_with_evidence:STRATEGY_ARGUMENT_INVALID#1", Kind::Unreachable("clap's `requires` between --evaluation and --approval (declared as rules of `strategy promote`) answers first")),
     site("learn.rs:run_rollback:STRATEGY_ARGUMENT_INVALID#1", Kind::Precondition("the id is parsed after the strategy is looked up in the store (an unknown strategy is refused first), so a bad --contradicting-trajectory is only reached after a state read")),
+    site("learn.rs:rollback_refusal:STRATEGY_ARGUMENT_INVALID#1", Kind::Precondition("a blank --reason or --actor is judged by the rollback's signature check, after the strategy, the contradicting trajectory and the signature file were read (an unknown strategy and an unreadable signature are refused first)")),
     site("learn.rs:run_rollback:STRATEGY_ARGUMENT_INVALID#2", Kind::Unreachable("--approval-at is normalised to RFC 3339 by clap's value parser before the handler runs; the calendar check is the validator of `strategy rollback`")),
     // policy approve
-    site("policy_approval.rs:run_approve:POLICY_APPROVAL_REFUSED#1", Kind::Precondition("the code of the policy record's own refusals (no policy file, an unreadable one); a blank approver is refused before it, by `check_approver`")),
-    site("policy_approval.rs:check_approver:POLICY_APPROVAL_REFUSED#1", Kind::Validator { command: "policy approve", arguments: &["approver"] }),
+    site("policy_approval.rs:run_approve:APPROVAL_INVALID#1", Kind::Precondition("the code of the policy record's own refusals (no policy file, an unreadable one); a blank approver is refused before it, by `check_approver`")),
+    site("policy_approval.rs:check_approver:APPROVAL_INVALID#1", Kind::Validator { command: "policy approve", arguments: &["approver"] }),
     // relayed approvals
     site("relay.rs:check_role:USAGE#1", Kind::Validator { command: "brief approve", arguments: &["relayed-via", "as"] }),
     site("relay.rs:check_via:USAGE#1", Kind::Domain { command: "brief approve", argument: "relayed-via" }),

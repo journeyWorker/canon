@@ -48,7 +48,7 @@ pub enum ContextPackError {
     #[error("prompt bundle `{name}@{version}` is invalid: {detail}")]
     PromptBundle { name: String, version: String, detail: String },
     /// A directory the store writes into cannot be written, known before the
-    /// write (`WRITE_UNAVAILABLE`).
+    /// write (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(CliError),
 }
@@ -65,7 +65,7 @@ impl ContextPackError {
             Self::MissingPack(_) => CliError::refused("CONTEXT_PACK_NOT_FOUND", self.to_string()).hint("check the pack id (sha256:<64 hex digits>), or create the pack with `canon context-pack add --manifest <file>`"),
             Self::PromptBundle { .. } => CliError::refused("PROMPT_BUNDLE_INVALID", self.to_string()).hint("fix the bundle name, version or manifest (`canon schema prompt add` lists them), then run `canon prompt add` again"),
             Self::Serialize(_) => CliError::refused("SERIALIZE_FAILED", self.to_string()).hint("this is a canon bug: report it together with the command line that produced it"),
-            Self::Io { .. } => CliError::failed("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
+            Self::Io { .. } => crate::read_cause::repo_io_error(self.to_string()),
             Self::ObjectConflict { .. } => CliError::failed("CONTEXT_OBJECT_CONFLICT", self.to_string()).hint("an object already stored under this digest differs from the new content: inspect it with `git status` and restore or remove it, then run the command again"),
             Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_CORRUPT", self.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack add`"),
             Self::Git(_) => CliError::failed("CONTEXT_GIT_REQUIRED", self.to_string()).hint("run from inside a git repository with git installed (`git init` creates one)"),
@@ -256,6 +256,7 @@ pub fn register_prompt_bundle(
     spec: &ContextPackSpec,
 ) -> Result<PromptBundleVersion, ContextPackError> {
     let repo = repo.canonicalize().map_err(|e| io(repo, e))?;
+    PENDING.with(|queue| queue.borrow_mut().clear());
     ensure_registry(&repo)?;
     validate_label(name)?;
     validate_label(version)?;
@@ -264,7 +265,8 @@ pub fn register_prompt_bundle(
     let digest_bytes = serde_json::to_vec(&unsigned).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
     let bundle = PromptBundleVersion { digest: digest(&digest_bytes), ..unsigned };
     let path = repo.join(PROMPT_REGISTRY_DIR).join(name).join(format!("{version}.json"));
-    write_immutable(&path, &serde_json::to_vec_pretty(&bundle).map_err(|e| ContextPackError::Serialize(e.to_string()))?)?;
+    queue_immutable(&path, serde_json::to_vec_pretty(&bundle).map_err(|e| ContextPackError::Serialize(e.to_string()))?);
+    flush_immutable()?;
     Ok(bundle)
 }
 
@@ -299,6 +301,7 @@ pub fn create(repo: &Path, spec: &ContextPackSpec) -> Result<ContextPack, Contex
         return Err(ContextPackError::InvalidManifestVersion(spec.manifest_version));
     }
     let repo = repo.canonicalize().map_err(|e| io(repo, e))?;
+    PENDING.with(|queue| queue.borrow_mut().clear());
     ensure_registry(&repo)?;
     let repo_identity = repo_identity(&repo)?;
     let knowledge_map = spec.knowledge_map.as_deref().map(|p| capture_file(&repo, p)).transpose()?;
@@ -342,7 +345,8 @@ pub fn create(repo: &Path, spec: &ContextPackSpec) -> Result<ContextPack, Contex
     pack.id = digest(&unsigned);
     let manifest = serde_json::to_vec_pretty(&pack).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
     let path = pack_path(&repo, &pack.id);
-    write_immutable(&path, &manifest)?;
+    queue_immutable(&path, manifest);
+    flush_immutable()?;
     Ok(pack)
 }
 /// Load and validate an explicit JSON input manifest without creating a pack.
@@ -470,7 +474,7 @@ fn capture_file(repo: &Path, relative: &Path) -> Result<FileSnapshot, ContextPac
     let file_digest = digest(&bytes);
     let object = StoredContent { digest: file_digest.clone(), bytes };
     let object_bytes = serde_json::to_vec(&object).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
-    write_immutable(&object_path(repo, &file_digest), &object_bytes)?;
+    queue_immutable(&object_path(repo, &file_digest), object_bytes);
     Ok(FileSnapshot {
         path: relative.to_string_lossy().replace('\\', "/"),
         version: Some(file_digest.clone()),
@@ -594,6 +598,41 @@ fn mark_unchanged_if_nothing_written<T>(op: impl FnOnce() -> Result<T, ContextPa
     Ok(out)
 }
 
+thread_local! {
+    /// The immutable files a command will store, collected while it captures its inputs and written by [`flush_immutable`].
+    static PENDING: std::cell::RefCell<Vec<(std::path::PathBuf, Vec<u8>)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Queue an immutable file: nothing is written until every file of the command is known and judged, so a refusal (`CONTEXT_OBJECT_CONFLICT`,
+/// `WRITE_DENIED` or `WRITE_INVALID`) leaves the tree as it was.
+fn queue_immutable(path: &Path, bytes: Vec<u8>) {
+    PENDING.with(|queue| queue.borrow_mut().push((path.to_path_buf(), bytes)));
+}
+
+/// Judge every queued file (an existing one that differs is a conflict, a target that cannot take a file is unavailable), then write them.
+fn flush_immutable() -> Result<(), ContextPackError> {
+    let queued = PENDING.with(|queue| std::mem::take(&mut *queue.borrow_mut()));
+    for (path, bytes) in &queued {
+        judge_immutable(path, bytes)?;
+    }
+    for (path, bytes) in &queued {
+        write_immutable(path, bytes)?;
+    }
+    Ok(())
+}
+
+fn judge_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
+    if path.exists() {
+        let existing = std::fs::read(path).map_err(|e| io(path, e))?;
+        if existing != bytes {
+            let digest = path.file_stem().and_then(OsStr::to_str).unwrap_or("unknown").to_string();
+            return Err(ContextPackError::ObjectConflict { digest });
+        }
+        return Ok(());
+    }
+    crate::write_mode::check_writable(path).map_err(|cause| ContextPackError::Unavailable(crate::write_mode::unwritable(path, &cause)))
+}
+
 fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
     if path.exists() {
         let existing = std::fs::read(path).map_err(|e| io(path, e))?;
@@ -603,8 +642,8 @@ fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
         }
         return Ok(());
     }
-    // A target that cannot take the file is refused before the write (`WRITE_UNAVAILABLE`), not after it fails.
-    crate::write_mode::check_writable(path).map_err(|cause| ContextPackError::Unavailable(crate::write_mode::unavailable(path, &cause)))?;
+    // A target that cannot take the file is refused before the write (`WRITE_DENIED` or `WRITE_INVALID`), not after it fails.
+    crate::write_mode::check_writable(path).map_err(|cause| ContextPackError::Unavailable(crate::write_mode::unwritable(path, &cause)))?;
     write_atomic(path, bytes).map_err(|e| io(path, e))?;
     FRESH_WRITES.with(|n| n.set(n.get() + 1));
     Ok(())

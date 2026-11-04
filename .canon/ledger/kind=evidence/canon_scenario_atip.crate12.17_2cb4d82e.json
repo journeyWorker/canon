@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-flowfix-036",
+    "role": "implementer",
+    "session_id": "s-0-36-flowfix-3"
+  },
+  "at": "2026-11-04T19:41:45.466017Z",
+  "attachments": [
+    {
+      "case": "cli_error::incomplete_probe::atip_crate12_17_a_reason_made_from_a_code_the_table_does_not_hold_or_in_a_table_of_the_wrong_length_stops_the_evaluation",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "53a72b04147d32b2b4b3adcb7b485cc825fa9b3973ba43f524797439d9ac2737"
+    }
+  ],
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "workspace nextest run, 3816 passed, from the clean worktree at a021655ea"
+  },
+  "evidence_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 67,
+  "scenario_id": "atip.crate12.17",
+  "schema": 1,
+  "staging_id": "20bc8f06",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

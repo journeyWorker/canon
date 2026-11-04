@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-table",
+    "role": "reviewer",
+    "session_id": "s-0-36-table-rev"
+  },
+  "at": "2026-11-04T14:37:28.733149Z",
+  "change_id": "canon-0-36-codes-table",
+  "code_tree": "6c825d1cbf7d1070f0a2daaca7523e0dd9f2ea67",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/old_codes/mod.rs:3; .canon/changes/canon-0-36-codes-table/scenario-diff.md",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "7ccaf06474d39b1eb92e7074546cc32197302409",
+  "reviewer": "rev-0-36-table",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestable.11"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] (1) The module doc of old_codes says the 0.35 registry is tests/fixtures/codes-0.35.txt; the file is codes-0.35.tsv with exit and retryable. (2) The scenario diff table's list of 117 is exact (rebuilt from git between 31df40acd and 7ccaf0647: the same 117 ids, 86 name-only and 31 meaning under my own normalisation), but two name-only rows correct a 0.35 sentence that named a code the 0.35 binary did not emit, so the old to new pair is no row of the replacement table: dispatch.manifest.12 (0.35 said exit 1 with ADAPTER_REFUSED; the 0.35 binary answered ADAPTER_RESPONSE_INVALID) and gate.check.107 (0.35 said HOOKS_INSTALL_FAILED for a non-directory --repo; the 0.35 binary answers HOOKS_INSTALL_REFUSED, now HOOKS_REPO_INVALID). Both 0.36 sentences are right (real-binary probes: ADAPTER_VALIDATION_FAILED exit 1, HOOKS_REPO_INVALID exit 2). Mark them meaning or say so in the row. (3) atip.codestable.11 checks the count, ids and kind words, not that the rows are the changed scenarios; a table that drops a changed scenario and adds an unchanged one passes.",
+  "worktree_dirty": false
+}

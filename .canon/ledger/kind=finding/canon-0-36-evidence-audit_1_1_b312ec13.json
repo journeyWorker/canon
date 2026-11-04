@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-audit",
+    "role": "reviewer",
+    "session_id": "s-0-36-audit-rev"
+  },
+  "at": "2026-11-04T18:21:09.327989Z",
+  "change_id": "canon-0-36-evidence-audit",
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "disposition": "open",
+  "file_ref": ".canon/changes/canon-0-36-evidence-audit/audit-table.md",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4b1732a54c54fc3b84f257210a1c362255dd004f",
+  "reviewer": "rev-0-36-audit",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards/spec fidelity: the table says the 54 of the 0.35 close became 45 because claim-1-4 re-bound the rest; the stored records do not show that. Re-drawn from .canon/archive+ledger evidence with the table's own rule (latest binds fewer cases than the earlier record with most), the list is 39 at the 0.35 close (11-03T19) and already 45 before the first claim-1-4 record (16:32) and after the last, so claim-1-4 changed no membership; the +6 (atip.codenames.04, contract11.03, l0.06, l0.19, schemadoc.06, ingest.sessions.16) are 0.36 code-rename/atip-dep/ingest changes. The 54 itself cannot be reproduced from the corpus (the checker scenarios that left canon are not in the 0.35 list under this rule). Every one of the 45 rows, their classes and re-recorded case sets check out (all 38 re-recordings equal the union of earlier cases; the 7 non-lost rows verified by git log -S: ff534b234/030701e96, 06e398e81, ab6806214, 1a7c512d); only the sentence explaining 54 to 45 is unsupported. Blast radius: none on gates or evidence; the count is prose in audit-table.md and the evidence summary only.",
+  "worktree_dirty": false
+}

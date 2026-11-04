@@ -72,9 +72,10 @@ canon의 모든 명령은 명세 하나(`docs/cli/canon.cli.json`)에서 생성�
   단계를, 같은 입력의 반복은 `data.unchanged`로 "이미 있음"을 알립니다.
 - **쓰기 명령은 모두 `--input`**(인라인 JSON, 파일, `-`로 stdin)을 받습니다. 배열은
   배치이고 첫 쓰기 전에 전부 검증됩니다. `canon schema <command> --json`이 입력
-  스키마와 예시를 보여 줍니다.
+  예시를, `canon schema <command> --schemas --json`이 입력 스키마를 보여 줍니다.
 - **코드에 묶이는 기록은 `--rev`**(git revision, 기본 `HEAD`)를 받습니다. 커밋하지
-  않은 코드도 기록할 수 있으며 `codeTree`가 함께 남습니다.
+  않은 코드도 기록할 수 있으며 `codeTree`가 함께 남습니다. git 밖이거나 커밋이 없는
+  레포에서는 이런 명령이 `COMMIT_REQUIRED`로 거부됩니다.
 - **파괴적 명령은 미리보기가 기본**입니다. `--commit --plan-digest <digest>`를 줘야
   실행됩니다.
 

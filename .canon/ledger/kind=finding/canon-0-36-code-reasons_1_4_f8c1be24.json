@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T15:27:25.659340Z",
+  "change_id": "canon-0-36-code-reasons",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-store/src/pg_tier.rs:270",
+  "introduced_by": "b524c40a4efbb63df3f3e515e987872918912612",
+  "kind": "finding",
+  "reason": "re-reviewed at 083f95f01 (code ea5fd3886): fixed, verified with the real binary and the bound tests",
+  "resolution_code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "resolution_sha": "ea5fd38860a0f88b85fdf2974f4918d060c54740",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "reviewer": "rev-0-36-reasons",
+  "round": 1,
+  "scenario_ids": [
+    "atip.reasons.14"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[correctness] A Postgres DSN that is set but MALFORMED or EMPTY is answered RETENTION_TIERS_UNAVAILABLE (exit 2, retryable true). pg_tier.rs maps every sqlx connect error to StoreError::tier_unreachable (configured: true) and tiers.rs treats any set DSN env var as 'unreachable'. Real binary: CANON_PG_DSN='not a dsn' and CANON_PG_DSN='' (set, empty) with a postgres hot tier, export --kind session --output out.json: RETENTION_TIERS_UNAVAILABLE retryable true, message 'error with configuration: relative URL without a base' (sqlx::Error::Configuration). Waiting never fixes that; an agent that follows retryable repeats forever. Only a connect that failed on the network or the server (Io, Tls, PoolTimedOut, a rejected login) is 'set and cannot be reached'. The unreachable cases are right: 127.0.0.1:1 and no-such-host.invalid both answer UNAVAILABLE. Fix: in PgTier::connect (and the lenient builder) keep sqlx::Error::Configuration (and an empty DSN, which is unset) as tier_unavailable / a Policy error so it answers RETENTION_TIERS_REQUIRED or _INVALID (not retryable), add a malformed and an empty DSN case to atip_reasons_14.",
+  "worktree_dirty": false
+}

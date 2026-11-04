@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-4"
+  },
+  "at": "2026-11-04T20:16:34.152546Z",
+  "change_id": "canon-0-35-crate-plan",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "disposition": "fixed",
+  "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "finding",
+  "resolution_code_tree": "60e72b3a26b60e8d5889a3148613d94a6218d1e4",
+  "resolution_sha": "bafd9bcce1bf3ce02726fb13b529394934535bb0",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 2,
+  "scenario_ids": [
+    "atip.planjcs.17"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] atip.planjcs.17's Then step 'is the same call whichever way the document came AND for the arguments given on the line' is not proven. The test runs the preview with the arguments on the line (by_args, atip_planjcs.rs:890) but only reads its planDigest; its commit call (next_argv) is never compared with the inline and stdin calls, so a fault that makes the line-given preview write a different commit call (extra word, other order, other spelling) passes. Fix: call commit_of(&by_args, 'line') and assert it equals the inline/stdin commit call. I probed the rest: replacing the --name=value form for dash values in atip::option failed 17 (and canoncursor.17); the --input half could not be probed because canon expands --input before given_of, so atip never sees it (not a test defect). Blast radius: only the line-given branch of the commit call; canoncursor.14 checks the same equality for export pages.",
+  "worktree_dirty": false
+}

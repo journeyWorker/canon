@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-refusals-fix",
+    "role": "implementer",
+    "session_id": "s-0-36-refusals-fix"
+  },
+  "at": "2026-11-04T10:08:48.851756Z",
+  "attachments": [
+    {
+      "case": "context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step_is_the_reopen",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "e9cb74c023ab9b2ae65cb7f9ea743b4078c5bd03c50a8db9c8ada1e084db1f12"
+    },
+    {
+      "case": "context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only_when_they_block",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "e9cb74c023ab9b2ae65cb7f9ea743b4078c5bd03c50a8db9c8ada1e084db1f12"
+    }
+  ],
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "56499ba18041cda113a7cf2dcff93d6b13026848",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 515,
+  "scenario_id": "context.status.70",
+  "schema": 1,
+  "staging_id": "77a59919",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

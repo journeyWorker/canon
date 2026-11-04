@@ -121,6 +121,18 @@ pub fn parse_runtime_label(s: &str) -> Result<String, RuntimeLabelError> {
     Ok(s.to_string())
 }
 
+/// The code of a refused artifact binding: the file is not usable (`INVALID`), is not there (`NOT_FOUND`), may not be bound (`DENIED`) or
+/// could not be read right now (`UNAVAILABLE`).
+fn artifact_code(kind: crate::evidence_attach::BindKind) -> &'static str {
+    use crate::evidence_attach::BindKind;
+    match kind {
+        BindKind::Invalid => "REVIEW_ARTIFACT_INVALID",
+        BindKind::NotFound => "REVIEW_ARTIFACT_NOT_FOUND",
+        BindKind::Denied => "REVIEW_ARTIFACT_DENIED",
+        BindKind::Unavailable => "REVIEW_ARTIFACT_UNAVAILABLE",
+    }
+}
+
 /// `canon review scenario` / `canon review change`'s arguments (one library
 /// path, two leaves: a change review sets `change`). `upstream_ref` /
 /// `original_spec_ref` are the raw `--upstream-ref` / `--original-spec-ref`
@@ -246,7 +258,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     }) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
+            return crate::read_cause::config_error(e.clone()).emit(&args.full(), args.json);
         }
     };
     if let Some(error) = args.change.as_ref().and_then(|change| crate::old_briefs::refusal_among(&repo, std::slice::from_ref(change))) {
@@ -267,14 +279,14 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     if !missing.is_empty() {
         let ids = missing.iter().map(|(id, _)| format!("`{}`", id.as_str())).collect::<Vec<_>>().join(", ");
         let nothing = if scenario_ids.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
-        return CliError::refused("REVIEW_SCENARIO_NOT_INDEXED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
+        return CliError::refused("SCENARIO_INDEX_REQUIRED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
             args.project_id.as_str()
         )).hint(format!("run `canon inventory sync`, then run `{cmd}` again")).emit(&cmd, args.json);
     }
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
-            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).hint("`canon schema review` lists the artifact options and their limits");
+            let refusal = CliError::refused(artifact_code(e.kind()), e.message().to_string()).hint("`canon schema review` lists the artifact options and their limits");
             let refusal = match e.hint() {
                 Some(hint) => refusal.hint(hint),
                 None => refusal,
@@ -453,20 +465,16 @@ fn write_reviews(
     write: &mut dyn FnMut(&GitTier, &Review) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
 ) -> Result<(usize, Vec<(String, bool)>), CliError> {
     const WRITE_HINT: &str = "check that the path is writable and the disk has room, then run the command again";
-    let unwritable = |message: String| CliError::refused("WRITE_UNAVAILABLE", message).hint("make the review directory writable, then run the command again; nothing was written");
+    let unwritable = |code: &'static str, message: String| CliError::refused(code, message).hint("make the review directory writable, then run the command again; nothing was written");
     let dir = ledger_root.join(format!("kind={}", RecordKind::Review.as_str()));
     match std::fs::create_dir_all(&dir).and_then(|()| std::fs::metadata(&dir)) {
-        Ok(meta) if meta.permissions().readonly() => return Err(unwritable(format!("{} is read-only", dir.display()))),
+        Ok(meta) if meta.permissions().readonly() => return Err(unwritable("WRITE_DENIED", format!("{} is read-only", dir.display()))),
         Ok(_) => {}
-        Err(e) => return Err(unwritable(format!("cannot prepare {}: {e}", dir.display()))),
+        Err(e) => return Err(unwritable(crate::read_cause::write_code_of_text(&e.to_string()), format!("cannot prepare {}: {e}", dir.display()))),
     }
     let held = crate::evidence_attach::store_files_held(repo, files).map_err(|(file, e)| {
-        let code = match &e {
-            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => "REVIEW_ARTIFACT_REFUSED",
-            _ if crate::artifacts::before_first_write(&e) => "ARTIFACTS_STORE_UNREACHABLE",
-            _ => "ARTIFACTS_STORE_FAILED",
-        };
-        CliError::refused(code, format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint())).hint(e.hint())
+        let message = format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint());
+        store_refusal(&e, message)
     })?;
     // Every refusal is behind us (an unwritable directory and a blob that cannot be stored are two): the index refresh this writer owes happens with the first review.
     crate::inventory::refresh_stale_index(repo, command);
@@ -495,6 +503,16 @@ fn write_reviews(
     Ok((held.stored(), written))
 }
 
+/// The refusal of a review whose bound file could not be stored: `REVIEW_ARTIFACT_STALE` for a file that changed while it was read, the code of
+/// the artifact store (exit 2) when the store could not be used before anything was written, `ARTIFACTS_STORE_FAILED` (exit 1) when a write to it failed.
+fn store_refusal(e: &canon_gate::artifact_store::ArtifactStoreError, message: String) -> CliError {
+    match e {
+        canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => CliError::refused("REVIEW_ARTIFACT_STALE", message).hint(e.hint()),
+        _ if crate::artifacts::before_first_write(e) => crate::artifacts::store_refusal(e, message),
+        _ => CliError::refused("ARTIFACTS_STORE_FAILED", message).hint(e.hint()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use canon_model::{EvidenceRecord, EvidenceVerdict, Scenario, SpecDigest};
@@ -502,6 +520,30 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    /// atip.codesplit.02: a bound file that changed while it was read is `REVIEW_ARTIFACT_STALE` (exit 2, not retryable: the same bytes bind
+    /// once what produced the file is run again); a store that could not be used before anything was written keeps the store's own code, and a
+    /// write that failed is `ARTIFACTS_STORE_FAILED` (exit 1).
+    #[test]
+    fn atip_codesplit_02_a_bound_file_that_changed_is_review_artifact_stale() {
+        use canon_gate::artifact_store::ArtifactStoreError;
+        let changed = ArtifactStoreError::Changed { expected: "sha256:a".to_string(), actual: "sha256:b".to_string() };
+        let stale = store_refusal(&changed, "m".to_string());
+        assert_eq!((stale.code, stale.exit, stale.retryable), ("REVIEW_ARTIFACT_STALE", 2, false));
+        let unsafe_dir = store_refusal(&ArtifactStoreError::UnsafeStoreDir, "m".to_string());
+        assert_eq!((unsafe_dir.code, unsafe_dir.exit), ("ARTIFACTS_STORE_INVALID", 2));
+        let failed = store_refusal(&ArtifactStoreError::Remote { tier: "cold".to_string(), reason: "down".to_string() }, "m".to_string());
+        assert_eq!((failed.code, failed.exit), ("ARTIFACTS_STORE_FAILED", 1));
+    }
+
+    /// atip.codestored.11: a review artifact whose read the system failed for a repeat to pass is `REVIEW_ARTIFACT_UNAVAILABLE` (retryable).
+    #[test]
+    fn atip_codestored_11_a_review_artifact_the_system_fails_to_read_is_unavailable() {
+        use crate::cli_error::CliErrorExt as _;
+        let code = artifact_code(crate::evidence_attach::BindKind::Unavailable);
+        let refused = CliError::refused(code, "x");
+        assert_eq!((code, refused.exit, refused.retryable), ("REVIEW_ARTIFACT_UNAVAILABLE", 2, true));
+    }
 
     #[test]
     fn the_value_parsers_refuse_in_their_old_words() {
@@ -713,7 +755,7 @@ mod tests {
         let refused = write_reviews(dir.path(), "canon review scenario", &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
         std::fs::set_permissions(&review_dir, original).unwrap();
         let refused = refused.unwrap_err();
-        assert_eq!((refused.code, refused.exit), ("WRITE_UNAVAILABLE", 2));
+        assert_eq!((refused.code, refused.exit), ("WRITE_DENIED", 2));
         assert!(refused.message.contains("is read-only"));
         assert_eq!(blobs(), 0);
 

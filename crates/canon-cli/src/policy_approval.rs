@@ -76,7 +76,7 @@ pub fn approval_state(repo: &Path) -> ApprovalState {
     let Ok(policy) = fs::read(repo.join(paths::POLICY_FILE)) else {
         return ApprovalState::NoPolicy;
     };
-    let text = match fs::read_to_string(repo.join(paths::POLICY_APPROVAL_FILE)) {
+    let text = match canon_store::eio::read_to_string(repo.join(paths::POLICY_APPROVAL_FILE)) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return ApprovalState::Unapproved,
         Err(e) => return ApprovalState::Unreadable { detail: e.to_string() },
@@ -292,10 +292,10 @@ pub enum PolicyApprovalError {
     },
 }
 
-/// `canon policy approve --approver` is not blank: refused before any state is read, `POLICY_APPROVAL_REFUSED`.
+/// `canon policy approve --approver` is not blank: refused before any state is read, `APPROVAL_INVALID`.
 pub(crate) fn check_approver(by: &str) -> Result<(), CliError> {
     if by.trim().is_empty() {
-        return Err(CliError::refused("POLICY_APPROVAL_REFUSED", PolicyApprovalError::BlankApprover.to_string()).hint("pass the human's name: `canon policy approve --approver <name>`").field("--approver"));
+        return Err(CliError::refused("APPROVAL_INVALID", PolicyApprovalError::BlankApprover.to_string()).hint("pass the human's name: `canon policy approve --approver <name>`").field("--approver"));
     }
     Ok(())
 }
@@ -315,7 +315,7 @@ pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str, r
         return Err(PolicyApprovalError::BlankApprover);
     }
     let policy_path = repo.join(paths::POLICY_FILE);
-    let policy = match fs::read(&policy_path) {
+    let policy = match canon_store::eio::read(&policy_path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(PolicyApprovalError::NoPolicy { path: policy_path });
@@ -375,7 +375,12 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, relay: Option<&App
         }
         Err(e) => {
             // A missing or unreadable policy and a blank approver are refused before anything is written; a failed write of the approval is a failure during the work.
-            let code = if matches!(e, PolicyApprovalError::WriteApproval { .. }) { "POLICY_APPROVAL_FAILED" } else { "POLICY_APPROVAL_REFUSED" };
+            let code = match &e {
+                PolicyApprovalError::WriteApproval { .. } => "POLICY_APPROVAL_FAILED",
+                PolicyApprovalError::NoPolicy { .. } => "POLICY_REQUIRED",
+                PolicyApprovalError::ReadPolicy { source, .. } => crate::read_cause::policy_code(source),
+                PolicyApprovalError::BlankApprover => "APPROVAL_INVALID",
+            };
             let refusal = CliError::refused(code, e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again");
             let refusal = if matches!(e, PolicyApprovalError::BlankApprover) { refusal.field("--approver") } else { refusal };
             refusal.emit("canon policy approve", json)

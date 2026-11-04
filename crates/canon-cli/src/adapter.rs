@@ -153,6 +153,25 @@ pub enum AdapterError {
     Policy(String),
 }
 
+impl AdapterError {
+    /// The code of a refusal to run `adapter validate`/`authorize` for this error, and the reason it carries: a response file that is
+    /// not there, that this user may not read, that the system failed to read in a way a repeat can pass, or that cannot be used is a
+    /// refusal of the file; a broken policy is the config's (`CONFIG_INVALID`, reason `POLICY`).
+    pub(crate) fn refusal_code(&self) -> (&'static str, Option<&'static str>) {
+        use crate::read_cause::{of_io, Cause};
+        match self {
+            AdapterError::Io { source, .. } => match of_io(source) {
+                Cause::NotFound => ("ADAPTER_FILE_NOT_FOUND", None),
+                Cause::Denied => ("ADAPTER_FILE_DENIED", None),
+                Cause::Unavailable => ("ADAPTER_FILE_UNAVAILABLE", None),
+                Cause::WrongPath | Cause::Other => ("ADAPTER_FILE_INVALID", None),
+            },
+            AdapterError::Policy(_) => ("CONFIG_INVALID", Some("POLICY")),
+            AdapterError::Json(_) | AdapterError::Validation(_) | AdapterError::Timestamp { .. } => ("ADAPTER_FILE_INVALID", None),
+        }
+    }
+}
+
 impl TryFrom<RawAdapterResponse> for AdapterResponse {
     type Error = AdapterError;
 
@@ -397,7 +416,7 @@ impl ValidationSummary {
 /// Read and validate one response file without executing anything.
 pub fn validate_response<P: AsRef<Path>>(path: P) -> Result<ValidationSummary, AdapterError> {
     let path = path.as_ref();
-    let bytes = fs::read(path).map_err(|source| AdapterError::Io {
+    let bytes = canon_store::eio::read(path).map_err(|source| AdapterError::Io {
         path: path.display().to_string(),
         source,
     })?;
@@ -445,7 +464,7 @@ fn default_none() -> String { "none".into() }
 
 /// Authorize a validated response against `.canon/policy.yaml`; this never executes anything.
 pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo: R) -> Result<AuthorizationResult, AdapterError> {
-    let response = parse_response(fs::read(response_path.as_ref()).map_err(|source| AdapterError::Io { path: response_path.as_ref().display().to_string(), source })?)?;
+    let response = parse_response(canon_store::eio::read(response_path.as_ref()).map_err(|source| AdapterError::Io { path: response_path.as_ref().display().to_string(), source })?)?;
     let policy_path = repo.as_ref().join(".canon/policy.yaml");
     let text = fs::read_to_string(&policy_path).unwrap_or_default();
     let root: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| AdapterError::Policy(format!("malformed policy: {e}")))?;
@@ -470,6 +489,26 @@ pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// atip.codestored.11: a response file the system fails to read in a way a repeat can pass is `ADAPTER_FILE_UNAVAILABLE` (retryable); a refused
+    /// read, a missing file and a directory in its place keep their codes.
+    #[test]
+    fn atip_codestored_11_a_response_file_the_system_fails_to_read_is_unavailable() {
+        use crate::cli_error::CliErrorExt as _;
+        let io = |source: std::io::Error| AdapterError::Io { path: "response.json".to_string(), source };
+        for (source, code) in [
+            (std::io::Error::from_raw_os_error(5), "ADAPTER_FILE_UNAVAILABLE"),
+            (std::io::Error::from(std::io::ErrorKind::TimedOut), "ADAPTER_FILE_UNAVAILABLE"),
+            (std::io::Error::from_raw_os_error(13), "ADAPTER_FILE_DENIED"),
+            (std::io::Error::from(std::io::ErrorKind::NotFound), "ADAPTER_FILE_NOT_FOUND"),
+            (std::io::Error::from(std::io::ErrorKind::IsADirectory), "ADAPTER_FILE_INVALID"),
+        ] {
+            let error = io(source);
+            assert_eq!(error.refusal_code(), (code, None), "{error}");
+            let refused = crate::cli_error::CliError::refused(code, error.to_string());
+            assert_eq!((refused.exit, refused.retryable), (2, code == "ADAPTER_FILE_UNAVAILABLE"), "{code}");
+        }
+    }
 
     #[test]
     fn a_bad_timestamp_reads_as_before_and_keeps_its_cause() {

@@ -179,7 +179,7 @@ fn acceptance_from_the_evidence_actor_or_session_is_refused() {
     let repo = dir.path();
     let same_session = accept(repo, &[("--session", "impl-session")]);
     assert_eq!(same_session.status.code(), Some(2), "{}", out(&same_session));
-    assert!(out(&same_session).contains("DIVERGENCE_ACCEPT_REFUSED") && out(&same_session).contains("session `impl-session`"), "{}", out(&same_session));
+    assert!(out(&same_session).contains("DIVERGENCE_DENIED") && out(&same_session).contains("session `impl-session`"), "{}", out(&same_session));
 
     let same_actor = accept(repo, &[("--actor", "impl-agent")]);
     assert_eq!(same_actor.status.code(), Some(2), "{}", out(&same_actor));

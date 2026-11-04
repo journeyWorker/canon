@@ -28,7 +28,7 @@
 //! subject record and prints the command that completes the link,
 //! `canon ingest plans && canon subject adopt <id> --change <slug>`,
 //! which is safe to rerun. A store that is known unwritable (a read-only
-//! directory) is refused before the change dir is made (`WRITE_UNAVAILABLE`,
+//! directory) is refused before the change dir is made (`WRITE_DENIED` or `WRITE_INVALID`,
 //! exit `2`); only a failure the check cannot foresee (an object store, a
 //! full disk) reaches the half-written state.
 //!
@@ -132,12 +132,12 @@ impl crate::reports::Report for ChangeNewReport<'_> {}
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused with nothing changed (a store that cannot be written is
-/// `WRITE_UNAVAILABLE`), `1` a write that began and failed.
+/// `WRITE_DENIED` or `WRITE_INVALID`), `1` a write that began and failed.
 pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     // The brief no longer carries the language, but a `canon.yaml` canon cannot read is still refused here.
     if let Err(e) = crate::language::configured(&repo) {
-        return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
+        return crate::read_cause::config_error(e.to_string()).emit("canon change new", json);
     }
 
     let subject = match crate::subject::lookup_adoption(&repo, subject_id, slug) {
@@ -149,7 +149,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         }
         Ok((Some(subject), None)) => subject,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon change new", json);
+            return crate::read_cause::repo_error(e.clone()).emit("canon change new", json);
         }
     };
 
@@ -200,7 +200,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         let error = if let Some(refusal) = e.unavailable {
             refusal
         } else if e.subject_written {
-            CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
+            CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message).reason("WRITE_FAILED").hint(format!("finish the adoption: run `{repair}`"))
         } else {
             CliError::refused("WRITE_FAILED", message).hint("check that the path is writable and the disk has room, then run the command again")
         };

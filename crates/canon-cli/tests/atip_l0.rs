@@ -13,6 +13,9 @@ use canon_cli::cli_error::{CliError, CliErrorExt as _};
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod old_codes;
+use old_codes::{gone_codes, word_in};
+
 /// The members `meta` may hold: the contract's, and canon's `x-canon` (spec 6.6).
 const META_MEMBERS: &[&str] = &["schemaVersion", "tool", "toolVersion", "command", "contract", "contractVersion", "output", "context", "next", "warnings", "coverage", "page", "fields", "truncated", "x-canon"];
 
@@ -84,7 +87,7 @@ fn atip_l0_01_status_json_names_the_tool_its_version_and_the_contract() {
     let meta = &document["meta"];
     assert_eq!(meta["tool"], "canon");
     assert_eq!(meta["contract"], "atip/1");
-    assert_eq!(meta["contractVersion"], "1.2", "every envelope declares the contract minor it follows");
+    assert_eq!(meta["contractVersion"], "1.4", "every envelope declares the contract minor it follows");
     assert_eq!(version.trim(), format!("canon {}", meta["toolVersion"].as_str().unwrap()), "toolVersion is the version `canon --version` prints");
     assert!(meta.get("canonVersion").is_none(), "canonVersion is gone");
     assert_eq!(meta["command"], "status");
@@ -420,7 +423,7 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
         assert_eq!(rows.get(code).copied(), Some((exit, false)), "{code} carries the contract's exit and retryable");
     }
     assert!(!rows.contains_key("OPERATION_REUSED"), "canon has no --operation");
-    for old in OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES) {
+    for old in OLD_CODES.iter().chain(gone_codes()) {
         assert!(!rows.contains_key(old), "`{old}` is gone from the registry");
     }
     // Every row conforms to the contract's registry-entry schema.
@@ -437,8 +440,12 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     assert!(files.len() > 100, "the scan found {} files", files.len());
     let mut hits = Vec::new();
     for file in &files {
+        // The scenarios of `area=atip` name the gone codes to say they are gone.
+        if file.components().any(|part| part.as_os_str() == "area=atip") {
+            continue;
+        }
         let text = std::fs::read_to_string(file).unwrap();
-        for old in OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES) {
+        for old in OLD_CODES.iter().chain(gone_codes()) {
             if word_in(&text, old) {
                 hits.push(format!("{} spells {old}", file.strip_prefix(&root).unwrap().display()));
             }
@@ -447,26 +454,8 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     assert!(hits.is_empty(), "{hits:#?}");
 }
 
-/// Error codes 0.36 renamed (`canon-0-36-codes-rename`; each has a replacement in the CHANGELOG's table). `CONFIG_MISSING` is not here:
-/// the error is `CONFIG_REQUIRED`, but the warning of `status` keeps the name `CONFIG_MISSING`.
-const RENAMED_CODES: &[&str] = &["APPROVAL_INCOMPLETE", "BRIEF_CHANGED_SINCE_PAGE_LOAD", "BRIEF_HAS_BLOCKERS", "BRIEF_UNAPPROVABLE", "CHANGE_AMBIGUOUS", "CHANGE_INVALID_ARGUMENT", "CONTEXT_INPUT_MISSING", "CONTEXT_SECRET_DETECTED", "CONTEXT_UNSAFE_PATH", "DASHBOARD_BAD_REQUEST", "DASHBOARD_CONFIG_INVALID", "DASHBOARD_ORIGIN_REFUSED", "DEMO_NOT_INITIALIZED", "DISPATCH_INVALID_ARGUMENT", "DISPATCH_ROLE_REGIME_MISMATCH", "DIVERGENCE_INVALID_ARGUMENT", "FEATURE_OUTSIDE_SPEC_ROOTS", "FINDING_INVALID_ARGUMENT", "FINDING_RESOLUTION_REV_UNEXPECTED", "FINDING_SEQ_OCCUPIED", "FINDING_STAGED", "FINDING_UNKNOWN_SCENARIO", "FORMAT_VIOLATIONS", "GATE_TASK_INVALID_ARGUMENT", "GATE_TASK_UNSUPPORTED", "GATE_VIOLATIONS", "HUMAN_ONLY", "INIT_CONFIG_EXISTS", "INIT_INVALID_ARGUMENT", "LEARN_DEMOTION_FAILED", "LEARN_INVALID_ARGUMENT", "LEARN_INVALID_INPUT", "LEARN_STRATEGY_NOT_FOUND", "LEARN_TRAJECTORY_NOT_FOUND", "MIGRATE_UNCOMMITTED", "NO_COMMIT", "PLAN_SOURCES_MISSING", "QUERY_INVALID_ARGUMENT", "RELAY_DIGEST_MISMATCH", "RETRIEVE_FAILED", "REVIEW_INVALID_ARGUMENT", "SCAFFOLD_INVALID_ARGUMENT", "SEARCH_QUERY_EMPTY", "SKILLS_DRIFT", "SPEC_ROOT_UNRESOLVED", "SUBJECT_INVALID_ARGUMENT", "SUBJECT_INVALID_TRANSITION", "UNKNOWN_ROLE", "UNKNOWN_SPEC_ROOT"];
-
-/// Error codes `canon-0-36-codes-exit` renamed or removed (each has a replacement in the CHANGELOG's table). `POLICY_CHANGED_SINCE_APPROVAL` is not here:
-/// the error is `POLICY_APPROVAL_STALE`, but the warning of `status` keeps the name.
-const RENAMED_EXIT_CODES: &[&str] = &["ADAPTER_EXECUTION_NOT_AUTHORIZED", "ADAPTER_RESPONSE_INVALID", "BRIEF_CHANGED_SINCE_APPROVAL", "BRIEF_UNAPPROVED", "CONTEXT_GIT_UNAVAILABLE", "DASHBOARD_NOT_BUILT", "DASHBOARD_PORT_IN_USE", "DISPATCH_END_IN_PROGRESS", "EVIDENCE_CONTRACT_MISMATCH", "EVIDENCE_FABRICATED", "EVIDENCE_REPORT_CONTRADICTION", "GATE_TASK_BLOCKED", "GATE_TASK_EVIDENCE_INVALID", "INGEST_SOURCE_UNUSABLE", "LEARN_EVALUATION_REJECTED", "REPORT_STALE", "PROMOTE_REFUSED", "SUBJECT_GATE_VIOLATION", "DIVERGENCE_REFUSED", "LEARN_PROMOTION_BLOCKED", "CONTEXT_PACK_TAMPERED", "EVIDENCE_BATCH_REFUSED"];
-
 /// The error codes 0.33 deletes (the CHANGELOG's replacement table lists them).
 const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATCH_UNSUPPORTED", "INPUT_INVALID_TYPE", "INPUT_UNKNOWN_FIELD", "INPUT_UNREADABLE", "INPUT_STDIN_TTY", "INPUT_STDIN_CONFLICT", "INPUT_MISSING", "INVALID_CURSOR", "UNKNOWN_FIELD"];
-
-/// `word` in `text` as a whole identifier (so `CONTEXT_INPUT_NOT_FOUND` is not `INPUT_MISSING`).
-fn word_in(text: &str, word: &str) -> bool {
-    text.match_indices(word).any(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + word.len()..].chars().next();
-        let part = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
-        !part(before) && !part(after)
-    })
-}
 
 fn collect(dir: &Path, ext: &str, out: &mut Vec<std::path::PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
@@ -574,7 +563,12 @@ fn atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract() {
     assert_eq!(on_disk, canon_cli::spec::render(), "docs/cli/canon.cli.json is generated: CANON_BLESS_CLI_SPEC=1 cargo test -p canon-cli --test cli_spec");
     let spec: Value = serde_json::from_str(&on_disk).unwrap();
     assert_eq!(spec["contract"], "atip/1");
+    assert_eq!(spec["contractVersion"], "1.4");
     assert!(spec.get("envelopes").is_none());
+    // The file holds the 1.4 form: the tree entries carry no `path` and no `kind: "command"`, the command documents no `path`, `schemas` or `rejects`; the schemas answers are beside them.
+    assert!(spec["tree"]["commands"].as_array().is_some_and(|entries| !entries.is_empty() && entries.iter().all(|entry| entry.get("path").is_none() && entry.get("kind").is_none_or(|kind| kind == "group"))), "tree entries are 1.4 entries");
+    assert!(spec["commands"].as_array().is_some_and(|docs| !docs.is_empty() && docs.iter().all(|doc| doc.get("path").is_none() && doc.get("schemas").is_none() && doc.get("rejects").is_none())), "command documents are the call surface only");
+    assert!(spec["schemas"].as_object().is_some_and(|schemas| !schemas.is_empty()), "the schemas answers are the top-level `schemas` map");
     // Every JSON envelope a conformance case freezes passes the contract's envelope schema and names the tool.
     let mut envelopes = 0;
     let mut cases = Vec::new();
@@ -603,7 +597,7 @@ fn atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract() {
         let meta = &document["meta"];
         assert_eq!(meta["tool"], "canon", "{args:?}");
         assert_eq!(meta["contract"], "atip/1");
-        assert_eq!(meta["contractVersion"], "1.2", "{args:?}");
+        assert_eq!(meta["contractVersion"], "1.4", "{args:?}");
         assert_eq!(format!("canon {}", meta["toolVersion"].as_str().unwrap()), version.trim());
         assert!(meta["schemaVersion"].is_string());
         assert!(document["error"]["retryable"].is_boolean());
@@ -690,7 +684,7 @@ fn atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reaso
     let many = json(&canon(repo.path(), &["scenario", "new", "--input", &items, "--json"]));
     assert_eq!((many["error"]["code"].as_str(), many["error"]["reason"].as_str()), (Some("INPUT_TOO_LARGE"), Some("TOO_MANY_ITEMS")), "{many}");
     for document in [&bytes, &many] {
-        assert_eq!(document["meta"]["contractVersion"], "1.2");
+        assert_eq!(document["meta"]["contractVersion"], "1.4");
         assert!(document["error"].get("x-canon").is_none(), "{document}");
         assert!(atip::envelope_problems(document).is_empty(), "{document}");
     }
@@ -842,4 +836,58 @@ fn atip_l0_31_every_error_object_passes_the_contract_error_schema() {
     let body = serde_json::to_value(error.body_with(None, Vec::new())).unwrap();
     assert!(atip::error_problems(&body).is_empty(), "an empty hint and field are left out: {body}");
     assert_eq!(body["received"], "", "an empty value the caller sent is reported as it was: {body}");
+}
+
+#[test]
+fn atip_l0_32_an_envelope_or_error_with_a_null_or_empty_optional_member_fails_the_contract_schema() {
+    let repo = scratch_repo();
+    let success = json(&canon(repo.path(), &["status", "--json"]));
+    let failure = json(&canon(repo.path(), &["subject", "show", "nosuch", "--json"]));
+    assert_eq!(failure["ok"], false, "{failure}");
+    // What canon prints passes, so each refusal below is the planted member alone.
+    assert_eq!(atip::envelope_problems(&success), Vec::<String>::new(), "{success}");
+    assert_eq!(atip::envelope_problems(&failure), Vec::<String>::new(), "{failure}");
+    assert_eq!(atip::error_problems(&failure["error"]), Vec::<String>::new(), "{failure}");
+
+    let meta_members: [(&str, Value); 8] = [
+        ("meta.warnings: []", serde_json::json!({"warnings": []})),
+        ("meta.fields: []", serde_json::json!({"fields": []})),
+        ("meta.context.repo: null", serde_json::json!({"context": {"repo": null}})),
+        ("meta.command: null", serde_json::json!({"command": null})),
+        ("meta.output: null", serde_json::json!({"output": null})),
+        ("meta.page: null", serde_json::json!({"page": null})),
+        ("meta.coverage: null", serde_json::json!({"coverage": null})),
+        ("meta: null", Value::Null),
+    ];
+    for (name, planted) in &meta_members {
+        for base in [&success, &failure] {
+            let mut document = base.clone();
+            match planted {
+                Value::Null => document["meta"] = Value::Null,
+                members => {
+                    for (key, value) in members.as_object().expect("a member") {
+                        document["meta"][key] = value.clone();
+                    }
+                }
+            }
+            assert!(!atip::envelope_problems(&document).is_empty(), "{name} on `ok: {}` passes the envelope schema: {document}", base["ok"]);
+        }
+    }
+
+    let error_members: [(&str, &str, Value); 8] = [
+        ("hint", "null", Value::Null),
+        ("hint", "\"\"", serde_json::json!("")),
+        ("field", "null", Value::Null),
+        ("field", "\"\"", serde_json::json!("")),
+        ("expected", "[]", serde_json::json!([])),
+        ("suggestions", "[]", serde_json::json!([])),
+        ("details", "[]", serde_json::json!([])),
+        ("reason", "null", Value::Null),
+    ];
+    for (member, shown, planted) in &error_members {
+        let mut document = failure.clone();
+        document["error"][member] = planted.clone();
+        assert!(!atip::error_problems(&document["error"]).is_empty(), "error.{member}: {shown} passes the error schema: {document}");
+        assert!(!atip::envelope_problems(&document).is_empty(), "error.{member}: {shown} passes the envelope schema: {document}");
+    }
 }

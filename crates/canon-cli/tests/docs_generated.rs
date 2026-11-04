@@ -9,7 +9,7 @@ use std::fs;
 
 #[test]
 fn every_generated_block_is_what_the_spec_renders() {
-    let spec = canon_cli::spec::generate();
+    let spec = canon_cli::spec::model();
     let bless = std::env::var_os("CANON_BLESS_DOCS").is_some();
     let mut stale = Vec::new();
     for path in doc_gen::doc_files() {
@@ -28,7 +28,7 @@ fn every_generated_block_is_what_the_spec_renders() {
 
 #[test]
 fn the_files_that_need_blocks_have_them() {
-    let spec = canon_cli::spec::generate();
+    let spec = canon_cli::spec::model();
     let files: Vec<String> = doc_gen::doc_files().iter().map(|p| doc_gen::rel_of(p)).collect();
     for role in ["planner", "implementer", "reviewer", "orchestrator"] {
         let rel = format!("canon/skills/reference/role-{role}.md");

@@ -153,7 +153,7 @@ fn subject_lifecycle_49_brief_show_body_refuses_an_unknown_change_and_an_unreada
     std::fs::write(brief_path(r, "c"), [0xff, 0xfe, 0x00, 0x41]).unwrap();
     let plain = run(r, &["brief", "show", "c", "--json"]);
     let body = run(r, &["brief", "show", "c", "--body", "--json"]);
-    assert_eq!(code(&body), "BRIEF_UNREADABLE");
+    assert_eq!(code(&body), "BRIEF_INVALID");
     assert_eq!((code(&body), body.status.code()), (code(&plain), plain.status.code()));
     assert!(!String::from_utf8_lossy(&body.stdout).contains("digest:"), "{}", text(&body));
 }
@@ -408,7 +408,7 @@ fn subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key(
     // A malformed section is refused rather than read as allow.
     std::fs::write(r.join("canon.yaml"), format!("{yaml}approval:\n  relay: maybe\n")).unwrap();
     let bad = run_as(r, Some("planner"), &["policy", "approve", "--approver", "Ana", "--note", "ok", "--relayed-via", "ask", "--actor", "plan-1", "--json"]);
-    assert_eq!((bad.status.code(), code(&bad).as_str()), (Some(2), "CONFIG_UNREADABLE"), "{}", text(&bad));
+    assert_eq!((bad.status.code(), code(&bad).as_str()), (Some(2), "CONFIG_INVALID"), "{}", text(&bad));
 }
 
 /// subject.lifecycle.60: without the key relaying is allowed, and a fresh

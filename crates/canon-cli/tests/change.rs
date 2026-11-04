@@ -203,8 +203,8 @@ fn change_new_leaves_nothing_behind_when_publishing_the_change_dir_fails() {
 
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    // Known unwritable before anything is written: `WRITE_UNAVAILABLE`, exit 2.
-    assert!(stderr(&out).starts_with("canon: WRITE_UNAVAILABLE: cannot write `"), "{}", stderr(&out));
+    // Known unwritable before anything is written, and a file stands where a directory belongs: `WRITE_INVALID`, exit 2.
+    assert!(stderr(&out).starts_with("canon: WRITE_INVALID: cannot write `"), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/add-login`") && stderr(&out).contains(".canon/changes` is not a directory"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
     assert_eq!(std::fs::read_to_string(dir.path().join(".canon/changes")).unwrap(), "not a directory\n");
@@ -243,7 +243,7 @@ fn ledger_file_count(repo: &Path) -> usize {
 }
 
 /// The subject's store cannot take a record: refused before anything is
-/// written (`WRITE_UNAVAILABLE`, exit 2), so the change dir is never made
+/// written (`WRITE_DENIED`, exit 2), so the change dir is never made
 /// and nothing remains.
 #[cfg(unix)]
 #[test]
@@ -256,7 +256,7 @@ fn change_new_leaves_nothing_behind_when_the_subject_store_is_read_only() {
     let out = run(dir.path(), &["change", "new", "add-login", "--subject", "auth", "--title", "Add login"]);
     make_writable(&ledger_subject);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert!(stderr(&out).starts_with("canon: WRITE_UNAVAILABLE: cannot write `"), "{}", stderr(&out));
+    assert!(stderr(&out).starts_with("canon: WRITE_DENIED: cannot write `"), "{}", stderr(&out));
     assert!(stderr(&out).contains("kind=subject"), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "nothing may be reported written: {}", stdout(&out));
     assert!(!dir.path().join(".canon/changes").exists(), "no change dir was started");

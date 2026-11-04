@@ -378,7 +378,7 @@ fn plan_files(repo: &Path, ledger: &Path, plan: &mut Plan) -> Result<(), String>
                 if file.extension().is_none_or(|e| e != "json") || !canon_store::partition::is_old_layout_path(&relative) {
                     continue;
                 }
-                let old_bytes = std::fs::read(&file).map_err(|e| format!("cannot read `{}`: {e}", rel(repo, &file)))?;
+                let old_bytes = canon_store::eio::read(&file).map_err(|e| format!("cannot read `{}`: {e}", rel(repo, &file)))?;
                 let renamed = rename_one(&root, &relative, &kind_dir, &old_bytes)?;
                 let new_bytes = renamed.bytes.clone().unwrap_or_else(|| old_bytes.clone());
                 match destinations.get(&renamed.to) {
@@ -897,8 +897,8 @@ pub fn scratch(repo: &Path, config: &str, plan: &Plan) -> Result<Scratch, String
                 let from = rel(repo, &file);
                 let (to, bytes) = match moved.get(&from) {
                     Some(m) if m.rewritten => (m.to.clone(), m.new_bytes.clone()),
-                    Some(m) => (m.to.clone(), std::fs::read(&file).map_err(|e| e.to_string())?),
-                    None => (from, std::fs::read(&file).map_err(|e| e.to_string())?),
+                    Some(m) => (m.to.clone(), canon_store::eio::read(&file).map_err(|e| e.to_string())?),
+                    None => (from, canon_store::eio::read(&file).map_err(|e| e.to_string())?),
                 };
                 let target = dir.join(&to);
                 if copied.insert(to) {
@@ -1209,13 +1209,34 @@ pub fn find_backup(repo: &Path, given: Option<&Path>) -> Result<PathBuf, String>
     found.pop().map(|(_, _, dir)| dir).ok_or_else(|| format!("no backup under {}/ holds a tree manifest: `canon migrate --commit` has not run here (or ran before 0.30)", canon_model::paths::MIGRATE_BACKUP_DIR))
 }
 
+/// Why a revert cannot be planned: the backup or the tree is not one a revert can use (`MIGRATION_INVALID`), or the tree holds
+/// a change a revert would discard, or the environment the revert needs is not as the migrate left it (`MIGRATION_CONFLICT`).
+#[derive(Debug)]
+pub struct RevertRefusal {
+    /// The state of the repository conflicts with the revert.
+    pub conflict: bool,
+    pub message: String,
+}
+
+impl From<String> for RevertRefusal {
+    fn from(message: String) -> Self {
+        Self { conflict: false, message }
+    }
+}
+
+impl RevertRefusal {
+    fn conflict(message: String) -> Self {
+        Self { conflict: true, message }
+    }
+}
+
 /// The plan that restores `repo` to the snapshot in `backup`, or why it cannot.
-pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
+pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, RevertRefusal> {
     let text = std::fs::read_to_string(backup.join(MANIFEST)).map_err(|e| format!("no tree manifest in {}: {e}", backup.display()))?;
     let manifest: Manifest = serde_json::from_str(&text).map_err(|e| format!("the tree manifest in {} is unreadable: {e}", backup.display()))?;
     for (path, entry) in &manifest.files {
         if entry.link.is_none() && !backup.join(SNAPSHOT_DIR).join(path).is_file() {
-            return Err(format!("the backup {} lacks its copy of {path}; it cannot restore the repo", backup.display()));
+            return Err(format!("the backup {} lacks its copy of {path}; it cannot restore the repo", backup.display()).into());
         }
     }
     let diff = diff(repo, &manifest)?;
@@ -1223,11 +1244,11 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
     let briefs = crate::migrate_briefs::check_revert(repo, backup, diff.is_empty())?;
     let acts = crate::migrate_briefs::later_human_acts(repo, backup, SNAPSHOT_DIR, &diff.remove, &diff.restore);
     if !acts.is_empty() {
-        return Err(format!("a human's approval was made after `canon migrate` ran, and a revert would discard it: {}; nothing was written. Revert by hand, or approve again after the revert", acts.join(", ")));
+        return Err(RevertRefusal::conflict(format!("a human's approval was made after `canon migrate` ran, and a revert would discard it: {}; nothing was written. Revert by hand, or approve again after the revert", acts.join(", "))));
     }
     let later = changed_since_migrate(repo, backup, &manifest, &diff)?;
     if !later.is_empty() {
-        return Err(format!("{} changed after `canon migrate` ran, and a revert would discard {}: {}; nothing was written. Revert by hand, or keep the change and leave the migrate in place", if later.len() == 1 { "a file" } else { "files" }, if later.len() == 1 { "that change" } else { "those changes" }, later.join(", ")));
+        return Err(RevertRefusal::conflict(format!("{} changed after `canon migrate` ran, and a revert would discard {}: {}; nothing was written. Revert by hand, or keep the change and leave the migrate in place", if later.len() == 1 { "a file" } else { "files" }, if later.len() == 1 { "that change" } else { "those changes" }, later.join(", "))));
     }
     let journal = match std::fs::read_to_string(backup.join(JOURNAL)) {
         Ok(text) if !diff.is_empty() => Some(serde_json::from_str::<Journal>(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?),
@@ -1235,7 +1256,7 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
     };
     if let Some((dsn_env, _, rows)) = journal.as_ref().and_then(|j| j.postgres.as_ref()) {
         if !rows.rows.is_empty() && std::env::var(dsn_env).is_err() {
-            return Err(format!("the migrate re-keyed Postgres rows and ${dsn_env} is not set, so their old keys cannot be restored; set it and run the revert again"));
+            return Err(RevertRefusal::conflict(format!("the migrate re-keyed Postgres rows and ${dsn_env} is not set, so their old keys cannot be restored; set it and run the revert again")));
         }
     }
     Ok(RevertPlan { backup: backup.to_path_buf(), manifest, diff, journal, briefs })
@@ -1321,14 +1342,14 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
     use crate::migrate::MigrateReport;
     use crate::safety;
     let repo = crate::context::resolve_repo_root(repo_args);
-    let refused = |message: String| CliError::refused("MIGRATE_REFUSED", message).hint("run `canon migrate --revert` in a repo `canon migrate --commit` ran in, or name its backup with `--backup .canon/migrate-backup/<timestamp>`").emit("canon migrate", json);
+    let refused = |code: &'static str, message: String| CliError::refused(code, message).hint("run `canon migrate --revert` in a repo `canon migrate --commit` ran in, or name its backup with `--backup .canon/migrate-backup/<timestamp>`").emit("canon migrate", json);
     let dir = match find_backup(&repo, backup) {
         Ok(dir) => dir,
-        Err(e) => return refused(e),
+        Err(e) => return refused("MIGRATION_INVALID", e),
     };
     let plan = match revert_plan(&repo, &dir) {
         Ok(plan) => plan,
-        Err(e) => return refused(e),
+        Err(e) => return refused(if e.conflict { "MIGRATION_CONFLICT" } else { "MIGRATION_INVALID" }, e.message),
     };
     let relative = rel(&repo, plan.backup());
     // What the plan read: the backup's manifest, its seal and its journal, and the repo as it is now at every path it restores or removes.
@@ -1372,7 +1393,7 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
     }
     let committed = safe_plan.committed();
     if let Err(e) = revert_apply(&repo, &plan) {
-        return CliError::refused("MIGRATE_STOPPED", e).hint("the backup is intact: fix what the message names, then run `canon migrate --revert` again").emit("canon migrate", json);
+        return crate::migrate::stopped("STOPPED", e, "the backup is intact: fix what the message names, then run `canon migrate --revert` again").emit("canon migrate", json);
     }
     log.line(format!("canon migrate --revert: restored {} path(s) and removed {} from {relative}/", committed.effects.iter().filter(|e| e.action == "restore").count(), committed.effects.iter().filter(|e| e.action == "remove").count()));
     if json {

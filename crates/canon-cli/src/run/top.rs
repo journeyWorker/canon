@@ -5,6 +5,16 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::cli::top::QueryArgs;
 use std::process::ExitCode;
 
+/// The error of a query that could not read the ledger: `REPO_UNAVAILABLE` (exit 2, retryable) when the system failed the read in a way a
+/// repeat can pass, because a query only reads and no work is left half done (spec 8.3); `QUERY_FAILED` for any other failure.
+fn query_failure(message: &str) -> CliError {
+    // A tier the caller configured wrongly (a malformed or empty DSN: `policy: …`) is a refusal of the configuration, which waiting does not fix.
+    if message.starts_with("policy: ") {
+        return crate::read_cause::repo_error(message);
+    }
+    crate::read_cause::unavailable_before_work(message).unwrap_or_else(|| CliError::failed("QUERY_FAILED", message).hint("run `canon inventory sync` to rebuild the index, then run the query again"))
+}
+
 /// `plugin: None` calls the EXACT SAME [`crate::query::run`] path this
 /// function used before sensitive query output was added. The selected
 /// formatter receives the already-policy-validated `include_sensitive` bit,
@@ -37,7 +47,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json))
+                ExitCode::from(query_failure(&err.to_string()).emit("canon query", json))
             }
         };
     };
@@ -67,7 +77,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json))
+            ExitCode::from(query_failure(&err.to_string()).emit("canon query", json))
         }
     }
 }
@@ -104,7 +114,7 @@ pub(crate) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
             };
             // A corpus root that is not a directory holds no files to find wrong: it must not read as clean.
             if !resolved.is_dir() {
-                let error = CliError::refused("REPO_UNREADABLE", format!("`{}` is not a directory, so there is no corpus to check", resolved.display()))
+                let error = crate::read_cause::repo_io_error(format!("`{}` is not a directory, so there is no corpus to check", resolved.display()))
                     .field("DIR")
                     .hint("pass the corpus directory, e.g. `canon format .canon/specs`, relative to the current directory or to --repo");
                 return ExitCode::from(error.emit("canon format", json));
@@ -115,7 +125,7 @@ pub(crate) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
             let roots = match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
                 Ok(roots) => roots,
                 Err(err) => {
-                    let error = CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), or pass the corpus directory: `canon format <DIR>`");
+                    let error = crate::read_cause::config_error(err.to_string()).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), or pass the corpus directory: `canon format <DIR>`");
                     return ExitCode::from(error.emit("canon format", json));
                 }
             };
@@ -296,7 +306,7 @@ pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     let (repo, inputs) = match crate::report::resolve_inputs(repo) {
         Ok(resolved) => resolved,
         Err(err) => {
-            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(command, json));
+            return ExitCode::from(crate::read_cause::config_error(err.to_string()).emit(command, json));
         }
     };
 

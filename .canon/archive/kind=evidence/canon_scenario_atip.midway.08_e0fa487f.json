@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:58:51.193417Z",
+  "attachments": [
+    {
+      "case": "input::tests::atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    },
+    {
+      "case": "atip_midway_08_a_batch_element_that_stops_part_way_is_failed_with_its_reason_and_the_batch_is_incomplete",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3dda22a0c50209222a85ca91eb879d243c07ce2c65a70f060bcfe9c8590de77d"
+    }
+  ],
+  "code_tree": "50b56872df3bf2fa8e8bec57fd6ef23d8422a8c0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "f26f96942d4c8e1d01117b718d9ff823dc363642",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 201,
+  "scenario_id": "atip.midway.08",
+  "schema": 1,
+  "staging_id": "b0822f75",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

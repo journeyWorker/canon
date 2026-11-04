@@ -139,8 +139,8 @@ Feature: learn promotion
   Scenario: A rollback with an unreadable or invalid signature or a malformed timestamp is refused and writes nothing
     Given a repo with a strategy candidate, an approver pinned in the policy, and a signature file whose content is not a signature
     When canon strategy rollback runs for the candidate with a signature file that does not exist, with the file that is not a signature, with --approval-at yesterday, and with no --reason
-    Then the missing signature file exits 2 with LEARN_SIGNATURE_UNREADABLE
-    And the file that is not a signature exits 1 with LEARN_ROLLBACK_FAILED, its message saying the ssh signature verification failed
+    Then the missing signature file exits 2 with STRATEGY_SIGNATURE_NOT_FOUND
+    And the file that is not a signature exits 2 with STRATEGY_SIGNATURE_INVALID, its message saying the ssh signature verification failed
     And the malformed timestamp and the missing reason each exit 2 with USAGE
     And no file in the repo changed
 
@@ -153,5 +153,5 @@ Feature: learn promotion
     Given a repo with no strategy of a well-formed id, and a signature file that is missing or wrong
     When canon strategy rollback runs for that id with that signature file
     Then it exits 2 with STRATEGY_NOT_FOUND, with the file missing and with it wrong alike
-    And a rollback of an existing strategy with a wrong signature still exits 1 with LEARN_ROLLBACK_FAILED
+    And a rollback of an existing strategy with a wrong signature still exits 2 with STRATEGY_SIGNATURE_INVALID
     And no file in the repo changed

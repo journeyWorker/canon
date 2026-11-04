@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T04:03:31.399368Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/plans.rs:run_pass_for,run; crates/canon-cli/tests/atip_codeexit.rs:atip_codeexit_08",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "resolution_code_tree": "e906ba7be5735b0a6898cedc4fcd13d5f52a4224",
+  "resolution_sha": "0c6d83f54c2462e367e49ce7165a5675f1bb62b6",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "A refused `ingest plans` writes a file when the hot rung is sqlite: with `hot: {backend: sqlite, path: .canon/hot.db}` routed for task and an openspec `root:` one level too high, `canon ingest plans` exits 2 INGEST_SOURCE_INVALID and `.canon/hot.db` is created (observed at 26cb75b5). The preview pass `run_pass_for(.., dry_run=true, will_write=true)` calls open_store, which attaches the hot db. The brief says the five commands that cannot start write nothing, and the message says `nothing was persisted`. Judge the sources before open_store (the malformed check needs only the scan), or open the store read-only in the preview. atip.codeexit.08 uses a git-only tier, so it cannot see this.",
+  "worktree_dirty": false
+}

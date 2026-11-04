@@ -28,7 +28,7 @@ Every violation carries one of these stable, grep-able strings:
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon task done <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
-| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (refused with `fabricated-evidence`, exit 1). |
+| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (refused with `fabricated-evidence`, `EVIDENCE_NOTE_INVALID`, exit 2). |
 | `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted — or closed `fixed` while an evidenced scenario of the subject has no evidence recorded after the close (re-verification). Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
 | `false-success` | The latest audit record (`canon evidence audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
@@ -227,7 +227,7 @@ Accepting a scenario whose latest evidence is `divergent` as a known gap
 limited by something outside the change is a human-only act: with a role
 declared (`--as`, `CANON_ROLE`) the leaf is refused with `ACTOR_DENIED`. It is
 never a way to skip a fix.
-Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is
+Refused (`DIVERGENCE_CONFLICT` when the evidence is not divergent, `DIVERGENCE_DENIED` when the actor or session attested it) unless the latest verdict is
 divergent and the session and actor differ from the evidence's. The record
 pins that evidence: new evidence for the scenario, or `--expiry` passing,
 ends it. While it holds, the ship guard counts the cell covered and
@@ -461,7 +461,7 @@ mentions. Each bound case is its own attachment with its name and
 outcome. `--report-case <name>` (repeatable; a Rust test by its
 function name) ADDS cases; it never hides the scenario's own. No match,
 or a `--report-case` naming no case, refuses (exit 2); a `faithful`
-verdict when ANY bound case failed or was skipped refuses (exit 1). Files
+verdict when ANY bound case failed or was skipped refuses (exit 2). Files
 must be inside the repository, are recorded by relative path, and are
 stored (see Bound evidence stays provable).
 
@@ -517,8 +517,9 @@ report (a JUnit test case's `[[ATTACHMENT|path]]` lines, which Playwright's
 JUnit reporter writes; a Cucumber JSON embedding), so a test's screenshot
 stays with its scenario. A file the report does not name goes with
 `--artifact <scenario-id>=<path>`; a bare `--artifact <path>` in a batch is
-refused (`EVIDENCE_INVALID_ARGUMENT`). A report attachment that is missing,
-outside the repo or oversized is refused.
+refused (`EVIDENCE_ARGUMENT_CONFLICT`). A report attachment that is missing,
+outside the repo or oversized is refused (`EVIDENCE_BINDING_NOT_FOUND`,
+`EVIDENCE_BINDING_DENIED`, `EVIDENCE_BINDING_INVALID`).
 
 It is all or nothing: a claimed `faithful` verdict over a failed case,
 a fabrication marker in `--summary`, an unapproved brief for any
@@ -536,7 +537,8 @@ or `-`; an array (or NDJSON) is a batch, validated element by element before
 the first write (a refusal writes nothing, exit 2). Keys are the option
 names in camelCase plus `operands`: one object per scenario, with
 `scenario`, `class`, `ref` and `role`. `canon schema evidence add --json`
-shows `input`: the schema of one document and a complete `example`. Each element reports `written`,
+shows `input` (its limits and a complete `example`) and `canon schema evidence add --schemas --json`
+gives `Input`, the schema of one document. Each element reports `written`,
 `unchanged` or `failed` in `data.items[]`.
 
 `--rev <rev>` names the commit the evidence ran against (default `HEAD`).
@@ -697,7 +699,7 @@ aggregates every record bound to the task, on one line:
 (the latest `--summary`, or a default naming the latest passing record).
 Every other path — missing evidence, a `Divergent` verdict, a fabricated
 note on any of the task's records — leaves the row byte-unchanged and
-exits `1` with the blocking violation on stderr. After a flip, the plan
+exits `2` with the blocking violation on stderr. After a flip, the plan
 source is re-ingested so the record store's task status agrees with the
 checkbox (`canon query --kind task` reads `done`); a failed re-ingest is
 a stderr warning naming `canon ingest plans`, never a failed flip.
@@ -789,8 +791,10 @@ It installs no git hook: copy the script into git's `pre-commit` hook
 agent hook files and the script, also under `--dry-run`. In `--json`,
 `installed` is true when an agent hook file changed and
 `preCommitScriptWritten` when the script was written. A `--repo` that is not an
-existing directory exits 2 with `HOOKS_INSTALL_FAILED` (also under `--dry-run`)
-and creates nothing.
+existing directory exits 2 with `HOOKS_REPO_INVALID` (also under `--dry-run`)
+and creates nothing. When the install writes the first hook file and then cannot
+write the second, it exits 1 with `HOOKS_INSTALL_INCOMPLETE`: the first file
+stays, `meta.next` leads with `canon status`, then run the install again.
 
 Prefer this over hand-editing `settings.json`/`hooks.json`.
 

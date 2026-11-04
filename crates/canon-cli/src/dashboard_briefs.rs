@@ -68,9 +68,9 @@ fn status_of(code: &str) -> u16 {
     match code {
         "APPROVAL_INVALID" => 400,
         "BRIEF_NOT_FOUND" => 404,
-        "BRIEF_APPROVE_REFUSED" | "BRIEF_INVALID" | CHANGED_SINCE_PAGE_LOAD => 409,
+        "BRIEF_INVALID" | CHANGED_SINCE_PAGE_LOAD => 409,
         // Another canon process holds the repository write lock: the page may ask again.
-        "REPO_WRITE_BUSY" => 503,
+        "REPO_LOCK_UNAVAILABLE" => 503,
         _ => 500,
     }
 }
@@ -278,7 +278,7 @@ fn no_live_brief(ids: &[&str]) -> Reply {
 /// `POST /api/briefs/approve` (the guards have passed): the single form's
 /// answer is `canon brief approve --json`'s document, or its error; the
 /// multi form's answer is its several-id document ([`ApprovedMany`]), and a
-/// refused brief refuses them all with `BRIEF_APPROVE_REFUSED` naming each.
+/// refused brief refuses them all with the first refused id's code and `details` for each.
 pub fn approve(repo: &Path, body: &[u8]) -> Reply {
     let request: ApproveRequest = match serde_json::from_slice(body) {
         Ok(request) => request,
@@ -287,7 +287,7 @@ pub fn approve(repo: &Path, body: &[u8]) -> Reply {
     // The one write the dashboard makes of what a plan reads: the repository write lock, for as long as the approval is written.
     let _hold = match crate::write_lock::hold(repo) {
         Ok(hold) => hold,
-        Err(error) => return refused_reply(error, None),
+        Err(error) => return refused_reply(error),
     };
     match (&request.change_id, &request.sha256, &request.briefs) {
         (Some(id), Some(sha256), None) => approve_one(repo, id, sha256, &request),
@@ -308,7 +308,7 @@ fn approve_one(repo: &Path, id: &str, sha256: &str, request: &ApproveRequest) ->
             let body = crate::json_out::envelope_with_next("brief approve", &approved, &after, Value::Null);
             Reply::ok(body)
         }
-        Err(e) => refused_reply(e, None),
+        Err(e) => refused_reply(e),
     }
 }
 
@@ -335,21 +335,17 @@ fn approve_many(repo: &Path, briefs: &[ApproveBrief], request: &ApproveRequest) 
             let after = crate::next::after_with(repo, &crate::next::Scope::Repo, false, Vec::new());
             Reply::ok(crate::json_out::envelope_with_next("brief approve", &report, &after, Value::Null))
         }
-        Err((e, data)) => refused_reply(e, data),
+        Err(e) => refused_reply(e),
     }
 }
 
-/// The reply of a refused approval: the code's status, and the refused ids as `data`
-/// when the call named several.
-fn refused_reply(e: CliError, data: Option<crate::brief_approve::Refused>) -> Reply {
+/// The reply of a refused approval: the code's status. A call that named several ids carries one `error.details` entry each.
+fn refused_reply(e: CliError) -> Reply {
     let status = status_of(e.code);
-    let e = match (e.code, data.is_some()) {
-        ("BRIEF_APPROVE_REFUSED", true) => e.hint("nothing was recorded: reload this page to read the briefs named as they are now, clear any blockers (`canon brief check` lists them), then select and approve again"),
-        ("BRIEF_APPROVE_REFUSED", false) => e.hint("clear the blockers in the brief (`canon brief check` lists them), then reload this page"),
+    let e = match (e.code, e.reason_name()) {
+        _ if !e.detail_errors().is_empty() => e.hint("nothing was recorded: reload this page to read the briefs named as they are now, clear any blockers (`canon brief check` lists them), then select and approve again"),
+        ("BRIEF_INVALID", Some("BLOCKERS")) => e.hint("nothing was recorded: reload this page to read the briefs as they are now, clear the blockers (`canon brief check` lists them), then select and approve again"),
         _ => e,
     };
-    match data {
-        Some(data) => Reply { status, body: crate::json_out::failure_value("dashboard briefs", &e, Some(&data)) },
-        None => Reply::error(status, &e),
-    }
+    Reply::error(status, &e)
 }

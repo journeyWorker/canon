@@ -193,6 +193,16 @@ fn validates(doc: &Value, name: &str, instance: &Value) {
     assert!(problems.is_empty(), "{name}: {problems:?}\n{instance}");
 }
 
+/// The `--schemas` answer of a leaf, from the binary: what a command document's `#/schemas/..` refs and its `Input` resolve in.
+fn schemas_of(dir: &Path, home: &Path, leaf: &str) -> Value {
+    let mut args: Vec<&str> = vec!["schema"];
+    args.extend(leaf.split(' '));
+    args.extend(["--schemas", "--json"]);
+    let answer = json_of(&canon(dir, home, &args, None))["data"].clone();
+    assert_eq!(answer["kind"], "schemas", "{leaf}");
+    answer
+}
+
 /// The spec node of a leaf, from the binary.
 fn node(dir: &Path, home: &Path, leaf: &str) -> Value {
     let mut args: Vec<&str> = vec!["schema"];
@@ -203,7 +213,7 @@ fn node(dir: &Path, home: &Path, leaf: &str) -> Value {
 
 fn write_leaves(dir: &Path, home: &Path) -> Vec<String> {
     let listing = json_of(&canon(dir, home, &["schema", "--json"], None));
-    listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command" && c["effect"] != "read").map(|c| c["command"].as_str().unwrap().to_string()).collect()
+    listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group" && c["effect"] != "read").map(|c| c["command"].as_str().unwrap().to_string()).collect()
 }
 
 // ---------------------------------------------------------------- the spec
@@ -214,33 +224,34 @@ fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
     let dir = TempDir::new().unwrap();
     let listing = json_of(&canon(dir.path(), home.path(), &["schema", "--json"], None));
     let mut writers = 0;
-    for command in listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command") {
+    for command in listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group") {
         let leaf = command["command"].as_str().unwrap();
         let detail = node(dir.path(), home.path(), leaf);
-        let has_input = detail["options"].as_array().unwrap().iter().any(|o| o["name"] == "input");
+        // `--input` is implied by `input`: the 1.4 document never lists it.
+        assert!(!detail["options"].as_array().unwrap().iter().any(|o| o == "input" || o["name"] == "input"), "`{leaf}`: --input is implied and not listed");
         let writes = detail["effect"] != "read";
-        assert_eq!(has_input, writes, "`{leaf}`: --input belongs to exactly the writing leaves");
         assert_eq!(detail["input"].is_object(), writes, "`{leaf}`: an input for each writing leaf");
+        assert!(detail["input"].get("option").is_none() && detail["input"].get("schemaRef").is_none(), "`{leaf}`: the 1.4 input names neither the option nor the schemaRef");
         if !writes {
             continue;
         }
         writers += 1;
         let input = &detail["input"];
         assert_eq!(input["maxBytes"], 8 * 1024 * 1024, "{leaf}");
-        let name = input["schemaRef"].as_str().unwrap().trim_start_matches("#/schemas/");
-        validates(&detail, name, &input["example"]);
+        let answer = schemas_of(dir.path(), home.path(), leaf);
+        validates(&answer, "Input", &input["example"]);
         // The batch variant is declared exactly where a batch is accepted.
         let outputs = detail["outputs"].as_array().unwrap();
         let batch: Vec<&Value> = outputs.iter().filter(|o| o["batch"] == true).collect();
         let destructive = detail["effect"] == "destructive";
         let serves = leaf == "dashboard";
-        assert_eq!(input["batch"], !(destructive || serves), "{leaf}");
+        assert_eq!(input["batch"] == true, !(destructive || serves), "{leaf}");
         assert_eq!(batch.len(), usize::from(!(destructive || serves)), "{leaf}: {outputs:?}");
         for variant in batch {
             let report = report_of(variant);
             assert!(report.starts_with("Batch") && report.ends_with("Report"), "{report}");
             assert_eq!(variant["schemaVersion"], "1.1");
-            assert!(detail["schemas"].get(&report).is_some(), "{report} is published");
+            assert!(answer["schemas"].get(&report).is_some(), "{report} is published");
         }
     }
     assert_eq!(writers, 47, "every leaf whose effect is write or destructive");
@@ -256,8 +267,7 @@ fn the_published_input_examples_are_valid_documents() {
     for leaf in write_leaves(dir.path(), home.path()) {
         let detail = node(dir.path(), home.path(), &leaf);
         let input = &detail["input"];
-        let name = input["schemaRef"].as_str().unwrap().trim_start_matches("#/schemas/").to_string();
-        validates(&detail, &name, &input["example"]);
+        validates(&schemas_of(dir.path(), home.path(), &leaf), "Input", &input["example"]);
         assert!(input["example"].is_object(), "`{leaf}`: the example is one document, not a batch");
         assert!(input.get("batchExample").is_none(), "`{leaf}`");
         seen += 1;

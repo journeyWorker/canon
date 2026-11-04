@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:25:52.538165Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/run/plugin.rs:31",
+  "introduced_by": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "kind": "finding",
+  "reason": "re-reviewed at 73e2b1a0",
+  "resolution_code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "resolution_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 1,
+  "scenario_ids": [
+    "atip.incomplete.08",
+    "atip.incomplete.05"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[correctness] Same class as the compact finding in two more places. (1) PLUGIN_SYNC_INCOMPLETE: `run/plugin.rs` answers it whenever `outcome.is_clean()` is false, so a root whose `overlay_candidates` fails (plugin_sync.rs:320, before any write), a dry-run, or a run where every candidate failed answers 'the candidates that were written stay' with nothing written; the brief F3 says 'some candidates not written', the audit says 'wrote some candidates'. Gate it on `!dry_run && total_written() > 0`. (2) RETENTION_PURGE_INCOMPLETE: retention.rs sets `deleting` before `purge()` is called, so a purge that fails with deleted == 0 (the `_ => (0, 0)` arm) is INCOMPLETE with 'what was deleted stays deleted'; use the counts the error already carries.",
+  "worktree_dirty": false
+}

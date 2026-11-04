@@ -270,8 +270,8 @@ pub enum StoreError {
         deleted: usize,
         reason: String,
     },
-    #[error("{}", tier_unavailable_message(*rung, *backend, reason))]
-    TierUnavailable { rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: String },
+    #[error("{}", tier_unavailable_message(*rung, *backend, reason, *configured))]
+    TierUnavailable { rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: String, configured: bool },
     #[error("{} backend is not attached ({reason})", backend.as_str())]
     BackendUnattached { backend: crate::policy::Backend, reason: String },
     #[error("io: {0}")]
@@ -305,8 +305,11 @@ fn partial_purge_message(rung: crate::policy::Rung, backend: crate::policy::Back
     )
 }
 
-fn tier_unavailable_message(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: &str) -> String {
+/// The text of a tier that cannot be used: `is not attached` when its settings are not there, and `did not answer` when they are and the backend
+/// did not (`canon-cli` reads the second as a read a repeat can pass).
+fn tier_unavailable_message(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: &str, configured: bool) -> String {
     match backend {
+        Some(b) if configured => format!("{} tier ({}) did not answer ({reason})", rung.as_str(), b.as_str()),
         Some(b) => format!("{} tier ({}) is not attached ({reason})", rung.as_str(), b.as_str()),
         None => format!("{} tier is not configured ({reason})", rung.as_str()),
     }
@@ -316,9 +319,17 @@ impl StoreError {
     /// Construct a [`StoreError::TierUnavailable`] — the one
     /// constructor every rung-aware caller (`TierRegistry::handle`,
     /// `canon-cli`'s tier builders) uses, so the field shape never
-    /// drifts between call sites.
+    /// drifts between call sites. The tier's settings are not there
+    /// (`configured` is false): an unset DSN or credential, a rung with
+    /// no `tiers.<rung>` entry. Waiting does not set them.
     pub fn tier_unavailable(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: impl Into<String>) -> Self {
-        StoreError::TierUnavailable { rung, backend, reason: reason.into() }
+        StoreError::TierUnavailable { rung, backend, reason: reason.into(), configured: false }
+    }
+
+    /// [`Self::tier_unavailable`] for a tier whose settings are all there and whose backend did not answer (a host that is down, a refused
+    /// connection, a file that cannot be opened): `configured` is true, and a repeat can pass.
+    pub fn tier_unreachable(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: impl Into<String>) -> Self {
+        StoreError::TierUnavailable { rung, backend, reason: reason.into(), configured: true }
     }
 }
 

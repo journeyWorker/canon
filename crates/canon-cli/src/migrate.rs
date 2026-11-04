@@ -199,7 +199,7 @@ pub struct MigrateReport {
     pub backup_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index_records_written: Option<usize>,
-    /// The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`).
+    /// The rebuild's own report when it found the corpus unclean (`MIGRATION_INCOMPLETE`, reason `INDEX`).
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<crate::inventory::InventorySyncReport<'static>>")]
     pub index: Option<serde_json::Value>,
@@ -302,46 +302,54 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let mut log = crate::json_out::Log::new(json);
     let repo = resolve_repo_root(repo);
     let canon_yaml = repo.join("canon.yaml");
-    let Ok(text) = fs::read_to_string(&canon_yaml) else {
-        return CliError::refused("CONFIG_REQUIRED", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).hint("run `canon init` in the repository root first").emit("canon migrate", json);
+    let text = match canon_store::eio::read_to_string(&canon_yaml) {
+        Ok(text) => text,
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            return crate::read_cause::config_error(format!("cannot read `{}`: {e}", canon_yaml.display())).emit("canon migrate", json);
+        }
+        Err(_) => {
+            return CliError::refused("CONFIG_REQUIRED", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).hint("run `canon init` in the repository root first").emit("canon migrate", json);
+        }
     };
     let git = in_git_work_tree(&repo);
     // 0.30 `ledger-naming`: the old world is recorded and the renaming planned first; every other step reads the renamed ledger.
     let names = match migrate_names::plan(&repo, &text) {
         Ok(names) => names,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return preview_refusal(e.clone(), "fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let renamed_config = match migrate_names::rewrite_config(&text) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("CONFIG_INVALID", e.clone()).reason("CANON_YAML").hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let plan = match plan(&repo, &renamed_config) {
         Ok(plan) => plan,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return preview_refusal(e.clone(), "fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let config = match render_config(&renamed_config, &plan, plan.roots.len(), plan.drop_source.is_some()) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("CONFIG_INVALID", e.clone()).reason("CANON_YAML").hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     // The renamed ledger is judged in a scratch copy (the review pins, the chore reviews of the briefs).
     let world = match names.renames().then(|| migrate_names::scratch(&repo, &renamed_config, &names)).transpose() {
         Ok(world) => world,
-        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("check that the system temp directory is writable, then run `canon migrate` again").emit("canon migrate", json),
+        Err(e) => {
+            return preview_refusal(e, "check that the system temp directory is a directory and that the ledger's files are valid, then run `canon migrate` again; nothing was changed").emit("canon migrate", json);
+        }
     };
     let view = world.as_ref().map_or(repo.as_path(), |w| w.path());
     // 0.31 `brief-format`: the briefs in the 0.30 format, and the approvals and review pins their rewrite re-binds.
     let real_ledger = match canon_gate::GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string())
+            return crate::read_cause::config_error(e.to_string())
                 .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run `canon migrate` again")
                 .emit("canon migrate", json)
         }
@@ -350,7 +358,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let view_ledger = world.as_ref().map_or_else(|| real_ledger.clone(), |w| w.ledger_root().to_path_buf());
     let briefs = match migrate_briefs::plan(&repo, &view_ledger, &ledger_prefix) {
         Ok(briefs) => briefs,
-        Err(e) => return CliError::refused("MIGRATE_REFUSED", e).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
+        Err(e) => return preview_refusal(e, "fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
     };
     if git {
         let mut moved_paths = plan.moved_paths.clone();
@@ -476,14 +484,13 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     // The renaming comes before every other step; one that fails reverts itself.
     if let Some(dir) = backup_path.as_ref().filter(|_| names.renames()) {
         if let Err(e) = migrate_names::apply(&repo, &names, dir, git) {
-            return CliError::refused("MIGRATE_STOPPED", e).hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
+            return stopped("STOPPED", e, "fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
         }
         log.line(format!("canon migrate: renamed {} record file(s) to the 0.30 rule (kind=<kind>/<components>_<digest8>.json)", names.moves.len()));
     }
     if let Some(dir) = backup_path.as_ref() {
         if let Err(e) = migrate_briefs::apply(&repo, &briefs, dir, relay.as_ref()) {
-            return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest"))
-                .hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/")
+            return stopped("STOPPED", format!("{e}; running `canon migrate` again finishes the rest"), "fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/")
                 .emit("canon migrate", json);
         }
         if briefs.writes() {
@@ -499,7 +506,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
         }
     }
     if let Err(e) = plan.legacy.apply(&repo) {
-        return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest")).hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
+        return stopped("STOPPED", format!("{e}; running `canon migrate` again finishes the rest"), "fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
     }
     for effect in plan.legacy.effects() {
         log.line(format!("canon migrate:{}", safety::effect_line(&effect)));
@@ -516,13 +523,13 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
         .map_err(|e| format!("could not rewrite canon.yaml: {e}"))
         .and_then(|config| if config == text { Ok(()) } else { write_atomic(&canon_yaml, &config) });
     if let Err(e) = written {
-        return CliError::refused("MIGRATE_STOPPED", format!("{e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started")).hint("fix what the message names, then run `canon migrate` again; canon.yaml is unchanged").emit("canon migrate", json);
+        return stopped("STOPPED", format!("{e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "fix what the message names, then run `canon migrate` again; canon.yaml is unchanged").emit("canon migrate", json);
     }
     if config != text && applied.error.is_none() {
         log.line("canon migrate: rewrote canon.yaml");
     }
     if let Some(e) = applied.error {
-        return CliError::refused("MIGRATE_STOPPED", format!("{e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest")).hint("run `canon migrate` again; it finishes the rest").emit("canon migrate", json);
+        return stopped("STOPPED", format!("{e}; what moved is recorded in canon.yaml, so running `canon migrate` again finishes the rest"), "run `canon migrate` again; it finishes the rest").emit("canon migrate", json);
     }
     // Only now that canon.yaml no longer lists the openspec source do its
     // placeholder and emptied directories go: removed earlier, a stopped
@@ -530,7 +537,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     // gone, which the openspec reader then reads as the repo root.
     if drop_source && plan.drop_source.is_some() {
         if let Err(e) = remove_dropped_source(&repo, &plan, git, &mut log) {
-            return CliError::refused("MIGRATE_STOPPED", format!("{e}; canon.yaml no longer lists the source, so remove it by hand")).hint("remove the source from canon.yaml by hand, then run `canon migrate` again").emit("canon migrate", json);
+            return stopped("STOPPED", format!("{e}; canon.yaml no longer lists the source, so remove it by hand"), "remove the source from canon.yaml by hand, then run `canon migrate` again").emit("canon migrate", json);
         }
     }
 
@@ -539,7 +546,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
         match crate::plans::refresh_change(&repo, change) {
             Ok(_) => log.line(format!("canon migrate: re-imported change `{}` from {} (same change id; its tasks and adoption keep joining)", change.as_str(), rel(&repo, dir))),
             Err(e) => {
-                return CliError::refused("MIGRATE_STOPPED", format!("moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str())).hint("run `canon migrate` again; it re-imports the moved change").emit("canon migrate", json);
+                return stopped("STOPPED", format!("moved change `{}` but could not re-import it: {e}; run `canon migrate` again", change.as_str()), "run `canon migrate` again; it re-imports the moved change").emit("canon migrate", json);
             }
         }
     }
@@ -567,8 +574,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
             }
         }
         Err(e) => {
-            return CliError::refused("MIGRATE_STOPPED", format!("{}; what moved is in the archive, so running `canon migrate` again finishes the rest", e.message))
-                .hint("run `canon ledger compact` (or `canon migrate`) again; it finishes the rest")
+            return stopped("STOPPED", format!("{}; what moved is in the archive, so running `canon migrate` again finishes the rest", e.message), "run `canon ledger compact` (or `canon migrate`) again; it finishes the rest")
                 .emit("canon migrate", json);
         }
     }
@@ -1426,14 +1432,18 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Previ
             log.line(format!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written()));
             // After the index: a pre-0.15 review is judged against the
             // scenario digests the rebuilt index holds.
-            match crate::migrate_pins::run_in(repo, None, old_world, true) {
+            let pinned = match crate::incomplete::injected_stop("migrate-pins") {
+                Some(stop) => Err(stop.to_string()),
+                None => crate::migrate_pins::run_in(repo, None, old_world, true).map_err(|e| e.to_string()),
+            };
+            match pinned {
                 Ok(report) => {
                     for line in report.lines(false) {
                         log.line(line);
                     }
                 }
                 Err(e) => {
-                    return CliError::refused("MIGRATE_PINS_FAILED", format!("the files moved and the index was rebuilt, but the reviews were not pinned to what their evidence says: {e}")).hint("fix what the message names, then run `canon migrate` again; it finishes the reviews").emit("canon migrate", json);
+                    return stopped("PINS", format!("the files moved and the index was rebuilt, but the reviews were not pinned to what their evidence says: {e}"), "fix what the message names, then run `canon migrate` again; it finishes the reviews").emit("canon migrate", json);
                 }
             }
             // What the migrate left, for `canon migrate --revert` to tell a later change from the migrate's own.
@@ -1449,13 +1459,36 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Previ
         }
         Ok(outcome) => {
             crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
-            CliError::failed("MIGRATE_INDEX_FAILED", "the files moved, but the scenario index rebuild found the problems; fix them, then run `canon inventory sync`").hint("run `canon inventory sync` and fix what it reports")
+            crate::incomplete::read_status("read what `canon migrate` changed before it stopped (what changed stays changed; the originals are in .canon/migrate-backup/)");
+            CliError::failed("MIGRATION_INCOMPLETE", "the files moved, but the scenario index rebuild found the problems; fix them, then run `canon inventory sync`").reason("INDEX").hint("run `canon inventory sync` and fix what it reports")
                 .emit_with_data("canon migrate", json, &MigrateReport { steps: log.into_lines(), backup_dir, index_records_written: None, index: Some(serde_json::to_value(crate::inventory::format_json(&outcome)).expect("a report serializes")), plan })
         }
         Err(e) => {
-            CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).hint("run `canon inventory sync` and fix what it reports").emit("canon migrate", json)
+            stopped("INDEX", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`"), "run `canon inventory sync` and fix what it reports").emit("canon migrate", json)
         }
     }
+}
+
+/// A refusal of the plan or its preview, made before anything was changed: `MIGRATION_DENIED` when the system refused a call on a file the
+/// plan reads, `MIGRATION_UNAVAILABLE` when it failed one in a way a repeat can pass, `MIGRATION_INVALID` otherwise, with `invalid_hint`.
+fn preview_refusal(message: String, invalid_hint: &str) -> CliError {
+    let code = crate::read_cause::migration_code_of_text(&message);
+    let hint = match code {
+        "MIGRATION_DENIED" => "check that the repository's ledger and the system temp directory are readable and writable by this user, then run `canon migrate` again; nothing was changed",
+        "MIGRATION_UNAVAILABLE" => "the system failed a call on the files the plan reads in a way a repeat can pass: wait a moment, then run `canon migrate` again; nothing was changed",
+        _ => invalid_hint,
+    };
+    CliError::refused(code, message).hint(hint)
+}
+
+/// `canon migrate` stopped after it had begun changing the repo: `MIGRATION_INCOMPLETE`, whose `reason` says where it stopped (`STOPPED` while
+/// moving, `INDEX` while rebuilding the scenario index, `PINS` while pinning the reviews). What it changed stays changed, and `meta.next` leads
+/// with the read of what it did.
+pub(crate) fn stopped(reason: &'static str, message: impl Into<String>, hint: &str) -> CliError {
+    crate::incomplete::read_status("read what `canon migrate` changed before it stopped (what changed stays changed; the originals are in .canon/migrate-backup/)");
+    CliError::failed("MIGRATION_INCOMPLETE", message)
+        .reason(reason)
+        .hint(hint)
 }
 
 /// The paths outside the default scope (`canon.yaml`, `.gitignore`, `AGENTS.md`, `.canon/`) the run's steps read and

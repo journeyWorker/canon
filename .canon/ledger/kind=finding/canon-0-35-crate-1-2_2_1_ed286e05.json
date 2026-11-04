@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-3"
+  },
+  "at": "2026-11-04T19:54:34.228818Z",
+  "change_id": "canon-0-35-crate-1-2",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "disposition": "open",
+  "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "finding",
+  "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 2,
+  "scenario_ids": [
+    "atip.crate12.15",
+    "atip.crate12.17"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[standards] The failure halves of crate-1-2 F2 and F4 are the crate's functions driven with canon's table as a fixture, not something canon does: atip.crate12.15 (rows with another exit/retryable, STOPPED_MIDWAY at exit 2 for 1.2) calls atip::registration_problem on synthetic values, and atip.crate12.17 (reason of a missing code, wrong length, duplicate probe row) calls atip::reason_of_code, reasons_with_exit and with_row under catch_unwind. They would pass whatever canon registers for those paths and only fail if the pinned crate regresses (mutation probe: dropping the retryable check or the sort in the atip copy fails them). Canon-side faults are caught by the other halves (probes: changing PLAN_STALE retryable fails 14 and 15; an unsorted reasons list fails 16). Honest as a pin of the crate version, thin as canon behaviour; the brief's F2/F4 failure paths have no other canon-observable form, since canon registers no STOPPED_MIDWAY row. Accepted, signed. Blast radius: a canon table row that the crate would reject at compile time (a reason of an absent code) stops the build, which no runtime test exercises.",
+  "worktree_dirty": false
+}

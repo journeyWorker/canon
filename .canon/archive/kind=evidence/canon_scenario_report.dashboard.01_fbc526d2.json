@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:47:55.469439Z",
+  "attachments": [
+    {
+      "case": "dashboard::tests::report_dashboard_01_an_embedded_app_is_served_gzip_to_a_browser_that_accepts_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "dashboard::tests::report_dashboard_01_an_embedded_app_is_served_decompressed_to_a_browser_that_does_not_accept_gzip",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "dashboard::tests::report_dashboard_01_resolve_app_serves_the_checkout_build_only_for_canons_own_dashboard_package",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    }
+  ],
+  "code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "9f601a4ffd4bedd1d3b0587f43a49308b22bc66d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 358,
+  "scenario_id": "report.dashboard.01",
+  "schema": 1,
+  "staging_id": "3be898ab",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

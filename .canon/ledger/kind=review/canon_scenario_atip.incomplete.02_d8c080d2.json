@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:38:53.826813Z",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "kind": "review",
+  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_incomplete_02_a_blocked_promotion_after_the_demotion_is_strategy_incomplete_and_one_with_no_demotion_is_a_refusal"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c015199bfce6b8fcc2e6b283ed4b1b9fb4c0233a1fbe8b9713bf823a3c0c7981",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
+  },
+  "review_id": "01M6K5NP02SR1SM0J656B8CE9E",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "atip.incomplete.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

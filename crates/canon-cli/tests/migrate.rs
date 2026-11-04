@@ -350,7 +350,7 @@ fn authoring_migrate_04_an_existing_destination_is_refused() {
     let out = canon(repo, &["migrate"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon: MIGRATE_REFUSED: spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
+        text(&out).contains("canon: MIGRATION_INVALID: spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
         "{}",
         text(&out)
     );
@@ -482,7 +482,7 @@ fn authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused() {
     let out = commit(repo);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon: MIGRATE_REFUSED: could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
+        text(&out).contains("canon: CONFIG_INVALID: could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
         "{}",
         text(&out)
     );
@@ -522,7 +522,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
     let out = commit(repo);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
-    assert!(text(&out).contains("canon: MIGRATE_STOPPED: failed to write"), "{}", text(&out));
+    assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write"), "{}", text(&out));
     assert!(text(&out).contains("canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "never half-written");
     assert!(repo.join(NEW_FEATURE).is_file() && repo.join(".canon/changes/add-cart/brief.md").is_file(), "the moves happened before the write failed");
@@ -564,7 +564,7 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
     let out = commit(repo);
     set_mode(&repo.join(".canon/changes"), 0o755);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
-    assert!(text(&out).contains("canon: MIGRATE_STOPPED: failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
+    assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());
 
@@ -588,7 +588,7 @@ fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_
     set_mode(&repo.join("openspec/changes/add-cart"), 0o755);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
-        text(&out).contains("canon: MIGRATE_REFUSED: openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
+        text(&out).contains("canon: MIGRATION_INVALID: openspec/changes/add-cart is not writable, so change dir openspec/changes/add-cart cannot be moved"),
         "{}",
         text(&out)
     );
@@ -726,4 +726,119 @@ fn migrate_previews_by_default_and_commits_only_the_previewed_plan() {
         args.extend_from_slice(old);
         assert_eq!(canon(repo, &args).status.code(), Some(2), "{old:?}");
     }
+}
+
+/// `canon migrate --commit --json` as `commit` applies it (the preview first, its digest second), with the extra environment `env`.
+fn commit_json(repo: &Path, env: &[(&str, &str)]) -> (Output, serde_json::Value) {
+    let preview = canon(repo, &["migrate"]);
+    let stdout = String::from_utf8_lossy(&preview.stdout).into_owned();
+    let digest = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("planDigest "))
+        .and_then(|rest| rest.split(';').next())
+        .unwrap_or_else(|| panic!("a plan digest: {}", text(&preview)))
+        .to_string();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    command
+        .args(["migrate", "--commit", "--plan-digest", &digest, "--json"])
+        .env("CANON_ACTOR", "canon")
+        .current_dir(repo);
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let out = command.output().expect("spawn canon");
+    let body = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|e| panic!("one JSON document ({e}): {}", text(&out)));
+    (out, body)
+}
+
+/// atip.incomplete.10: `migrate` stopped after it began changing the repo is `MIGRATION_INCOMPLETE` (exit 1, not retryable) and its reason says where:
+/// `STOPPED` while it moves (a temp file it cannot create), `PINS` while it pins the reviews (the debug seam `migrate-pins`, after the index was
+/// rebuilt) and `INDEX` while it rebuilds the scenario index (a corpus the rebuild finds violations in, with the report in `data.index`). What it did
+/// stays done, `meta.next` leads with `canon status`, and running it again finishes the rest.
+#[test]
+fn atip_incomplete_10_a_migrate_that_stopped_after_it_began_is_incomplete_with_the_reason_where_it_stopped(
+) {
+    // STOPPED: the canon.yaml temp file cannot be created, after the corpus and the change moved (authoring.migrate.09).
+    let dir = old_repo();
+    let repo = dir.path();
+    std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
+    let (out, body) = commit_json(repo, &[]);
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!(
+        (
+            body["error"]["code"].as_str(),
+            body["error"]["reason"].as_str(),
+            body["error"]["retryable"].as_bool()
+        ),
+        (Some("MIGRATION_INCOMPLETE"), Some("STOPPED"), Some(false)),
+        "{body}"
+    );
+    assert_eq!(
+        body["meta"]["next"][0]["argv"],
+        serde_json::json!(["status", "--json"]),
+        "{body}"
+    );
+    assert!(repo.join(".canon/specs").is_dir(), "what moved stays moved");
+    std::fs::remove_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
+    let finished = commit(repo);
+    assert_eq!(
+        finished.status.code(),
+        Some(0),
+        "running it again finishes the rest: {}",
+        text(&finished)
+    );
+
+    // PINS: the reviews could not be pinned after the index was rebuilt (the seam).
+    let other = old_repo();
+    let repo = other.path();
+    let (out, body) = commit_json(repo, &[("CANON_TEST_STOP_AT", "migrate-pins")]);
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!(
+        (
+            body["error"]["code"].as_str(),
+            body["error"]["reason"].as_str()
+        ),
+        (Some("MIGRATION_INCOMPLETE"), Some("PINS")),
+        "{body}"
+    );
+    assert!(
+        repo.join(".canon/specs").is_dir(),
+        "the files moved and stay moved"
+    );
+    let finished = commit(repo);
+    assert_eq!(
+        finished.status.code(),
+        Some(0),
+        "running it again finishes the reviews: {}",
+        text(&finished)
+    );
+
+    // INDEX: a corpus the index rebuild finds violations in, after the files moved.
+    let third = old_repo();
+    let repo = third.path();
+    write(
+        repo,
+        "specs/features/kind=feature/area=cart/broken.feature",
+        "Feature: cart broken\n\n  @cart.broken.01\n  Scenario: no provenance\n    Given a step\n",
+    );
+    commit_all(repo, "a corpus with a violation");
+    let (out, body) = commit_json(repo, &[]);
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!(
+        (
+            body["error"]["code"].as_str(),
+            body["error"]["reason"].as_str()
+        ),
+        (Some("MIGRATION_INCOMPLETE"), Some("INDEX")),
+        "{body}"
+    );
+    assert!(
+        body["data"]["index"].is_object(),
+        "the rebuild's report is in data.index: {body}"
+    );
+    assert!(
+        repo.join(".canon/specs").is_dir(),
+        "the files moved and stay moved"
+    );
 }

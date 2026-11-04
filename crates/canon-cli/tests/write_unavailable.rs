@@ -1,6 +1,6 @@
 //! A command that writes into a target it cannot write refuses before it
 //! changes anything (`canon-0-33-atip-l0` F7, scenario `atip.l0.24`): exit 2,
-//! `WRITE_UNAVAILABLE`, a message that names the path, and a repo that holds
+//! `WRITE_DENIED`, a message that names the path, and a repo that holds
 //! exactly what it held. A write that fails after the first record is exit 1
 //! `WRITE_FAILED`.
 //!
@@ -163,35 +163,35 @@ fn assert_refused(repo: &Path, read_only: &[&Path], args: &[&str], code: &str, n
     drop(guards);
 }
 
-const WRITE_UNAVAILABLE: &str = "WRITE_UNAVAILABLE";
+const WRITE_DENIED: &str = "WRITE_DENIED";
 
 #[test]
 fn atip_l0_24_subject_new_into_a_read_only_ledger_is_refused() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=subject");
-    assert_refused(dir.path(), &[&kind], &["subject", "new", "fresh", "--domain", "dev", "--title", "Fresh"], WRITE_UNAVAILABLE, "kind=subject");
+    assert_refused(dir.path(), &[&kind], &["subject", "new", "fresh", "--domain", "dev", "--title", "Fresh"], WRITE_DENIED, "kind=subject");
 }
 
 #[test]
 fn atip_l0_24_subject_move_into_a_read_only_ledger_is_refused() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=subject");
-    assert_refused(dir.path(), &[&kind], &["subject", "move", "demo", "--to", "specced"], WRITE_UNAVAILABLE, "kind=subject");
+    assert_refused(dir.path(), &[&kind], &["subject", "move", "demo", "--to", "specced"], WRITE_DENIED, "kind=subject");
 }
 
 #[test]
 fn atip_l0_24_subject_adopt_and_unadopt_into_a_read_only_ledger_are_refused() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=subject");
-    assert_refused(dir.path(), &[&kind], &["subject", "adopt", "demo-two", "--change", "add-login"], WRITE_UNAVAILABLE, "kind=subject");
-    assert_refused(dir.path(), &[&kind], &["subject", "unadopt", "demo", "--change", "add-login"], WRITE_UNAVAILABLE, "kind=subject");
+    assert_refused(dir.path(), &[&kind], &["subject", "adopt", "demo-two", "--change", "add-login"], WRITE_DENIED, "kind=subject");
+    assert_refused(dir.path(), &[&kind], &["subject", "unadopt", "demo", "--change", "add-login"], WRITE_DENIED, "kind=subject");
 }
 
 #[test]
 fn atip_l0_24_change_new_refuses_a_read_only_change_store_before_creating_the_change() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=change");
-    assert_refused(dir.path(), &[&kind], &["change", "new", "second", "--subject", "demo", "--title", "Second"], WRITE_UNAVAILABLE, "kind=change");
+    assert_refused(dir.path(), &[&kind], &["change", "new", "second", "--subject", "demo", "--title", "Second"], WRITE_DENIED, "kind=change");
     assert!(!dir.path().join(".canon/changes/second").exists(), "no change directory was started");
 }
 
@@ -199,14 +199,14 @@ fn atip_l0_24_change_new_refuses_a_read_only_change_store_before_creating_the_ch
 fn atip_l0_24_inventory_sync_into_a_read_only_ledger_is_refused() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=scenario");
-    assert_refused(dir.path(), &[&kind], &["inventory", "sync"], WRITE_UNAVAILABLE, "kind=scenario");
+    assert_refused(dir.path(), &[&kind], &["inventory", "sync"], WRITE_DENIED, "kind=scenario");
 }
 
 #[test]
 fn atip_l0_24_ingest_plans_into_a_read_only_change_store_is_refused() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=change");
-    assert_refused(dir.path(), &[&kind], &["ingest", "plans"], WRITE_UNAVAILABLE, "kind=change");
+    assert_refused(dir.path(), &[&kind], &["ingest", "plans"], WRITE_DENIED, "kind=change");
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn atip_l0_24_ingest_sessions_into_a_read_only_hot_store_is_refused() {
     .unwrap();
     let canon_dir = dir.path().join(".canon");
     let home_arg = home.path().display().to_string();
-    assert_refused(dir.path(), &[&canon_dir], &["ingest", "sessions", "--home", &home_arg, "--all-workspaces"], WRITE_UNAVAILABLE, "hot.db");
+    assert_refused(dir.path(), &[&canon_dir], &["ingest", "sessions", "--home", &home_arg, "--all-workspaces"], WRITE_DENIED, "hot.db");
 }
 
 #[test]
@@ -237,14 +237,14 @@ fn atip_l0_24_ingest_records_into_a_read_only_trajectory_store_is_refused() {
     fs::write(review.join("world.firstbuy-hotdeal.26.json"), r#"{"kind":"code-review","scenario_id":"world.firstbuy-hotdeal.26","at":"2026-07-01T00:00:00Z"}"#).unwrap();
     let learn = repo.join(".canon/learn");
     fs::create_dir_all(&learn).unwrap();
-    assert_refused(repo, &[&learn], &["ingest", "records", "--repo", "."], WRITE_UNAVAILABLE, "trajectories");
+    assert_refused(repo, &[&learn], &["ingest", "records", "--repo", "."], WRITE_DENIED, "trajectories");
 }
 
 #[test]
 fn atip_l0_24_report_build_into_a_read_only_canon_directory_is_refused() {
     let dir = scratch_repo();
     let canon_dir = dir.path().join(".canon");
-    assert_refused(dir.path(), &[&canon_dir], &["report", "build"], WRITE_UNAVAILABLE, "REPORT.md");
+    assert_refused(dir.path(), &[&canon_dir], &["report", "build"], WRITE_DENIED, "REPORT.md");
 }
 
 #[test]
@@ -252,7 +252,7 @@ fn atip_l0_24_report_snapshot_into_a_read_only_directory_is_refused() {
     let dir = scratch_repo();
     fs::create_dir(dir.path().join("out")).unwrap();
     let out = dir.path().join("out");
-    assert_refused(dir.path(), &[&out], &["report", "snapshot", "out/snap"], WRITE_UNAVAILABLE, "snap");
+    assert_refused(dir.path(), &[&out], &["report", "snapshot", "out/snap"], WRITE_DENIED, "snap");
 }
 
 const REGIME: &str = "dev/canon/join-spine/9c93d024b1a2";
@@ -261,7 +261,7 @@ const REGIME: &str = "dev/canon/join-spine/9c93d024b1a2";
 fn atip_l0_24_dispatch_begin_into_a_read_only_canon_directory_is_refused() {
     let dir = scratch_repo();
     let canon_dir = dir.path().join(".canon");
-    assert_refused(dir.path(), &[&canon_dir], &["dispatch", "begin", "--role", "dev", "--regime", REGIME], WRITE_UNAVAILABLE, ".canon/dispatch");
+    assert_refused(dir.path(), &[&canon_dir], &["dispatch", "begin", "--role", "dev", "--regime", REGIME], WRITE_DENIED, ".canon/dispatch");
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn atip_l0_24_dispatch_end_into_a_read_only_manifest_directory_is_refused() {
     let begun = json(&ok(dir.path(), &["dispatch", "begin", "--role", "dev", "--regime", REGIME, "--json"]));
     let run_id = begun["data"]["runId"].as_str().expect("the run id").to_string();
     let manifests = dir.path().join(".canon/dispatch");
-    assert_refused(dir.path(), &[&manifests], &["dispatch", "end", &run_id, "--run-outcome", "succeeded"], WRITE_UNAVAILABLE, ".canon/dispatch");
+    assert_refused(dir.path(), &[&manifests], &["dispatch", "end", &run_id, "--run-outcome", "succeeded"], WRITE_DENIED, ".canon/dispatch");
 }
 
 const MANIFEST: &str = r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#;
@@ -288,14 +288,14 @@ fn repo_with_manifest() -> TempDir {
 fn atip_l0_24_context_pack_add_into_a_read_only_canon_directory_is_refused() {
     let dir = repo_with_manifest();
     let canon_dir = dir.path().join(".canon");
-    assert_refused(dir.path(), &[&canon_dir], &["context-pack", "add", "--manifest", "manifest.json"], WRITE_UNAVAILABLE, ".canon/context-packs");
+    assert_refused(dir.path(), &[&canon_dir], &["context-pack", "add", "--manifest", "manifest.json"], WRITE_DENIED, ".canon/context-packs");
 }
 
 #[test]
 fn atip_l0_24_prompt_add_into_a_read_only_canon_directory_is_refused() {
     let dir = repo_with_manifest();
     let canon_dir = dir.path().join(".canon");
-    assert_refused(dir.path(), &[&canon_dir], &["prompt", "add", "reviewer@v1", "--manifest", "manifest.json"], WRITE_UNAVAILABLE, ".canon/prompts");
+    assert_refused(dir.path(), &[&canon_dir], &["prompt", "add", "reviewer@v1", "--manifest", "manifest.json"], WRITE_DENIED, ".canon/prompts");
 }
 
 #[test]
@@ -317,7 +317,7 @@ fn atip_l0_24_plugin_sync_into_a_read_only_ledger_is_refused() {
     );
     ok(repo, &["inventory", "sync", "--repo", "."]);
     let ledger = repo.join(".canon/ledger");
-    assert_refused(repo, &[&ledger], &["plugin", "sync", "porting", "--repo", "."], WRITE_UNAVAILABLE, ".canon/ledger");
+    assert_refused(repo, &[&ledger], &["plugin", "sync", "porting", "--repo", "."], WRITE_DENIED, ".canon/ledger");
 }
 
 #[test]
@@ -325,19 +325,19 @@ fn atip_l0_24_gate_promote_into_a_read_only_ledger_is_refused() {
     let dir = scratch_repo();
     ok(dir.path(), &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "rev", "--summary", "a note", "--no-promote"]);
     let ledger = dir.path().join(".canon/ledger");
-    assert_refused(dir.path(), &[&ledger], &["gate", "promote"], WRITE_UNAVAILABLE, ".canon/ledger");
+    assert_refused(dir.path(), &[&ledger], &["gate", "promote"], WRITE_DENIED, ".canon/ledger");
 }
 
 #[test]
 fn atip_l0_24_divergence_resolve_and_defer_into_a_read_only_ledger_are_refused() {
     let dir = scratch_repo();
     let ledger = dir.path().join(".canon/ledger");
-    assert_refused(dir.path(), &[&ledger], &["divergence", "resolve", "auth.login.01", "--actor", "rev", "--role", "reviewer"], WRITE_UNAVAILABLE, ".canon/ledger");
+    assert_refused(dir.path(), &[&ledger], &["divergence", "resolve", "auth.login.01", "--actor", "rev", "--role", "reviewer"], WRITE_DENIED, ".canon/ledger");
     assert_refused(
         dir.path(),
         &[&ledger],
         &["divergence", "defer", "auth.login.01", "--actor", "rev", "--role", "reviewer", "--reason", "later", "--expiry", "2099-01-01T00:00:00Z"],
-        WRITE_UNAVAILABLE,
+        WRITE_DENIED,
         ".canon/ledger",
     );
 }
@@ -357,21 +357,21 @@ fn atip_l0_24_ledger_compact_refuses_a_read_only_ledger_before_moving_a_version(
     let preview = json(&ok(dir.path(), &["ledger", "compact", "--json"]));
     let digest = preview["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
     assert!(preview["data"]["effects"].as_array().is_some_and(|effects| !effects.is_empty()), "the older version is a move the plan lists: {preview}");
-    assert_refused(dir.path(), &[&subjects], &["ledger", "compact", "--commit", "--plan-digest", &digest], WRITE_UNAVAILABLE, "kind=subject");
+    assert_refused(dir.path(), &[&subjects], &["ledger", "compact", "--commit", "--plan-digest", &digest], WRITE_DENIED, "kind=subject");
 }
 
 #[test]
 fn atip_l0_24_export_into_a_read_only_canon_directory_is_refused() {
     let dir = scratch_repo();
     let canon_dir = dir.path().join(".canon");
-    assert_refused(dir.path(), &[&canon_dir], &["export", "--kind", "subject", "--output", "out.json"], WRITE_UNAVAILABLE, "access.jsonl");
+    assert_refused(dir.path(), &[&canon_dir], &["export", "--kind", "subject", "--output", "out.json"], WRITE_DENIED, "access.jsonl");
 }
 
 #[test]
 fn atip_l0_24_skills_install_into_a_read_only_repo_is_refused() {
     let dir = scratch_repo();
     let repo = dir.path().to_path_buf();
-    assert_refused(&repo, &[&repo], &["skills", "install", "--providers", "claude"], WRITE_UNAVAILABLE, "read-only");
+    assert_refused(&repo, &[&repo], &["skills", "install", "--providers", "claude"], WRITE_DENIED, "read-only");
 }
 
 #[test]
@@ -387,7 +387,7 @@ fn atip_l0_24_artifacts_store_into_a_read_only_blob_directory_is_refused() {
     }
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "review"]);
-    assert_refused(repo, &[&store], &["artifacts", "store"], WRITE_UNAVAILABLE, "sha256");
+    assert_refused(repo, &[&store], &["artifacts", "store"], WRITE_DENIED, "sha256");
 }
 
 #[test]
@@ -403,11 +403,11 @@ fn atip_l0_24_tier_age_and_purge_refuse_a_read_only_store_before_moving_or_remov
     let age = json(&ok(repo, &["tier", "age", "--json", "--repo", &repo_arg]));
     let age_digest = age["data"]["planDigest"].as_str().expect("a planDigest").to_string();
     let kind = repo.join(".canon/ledger/kind=trajectory");
-    assert_refused(repo, &[&kind], &["tier", "age", "--commit", "--plan-digest", &age_digest, "--repo", &repo_arg], WRITE_UNAVAILABLE, "kind=trajectory");
+    assert_refused(repo, &[&kind], &["tier", "age", "--commit", "--plan-digest", &age_digest, "--repo", &repo_arg], WRITE_DENIED, "kind=trajectory");
 
     let purge = json(&ok(repo, &["purge", "--kind", "trajectory", "--before", "2099-01-01T00:00:00Z", "--json", "--repo", &repo_arg]));
     let purge_digest = purge["data"]["planDigest"].as_str().expect("a planDigest").to_string();
-    assert_refused(repo, &[&kind], &["purge", "--kind", "trajectory", "--before", "2099-01-01T00:00:00Z", "--commit", "--plan-digest", &purge_digest, "--repo", &repo_arg], WRITE_UNAVAILABLE, "kind=trajectory");
+    assert_refused(repo, &[&kind], &["purge", "--kind", "trajectory", "--before", "2099-01-01T00:00:00Z", "--commit", "--plan-digest", &purge_digest, "--repo", &repo_arg], WRITE_DENIED, "kind=trajectory");
 }
 
 mod strategy {
@@ -444,7 +444,7 @@ mod strategy {
         let dir = scratch_repo();
         let id = seeded(dir.path()).to_string();
         let store = dir.path().join(".canon/learn/strategies");
-        assert_refused(dir.path(), &[&store], &["strategy", "promote", &id], WRITE_UNAVAILABLE, "strategies");
+        assert_refused(dir.path(), &[&store], &["strategy", "promote", &id], WRITE_DENIED, "strategies");
     }
 
     #[test]
@@ -457,7 +457,7 @@ mod strategy {
             dir.path(),
             &[&store],
             &["strategy", "rollback", &id, "--reason", "it regressed", "--actor", "human", "--signature-file", "approval.sig", "--approval-at", "2026-01-01T00:00:00Z"],
-            WRITE_UNAVAILABLE,
+            WRITE_DENIED,
             "strategies",
         );
     }

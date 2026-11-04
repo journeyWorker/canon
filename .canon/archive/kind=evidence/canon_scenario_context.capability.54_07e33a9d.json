@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:18:47.822581Z",
+  "attachments": [
+    {
+      "case": "context_capability_54_with_two_spec_roots_a_missing_project_is_refused_in_the_new_spelling",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    }
+  ],
+  "code_tree": "84454e6621e493af02ddc9c1cd5b2158249ee38a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "91a47e478825254994473672e759b11ec606c931",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 973,
+  "scenario_id": "context.capability.54",
+  "schema": 1,
+  "staging_id": "6317758d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -236,7 +236,7 @@ pub fn sample(doc: &Value, example: &[String], argument: &Value) -> String {
         "NAME@VERSION" => "reviewer@v1",
         "PATH_OR_EFFECT" => "effect:cache",
         "DIR" | "FILE" | "PATH" => "sample.txt",
-        "DIGEST" => "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "DIGEST" | "PLAN_DIGEST" => "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         _ => "",
     };
     if !by_name.is_empty() {

@@ -518,7 +518,7 @@ Feature: evidence add
   Scenario: A fabrication marker is refused the way every other gate-red refusal of evidence add is
     Given a summary holding "TBD" and a command result reading "n/a"
     When evidence is added with them
-    Then the command exits 1 with the code EVIDENCE_NOTE_INVALID and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
+    Then the command exits 2 with the code EVIDENCE_NOTE_INVALID and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
     And nothing is staged or committed
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -548,7 +548,7 @@ Feature: evidence add
   Scenario: A bare artifact is refused in a batch because it would bind to every scenario
     Given indexed scenarios and a report that owns a case for several of them
     When evidence is added with --all-scenarios and --artifact <path>
-    Then the add exits 2 with the code EVIDENCE_INVALID_ARGUMENT and a hint naming per-test report attachments and --artifact <scenario-id>=<path>
+    Then the add exits 2 with the code EVIDENCE_ARGUMENT_CONFLICT and a hint naming per-test report attachments and --artifact <scenario-id>=<path>
     And nothing is staged, committed or stored
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -608,7 +608,7 @@ Feature: evidence add
   Scenario: A subject whose only change is unapproved, or whose approval was edited, still refuses evidence
     Given a verifying subject whose only change has a brief.md with no "Approved:" line, or an approved one edited since
     When evidence is added for an untagged scenario and for one tagged @flow: with that change
-    Then each add exits 1 with BRIEF_APPROVAL_REQUIRED, or BRIEF_APPROVAL_STALE for the edited approval, naming that brief.md
+    Then each add exits 2 with BRIEF_APPROVAL_REQUIRED, or BRIEF_APPROVAL_STALE for the edited approval, naming that brief.md
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:42Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:evidence-attestation
@@ -801,7 +801,7 @@ Feature: evidence add
   Scenario: Artifacts move refuses a tier that is no object store or a missing tier and changes nothing
     Given a repo with an object-store tier cold and a scenario attested with one bound artifact in the local store
     When canon artifacts move names tier hot, which is no object store, with --json
-    Then it exits 2 with ARTIFACTS_MOVE_REFUSED saying the tier is not an object store
+    Then it exits 2 with ARTIFACTS_TIER_INVALID saying the tier is not an object store
     And canon artifacts move with no --tier exits 2 naming --tier, and --commit without --plan-digest exits 2 naming --plan-digest
     And after each refusal the tree is unchanged, the local blob is still there and the store holds nothing
 
@@ -838,7 +838,7 @@ Feature: evidence add
   Scenario: An approval payload is refused without a task or scenario, or with an unreadable time, and prints no bytes
     Given a repo with one indexed scenario
     When canon evidence approval-payload is run with neither --task nor --scenario, with --approval-at yesterday, or with no --approver
-    Then each exits 2, the first with EVIDENCE_REFUSED and the others as usage errors naming invalid timestamp and --approver
+    Then each exits 2, the first with EVIDENCE_REQUIRED and the others as usage errors naming invalid timestamp and --approver
     And no payload bytes reach stdout
     And the tree is unchanged
 
@@ -861,7 +861,7 @@ Feature: evidence add
   Scenario: An untagged scenario's evidence is refused when an approved governing change was edited since its approval
     Given a building subject owning a scenario with no @flow tag, adopting an approved change whose brief was edited after its approval
     When evidence is added for that scenario
-    Then it exits 1 with BRIEF_APPROVAL_STALE naming that brief.md and nothing is staged
+    Then it exits 2 with BRIEF_APPROVAL_STALE naming that brief.md and nothing is staged
     And once the brief is approved again the same add succeeds
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:28Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
@@ -883,7 +883,7 @@ Feature: evidence add
   Scenario: An approval payload for a scenario the index does not hold is refused and prints no bytes
     Given a repo with one indexed scenario
     When canon evidence approval-payload is run with --scenario naming a scenario the index does not hold, and then with the indexed one
-    Then the first exits 2 with EVIDENCE_SCENARIO_NOT_INDEXED, its message names the id and the spec root and its hint points to canon inventory sync, and stdout is empty
+    Then the first exits 2 with SCENARIO_INDEX_REQUIRED, its message names the id and the spec root and its hint points to canon inventory sync, and stdout is empty
     And the indexed scenario exits 0 and prints the bytes to sign
     And the tree is unchanged after both
 
@@ -895,5 +895,5 @@ Feature: evidence add
   Scenario: evidence add is refused, writing nothing, when a brief it judges is in the 0.30 format, approved or not
     Given a subject whose adopted change has a brief in the 0.30 format, approved with a matching digest and not
     When canon evidence add runs for a scenario the subject answers for
-    Then it exits 2 with OLD_BRIEF_FORMAT whose hint is canon migrate, writes nothing, and --override-reason does not waive it
+    Then it exits 2 with BRIEF_MIGRATION_REQUIRED whose hint is canon migrate, writes nothing, and --override-reason does not waive it
     And an approved old brief whose digest matches still reads as approved by status

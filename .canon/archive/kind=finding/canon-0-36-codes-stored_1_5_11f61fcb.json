@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T07:25:33.053205Z",
+  "change_id": "canon-0-36-codes-stored",
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4ea21af84a4cad334690b6662e01ba946daace8b",
+  "reviewer": "rev-0-36-stored",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.03"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] A dispatch manifest that is broken in a way other than 'not JSON' or 'not readable by this user' is not DISPATCH_MANIFEST_CORRUPT at exit 2: `read_dispatched_manifest` sends every other read failure to `DispatchError::Io`, which `to_cli_error` answers WRITE_FAILED, exit 1, hint 'check that .canon is writable'. Driven with `dispatch end <run>`: a manifest with non-UTF-8 bytes -> exit 1 WRITE_FAILED 'stream did not contain valid UTF-8'; a directory where the manifest belongs -> exit 1 WRITE_FAILED 'Is a directory (os error 21)'; `.canon/dispatch` at mode 000 -> exit 1 WRITE_FAILED 'Permission denied'. The brief (F2 acceptance) says a broken dispatch manifest is DISPATCH_MANIFEST_CORRUPT and exit 2, and atip.codestored.03 is titled that way; a read is not a write, and exit 1 says work began. Also: a manifest at mode 000 answers WRITE_DENIED ('cannot write'), not DISPATCH_MANIFEST_DENIED, because the writability check runs before the read (the bound test sets mode 200, which passes the write check; mode 000 does not). Fix: map a non-NotFound, non-denied read error to CORRUPT (UTF-8, EISDIR) or DENIED (EACCES) before it reaches Io; read before check_writable or classify both. Blast radius: `artifact_ingest --run` attribution reads through the same function.",
+  "worktree_dirty": false
+}

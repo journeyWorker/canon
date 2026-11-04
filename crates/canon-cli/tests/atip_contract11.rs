@@ -31,20 +31,20 @@ fn atip_contract11_01_every_envelope_declares_the_contract_and_its_version_and_a
     for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["finding", "nosuch", "--json"], vec!["--json"], vec!["schema", "--json"], vec!["schema", "status", "--json"], vec!["schema", "--errors", "--json"], vec!["schema", "--warnings", "--json"], vec!["gate", "check", "--json"]] {
         let document = json(&canon(dir.path(), &args));
         assert_eq!(document["meta"]["contract"], "atip/1", "{args:?}: {document}");
-        assert_eq!(document["meta"]["contractVersion"], "1.2", "{args:?}: the same build says the same version everywhere: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.4", "{args:?}: the same build says the same version everywhere: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     for (flag, kind) in [("--errors", "errors"), ("--warnings", "warnings")] {
         let document = json(&canon(dir.path(), &["schema", flag, "--json"]));
         assert_eq!(document["data"]["kind"], kind);
-        assert_eq!(document["meta"]["schemaVersion"], "1.2", "{document}");
+        assert_eq!(document["meta"]["schemaVersion"], "1.4", "{document}");
         assert_eq!(document["meta"]["command"], "schema");
     }
     for (flag, code, kind) in [("--error", "USAGE", "error"), ("--warning", "OLD_LAYOUT_FOUND", "warning")] {
         let document = json(&canon(dir.path(), &["schema", flag, code, "--json"]));
-        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.2")), "{document}");
+        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.4")), "{document}");
     }
-    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.2.
+    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.4.
     assert_eq!(json(&canon(dir.path(), &["nosuch", "--json"]))["meta"]["schemaVersion"], "1.0");
 }
 
@@ -155,4 +155,27 @@ fn atip_contract11_16_a_group_option_that_is_not_tool_wide_or_has_no_value_is_st
     // After a leaf nothing is hoisted: a leaf that does not take the option refuses it as USAGE, naming it.
     let refused = json(&canon(dir.path(), &["skills", "--repo", ".", "show", "canon", "--json"]));
     assert_eq!((refused["error"]["code"].as_str(), refused["error"]["field"].as_str()), (Some("USAGE"), Some("--repo")), "{refused}");
+}
+
+/// atip.contract11.17 (the failure path of F1): an envelope a caller would read that has `contractVersion` without `contract`, says `"1.0"` or names another
+/// contract is refused by the envelope schema, so a build that drops `contract` or lowers the version in a success, a refusal or a registry answer
+/// fails the test, and the version every shipped envelope names is the one canon declares; the shipped envelopes
+/// of each kind pass.
+#[test]
+fn atip_contract11_17_an_envelope_without_the_contract_or_with_version_1_0_or_another_contract_fails_the_envelope_schema() {
+    let dir = repo();
+    for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["schema", "--errors", "--json"]] {
+        let envelope = json(&canon(dir.path(), &args));
+        assert_eq!(atip::envelope_problems(&envelope), Vec::<String>::new(), "{args:?}: the shipped envelope passes");
+        assert_eq!((envelope["meta"]["contract"].as_str(), envelope["meta"]["contractVersion"].as_str()), (Some("atip/1"), Some("1.4")), "{args:?}");
+        for (fault, change) in [
+            ("contract removed", Box::new(|meta: &mut serde_json::Map<String, Value>| drop(meta.remove("contract"))) as Box<dyn Fn(&mut serde_json::Map<String, Value>)>),
+            ("contractVersion 1.0", Box::new(|meta| drop(meta.insert("contractVersion".into(), Value::from("1.0"))))),
+            ("contract of another family", Box::new(|meta| drop(meta.insert("contract".into(), Value::from("atip/2"))))),
+        ] {
+            let mut broken = envelope.clone();
+            change(broken["meta"].as_object_mut().expect("meta is an object"));
+            assert!(!atip::envelope_problems(&broken).is_empty(), "{args:?}: an envelope with {fault} must fail the envelope schema: {broken}");
+        }
+    }
 }

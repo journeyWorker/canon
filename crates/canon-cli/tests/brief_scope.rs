@@ -577,7 +577,7 @@ fn subject_lifecycle_37_unadopt_refuses_an_approved_change() {
     );
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(json["error"]["code"], "SUBJECT_UNADOPT_REFUSED", "{json}");
+    assert_eq!(json["error"]["code"], "SUBJECT_CONFLICT", "{json}");
     assert!(
         json["error"]["hint"]
             .as_str()
@@ -667,7 +667,7 @@ fn subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for() {
     );
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(json["error"]["code"], "SUBJECT_UNADOPT_REFUSED", "{json}");
+    assert_eq!(json["error"]["code"], "SUBJECT_CONFLICT", "{json}");
     let text = json.to_string();
     assert!(
         text.contains("shop.cart.01") && text.contains("remove or retag"),

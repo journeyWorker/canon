@@ -90,3 +90,13 @@ Feature: atip help json: --help and --version with --json are refused and point 
     Given the guides, README files, doc pages, scripts, skills and website sources of the repository, apart from the changelog, the briefs and the research notes that name the old behavior
     When their text is searched for --help with --json on one line
     Then none recommends them as the machine description; the recommendation is canon schema
+
+  # canon: {"schema":1,"at":"2026-11-05T09:00:05Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
+  @subject:atip-schema
+  @case:failure
+  @flow:canon-0-36-help-json.F4
+  @atip.helpjson.10
+  Scenario: A guide that recommends --help --json, or a text help that lost its pointer or became JSON, is found, and an unknown command asked for help is no help
+    Given lines that recommend help with JSON in a backtick, a quote and a bare line, and the text help and version of the built canon
+    When the recommendation guard reads them, and the text help of the root, a group and a command and the version line are read
+    Then each recommendation is found and a line that recommends nothing is not, a help text without its first-line pointer or in JSON is named, the text answers keep the pointer and one version line, and canon nosuch --help does not exit 0

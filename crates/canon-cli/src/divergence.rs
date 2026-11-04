@@ -175,13 +175,13 @@ pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate:
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return crate::read_cause::config_error(error.to_string()).emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon divergence add", json);
         }
     };
     let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
@@ -209,9 +209,10 @@ pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate:
             return CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence add", json);
         }
     };
-    let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
+    let outcome = crate::gate::promote_after_stage("canon divergence add", "DIVERGENCE_INCOMPLETE", &gate_ctx.ledger_root, &location, promote, json);
     crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
-    if json {
+    // A stop after the record was staged answered with its error already (`DIVERGENCE_INCOMPLETE`): no success envelope follows it.
+    if json && outcome.exit_code() == 0 {
         crate::json_out::data("divergence add", &DivergenceAddReport { landing: outcome.landing(&location) });
     }
     outcome.exit_code()
@@ -301,7 +302,7 @@ fn run_commit(verb: &str, status: DivergenceStatus, args: CommitArgs<'_>) -> u8 
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
+            return crate::read_cause::config_error(e.to_string()).emit(&format!("canon divergence {verb}"), json);
         }
     };
     let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
@@ -382,7 +383,8 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
             .emit(CMD, args.json)
     };
     if args.role.as_str() != "reviewer" {
-        return CliError::refused("DIVERGENCE_ACCEPT_REFUSED", format!("accepting a divergence is a reviewer step, not `{}`", args.role.as_str()))
+        return CliError::refused("DIVERGENCE_DENIED", format!("accepting a divergence is a reviewer step, not `{}`", args.role.as_str()))
+            .reason("NOT_REVIEWER")
             .field("--role")
             .hint("pass --role reviewer (or declare --as reviewer)")
             .emit(CMD, args.json);
@@ -413,7 +415,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         ctx
     }) {
         Ok(context) => context,
-        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
+        Err(e) => return crate::read_cause::config_error(e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
     let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
     let mut scenarios = Vec::new();
@@ -430,15 +432,20 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
             .hint("run `canon inventory sync`, then accept again")
             .emit(CMD, args.json);
     }
-    let refusals: Vec<String> = scenarios
+    let refusals: Vec<canon_gate::acceptance::Refusal> = scenarios
         .iter()
         .filter_map(|scenario| canon_gate::acceptance::refusal(&context, scenario, &args.reviewer, &args.actor_id, args.session_id.as_ref()))
         .collect();
     if !refusals.is_empty() {
         let nothing = if scenarios.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
-        return CliError::refused("DIVERGENCE_ACCEPT_REFUSED", format!("{}{nothing}", refusals.join("; ")))
-            .hint("an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest")
-            .emit(CMD, args.json);
+        let hint = "an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest";
+        let error = |refusal: &canon_gate::acceptance::Refusal, message: String| match refusal.kind {
+            canon_gate::acceptance::RefusalKind::NotDivergent => CliError::refused("DIVERGENCE_CONFLICT", message).reason("NOT_DIVERGENT").hint(hint),
+            canon_gate::acceptance::RefusalKind::SelfAttested => CliError::refused("DIVERGENCE_DENIED", message).reason("SELF_ATTESTED").hint(hint),
+        };
+        let first = error(&refusals[0], format!("{}{nothing}", refusals[0].message));
+        let all: Vec<CliError> = refusals.iter().map(|r| error(r, r.message.clone())).collect();
+        return if refusals.len() > 1 { first.details(all).emit(CMD, args.json) } else { first.emit(CMD, args.json) };
     }
 
     let mut actor = Actor::new(&args.actor_id, args.role.clone());
@@ -526,7 +533,7 @@ pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &cr
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence list", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon divergence list", json);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);

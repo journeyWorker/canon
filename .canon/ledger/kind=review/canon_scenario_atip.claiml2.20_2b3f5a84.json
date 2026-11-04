@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev"
+  },
+  "at": "2026-11-04T18:40:49.303662Z",
+  "code_tree": "1a4b9e6c3c6d893d3ee046015816857f27417fa0",
+  "kind": "review",
+  "pin": "15d319179e78d0d448d146b1492138dfaa6245cb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_4"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "d8121bcfd9fbd0fff07ae706421d1b5c55329bd4bfff6cbc24b72af894431c93",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
+  },
+  "review_id": "01M6KXT84QQWTMDGPER259M3QA",
+  "reviewer": "rev-0-36-flowfix",
+  "scenario_id": "atip.claiml2.20",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:25:57.824668Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/gate.rs:1368-1376",
+  "introduced_by": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "kind": "finding",
+  "reason": "re-reviewed at 73e2b1a0",
+  "resolution_code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "resolution_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 1,
+  "scenario_ids": [
+    "atip.incomplete.04"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[correctness] HOOKS_INSTALL_INCOMPLETE covers the second hook file only. `write_pre_commit_script` failing after both hook files were written is still WRITE_FAILED (gate.rs, `if writes_script`), with the files installed and no read-first next; the same stop one step later takes the other code. Make the script write the third step of the same INCOMPLETE (claude or codex outcome Installed), keep WRITE_FAILED only for a first write that kept nothing. Also the brief table says not retryable, and a repeat of install-hooks does finish the install (observed: the second run without the seam installed the codex file); not retryable is the conservative registry value and matches the brief, so no change asked.",
+  "worktree_dirty": false
+}

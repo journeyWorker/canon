@@ -145,32 +145,61 @@ pub fn accepted_divergences(ctx: &GateContext) -> Vec<Acceptance> {
     out
 }
 
+/// Why an acceptance is refused: the evidence is not divergent (`DIVERGENCE_CONFLICT`, reason `NOT_DIVERGENT`) or the acceptor
+/// attested it (`DIVERGENCE_DENIED`, reason `SELF_ATTESTED`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refusal {
+    /// What the refusal is.
+    pub kind: RefusalKind,
+    /// The sentence that names the scenario and the cause.
+    pub message: String,
+}
+
+/// The condition of a [`Refusal`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RefusalKind {
+    /// The scenario's latest evidence is not divergent, or there is none: a state conflict.
+    NotDivergent,
+    /// The acceptor, or the session, attested the evidence: only an independent reviewer accepts.
+    SelfAttested,
+}
+
+impl Refusal {
+    fn not_divergent(message: String) -> Self {
+        Self { kind: RefusalKind::NotDivergent, message }
+    }
+
+    fn self_attested(message: String) -> Self {
+        Self { kind: RefusalKind::SelfAttested, message }
+    }
+}
+
 /// Why `reviewer`, acting as `actor_id` in `session`, cannot accept
 /// `scenario`'s divergence now; `None` when they can. Acceptance needs the
 /// scenario's latest evidence (for some role) to be divergent, and no
 /// evidence record of the scenario by the same actor or from the same
 /// session: the reviewer must be independent of whoever attested it.
-pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id: &str, session: Option<&SessionId>) -> Option<String> {
+pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id: &str, session: Option<&SessionId>) -> Option<Refusal> {
     let id = scenario.scenario_id.as_str();
     let verdicts = latest_verdicts(ctx);
     let latest: Vec<_> = verdicts_of(verdicts, id).map(|(_, entry)| entry).collect();
     if latest.is_empty() {
-        return Some(format!("{id} has no evidence: only a divergent verdict can be accepted as a known gap"));
+        return Some(Refusal::not_divergent(format!("{id} has no evidence: only a divergent verdict can be accepted as a known gap")));
     }
     if !latest.iter().any(|e| e.verdict == EvidenceVerdict::Divergent) {
         let seen = latest.iter().map(|e| serde_json::to_value(e.verdict).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default()).collect::<BTreeSet<_>>().into_iter().collect::<Vec<_>>().join(", ");
-        return Some(format!("{id}'s latest evidence is not divergent ({seen}): there is no gap to accept"));
+        return Some(Refusal::not_divergent(format!("{id}'s latest evidence is not divergent ({seen}): there is no gap to accept")));
     }
     // Independence holds against EVERY attestation, superseded ones
     // included: the archive is read explicitly (`crate::history`).
     let evidence = crate::history::scenario_history(ctx, scenario);
     let actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
     if let Some(same) = [reviewer, actor_id].into_iter().find(|who| actors.contains(who)) {
-        return Some(format!("`{same}` attested {id}'s evidence; acceptance is an independent reviewer's step, by an actor other than the evidence's"));
+        return Some(Refusal::self_attested(format!("`{same}` attested {id}'s evidence; acceptance is an independent reviewer's step, by an actor other than the evidence's")));
     }
     let sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(SessionId::as_str).collect();
     if let Some(same) = session.filter(|s| sessions.contains(s.as_str())) {
-        return Some(format!("session `{}` attested {id}'s evidence; acceptance is an independent reviewer's step, from a session other than the evidence's", same.as_str()));
+        return Some(Refusal::self_attested(format!("session `{}` attested {id}'s evidence; acceptance is an independent reviewer's step, from a session other than the evidence's", same.as_str())));
     }
     None
 }

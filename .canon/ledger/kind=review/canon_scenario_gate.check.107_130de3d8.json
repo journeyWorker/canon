@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:39:29.039762Z",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "kind": "review",
+  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_check_107_gate_install_hooks_refuses_a_repo_that_is_no_directory_and_an_unreadable_timeout_and_writes_nothing"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ac1cab21260a88f08113833b702919d970ef4b781bb5393cf8a03f5ecc122497",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/specs/kind=feature/area=gate/check.feature"
+  },
+  "review_id": "01M6K5PRCFQ483MRW6GPXHTKG5",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "gate.check.107",
+  "schema": 2,
+  "worktree_dirty": false
+}

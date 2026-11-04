@@ -6,8 +6,7 @@
 //!   and the `CANON_*` variables the crates read are accounted for in
 //!   `tests/cli_spec.rs`);
 //! - `canon schema --error <CODE>` explains every code, and `--errors` lists them all;
-//! - every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits 2 (D4), but `POLICY_APPROVAL_UNREADABLE`
-//!   (0.33: an unreadable approval is a closed gate, exit 1);
+//! - every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits 2 (D4);
 //! - every code and exit a leaf lists is a registered code and a row of the exit table.
 
 mod harness;
@@ -56,7 +55,7 @@ fn live_sources(dir: &Path, out: &mut Vec<(String, String)>) {
 }
 
 /// Every string literal a source hands to `CliError::refused(` / `::failed(` (the constructors of a coded error), to a local `refuse(` helper
-/// (`brief_approve.rs`) and to the `Cause { code: … }` of a gate's refusal (`gate_refusal.rs`, `run/ingest.rs`).
+/// (`brief_approve.rs`) and to the `Cause::new("CODE", …)` of a gate's refusal (`gate_refusal.rs`, `run/ingest.rs`).
 #[test]
 fn every_code_a_source_builds_is_registered() {
     let registry: BTreeSet<&str> = all_codes().iter().map(|i| i.code).collect();
@@ -64,7 +63,7 @@ fn every_code_a_source_builds_is_registered() {
     live_sources(&repo_root().join("crates/canon-cli/src"), &mut sources);
     let (mut seen, mut problems) = (0, Vec::new());
     for (file, text) in &sources {
-        for needle in ["CliError::refused(\"", "CliError::failed(\"", "refused(\"", "failed(\"", "refuse(\"", "Cause { code: \""] {
+        for needle in ["CliError::refused(\"", "CliError::failed(\"", "refused(\"", "failed(\"", "refuse(\"", "Cause::new(\""] {
             for (at, _) in text.match_indices(needle) {
                 let rest = &text[at + needle.len()..];
                 let code: String = rest.chars().take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_').collect();
@@ -86,12 +85,12 @@ fn every_code_a_source_builds_is_registered() {
 fn not_found_unreadable_and_invalid_argument_exit_2() {
     let mut checked = 0;
     for info in all_codes() {
-        if ["_NOT_FOUND", "_UNREADABLE", "_INVALID_ARGUMENT"].iter().any(|suffix| info.code.ends_with(suffix)) && info.code != "POLICY_APPROVAL_UNREADABLE" {
+        if ["_NOT_FOUND", "_UNREADABLE", "_INVALID_ARGUMENT"].iter().any(|suffix| info.code.ends_with(suffix)) {
             checked += 1;
             assert_eq!(info.exit, 2, "{} must exit 2 (D4)", info.code);
         }
     }
-    assert!(checked > 20, "the registry has the families ({checked})");
+    assert!(checked > 15, "the registry has the families ({checked})");
 }
 
 #[test]
@@ -140,7 +139,7 @@ fn atip_contract11_05_schema_lists_every_warning_and_explains_each() {
     let dir = tempfile::tempdir().unwrap();
     let listing = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--warnings", "--json"]), &[]));
     assert_eq!(listing["data"]["kind"], "warnings");
-    assert_eq!(listing["meta"]["schemaVersion"], "1.2");
+    assert_eq!(listing["meta"]["schemaVersion"], "1.4");
     let listed = listing["data"]["warnings"].as_array().expect("--warnings lists the codes").clone();
     assert_eq!(listed.iter().map(|e| e["code"].as_str().unwrap().to_string()).collect::<Vec<_>>(), canon_cli::cli_error::all_warnings().iter().map(|i| i.code.to_string()).collect::<Vec<_>>());
     for entry in &listed {
@@ -151,7 +150,7 @@ fn atip_contract11_05_schema_lists_every_warning_and_explains_each() {
         assert!(atip::envelope_problems(&one).is_empty());
     }
     let errors = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--errors", "--json"]), &[]));
-    assert_eq!((errors["data"]["kind"].as_str(), errors["meta"]["schemaVersion"].as_str()), (Some("errors"), Some("1.2")));
+    assert_eq!((errors["data"]["kind"].as_str(), errors["meta"]["schemaVersion"].as_str()), (Some("errors"), Some("1.4")));
     let error_codes: Vec<&str> = errors["data"]["errors"].as_array().unwrap().iter().map(|e| e["code"].as_str().unwrap()).collect();
     let warning_codes: Vec<&str> = listed.iter().map(|e| e["code"].as_str().unwrap()).collect();
     assert!(warning_codes.contains(&"OLD_LAYOUT_FOUND") && !error_codes.contains(&"OLD_LAYOUT_FOUND"), "a code that is only a warning left the error registry");
@@ -185,12 +184,12 @@ fn atip_contract11_06_a_registry_option_the_other_registry_owns_or_does_not_know
     }
 }
 
-/// atip.codeexit.12: the scan above reads a `refuse("CODE", …)` helper call and a `Cause { code: "CODE", … }`, so a typo in either is found.
+/// atip.codeexit.12: the scan above reads a `refuse("CODE", …)` helper call and a `Cause::new("CODE", …)`, so a typo in either is found.
 #[test]
 fn atip_codeexit_12_the_scan_reads_the_refuse_helper_and_the_cause_literal() {
     let registry: BTreeSet<&str> = all_codes().iter().map(|i| i.code).collect();
-    let needles = ["refuse(\"", "Cause { code: \""];
-    for (text, code) in [("return refuse(\"BRIEF_INVALID\", &message);", "BRIEF_INVALID"), ("Cause { code: \"INGEST_SOURCE_INVALID\", message }", "INGEST_SOURCE_INVALID")] {
+    let needles = ["refuse(\"", "Cause::new(\""];
+    for (text, code) in [("return refuse(\"BRIEF_INVALID\", &message);", "BRIEF_INVALID"), ("Cause::new(\"INGEST_SOURCE_INVALID\", message)", "INGEST_SOURCE_INVALID")] {
         let read: Vec<String> = needles
             .iter()
             .flat_map(|needle| text.match_indices(needle).map(move |(at, _)| text[at + needle.len()..].chars().take_while(|c| c.is_ascii_uppercase() || *c == '_').collect::<String>()))

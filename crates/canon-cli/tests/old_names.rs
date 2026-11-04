@@ -5,19 +5,15 @@
 
 use std::path::{Path, PathBuf};
 
+mod old_codes;
+use old_codes::{gone_codes, gone_codes_in, registered_names, unregistered_codes_in, word_in};
+
 /// Error codes 0.33 deleted (each has a replacement in the CHANGELOG's table).
 const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATCH_UNSUPPORTED", "INPUT_INVALID_TYPE", "INPUT_UNKNOWN_FIELD", "INPUT_UNREADABLE", "INPUT_STDIN_TTY", "INPUT_STDIN_CONFLICT", "INPUT_MISSING", "INVALID_CURSOR", "UNKNOWN_FIELD"];
 
-/// Error codes 0.36 renamed (`canon-0-36-codes-rename`; each has a replacement in the CHANGELOG's table). `CONFIG_MISSING` is not here:
-/// the error is `CONFIG_REQUIRED`, but the warning of `status` keeps the name `CONFIG_MISSING`.
-const RENAMED_CODES: &[&str] = &["APPROVAL_INCOMPLETE", "BRIEF_CHANGED_SINCE_PAGE_LOAD", "BRIEF_HAS_BLOCKERS", "BRIEF_UNAPPROVABLE", "CHANGE_AMBIGUOUS", "CHANGE_INVALID_ARGUMENT", "CONTEXT_INPUT_MISSING", "CONTEXT_SECRET_DETECTED", "CONTEXT_UNSAFE_PATH", "DASHBOARD_BAD_REQUEST", "DASHBOARD_CONFIG_INVALID", "DASHBOARD_ORIGIN_REFUSED", "DEMO_NOT_INITIALIZED", "DISPATCH_INVALID_ARGUMENT", "DISPATCH_ROLE_REGIME_MISMATCH", "DIVERGENCE_INVALID_ARGUMENT", "FEATURE_OUTSIDE_SPEC_ROOTS", "FINDING_INVALID_ARGUMENT", "FINDING_RESOLUTION_REV_UNEXPECTED", "FINDING_SEQ_OCCUPIED", "FINDING_STAGED", "FINDING_UNKNOWN_SCENARIO", "FORMAT_VIOLATIONS", "GATE_TASK_INVALID_ARGUMENT", "GATE_TASK_UNSUPPORTED", "GATE_VIOLATIONS", "HUMAN_ONLY", "INIT_CONFIG_EXISTS", "INIT_INVALID_ARGUMENT", "LEARN_DEMOTION_FAILED", "LEARN_INVALID_ARGUMENT", "LEARN_INVALID_INPUT", "LEARN_STRATEGY_NOT_FOUND", "LEARN_TRAJECTORY_NOT_FOUND", "MIGRATE_UNCOMMITTED", "NO_COMMIT", "PLAN_SOURCES_MISSING", "QUERY_INVALID_ARGUMENT", "RELAY_DIGEST_MISMATCH", "RETRIEVE_FAILED", "REVIEW_INVALID_ARGUMENT", "SCAFFOLD_INVALID_ARGUMENT", "SEARCH_QUERY_EMPTY", "SKILLS_DRIFT", "SPEC_ROOT_UNRESOLVED", "SUBJECT_INVALID_ARGUMENT", "SUBJECT_INVALID_TRANSITION", "UNKNOWN_ROLE", "UNKNOWN_SPEC_ROOT"];
-
-/// Error codes `canon-0-36-codes-exit` renamed or removed (each has a replacement in the CHANGELOG's table). `POLICY_CHANGED_SINCE_APPROVAL` is not here:
-/// the error is `POLICY_APPROVAL_STALE`, but the warning of `status` keeps the name.
-const RENAMED_EXIT_CODES: &[&str] = &["ADAPTER_EXECUTION_NOT_AUTHORIZED", "ADAPTER_RESPONSE_INVALID", "BRIEF_CHANGED_SINCE_APPROVAL", "BRIEF_UNAPPROVED", "CONTEXT_GIT_UNAVAILABLE", "DASHBOARD_NOT_BUILT", "DASHBOARD_PORT_IN_USE", "DISPATCH_END_IN_PROGRESS", "EVIDENCE_CONTRACT_MISMATCH", "EVIDENCE_FABRICATED", "EVIDENCE_REPORT_CONTRADICTION", "GATE_TASK_BLOCKED", "GATE_TASK_EVIDENCE_INVALID", "INGEST_SOURCE_UNUSABLE", "LEARN_EVALUATION_REJECTED", "REPORT_STALE", "PROMOTE_REFUSED", "SUBJECT_GATE_VIOLATION", "DIVERGENCE_REFUSED", "LEARN_PROMOTION_BLOCKED", "CONTEXT_PACK_TAMPERED", "EVIDENCE_BATCH_REFUSED"];
-
-/// Error codes 0.35 moved to `STOPPED_MIDWAY` (`atip.midway`; each has a replacement in the CHANGELOG's table).
+/// Error codes 0.35 moved to the reserved midway code (`atip.midway`; each has a replacement in the CHANGELOG's table).
 const MOVED_CODES: &[&str] = &["INIT_SKILL_INSTALL_FAILED"];
+
 
 /// `meta` keys 0.33 deleted, each a whole word or dotted path.
 const OLD_KEYS: &[&str] = &["canonVersion", "hasMore", "meta.unchanged", "meta.waitingOn", "meta.nextOmitted", "meta.hotStore", "meta.context.role", "meta.context.actor", "meta.next[].why"];
@@ -51,22 +47,12 @@ fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// `word` in `text` as a whole identifier, so `CONTEXT_INPUT_NOT_FOUND` is not `INPUT_MISSING`.
-fn word_in(text: &str, word: &str) -> bool {
-    text.match_indices(word).any(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + word.len()..].chars().next();
-        let part = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
-        !part(before) && !part(after)
-    })
-}
-
 /// Every old name `text` spells. One spelling is not old: the quoted JSON key `"canonVersion"`
 /// is a member of the `status` report's own `data` (the report is not part of this change; only
 /// `meta.canonVersion` is gone), which a guide shows when it prints that report.
 fn old_names_in(text: &str) -> Vec<&'static str> {
     let text = text.replace("\"canonVersion\"", "\"statusReportMember\"");
-    OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
+    OLD_CODES.iter().chain(gone_codes()).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
 }
 
 fn collect(dir: &Path, extensions: &[&str], skip: &[&str], out: &mut Vec<PathBuf>) {
@@ -143,14 +129,14 @@ fn atip_l0_27_the_check_catches_an_old_shape_that_comes_back() {
 
 /// Every moved code `text` spells.
 fn moved_names_in(text: &str) -> Vec<&'static str> {
-    MOVED_CODES.iter().copied().filter(|moved| word_in(text, moved)).collect()
+    MOVED_CODES.iter().chain(gone_codes()).copied().filter(|moved| word_in(text, moved)).collect()
 }
 
 /// atip.midway.11: no guide, website page, dashboard source, eval script, design document, scenario outside `area=atip`, README or
-/// the sources of canon spells a code 0.35 moved to `STOPPED_MIDWAY`; the CHANGELOG's replacement table and the history of a change
-/// are the only places that spell them.
+/// the sources of canon spells a code that was moved to the reserved midway code in 0.35 or replaced by a `<SUBJECT>_INCOMPLETE` code in 0.36;
+/// the CHANGELOG's replacement table and the history of a change are the only places that spell them.
 #[test]
-fn atip_midway_11_no_consumer_spells_a_code_that_moved_to_stopped_midway() {
+fn atip_midway_11_no_consumer_spells_a_code_that_moved_or_was_replaced_by_an_incomplete_code() {
     let mut files = consumers();
     let root = repo_root();
     let skip = ["node_modules", "dist", "target", ".git", "__pycache__"];
@@ -170,7 +156,10 @@ fn atip_midway_11_no_consumer_spells_a_code_that_moved_to_stopped_midway() {
 /// atip.midway.11: the check catches a moved code that comes back, and does not take a longer name for it.
 #[test]
 fn atip_midway_11_the_check_catches_a_moved_code_that_comes_back() {
-    assert_eq!(moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_INVALID_ARGUMENT"), Vec::<&str>::new());
+    assert_eq!(moved_names_in("exits 1 with INIT_INCOMPLETE, reason SKILLS_SOURCE_NOT_FOUND"), Vec::<&str>::new());
+    assert_eq!(moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_SOURCE_NOT_FOUND"), ["STOPPED_MIDWAY"], "the reserved code came back");
+    assert_eq!(moved_names_in("MIGRATE_STOPPED and MIGRATE_PINS_FAILED"), ["MIGRATE_PINS_FAILED", "MIGRATE_STOPPED"]);
+    assert_eq!(moved_names_in("MY_STOPPED_MIDWAY_TOO is another name, MIGRATION_INCOMPLETE is the new one"), Vec::<&str>::new());
     assert_eq!(moved_names_in("run again: INIT_SKILL_INSTALL_FAILED"), ["INIT_SKILL_INSTALL_FAILED"]);
     assert_eq!(moved_names_in(r#"{"code": "INIT_SKILL_INSTALL_FAILED", "exit": 1}"#), ["INIT_SKILL_INSTALL_FAILED"]);
     assert_eq!(moved_names_in("MY_INIT_SKILL_INSTALL_FAILED_TOO is another name"), Vec::<&str>::new());
@@ -186,63 +175,11 @@ fn atip_codenames_06_no_consumer_spells_a_renamed_code() {
     let mut hits = Vec::new();
     for file in &files {
         let Ok(text) = std::fs::read_to_string(file) else { continue };
-        for old in RENAMED_CODES.iter().chain(RENAMED_EXIT_CODES).filter(|old| word_in(&text, old)) {
+        for old in gone_codes_in(&text) {
             hits.push(format!("{} spells `{old}`", file.strip_prefix(repo_root()).unwrap_or(file).display()));
         }
     }
     assert!(hits.is_empty(), "renamed codes left in consumers: {hits:#?}");
-}
-
-/// The condition words a code's name may end in (spec 7.2.1).
-const CONDITIONS: &[&str] = &["INVALID", "REQUIRED", "NOT_FOUND", "EXISTS", "CONFLICT", "STALE", "EXPIRED", "DENIED", "UNSUPPORTED", "TOO_LARGE", "CORRUPT", "UNAVAILABLE", "FAILED", "INCOMPLETE", "TIMEOUT"];
-
-/// Every whole identifier of `text` that reads as a code name of the rule (`<SUBJECT>_<CONDITION>`) and that neither the error registry, the warning
-/// registry nor a reason of either holds: a code a consumer says that canon does not have (a typo included).
-fn unregistered_codes_in(text: &str, registered: &std::collections::BTreeSet<String>) -> Vec<String> {
-    let mut found = Vec::new();
-    let mut word = String::new();
-    let flush = |word: &mut String, found: &mut Vec<String>| {
-        let candidate = word.trim_matches('_').to_string();
-        let upper = candidate.contains('_') && candidate.chars().next().is_some_and(|c| c.is_ascii_uppercase()) && candidate.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
-        // A name of the rule's shape, or a name one or two letters from a registered code (a typo).
-        let looks_like_code = upper && (CONDITIONS.iter().any(|c| candidate.len() > c.len() + 1 && candidate.ends_with(&format!("_{c}"))) || (candidate.len() >= 8 && registered.iter().any(|code| code.len() >= 8 && edit_distance(code, &candidate) <= 2)));
-        if looks_like_code && !registered.contains(&candidate) && !found.contains(&candidate) {
-            found.push(candidate);
-        }
-        word.clear();
-    };
-    for c in text.chars() {
-        if c.is_ascii_alphanumeric() || c == '_' {
-            word.push(c);
-        } else {
-            flush(&mut word, &mut found);
-        }
-    }
-    flush(&mut word, &mut found);
-    found
-}
-
-/// The Levenshtein distance of two names.
-fn edit_distance(a: &str, b: &str) -> usize {
-    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
-    let mut row: Vec<usize> = (0..=b.len()).collect();
-    for (i, ca) in a.iter().enumerate() {
-        let mut diagonal = row[0];
-        row[0] = i + 1;
-        for (j, cb) in b.iter().enumerate() {
-            let above = row[j + 1];
-            row[j + 1] = (row[j] + 1).min(above + 1).min(diagonal + usize::from(ca != cb));
-            diagonal = above;
-        }
-    }
-    row[b.len()]
-}
-
-/// Every code, warning and reason canon registers, and the names a consumer may spell that are not codes (environment variables and the like).
-fn registered_names() -> std::collections::BTreeSet<String> {
-    let mut names: std::collections::BTreeSet<String> = canon_cli::cli_error::all_codes().iter().flat_map(|info| std::iter::once(info.code.to_string()).chain(info.reasons.iter().map(|r| r.reason.to_string()))).collect();
-    names.extend(canon_cli::cli_error::all_warnings().iter().map(|info| info.code.to_string()));
-    names
 }
 
 /// `atip.codenames.07`: a consumer that says a code canon does not have fails, a revived old name fails, and a registered code passes.

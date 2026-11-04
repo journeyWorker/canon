@@ -287,6 +287,9 @@ pub struct SchemaArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    /// Print the JSON Schemas the command's refs reach, its `Input` and the `rejects` of its validators, instead of its call surface (needs a command path)
+    #[arg(long)]
+    pub schemas: bool,
     /// Print every error code any command can emit, with its meaning and reasons, instead of a command
     #[arg(long)]
     pub errors: bool,

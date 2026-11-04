@@ -12,7 +12,7 @@ const handlers: BriefHandlers = { onChange: () => {}, onApprove: () => {} };
 const failure = {
   ok: false,
   error: {
-    code: "BRIEF_APPROVE_REFUSED",
+    code: "BRIEF_INVALID",
     reason: "A_REASON_FROM_A_LATER_CANON",
     message: "refused",
     retryable: false,
@@ -21,14 +21,15 @@ const failure = {
     hint: "run it again",
     "x-future": { anything: true },
     futureMember: [1, 2, 3],
+    details: [{ code: "BRIEF_CHECK_FAILED", message: "`add-login`: blockers", also: "unknown member of a detail" }],
   },
-  data: { refused: [{ changeId: "add-login", code: "BRIEF_CHECK_FAILED", message: "blockers", also: "unknown member of a refusal" }], newMember: 1 },
+  data: { newMember: 1 },
   meta: { schemaVersion: "1.9", tool: "canon", toolVersion: "9.9.9", contract: "atip/1", contractVersion: "1.9", command: "brief approve", "x-canon": {}, futureMeta: { a: 1 } },
 };
 
 test("a failure with members it does not know is read: code, message, hint and each refused brief", () => {
   const read = approveFailure(failure, 422);
-  expect(read.code).toBe("BRIEF_APPROVE_REFUSED");
+  expect(read.code).toBe("BRIEF_INVALID");
   expect(read.message).toBe("refused");
   expect(read.hint).toBe("run it again");
   expect(refusedIds(read)).toEqual(["add-login"]);
@@ -38,11 +39,11 @@ test("a failure with members it does not know is read: code, message, hint and e
 });
 
 test("a failure with no hint and a reason it does not know still reads", () => {
-  const { hint: _hint, ...error } = failure.error;
+  const { hint: _hint, details: _details, ...error } = failure.error;
   const read = approveFailure({ error, data: undefined }, 500);
   expect(read.hint).toBeUndefined();
   expect(read.refused).toEqual([]);
-  expect(read.code).toBe("BRIEF_APPROVE_REFUSED");
+  expect(read.code).toBe("BRIEF_INVALID");
 });
 
 test("an approval whose outcome is a string this page does not know is left out, the others count", () => {

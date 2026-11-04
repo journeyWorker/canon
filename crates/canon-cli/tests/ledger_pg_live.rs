@@ -320,7 +320,7 @@ fn ledger_migrate_10_a_postgres_row_holding_a_planned_key_with_other_json_refuse
     let tree_before = repo.snapshot(true);
     let (doc, out) = repo.json(&["migrate"]);
     assert!(!out.status.success() && doc["ok"] == false, "the preview is not refused: {doc}");
-    assert_eq!(doc["error"]["code"], "MIGRATE_REFUSED", "{doc}");
+    assert_eq!(doc["error"]["code"], "MIGRATION_INVALID", "{doc}");
     let (doc, out) = repo.json(&["migrate", "--commit", "--plan-digest", &stale]);
     assert!(!out.status.success() && doc["ok"] == false, "the commit is not refused: {doc}");
     assert_eq!(repo.rows(), rows_before, "the rows changed");

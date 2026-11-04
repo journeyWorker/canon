@@ -1,7 +1,7 @@
 //! The validators of the command tree (ATIP 10.8.3, 11.7 step 6): the stateless checks of an
 //! invocation that the contract declares in `canon schema <command>` as `validators`. They run for
 //! every invocation, after clap parsed it and BEFORE any precondition (`CONFIG_REQUIRED`,
-//! `OLD_LAYOUT`) or state read, so a call they refuse is refused the same way in an empty
+//! `LAYOUT_MIGRATION_REQUIRED`) or state read, so a call they refuse is refused the same way in an empty
 //! directory. The checks themselves sit next to the command that owns them (`check_*`, each taking
 //! the parsed arguments and nothing else: no repository, no environment that is not an argument,
 //! no file); this module only runs them, in one place, in front of the handlers, which do not call

@@ -132,7 +132,7 @@ fn row(code: &str) -> (u8, bool) {
 /// during it is exit 1. `INIT_SKILL_INSTALL_FAILED`, the one of the
 /// thirteen decided "only during the work", is not in the registry since
 /// 0.35: it was the failure of a later step that met a refusal after earlier
-/// steps made their effects, which is `STOPPED_MIDWAY` (spec 8.3.2,
+/// steps made their effects, which is `INIT_INCOMPLETE` (spec 8.3.2,
 /// `atip.midway`), the other twelve hold their decided exits.
 #[test]
 fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
@@ -140,18 +140,18 @@ fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
     let decided: [(&str, u8); 12] = [
         // split: the failure during the work is the old code, exit 1; the precondition is the partner below.
         ("ARTIFACTS_STORE_FAILED", 1),
-        ("ARTIFACTS_STORE_UNREACHABLE", 2), // the precondition partner of ARTIFACTS_STORE_FAILED
-        ("EVIDENCE_STORE_FAILED", 1),
-        ("HOOKS_INSTALL_FAILED", 1),
+        ("ARTIFACTS_STORE_UNAVAILABLE", 2), // the precondition partner of ARTIFACTS_STORE_FAILED
+        ("ARTIFACTS_STORE_INCOMPLETE", 1), // the store that stopped part-way; `EVIDENCE_STORE_FAILED` merged into `ARTIFACTS_STORE_FAILED`
+        ("HOOKS_INSTALL_INCOMPLETE", 1),
         ("INVENTORY_FAILED", 1),
         ("POLICY_APPROVAL_FAILED", 1),
         ("RETENTION_EXPORT_FAILED", 1),
-        ("RETENTION_PURGE_FAILED", 1),
+        ("RETENTION_PURGE_INCOMPLETE", 1),
         // only during the work: exit 1.
-        ("MIGRATE_PINS_FAILED", 1),
+        ("MIGRATION_INCOMPLETE", 1),
         // only before the work: exit 2.
-        ("LEDGER_ARCHIVE_UNAVAILABLE", 2),
-        ("PLUGIN_SYNC_FAILED", 2),
+        ("LEDGER_ARCHIVE_INVALID", 2),
+        ("PLUGIN_REQUIRED", 2),
         ("RETRIEVE_INVALID", 2),
     ];
     for (code, exit) in decided {
@@ -160,39 +160,40 @@ fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
 }
 
 /// atip.l0.25: the precondition side of each split, the situations that had
-/// two exits and now have one code each, and `WRITE_FAILED`/`WRITE_UNAVAILABLE`.
+/// two exits and now have one code each, and `WRITE_FAILED`/`WRITE_DENIED`/`WRITE_INVALID`.
 #[test]
 fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
-    let partners: [(&str, u8); 18] = [
-        ("EVIDENCE_STORE_UNAVAILABLE", 2),
-        ("HOOKS_INSTALL_REFUSED", 2),
-        ("INVENTORY_REFUSED", 2),
-        ("POLICY_APPROVAL_REFUSED", 2),
-        ("RETENTION_EXPORT_REFUSED", 2),
-        ("RETENTION_PURGE_REFUSED", 2),
+    let partners: [(&str, u8); 19] = [
+        ("ARTIFACTS_STORE_REQUIRED", 2),
+        ("HOOKS_FILE_CONFLICT", 2),
+        ("INVENTORY_INDEX_UNAVAILABLE", 2),
+        ("POLICY_REQUIRED", 2),
+        ("RETENTION_EXPORT_DENIED", 2),
+        ("RETENTION_TIERS_UNAVAILABLE", 2),
         // `ADAPTER_REFUSED` was exit 1 and 2.
-        ("ADAPTER_REFUSED", 2),
+        ("ADAPTER_FILE_NOT_FOUND", 2),
         ("ADAPTER_VALIDATION_FAILED", 1),
         // `EVIDENCE_BATCH_REFUSED` was exit 1 (a refused promotion) and 2 (a preflight, a write failure); 0.36 judges the gate before the first write, so the refusal is `PROMOTION_INVALID`.
         ("PROMOTION_INVALID", 2),
         // a write that began and failed, and the same failure known before anything changed.
         ("WRITE_FAILED", 1),
-        ("WRITE_UNAVAILABLE", 2),
-        // the closed policy gate of `subject move` was forced to exit 1 over a registry 2; 0.36 gives a stale policy and a refused transition exit 2.
-        ("POLICY_APPROVAL_UNREADABLE", 1),
+        ("WRITE_DENIED", 2),
+        ("WRITE_INVALID", 2),
+        // the closed policy gate of `subject move` was forced to exit 1 over a registry 2; 0.36 gives a broken approval, a stale policy and a refused transition exit 2.
+        ("POLICY_APPROVAL_CORRUPT", 2),
+        ("POLICY_APPROVAL_DENIED", 2),
         ("POLICY_APPROVAL_STALE", 2),
         ("SUBJECT_INVALID", 2),
         // `brief approve` computed the exit of these; the registry row is the exit now.
-        ("BRIEF_UNREADABLE", 2),
+        ("BRIEF_DENIED", 2),
         ("BRIEF_WRITE_FAILED", 1),
-        ("BRIEF_APPROVE_REFUSED", 2),
         ("BRIEF_INVALID", 2),
     ];
     for (code, exit) in partners {
         assert_eq!(row(code).0, exit, "{code}");
     }
     // The splits that keep a retry meaningful say so.
-    assert!(row("ARTIFACTS_STORE_FAILED").1 && row("ARTIFACTS_STORE_UNREACHABLE").1 && row("EVIDENCE_STORE_FAILED").1 && row("EVIDENCE_STORE_UNAVAILABLE").1);
+    assert!(row("ARTIFACTS_STORE_FAILED").1 && row("ARTIFACTS_STORE_UNAVAILABLE").1 && row("ARTIFACTS_STORE_INCOMPLETE").1 && !row("ARTIFACTS_STORE_REQUIRED").1);
 }
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
@@ -233,7 +234,7 @@ impl Drop for Restore<'_> {
 }
 
 /// atip.l0.24: a command that writes into a directory that cannot be written
-/// refuses before anything changes: exit 2, `WRITE_UNAVAILABLE`, and the
+/// refuses before anything changes: exit 2, `WRITE_DENIED`, and the
 /// directory holds what it held.
 #[cfg(unix)]
 #[test]
@@ -263,7 +264,7 @@ fn atip_l0_24_a_directory_that_cannot_be_written_refuses_with_exit_2_and_changes
     assert_eq!(out.status.code(), Some(2), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     let document = json(&out);
     assert_eq!(document["ok"], false, "{document}");
-    assert_eq!(document["error"]["code"], "WRITE_UNAVAILABLE", "{document}");
+    assert_eq!(document["error"]["code"], "WRITE_DENIED", "{document}");
     assert_eq!(document["error"]["retryable"], false, "{document}");
     assert_eq!(listing(repo), before, "a refused write leaves the directory as it was");
     assert!(!repo.join(".claude").exists() && !repo.join(".codex").exists(), "no hook file was started");

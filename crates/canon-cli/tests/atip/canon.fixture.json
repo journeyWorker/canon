@@ -517,7 +517,7 @@
       }
     }
   },
-  "contractVersion": "1.2",
+  "contractVersion": "1.4",
   "globalOptions": [
     [
       "--repo",
@@ -563,9 +563,24 @@
       "retryable": false
     },
     {
-      "code": "ADAPTER_REFUSED",
+      "code": "ADAPTER_FILE_DENIED",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ADAPTER_FILE_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "ADAPTER_VALIDATION_FAILED",
@@ -578,7 +593,34 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_MOVE_REFUSED",
+      "code": "ARTIFACTS_BLOB_CORRUPT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_BLOB_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_DIGEST_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_MOVE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "ARTIFACTS_BLOB_CORRUPT",
+        "ARTIFACTS_STORE_DENIED",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_DENIED",
       "exit": 2,
       "retryable": false
     },
@@ -588,9 +630,33 @@
       "retryable": true
     },
     {
-      "code": "ARTIFACTS_STORE_UNREACHABLE",
+      "code": "ARTIFACTS_STORE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "ARTIFACTS_STORE_FAILED",
+        "ARTIFACTS_STORE_UNAVAILABLE"
+      ],
+      "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_STORE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_UNAVAILABLE",
       "exit": 2,
       "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_TIER_INVALID",
+      "exit": 2,
+      "retryable": false
     },
     {
       "code": "ARTIFACTS_VERIFY_FAILED",
@@ -613,11 +679,6 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_APPROVE_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "BRIEF_CHECK_FAILED",
       "exit": 1,
       "reasons": [
@@ -626,11 +687,23 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "BRIEF_INVALID",
       "exit": 2,
       "reasons": [
-        "UNAPPROVABLE"
+        "BLOCKERS",
+        "UNAPPROVABLE",
+        "UNREADABLE"
       ],
+      "retryable": false
+    },
+    {
+      "code": "BRIEF_MIGRATION_REQUIRED",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -644,9 +717,14 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_UNREADABLE",
+      "code": "BRIEF_REQUIRED",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "BRIEF_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "BRIEF_WRITE_FAILED",
@@ -656,6 +734,9 @@
     {
       "code": "CHANGE_ADOPTION_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -665,6 +746,11 @@
     },
     {
       "code": "CHANGE_EXISTS",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -689,6 +775,11 @@
       "retryable": false
     },
     {
+      "code": "CONFIG_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "CONFIG_EXISTS",
       "exit": 2,
       "retryable": false
@@ -697,7 +788,13 @@
       "code": "CONFIG_INVALID",
       "exit": 2,
       "reasons": [
-        "DASHBOARD"
+        "ARTIFACT_STORE",
+        "CANON_YAML",
+        "DASHBOARD",
+        "POLICY",
+        "SKILLS",
+        "SPECS",
+        "TIERS"
       ],
       "retryable": false
     },
@@ -707,9 +804,9 @@
       "retryable": false
     },
     {
-      "code": "CONFIG_UNREADABLE",
+      "code": "CONFIG_UNAVAILABLE",
       "exit": 2,
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "CONTEXT_GIT_REQUIRED",
@@ -800,29 +897,33 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_ALREADY_ENDED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "DISPATCH_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DISPATCH_MANIFEST_MISMATCH",
+      "code": "DISPATCH_CONFLICT",
+      "exit": 2,
+      "reasons": [
+        "ALREADY_ENDED",
+        "NOT_RUNNING"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "DISPATCH_MANIFEST_CORRUPT",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DISPATCH_MANIFEST_UNREADABLE",
+      "code": "DISPATCH_MANIFEST_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DISPATCH_NOT_RUNNING",
+      "code": "DISPATCH_MANIFEST_UNAVAILABLE",
       "exit": 2,
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "DISPATCH_ROLE_CONFLICT",
@@ -840,13 +941,33 @@
       "retryable": true
     },
     {
-      "code": "DIVERGENCE_ACCEPT_REFUSED",
+      "code": "DIVERGENCE_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "DIVERGENCE_ARGUMENT_INVALID",
+      "code": "DIVERGENCE_CONFLICT",
       "exit": 2,
+      "reasons": [
+        "NOT_DIVERGENT"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_DENIED",
+      "exit": 2,
+      "reasons": [
+        "NOT_REVIEWER",
+        "SELF_ATTESTED"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "DIVERGENCE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "PROMOTION_INVALID"
+      ],
       "retryable": false
     },
     {
@@ -864,9 +985,49 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_BIND_REFUSED",
+      "code": "EVIDENCE_APPROVAL_REQUIRED",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_CONFLICT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_ARGUMENT_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_STALE",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "EVIDENCE_BINDING_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "EVIDENCE_CONTRACT_CONFLICT",
@@ -874,17 +1035,15 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_INVALID_ARGUMENT",
-      "exit": 2,
+      "code": "EVIDENCE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "PROMOTION_INVALID"
+      ],
       "retryable": false
     },
     {
       "code": "EVIDENCE_NOTE_INVALID",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "EVIDENCE_REFUSED",
       "exit": 2,
       "retryable": false
     },
@@ -894,7 +1053,7 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_SCENARIO_NOT_INDEXED",
+      "code": "EVIDENCE_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -902,16 +1061,6 @@
       "code": "EVIDENCE_STALE",
       "exit": 2,
       "retryable": false
-    },
-    {
-      "code": "EVIDENCE_STORE_FAILED",
-      "exit": 1,
-      "retryable": true
-    },
-    {
-      "code": "EVIDENCE_STORE_UNAVAILABLE",
-      "exit": 2,
-      "retryable": true
     },
     {
       "code": "FEATURE_EXISTS",
@@ -936,6 +1085,14 @@
     {
       "code": "FINDING_EXISTS",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "FINDING_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "PROMOTION_INVALID"
+      ],
       "retryable": false
     },
     {
@@ -974,12 +1131,30 @@
       "retryable": false
     },
     {
-      "code": "HOOKS_INSTALL_FAILED",
-      "exit": 1,
+      "code": "HOOKS_FILE_CONFLICT",
+      "exit": 2,
       "retryable": false
     },
     {
-      "code": "HOOKS_INSTALL_REFUSED",
+      "code": "HOOKS_FILE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "HOOKS_FILE_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "HOOKS_INSTALL_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "HOOKS_REPO_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1001,6 +1176,16 @@
     {
       "code": "INIT_ARGUMENT_INVALID",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "INIT_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "CONFIG_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
+        "SKILLS_SOURCE_NOT_FOUND"
+      ],
       "retryable": false
     },
     {
@@ -1039,18 +1224,31 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_ABORTED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
       "code": "INVENTORY_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "INVENTORY_REFUSED",
+      "code": "INVENTORY_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "INVENTORY_FAILED",
+        "INVENTORY_INVALID"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "INVENTORY_INDEX_UNAVAILABLE",
       "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "INVENTORY_INVALID",
+      "exit": 2,
+      "reasons": [
+        "DUPLICATE_SCENARIOS",
+        "VIOLATIONS"
+      ],
       "retryable": false
     },
     {
@@ -1059,48 +1257,19 @@
       "retryable": false
     },
     {
-      "code": "LEARN_PROMOTION_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_ROLLBACK_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_SIGNATURE_UNREADABLE",
+      "code": "LEDGER_ARCHIVE_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "LEDGER_ARCHIVE_UNAVAILABLE",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "LEDGER_COMPACT_FAILED",
+      "code": "LEDGER_COMPACT_INCOMPLETE",
       "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_INDEX_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_PINS_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_STOPPED",
-      "exit": 1,
+      "reasons": [
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_UNAVAILABLE",
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -1109,22 +1278,47 @@
       "retryable": false
     },
     {
-      "code": "NO_BRIEF",
+      "code": "MIGRATION_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "OLD_BRIEF_FORMAT",
+      "code": "MIGRATION_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "INDEX",
+        "PINS",
+        "STOPPED"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "MIGRATION_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "OLD_LAYOUT",
+      "code": "MIGRATION_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "PLAN_CORPUS_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "PLAN_CORPUS_UNREADABLE",
+      "code": "PLAN_CORPUS_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "PLAN_CORPUS_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "PLAN_DOCUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1139,12 +1333,25 @@
       "retryable": false
     },
     {
-      "code": "PLUGIN_SYNC_ERRORS",
-      "exit": 1,
+      "code": "PLUGIN_REQUIRED",
+      "exit": 2,
       "retryable": false
     },
     {
-      "code": "PLUGIN_SYNC_FAILED",
+      "code": "PLUGIN_SYNC_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_CORRUPT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "POLICY_APPROVAL_DENIED",
       "exit": 2,
       "retryable": false
     },
@@ -1154,22 +1361,37 @@
       "retryable": false
     },
     {
-      "code": "POLICY_APPROVAL_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "POLICY_APPROVAL_STALE",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "POLICY_APPROVAL_UNREADABLE",
-      "exit": 1,
+      "code": "POLICY_APPROVAL_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "POLICY_DENIED",
+      "exit": 2,
       "retryable": false
     },
     {
-      "code": "PROMOTE_FAILED",
+      "code": "POLICY_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "POLICY_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "POLICY_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "PROMOTION_FAILED",
       "exit": 1,
       "retryable": false
     },
@@ -1217,14 +1439,29 @@
       "retryable": false
     },
     {
-      "code": "REPO_UNREADABLE",
+      "code": "REPO_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "REPO_WRITE_BUSY",
+      "code": "REPO_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REPO_LOCK_UNAVAILABLE",
       "exit": 2,
       "retryable": true
+    },
+    {
+      "code": "REPO_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "RETENTION_EXPORT_DENIED",
+      "exit": 2,
+      "retryable": false
     },
     {
       "code": "RETENTION_EXPORT_FAILED",
@@ -1232,19 +1469,37 @@
       "retryable": false
     },
     {
-      "code": "RETENTION_EXPORT_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "RETENTION_PURGE_FAILED",
+      "code": "RETENTION_PURGE_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
-      "code": "RETENTION_PURGE_REFUSED",
+      "code": "RETENTION_TIERS_CORRUPT",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "RETENTION_TIERS_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "RETRIEVE_INVALID",
@@ -1257,14 +1512,29 @@
       "retryable": false
     },
     {
-      "code": "REVIEW_ARTIFACT_REFUSED",
+      "code": "REVIEW_ARTIFACT_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "REVIEW_SCENARIO_NOT_INDEXED",
+      "code": "REVIEW_ARTIFACT_INVALID",
       "exit": 2,
       "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_STALE",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARTIFACT_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "ROLE_INVALID",
@@ -1273,6 +1543,11 @@
     },
     {
       "code": "SCAFFOLD_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_INDEX_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1307,6 +1582,11 @@
       "retryable": false
     },
     {
+      "code": "SKILLS_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "SKILLS_CHECK_FAILED",
       "exit": 1,
       "reasons": [
@@ -1320,12 +1600,17 @@
       "retryable": false
     },
     {
-      "code": "SKILLS_INVALID_ARGUMENT",
+      "code": "SKILLS_SOURCE_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "SPEC_ROOTS_UNREADABLE",
+      "code": "SPEC_ROOT_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1340,14 +1625,9 @@
       "retryable": false
     },
     {
-      "code": "STOPPED_MIDWAY",
-      "exit": 1,
-      "reasons": [
-        "PROMOTION_INVALID",
-        "SKILLS_INVALID_ARGUMENT",
-        "STRATEGY_PROMOTION_INVALID"
-      ],
-      "retryable": false
+      "code": "SPEC_ROOT_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "STRATEGY_ARGUMENT_INVALID",
@@ -1370,8 +1650,21 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "STRATEGY_PROMOTION_INVALID"
+      ],
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_NOT_FOUND",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_PROMOTION_FAILED",
+      "exit": 1,
       "retryable": false
     },
     {
@@ -1380,7 +1673,42 @@
       "retryable": false
     },
     {
-      "code": "SUBJECT_ADOPT_REFUSED",
+      "code": "STRATEGY_ROLLBACK_FAILED",
+      "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_SIGNATURE_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "STRATEGY_SIGNER_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_VERIFIER_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1398,6 +1726,8 @@
       "code": "SUBJECT_CONFLICT",
       "exit": 2,
       "reasons": [
+        "APPROVED_BRIEF",
+        "FLOW_TAGGED",
         "TRANSITION"
       ],
       "retryable": false
@@ -1410,6 +1740,11 @@
     {
       "code": "SUBJECT_INVALID",
       "exit": 2,
+      "reasons": [
+        "FALSE_SUCCESS",
+        "MALFORMED_EVIDENCE",
+        "OPEN_BLOCKER"
+      ],
       "retryable": false
     },
     {
@@ -1419,11 +1754,6 @@
     },
     {
       "code": "SUBJECT_REASON_REQUIRED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_UNADOPT_REFUSED",
       "exit": 2,
       "retryable": false
     },
@@ -1448,11 +1778,6 @@
       "retryable": false
     },
     {
-      "code": "TASK_ROW_NOT_FOUND",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "TASK_UNSUPPORTED",
       "exit": 2,
       "retryable": false
@@ -1460,6 +1785,24 @@
     {
       "code": "TIER_FAILED",
       "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "TIER_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "TIER_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
+    },
+    {
+      "code": "TRACE_CONFLICT",
+      "exit": 2,
       "retryable": false
     },
     {
@@ -1498,12 +1841,17 @@
       "retryable": false
     },
     {
+      "code": "WRITE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "WRITE_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "WRITE_UNAVAILABLE",
+      "code": "WRITE_INVALID",
       "exit": 2,
       "retryable": false
     }

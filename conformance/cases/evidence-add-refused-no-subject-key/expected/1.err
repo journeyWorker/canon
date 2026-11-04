@@ -1,3 +1,3 @@
-canon: EVIDENCE_INVALID_ARGUMENT: one of `--task`, `--scenario`, `--all-scenarios` is required, and none was given
+canon: EVIDENCE_REQUIRED: one of `--task`, `--scenario`, `--all-scenarios` is required, and none was given
   field: --task
   hint: A record needs a coverage subject: a task, a scenario, or one record per scenario of a report. a working call: canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer; `canon schema evidence add --json` lists the constraints of the command

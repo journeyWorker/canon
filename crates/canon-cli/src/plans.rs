@@ -158,18 +158,35 @@ pub enum PlansError {
     /// per construct, loud per configuration").
     #[error("{0}")]
     Config(String),
+    /// canon.yaml is there and cannot be read: the system refused it, failed it in a way a repeat can pass, or it is no UTF-8 file. Only a
+    /// canon.yaml that is not there is the first-run state with no plan sources; answering zero sources for any other read would hide a `plans:`
+    /// section that is there. [`PlansError::cli_error`] tells the causes apart.
+    #[error("cannot read `{path}`: {source}")]
+    CanonYamlRead { path: String, source: std::io::Error },
     #[error(transparent)]
     Policy(#[from] TierPolicyError),
     #[error(transparent)]
     Store(#[from] StoreError),
     /// A store the import writes cannot be written, known before anything was
-    /// changed (`WRITE_UNAVAILABLE`).
+    /// changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
     /// A source yields nothing usable: it holds malformed constructs and not one that parses. Known before anything is persisted
     /// (`INGEST_SOURCE_INVALID`, exit 2): one message per malformed construct, in the order of the sources.
     #[error("a plan source is malformed and yields nothing usable: {}", .0.join("; "))]
     SourcesInvalid(Vec<String>),
+}
+
+impl PlansError {
+    /// The refusal for a canon.yaml the plan corpus could not read (`PLAN_CORPUS_UNAVAILABLE`, `CONFIG_DENIED`, `CONFIG_INVALID`), the same
+    /// one for every command that reads the corpus (`dispatch begin --task`, `evidence add --task`, `task done`, `ingest plans`); `None` for any other
+    /// failure, which each command answers with its own code.
+    pub(crate) fn cli_error(&self) -> Option<crate::cli_error::CliError> {
+        match self {
+            Self::CanonYamlRead { source, .. } => Some(crate::read_cause::plan_canon_yaml_error(source, self.to_string())),
+            _ => None,
+        }
+    }
 }
 
 /// [`crate::tiers::build_lenient_tiers`]'s relocated error type
@@ -335,12 +352,16 @@ struct RawPlanSource {
 /// pass over every configured plan source, in config/one-shot order
 /// (module doc).
 fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
-    run_pass_for(repo, dialect, source, dry_run, !dry_run)
+    run_pass_for(repo, dialect, source, dry_run, !dry_run, false)
 }
 
 /// [`run_pass`], with `will_write` saying whether the import this pass previews goes on to persist: a preview that will be followed by a write takes the
 /// stores' writability check first, so a refusal does not even open the hot store.
-fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool, will_write: bool) -> Result<PlansOutcome, PlansError> {
+///
+/// `judge_only` reads and parses the sources without opening any store: the sources are judged before a store (a sqlite hot rung creates its
+/// file as it opens) is touched, so a refusal leaves the tree as it was. Every admitted candidate then counts as persisted, which is what a
+/// preview of a writable store answers.
+fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool, will_write: bool, judge_only: bool) -> Result<PlansOutcome, PlansError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
 
@@ -357,7 +378,12 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
     if will_write {
         crate::write_mode::check_kinds_writable(&canon_yaml_path, &[RecordKind::Change, RecordKind::Task]).map_err(PlansError::Unavailable)?;
     }
-    let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
+    let (store, git_root) = if judge_only {
+        (None, configured_git_root(&repo, &canon_yaml_path)?)
+    } else {
+        let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
+        (Some(store), git_root)
+    };
 
     // F2 / design note: the digest below must never include this
     // driver's OWN repo-local write surface (the git ledger root, the
@@ -445,8 +471,10 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
             admit_source_candidates(&mut seen_change_ids, changes, tasks);
         let duplicate_change_id = duplicate_change_ids.len();
 
-        let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } =
-            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome, dry_run)?;
+        let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } = match &store {
+            Some(store) => persist_candidates(store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome, dry_run)?,
+            None => Persisted { changes_persisted: accepted_changes.len(), changes_unwritten: 0, tasks_persisted: accepted_tasks.len(), tasks_unwritten: 0 },
+        };
 
         // s23 durable-import-diagnostics: a malformed-nonzero,
         // zero-persisted pass produced no durable evidence at all --
@@ -518,7 +546,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: b
     // A source that yields nothing usable is a refusal, and a refusal changes nothing (spec 8.3, 11.2): the sources are judged by a
     // preview pass before the first record is persisted.
     if !dry_run {
-        refuse_unusable_sources(&run_pass_for(repo, dialect, source, true, true)?)?;
+        refuse_unusable_sources(&run_pass_for(repo, dialect, source, true, true, true)?)?;
     }
     let outcome = run_pass(repo, dialect, source, dry_run)?;
     refuse_unusable_sources(&outcome)?;
@@ -557,6 +585,19 @@ fn refuse_unusable_sources(outcome: &PlansOutcome) -> Result<(), PlansError> {
 /// (every candidate lands in the `unwritten` seam) rather than a hard
 /// failure — a genuinely malformed (present but unparseable) canon.yaml
 /// still fails loud via `TierPolicy::from_yaml`.
+/// The root of the git tier canon.yaml configures, read from the policy alone (no tier is built, so nothing is created).
+fn configured_git_root(repo: &Path, canon_yaml_path: &Path) -> Result<Option<PathBuf>, PlansError> {
+    let text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    let policy = TierPolicy::from_yaml_at(&text, repo)?;
+    Ok(policy.tiers.values().find_map(|cfg| match cfg {
+        canon_store::policy::BackendConfig::Git(cfg) => Some(repo.join(&cfg.root)),
+        _ => None,
+    }))
+}
+
 fn open_store(repo: &Path, canon_yaml_path: &Path) -> Result<(TierRegistry, Option<PathBuf>), PlansError> {
     let canon_yaml_text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
     let policy = if canon_yaml_text.trim().is_empty() {
@@ -815,11 +856,16 @@ pub(crate) fn declared_ids(repo: &Path) -> Result<(BTreeSet<String>, BTreeSet<St
 /// the fail-soft-on-absent vs fail-loud-on-present split, mirroring
 /// `crate::ingest::IngestSourceConfig::load`'s established pattern).
 fn configured_plan_sources(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
-    // Missing/unreadable canon.yaml: fail-soft (no config at all is a
+    // A canon.yaml that is not there: fail-soft (no config at all is a
     // legitimate first-run state) -- zero sources, same as an absent
-    // `plans:` section.
-    let Ok(text) = std::fs::read_to_string(canon_yaml_path) else {
-        return Ok(Vec::new());
+    // `plans:` section. Any other failure of the read (the system refused
+    // it, failed it for a repeat to pass, a directory or not UTF-8 text) is
+    // not "no config": answering zero sources would hide a `plans:` section
+    // that is there, so it is the error.
+    let text = match canon_store::eio::read_to_string(canon_yaml_path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => return Err(PlansError::CanonYamlRead { path: canon_yaml_path.display().to_string(), source }),
     };
     // A PRESENT but non-YAML canon.yaml fails LOUD -- a syntax typo in
     // a canon.yaml meant to set `plans.sources` must never silently

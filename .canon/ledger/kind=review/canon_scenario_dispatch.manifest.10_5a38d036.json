@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:04:28.664613Z",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "kind": "review",
+  "pin": "dfe371b25787f3be0f8de97db7cb24593d0ad1bb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:dispatch_manifest_10_adapter_authorize_on_a_missing_response_file_is_refused_as_a_fixable_invocation"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "7de9e7f5b219f27ad7bbb838839268625cb9c0c1f8cc87125f3a2e6f296fe06e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
+  },
+  "review_id": "01M6JJHB3RX6BMK6HS8CFDY864",
+  "reviewer": "rev-0-36-refusals",
+  "scenario_id": "dispatch.manifest.10",
+  "schema": 2,
+  "worktree_dirty": false
+}

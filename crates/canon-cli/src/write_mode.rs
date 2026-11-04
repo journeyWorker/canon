@@ -155,7 +155,7 @@ pub fn check_creatable(path: &Path, create_parents: bool) -> std::io::Result<()>
 /// permissions allow writing, and `path` itself, when it exists, is not a
 /// read-only file or a directory that forbids writing. What a write command
 /// asks before it changes anything, so a target that cannot be written is
-/// refused up front ([`unavailable`]) instead of failing after the first write.
+/// refused up front ([`unwritable`]) instead of failing after the first write.
 pub fn check_writable(path: &Path) -> std::io::Result<()> {
     let permission_denied = |what: &Path| std::io::Error::new(std::io::ErrorKind::PermissionDenied, format!("`{}` is read-only", what.display()));
     if path.exists() {
@@ -176,17 +176,22 @@ pub fn check_writable(path: &Path) -> std::io::Result<()> {
     }
 }
 
-/// The refusal for a target [`check_writable`] found unwritable: known before
-/// the first write, so exit 2 (`WRITE_UNAVAILABLE`) and nothing changed. A
+/// The refusal for a target [`check_writable`] found unwritable: known before the first write, so exit 2 and nothing changed.
+/// `WRITE_DENIED` when the system refuses the write (permissions, a read-only mount), `WRITE_INVALID` when the target cannot be
+/// one (its directory is missing, or a file stands where a directory belongs). Neither is retryable: waiting changes neither. A
 /// write that began and failed is `WRITE_FAILED` (exit 1).
-pub fn unavailable(path: &Path, cause: &std::io::Error) -> CliError {
-    CliError::refused("WRITE_UNAVAILABLE", format!("cannot write `{}`: {cause}", path.display())).hint("make the target writable (its permissions, a mounted volume, a missing parent), then run the command again; nothing was changed")
+pub fn unwritable(path: &Path, cause: &std::io::Error) -> CliError {
+    let message = format!("cannot write `{}`: {cause}", path.display());
+    match crate::read_cause::of_io(cause) {
+        crate::read_cause::Cause::Denied => CliError::refused("WRITE_DENIED", message).hint("make the target writable (its permissions, a read-only mount), then run the command again; nothing was changed"),
+        _ => CliError::refused("WRITE_INVALID", message).hint("create the missing directory or name a directory that exists, then run the command again; nothing was changed"),
+    }
 }
 
 /// [`check_writable`] over every target a command writes, refused as
-/// [`unavailable`] under `command`. `None` when all can be written.
+/// [`unwritable`] under `command`. `None` when all can be written.
 pub fn refuse_unwritable(targets: &[&Path], command: &str, json: bool) -> Option<u8> {
-    targets.iter().find_map(|target| check_writable(target).err().map(|cause| unavailable(target, &cause).emit(command, json)))
+    targets.iter().find_map(|target| check_writable(target).err().map(|cause| unwritable(target, &cause).emit(command, json)))
 }
 
 /// The local paths a write of records of `kinds` lands in, by `canon.yaml`'s
@@ -259,10 +264,10 @@ fn add_rung_targets(targets: &mut Vec<PathBuf>, policy: &TierPolicy, base: &Path
 }
 
 /// [`check_writable`] over [`routed_targets`]: the first target a write of
-/// `kinds` could not land in, as the [`unavailable`] refusal.
+/// `kinds` could not land in, as the [`unwritable`] refusal.
 pub fn check_kinds_writable(canon_yaml: &Path, kinds: &[RecordKind]) -> Result<(), CliError> {
     for target in routed_targets(canon_yaml, kinds) {
-        check_writable(&target).map_err(|cause| unavailable(&target, &cause))?;
+        check_writable(&target).map_err(|cause| unwritable(&target, &cause))?;
     }
     Ok(())
 }

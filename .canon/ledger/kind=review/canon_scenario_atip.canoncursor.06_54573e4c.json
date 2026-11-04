@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-3"
+  },
+  "at": "2026-11-04T19:55:18.499590Z",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "kind": "review",
+  "pin": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_canoncursor_06_other_arguments_are_arguments_changed_another_command_is_foreign_and_a_gone_record_is_expired"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "7fac179c491f0a18a9db6133a725b7bbef913eb7cf9fcfe9ed17fad0fe9d200d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-cursor/brief.md"
+  },
+  "review_id": "01M6M22MK320K7260M3PCJ1Y1R",
+  "reviewer": "rev-0-36-flowfix",
+  "scenario_id": "atip.canoncursor.06",
+  "schema": 2,
+  "worktree_dirty": false
+}

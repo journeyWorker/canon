@@ -207,7 +207,7 @@ pub fn refuse_write(command_tree: &clap::Command, parsed: &clap::ArgMatches) -> 
     }
     let found = detect(&root)?;
     let json = leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false);
-    let error = CliError::refused("OLD_LAYOUT", found.message())
+    let error = CliError::refused("LAYOUT_MIGRATION_REQUIRED", found.message())
         .hint("run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`; nothing was written");
     Some(ExitCode::from(error.emit(&format!("canon {command}"), json)))
 }

@@ -220,7 +220,7 @@ pub enum PluginSyncError {
     #[error("plugin `{0}` declares no overlay")]
     NoOverlay(String),
     /// The ledger the overlay records are written into cannot be written,
-    /// known before anything was changed (`WRITE_UNAVAILABLE`).
+    /// known before anything was changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
 }
@@ -294,9 +294,14 @@ pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Opt
                     outcome.candidates = candidates.len();
                     // Overlay records are about to be written into the ledger: refused before the first one, nothing changed.
                     if !dry_run && !candidates.is_empty() {
-                        crate::write_mode::check_writable(&ctx.ledger_root).map_err(|cause| PluginSyncError::Unavailable(crate::write_mode::unavailable(&ctx.ledger_root, &cause)))?;
+                        crate::write_mode::check_writable(&ctx.ledger_root).map_err(|cause| PluginSyncError::Unavailable(crate::write_mode::unwritable(&ctx.ledger_root, &cause)))?;
                     }
-                    for body in candidates {
+                    for (index, body) in candidates.into_iter().enumerate() {
+                        // `plugin-second-candidate` and `plugin-every-candidate` (a debug build's test seams, `incomplete::injected_stop`): the write of the second candidate, or the write or check of each, fails.
+                        if let Some(stop) = crate::incomplete::injected_stop("plugin-every-candidate").or_else(|| (!dry_run && index == 1).then(|| crate::incomplete::injected_stop("plugin-second-candidate")).flatten()) {
+                            outcome.errors.push(stop.to_string());
+                            continue;
+                        }
                         let receipt = if dry_run { check_overlay(&git, decl, &body) } else { write_overlay(&git, decl, body) };
                         match receipt {
                             Ok(receipt) if receipt.deduped => outcome.deduped += 1,

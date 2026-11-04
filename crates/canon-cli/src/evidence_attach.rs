@@ -100,6 +100,8 @@ pub enum BindError {
         message: String,
         hint: String,
         field: Option<&'static str>,
+        /// Which condition the refusal is: a value that is wrong, a file that is not there, or one canon may not read.
+        kind: BindKind,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
@@ -108,15 +110,57 @@ pub enum BindError {
     Contradiction(String),
 }
 
+/// The condition of a refused binding (spec 7.2.2): the file is not what the binding needs (`INVALID`), is not there
+/// (`NOT_FOUND`), is outside the repository or unreadable by this user (`DENIED`), or the system failed the read in a way a repeat can
+/// pass (`UNAVAILABLE`, the one retryable condition).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindKind {
+    Invalid,
+    NotFound,
+    Denied,
+    Unavailable,
+}
+
+impl BindKind {
+    /// What a failed file operation says about the file: missing, not permitted, failed for a repeat to pass, or in a form that cannot
+    /// be used (a directory where a file belongs, and the like).
+    fn of_io(error: &std::io::Error) -> Self {
+        use crate::read_cause::{of_io, Cause};
+        match of_io(error) {
+            Cause::NotFound => BindKind::NotFound,
+            Cause::Denied => BindKind::Denied,
+            Cause::Unavailable => BindKind::Unavailable,
+            Cause::WrongPath | Cause::Other => BindKind::Invalid,
+        }
+    }
+}
+
 impl BindError {
     fn usage(message: impl Into<String>, hint: impl Into<String>) -> Self {
-        BindError::Usage { message: message.into(), hint: hint.into(), field: None, source: None }
+        BindError::Usage { message: message.into(), hint: hint.into(), field: None, kind: BindKind::Invalid, source: None }
+    }
+
+    /// A refusal whose condition is what the failed file operation `error` says.
+    fn io(message: impl Into<String>, hint: impl Into<String>, error: &std::io::Error) -> Self {
+        BindError::Usage { message: message.into(), hint: hint.into(), field: None, kind: BindKind::of_io(error), source: None }
+    }
+
+    /// A file canon may not bind because it lies outside the repository.
+    fn denied(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        BindError::Usage { message: message.into(), hint: hint.into(), field: None, kind: BindKind::Denied, source: None }
+    }
+
+    pub fn kind(&self) -> BindKind {
+        match self {
+            BindError::Usage { kind, .. } => *kind,
+            BindError::Contradiction(_) => BindKind::Invalid,
+        }
     }
 
     /// Records the failure behind a usage refusal.
     fn caused_by(self, cause: impl std::error::Error + Send + Sync + 'static) -> Self {
         match self {
-            BindError::Usage { message, hint, field, .. } => BindError::Usage { message, hint, field, source: Some(Box::new(cause)) },
+            BindError::Usage { message, hint, field, kind, .. } => BindError::Usage { message, hint, field, kind, source: Some(Box::new(cause)) },
             other => other,
         }
     }
@@ -124,7 +168,7 @@ impl BindError {
     /// Names the flag the refused file was given with.
     fn on(self, flag: &'static str) -> Self {
         match self {
-            BindError::Usage { message, hint, source, .. } => BindError::Usage { message, hint, field: Some(flag), source },
+            BindError::Usage { message, hint, kind, source, .. } => BindError::Usage { message, hint, field: Some(flag), kind, source },
             other @ BindError::Contradiction(_) => other,
         }
     }
@@ -314,13 +358,13 @@ pub fn bind_artifacts(repo: &Path, artifacts: &[PathBuf], max_bytes: u64) -> Res
 }
 
 fn canonical_repo(repo: &Path) -> Result<PathBuf, BindError> {
-    repo.canonicalize().map_err(|e| BindError::usage(format!("resolve repository root: {e}"), "run canon from inside the repository, or pass --repo <root>"))
+    repo.canonicalize().map_err(|e| BindError::io(format!("resolve repository root: {e}"), "run canon from inside the repository, or pass --repo <root>", &e))
 }
 
 fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, BoundFile), BindError> {
     let (relative, resolved, file) = open_in_repo(repo, path, max_bytes).map_err(|e| e.on("--artifact"))?;
     let sha256 = canon_gate::artifact_store::sha256_reader(file)
-        .map_err(|e| BindError::usage(format!("read {}: {e}", path.display()), "check the file is readable by this user").on("--artifact"))?;
+        .map_err(|e| BindError::io(format!("read {}: {e}", path.display()), "check the file is readable by this user", &e).on("--artifact"))?;
     Ok((relative, BoundFile::on_disk(resolved, sha256)))
 }
 
@@ -562,7 +606,7 @@ fn read_report_file(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u
     let mut bytes = Vec::new();
     file.take(MAX_REPORT_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|e| BindError::usage(format!("read {}: {e}", path.display()), "check the file is readable by this user and not being written by the test run still"))?;
+        .map_err(|e| BindError::io(format!("read {}: {e}", path.display()), "check the file is readable by this user and not being written by the test run still", &e))?;
     if bytes.len() as u64 > MAX_REPORT_BYTES {
         return Err(BindError::usage(
             format!("{} is larger than {MAX_REPORT_BYTES} bytes; bind it with --artifact instead", path.display()),
@@ -836,7 +880,7 @@ fn outcome_name(outcome: ReportOutcome) -> &'static str {
 /// a machine-local location no reviewer can find.
 fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, PathBuf, std::fs::File), BindError> {
     let resolved = path.canonicalize().map_err(|e| {
-        BindError::usage(format!("{}: {e}", path.display()), "check the path exists and is readable from the directory canon runs in; a relative path is resolved against it")
+        BindError::io(format!("{}: {e}", path.display()), "check the path exists and is readable from the directory canon runs in; a relative path is resolved against it", &e)
     })?;
     if !resolved.is_file() {
         return Err(BindError::usage(
@@ -845,7 +889,7 @@ fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Pat
         ));
     }
     let relative = resolved.strip_prefix(repo).map_err(|cause| {
-        BindError::usage(
+        BindError::denied(
             format!("{} is outside the repository; bound files are recorded by repository-relative path", path.display()),
             "copy the file anywhere under the repository and bind that path; canon stores the bytes under .canon/artifacts/sha256 either way",
         )
@@ -856,11 +900,11 @@ fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Pat
         .map(|c| c.as_os_str().to_string_lossy().into_owned())
         .collect::<Vec<_>>()
         .join("/");
-    let file = std::fs::File::open(&resolved)
-        .map_err(|e| BindError::usage(format!("open {}: {e}", path.display()), "check the file is readable by this user (permissions) and not locked by another process"))?;
+    let file = canon_store::eio::open(&resolved)
+        .map_err(|e| BindError::io(format!("open {}: {e}", path.display()), "check the file is readable by this user (permissions) and not locked by another process", &e))?;
     let size = file
         .metadata()
-        .map_err(|e| BindError::usage(format!("stat {}: {e}", path.display()), "check the file is readable by this user (permissions) and still exists"))?
+        .map_err(|e| BindError::io(format!("stat {}: {e}", path.display()), "check the file is readable by this user (permissions) and still exists", &e))?
         .len();
     if size > max_bytes {
         return Err(BindError::usage(
@@ -1404,6 +1448,19 @@ fn issue_is_failure(issue: &serde_json::Value) -> bool {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    /// atip.codestored.11: a file the system fails to read in a way a repeat can pass is the `UNAVAILABLE` condition of a binding, whichever
+    /// file operation failed; the other causes keep their conditions.
+    #[test]
+    fn atip_codestored_11_a_binding_the_system_fails_to_read_is_unavailable() {
+        let eio = std::io::Error::from_raw_os_error(5);
+        assert_eq!(BindKind::of_io(&eio), BindKind::Unavailable);
+        assert_eq!(BindKind::of_io(&std::io::Error::from(std::io::ErrorKind::TimedOut)), BindKind::Unavailable);
+        assert_eq!(BindKind::of_io(&std::io::Error::from_raw_os_error(13)), BindKind::Denied);
+        assert_eq!(BindKind::of_io(&std::io::Error::from(std::io::ErrorKind::NotFound)), BindKind::NotFound);
+        assert_eq!(BindKind::of_io(&std::io::Error::from(std::io::ErrorKind::IsADirectory)), BindKind::Invalid);
+        assert_eq!(BindError::io("read x", "wait", &eio).kind(), BindKind::Unavailable);
+    }
 
     #[test]
     fn binding_refusals_read_as_before() {

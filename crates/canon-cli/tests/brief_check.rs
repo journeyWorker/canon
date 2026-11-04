@@ -321,7 +321,7 @@ fn operational_errors_carry_a_string_code_and_the_registry_exit() {
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--providers", "none"]);
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("NO_BRIEF")));
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("BRIEF_REQUIRED")));
 
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(dir.path(), &["change", "new", "one", "--subject", "demo", "--title", "One"]);
@@ -335,7 +335,7 @@ fn operational_errors_carry_a_string_code_and_the_registry_exit() {
 
     std::fs::write(dir.path().join("canon.yaml"), std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap() + "language: [ko]\n").unwrap();
     let (code, report) = check(dir.path(), &["one"]);
-    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CONFIG_UNREADABLE")));
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CONFIG_INVALID")));
 }
 
 #[test]

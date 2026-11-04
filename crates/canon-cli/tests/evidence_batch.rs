@@ -234,7 +234,7 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
     ] {
         let out = attest_all(repo, "junit:reports/junit.xml", &extra);
         assert_eq!(out.status.code(), Some(2), "{flag}: {}", stderr(&out));
-        assert!(stderr(&out).contains("EVIDENCE_INVALID_ARGUMENT") && stderr(&out).contains(flag.split(", ").next().unwrap()), "{flag}: {}", stderr(&out));
+        assert!(stderr(&out).contains("EVIDENCE_ARGUMENT_CONFLICT") && stderr(&out).contains(flag.split(", ").next().unwrap()), "{flag}: {}", stderr(&out));
     }
     let bare = canon(repo, &["evidence", "add", "--project", "root", "--all-scenarios", "--class", "test-run", "--ref", "x", "--role", "implementer"]);
     assert_eq!(bare.status.code(), Some(2));
@@ -433,7 +433,7 @@ fn evidence_add_95_a_bare_artifact_is_refused_in_a_batch() {
     let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "reports/screens/a.png", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let json: Value = serde_json::from_slice(&out.stderr).or_else(|_| serde_json::from_slice(&out.stdout)).unwrap();
-    assert_eq!(json["error"]["code"], "EVIDENCE_INVALID_ARGUMENT", "{json}");
+    assert_eq!(json["error"]["code"], "EVIDENCE_ARGUMENT_CONFLICT", "{json}");
     let hint = json["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("per-test attachments") && hint.contains("--artifact <scenario-id>=<path>"), "{hint}");
     assert_eq!(evidence_files(repo), before, "a refused add writes nothing");
@@ -724,7 +724,7 @@ fn review_scenario_a_batch_with_an_unindexed_scenario_writes_nothing() {
     let repo = dir.path();
     let out = canon(repo, &review_args(&["shop.cart.01", "shop.cart.02", "shop.cart.77"], &["--json"]));
     assert_eq!(out.status.code(), Some(2));
-    assert!(stderr(&out).contains("REVIEW_SCENARIO_NOT_INDEXED") || stdout(&out).contains("REVIEW_SCENARIO_NOT_INDEXED"), "{}{}", stdout(&out), stderr(&out));
+    assert!(stderr(&out).contains("SCENARIO_INDEX_REQUIRED") || stdout(&out).contains("SCENARIO_INDEX_REQUIRED"), "{}{}", stdout(&out), stderr(&out));
     assert!(reviews(repo).is_empty());
 
     let none = canon(repo, &review_args(&[], &[]));

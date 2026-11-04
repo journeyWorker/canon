@@ -150,7 +150,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate check", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon gate check", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -163,7 +163,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     let mut gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate check", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon gate check", json);
         }
     };
 
@@ -435,8 +435,11 @@ pub(crate) struct LocatedTask {
 /// the sources consulted, minus the `canon task done: ` prefix: every
 /// location failure is a usage failure (exit `2`) for the flip, so the
 /// caller needs no further discrimination between them.
-fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
-    let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|e| e.to_string())?;
+fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, LocateFailure> {
+    let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|plans_err| match plans_err.cli_error() {
+        Some(error) => LocateFailure::Corpus(error),
+        None => LocateFailure::NotFound(plans_err.to_string()),
+    })?;
     if sources.is_empty() {
         // Distinct from "consulted N sources, none held it": this repo
         // has no `.canon/changes/` and declares `plans.sources: []`
@@ -445,16 +448,16 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
         // here would blame a dialect the operator never configured —
         // the same refusal `crate::dispatch::DispatchError::NoPlanSources`
         // already makes for `--task`.
-        return Err(format!(
+        return Err(LocateFailure::NotFound(format!(
             "this repo configures no plan sources (no `{}` and no `plans.sources` entries in canon.yaml), so no plan document exists for {task_id} to live in — write the change with `canon change new`, or list your external plans under `plans.sources`",
             canon_model::paths::CHANGES_DIR
-        ));
+        )));
     }
     let mut consulted: Vec<String> = Vec::new();
     for src in &sources {
         consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));
         let Some(entry) = src.entry() else {
-            return Err(format!("`{}` is not a registered plan dialect", src.dialect()));
+            return Err(LocateFailure::NotFound(format!("`{}` is not a registered plan dialect", src.dialect())));
         };
         // A dialect that registered no write-back capability at all
         // cannot own a flip — skip it for location (a later source may
@@ -467,7 +470,14 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
             return Ok(LocatedTask { write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
         }
     }
-    Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
+    Err(LocateFailure::NotFound(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; "))))
+}
+
+/// Why [`locate_task`] found no task: the plan corpus could not be read (canon.yaml, answered with its own refusal: `PLAN_CORPUS_UNAVAILABLE`,
+/// `CONFIG_DENIED` or `CONFIG_INVALID`), or it was read and does not hold the task (`TASK_NOT_FOUND`).
+enum LocateFailure {
+    Corpus(CliError),
+    NotFound(String),
 }
 
 /// `canon task done`: the task row flipped, or already done.
@@ -512,22 +522,24 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     // SAME source).
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
-        Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.clone()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
+        Err(LocateFailure::Corpus(error)) => return error.emit("canon task done", json),
+        Err(LocateFailure::NotFound(e)) => {
+            return CliError::refused("TASK_NOT_FOUND", e).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
         }
     };
 
     let document = match std::fs::read_to_string(&document_path) {
         Ok(d) => d,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
+            let code = crate::read_cause::plan_corpus_code(&e);
+            return CliError::refused(code, format!("cannot read {}: {e}", document_path.display())).hint("make the plan document a readable text file, then run the command again").emit("canon task done", json);
         }
     };
 
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon task done", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon task done", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -538,7 +550,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon task done", json);
         }
     };
 
@@ -548,7 +560,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::Evidence) {
         Ok(read) => read.records,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
+            return crate::read_cause::repo_error(e.to_string()).emit("canon task done", json);
         }
     };
 
@@ -598,7 +610,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let flip = match write_back.flip_task(&document, &task_id, approved_note.as_deref().unwrap_or("")) {
         Ok(o) => o,
         Err(e @ WriteBackError::RowNotFound(_)) => {
-            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon task done", json);
+            return CliError::failed("PLAN_DOCUMENT_INVALID", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon task done", json);
         }
         // Gate-red, not usage (the variant's own doc): the offending
         // text came from an already-COMMITTED ledger record's approved
@@ -976,7 +988,7 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate promote", json);
+            return crate::read_cause::config_error(e.to_string()).emit("canon gate promote", json);
         }
     };
     // Something staged is about to move into the ledger: both directories must take it before the first record moves. An empty staging area writes nothing and is not refused.
@@ -1024,20 +1036,20 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
             }
         }
         Err(e) => {
-            CliError::refused("PROMOTE_FAILED", e.to_string()).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`").emit("canon gate promote", json)
+            CliError::refused("PROMOTION_FAILED", e.to_string()).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`").emit("canon gate promote", json)
         }
     }
 }
 
 /// The refusal of a promotion the gate refused: exit 2, the first record's code, and an entry of `error.details` for each record when
-/// there are several (`atip.codeexit.04`). No `data`: the refusals are the answer.
+/// there are several (`atip.codeexit.03`). No `data`: the refusals are the answer.
 pub(crate) fn refused_promotion(refused: &[canon_gate::promote::Refused]) -> CliError {
     let mut causes: Vec<crate::gate_refusal::Cause> = refused
         .iter()
-        .map(|r| crate::gate_refusal::Cause { code: crate::gate_refusal::promotion_code(r.violation.class), message: format!("{}: {}", r.violation.subject, r.violation.detail) })
+        .map(|r| crate::gate_refusal::Cause::new(crate::gate_refusal::PROMOTION_CODE, format!("{}: {}", r.violation.subject, r.violation.detail)))
         .collect();
     if causes.is_empty() {
-        causes.push(crate::gate_refusal::Cause { code: "PROMOTION_INVALID", message: "promotion landed nothing".to_string() });
+        causes.push(crate::gate_refusal::Cause::new("PROMOTION_INVALID", "promotion landed nothing".to_string()));
     }
     crate::gate_refusal::refusal(causes, "the records stay staged: fix each one the error names (or re-add it), then run `canon gate promote` again")
 }
@@ -1116,27 +1128,31 @@ impl StagedOutcome {
 /// record. Reads the outcome off the report, which carries only that
 /// record: committed (or recovered) means promoted, and the caller's
 /// one success line names the committed path; refused means it is
-/// still staged, and the refusal lines are printed here.
-pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool, json: bool) -> StagedOutcome {
+/// still staged, and the refusal lines are printed here. A refusal after the staging is `incomplete` (the `<SUBJECT>_INCOMPLETE`
+/// code of the record's subject) with the gate's code as its reason.
+pub(crate) fn promote_after_stage(command: &str, incomplete: &'static str, ledger_root: &Path, location: &str, promote: bool, json: bool) -> StagedOutcome {
     if !promote {
         return StagedOutcome::Staged;
+    }
+    // `promote-staged-corrupt` (a debug build's test seam, `incomplete::injected_stop`): another process damages the staged file between the staging and
+    // the promotion, so the gate refuses the record it was just given and the record stays staged.
+    if let Some(stop) = crate::incomplete::injected_stop("promote-staged-corrupt") {
+        let _ = std::fs::write(evidence_staging_dir(ledger_root).join(location), format!("{{ {stop}"));
     }
     match try_promote(ledger_root, location) {
         Ok(target) => StagedOutcome::Promoted { target },
         Err(refusal) => {
             crate::say_raw!(json, "{}", refusal.lines);
             // The record was staged before the gate refused it, so it stays staged: the command stopped after an effect (spec 8.3.2),
-            // and the refusal is the reason. A promotion that failed for another cause (`PROMOTE_FAILED`) keeps its own code.
+            // and the refusal is the reason. A promotion that failed for another cause (`PROMOTION_FAILED`) keeps its own code.
             let error = if refusal.data.is_some() {
-                crate::json_out::prepend_next(crate::status::NextStep {
-                    command: "canon gate promote --dry-run --json".into(),
-                    why: "read what is staged and why the gate refuses it before running anything again".into(),
-                    actor: crate::status::StepActor::Agent,
-                    role: Some(crate::role::Role::Orchestrator),
-                });
-                CliError::failed("STOPPED_MIDWAY", format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
+                crate::incomplete::read_first("canon gate promote --dry-run --json", "read what is staged and why the gate refuses it before running anything again");
+                // The causes the gate named stay: each is an entry of `details` with its own code, the first being the error itself.
+                let details = refusal.error.detail_errors().to_vec();
+                let stopped = CliError::failed(incomplete, format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
                     .reason(refusal.error.code)
-                    .hint("fix the record the message names and run `canon gate promote` (the refused record is still staged); do not add it again")
+                    .hint("fix the record the message names and run `canon gate promote` (the refused record is still staged); do not add it again");
+                if details.len() > 1 { stopped.details(details) } else { stopped }
             } else {
                 refusal.error
             };
@@ -1179,7 +1195,7 @@ fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreErr
                 data: Some(promote_report(&report, false)),
             })),
         },
-        Err(e) => Err(Box::new(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None })),
+        Err(e) => Err(Box::new(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTION_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None })),
     }
 }
 
@@ -1287,7 +1303,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let repo = resolve_repo_root(repo);
     if !repo.is_dir() {
         let what = if repo.exists() { "is not a directory" } else { "does not exist" };
-        return CliError::refused("HOOKS_INSTALL_REFUSED", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+        return CliError::refused("HOOKS_REPO_INVALID", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
     }
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -1303,39 +1319,67 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         match install_into(path, &entry, true) {
             Ok(InstallOutcome::Installed) => {
                 if let Err(e) = crate::write_mode::check_writable(path) {
-                    return crate::write_mode::unavailable(path, &e).emit("canon gate install-hooks", json);
+                    return crate::write_mode::unwritable(path, &e).emit("canon gate install-hooks", json);
                 }
             }
             Ok(_) => {}
             Err(e) => {
-                return CliError::refused("HOOKS_INSTALL_REFUSED", e.to_string()).hint("check that the hook file under .claude / .codex is a readable JSON file and that its directory can be created, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+                let code = crate::read_cause::hooks_file_code(&e);
+                return CliError::refused(code, e.to_string()).hint("check that the hook file under .claude / .codex is a readable JSON file and that its directory can be created, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
             }
         }
     }
     if writes_script {
         if let Err(e) = crate::write_mode::check_creatable(&script_path, true).and_then(|()| crate::write_mode::check_writable(&script_path)) {
-            return crate::write_mode::unavailable(&script_path, &e).emit("canon gate install-hooks", json);
+            return crate::write_mode::unwritable(&script_path, &e).emit("canon gate install-hooks", json);
         }
     }
 
+    // One write that fails and left nothing written is the I/O category's `WRITE_FAILED`; the second file failing after the first was
+    // written is the install stopping part-way, `HOOKS_INSTALL_INCOMPLETE`, and the first file stays.
     let claude_outcome = match install_into(&claude_path, &entry, dry_run) {
         Ok(o) => o,
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+            return CliError::refused("WRITE_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
-    let codex_outcome = match install_into(&codex_path, &entry, dry_run) {
+    let codex_result = match crate::incomplete::injected_stop("hooks-second-file") {
+        Some(stop) if !dry_run => Err(stop.to_string()),
+        _ => install_into(&codex_path, &entry, dry_run).map_err(|e| e.to_string()),
+    };
+    let codex_outcome = match codex_result {
         Ok(o) => o,
+        Err(e) if !dry_run && matches!(claude_outcome, InstallOutcome::Installed) => {
+            crate::incomplete::read_status(&format!("read what the install wrote before it stopped: {} is installed, {} is not", claude_path.display(), codex_path.display()));
+            return CliError::failed("HOOKS_INSTALL_INCOMPLETE", format!("installed the hook in {}, but could not write {}: {e}", claude_path.display(), codex_path.display()))
+                .reason("WRITE_FAILED")
+                .hint("the first hook file stays installed; check that the other hook file and its directory are writable, then run `canon gate install-hooks` again")
+                .emit("canon gate install-hooks", json);
+        }
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+            return CliError::refused("WRITE_FAILED", e).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
 
     let mut script_written = false;
     if writes_script {
         if !dry_run {
-            if let Err(e) = write_pre_commit_script(&script_path) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
+            // `hooks-script` (a debug build's test seam, `incomplete::injected_stop`): the write of the pre-commit script fails.
+            let written = match crate::incomplete::injected_stop("hooks-script") {
+                Some(stop) => Err(stop),
+                None => write_pre_commit_script(&script_path),
+            };
+            if let Err(e) = written {
+                let message = format!("failed to write {}: {e}", script_path.display());
+                // Both hook files were written (or were already there): a script that fails now stops the install part-way.
+                if matches!(claude_outcome, InstallOutcome::Installed) || matches!(codex_outcome, InstallOutcome::Installed) {
+                    crate::incomplete::read_status("read what the install wrote before it stopped: the hook files are installed, the pre-commit script is not");
+                    return CliError::failed("HOOKS_INSTALL_INCOMPLETE", message)
+                        .reason("WRITE_FAILED")
+                        .hint("the hook files stay installed; check that the path of the script is writable and the disk has room, then run `canon gate install-hooks` again")
+                        .emit("canon gate install-hooks", json);
+                }
+                return CliError::refused("WRITE_FAILED", message).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
             }
         }
         script_written = true;
@@ -1376,8 +1420,18 @@ fn any_canon_gate_command(settings: &serde_json::Value) -> bool {
     })
 }
 
+/// The settings of an existing hook file, `{}` when there is none (or its text is not JSON, which the install replaces); a file the system will not
+/// read is the error, so it is told as what it is (`HOOKS_FILE_DENIED`, `HOOKS_FILE_UNAVAILABLE`) before anything is written.
+fn read_hook_settings(path: &Path) -> std::io::Result<serde_json::Value> {
+    match canon_store::eio::read_to_string(path) {
+        Ok(text) => Ok(serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({}))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
+        Err(e) => Err(e),
+    }
+}
+
 fn install_into(path: &Path, entry: &HookEntry, dry_run: bool) -> std::io::Result<InstallOutcome> {
-    let mut settings = read_json_or_default(path);
+    let mut settings = read_hook_settings(path)?;
     let outcome = install_hooks(&mut settings, entry);
     if dry_run && matches!(outcome, InstallOutcome::Installed) {
         crate::write_mode::check_creatable(path, true)?;
@@ -1437,10 +1491,10 @@ mod tests {
         let bystander = stage(&ledger_root, Actor::new("other", RoleId::parse("reviewer").unwrap()));
 
         let kept = stage(&ledger_root, Actor::new("impl", RoleId::parse("implementer").unwrap()));
-        assert_eq!(promote_after_stage("t", &ledger_root, &kept, false, false), StagedOutcome::Staged);
+        assert_eq!(promote_after_stage("t", "EVIDENCE_INCOMPLETE", &ledger_root, &kept, false, false), StagedOutcome::Staged);
         assert!(evidence_staging_dir(&ledger_root).join(&kept).exists(), "not asked to promote: nothing moves");
 
-        let promoted = promote_after_stage("t", &ledger_root, &kept, true, false);
+        let promoted = promote_after_stage("t", "EVIDENCE_INCOMPLETE", &ledger_root, &kept, true, false);
         let StagedOutcome::Promoted { target } = &promoted else { panic!("promoted: {promoted:?}") };
         assert!(ledger_root.join(target).is_file(), "the outcome names the committed record: {target}");
         assert_ne!(target, &kept, "promotion assigns the committed record its own name");
@@ -1454,7 +1508,7 @@ mod tests {
         // bystander beside it stays untouched rather than being promoted
         // in its place.
         let refused = stage(&ledger_root, Actor::new_unattributed("legacy-writer"));
-        let outcome = promote_after_stage("t", &ledger_root, &refused, true, false);
+        let outcome = promote_after_stage("t", "EVIDENCE_INCOMPLETE", &ledger_root, &refused, true, false);
         assert_eq!((outcome.exit_code(), outcome.suffix()), (1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
         assert_eq!(outcome, StagedOutcome::Refused);
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");

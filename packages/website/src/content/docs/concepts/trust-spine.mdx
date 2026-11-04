@@ -120,7 +120,8 @@ record — `canon review scenario <id> --project <root>
 --session <session>`, which writes directly (there is nothing to promote).
 `--rev` names the reviewed code and defaults to `HEAD`; a review of uncommitted
 code is recorded with its `codeTree`, and it still counts after the commit when
-the code tree is the same. Several scenarios, or several records of any write
+the code tree is the same. Outside git, or in a repo with no commit yet, the
+review is refused with `COMMIT_REQUIRED`. Several scenarios, or several records of any write
 command, go in one `--input` array: it is validated whole before anything is written.
 With `distinct_actor`, both the review's `reviewer` and its actor must differ
 from every actor on that scenario's evidence, and a review that carries a

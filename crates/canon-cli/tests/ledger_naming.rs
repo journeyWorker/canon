@@ -1144,7 +1144,7 @@ fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_m
     let o = canon(&["evidence", "add", "--scenario", "cart.add.01", "--class", "test-run", "--ref", "x", "--verdict", "faithful", "--role", "implementer", "--actor", "a", "--session", "s", "--json"]);
     assert_eq!(o.status.code(), Some(2), "{}", text(&o));
     let doc = json_of(&o);
-    assert_eq!(doc["error"]["code"], "OLD_LAYOUT", "{doc}");
+    assert_eq!(doc["error"]["code"], "LAYOUT_MIGRATION_REQUIRED", "{doc}");
     assert!(doc["error"]["hint"].as_str().is_some_and(|h| h.contains("canon migrate")), "{doc}");
     assert_eq!(files(&repo.join(".canon")), before, "nothing is written");
 }

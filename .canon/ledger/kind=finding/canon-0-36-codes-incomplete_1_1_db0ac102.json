@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:25:29.810530Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/ledger.rs:48-60",
+  "introduced_by": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "kind": "finding",
+  "reason": "re-reviewed at 73e2b1a0",
+  "resolution_code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "resolution_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 1,
+  "scenario_ids": [
+    "atip.incomplete.06"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[correctness] `ledger compact` names every failure of the archive pass LEDGER_COMPACT_INCOMPLETE, including a preview and a failure before the first version moved, where nothing was written. Real call at 8e9de889 (debug build): a ledger whose `kind=*` directories are mode 000, `canon ledger compact --json` (the preview, no --commit) -> exit 1, code LEDGER_COMPACT_INCOMPLETE, retryable false, hint 'versions already moved stay in the archive', no meta.next; the cause is `scan_kind` failing with EACCES before any move (canon-store archive.rs compact_kind -> scan_kind), and a dry-run never moves anything. The brief F1 acceptance says a call whose name ends in _INCOMPLETE and leaves no partial effect fails; F5 gives INCOMPLETE only to a compaction that moved some. `ledger.rs::compact` wraps `tier.compact(dry_run)` in one closure for all three call sites (preview at ledger.rs:142/175/242, commit at 216). Fix: INCOMPLETE only when the commit has moved at least one version (the error must carry the moved count, as KindCompaction.moved does); a preview and a first-move failure are a FAILED answer, or the codes-stored read codes (DENIED/UNAVAILABLE, exit 2) for the unreadable ledger; add the `read_status` next only on INCOMPLETE. Add a test: preview over an unreadable kind directory is not LEDGER_COMPACT_INCOMPLETE.",
+  "worktree_dirty": false
+}

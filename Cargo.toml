@@ -15,14 +15,14 @@ members = [
 ]
 
 [workspace.package]
-version = "0.35.0"
+version = "0.36.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/journeyWorker/canon"
 
 [workspace.dependencies]
-# The atip/1 contract crate: it lives in the atip repo (tag `atip-crate-v0.1.0`; the checker is `atip-check-v0.1.0`).
-atip = { git = "https://github.com/journeyWorker/atip", tag = "atip-crate-v0.1.0" }
+# The atip/1 contract crate: it lives in the atip repo (tag `atip-crate-v0.1.3`; the checker is `atip-check-v0.1.4`).
+atip = { git = "https://github.com/journeyWorker/atip", tag = "atip-crate-v0.1.3" }
 
 # Internal crates
 canon-model = { path = "crates/canon-model" }

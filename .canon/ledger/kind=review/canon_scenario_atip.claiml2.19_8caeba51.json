@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev"
+  },
+  "at": "2026-11-04T18:40:49.303662Z",
+  "code_tree": "1a4b9e6c3c6d893d3ee046015816857f27417fa0",
+  "kind": "review",
+  "pin": "15d319179e78d0d448d146b1492138dfaa6245cb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claiml2_19_a_fixture_missing_a_required_item_is_refused_by_the_fixture_test"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "50451b56da28e2f4a1b23890c422b14f03351e06e64ffad2360bb1f6b17673e1",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-claim-l2/brief.md"
+  },
+  "review_id": "01M6KXT84QQWTMDGPER259M3QA",
+  "reviewer": "rev-0-36-flowfix",
+  "scenario_id": "atip.claiml2.19",
+  "schema": 2,
+  "worktree_dirty": false
+}

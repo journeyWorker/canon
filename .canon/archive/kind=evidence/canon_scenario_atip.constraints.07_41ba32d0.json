@@ -1,0 +1,101 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-4",
+    "role": "implementer",
+    "session_id": "s-0-36-claim-1-4"
+  },
+  "at": "2026-11-04T16:32:16.161730Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_07_every_validator_refuses_every_call_it_rejects",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_one_change_with_two_digests_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_a_relayed_approval_without_its_digest_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_class_audit_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_evidence_audit_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_finding_add_a_defect_without_its_origin_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_export_an_empty_window_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_query_a_status_foreign_to_the_kind_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    }
+  ],
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "5d9c3a6a70c16b3251dcddbc196a2de3a0ff0c41",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 539,
+  "scenario_id": "atip.constraints.07",
+  "schema": 1,
+  "staging_id": "543ff471",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

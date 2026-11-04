@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-evidence-audit",
+    "role": "implementer",
+    "session_id": "s-0-36-evidence-audit"
+  },
+  "at": "2026-11-04T17:53:22.201990Z",
+  "attachments": [
+    {
+      "case": "atip_l0_23_every_registry_row_is_exit_1_or_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "atip_l0_23_no_call_site_overrides_an_exit_and_no_literal_exit_is_outside_0_1_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    },
+    {
+      "case": "atip_l0_23_the_scan_reads_literals_and_leaves_variables_alone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c19b32afea5f4f6cd96e135cb2964ef7723c98a8a98002bbad823766f15e0638"
+    }
+  ],
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-36 evidence audit: every scenario bound to the workspace nextest run (3793 passed) from a clean worktree at 1419794e5"
+  },
+  "evidence_sha": "1419794e5b88c9fb9b35ad22588e1da48e3cb240",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 753,
+  "scenario_id": "atip.l0.23",
+  "schema": 1,
+  "staging_id": "8a47cc6d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-4"
+  },
+  "at": "2026-11-04T20:16:34.843360Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "disposition": "fixed",
+  "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "finding",
+  "resolution_code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "resolution_sha": "2fb67c4fa49964b3cc86f280c183345970d4ad0d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 3,
+  "scenario_ids": [
+    "atip.codesplit.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec-fidelity] CHANGELOG row of SUBJECT_ADOPT_REFUSED correctly does NOT list SUBJECT_CONFLICT; the brief text (lines 62, 71, 109, 125) lags, not canon. Checked: before the split (c0e7c7b89^) SUBJECT_ADOPT_REFUSED was emitted by adopt_change and by the unadopt precondition lookups only for a missing subject, a missing change and a failed read/write, never for a conflict; those are now SUBJECT_NOT_FOUND, CHANGE_NOT_FOUND, WRITE_*, REPO_* as the row says. The conflicts of unadopt (approved brief, @flow-tagged scenario) were SUBJECT_UNADOPT_REFUSED, whose row already lists SUBJECT_CONFLICT with APPROVED_BRIEF and FLOW_TAGGED (CHANGELOG line 178), and I confirmed subject.rs:589 answers SUBJECT_CONFLICT/APPROVED_BRIEF. subject adopt has no conflict condition (an already adopted change is an idempotent no-op), so SUBJECT_CONFLICT on the adopt row would be false. atip.codesplit.10 encodes this (SPLIT has no new code for SUBJECT_ADOPT_REFUSED) and its Then step says so. Action: planner should correct the approved brief text; no code change. Blast radius: scripts that branch on SUBJECT_CONFLICT only see unadopt and subject move TRANSITION refusals.",
+  "worktree_dirty": false
+}

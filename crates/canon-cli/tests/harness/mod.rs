@@ -18,9 +18,9 @@ pub fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The generated spec, in memory (T4 holds it equal to the checked-in file).
+/// The spec as canon declares it, in memory: the full model form (every member, `schemas` in each command document). The checked-in file and `canon schema` hold the 1.4 form of it.
 pub fn spec() -> &'static Value {
-    static SPEC: LazyLock<Value> = LazyLock::new(canon_cli::spec::generate);
+    static SPEC: LazyLock<Value> = LazyLock::new(canon_cli::spec::model);
     &SPEC
 }
 

@@ -1,7 +1,7 @@
-//! `canon-0-35-claim-l2`: canon declares atip/1 1.2 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-18`; `canon-0-36-atip-dep` moved the checker to the atip repository).
+//! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4`: canon declares atip/1 1.4 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-20`; `canon-0-36-atip-dep` moved the checker to the atip repository).
 //!
-//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.2 --deep`
-//! on the committed fixture, which `just atip` and the job `atip` run, and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
+//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.4 --deep`
+//! on the committed fixture, which `just atip-deep` and the job `atip` run (`just atip` runs it without `--deep`), and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
 //! stand for the obligations of contract 17.2 that a green checker run does not prove; the last four tests read it.
 
 use std::path::{Path, PathBuf};
@@ -35,33 +35,33 @@ fn canon_in(dir: &Path, args: &[&str]) -> Value {
 }
 
 #[test]
-fn atip_claiml2_01_every_envelope_declares_1_2_and_the_schema_tree_says_l2() {
+fn atip_claiml2_01_every_envelope_declares_1_4_and_the_schema_tree_says_l2() {
     let dir = tempfile::tempdir().expect("tempdir");
-    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.2");
+    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.4");
     assert_eq!(canon_cli::spec::LEVEL, "L2");
     let init = Command::new(CANON).args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     for args in [&["status", "--json"][..], &["nosuch", "--json"], &["schema", "--json"], &["schema", "--errors", "--json"], &["schema", "--warnings", "--json"]] {
         let document = canon_in(dir.path(), args);
-        assert_eq!(document["meta"]["contractVersion"], "1.2", "{args:?}: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.4", "{args:?}: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     let schema = canon_in(dir.path(), &["schema", "--json"]);
-    assert_eq!((schema["data"]["kind"].as_str(), schema["data"]["level"].as_str(), schema["meta"]["schemaVersion"].as_str()), (Some("tree"), Some("L2"), Some("1.2")), "{schema}");
+    assert_eq!((schema["data"]["kind"].as_str(), schema["data"]["level"].as_str(), schema["meta"]["schemaVersion"].as_str()), (Some("tree"), Some("L2"), Some("1.4")), "{schema}");
 }
 
-/// Whether `text` says that canon's `contractVersion` is `1.1`, in any of the ways the repository writes it (JSON, escaped JSON, code spans, prose).
-fn spells_1_1(text: &str) -> bool {
+/// Whether `text` says that canon's `contractVersion` is one of the minors it no longer declares (`1.1`, `1.2`, `1.3`), in any of the ways the repository writes it (JSON, escaped JSON, code spans, prose).
+fn spells_an_old_minor(text: &str) -> bool {
     text.match_indices("contractVersion").any(|(at, word)| {
         let after: String = text[at + word.len()..].chars().take(12).filter(|c| !matches!(c, '"' | '\\' | ':' | '`' | '(' | ' ' | '=' | '\'')).collect();
-        after.starts_with("1.1") && !after.starts_with("1.1.")
+        ["1.1", "1.2", "1.3"].iter().any(|old| after.strip_prefix(old).is_some_and(|rest| !rest.starts_with(|c: char| c == '.' || c.is_ascii_digit())))
     })
 }
 
 #[test]
-fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1() {
-    assert!(spells_1_1("\"contractVersion\": \"1.1\"") && spells_1_1("`contractVersion` (`1.1`, on every envelope)") && spells_1_1("{\\\"contractVersion\\\":\\\"1.1\\\"}"), "the detector sees the spellings");
-    assert!(!spells_1_1("\"contractVersion\": \"1.2\"") && !spells_1_1("`contractVersion` (`1.2`)") && !spells_1_1("contractVersion 1.9"));
+fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_an_earlier_minor() {
+    assert!(spells_an_old_minor("\"contractVersion\": \"1.1\"") && spells_an_old_minor("`contractVersion` (`1.2`, on every envelope)") && spells_an_old_minor("{\\\"contractVersion\\\":\\\"1.3\\\"}"), "the detector sees the spellings");
+    assert!(!spells_an_old_minor("\"contractVersion\": \"1.4\"") && !spells_an_old_minor("`contractVersion` (`1.4`)") && !spells_an_old_minor("contractVersion 1.9") && !spells_an_old_minor("contractVersion 1.2.1"));
     let root = repo_root();
     let mut found = Vec::new();
     // What reads canon's declaration: the skills, the website, the eval scripts, the conformance corpus, the generated spec and canon's own sources.
@@ -74,14 +74,14 @@ fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1() {
             if path.is_dir() {
                 pending.extend(std::fs::read_dir(&path).expect("a directory").map(|entry| entry.expect("an entry").path()));
             } else if let Ok(text) = std::fs::read_to_string(&path) {
-                if spells_1_1(&text) {
+                if spells_an_old_minor(&text) {
                     found.push(path.strip_prefix(&root).unwrap_or(&path).display().to_string());
                 }
             }
         }
     }
     found.sort();
-    assert!(found.is_empty(), "these files spell canon's contractVersion as 1.1: {found:?}");
+    assert!(found.is_empty(), "these files spell canon's contractVersion as 1.1, 1.2 or 1.3: {found:?}");
 }
 
 #[test]
@@ -115,15 +115,17 @@ fn recipe_lines(justfile: &str, name: &str) -> Vec<String> {
 }
 
 #[test]
-fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
+fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_4() {
     let root = repo_root();
     let workflow = read(&root.join(".github/workflows/test.yml"));
     let justfile = read(&root.join("justfile"));
-    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.2 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
-    let recipe = recipe_lines(&justfile, "atip");
-    assert!(recipe.contains(&canon_at_l2), "the recipe runs `{canon_at_l2}`: {recipe:?}");
+    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.4 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
+    let recipe = recipe_lines(&justfile, "atip-deep");
+    assert!(recipe.contains(&canon_at_l2), "the recipe atip-deep runs `{canon_at_l2}`: {recipe:?}");
     assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "the recipe builds canon only: {recipe:?}");
     assert!(!recipe.iter().any(|line| line.contains("--level L0") || line.contains("--level L1")), "the L2 report holds the L0 and L1 rows: {recipe:?}");
+    let quick = recipe_lines(&justfile, "atip");
+    assert!(quick.contains(&canon_at_l2.replace(" --deep", "")), "the recipe atip runs the same check without --deep: {quick:?}");
     let job = job_commands(&workflow, "atip");
     assert!(job.contains(&canon_at_l2), "the job atip runs `{canon_at_l2}`: {job:?}");
     assert!(job.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{job:?}");
@@ -131,37 +133,104 @@ fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
         assert!(!workflow.lines().any(|line| line == format!("  {retired}:")), "the job {retired} is folded into the job atip");
     }
     let ci = justfile.lines().find(|line| line.starts_with("ci:")).expect("the recipe ci");
-    assert!(ci.split_whitespace().any(|word| word == "atip"), "just ci runs the recipe atip: {ci}");
+    assert!(ci.split_whitespace().any(|word| word == "atip-deep"), "just ci runs the recipe atip-deep, as the job does: {ci}");
 }
 
-#[test]
-fn atip_claiml2_09_the_fixture_claims_1_2_and_lists_what_the_l2_rows_need() {
-    let fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
-    assert_eq!(fixture["contractVersion"], "1.2");
-    assert_eq!(fixture["notRun"], json!(["dashboard"]));
-    let prepare = fixture["prepare"].as_array().expect("prepare");
-    assert_eq!(prepare[0], json!(["git", "init", "-q"]));
-    assert!(prepare[1].as_array().is_some_and(|step| step.iter().any(|word| word == "--allow-empty")), "an empty commit: {prepare:?}");
-    let commands = fixture["commands"].as_object().expect("commands");
-    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
-        assert!(commands[id]["preview"].as_array().is_some_and(|previews| !previews.is_empty()), "the preview of {id}");
-    }
-    for id in ["export", "finding close"] {
-        for key in ["ok", "batchFailsAt", "batchFailsFirst"] {
-            assert!(commands[id][key].as_array().is_some_and(|cases| !cases.is_empty()), "{id}.{key}");
-        }
-    }
-    for id in ["export", "query"] {
-        assert_eq!(commands[id]["allowedEffects"], json!([".canon/audit/access.jsonl"]), "{id}");
-    }
-    // The destructive commands the schema lists are the ones the fixture previews.
+/// The commands the schema calls destructive, sorted: the ones the fixture must preview.
+fn destructive_commands() -> Vec<String> {
     let dir = tempfile::tempdir().expect("tempdir");
     let schema = canon_in(dir.path(), &["schema", "--json"]);
     let mut destructive: Vec<String> = schema["data"]["commands"].as_array().expect("commands").iter().filter(|entry| entry["effect"] == "destructive").map(|entry| entry["command"].as_str().expect("a name").to_string()).collect();
     destructive.sort();
+    destructive
+}
+
+/// What canon's fixture lacks of what the L2 rows need: the declaration, `prepare`, `notRun`, a preview for each destructive command, the batch cases and `allowedEffects`. One line per missing item, empty when the fixture has them all.
+fn fixture_problems(fixture: &Value, destructive: &[String]) -> Vec<String> {
+    let mut problems = Vec::new();
+    if fixture["contractVersion"] != "1.4" {
+        problems.push("contractVersion is not 1.4".to_string());
+    }
+    if fixture["notRun"] != json!(["dashboard"]) {
+        problems.push("notRun does not name dashboard".to_string());
+    }
+    let prepare = fixture["prepare"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let repository = prepare.first() == Some(&json!(["git", "init", "-q"]));
+    let empty_commit = prepare.get(1).and_then(Value::as_array).is_some_and(|step| step.iter().any(|word| word == "--allow-empty"));
+    if !(repository && empty_commit) {
+        problems.push("prepare does not make a git repository with one empty commit".to_string());
+    }
+    let Some(commands) = fixture["commands"].as_object() else {
+        problems.push("commands is missing".to_string());
+        return problems;
+    };
+    let has = |id: &str, key: &str| commands.get(id).is_some_and(|entry| entry[key].as_array().is_some_and(|cases| !cases.is_empty()));
+    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+        if !has(id, "preview") {
+            problems.push(format!("{id} has no preview"));
+        }
+    }
+    for id in ["export", "finding close"] {
+        for key in ["ok", "batchFailsAt", "batchFailsFirst"] {
+            if !has(id, key) {
+                problems.push(format!("{id} has no {key}"));
+            }
+        }
+    }
+    for id in ["export", "query"] {
+        if commands.get(id).is_none_or(|entry| entry["allowedEffects"] != json!([".canon/audit/access.jsonl"])) {
+            problems.push(format!("{id} has no allowedEffects"));
+        }
+    }
+    // The destructive commands the schema lists are the ones the fixture previews.
     let mut previewed: Vec<String> = commands.iter().filter(|(_, entry)| entry.get("preview").is_some()).map(|(id, _)| id.clone()).collect();
     previewed.sort();
-    assert_eq!(previewed, destructive, "every destructive command has a preview in the fixture");
+    if previewed != destructive {
+        problems.push(format!("the commands with a preview are {previewed:?}, the destructive ones are {destructive:?}"));
+    }
+    problems
+}
+
+#[test]
+fn atip_claiml2_09_the_fixture_claims_1_4_and_lists_what_the_l2_rows_need() {
+    let fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
+    assert_eq!(fixture_problems(&fixture, &destructive_commands()), Vec::<String>::new());
+}
+
+#[test]
+fn atip_claiml2_19_a_fixture_missing_a_required_item_is_refused_by_the_fixture_test() {
+    let committed: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
+    let destructive = destructive_commands();
+    assert_eq!(fixture_problems(&committed, &destructive), Vec::<String>::new(), "the committed fixture has every item");
+    // Each item taken out, or lowered, is found by itself and by its name.
+    let mut broken: Vec<(String, Value, &'static str)> = Vec::new();
+    let mut without = |name: &str, found: &'static str, change: &dyn Fn(&mut Value)| {
+        let mut fixture = committed.clone();
+        change(&mut fixture);
+        broken.push((name.to_string(), fixture, found));
+    };
+    without("contractVersion lowered to 1.3", "contractVersion", &|f| f["contractVersion"] = json!("1.3"));
+    without("prepare removed", "prepare", &|f| drop(f.as_object_mut().expect("object").remove("prepare")));
+    without("prepare without the empty commit", "prepare", &|f| f["prepare"] = json!([["git", "init", "-q"]]));
+    without("notRun removed", "notRun", &|f| drop(f.as_object_mut().expect("object").remove("notRun")));
+    without("notRun without dashboard", "notRun", &|f| f["notRun"] = json!([]));
+    without("commands removed", "commands", &|f| drop(f.as_object_mut().expect("object").remove("commands")));
+    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+        without(&format!("the preview of {id} removed"), "has no preview", &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove("preview")));
+    }
+    for id in ["export", "finding close"] {
+        for key in ["batchFailsAt", "batchFailsFirst"] {
+            without(&format!("{id}.{key} removed"), key, &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove(key)));
+        }
+    }
+    for id in ["export", "query"] {
+        without(&format!("the allowedEffects of {id} removed"), "allowedEffects", &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove("allowedEffects")));
+    }
+    for (name, fixture, found) in &broken {
+        let problems = fixture_problems(fixture, &destructive);
+        assert!(problems.iter().any(|problem| problem.contains(found)), "{name}: the fixture test must name `{found}`: {problems:?}");
+    }
+    assert!(broken.len() >= 17, "every kind of item is taken out once: {}", broken.len());
 }
 
 /// The part of the CHANGELOG that is the release being prepared (the section `## 0.35.0`).

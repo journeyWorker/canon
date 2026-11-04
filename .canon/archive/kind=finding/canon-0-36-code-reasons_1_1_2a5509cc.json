@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T13:49:10.274865Z",
+  "change_id": "canon-0-36-code-reasons",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/gate_refusal.rs:11-14",
+  "introduced_by": "b524c40a4efbb63df3f3e515e987872918912612",
+  "kind": "finding",
+  "reviewed_sha": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "reviewer": "rev-0-36-reasons",
+  "round": 1,
+  "scenario_ids": [
+    "atip.reasons.04",
+    "atip.reasons.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[correctness] false-success IS raised by a transition, so SUBJECT_INVALID has a third situation with no reason. gate_refusal.rs (module doc, subject_reason, GATE_AUDIT in tests/atip_reasons.rs) and the CHANGELOG say trust-below-required, flagged, fabricated-evidence and false-success are 'reported by gate check and gate task as data and raised by no transition'. Three of the four hold (subject move calls no trust, marker or checkbox check, and 'gate task' was removed in 0.28), but subject move to shipped calls canon_gate::audit::subject_audit_gaps (subject.rs:1403), which returns FailureClass::FalseSuccess for a scenario whose latest audit is refuted. Observed with the real binary (the setup of evidence_audit.rs:217-256, --json): subject move run --to shipped answers exit 2, SUBJECT_INVALID, NO reason, message 'false-success game.run.01 - verifying -> shipped: latest audit refuted...'. A move refused for an open blocker answers SUBJECT_INVALID/OPEN_BLOCKER (close the blocker finding), and for malformed evidence MALFORMED_EVIDENCE (fix the record); the false-success fix (fix the behavior, re-attest, record the evaluator's new audit with canon evidence audit) is a third different next action under the same code, which brief F4 says is a reason, and the audit's own GATE_AUDIT row gives it its own action ('record a newer audit'). With two causes in error.details the false-success entry carries no fix at all. Fix: register FALSE_SUCCESS under SUBJECT_INVALID (meaning/fix of its own), map FailureClass::FalseSuccess to it in subject_reason, correct the module doc, GATE_AUDIT and the CHANGELOG sentence and table row (and drop 'gate task'), re-bless docs/cli/canon.cli.json and the atip fixture, and add a real-binary test beside atip_reasons_07 that ships a subject with a refuted audit and asserts SUBJECT_INVALID/FALSE_SUCCESS, exit 2, no data.",
+  "worktree_dirty": false
+}

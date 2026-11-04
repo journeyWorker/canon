@@ -105,6 +105,15 @@ pub(crate) static TABLES: Tables = Tables {
         ),
         ("purge", &[Validator { arguments: &["before"], code: "USAGE", description: CALENDAR, rejects: &["canon purge --kind session --before 2026-02-30 --json"] }]),
         (
+            "schema",
+            &[Validator {
+                arguments: &["schemas", "path"],
+                code: "USAGE",
+                description: "`--schemas` answers for one command: `path` names a command, not a group and not nothing (the tree).",
+                rejects: &["canon schema --schemas --json", "canon schema finding --schemas --json"],
+            }],
+        ),
+        (
             "retrieve",
             &[Validator {
                 arguments: &["for-role", "regime"],
@@ -119,7 +128,7 @@ pub(crate) static TABLES: Tables = Tables {
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_REQUIRED").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_ARGUMENT_INVALID").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
-        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_INVALID_ARGUMENT").inside(&["claude", "none", "NONE", "", " Claude , codex,,pi ", ",omp"]).outside(&[",", "gemini", "none,claude", "claude,gemini", " , "]),
+        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID").inside(&["claude", "none", "NONE", "", " Claude , codex,,pi ", ",omp"]).outside(&[",", "gemini", "none,claude", "claude,gemini", " , "]),
         DomainRow::new(Scope::Arguments(&["retrieve"], "regime"), Domain::matching(REGIME_KEY), "USAGE").inside(&["reviewer/canon/join-spine/9c93d024b1a2", "reviewer/b/c/abcdef"]).outside(&["reviewer/b/c", "reviewer/b/c/d/abcdef", "reviewer//c/abcdef", "reviewer/b/c/ABCDEF", "reviewer/b/c/abcde", "reviewer/b c/c/abcdef"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "role-segment"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["reviewer", " a b ", "/x/"]).outside(&["", "  ", "/", " / "]),
         DomainRow::new(Scope::Arguments(&["regime show"], "repo-name"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["my-repo", "A B"]).outside(&["", "  ", "//"]),

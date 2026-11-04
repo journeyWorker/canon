@@ -5,6 +5,8 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:happy
   @flow:canon-0-35-canon-cursor-1-2.F1
+  @flow:canon-0-35-crate-cursor.F2
+  @flow:canon-0-35-crate-cursor.F4
   @atip.canoncursor.01
   Scenario: A page's next call holds the call's explicit arguments and --cursor and nothing else, and reads the next page, on the four paged commands
     Given a repo with three subjects, a change with three findings and two divergent scenarios
@@ -15,6 +17,8 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:failure
   @flow:canon-0-35-canon-cursor-1-2.F1
+  @flow:canon-0-35-crate-cursor.F1
+  @flow:canon-0-35-crate-cursor.F5
   @atip.canoncursor.02
   Scenario: A changed CANON_ROLE, an explicit --as, an explicit default added or dropped refuses the cursor with ARGUMENTS_CHANGED; --limit, --fields and --json do not
     Given a first page of each of the four commands issued with no CANON_ROLE, and one issued with CANON_ROLE=reviewer
@@ -25,6 +29,7 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:failure
   @flow:canon-0-35-canon-cursor-1-2.F1
+  @flow:canon-0-35-crate-cursor.F2
   @atip.canoncursor.03
   Scenario: The cursor is one ASCII word and one changed character makes it FOREIGN
     Given a first page of each of the four commands issued with --limit 1
@@ -35,6 +40,7 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:happy
   @flow:canon-0-35-canon-cursor-1-2.F2
+  @flow:canon-0-35-crate-cursor.F5
   @atip.canoncursor.04
   Scenario: The next call with --all in place of --limit reads the remaining records without refusal, on the four paged commands
     Given a first page of each of the four commands issued with --limit 1
@@ -55,6 +61,7 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:happy
   @flow:canon-0-35-canon-cursor-1-2.F3
+  @flow:canon-0-35-crate-cursor.F3
   @atip.canoncursor.06
   Scenario: A cursor used with another filter, kind or repo is ARGUMENTS_CHANGED, another command's is FOREIGN and one whose record is gone is EXPIRED
     Given a first page of each of the four commands, a cursor of another command and a cursor whose finding was deleted
@@ -85,6 +92,7 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:happy
   @flow:canon-0-35-canon-cursor-1-2.F5
+  @flow:canon-0-35-crate-1-2.F3
   @atip.canoncursor.09
   Scenario: limit, cursor, all and fields are flagOnly in the command document of the four commands and are not in their fragment schema
     Given the command documents of query, finding list, divergence list and export, and of retrieve and search
@@ -105,6 +113,7 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:failure
   @flow:canon-0-35-canon-cursor-1-2.F5
+  @flow:canon-0-35-crate-1-2.F3
   @atip.canoncursor.11
   Scenario: canon's flag-only set is the crate's 1.2 set plus repo and as, and the source holds no list of its own
     Given canon's flag-only set and the atip crate's set at 1.2
@@ -115,6 +124,7 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:failure
   @flow:canon-0-35-canon-cursor-1-2.F6
+  @flow:canon-0-35-crate-cursor.F3
   @atip.canoncursor.12
   Scenario: A cursor the 0.34 binary issued is CURSOR_INVALID with reason FOREIGN
     Given a cursor string issued by the 0.34 binary for query --kind subject --limit 1
@@ -135,6 +145,8 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @subject:atip-contract
   @case:edge
   @flow:canon-0-35-canon-cursor-1-2.F1
+  @flow:canon-0-35-crate-cursor.F1
+  @flow:canon-0-35-crate-cursor.F4
   @atip.canoncursor.14
   Scenario: A call given by --input is carried as argv options: the next page holds no --input
     Given export documents given as --input inline and on stdin
@@ -150,3 +162,23 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
     Given a repo with three subjects, a change with three findings and two divergent scenarios
     When query, finding list, divergence list and export run with --fields nosuch, with an empty value, with subject_id[], with a trailing comma, with an unclosed bracketed key and with a path the command always keeps, each with --json and without
     Then every call is exit 2 USAGE with field --fields; the JSON mode lists the declared paths as expected and the text mode prints the same refusal on stderr with nothing on stdout, and the repository is byte-identical afterwards
+
+  # canon: {"schema":1,"at":"2026-11-04T19:20:46Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
+  @subject:atip-contract
+  @case:happy
+  @flow:canon-0-35-crate-cursor.F1
+  @atip.canoncursor.16
+  Scenario: A cursor continues the same call written in another order or spelling: options reversed, a value apart from its option or as --name=value, the page size spelled 01 or moved, and the cursor first or between the options
+    Given a first page of each of the four commands issued with --limit 1, and the call the next page names
+    When the cursor is given to the same call with its options in the reverse order and each value apart from its option and the page size as 01, to the call with every option as --name=value and the cursor first, and to the call with the cursor and the page size between the options
+    Then each is accepted and reads the same page as the call the next page names: the binding is the call's arguments, not their order or their spelling
+
+  # canon: {"schema":1,"at":"2026-11-04T19:20:51Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-crate-cursor.F4
+  @atip.canoncursor.17
+  Scenario: A next page holds one cursor, the one it issues and not the one that was run, and a value that starts with a dash stays one word with its option
+    Given each of the four commands paged with --limit 1 and followed through the call each page names, and a repository in a directory called -dash
+    When the next call of every page after the first is read, and query --kind subject --limit 1 --repo=-dash runs and its next call is run as it is
+    Then the next call holds exactly one --cursor, the page's own and not the one that was run, and for -dash it holds --repo=-dash as one word with no bare word that starts with a dash and runs to the second page

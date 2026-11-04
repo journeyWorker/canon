@@ -296,12 +296,14 @@ fn inventory_sync_on_a_dropped_provenance_line_names_the_line_to_restore() {
     std::fs::write(&path, stripped).unwrap();
 
     let out = run_canon(&["inventory", "sync", "--repo", ".", "--json"], dir.path());
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let envelope: Value = serde_json::from_str(stdout(&out).lines().last().unwrap()).unwrap();
-    assert_eq!(envelope["error"]["code"], "INVENTORY_ABORTED", "{envelope}");
+    assert_eq!(envelope["error"]["code"], "INVENTORY_INVALID", "{envelope}");
+    assert_eq!(envelope["error"]["reason"], "VIOLATIONS", "{envelope}");
     let hint = envelope["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("restore the `# canon: {...}` line") && hint.contains("directly after `Feature:`"), "{hint}");
-    let message = envelope["data"]["roots"][0]["violations"][0]["message"].as_str().unwrap();
+    assert!(envelope.get("data").is_none(), "a refusal carries no data: {envelope}");
+    let message = envelope["error"]["details"][1]["message"].as_str().unwrap();
     assert!(message.contains("line 1 `world checkout`") && message.contains("restore the `# canon: {...}` line"), "{message}");
 }
 

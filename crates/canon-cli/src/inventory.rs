@@ -91,9 +91,12 @@ pub enum InventoryError {
     #[error("{0}")]
     Locked(String),
     /// A store the sync writes cannot be written, known before anything was
-    /// changed (`WRITE_UNAVAILABLE`).
+    /// changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
+    /// The record store failed after `indexed` records of earlier spec roots were written: the sync stopped part-way and they stay.
+    #[error("the store failed after {indexed} record(s) of the spec roots before this one were indexed: {cause}")]
+    Stopped { indexed: usize, cause: String },
 }
 
 /// `canon.yaml`'s `specs:` section, parsed STRICTLY
@@ -198,13 +201,12 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
 /// is keyed `(project_id, scenario_id)`), and no command removes one
 /// record, so the id is checked before anything is written. The hint
 /// names the configured roots, and with one root the exact flag to use.
-/// An unreadable `canon.yaml` is `CONFIG_UNREADABLE`, as everywhere else.
+/// An unreadable `canon.yaml` is `CONFIG_INVALID`, as everywhere else.
 /// Read-only queries are not checked: a filter on an id no root carries
 /// matches nothing and writes nothing.
 pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
-    use crate::cli_error::{CliError, CliErrorExt as _};
     let roots = load_spec_roots(&repo.join("canon.yaml")).map_err(|e| {
-        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
+        crate::read_cause::config_error(e.to_string())
     })?;
     check_spec_root(&roots, project_id)
 }
@@ -241,7 +243,7 @@ pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static
     let roots = match load_spec_roots(&repo.join("canon.yaml")) {
         Ok(roots) => roots,
         Err(e) => {
-            return Err(CliError::refused("CONFIG_UNREADABLE", e.to_string())
+            return Err(crate::read_cause::config_error(e.to_string())
                 .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
                 .emit(command, json));
         }
@@ -425,8 +427,12 @@ fn sync_repo(repo: &Path, spec_root: Option<&Path>, dry_run: bool) -> Result<Syn
     if !dry_run {
         // The first things a sync writes: the index lock, then the scenario records. Refused before either.
         for target in [ctx.repo.join(paths::SCENARIO_INDEX_LOCK_FILE), ctx.ledger_root.join(format!("kind={}", RecordKind::Scenario.as_str()))] {
-            crate::write_mode::check_writable(&target).map_err(|cause| InventoryError::Unavailable(crate::write_mode::unavailable(&target, &cause)))?;
+            crate::write_mode::check_writable(&target).map_err(|cause| InventoryError::Unavailable(crate::write_mode::unwritable(&target, &cause)))?;
         }
+    }
+    // A `specs:` section that is wrong is refused before the lock file exists: a refused call writes nothing. The roots are read again under the lock.
+    if !dry_run {
+        ctx.spec_roots(spec_root)?;
     }
     let _lock = if dry_run { None } else { Some(lock_index(&ctx.repo)?) };
     sync_with_ctx(&ctx, spec_root, dry_run)
@@ -455,11 +461,23 @@ fn sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>, dry_run: bool
     let corpus = corpus_ids(&roots, &scans);
 
     let mut outcomes = Vec::with_capacity(roots.len());
-    for (spec_root, scanned) in roots.iter().zip(&scans) {
-        let outcome = if dry_run {
-            plan_one_root(|| latest_index(&tier).map(std::borrow::Cow::Owned), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?.outcome
+    for (index, (spec_root, scanned)) in roots.iter().zip(&scans).enumerate() {
+        // `inventory-second-root` (a debug build's test seam, `incomplete::injected_stop`): the store fails while the second root is indexed.
+        let injected = (!dry_run && index == 1).then(|| crate::incomplete::injected_stop("inventory-second-root")).flatten();
+        let result = if let Some(stop) = injected {
+            Err(InventoryError::Store(StoreError::Io(stop)))
+        } else if dry_run {
+            plan_one_root(|| latest_index(&tier).map(std::borrow::Cow::Owned), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None).map(|plan| plan.outcome)
         } else {
-            sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?
+            sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)
+        };
+        let outcome = match result {
+            Ok(outcome) => outcome,
+            // A store error after an earlier root was indexed: the sync stopped part-way, and what it wrote stays.
+            Err(InventoryError::Store(cause)) if outcomes.iter().any(|done: &RootSyncOutcome| done.written > 0) => {
+                return Err(InventoryError::Stopped { indexed: outcomes.iter().map(|done| done.written).sum(), cause: cause.to_string() });
+            }
+            Err(other) => return Err(other),
         };
         outcomes.push(outcome);
     }
@@ -520,6 +538,16 @@ fn removed_from_corpus<'a>(latest: &'a BTreeMap<(ProjectId, ScenarioId), Scenari
 /// finish before giving up.
 const INDEX_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// How long a writer of the scenario index waits: [`INDEX_LOCK_WAIT`], or the milliseconds of `CANON_TEST_INDEX_LOCK_WAIT_MS` in a debug build
+/// (the tests' way to reach the end of the wait without waiting thirty seconds).
+fn index_lock_wait() -> std::time::Duration {
+    #[cfg(debug_assertions)]
+    if let Some(millis) = std::env::var("CANON_TEST_INDEX_LOCK_WAIT_MS").ok().and_then(|text| text.parse::<u64>().ok()) {
+        return std::time::Duration::from_millis(millis);
+    }
+    INDEX_LOCK_WAIT
+}
+
 /// The repo's scenario-index lock ([`paths::SCENARIO_INDEX_LOCK_FILE`]),
 /// held until this value is dropped.
 ///
@@ -536,7 +564,7 @@ struct IndexLock {
 
 /// Take [`IndexLock`] for the repo rooted at `repo`.
 fn lock_index(repo: &Path) -> Result<IndexLock, InventoryError> {
-    match FileLock::acquire(&repo.join(paths::SCENARIO_INDEX_LOCK_FILE), INDEX_LOCK_WAIT) {
+    match FileLock::acquire(&repo.join(paths::SCENARIO_INDEX_LOCK_FILE), index_lock_wait()) {
         Ok(lock) => Ok(IndexLock { _lock: lock }),
         Err(FileLockError::Busy(waited)) => Err(InventoryError::Locked(format!(
             "another canon process has been writing the scenario index for {}s (it holds `{}`); retry once it finishes",

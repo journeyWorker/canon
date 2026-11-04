@@ -279,7 +279,7 @@ Feature: review scenario
   Scenario: A review of several scenarios where any has no record writes nothing
     Given two indexed scenarios and one id with no scenario record
     When canon review scenario names all three
-    Then the call exits 2 with REVIEW_SCENARIO_NOT_INDEXED, and no review is written for any of them
+    Then the call exits 2 with SCENARIO_INDEX_REQUIRED, and no review is written for any of them
     And a call naming no scenario is refused with exit 2 and writes nothing
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
@@ -331,7 +331,7 @@ Feature: review scenario
     Given a batch of two review documents whose second carries a review outcome outside the closed set, and a call naming a scenario no record carries
     When review scenario is run on each with --input
     Then the batch exits 2 and the error's field points at that element and key, such as /items/1/reviewOutcome
-    And the unindexed scenario is refused with REVIEW_SCENARIO_NOT_INDEXED
+    And the unindexed scenario is refused with SCENARIO_INDEX_REQUIRED
     And no review is written in either case, not even for the valid first element
 
   # canon: {"schema":1,"at":"2026-10-23T12:07:18Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -428,4 +428,4 @@ Feature: review scenario
   Scenario: A change review of a chore pins a brief whose chore kind is in the frontmatter and refuses an old-format one
     Given a chore whose frontmatter says kind: chore and one in the 0.30 format
     When canon review change runs for each
-    Then the first pins the brief digest of the new text and the second is refused with OLD_BRIEF_FORMAT
+    Then the first pins the brief digest of the new text and the second is refused with BRIEF_MIGRATION_REQUIRED

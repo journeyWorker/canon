@@ -282,7 +282,7 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
 }
 
 /// A change store the adoption writes that is read-only is refused before
-/// either record is written (`WRITE_UNAVAILABLE`, exit 2), so the subject
+/// either record is written (`WRITE_DENIED`, exit 2), so the subject
 /// record is left as it was and the rerun, once the store is writable,
 /// links both sides.
 #[cfg(unix)]
@@ -305,7 +305,7 @@ fn adopt_into_a_read_only_change_store_is_refused_before_the_subject_record_is_w
     let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]);
     std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert!(stderr(&out).contains("canon: WRITE_UNAVAILABLE: cannot write `") && stderr(&out).contains("kind=change"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: WRITE_DENIED: cannot write `") && stderr(&out).contains("kind=change"), "{}", stderr(&out));
     let subjects = query_subjects(dir.path(), &[]);
     assert!(subjects["records"][0]["change_ids"].as_array().is_none_or(Vec::is_empty), "the subject record was not written: {subjects}");
 
@@ -998,7 +998,7 @@ fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     );
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     let err = stderr(&out);
-    assert!(err.contains("canon: REVIEW_SCENARIO_NOT_INDEXED: no scenario record for `world.demo.99` in spec root `demo`"), "{err}");
+    assert!(err.contains("canon: SCENARIO_INDEX_REQUIRED: no scenario record for `world.demo.99` in spec root `demo`"), "{err}");
     assert!(err.contains("(`canon inventory sync`)"), "the refusal must name the repair: {err}");
     assert!(!dir.path().join(".canon/ledger/kind=review").exists(), "a refused review add writes nothing");
 }

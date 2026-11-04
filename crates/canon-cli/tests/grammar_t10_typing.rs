@@ -24,8 +24,8 @@ const PRINTS: &[(&str, &str, &str)] = &[
 /// Schemas that are deliberately opaque, as (definition name, why).
 const OPAQUE: &[(&str, &str)] = &[
     ("Effect", "`atip::plan::Effect`, the contract's (spec 12.4): its `detail` is \"a sentence, or a JSON value the tool structures\", so it names no type, and a tool's own members ride beside the fixed ones; the five destructive commands' reports reference it, they do not define it"),
-    ("EmbeddedSchema", "an embedded JSON Schema of a command document: its shape is JSON Schema's own, published by the draft"),
-    ("InputExample", "an example `--input` document: its keys are the command's option names, so its shape is that command's `<Name>Input` schema, published beside it"),
+    ("EmbeddedSchema", "an embedded JSON Schema of the `--schemas` answer: its shape is JSON Schema's own, published by the draft"),
+    ("InputExample", "an example `--input` document: its keys are the command's option names, so its shape is that command's `Input` schema, published beside it in the `--schemas` answer"),
     ("LedgerRecord", "a ledger record embedded verbatim keeps its own snake_case schema (crates/canon-model/schemas)"),
     ("QueryRecord", "a ledger record of any kind: each kind keeps its own snake_case schema (crates/canon-model/schemas), and `--fields` selects the members they declare"),
 ];

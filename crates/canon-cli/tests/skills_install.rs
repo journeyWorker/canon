@@ -630,7 +630,7 @@ fn skills_install_55_a_missing_skills_source_is_refused_with_exit_two() {
         let output = canon(&["skills", command, "--providers", "claude", "--json"], &missing, &target);
         assert_eq!(output.status.code(), Some(2), "{command}: {}", String::from_utf8_lossy(&output.stdout));
         let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(doc["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{command}: {doc}");
+        assert_eq!(doc["error"]["code"], "SKILLS_SOURCE_NOT_FOUND", "{command}: {doc}");
         assert_eq!(doc["error"]["field"], "--skills-source", "{command}: {doc}");
     }
     assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "nothing is written");
@@ -927,12 +927,14 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
             let output = canon(&["skills", command], &source, &target);
             let err = String::from_utf8_lossy(&output.stderr);
             assert_eq!(output.status.code(), Some(2), "{command} {section:?}: {err}");
-            assert!(err.contains("SKILLS_INVALID_ARGUMENT"), "{command} {section:?}: {err}");
+            assert!(err.contains("CONFIG_INVALID"), "{command} {section:?}: {err}");
             assert!(err.contains(needle), "{command} {section:?}: {err}");
         }
+        // The section's fault is CONFIG_INVALID with the reason SKILLS, a provider canon.yaml names included.
         for command in ["install", "check", "doctor"] {
-            let output = canon(&["skills", command, "--providers", "gemini"], &source, &target);
-            assert_eq!(output.status.code(), Some(2), "{command} --providers gemini: {}", String::from_utf8_lossy(&output.stderr));
+            let output = canon(&["skills", command, "--json"], &source, &target);
+            let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| panic!("{command} {section:?}: {e}: {}", String::from_utf8_lossy(&output.stdout)));
+            assert_eq!((doc["error"]["code"].as_str(), doc["error"]["reason"].as_str()), (Some("CONFIG_INVALID"), Some("SKILLS")), "{command} {section:?}: {doc}");
         }
         assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
@@ -942,6 +944,26 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         assert_eq!(check.status.code(), Some(1), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");
     }
+}
+
+/// skills.install.55: a provider the `--providers` flag names that canon does not know is `SKILLS_ARGUMENT_INVALID` (exit 2, naming the field `--providers`),
+/// from install, check and doctor, with a clean canon.yaml; nothing is written.
+#[test]
+fn skills_install_55_an_unknown_provider_on_the_flag_is_an_invalid_argument() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    fs::create_dir_all(target.join(".claude")).unwrap();
+    fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    for command in ["install", "check", "doctor"] {
+        let output = canon(&["skills", command, "--providers", "gemini", "--json"], &source, &target);
+        assert_eq!(output.status.code(), Some(2), "{command}: {}", String::from_utf8_lossy(&output.stdout));
+        let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(doc["error"]["code"], "SKILLS_ARGUMENT_INVALID", "{command}: {doc}");
+        assert_eq!(doc["error"]["field"], "--providers", "{command}: {doc}");
+    }
+    assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "nothing is written");
 }
 
 /// The owned-paths block install and doctor end with: the globs of the

@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T04:03:22.699603Z",
+  "code_tree": "e906ba7be5735b0a6898cedc4fcd13d5f52a4224",
+  "kind": "review",
+  "pin": "0c6d83f54c2462e367e49ce7165a5675f1bb62b6",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codeexit_04_a_subject_move_blocked_for_two_causes_lists_both_in_details",
+          "junit:atip_codeexit_04_a_subject_move_the_gate_blocks_is_exit_2_with_the_cause_as_the_error"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e2b9eb1312ca8825f63e61137d0420d7bd93d05ca349ca46457e6af015c1ae7a",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-exit/brief.md"
+  },
+  "review_id": "01M6JBKKEB18KREDM52D2D8BXB",
+  "reviewer": "rev-0-36-exit",
+  "scenario_id": "atip.codeexit.04",
+  "schema": 2,
+  "worktree_dirty": false
+}

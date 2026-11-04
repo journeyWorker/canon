@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-table",
+    "role": "reviewer",
+    "session_id": "s-0-36-table-rev"
+  },
+  "at": "2026-11-04T15:28:45.931362Z",
+  "change_id": "canon-0-36-codes-table",
+  "code_tree": "6c825d1cbf7d1070f0a2daaca7523e0dd9f2ea67",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md (Unreleased, upgrade note, 'Scripts and hooks that read the exit')",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reason": "the note names dispatch begin/end, divergence defer/resolve and strategy approval-payload and atip_codestable_12 checks them",
+  "resolution_code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "resolution_sha": "ea5fd38860a0f88b85fdf2974f4918d060c54740",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "7ccaf06474d39b1eb92e7074546cc32197302409",
+  "reviewer": "rev-0-36-table",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestable.12"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] The upgrade note's command sentence for the 21 codes that moved to exit 2 names nine commands (subject move, gate promote, task done, evidence add, brief approve, strategy promote, ingest plans, dashboard, context-pack add) and misses the commands of three pure-moved codes: DISPATCH_END_IN_PROGRESS (dispatch begin and dispatch end, now DISPATCH_RUN_UNAVAILABLE), DIVERGENCE_REFUSED (divergence defer and resolve, now DIVERGENCE_INVALID) and LEARN_EVALUATION_REJECTED (strategy approval-payload, now STRATEGY_EVALUATION_INVALID). The first list carries every code, so a branch on the code is covered; a script that keys on the command and its exit 1 is not told. atip.codestable.12 checks a fixed list of nine commands, so it cannot catch the omission. Add the three, or say the list of codes is the truth and the commands are examples.",
+  "worktree_dirty": false
+}

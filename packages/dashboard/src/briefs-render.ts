@@ -223,14 +223,20 @@ export interface ApproveFailure {
   refused: Refusal[];
 }
 
-/** The failure an approve answer carries: `error` of the atip/1 envelope
- * (`hint` absent when there is none) and the refused briefs in `data.refused`. */
+/** The failure an approve answer carries: `error` of the atip/1 envelope (`hint` absent when there is none). A call
+ * that named several briefs and had several refused answers with the first refused brief's own code and one
+ * `error.details` entry per refused brief, whose message starts with the change id in backquotes. */
 export function approveFailure(
-  json: { error?: { code: string; message: string; hint?: string | null }; data?: { refused?: Refusal[] } },
+  json: { error?: { code: string; message: string; hint?: string | null; details?: { code: string; message: string }[] } },
   status: number,
 ): ApproveFailure {
   const error = json.error ?? { code: "UNKNOWN", message: `the server answered ${status}` };
-  return { code: error.code, message: error.message, hint: error.hint ?? undefined, refused: json.data?.refused ?? [] };
+  const refused: Refusal[] = [];
+  for (const detail of "details" in error ? (error.details ?? []) : []) {
+    const named = /^`([^`]+)`: ([\s\S]*)$/.exec(detail.message);
+    if (named) refused.push({ changeId: named[1]!, code: detail.code, message: named[2]! });
+  }
+  return { code: error.code, message: error.message, hint: error.hint ?? undefined, refused };
 }
 
 /** What a refused approval shows: the server's message and hint, and each

@@ -454,7 +454,7 @@ pub enum AllowedSignersError {
 /// policy is an error, never an absent verifier.
 pub fn allowed_signers_path(repo: &Path) -> Result<Option<PathBuf>, AllowedSignersError> {
     let path = repo.join(POLICY_YAML_RELATIVE_PATH);
-    let content = match std::fs::read_to_string(&path) {
+    let content = match canon_store::eio::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(source) => return Err(AllowedSignersError::Read { path, source }),

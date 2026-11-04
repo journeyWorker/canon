@@ -74,7 +74,7 @@ output	FILE	file to write instead of stdout
 override-reason	TEXT	reason for proceeding although refused
 owner-role	ROLE	role that owns a strategy
 parent-run	RUN_ID	run a run descends from
-plan-digest	DIGEST	digest of the previewed plan
+plan-digest	PLAN_DIGEST	digest of the previewed plan
 plan-source	DIR	plan source root
 plugin	PLUGIN_ID	plugin
 policy	LEVEL	policy level
@@ -108,6 +108,7 @@ round	N	review round
 run	RUN_ID	dispatch run
 run-outcome	RUN_OUTCOME	how a dispatch run ended
 scenario	SCENARIO_ID	scenario
+schemas	-	mode: print the JSON Schemas a command's refs reach
 seq	N	sequence number within a round
 session	SESSION_ID	agent session
 severity	SEVERITY	severity of a finding

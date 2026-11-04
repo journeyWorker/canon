@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:41:11.147285Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md (canon declares atip/1 1.4, sizes table and the paragraph under it)",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "resolution_sha": "1419794e5b88c9fb9b35ad22588e1da48e3cb240",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.15"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The amended acceptance is 'each command document smaller, the tree may grow, tree plus one command smaller'. Measured with the real binary on main before this change (844bbb4fc) and on cf01da6ed: tree + finding close 38,545 -> 30,586 (smaller) and tree + purge 30,051 -> 29,049 (smaller), but tree + finding list 26,303 -> 28,048 and tree + skills show 24,593 -> 28,313 are LARGER (the shared options cost 4,638 bytes once; a command document that shrank by less than that, finding list 2,893 and skills show 918, does not pay it back on a single call). The CHANGELOG states the one sum row for finding close and the paragraph says 'an agent that reads the tree once and then one command document (finding close here) reads 7,959 bytes less', which reads as a general result. The sum is not smaller for every command, and with the crate's sharing rule it cannot be for the small ones. State the truth: give the sum for each of the four measured commands (or say which ones win and that the others break even after N calls: finding list after 2, skills show after 6 calls on the same tree). Main/owner: decide whether 'tree + one command smaller' was meant for every command; if so the shared set (a crate rule) has to change, if it was meant for the example command the table only needs the honest sentence.",
+  "worktree_dirty": false
+}

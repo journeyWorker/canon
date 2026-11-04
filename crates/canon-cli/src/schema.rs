@@ -224,18 +224,226 @@ pub struct WarningList {
     warnings: Vec<spec::WarningRow>,
 }
 
-/// `canon schema`'s report (`SchemaReport`): the tree, a group, a command, or a registry
-/// (atip/1 spec 10.1.4: `data.kind` names which).
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+/// `canon schema`'s report (`SchemaReport`): a document of the contract's self-description (the tree, a group, a command, the
+/// schemas of a command: [`atip::Document`], written in the form of the minor canon declares), or a registry (atip/1 spec 9.1:
+/// `data.kind` names which).
+#[derive(Debug, Serialize)]
 #[serde(untagged)]
-pub enum SchemaReport {
-    Tree(atip::doc::TreeDoc),
-    Group(atip::doc::GroupDoc),
-    Command(Box<atip::doc::CommandDoc>),
+pub enum SchemaReport<'a> {
+    Document(atip::Document<'a>),
     Errors(ErrorList),
     Error(ErrorEntry),
     Warnings(WarningList),
     Warning(WarningEntry),
+}
+
+/// The shape of the entries of a tree or a group (1.4: no `path`, `kind` only for a group).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct EntryShape {
+    command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<String>,
+    summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect: Option<Effect>,
+}
+
+/// An option the document lists in full (spec 9.7): every member that is not its default.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct OptionShape {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    short: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value_type: Option<atip::doc::ValueType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    possible_values: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    required: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repeatable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<atip::doc::DefaultValue>")]
+    default: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    env: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    flag_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<atip::doc::DomainSchema>")]
+    domain: Option<serde_json::Value>,
+    help: String,
+}
+
+/// One entry of `options`: the name of a tree option or of a reserved option, or an option listed in full (spec 9.5).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+#[expect(dead_code, reason = "the enum only gives the schema of an entry of `options`: the document itself is written by the atip crate")]
+enum OptionEntry {
+    Name(String),
+    Own(Box<OptionShape>),
+}
+
+/// An operand of a 1.4 document: every member that is not its default.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct OperandShape {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value_type: Option<atip::doc::ValueType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    possible_values: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    required: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variadic: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<atip::doc::DefaultValue>")]
+    default: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<atip::doc::DomainSchema>")]
+    domain: Option<serde_json::Value>,
+    help: String,
+}
+
+/// A validator of a 1.4 document: its `rejects` are in the `--schemas` answer.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct ValidatorShape {
+    arguments: Vec<String>,
+    code: String,
+    description: String,
+}
+
+/// An output of a 1.4 document: every member that is not its default.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct OutputShape {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<atip::doc::OutputKind>,
+    schema_ref: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    schema_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    media_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    event_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    batch: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    when: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fields: Option<atip::doc::FieldsDoc>,
+}
+
+/// The `input` of a 1.4 document: no `option` and no `schemaRef`, the fragment schema is derived and is `Input` of the schemas answer.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct InputShape {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    arguments_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    batch: Option<bool>,
+    max_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_items: Option<u64>,
+    #[schemars(with = "atip::doc::InputExample")]
+    example: serde_json::Value,
+}
+
+/// `canon schema --json`: the tree (spec 9.3), with `options` the options commands share.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct TreeShape {
+    #[schemars(extend("const" = "tree"))]
+    kind: String,
+    level: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    options: Option<Vec<OptionShape>>,
+    commands: Vec<EntryShape>,
+}
+
+/// `canon schema <GROUP> --json`: a group and the entries of its children (spec 9.4).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct GroupShape {
+    #[schemars(extend("const" = "group"))]
+    kind: String,
+    command: String,
+    summary: String,
+    commands: Vec<EntryShape>,
+}
+
+/// `canon schema <COMMAND> --json`: the call surface of one command (spec 9.5); its members that equal their default are absent.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct CommandShape {
+    #[schemars(extend("const" = "command"))]
+    kind: String,
+    command: String,
+    summary: String,
+    effect: Effect,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    idempotency: Option<atip::doc::Idempotency>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect_note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    operands: Option<Vec<OperandShape>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    options: Option<Vec<OptionEntry>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    constraints: Option<Vec<atip::doc::ConstraintDoc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    validators: Option<Vec<ValidatorShape>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    errors: Option<Vec<String>>,
+    outputs: Vec<OutputShape>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input: Option<InputShape>,
+    examples: Vec<String>,
+}
+
+/// `canon schema <COMMAND> --schemas --json`: the JSON Schemas the command's refs reach, `Input` and the `rejects` of its validators (spec 9.9.3).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct SchemasShape {
+    #[schemars(extend("const" = "schemas"))]
+    kind: String,
+    command: String,
+    schemas: std::collections::BTreeMap<String, atip::doc::EmbeddedSchema>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rejects: Option<Vec<Vec<String>>>,
+}
+
+impl schemars::JsonSchema for SchemaReport<'_> {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "SchemaReport".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        concat!(module_path!(), "::SchemaReport").into()
+    }
+
+    /// One of the answers, by `kind`. The members of a document are the contract's (`atip::SCHEMA_DOC_SCHEMA` holds each in full, and
+    /// the tests hold every answer to it), so a list of options, operands, validators or outputs is typed no further here.
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let alternatives = vec![
+            generator.subschema_for::<TreeShape>(),
+            generator.subschema_for::<GroupShape>(),
+            generator.subschema_for::<CommandShape>(),
+            generator.subschema_for::<SchemasShape>(),
+            generator.subschema_for::<ErrorList>(),
+            generator.subschema_for::<ErrorEntry>(),
+            generator.subschema_for::<WarningList>(),
+            generator.subschema_for::<WarningEntry>(),
+        ];
+        schemars::json_schema!({ "anyOf": alternatives })
+    }
 }
 
 /// `canon schema --error <CODE>`: the one registry row.
@@ -254,8 +462,8 @@ pub struct WarningEntry {
     pub warning: spec::WarningRow,
 }
 
-impl crate::json_out::Report for SchemaReport {
-    /// The version of the self-description format is the contract version canon implements (spec 10.1.4).
+impl crate::json_out::Report for SchemaReport<'_> {
+    /// The version of the self-description format is the contract version canon implements (spec 9.1.2).
     const SCHEMA_VERSION: &'static str = crate::json_out::DECLARED_MINOR;
 }
 
@@ -320,8 +528,11 @@ pub fn meta_for(path: &str) -> Option<&'static CommandMeta> {
 /// `--as` flag, never `CANON_ROLE`) keeps only that role's commands and the groups
 /// that hold one. `--errors` lists every error code and `--error <CODE>` shows one,
 /// `--warnings` and `--warning <CODE>` the same for the warning registry (an unknown
-/// code is `USAGE`, exit 2). A group or command document is the one [`crate::spec`] builds.
-pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>, as_role: Option<Role>) -> u8 {
+/// code is `USAGE`, exit 2). `--schemas` answers for a command path with the JSON Schemas its
+/// refs reach, `Input` and the `rejects` of its validators; the tree, a group or no path is
+/// `USAGE` with `field` `--schemas` (spec 9.1.1). A tree, group or command document is the one
+/// [`crate::spec::described`] writes.
+pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>, schemas: bool, as_role: Option<Role>) -> u8 {
     if registry.errors {
         print_errors(json);
         return 0;
@@ -341,7 +552,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>
     built.build();
     let root = &built;
     // `canon schema "evidence add"` (one quoted word, dogfood eval 8) names
-    // the same command as `canon schema evidence add` (spec 10.1.1).
+    // the same command as `canon schema evidence add` (spec 9.1.1).
     let words: Vec<String> = tokens.iter().flat_map(|t| t.split_whitespace()).map(str::to_string).collect();
     let resolved = match atip::project::resolve(root, &words) {
         Ok(resolved) => resolved,
@@ -350,24 +561,41 @@ pub fn run(root: &Command, tokens: &[String], json: bool, registry: Registry<'_>
             return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", unknown.message()).field("command").received(unknown.word.clone()).expected(unknown.expected.clone()).suggestions(unknown.suggestions.clone()).hint(hint).emit("canon schema", json);
         }
     };
-    let report = match &resolved {
-        atip::project::Resolved::Tree => spec::tree(root, as_role).map(SchemaReport::Tree),
-        atip::project::Resolved::Group(path) => {
-            // A role's tree omits a group that holds none of its commands: its group document would be empty (spec 10.4).
-            if let Some(role) = as_role.filter(|role| !spec::is_listed(root, path, *role)) {
-                let message = format!("`{}` holds no command for the role `{}`", path.join(" "), role.as_str());
-                let expected = spec::listed_children(root, &path[..path.len() - 1], role);
-                return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", message).field("command").received(path[path.len() - 1].clone()).expected(expected).hint(format!("canon schema --as {} --json", role.as_str())).emit("canon schema", json);
-            }
-            spec::group(root, path, as_role).map(SchemaReport::Group)
+    if let atip::project::Resolved::Group(path) = &resolved {
+        // A role's tree omits a group that holds none of its commands: its group document would be empty (spec 9.4).
+        if let Some(role) = as_role.filter(|role| !spec::is_listed(root, path, *role)) {
+            let message = format!("`{}` holds no command for the role `{}`", path.join(" "), role.as_str());
+            let expected = spec::listed_children(root, &path[..path.len() - 1], role);
+            return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", message).field("command").received(path[path.len() - 1].clone()).expected(expected).hint(format!("canon schema --as {} --json", role.as_str())).emit("canon schema", json);
         }
-        atip::project::Resolved::Command(path) => spec::command(root, path).map(|doc| SchemaReport::Command(Box::new(doc))),
     }
-    .expect("the command spec is built from the tables the tests keep whole");
+    if schemas {
+        let (what, hint) = match &resolved {
+            atip::project::Resolved::Command(_) => ("", String::new()),
+            atip::project::Resolved::Tree => ("no command path", "canon schema --json".to_string()),
+            atip::project::Resolved::Group(path) => ("a group", format!("canon schema {} --json", path.join(" "))),
+        };
+        if !what.is_empty() {
+            return crate::cli_error::CliError::refused("USAGE", format!("`--schemas` answers for one command, and the call names {what}")).field("--schemas").hint(hint).emit("canon schema", json);
+        }
+    }
+    if !json && !schemas {
+        print_human(root, &resolved, as_role);
+        return 0;
+    }
+    let described = spec::described(root, as_role).expect("the command spec is built from the tables the tests keep whole");
+    let name = |path: &[String]| path.join(" ");
+    let document = match &resolved {
+        atip::project::Resolved::Tree => described.tree(),
+        atip::project::Resolved::Group(path) => described.group(&name(path)).expect("a resolved group is in the tree"),
+        atip::project::Resolved::Command(path) if schemas => described.schemas(&name(path)).expect("a resolved command has its schemas answer"),
+        atip::project::Resolved::Command(path) => described.command(&name(path)).expect("a resolved command has its document"),
+    };
     if json {
-        crate::json_out::data("schema", &report);
+        crate::json_out::data("schema", &SchemaReport::Document(document));
     } else {
-        print_human(&report);
+        // Without `--json` the schemas answer is the document itself, on one line (spec 9.1.1).
+        atip::print_line(&atip::line(&document));
     }
     0
 }
@@ -457,17 +685,19 @@ fn print_entries(entries: &[atip::doc::TreeEntry]) {
     }
 }
 
-fn print_human(report: &SchemaReport) {
-    match report {
-        SchemaReport::Tree(tree) => print_entries(&tree.commands),
-        SchemaReport::Group(group) => {
+/// The text of a tree, a group or a command, read from the typed model (the full form), not from the document `--json` writes.
+fn print_human(root: &Command, resolved: &atip::project::Resolved, as_role: Option<Role>) {
+    const BUILT: &str = "the command spec is built from the tables the tests keep whole";
+    match resolved {
+        atip::project::Resolved::Tree => print_entries(&spec::tree(root, as_role).expect(BUILT).commands),
+        atip::project::Resolved::Group(path) => {
+            let group = spec::group(root, path, as_role).expect(BUILT);
             println!("canon {}", group.command);
             println!("  {}", group.summary);
             println!("a group of commands:");
             print_entries(&group.commands);
         }
-        SchemaReport::Command(doc) => print_command(doc),
-        SchemaReport::Errors(_) | SchemaReport::Error(_) | SchemaReport::Warnings(_) | SchemaReport::Warning(_) => {}
+        atip::project::Resolved::Command(path) => print_command(&spec::command(root, path).expect(BUILT)),
     }
 }
 

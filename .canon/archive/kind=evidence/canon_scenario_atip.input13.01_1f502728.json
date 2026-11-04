@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:01:10.889469Z",
+  "attachments": [
+    {
+      "case": "atip_input13_01_a_document_supplies_the_required_options_and_argv_gives_the_operand",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    }
+  ],
+  "code_tree": "63d0921888897cc1c79c79ef3df27b5222696534",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "ea5fd38860a0f88b85fdf2974f4918d060c54740",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 131,
+  "scenario_id": "atip.input13.01",
+  "schema": 1,
+  "staging_id": "52689940",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

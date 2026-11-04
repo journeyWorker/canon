@@ -143,7 +143,7 @@ fn load_corpus(command: &str, repo: &std::path::Path, json: bool) -> Result<Corp
     let corpus: Corpus = match inputs::load(repo) {
         Ok(corpus) => corpus,
         Err(InputError::Config(why)) => {
-            return Err(ExitCode::from(CliError::refused("CONFIG_UNREADABLE", why).hint("fix canon.yaml so it parses and names usable spec roots (`canon init --check` reports what is wrong), then run the command again").emit(command, json)));
+            return Err(ExitCode::from(crate::read_cause::config_error(why).hint("fix canon.yaml so it parses and names usable spec roots (`canon init --check` reports what is wrong), then run the command again").emit(command, json)));
         }
         Err(InputError::Unreadable(why)) => {
             return Err(ExitCode::from(CliError::failed("SEARCH_INDEX_FAILED", format!("the records the index is built from cannot be read: {why}")).hint("fix or restore what the message names, then run the command again; `canon gate check` shows the state of the ledger").emit(command, json)));
@@ -265,7 +265,7 @@ pub(crate) fn run_trace(args: TraceArgs) -> ExitCode {
         let error = match refusal {
             trace::TraceError::Unrecognized => CliError::refused("TRACE_OPERAND_INVALID", format!("`{id}` is none of the three things canon trace takes; it takes {shapes}")).hint("pass a review id, a commit sha or a finding key"),
             trace::TraceError::NotFound => CliError::refused("TRACE_NOT_FOUND", format!("no record says `{id}`; it takes {shapes}")).hint("pass an id a record carries: `canon query --kind finding` shows finding keys, `canon query --kind review --json` review ids"),
-            trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_NOT_FOUND", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).hint("pass more characters of the sha"),
+            trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_CONFLICT", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).expected(shas.clone()).hint("pass more characters of the sha"),
         };
         ExitCode::from(error.field("ID").emit("canon trace", json))
     };

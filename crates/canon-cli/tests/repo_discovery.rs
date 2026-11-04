@@ -163,7 +163,7 @@ fn format_never_reports_a_missing_path_or_a_missing_config_as_clean() {
 
     let missing = canon(empty.path(), home.path(), &["format", "no-such-dir", "--json"]);
     assert_eq!(missing.status.code(), Some(2), "stdout: {} stderr: {}", stdout(&missing), stderr(&missing));
-    assert_eq!(error_of(&missing)["code"], "REPO_UNREADABLE");
+    assert_eq!(error_of(&missing)["code"], "REPO_INVALID");
 
     let absolute = canon(empty.path(), home.path(), &["format", "/no/such/corpus/anywhere", "--json"]);
     assert_eq!(absolute.status.code(), Some(2));

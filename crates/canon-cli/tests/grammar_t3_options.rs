@@ -23,7 +23,7 @@ use serde_json::Value;
 /// the table's rows also use `STATUS` and `HASH`, the typed forms `JSON|FILE|-` and `FORMAT:PATH`, and the concept ids (`*_ID`).
 const PLACEHOLDERS: &[&str] = &[
     "DIR", "FILE", "PATH", "ID", "SHA", "N", "TIMESTAMP", "NAME", "TEXT", "URL", "KIND", "FIELDS", // D1
-    "REV", "DIGEST", "LIST", "TAG", "LEVEL", "TIER", "STATE", "SHELL", "KEY", "CURSOR", "CLASS", "CODE", "SEVERITY", "DISPOSITION", "RUN_OUTCOME", "REVIEW_OUTCOME", "RESULT", "VERDICT", "ROLE", "CHANGE_KIND", "FLOW_ID", "PATH_OR_EFFECT", "NAME@VERSION", // the table
+    "REV", "DIGEST", "PLAN_DIGEST", "LIST", "TAG", "LEVEL", "TIER", "STATE", "SHELL", "KEY", "CURSOR", "CLASS", "CODE", "SEVERITY", "DISPOSITION", "RUN_OUTCOME", "REVIEW_OUTCOME", "RESULT", "VERDICT", "ROLE", "CHANGE_KIND", "FLOW_ID", "PATH_OR_EFFECT", "NAME@VERSION", // the table
     "STATUS", "HASH", "JSON|FILE|-", "FORMAT:PATH", // used by table rows
 ];
 
@@ -56,6 +56,11 @@ fn all_options() -> Vec<(String, &'static Value)> {
     out
 }
 
+/// The value name an option shows: the one its document gives, else the default one (the upper-cased name, `_` for `-`).
+fn value_name(option: &Value) -> Option<String> {
+    option["valueName"].as_str().map(str::to_string)
+}
+
 fn name(option: &Value) -> &str {
     option["name"].as_str().expect("an option has a name")
 }
@@ -75,7 +80,7 @@ fn every_option_says_what_it_is() {
 fn a_value_is_named_from_the_placeholder_list_and_a_flag_names_none() {
     let mut problems = Vec::new();
     for (leaf, option) in all_options() {
-        match (is_flag(option), option["valueName"].as_str()) {
+        match (is_flag(option), value_name(option).as_deref()) {
             (false, Some(value)) => {
                 if !PLACEHOLDERS.contains(&value) && !value.ends_with("_ID") {
                     problems.push(format!("`{leaf}` --{}: value name {value} is not in the placeholder list", name(option)));
@@ -170,8 +175,8 @@ fn the_spec_carries_the_defaults_sets_and_arities_the_table_writes() {
                 }
             }
             if let Some(value) = &row.value {
-                if option["valueName"].as_str() != Some(value.as_str()) {
-                    problems.push(format!("`{leaf_path}` --{}: the table's value name is {value}, the spec's {}", row.name, option["valueName"]));
+                if value_name(option).as_deref() != Some(value.as_str()) {
+                    problems.push(format!("`{leaf_path}` --{}: the table's value name is {value}, the spec's {:?}", row.name, value_name(option)));
                 }
             }
             // The table writes `...` where an option repeats; a row without it does not claim the option is single.
@@ -192,7 +197,7 @@ fn one_name_has_one_value_name_arity_and_value_set_on_every_leaf() {
     }
     let mut problems = Vec::new();
     for (n, uses) in &by_name {
-        let shape = |option: &Value| (option["valueType"].clone(), option["valueName"].clone(), if REPEATABLE_DIFFERS.contains(&n.as_str()) { Value::Null } else { option["repeatable"].clone() });
+        let shape = |option: &Value| (option["valueType"].clone(), serde_json::json!(value_name(option)), if REPEATABLE_DIFFERS.contains(&n.as_str()) { Value::Null } else { option["repeatable"].clone() });
         let first = shape(uses[0].1);
         for (leaf, option) in uses {
             if shape(option) != first {
@@ -232,7 +237,7 @@ fn the_vocabulary_and_the_spec_use_the_same_options_with_the_same_value_names() 
     }
     let mut used: BTreeMap<String, (Option<String>, String)> = BTreeMap::new();
     for (leaf, option) in all_options() {
-        used.entry(name(option).to_string()).or_insert((option["valueName"].as_str().map(str::to_string), leaf));
+        used.entry(name(option).to_string()).or_insert((value_name(option), leaf));
     }
     let mut problems = Vec::new();
     for (n, (value, leaf)) in &used {

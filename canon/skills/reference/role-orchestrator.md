@@ -37,8 +37,8 @@ canon adapter validate --response adapter-response.json --json
 ```
 ```text
 # Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
-usage: canon artifacts move --tier <TIER> [--commit --plan-digest <DIGEST>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon artifacts move --tier <TIER> [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon artifacts move --tier cold --json
@@ -220,16 +220,16 @@ canon inventory sync --json
 ```
 ```text
 # Move superseded versions of every record out of the ledger into the archive
-usage: canon ledger compact [--commit --plan-digest <DIGEST>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon ledger compact [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon ledger compact --json
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-usage: canon migrate [--commit --plan-digest <DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon migrate [--commit --plan-digest <PLAN_DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon migrate --json
@@ -264,8 +264,8 @@ canon prompt show reviewer@v1 --json
 ```
 ```text
 # Remove allowlisted records older than a cutoff
-usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <DIGEST>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon purge --kind session --before 2020-01-01T00:00:00Z --json
@@ -314,7 +314,7 @@ canon retrieve --for-role reviewer --domain dev --limit 20 --json
 ```
 ```text
 # Describe canon's own commands
-usage: canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
+usage: canon schema [<PATH>]* [--schemas | --error <CODE> | --errors | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add --json
@@ -426,8 +426,8 @@ canon subject unadopt demo --change add-login --json
 ```
 ```text
 # Apply canon.yaml aging rules, moving old records to their destination tier
-usage: canon tier age [--commit --plan-digest <DIGEST>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon tier age [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon tier age --json
@@ -536,7 +536,7 @@ dropping `--as`) to get past a refusal is the same act under another label.
 implementer before `canon brief show <slug>` reports `state: approved`.
 Never approve it yourself and never edit the policy to pass the gate. A
 policy that no longer matches the approval fails closed
-(`POLICY_APPROVAL_STALE`, or `POLICY_APPROVAL_UNREADABLE`): the ship
+(`POLICY_APPROVAL_STALE`, or `POLICY_APPROVAL_CORRUPT`): the ship
 guard and the reopen refuse, and `--override-reason` does not waive it. Run
 `canon policy show`, then show the policy to the human, ask them to re-approve
 and record their explicit answer (`canon policy approve --approver <their name>
@@ -630,7 +630,7 @@ digits, over the effects and what the plan read, so a file or record the plan
 read that changed since is `PLAN_STALE` too, and `meta.next[0]` is the preview
 to run again. A commit holds the repository write lock for its whole run:
 another command that writes waits for it, and one that waited 30 seconds
-answers `REPO_WRITE_BUSY` (exit 2, retryable): run it again. A document passed
+answers `REPO_LOCK_UNAVAILABLE` (exit 2, retryable): run it again. A document passed
 with `--input` never carries `--commit` or `--plan-digest`, and these five
 leaves take one object only (`INPUT_INVALID`).
 

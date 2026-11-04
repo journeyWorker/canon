@@ -1,2 +1,2 @@
-canon: SUBJECT_ADOPT_REFUSED: change `no-such-change` does not exist (import it with `canon ingest plans` first)
-  hint: fix what the message names, then run `canon subject unadopt` again
+canon: CHANGE_NOT_FOUND: change `no-such-change` does not exist (import it with `canon ingest plans` first)
+  hint: import the change with `canon ingest plans`, or check the id against the changes `canon status` lists, then run `canon subject unadopt` again

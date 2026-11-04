@@ -104,7 +104,7 @@ pub(crate) static TABLES: Tables = Tables {
                 },
                 Validator {
                     arguments: &["approver"],
-                    code: "POLICY_APPROVAL_REFUSED",
+                    code: "APPROVAL_INVALID",
                     description: "The human's name (`--approver`) is not blank once trimmed (a blank name under `--relayed-via` is the relayed validator's, `USAGE`).",
                     rejects: &["canon policy approve --approver \" \""],
                 },

@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:18:47.822581Z",
+  "attachments": [
+    {
+      "case": "arg_rules::enforce::tests::atip_checkorder_16_an_integer_outside_its_bound_is_a_domain_and_no_integer_is_a_failure_to_parse",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    },
+    {
+      "case": "arg_rules::enforce::tests::atip_checkorder_16_the_argument_object_has_the_default_and_a_constraint_sees_only_what_was_given",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    }
+  ],
+  "code_tree": "84454e6621e493af02ddc9c1cd5b2158249ee38a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "91a47e478825254994473672e759b11ec606c931",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 264,
+  "scenario_id": "atip.checkorder.16",
+  "schema": 1,
+  "staging_id": "6d91fd73",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

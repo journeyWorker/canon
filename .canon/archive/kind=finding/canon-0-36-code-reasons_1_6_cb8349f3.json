@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T13:49:42.805240Z",
+  "change_id": "canon-0-36-code-reasons",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/cli_error.rs:114-117",
+  "introduced_by": "b524c40a4efbb63df3f3e515e987872918912612",
+  "kind": "finding",
+  "reviewed_sha": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "reviewer": "rev-0-36-reasons",
+  "round": 1,
+  "scenario_ids": [
+    "atip.reasons.01",
+    "atip.reasons.02",
+    "atip.reasons.07",
+    "atip.reasons.08"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[standards] Three guards prove less than their names say. (1) The debug assertions in emit and emit_with_data_and_meta check the registered reason and the row's exit/retryable of the top error only, not of error.details() entries (CliError::detail_errors); atip_reasons_07's fixture is one cause, so its loop over details checks the error itself only and F4's 'every details entry carries a registered reason' is unproved for several causes (after finding 1, an open-blocker plus false-success refusal is a ready two-cause fixture). Recurse over detail_errors() in the assertions. (2) atip_reasons_08's first test cannot fail: CliError::refused takes exit and retryable from the row and .reason() touches neither, so the comparison is row == row; the real guards are the emit assertion and the source scan for '.exit = ' / '.retryable = ' (which hold: pub fields, no writer in canon-cli/src). Say so in the test comment, or drive it through a code whose emission sets a field. (3) atip_reasons_02's 'registered reason raised by a site' accepts any source literal \"NAME\", so a reason that is also a code name (WRITE_FAILED, REPO_DENIED, PROMOTION_INVALID, CONFIG_INVALID) can never be reported dead; match .reason(\"NAME\") / the reason tuples for those.",
+  "worktree_dirty": false
+}

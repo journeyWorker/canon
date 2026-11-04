@@ -9,6 +9,8 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod old_codes;
+
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
@@ -106,17 +108,6 @@ fn refused(dir: &Path, role: Option<&str>, args: &[&str], code: &str, retryable:
     b
 }
 
-/// atip.codeexit.01: the preconditions of a write answer exit 2 with their code and no `data`, and the work tree and `.canon/` are what they were.
-#[test]
-fn atip_codeexit_01_a_precondition_that_starts_nothing_is_exit_2_with_its_code_and_writes_nothing() {
-    let dir = repo_with_clean_brief();
-    let repo = dir.path();
-    let mut attest = ATTEST.to_vec();
-    attest.extend(["--actor", "impl"]);
-    refused(repo, Some("implementer"), &attest, "BRIEF_APPROVAL_REQUIRED", false);
-    refused(repo, None, &["task", "done", "add-login#1"], "TASK_EVIDENCE_REQUIRED", false);
-}
-
 /// atip.codeexit.02: an approved brief takes the same call; a brief edited after its approval is `BRIEF_APPROVAL_STALE`, and a re-approval opens it.
 #[test]
 fn atip_codeexit_02_an_approved_brief_takes_the_call_and_an_edit_after_the_approval_is_stale() {
@@ -180,16 +171,6 @@ fn atip_codeexit_04_a_subject_move_the_gate_blocks_is_exit_2_with_the_cause_as_t
     assert!(b["error"].get("details").is_none(), "one cause is the error itself: {b}");
 }
 
-/// atip.codeexit.05: the gate judges every record of an evidence batch before the first write; the second record's refusal is exit 2,
-/// `PROMOTION_INVALID`, `field` `/1`, and nothing is written (the unit test `evidence_add_115_*` proves the same on `land_batch`).
-#[test]
-fn atip_codeexit_05_the_batch_order_is_judged_before_the_first_write() {
-    let source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/evidence.rs")).unwrap();
-    let judged = source.find("judge_evidence_body(body)").expect("land_batch judges the bodies");
-    let first_write = source.find("let staging_root = evidence_staging_dir(ledger_root);").expect("land_batch writes after");
-    assert!(judged < first_write, "the gate is judged before the staging directory is touched");
-}
-
 fn adapter_fixture() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/adapter/claude.json")
 }
@@ -238,7 +219,7 @@ fn atip_codeexit_07_a_check_command_that_cannot_start_is_exit_2_and_not_failed()
     let dir = git_repo();
     let d = dir.path();
     ok(d, &["init", "--providers", "none"], None);
-    let b = refused(d, None, &["adapter", "validate", "--response", "no-such-response.json"], "ADAPTER_REFUSED", false);
+    let b = refused(d, None, &["adapter", "validate", "--response", "no-such-response.json"], "ADAPTER_FILE_NOT_FOUND", false);
     assert!(!b["error"]["code"].as_str().unwrap().ends_with("_FAILED"), "{b}");
     let out = canon(d, &["report", "check", "--repo", "/no/such/repo"], None);
     assert_eq!(out.status.code(), Some(2), "{}", body(&out));
@@ -335,27 +316,62 @@ const EXIT_TABLE: &[(&str, &[&str], u8)] = &[
     ("SUBJECT_GATE_VIOLATION", &["SUBJECT_APPROVAL_REQUIRED", "EVIDENCE_STALE", "SUBJECT_INVALID", "LAYOUT_MIGRATION_REQUIRED"], 2),
 ];
 
-/// atip.codeexit.10: every row of the exit table is the registry's: each new code exists, has the new exit, and the old code is gone (the old
-/// `POLICY_CHANGED_SINCE_APPROVAL` is a warning's name that stays); a call site that overrides an exit fails `exit_registry`.
+/// The rows of the CHANGELOG's replacement table: `(old code, new codes, exit before, exits after)`.
+fn changelog_exit_rows(changelog: &str) -> Vec<(String, Vec<String>, u8, Vec<u8>)> {
+    old_codes::replacement_table(changelog).expect("the replacement table reads").into_iter().map(|row| (row.old, row.new, row.exit_before, row.exit_after)).collect()
+}
+
+/// atip.codeexit.10: every row of the CHANGELOG's replacement table is the registry's: each new code exists and the exits of the row are the exits of its
+/// new codes, an old code that is not also a new one is gone, the rows hold every code of the brief's table, and the headline counts the old codes
+/// whose every new code moved from exit 1 to exit 2.
 #[test]
 fn atip_codeexit_10_every_row_of_the_exit_table_is_the_registrys() {
     let all = canon_cli::cli_error::all_codes();
-    for (old, new, exit) in EXIT_TABLE {
-        if *old != "POLICY_CHANGED_SINCE_APPROVAL" && *old != "CONTEXT_OBJECT_CONFLICT" {
-            assert!(!all.iter().any(|info| info.code == *old), "`{old}` is still registered");
-        }
-        for code in *new {
-            let info = all.iter().find(|info| info.code == *code).unwrap_or_else(|| panic!("`{code}` is not registered"));
-            if *exit != 0 {
-                assert_eq!(info.exit, *exit, "{code}");
-            }
+    let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
+    let rows = changelog_exit_rows(&changelog);
+    assert_eq!(rows.len(), 179, "the replacement table has a row for each code of 0.35");
+    for (old, news, _, after) in &rows {
+        let mut registry: Vec<u8> = news.iter().map(|new| all.iter().find(|info| info.code == new).unwrap_or_else(|| panic!("the row of `{old}` names `{new}`, which the registry lacks")).exit).collect();
+        registry.sort_unstable();
+        registry.dedup();
+        let mut stated = after.clone();
+        stated.sort_unstable();
+        stated.dedup();
+        assert_eq!(registry, stated, "the row of `{old}` says exits {after:?} after, the registry says {registry:?}");
+        if !news.contains(old) {
+            assert!(!all.iter().any(|info| info.code == old), "`{old}` is still registered");
         }
     }
+    // Every old code of the brief's table has a row.
+    for (old, news, _) in EXIT_TABLE {
+        let row = rows.iter().find(|(o, ..)| o == old).unwrap_or_else(|| panic!("the CHANGELOG has no row for `{old}`"));
+        let mut stated = row.1.clone();
+        stated.sort_unstable();
+        let mut expected: Vec<String> = news.iter().map(|code| (*code).to_string()).collect();
+        expected.sort_unstable();
+        assert_eq!(stated, expected, "the row of `{old}` names the codes of the brief's table");
+    }
+    // The headline counts the old codes whose exit moved from 1 to 2.
+    let mut moved: Vec<&str> = rows.iter().filter(|(_, _, before, after)| *before == 1 && after.iter().all(|exit| *exit == 2)).map(|(old, ..)| old.as_str()).collect();
+    moved.sort_unstable();
+    moved.dedup();
+    assert!(changelog.contains(&format!("**{} codes changed from exit 1 to exit 2", moved.len())), "the headline says {} codes: {moved:?}", moved.len());
     assert_eq!(all.iter().find(|i| i.code == "CONTEXT_PACK_VERIFY_FAILED").unwrap().exit, 1);
     assert_eq!(all.iter().find(|i| i.code == "CONTEXT_PACK_CORRUPT").unwrap().exit, 2);
     assert!(canon_cli::cli_error::all_warnings().iter().any(|w| w.code == "POLICY_CHANGED_SINCE_APPROVAL"), "the warning keeps its name");
-    let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
-    assert!(changelog.contains("the codes that changed from exit 1 to exit 2"), "the CHANGELOG collects the codes whose exit changed");
+}
+
+/// atip.codeexit.10 (failure case): a row whose exit disagrees with the registry, or whose count is wrong, is found.
+#[test]
+fn atip_codeexit_10_a_row_that_disagrees_with_the_registry_is_found() {
+    let table = format!(
+        "\n## 0.36.0\n\n{}\n|---|---|---|---|---|---|---|\n| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | renamed | 1 → 1 | no → no |  | a note |\n| `NO_COMMIT` | `COMMIT_REQUIRED` | renamed | 1 → 2 | no → no |  | a note |\n\n## 0.35.0\n",
+        old_codes::TABLE_HEADER
+    );
+    let rows = changelog_exit_rows(&table);
+    assert_eq!(rows, [("BRIEF_UNAPPROVED".to_string(), vec!["BRIEF_APPROVAL_REQUIRED".to_string()], 1, vec![1]), ("NO_COMMIT".to_string(), vec!["COMMIT_REQUIRED".to_string()], 1, vec![2])]);
+    let registry = canon_cli::cli_error::all_codes().iter().find(|i| i.code == "BRIEF_APPROVAL_REQUIRED").unwrap().exit;
+    assert_ne!(vec![registry], rows[0].3, "the first row says exit 1 where the registry says {registry}: the test above fails on it");
 }
 
 /// atip.codeexit.11: the branches on a canon exit that canon ships (the pre-commit hook, the npm launcher, the eval scripts) treat every non-zero
@@ -385,4 +401,54 @@ fn branches_on_exit_1(text: &str) -> bool {
         let mentions_exit = line.contains("$?") || line.contains("status") || line.contains("returncode") || line.contains("exitCode") || line.contains("exit_code");
         mentions_exit && ["-eq 1", "== 1", "=== 1"].iter().any(|op| line.contains(op))
     })
+}
+
+/// atip.codeexit.01: no exit-2 answer carries `data`: the one place that prints an error with data refuses an exit-2 error in a debug build
+/// (the build every test in this directory runs), so a refusal that grows a `data` member fails the test that meets it.
+#[cfg(debug_assertions)]
+#[test]
+fn atip_codeexit_01_an_exit_2_error_cannot_be_emitted_with_data() {
+    use canon_cli::cli_error::{CliError, CliErrorExt as _};
+    let refusal = CliError::refused("ACTOR_DENIED", "x");
+    assert_eq!(refusal.exit, 2);
+    let result = std::panic::catch_unwind(|| refusal.emit_with_data("canon x", false, &canon_cli::adapter::ValidationFailure { valid: false, problem: "x".into() }));
+    assert!(result.is_err(), "an exit-2 error with data is refused");
+    let failure = CliError::failed("GATE_CHECK_FAILED", "x");
+    assert_eq!(failure.exit, 1);
+    assert_eq!(failure.emit_with_data("canon x", false, &canon_cli::adapter::ValidationFailure { valid: false, problem: "x".into() }), 1, "an exit-1 failure keeps its data");
+}
+
+/// atip.codeexit.04 (two causes): a `subject move` the gate blocks for two causes is exit 2 with no `data`; `error` is the first cause and
+/// `details` lists both, each with its own code (a missing approval and an open blocker are different conditions); the status is unchanged.
+#[test]
+fn atip_codeexit_04_a_subject_move_blocked_for_two_causes_lists_both_in_details() {
+    let dir = git_repo();
+    let repo = dir.path();
+    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["subject", "new", "demo", "--domain", "d", "--title", "T"], Some("planner"));
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "L"], Some("planner"));
+    for to in ["specced", "building", "verifying"] {
+        ok(repo, &["subject", "move", "demo", "--to", to], Some("planner"));
+    }
+    ok(repo, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor", "r1", "--summary", "blocks", "--promote"], Some("reviewer"));
+    let b = refused(repo, Some("planner"), &["subject", "move", "demo", "--to", "shipped"], "SUBJECT_APPROVAL_REQUIRED", false);
+    let details = b["error"]["details"].as_array().unwrap_or_else(|| panic!("two causes are two details: {b}"));
+    assert!(details.len() >= 2, "{b}");
+    assert_eq!(details[0]["code"], b["error"]["code"], "the error is the first cause: {b}");
+    let codes: Vec<&str> = details.iter().filter_map(|d| d["code"].as_str()).collect();
+    assert!(codes.contains(&"SUBJECT_APPROVAL_REQUIRED") && codes.contains(&"SUBJECT_INVALID"), "each cause has its own code: {codes:?}");
+}
+
+/// atip.codeexit.08 (the hot rung): a refused `ingest plans` leaves the tree byte-identical even when canon.yaml has a sqlite hot rung, whose file
+/// a store would create as it opens: the sources are judged before any store is opened.
+#[test]
+fn atip_codeexit_08_a_refused_ingest_does_not_create_the_hot_store() {
+    let dir = git_repo();
+    let d = dir.path();
+    std::fs::write(d.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  change: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec\n").unwrap();
+    std::fs::create_dir_all(d.join("openspec/changes/widget")).unwrap();
+    std::fs::write(d.join("openspec/changes/widget/proposal.md"), "## Why\n\nWidgets.\n").unwrap();
+    std::fs::write(d.join("openspec/changes/widget/tasks.md"), "- [ ] 1.1 wire it\n").unwrap();
+    refused(d, None, &["ingest", "plans"], "INGEST_SOURCE_INVALID", false);
+    assert!(!d.join(".canon/hot.db").exists(), "no hot store was created");
 }

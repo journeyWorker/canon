@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T11:26:25.561613Z",
+  "attachments": [
+    {
+      "case": "atip_codeexit_11_a_branch_on_exit_1_is_found_by_the_scan",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_codeexit_11_no_shipped_branch_depends_on_exit_1_of_a_changed_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    }
+  ],
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "e78850731e858b7cae70a3e4244a0670b081c25a",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 83,
+  "scenario_id": "atip.codeexit.11",
+  "schema": 1,
+  "staging_id": "9640dab8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

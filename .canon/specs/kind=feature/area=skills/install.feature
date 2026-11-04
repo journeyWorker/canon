@@ -189,7 +189,7 @@ Feature: skills install
   Scenario: An unapproved brief blocks attestation until the human's answer is recorded, and the approval is never assumed
     Given a verifying subject whose only adopted change has a brief with no Approved line, and whose scenarios are tagged for it or none of its changes is approved
     When canon evidence add runs for any of the subject's scenarios, with no override reason
-    Then each call exits 1 with BRIEF_APPROVAL_REQUIRED naming the change's brief.md, so nothing is attested for that scope
+    Then each call exits 2 with BRIEF_APPROVAL_REQUIRED naming the change's brief.md, so nothing is attested for that scope
     And once the human's answer is recorded with canon brief approve, alone or with other ids in one call, the same call succeeds
     And an approved brief edited afterwards refuses again with BRIEF_APPROVAL_STALE naming the brief
 
@@ -253,9 +253,9 @@ Feature: skills install
   @case:failure
   @skills.install.55
   Scenario: A malformed skills section in canon.yaml fails loud
-    Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know
-    When canon skills install, check and doctor run with no provider named
-    Then each is refused with exit 2 (SKILLS_INVALID_ARGUMENT), naming the expected shape or the unknown provider
+    Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know, and a clean canon.yaml
+    When canon skills install, check and doctor run with no provider named, and with --providers naming an unknown provider
+    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), naming the expected shape or the unknown provider, and the unknown provider on the --providers flag of the clean canon.yaml is SKILLS_ARGUMENT_INVALID
     And nothing is projected and canon.yaml is byte-identical
     And a --skills-source directory that does not exist is refused the same way, exit 2 naming the option
     And canon init --check exits 1 reporting the skills section as FAIL with the same reason
@@ -424,7 +424,7 @@ Feature: skills install
   Scenario: A brief approve call with a blocked, a missing and an unclosed brief refuses all of them and writes nothing
     Given three changes: one whose brief has a blocker finding, one id that has no brief, and one whose brief ends inside an open code fence
     When the human runs canon brief approve with all three ids and one answer
-    Then the command exits 2 with one BRIEF_APPROVE_REFUSED naming all three ids, each with its own code and reason
+    Then the command exits 2 with the first refused id's own code (BRIEF_INVALID with the reason BLOCKERS) and one error.details entry for each of the three ids with its own code and reason, and no data
     And no brief and no policy approval was written or changed, and the same call with the three fixed approves all of them
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:09Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

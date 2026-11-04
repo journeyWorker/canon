@@ -300,7 +300,7 @@ pub fn role_commands(spec: &Value, role: &str) -> String {
         let about = gist(leaf["summary"].as_str().expect("summary"));
         let _ = writeln!(out, "```text\n# {about}\nusage: {}", syntax_line(leaf));
         if leaf["effect"] == "destructive" {
-            out.push_str("# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts\n");
+            out.push_str("# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts\n");
         }
         let _ = writeln!(out, "```\n```bash\n{}\n```", example(leaf));
     }

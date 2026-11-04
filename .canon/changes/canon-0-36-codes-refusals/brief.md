@@ -59,7 +59,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 ### F1 인자와 증거의 규칙
 
 - ==**인자 제약이 만드는 거절은 제약의 규칙을 따른다.**== `requires`와 `atLeastOne`은 `REQUIRED`, `forbids`와 `atMostOne`은 `CONFLICT`, 값이 틀리거나 비면 `INVALID`이다. `EVIDENCE_INVALID_ARGUMENT`가 이렇게 셋으로 갈라진다.
-- `EVIDENCE_REFUSED`는 `task`나 `scenario`가 하나도 없으면 `EVIDENCE_REQUIRED`이다. 증거 규칙이 기록을 막으면 `EVIDENCE_INVALID`나 `EVIDENCE_CONFLICT`이다.
+- `EVIDENCE_REFUSED`는 `task`나 `scenario`가 하나도 없으면 `EVIDENCE_REQUIRED`이다. 인자가 틀리면 `EVIDENCE_ARGUMENT_INVALID`, 대상 task가 없으면 `TASK_NOT_FOUND`, 저장소가 틀리면 `REPO_INVALID`이다. 저장된 증거와 어긋나서 기록을 막는 규칙은 없으므로 `EVIDENCE_CONFLICT`는 등록하지 않는다.
 - 증거의 사람 승인이 없으면 `EVIDENCE_APPROVAL_REQUIRED`이다. 있는데 틀렸거나 서명이 맞지 않으면 `EVIDENCE_APPROVAL_INVALID`이고 이유 `MALFORMED`, `SIGNATURE_MISMATCH`는 그대로이다.
 - 묶으려는 파일이 앞서 본 뒤에 바뀌었으면 `*_BINDING_STALE`이다. 저장소 밖이면 `*_DENIED`, 없으면 `*_NOT_FOUND`, 형식이 틀리면 `*_INVALID`이다. 리뷰의 산출물 묶음(`REVIEW_ARTIFACT_*`)도 같다.
 - `policy approve`는 정책 파일이 없으면 `POLICY_REQUIRED`, 읽을 수 없거나 틀리면 `POLICY_INVALID`, 승인자가 비면 `APPROVAL_INVALID`이다.
@@ -68,7 +68,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 
 - 발산 승인은 승인자가 리뷰어가 아니거나 스스로 증명한 증거이면 `DIVERGENCE_DENIED`(이유 `NOT_REVIEWER`, `SELF_ATTESTED`), 증거가 발산이 아니면 `DIVERGENCE_CONFLICT`(이유 `NOT_DIVERGENT`)이다. 해결할 사람이 다르다.
 - 이미 끝난 dispatch run과 진행 중이 아닌 run은 `DISPATCH_CONFLICT`의 이유 `ALREADY_ENDED`와 `NOT_RUNNING`이다. 끝난 run을 다시 끝내는 호출은 지금처럼 거절한다.
-- 채택과 채택 취소의 거절은 둘 다 `SUBJECT_CONFLICT`이고 원인마다 이유가 있다. 채택 취소가 승인된 브리프나 `@flow` 태그 시나리오 때문에 거절되면 이유로 구별한다. 지금 `subject unadopt`가 `SUBJECT_ADOPT_REFUSED`를 내는 곳이 있으면 고친다.
+- 채택 취소의 거절은 `SUBJECT_CONFLICT`이고 원인마다 이유가 있다. 승인된 브리프 때문이면 `APPROVED_BRIEF`, `@flow` 태그 시나리오 때문이면 `FLOW_TAGGED`이다. 채택에는 충돌 조건이 없다. 옛 `SUBJECT_ADOPT_REFUSED`는 주제나 변경이 없을 때와 읽기·쓰기 실패에만 났으므로 `*_NOT_FOUND`와 쓰기·저장소 코드로 간다.
 - `trace`가 앞자리 sha로 커밋 여럿을 만나면 `TRACE_CONFLICT`이고 `expected`에 후보를 싣는다. 아무 기록도 없으면 `TRACE_NOT_FOUND`이다.
 - 전략 롤백은 서명이 맞지 않으면 종료 값 2의 `STRATEGY_SIGNATURE_INVALID`이고 아무것도 기록하지 않는다. 롤백을 기록하지 못하면 종료 값 1의 `STRATEGY_ROLLBACK_FAILED`이다.
 
@@ -106,7 +106,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 | `EVIDENCE_APPROVAL_INVALID` | 2 | `EVIDENCE_APPROVAL_INVALID` · `EVIDENCE_APPROVAL_REQUIRED` |  | 2 | 아니오 |
 | `EVIDENCE_BIND_REFUSED` | 2 | `EVIDENCE_BINDING_STALE` · `EVIDENCE_BINDING_INVALID` · `EVIDENCE_BINDING_NOT_FOUND` · `EVIDENCE_BINDING_DENIED` |  | 2 | 아니오 |
 | `EVIDENCE_INVALID_ARGUMENT` | 2 | `EVIDENCE_ARGUMENT_INVALID` · `EVIDENCE_ARGUMENT_REQUIRED` · `EVIDENCE_ARGUMENT_CONFLICT` |  | 2 | 아니오 |
-| `EVIDENCE_REFUSED` | 2 | `EVIDENCE_REQUIRED` · `EVIDENCE_INVALID` · `EVIDENCE_CONFLICT` |  | 2 | 아니오 |
+| `EVIDENCE_REFUSED` | 2 | `EVIDENCE_REQUIRED` · `EVIDENCE_ARGUMENT_INVALID` · `TASK_NOT_FOUND` · `REPO_INVALID` |  | 2 | 아니오 |
 | `EVIDENCE_SCENARIO_NOT_INDEXED` | 2 | `SCENARIO_INDEX_REQUIRED` |  | 2 | 아니오 |
 | `HOOKS_INSTALL_REFUSED` | 2 | `HOOKS_REPO_INVALID` · `HOOKS_FILE_CONFLICT` · `HOOKS_FILE_DENIED` |  | 2 | 아니오 |
 | `INVENTORY_REFUSED` | 2 | `CONFIG_INVALID` · `INVENTORY_INDEX_UNAVAILABLE` | SPECS | 2 | 아니오/예 |
@@ -122,7 +122,7 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 | `REVIEW_ARTIFACT_REFUSED` | 2 | `REVIEW_ARTIFACT_STALE` · `REVIEW_ARTIFACT_INVALID` · `REVIEW_ARTIFACT_NOT_FOUND` · `REVIEW_ARTIFACT_DENIED` |  | 2 | 아니오 |
 | `REVIEW_SCENARIO_NOT_INDEXED` | 2 | `SCENARIO_INDEX_REQUIRED` |  | 2 | 아니오 |
 | `SKILLS_INVALID_ARGUMENT` | 2 | `SKILLS_ARGUMENT_INVALID` · `SKILLS_SOURCE_NOT_FOUND` · `CONFIG_INVALID` | SKILLS | 2 | 아니오 |
-| `SUBJECT_ADOPT_REFUSED` | 2 | `SUBJECT_CONFLICT` | 원인마다 | 2 | 아니오 |
+| `SUBJECT_ADOPT_REFUSED` | 2 | `SUBJECT_NOT_FOUND` · `CHANGE_NOT_FOUND` · `WRITE_DENIED` · `WRITE_INVALID` · `REPO_DENIED` · `REPO_INVALID` |  | 2 | 아니오 |
 | `SUBJECT_UNADOPT_REFUSED` | 2 | `SUBJECT_CONFLICT` | 원인마다 | 2 | 아니오 |
 | `TRACE_NOT_FOUND` | 2 | `TRACE_NOT_FOUND` · `TRACE_CONFLICT` |  | 2 | 아니오 |
 
@@ -166,4 +166,4 @@ Source: https://github.com/journeyWorker/atip tag v1.4.2 spec 7.2.2, 7.6, 계약
 - 중간에 멈추는 명령(`canon-0-36-codes-incomplete`)과 이유 이름 전체의 정리(`canon-0-36-code-reasons`).
 - 새 거절 규칙을 더하는 일.
 
-Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:4c3c68720f0f6188f7f6cc9cf662437357864acb09fecacee2cd73a9a1404512)
+Approved: Journey Hwang 2026-11-04T19:56:40Z — "휴가 중 승인 위임(2026-11-01 대화): F6 표를 리뷰된 동작에 맞춤(EVIDENCE_REFUSED, SUBJECT_ADOPT_REFUSED 행)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:f86cb403733878c60d85101d6adc158fe853013ebd476a85ffc6315e788439f6)

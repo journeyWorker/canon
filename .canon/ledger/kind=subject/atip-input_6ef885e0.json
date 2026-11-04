@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-04T18:41:38.687079Z",
+  "change_ids": [
+    "canon-0-35-input-order",
+    "canon-0-35-batch-pointers",
+    "canon-0-35-claim-l2",
+    "canon-0-36-input-1-3"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-36-orch"
+    },
+    "reason": "0.36 atip/1 1.4 + 1.3 code names + atip-dep: every change reviewed, gate clean"
+  },
+  "subject_id": "atip-input",
+  "summary": "The --input document processing order, fragment schemas, conflicts, env values and batch pointers of atip/1 L2",
+  "title": "ATIP: canon's --input documents and batches (L2)"
+}

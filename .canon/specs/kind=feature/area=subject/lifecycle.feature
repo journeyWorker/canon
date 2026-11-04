@@ -373,7 +373,7 @@ Feature: subject lifecycle
   Scenario: A change with an approved brief is not unadopted
     Given a building subject adopting a change whose brief.md carries an "Approved:" line
     When the change is unadopted from that subject
-    Then the command exits 2 with SUBJECT_UNADOPT_REFUSED, its hint naming the approved scope, and the link stays
+    Then the command exits 2 with SUBJECT_CONFLICT with the reason APPROVED_BRIEF, its hint naming the approved scope, and the link stays
     And a draft change a scenario of the subject is tagged @flow:<change>.* for is refused the same way, its hint naming the scenarios and saying to remove or retag them first
 
   # canon: {"schema":1,"at":"2026-10-21T12:38:43Z","actor":{"agent_id":"canon-impl-025"}}
@@ -483,7 +483,7 @@ Feature: subject lifecycle
   Scenario: Reopen and ship refuse a subject that answers for an old-format brief, and a change it does not answer for never blocks
     Given a verifying subject answering for an old-format brief, and another whose only old-format brief is a change it does not answer for
     When each is moved to shipped, and a shipped one is reopened
-    Then the first is refused with OLD_BRIEF_FORMAT and stays where it is
+    Then the first is refused with BRIEF_MIGRATION_REQUIRED and stays where it is
     And the second moves, because the command does not judge that change
 
   # canon: {"schema":1,"at":"2026-10-30T11:53:55Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
@@ -627,4 +627,4 @@ Feature: subject lifecycle
     Given a repo whose canon.yaml has no approval key, and a fresh canon init
     When a relayed brief approval runs, and the written canon.yaml is read
     Then the approval is recorded, and the init template carries approval: and relay: allow | deny as comments
-    And a malformed approval section is refused CONFIG_UNREADABLE rather than read as allow
+    And a malformed approval section is refused CONFIG_INVALID rather than read as allow

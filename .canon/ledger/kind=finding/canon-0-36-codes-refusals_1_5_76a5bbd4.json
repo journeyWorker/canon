@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:35.647617Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/retention.rs:47",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "resolution_sha": "56499ba18041cda113a7cf2dcff93d6b13026848",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "4983b3208c9177bded50efe00dc90220c03fe49f",
+  "reviewer": "rev-0-36-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[standards] Unreadable-file conditions land on the wrong code against ATIP 1.3 (a permission problem is DENIED; UNAVAILABLE only when a repeat can succeed; the registry value decides retryable). (a) `tiers_code` maps every `RetentionError::Io` and `TierCliError::ReadCanonYaml` to RETENTION_TIERS_UNAVAILABLE, retryable true: a canon.yaml that is permission-denied or missing is not fixed by waiting, yet the caller is told to retry. Only a backend that is down (TierUnavailable, BackendUnattached, Sql, ObjectStore) is retryable; EACCES is DENIED, a malformed tier is INVALID, and a broken stored object is CORRUPT. (b) `policy approve` on a policy.yaml with mode 000 answers POLICY_INVALID ('cannot read ...: Permission denied'): the brief wrote 'unreadable or wrong is POLICY_INVALID', but a permission problem is DENIED by the rule the brief cites, and `policy approve` never parses the policy, so the registry's 'or it is not a policy' has no emitter. (c) ARTIFACTS_BLOB_CORRUPT also carries `{digest}: cannot be read: {e}` (artifacts.rs ~405), which is a read error of a local blob, not a blob that does not match its name; its registry meaning also lists 'changed while it was read', which is a race, not damage. Decide each: add the DENIED codes (the brief would need a note) or keep the brief's choice and record why, and split the retryable arm by error kind.",
+  "worktree_dirty": false
+}

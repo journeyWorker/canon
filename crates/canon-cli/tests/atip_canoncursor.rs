@@ -378,11 +378,8 @@ fn atip_canoncursor_08_fields_is_checked_the_same_in_text_mode_and_in_json_mode(
     assert_eq!(snapshot(repo.path()), before);
 }
 
-fn command_doc(dir: &Path, command: &str) -> Value {
-    let mut args: Vec<&str> = vec!["schema"];
-    args.extend(command.split(' '));
-    args.push("--json");
-    json(&canon(dir, &args))["data"].clone()
+fn command_doc(_dir: &Path, command: &str) -> Value {
+    canon_cli::spec::model()["commands"].as_array().unwrap().iter().find(|doc| doc["command"] == command).unwrap_or_else(|| panic!("`{command}` is a command of the model")).clone()
 }
 
 #[test]
@@ -566,4 +563,101 @@ fn atip_canoncursor_15_a_fields_value_that_cannot_be_read_is_the_same_usage_in_t
         assert!(stderr.starts_with("canon: USAGE:") && stderr.contains("field: --fields"), "{args:?} {what}: {stderr}");
         assert_eq!(snapshot(repo.path()), before, "{args:?} {what}: a refusal writes nothing");
     }
+}
+
+/// `args` cut into its command words and its options: each `--name` with the value that follows it, if the next word is not another option.
+fn split_options(args: &[&str]) -> (Vec<String>, Vec<(String, Option<String>)>) {
+    let at = args.iter().position(|word| word.starts_with("--")).unwrap_or(args.len());
+    let words = args[..at].iter().map(ToString::to_string).collect();
+    let mut options = Vec::new();
+    let mut rest = args[at..].iter().peekable();
+    while let Some(name) = rest.next() {
+        let value = rest.next_if(|next| !next.starts_with("--")).map(ToString::to_string);
+        options.push((name.to_string(), value));
+    }
+    (words, options)
+}
+
+#[test]
+fn atip_canoncursor_16_a_cursor_continues_the_same_call_written_in_another_order_or_spelling() {
+    let repo = fixture();
+    for (name, args) in listings() {
+        let (_, next) = first_page(repo.path(), &args, &["--limit", "1"], &[]);
+        let cursor = cursor_of(&next);
+        let straight = json(&run(repo.path(), &resumed(&with(&args, &["--limit=1"]), &cursor, &[]), &[]));
+        assert_eq!(straight["ok"], true, "{name}: {straight}");
+        // What the page holds, without the moment a listing was read at.
+        let place = |page: &Value| -> Value {
+            let mut data = page["data"].clone();
+            if let Some(members) = data.as_object_mut() {
+                members.remove("asOf");
+            }
+            data
+        };
+        let (words, options) = split_options(&args);
+        let apart = |options: &[(String, Option<String>)]| -> Vec<String> { options.iter().flat_map(|(option, value)| std::iter::once(option.clone()).chain(value.clone())).collect() };
+        let joined = |options: &[(String, Option<String>)]| -> Vec<String> { options.iter().map(|(option, value)| value.as_ref().map_or_else(|| option.clone(), |value| format!("{option}={value}"))).collect() };
+        let reversed: Vec<(String, Option<String>)> = options.iter().rev().cloned().collect();
+        let cases: Vec<(&str, Vec<String>)> = vec![
+            ("the options in the reverse order, a value apart from its option, the page size spelled 01", [words.clone(), apart(&reversed), vec!["--limit".into(), "01".into(), "--cursor".into(), cursor.clone()]].concat()),
+            ("each option as --name=value, the cursor first", [words.clone(), vec![format!("--cursor={cursor}")], joined(&options), vec!["--limit=1".into()]].concat()),
+            ("the cursor and the page size between the options", [words.clone(), joined(&reversed[..1]), vec![format!("--cursor={cursor}"), "--limit=1".into()], joined(&reversed[1..])].concat()),
+        ];
+        for (what, call) in cases {
+            let out = json(&run(repo.path(), &call, &[]));
+            assert_eq!(out["ok"], true, "{name}: {what}: {call:?}: {out}");
+            assert_eq!(place(&out), place(&straight), "{name}: {what}: the same place");
+        }
+    }
+}
+
+/// A repository in a directory called `-dash` under a new parent, with three subjects; the calls run in the parent.
+fn dash_repo() -> TempDir {
+    let parent = TempDir::new().unwrap();
+    let repo = parent.path().join("-dash");
+    std::fs::create_dir(&repo).unwrap();
+    ok(&repo, &["init", "--providers", "none"]);
+    for subject in ["demo", "demo-two", "demo-three"] {
+        ok(&repo, &["subject", "new", subject, "--domain", "dev", "--title", &format!("Title {subject}")]);
+    }
+    parent
+}
+
+#[test]
+fn atip_canoncursor_17_a_next_page_has_one_cursor_and_a_value_that_starts_with_a_dash_stays_part_of_its_option() {
+    let repo = fixture();
+    let mut continued = 0;
+    for (name, args) in listings() {
+        // Walk the pages by the call each one names: from the second on, the call that was run carried a cursor of its own.
+        let (first, mut call) = first_page(repo.path(), &args, &["--limit", "1"], &[]);
+        let mut previous = first["meta"]["page"]["nextCursor"].as_str().unwrap().to_string();
+        loop {
+            let page = json(&run(repo.path(), &call, &[]));
+            assert_eq!(page["ok"], true, "{name}: {page}");
+            if page["meta"]["page"].get("nextCursor").is_none() {
+                break;
+            }
+            let argv = page["meta"]["next"][0]["argv"].as_array().expect("a page with a cursor names its next call");
+            let next: Vec<String> = argv.iter().map(|word| word.as_str().unwrap().to_string()).collect();
+            let cursors: Vec<&String> = next.iter().filter(|word| word.starts_with("--cursor")).collect();
+            assert_eq!(cursors.len(), 1, "{name}: the cursor that was run is replaced, not kept: {next:?}");
+            assert_eq!(cursor_of(&next), page["meta"]["page"]["nextCursor"].as_str().unwrap(), "{name}");
+            assert_ne!(cursor_of(&next), previous, "{name}: the new cursor, not the one that was run");
+            previous = cursor_of(&next);
+            continued += 1;
+            call = next;
+        }
+    }
+    assert!(continued >= 3, "three listings have a third page: {continued}");
+    // A value that starts with a dash is written as one word with its option, so that it is not read as an option of its own.
+    let parent = dash_repo();
+    let first = json(&canon(parent.path(), &["query", "--kind", "subject", "--limit", "1", "--repo=-dash", "--json"]));
+    assert_eq!(first["ok"], true, "{first}");
+    let next: Vec<String> = first["meta"]["next"][0]["argv"].as_array().unwrap().iter().map(|word| word.as_str().unwrap().to_string()).collect();
+    assert!(next.iter().any(|word| word == "--repo=-dash"), "{next:?}");
+    assert!(next.iter().all(|word| !word.starts_with('-') || word.starts_with("--")), "no word is a bare value that starts with a dash: {next:?}");
+    assert!(next[1..].iter().all(|word| word.starts_with("--") && (word.contains('=') || word == "--json")), "every word after the command is an option, with its value inside: {next:?}");
+    let second = json(&run(parent.path(), &next, &[]));
+    assert_eq!(second["ok"], true, "the call as it is runs: {second}");
+    assert_eq!(second["meta"]["page"]["returned"], 1);
 }

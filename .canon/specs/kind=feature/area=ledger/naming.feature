@@ -237,7 +237,7 @@ Feature: ledger naming
     Given a repo on the 0.30 layout whose `canon.yaml` routes the kind as `evidence_record: local`
     When `canon context --json` runs
     Then it exits 0, warns that `canon.yaml` spells `evidence_record` the 0.29 way, and its first next step is `canon migrate --json`
-    And `canon evidence add` exits 2 with `OLD_LAYOUT`, a hint naming `canon migrate`, and writes nothing
+    And `canon evidence add` exits 2 with `LAYOUT_MIGRATION_REQUIRED`, a hint naming `canon migrate`, and writes nothing
 
   # canon: {"schema":1,"at":"2026-10-26T21:17:31Z","actor":{"agent_id":"impl-030-ln-fix","role":"implementer","session_id":"ln-fix-2026-10-26c"}}
   @subject:divergence-lifecycle

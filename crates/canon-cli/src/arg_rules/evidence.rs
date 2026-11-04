@@ -30,27 +30,27 @@ pub(crate) static TABLES: Tables = Tables {
             &[
                 Rule::at_least_one(&["class", "report"]),
                 Rule::at_least_one(&["ref", "report"]),
-                Rule::at_least_one(&["task", "scenario", "all-scenarios"]).code("EVIDENCE_INVALID_ARGUMENT").help("A record needs a coverage subject: a task, a scenario, or one record per scenario of a report."),
+                Rule::at_least_one(&["task", "scenario", "all-scenarios"]).code("EVIDENCE_REQUIRED").help("A record needs a coverage subject: a task, a scenario, or one record per scenario of a report."),
                 Rule::forbids("all-scenarios", &["scenario", "task", "report-case", "approver", "approval-role", "signature-file", "approval-at"])
-                    .code("EVIDENCE_INVALID_ARGUMENT")
+                    .code("EVIDENCE_ARGUMENT_CONFLICT")
                     .help("--all-scenarios writes one record per scenario its report owns, so it names no single subject."),
-                Rule::requires("all-scenarios", &["report"]).code("EVIDENCE_INVALID_ARGUMENT").help("--all-scenarios splits a --report by the scenario each case belongs to.").says("--all-scenarios splits a --report by the scenario each case belongs to, and no --report was given: none was given"),
-                Rule::requires("report-case", &["report"]).code("EVIDENCE_INVALID_ARGUMENT").help("--report-case names a case of a --report."),
-                Rule::requires("command-result", &["summary"]).code("EVIDENCE_INVALID_ARGUMENT").help("The captured output backs a --summary."),
-                Rule::requires("approver", &["approval-role", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
-                Rule::requires("approval-role", &["approver", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
-                Rule::requires("signature-file", &["approver", "approval-role", "approval-at"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
-                Rule::requires("approval-at", &["approver", "approval-role", "signature-file"]).code("EVIDENCE_APPROVAL_INVALID").help(APPROVAL_TOGETHER).reason("MALFORMED"),
+                Rule::requires("all-scenarios", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--all-scenarios splits a --report by the scenario each case belongs to.").says("--all-scenarios splits a --report by the scenario each case belongs to, and no --report was given: none was given"),
+                Rule::requires("report-case", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--report-case names a case of a --report."),
+                Rule::requires("command-result", &["summary"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("The captured output backs a --summary."),
+                Rule::requires("approver", &["approval-role", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_REQUIRED").help(APPROVAL_TOGETHER),
+                Rule::requires("approval-role", &["approver", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_REQUIRED").help(APPROVAL_TOGETHER),
+                Rule::requires("signature-file", &["approver", "approval-role", "approval-at"]).code("EVIDENCE_APPROVAL_REQUIRED").help(APPROVAL_TOGETHER),
+                Rule::requires("approval-at", &["approver", "approval-role", "signature-file"]).code("EVIDENCE_APPROVAL_REQUIRED").help(APPROVAL_TOGETHER),
             ],
         ),
         (
             "evidence audit",
             &[
-                Rule::requires("report-case", &["report"]).code("EVIDENCE_INVALID_ARGUMENT").help("--report-case names a case of a --report."),
-                Rule::requires("command-result", &["summary"]).code("EVIDENCE_INVALID_ARGUMENT").help("The captured output backs a --summary."),
+                Rule::requires("report-case", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--report-case names a case of a --report."),
+                Rule::requires("command-result", &["summary"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("The captured output backs a --summary."),
             ],
         ),
-        ("evidence approval-payload", &[Rule::at_least_one(&["task", "scenario"]).code("EVIDENCE_REFUSED").help("An approval is for a task or a scenario.")]),
+        ("evidence approval-payload", &[Rule::at_least_one(&["task", "scenario"]).code("EVIDENCE_REQUIRED").help("An approval is for a task or a scenario.")]),
         (
             "finding add",
             &[
@@ -138,13 +138,13 @@ pub(crate) static TABLES: Tables = Tables {
                 },
                 Validator {
                     arguments: &["class"],
-                    code: "EVIDENCE_INVALID_ARGUMENT",
+                    code: "EVIDENCE_ARGUMENT_INVALID",
                     description: "`--class audit` is refused: an external evaluator's re-audit is `canon evidence audit`.",
                     rejects: &["canon evidence add --scenario auth.login.01 --class audit --ref \"npm test\" --role implementer"],
                 },
                 Validator {
                     arguments: &["artifact", "scenario", "all-scenarios"],
-                    code: "EVIDENCE_INVALID_ARGUMENT",
+                    code: "EVIDENCE_ARGUMENT_CONFLICT",
                     description: "An `--artifact` binds to one record. Without `--all-scenarios` a scoped `--artifact <scenario-id>=<path>` must name the record's own `--scenario`; with `--all-scenarios` every `--artifact` must be scoped (a bare path would bind to every record of the batch). The part before the first `=` is a scope only when it is shaped like a scenario id.",
                     rejects: &[
                         "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --artifact auth.login.02=shot.png",
@@ -157,7 +157,7 @@ pub(crate) static TABLES: Tables = Tables {
             "evidence audit",
             &[Validator {
                 arguments: &["artifact", "scenario"],
-                code: "EVIDENCE_INVALID_ARGUMENT",
+                code: "EVIDENCE_ARGUMENT_CONFLICT",
                 description: "An `--artifact` binds to one record: a scoped `--artifact <scenario-id>=<path>` must name the audited scenario. The part before the first `=` is a scope only when it is shaped like a scenario id.",
                 rejects: &["canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --artifact auth.login.02=shot.png"],
             }],
@@ -212,18 +212,18 @@ pub(crate) static TABLES: Tables = Tables {
     ],
     domains: &[
         // evidence add / audit: the checks run_add makes on the strings it records.
-        DomainRow::new(Scope::Arguments(&["evidence add"], "class"), Domain::matching(NOT_BLANK), "EVIDENCE_INVALID_ARGUMENT").inside(&["test-run", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "ref"), Domain::matching(NOT_BLANK), "EVIDENCE_INVALID_ARGUMENT").inside(&["npm test", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "summary"), Domain::matching(ONE_LINE), "EVIDENCE_INVALID_ARGUMENT").inside(&["Tests pass", ""]).outside(&["a\nb", "a\rb", "a\u{2028}b", "a\u{85}b"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "actor"), Domain::matching(ONE_LINE), "EVIDENCE_INVALID_ARGUMENT").inside(&["alice", ""]).outside(&["a\nb", "a\u{b}b", "a\u{2029}b"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "override-reason"), Domain::matching(ONE_LINE_NOT_BLANK), "EVIDENCE_INVALID_ARGUMENT").inside(&["the human is away", " a "]).outside(&["", " ", "a\nb"]),
-        DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_INVALID_ARGUMENT").inside(&["eval-1", "a b"]).outside(&["", " a", "a ", "a\nb"]),
-        DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-version"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_INVALID_ARGUMENT").inside(&["2.1", "a b"]).outside(&["", " 1", "1 ", "1\n2"]),
-        DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-digest"), Domain::matching(SHA256_HEX), "EVIDENCE_INVALID_ARGUMENT")
+        DomainRow::new(Scope::Arguments(&["evidence add"], "class"), Domain::matching(NOT_BLANK), "EVIDENCE_ARGUMENT_INVALID").inside(&["test-run", " a "]).outside(&["", " ", "\t"]),
+        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "ref"), Domain::matching(NOT_BLANK), "EVIDENCE_ARGUMENT_INVALID").inside(&["npm test", " a "]).outside(&["", " ", "\t"]),
+        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "summary"), Domain::matching(ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["Tests pass", ""]).outside(&["a\nb", "a\rb", "a\u{2028}b", "a\u{85}b"]),
+        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "actor"), Domain::matching(ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["alice", ""]).outside(&["a\nb", "a\u{b}b", "a\u{2029}b"]),
+        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "override-reason"), Domain::matching(ONE_LINE_NOT_BLANK), "EVIDENCE_ARGUMENT_INVALID").inside(&["the human is away", " a "]).outside(&["", " ", "a\nb"]),
+        DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["eval-1", "a b"]).outside(&["", " a", "a ", "a\nb"]),
+        DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-version"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["2.1", "a b"]).outside(&["", " 1", "1 ", "1\n2"]),
+        DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-digest"), Domain::matching(SHA256_HEX), "EVIDENCE_ARGUMENT_INVALID")
             .inside(&["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"])
             .outside(&["", "0123456789abcdef", "0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"]),
         DomainRow::new(Scope::Arguments(&["evidence add"], "approver"), Domain::matching(APPROVER), "EVIDENCE_APPROVAL_INVALID").reason("MALFORMED").inside(&["alice", "a b", "a\u{2028}b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
-        DomainRow::new(Scope::Arguments(&["evidence approval-payload"], "approver"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_REFUSED").inside(&["alice", "a b"]).outside(&["", " a", "a ", "a\nb", "a\u{2028}b"]),
+        DomainRow::new(Scope::Arguments(&["evidence approval-payload"], "approver"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["alice", "a b"]).outside(&["", " a", "a ", "a\nb", "a\u{2028}b"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence approval-payload"], "surface-ref"), Domain::matching(SURFACE_REF), "USAGE").inside(&["src/lib.rs", "effect:payments", "a b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "report"), Domain::matching(REPORT), "USAGE").inside(&["junit:r.xml", "cucumber:r.json", "swift-testing:e.jsonl", "junit:a:b"]).outside(&["r.xml", "junit:", "mocha:r.xml", ":r.xml", "JUnit:r.xml"]),
         // review: the runtime labels clap's value parser reads.
@@ -233,7 +233,7 @@ pub(crate) static TABLES: Tables = Tables {
         // divergence accept.
         DomainRow::new(Scope::Arguments(&["divergence accept"], "reason"), Domain::matching(NOT_BLANK), "DIVERGENCE_ARGUMENT_INVALID").inside(&["the engine drops the event", " a "]).outside(&["", " ", "\t"]),
         DomainRow::new(Scope::Arguments(&["divergence accept"], "tracking"), Domain::matching(NOT_BLANK), "DIVERGENCE_ARGUMENT_INVALID").says("is empty: a blank tracking reference names no issue").inside(&["https://example.com/issues/1", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "role"), Domain::matching("^reviewer$"), "DIVERGENCE_ACCEPT_REFUSED").says("must name the reviewer step: only a reviewer step accepts a divergence").inside(&["reviewer"]).outside(&["implementer", "planner"]),
+        DomainRow::new(Scope::Arguments(&["divergence accept"], "role"), Domain::matching("^reviewer$"), "DIVERGENCE_DENIED").reason("NOT_REVIEWER").says("must name the reviewer step: only a reviewer step accepts a divergence").inside(&["reviewer"]).outside(&["implementer", "planner"]),
         // finding add / close.
         DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "round"), Domain::at_least(1), "FINDING_ARGUMENT_INVALID"),
         DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "seq"), Domain::at_least(1), "FINDING_ARGUMENT_INVALID"),

@@ -229,7 +229,7 @@ Feature: ATIP L0 output contract
   Scenario: A target that cannot be written refuses with exit 2 before anything changes and a failure after the first write is exit 1
     Given a directory that cannot be written, and a store that fails after its first write
     When a command writes into the first, and a write fails after the first record in the second
-    Then the first exits 2 with WRITE_UNAVAILABLE and changes nothing, and the second exits 1 with WRITE_FAILED
+    Then the first exits 2 with WRITE_DENIED (WRITE_INVALID when its directory is missing) and changes nothing, and the second exits 1 with WRITE_FAILED
 
   # canon: {"schema":1,"at":"2026-10-31T11:36:24Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract
@@ -300,3 +300,13 @@ Feature: ATIP L0 output contract
     Given the failures of every code path the tests drive: usage, unknown command, input, cursor, refusals and a panic
     When each error object is validated against the vendored error schema
     Then every one passes, and none has an empty or null member
+
+  # canon: {"schema":1,"at":"2026-11-04T18:27:09Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-33-atip-l0.F2
+  @atip.l0.32
+  Scenario: An envelope or error with a null or empty optional member fails the contract schema
+    Given a status answer and a failure answer that pass the contract's envelope schema
+    When a member with no value is planted in each: an empty warnings, fields, expected, suggestions or details list, a null or empty hint or field, a null command, output, page, coverage, reason or context value, and a null meta
+    Then the envelope schema and the error schema refuse each one, and the unchanged answers pass

@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-audit",
+    "role": "reviewer",
+    "session_id": "s-0-36-audit-rev"
+  },
+  "at": "2026-11-04T18:21:49.714111Z",
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "kind": "review",
+  "pin": "4b1732a54c54fc3b84f257210a1c362255dd004f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:a_repo_without_a_policy_gets_no_approval_advisory",
+          "junit:approve_records_the_policy_digest_the_approver_the_time_and_the_note",
+          "junit:approve_refuses_a_repo_with_no_policy",
+          "junit:approve_refuses_an_empty_approver",
+          "junit:gate_check_and_status_advise_until_the_current_policy_is_approved",
+          "junit:the_approval_file_is_never_ignored"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0cf833870678480b6c292d4c6ebe8973577bc59d0009873ea0bd4c88dd05363d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-evidence-audit/brief.md"
+  },
+  "review_id": "01M6KWQF8JFGEJF9N4QV3YHQ4J",
+  "reviewer": "rev-0-36-audit",
+  "scenario_id": "context.status.40",
+  "schema": 2,
+  "worktree_dirty": false
+}

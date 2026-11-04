@@ -1,0 +1,206 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:47:55.469439Z",
+  "attachments": [
+    {
+      "case": "atip_l0_24_a_directory_that_cannot_be_written_refuses_with_exit_2_and_changes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_a_write_that_fails_after_the_first_record_is_exit_1_write_failed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_change_new_refuses_a_read_only_change_store_before_creating_the_change",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_ingest_records_into_a_read_only_trajectory_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_dispatch_begin_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_export_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_divergence_resolve_and_defer_into_a_read_only_ledger_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_plugin_sync_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_dispatch_end_into_a_read_only_manifest_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_artifacts_store_into_a_read_only_blob_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_ingest_plans_into_a_read_only_change_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_context_pack_add_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_gate_promote_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_inventory_sync_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_ledger_compact_refuses_a_read_only_ledger_before_moving_a_version",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_tier_age_and_purge_refuse_a_read_only_store_before_moving_or_removing_a_record",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_subject_adopt_and_unadopt_into_a_read_only_ledger_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_report_snapshot_into_a_read_only_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_report_build_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_skills_install_into_a_read_only_repo_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_prompt_add_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_subject_new_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_subject_move_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "strategy::atip_l0_24_strategy_promote_into_a_read_only_strategy_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "strategy::atip_l0_24_strategy_rollback_into_a_read_only_strategy_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    },
+    {
+      "case": "atip_l0_24_ingest_sessions_into_a_read_only_hot_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    }
+  ],
+  "code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "9f601a4ffd4bedd1d3b0587f43a49308b22bc66d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 664,
+  "scenario_id": "atip.l0.24",
+  "schema": 1,
+  "staging_id": "07879bbf",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

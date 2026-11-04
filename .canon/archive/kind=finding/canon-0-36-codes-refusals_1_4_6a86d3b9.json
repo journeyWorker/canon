@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:03:54.909128Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=report/dashboard.feature",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4983b3208c9177bded50efe00dc90220c03fe49f",
+  "reviewer": "rev-0-36-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] Two rewritten scenarios say what the bound test and the binary contradict. report.dashboard.14 now says the 409 BRIEF_PAGE_STALE carries 'an error.details entry for the edited brief'; its test asserts `doc[\"error\"].get(\"details\").is_none()` ('one stale brief is the refusal itself, with no per-id entries'), which is the right behaviour (details is for several causes). Fix the scenario: one refused id answers its own code with no details. skills.install.55 now says each refusal is 'CONFIG_INVALID with the reason SKILLS, or SKILLS_ARGUMENT_INVALID for an unknown provider', but its Given is a canon.yaml that names the unknown provider and the commands run with no --providers: that is CONFIG_INVALID/SKILLS (the test asserts CONFIG_INVALID; I ran it: `skills.providers names bogus` is CONFIG_INVALID reason SKILLS). SKILLS_ARGUMENT_INVALID is the --providers flag; the test only asserts exit 2 for `--providers gemini`. Say which input gives which code and assert the code and the reason SKILLS in the test. Both scenarios are left unsigned.",
+  "worktree_dirty": false
+}

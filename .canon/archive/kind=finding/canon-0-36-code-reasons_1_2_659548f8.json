@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T13:49:25.383569Z",
+  "change_id": "canon-0-36-code-reasons",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/gate.rs:511-517",
+  "introduced_by": "b524c40a4efbb63df3f3e515e987872918912612",
+  "kind": "finding",
+  "reviewed_sha": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "reviewer": "rev-0-36-reasons",
+  "round": 1,
+  "scenario_ids": [
+    "atip.reasons.12",
+    "atip.reasons.11"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[correctness] An EIO of canon.yaml is still the wrong code for two commands that read the plan corpus. The change made plans::configured_plan_sources return PlansError::Config (cannot read canon.yaml ... os error 5) instead of 'no plans', and mapped it to PLAN_CORPUS_UNAVAILABLE for dispatch begin --task and evidence add/approval-payload --task only. Real binary, CANON_TEST_EIO='*/canon.yaml': (a) task done c#1 answers TASK_NOT_FOUND exit 2 not retryable (gate.rs run_task maps every locate_task error to TASK_NOT_FOUND; the message says Input/output error) although canon schema 'task done' lists PLAN_CORPUS_UNAVAILABLE; (b) ingest plans answers INGEST_FAILED exit 1 (run/ingest.rs _ arm), a read that failed before anything was persisted, so brief/1.3 says exit 2 with the subject's UNAVAILABLE code. A caller that gets TASK_NOT_FOUND does not retry. The CHANGELOG row says 'and the commands that read the plan corpus', which is not true for these two, and atip.reasons.12 says every call site that reads answers its subject's UNAVAILABLE. Fix: decide the code from the cause of the Config text (read_cause::plan_corpus_code_of_text / of_text) in run_task and in the ingest arm (or make locate_task/PlansError carry the io cause), add both commands to the EIO test (and to the CALL_SITES table if the scan cannot follow), keep TASK_NOT_FOUND for a task that is really absent, and make the CHANGELOG row name exactly the commands that do.",
+  "worktree_dirty": false
+}

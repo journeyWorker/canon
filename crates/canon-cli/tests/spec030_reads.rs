@@ -244,10 +244,10 @@ fn learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_ma
     };
     let unreadable = rollback(&id, "missing.sig", "2030-01-01T00:00:00Z");
     assert_eq!(unreadable.status.code(), Some(2));
-    assert_eq!(error_code(&unreadable), "LEARN_SIGNATURE_UNREADABLE");
+    assert_eq!(error_code(&unreadable), "STRATEGY_SIGNATURE_NOT_FOUND");
     let bad_signature = rollback(&id, "bad.sig", "2030-01-01T00:00:00Z");
-    assert_eq!(bad_signature.status.code(), Some(1));
-    assert_eq!(error_code(&bad_signature), "LEARN_ROLLBACK_FAILED");
+    assert_eq!(bad_signature.status.code(), Some(2));
+    assert_eq!(error_code(&bad_signature), "STRATEGY_SIGNATURE_INVALID");
     let message = json(&bad_signature)["error"]["message"].as_str().unwrap().to_string();
     assert!(message.contains("ssh signature verification failed"), "{message}");
     let bad_time = rollback(&id, "bad.sig", "yesterday");
@@ -285,7 +285,7 @@ fn context_capability_45_brief_show_of_a_change_with_no_brief_or_in_a_repo_with_
     let repo = repo_with_subject();
     let none = canon(repo.path(), &["brief", "show", "--json"]);
     assert_eq!(none.status.code(), Some(2));
-    assert_eq!(error_code(&none), "NO_BRIEF");
+    assert_eq!(error_code(&none), "BRIEF_REQUIRED");
 
     assert!(canon(repo.path(), &["change", "new", "a", "--subject", "demo", "--title", "A"]).status.success());
     assert!(canon(repo.path(), &["change", "new", "b", "--subject", "demo", "--title", "B"]).status.success());
@@ -352,6 +352,105 @@ fn report_generation_14_snapshot_without_an_output_directory_is_refused_with_exi
     assert_eq!(tree(repo.path()), before, "a refused snapshot writes nothing");
 }
 
+/// atip.codestored.02 (the detached signature of a strategy rollback): a signature file the system refuses is `STRATEGY_SIGNATURE_DENIED`, a path
+/// that is no file (a directory) or bytes that are not UTF-8 text are `STRATEGY_SIGNATURE_INVALID`, a path that is not there is
+/// `STRATEGY_SIGNATURE_NOT_FOUND`; each exits 2, is not retryable and writes nothing (a test run as root, which ignores file modes, skips the
+/// refused read and says so).
+#[test]
+fn atip_codestored_02_a_detached_signature_that_cannot_be_read_is_denied_invalid_or_not_found_by_its_cause() {
+    use std::os::unix::fs::PermissionsExt;
+    let signing = Signing::new();
+    let repo = signing.repo.path();
+    let (candidate, _) = candidate_and_evaluation(repo);
+    let id = candidate.id.to_string();
+    let files = tempfile::TempDir::new().unwrap();
+    let (directory, not_utf8, closed) = (files.path().join("a-directory"), files.path().join("not-utf8.sig"), files.path().join("closed.sig"));
+    fs::create_dir(&directory).unwrap();
+    fs::write(&not_utf8, [0xff, 0xfe, 0x00, 0x41]).unwrap();
+    fs::write(&closed, "x").unwrap();
+    let before = tree(repo);
+    let rollback = |signature: &Path| {
+        let out = canon(repo, &["strategy", "rollback", &id, "--reason", "regressed", "--actor", "alice", "--signature-file", signature.to_str().unwrap(), "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+        assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
+        assert_eq!(json(&out)["error"]["retryable"], false);
+        assert!(json(&out).get("data").is_none(), "a refusal carries no data");
+        error_code(&out)
+    };
+    assert_eq!(rollback(&files.path().join("missing.sig")), "STRATEGY_SIGNATURE_NOT_FOUND");
+    assert_eq!(rollback(&directory), "STRATEGY_SIGNATURE_INVALID");
+    assert_eq!(rollback(&not_utf8), "STRATEGY_SIGNATURE_INVALID");
+    fs::set_permissions(&closed, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&closed).is_err() {
+        assert_eq!(rollback(&closed), "STRATEGY_SIGNATURE_DENIED");
+    } else {
+        eprintln!("skipped: this process can read a file whose mode is 000 (running as root?), so a refused read cannot be shown");
+    }
+    fs::set_permissions(&closed, fs::Permissions::from_mode(0o644)).unwrap();
+    assert_eq!(tree(repo), before, "a refused rollback writes nothing");
+}
+
+/// atip.codesplit.06: a `strategy rollback` the signature check turns away says which condition failed, each exit 2 with nothing recorded: a blank
+/// `--reason` is `STRATEGY_ARGUMENT_INVALID` (field `--reason`), a policy with no `approval.allowed_signers` is `STRATEGY_VERIFIER_REQUIRED`, a policy that does
+/// not parse or an allowed-signers file that is not there is `CONFIG_INVALID` with the reason `POLICY`, one this user may not read is `CONFIG_DENIED`, an
+/// actor the file does not list is `STRATEGY_SIGNER_DENIED`, an empty signature file is `STRATEGY_SIGNATURE_REQUIRED`, and only a signature that does not verify
+/// is `STRATEGY_SIGNATURE_INVALID` (the mapping of the operating-system errors that a repeat can pass is the unit test of `learn.rs`).
+#[test]
+fn atip_codesplit_06_a_rollback_the_signature_check_turns_away_says_which_condition_failed() {
+    use std::os::unix::fs::PermissionsExt;
+    let signing = Signing::new();
+    let repo = signing.repo.path();
+    let (candidate, _) = candidate_and_evaluation(repo);
+    let id = candidate.id.to_string();
+    fs::write(repo.join("bad.sig"), "not a signature\n").unwrap();
+    fs::write(repo.join("empty.sig"), "").unwrap();
+    let before = tree(repo);
+    let rollback = |reason: &str, actor: &str, signature: &str| {
+        canon(repo, &["strategy", "rollback", &id, "--reason", reason, "--actor", actor, "--signature-file", signature, "--approval-at", "2030-01-01T00:00:00Z", "--json"])
+    };
+    let refused = |out: Output, code: &str, reason: Option<&str>| -> Value {
+        let doc = json(&out);
+        assert_eq!(out.status.code(), Some(2), "{doc}");
+        assert_eq!((doc["error"]["code"].as_str(), doc["error"]["reason"].as_str(), doc["error"]["retryable"].as_bool()), (Some(code), reason, Some(false)), "{doc}");
+        assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
+        doc
+    };
+
+    // A blank reason is the caller's value, named by its field.
+    let blank = refused(rollback("  ", "alice", "bad.sig"), "STRATEGY_ARGUMENT_INVALID", None);
+    assert_eq!(blank["error"]["field"], "--reason", "{blank}");
+    // An actor the allowed-signers file does not list, and a signature file with nothing in it.
+    refused(rollback("regressed", "bob", "bad.sig"), "STRATEGY_SIGNER_DENIED", None);
+    refused(rollback("regressed", "alice", "empty.sig"), "STRATEGY_SIGNATURE_REQUIRED", None);
+    // A signature that is there and does not verify is the one INVALID.
+    refused(rollback("regressed", "alice", "bad.sig"), "STRATEGY_SIGNATURE_INVALID", None);
+
+    // The allowed-signers file this user may not read, and one that is not there.
+    let allowed = repo.join(".canon/allowed_signers");
+    let signers = fs::read(&allowed).unwrap();
+    fs::set_permissions(&allowed, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&allowed).is_err() {
+        refused(rollback("regressed", "alice", "bad.sig"), "CONFIG_DENIED", None);
+    } else {
+        eprintln!("skipped: this process can read a file whose mode is 000 (running as root?), so a refused read cannot be shown");
+    }
+    fs::set_permissions(&allowed, fs::Permissions::from_mode(0o644)).unwrap();
+    fs::remove_file(&allowed).unwrap();
+    refused(rollback("regressed", "alice", "bad.sig"), "CONFIG_INVALID", Some("POLICY"));
+    fs::write(&allowed, &signers).unwrap();
+
+    // A policy that does not parse, and one that names no verifier.
+    let policy = repo.join(".canon/policy.yaml");
+    let policy_text = fs::read_to_string(&policy).unwrap();
+    fs::write(&policy, "approval: [x\n").unwrap();
+    refused(rollback("regressed", "alice", "bad.sig"), "CONFIG_INVALID", Some("POLICY"));
+    fs::write(&policy, "{}\n").unwrap();
+    let required = refused(rollback("regressed", "alice", "bad.sig"), "STRATEGY_VERIFIER_REQUIRED", None);
+    assert!(required["error"]["hint"].as_str().unwrap().contains("allowed_signers"), "{required}");
+    fs::write(&policy, policy_text).unwrap();
+
+    assert_eq!(tree(repo), before, "a refused rollback writes nothing");
+}
+
 #[test]
 fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_signature_is_read_and_writes_nothing() {
     let signing = Signing::new();
@@ -366,7 +465,7 @@ fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_si
         assert!(json(&out)["error"]["message"].as_str().unwrap().contains(UNKNOWN_STRATEGY));
     }
     let existing = canon(repo, &["strategy", "rollback", &candidate.id.to_string(), "--reason", "regressed", "--actor", "alice", "--signature-file", "bad.sig", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
-    assert_eq!(existing.status.code(), Some(1));
-    assert_eq!(error_code(&existing), "LEARN_ROLLBACK_FAILED");
+    assert_eq!(existing.status.code(), Some(2));
+    assert_eq!(error_code(&existing), "STRATEGY_SIGNATURE_INVALID");
     assert_eq!(tree(repo), before, "a refused rollback writes nothing");
 }

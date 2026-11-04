@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:25:41.085026Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/cli_error.rs:331",
+  "introduced_by": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "kind": "finding",
+  "reason": "re-reviewed at 73e2b1a0",
+  "resolution_code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "resolution_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.07"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[standards] The artifacts move code differs from the approved brief and the approval is not on the record. Brief F4 and the F6 table name `ARTIFACTS_MOVE_INCOMPLETE` (retryable no) beside `ARTIFACTS_STORE_INCOMPLETE` (retryable yes) precisely to split the two commands that shared ARTIFACTS_STORE_FAILED; the code, registry, schema, fixture, tests, audit and CHANGELOG say `ARTIFACTS_INCOMPLETE` ('the owner's one code per subject for the move', tests/atip_incomplete.rs AUDIT) and I found that decision in no brief, issue comment or ledger record. The result is two _INCOMPLETE codes under the ARTIFACTS prefix with opposite retryability, which is the shape the one-per-subject rule exists to avoid, and the name no longer says which command it is. The briefs are immutable, so either the code is renamed to ARTIFACTS_MOVE_INCOMPLETE (rename in cli_error.rs, schema_codes.rs, canon.cli.json, the fixture, codestored.feature, CHANGELOG, tests; ARTIFACTS_MOVE_REFUSED is already gone so MOVE is free) or the owner's decision is recorded where the next reviewer can read it. atip.codestored.07 spells the name, so I did not re-sign it.",
+  "worktree_dirty": false
+}

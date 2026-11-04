@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T07:25:30.992992Z",
+  "change_id": "canon-0-36-codes-stored",
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "disposition": "open",
+  "introduced_by": "ae941277f52c0177c640f51c0aa3f5b28545b085",
+  "kind": "finding",
+  "reviewed_sha": "4ea21af84a4cad334690b6662e01ba946daace8b",
+  "reviewer": "rev-0-36-stored",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.05"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[standards] LEDGER_CORRUPT is registered, listed on 12 commands' error lists and promised by the brief (F2: a broken ledger record) and by atip.codestored.05, but no real call can answer it, and the scenario says so ('proved by the classification test'). I corrupted ledger records six ways (truncated JSON, wrong shape, empty file, a directory in place, a misfiled record, a junk file in `_staging`) in the subject, change, scenario and evidence kinds and ran about 25 commands (subject show/new/move, change new, gate check/promote, status, inventory sync, export, query, task done, ...): every reader skips the record and `status` warns LEDGER_RECORDS_UNREADABLE; none answers LEDGER_CORRUPT. The only evidence is the unit test of `repo_error`, which feeds it a string that starts with `json: `. The classification itself is a prefix match on a Display text (`json: `, `yaml: `, `layout violation: `, `parquet/arrow: `, also `: json: ` anywhere), so a StoreError built from a value the caller gave (a bad key in a staged record) would be filed as LEDGER_CORRUPT. Fix: either reach it where a strict reader exists (name it in the scenario with a real call) or drop the code and its 12 attributions until a reader refuses a bad record; if kept, match on the StoreError variant, not on text. The scenario's last clause cannot be signed as written.",
+  "worktree_dirty": false
+}

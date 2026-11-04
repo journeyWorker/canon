@@ -216,7 +216,7 @@ fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, Sto
             }
         }
     }
-    let bytes = std::fs::read(&candidate.absolute)?;
+    let bytes = crate::eio::read(&candidate.absolute)?;
     let loaded = validate_file(kind, &candidate.relative, &bytes).map(Arc::new);
     if let Some(stamp) = candidate.stamp {
         FILE_MEMO.lock().expect("file memo lock poisoned").insert(key, (stamp, loaded.clone()));
@@ -369,7 +369,7 @@ impl GitTier {
         if std::fs::symlink_metadata(&absolute)?.file_type().is_symlink() {
             return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", relative.display())));
         }
-        let bytes = std::fs::read(&absolute)?;
+        let bytes = crate::eio::read(&absolute)?;
         Ok(validate_file(kind, relative, &bytes))
     }
 
@@ -409,7 +409,7 @@ impl GitTier {
     /// an s15-era consumer.
     pub fn scan_corpus(&self) -> Result<CorpusScanResult, StoreError> {
         let mut result = CorpusScanResult::default();
-        let entries = match std::fs::read_dir(&self.root) {
+        let entries = match crate::eio::read_dir(&self.root) {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(result),
             Err(e) => return Err(e.into()),
@@ -698,7 +698,7 @@ impl GitTier {
     pub(crate) fn scan_dir(&self, kind: RecordKind, dir: &Path, belongs: &dyn Fn(&str) -> bool) -> Result<ScanResult, StoreError> {
         let mut records = Vec::new();
         let mut violations = Vec::new();
-        let entries = match std::fs::read_dir(self.absolute(dir)) {
+        let entries = match crate::eio::read_dir(self.absolute(dir)) {
             Ok(entries) => entries,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok((records, violations)),
             Err(err) => return Err(err.into()),
@@ -716,7 +716,7 @@ impl GitTier {
         names.sort();
         for name in names {
             let relative = dir.join(name);
-            let bytes = std::fs::read(self.absolute(&relative))?;
+            let bytes = crate::eio::read(self.absolute(&relative))?;
             match validate_file(kind, &relative, &bytes) {
                 Ok(raw) => records.push((relative, raw)),
                 Err(violation) => violations.push(violation),

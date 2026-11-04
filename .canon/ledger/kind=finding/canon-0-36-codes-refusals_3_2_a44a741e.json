@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-4"
+  },
+  "at": "2026-11-04T20:16:35.183866Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "disposition": "fixed",
+  "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "finding",
+  "resolution_code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "resolution_sha": "2fb67c4fa49964b3cc86f280c183345970d4ad0d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 3,
+  "scenario_ids": [
+    "atip.codesplit.10"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec-fidelity] EVIDENCE_INVALID and EVIDENCE_CONFLICT of the brief's table (lines 109, 125) are not missing behaviour; the brief was overtaken by reviewed decisions. Old EVIDENCE_REFUSED had three call sites (git show c0e7c7b89^: arg_rules/evidence.rs:53 at-least-one task/scenario, evidence.rs:226 approver domain, evidence.rs:827 and :1110 ArgRefusal conversions): none refuses a record for contradicting stored evidence (CONFLICT) and the only generic one was removed as a catch-all by finding canon-0-36-codes-refusals 1.1 (fixed; CHANGELOG lines 277-280: a missing task is TASK_NOT_FOUND, a bad --surface-ref EVIDENCE_ARGUMENT_INVALID, git failure REPO_INVALID/DENIED/UNAVAILABLE). Shipped row (CHANGELOG line 72) EVIDENCE_REQUIRED, EVIDENCE_ARGUMENT_INVALID, TASK_NOT_FOUND, REPO_INVALID matches what canon emits, and line 225 already states that EVIDENCE_CONFLICT is not registered because no call site needs it; codestored/codesplit tests assert code_info(EVIDENCE_INVALID) is none. Registering either code now would add a code no call site can emit. Action: planner should fix the brief table; no code or CHANGELOG change. Blast radius: none for callers; a future evidence rule that rejects a record for contradicting stored evidence must register EVIDENCE_CONFLICT with it.",
+  "worktree_dirty": false
+}

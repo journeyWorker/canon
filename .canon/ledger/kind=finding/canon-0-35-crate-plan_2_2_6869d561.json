@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-4"
+  },
+  "at": "2026-11-04T20:16:34.502984Z",
+  "change_id": "canon-0-35-crate-plan",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "disposition": "fixed",
+  "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "finding",
+  "resolution_code_tree": "60e72b3a26b60e8d5889a3148613d94a6218d1e4",
+  "resolution_sha": "bafd9bcce1bf3ce02726fb13b529394934535bb0",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 2,
+  "scenario_ids": [
+    "atip.planjcs.11"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The retag atip.planjcs.11 -> canon-0-35-crate-plan.F1 is nominal. F1 is the digest of a Plan (sha256: + JCS of {effects,inputs}; failure path: a number outside the safe integers or a float is an error). atip.planjcs.11 proves that a 0.34-form digest (64 hex, no prefix) is PLAN_STALE on the six commands, which is the failure path of brief F3 (and atip.planjcs.02 already carries F3 for it). canon cannot observe F1's failure path at all: none of the six destructive commands takes an integer argument (checked canon purge/tier age help; every plan argument is text), so that path is crate-only, as atip-dep ruled. Fix: drop crate-plan.F1 from atip.planjcs.11 (tag crate-plan.F3 if a second F3 failure is wanted) and leave F1's failure path to the crate's own tests. I did not sign atip.planjcs.11; its own test passes. Blast radius: the brief check would count F1 as having a failure scenario that is really F3's.",
+  "worktree_dirty": false
+}

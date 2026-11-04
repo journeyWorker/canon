@@ -182,7 +182,7 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
 
     let refused = run_promote(dir.path(), &id, &["--json"]);
     assert_eq!(refused.status.code(), Some(1), "direct promotion without approval must be refused");
-    assert!(error_code(&refused).starts_with("LEARN_PROMOTION"), "the refusal carries a promotion error code: {}", error_code(&refused));
+    assert!(error_code(&refused).starts_with("STRATEGY_PROMOTION"), "the refusal carries a promotion error code: {}", error_code(&refused));
     assert!(!written_at.exists(), "refused direct promotion must not write the git-tier file");
 
     let (evaluation_path, approval_path, evaluation, approval) = write_approved_bundle(dir.path(), &candidate, &private_key);
@@ -333,7 +333,7 @@ fn the_per_role_promotion_config_in_canon_yaml_drives_the_gate() {
 
     let output = run_promote(dir.path(), &id, &["--json"]);
     assert!(!output.status.success(), "direct promotion must still require approval");
-    assert!(error_code(&output).starts_with("LEARN_PROMOTION"), "{}", error_code(&output));
+    assert!(error_code(&output).starts_with("STRATEGY_PROMOTION"), "{}", error_code(&output));
     assert!(
         !git_tier_file(dir.path(), &id).exists(),
         "configured statistical gate must not bypass activation approval"
@@ -405,4 +405,118 @@ fn approval_payload_is_deterministic_and_enveloped_with_json() {
     assert_eq!(data["approvalAt"], "2030-01-01T00:00:00Z", "{body}");
     assert_eq!(data["subject"], format!("strategy:{id}"), "{body}");
     assert!(data["instructions"].as_str().is_some_and(|text| !text.is_empty()), "{body}");
+}
+
+/// atip.incomplete.02: a contradicting trajectory demotes an active strategy and the promotion gate then blocks the promotion: the run did work and
+/// stopped, so it is `STRATEGY_INCOMPLETE` (exit 1, not retryable, reason `STRATEGY_PROMOTION_INVALID`), the strategy stays demoted, and `meta.next`
+/// leads with the read of what was done (a preview of the same strategy, never the repeat of the promotion). The same block with nothing demoted
+/// is the refusal `STRATEGY_PROMOTION_INVALID` (exit 2), and the strategy is as it was.
+#[test]
+fn atip_incomplete_02_a_blocked_promotion_after_the_demotion_is_strategy_incomplete_and_one_with_no_demotion_is_a_refusal(
+) {
+    let dir = tempfile::tempdir().unwrap();
+    let learn = dir.path().join(".canon").join("learn");
+    let store = ParquetStrategyStore::open(learn.join("strategies"));
+    let id = StrategyId::new();
+    let item = StrategyItem::new(StrategyItemFields {
+        id,
+        regime_key: fixture_regime(),
+        role: dev_role(),
+        title: "review guidance".into(),
+        description: "one-liner".into(),
+        content: "demotable".into(),
+        source_trajectory_ids: vec![TrajectoryId::new()],
+        recorded_at: Utc::now(),
+    })
+    .with_lifecycle(StrategyLifecycle::Active);
+    store.append(&item).expect("seed active strategy");
+    seed_proven_regime(dir.path());
+    let trajectories = ParquetTrajectoryStore::open(learn.join("trajectories"));
+    append_trajectory(&trajectories, Utc::now(), VerdictOutcome::Failure);
+    // The strategy's git-tier file, as a promotion writes it, so the demotion can flag it.
+    canon_learn::promote_strategy(&store, &id, &dir.path().join(".canon").join("strategies"))
+        .expect("the active strategy's file");
+    let file = git_tier_file(dir.path(), &id);
+    assert!(std::fs::read_to_string(&file)
+        .unwrap()
+        .contains("status: active"));
+
+    let output = run_promote(dir.path(), &id, &["--json"]);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let body: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("one JSON document");
+    let error = &body["error"];
+    assert_eq!(
+        (
+            error["code"].as_str(),
+            error["reason"].as_str(),
+            error["retryable"].as_bool()
+        ),
+        (
+            Some("STRATEGY_INCOMPLETE"),
+            Some("STRATEGY_PROMOTION_INVALID"),
+            Some(false)
+        ),
+        "{body}"
+    );
+    assert!(
+        body["data"].is_null() || body.get("data").is_none(),
+        "{body}"
+    );
+    let first = &body["meta"]["next"][0];
+    assert!(
+        first["command"].as_str().is_some_and(
+            |command| command.contains("strategy promote") && command.contains("--dry-run")
+        ),
+        "the first step reads what was done: {body}"
+    );
+    assert!(
+        std::fs::read_to_string(&file)
+            .unwrap()
+            .contains("status: demoted"),
+        "the strategy stays demoted"
+    );
+
+    // Nothing to demote (no contradicting trajectory) and the gate still blocks: a refusal that wrote nothing.
+    let other = tempfile::tempdir().unwrap();
+    let other_store =
+        ParquetStrategyStore::open(other.path().join(".canon").join("learn").join("strategies"));
+    let other_id = StrategyId::new();
+    let other_item = StrategyItem::new(StrategyItemFields {
+        id: other_id,
+        regime_key: fixture_regime(),
+        role: dev_role(),
+        title: "review guidance".into(),
+        description: "one-liner".into(),
+        content: "blocked".into(),
+        source_trajectory_ids: vec![TrajectoryId::new()],
+        recorded_at: Utc::now(),
+    })
+    .with_lifecycle(StrategyLifecycle::Active);
+    other_store
+        .append(&other_item)
+        .expect("seed active strategy");
+    let refused = run_promote(other.path(), &other_id, &["--json"]);
+    assert_eq!(
+        refused.status.code(),
+        Some(2),
+        "{}",
+        String::from_utf8_lossy(&refused.stdout)
+    );
+    let refused_body: serde_json::Value =
+        serde_json::from_slice(&refused.stdout).expect("one JSON document");
+    assert_eq!(
+        refused_body["error"]["code"], "STRATEGY_PROMOTION_INVALID",
+        "{refused_body}"
+    );
+    assert!(refused_body.get("data").is_none(), "{refused_body}");
+    assert!(
+        !git_tier_file(other.path(), &other_id).exists(),
+        "nothing was written"
+    );
 }

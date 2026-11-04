@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:26.135682Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/schema_codes.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "401ecbcad1607f3d3352b54c9f12e88a52b63fe1",
+  "reviewer": "rev-0-36-refusals",
+  "round": 2,
+  "scenario_ids": [
+    "atip.codesplit.01"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] `canon schema evidence approval-payload` still declares only COMMIT_REQUIRED, CONFIG_*, EVIDENCE_ARGUMENT_INVALID/REQUIRED, EVIDENCE_REQUIRED, SCENARIO_INDEX_REQUIRED, SPEC_ROOT_NOT_FOUND, WRITE_FAILED (plus globals), while the fixed call now answers TASK_NOT_FOUND, PLAN_SOURCES_REQUIRED and the plan document codes (driven: `evidence approval-payload --task c1#1` -> TASK_NOT_FOUND / PLAN_SOURCES_REQUIRED) and `repo_error` codes. The table is derived by a source scan that cannot see `error.to_cli_error()` of `dispatch::validate_task_binding`; `evidence add` has the same gap (TASK_NOT_FOUND undeclared, TASK_EVIDENCE_INVALID declared). Pre-existing limit of the scan, the fix did not widen it for the new path. An agent reading `canon schema` is not told the code the scenario names.",
+  "worktree_dirty": false
+}

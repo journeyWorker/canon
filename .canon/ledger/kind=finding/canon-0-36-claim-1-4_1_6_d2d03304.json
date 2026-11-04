@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-claim14",
+    "role": "reviewer",
+    "session_id": "s-0-36-claim14-rev"
+  },
+  "at": "2026-11-04T17:41:12.716426Z",
+  "change_id": "canon-0-36-claim-1-4",
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "disposition": "fixed",
+  "file_ref": "conformance/cases/atip-1-1-schema-documents/case.yaml:1",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "resolution_sha": "1419794e5b88c9fb9b35ad22588e1da48e3cb240",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "cf01da6edd99f22251bc6d2048723523428f9bed",
+  "reviewer": "rev-0-36-claim14",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.11"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "[standards] F5 names the conformance cases that expect a schema answer. The expectations were regenerated (the diff is the 1.4 form and contractVersion only, checked), but the case description in atip-1-1-schema-documents/case.yaml still says '(0.34 L1) ... kind tree, level L1 ... a command path answers the command document with typed options, errors, outputs, input and the schemas its refs name': the tree says L2 and the command document names its schemas but does not hold them. Update it to the 1.4 form (level L2, call surface, schemas under --schemas). No case runs 'schema <command> --schemas --json'; adding one step (and its expected output) is cheap and puts the new answer under the conformance corpus (note, not required by the brief).",
+  "worktree_dirty": false
+}

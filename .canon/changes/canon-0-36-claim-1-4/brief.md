@@ -125,7 +125,7 @@ canon은 `meta.contractVersion` 1.2와 L2를 선언한다. `canon schema <명령
   - CI의 `atip check --contract 1.4 --level L2 --deep`이 통과한다. 보고서에 `L1.schemas`, `L1.help-json`, `L0.compact`, `L1.code-names`가 통과로 있다.
   - 실패 경로: 선언을 1.3으로 낮추거나 픽스처 `contractVersion`을 바꾸면 같은 실행이 실패한다.
 - F7:
-  - CHANGELOG 표가 전후를 싣고 크기 실측이 명령 다섯과 트리에 있다. 각 크기는 이전보다 작다.
+  - CHANGELOG 표가 전후 크기를 싣는다. 명령 다섯과 트리를 실측하고, 이전 값은 v0.35.0 태그 바이너리에서 잰다. 명령 문서는 각각 이전보다 작다. 공유 옵션이 트리로 모이면서 트리는 커질 수 있다. 명령 다섯 모두 트리 한 번과 그 명령 하나의 합을 싣는다. 합이 커진 명령이 있으면 그 이유(크레이트의 공유 기준)를 적는다.
 - `cargo test --workspace`, conformance, 생성 문서 drift 시험이 통과한다.
 
 ## Questions and assumptions
@@ -144,4 +144,4 @@ canon은 `meta.contractVersion` 1.2와 L2를 선언한다. `canon schema <명령
 - `schema --search`와 같은 선택 기능을 더하는 일.
 - 출력 데이터(`data`)의 형식 변경.
 
-Approved: Journey Hwang 2026-11-03T22:21:29Z — "휴가 중 승인 위임(2026-11-01 대화); 코드 개명은 1.3 컨벤션 나오면 한 번에(2026-11-03 사용자 결정), 체커는 atip 레포로(2026-11-03 사용자 결정)" (relayed by orchestrator orchestrator-main via chat) (brief sha256:d574e18c1292ae583aa936eb2e6ad8570911ee8607afecded34a585dba1c191e)
+Approved: Journey Hwang 2026-11-04T17:06:28Z — "휴가 중 승인 위임(2026-11-01 대화): 크기 표는 v0.35.0 기준, 명령 다섯 모두 트리+명령 합을 싣고 커진 경우 이유를 적음" (relayed by orchestrator orchestrator-main via chat) (brief sha256:2234b418b44c1cc3d5bcda9487407c9d83697937b9f865891d87f4beec36d0b8)

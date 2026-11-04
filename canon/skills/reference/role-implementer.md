@@ -177,7 +177,7 @@ canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=
 ```
 ```text
 # Describe canon's own commands
-usage: canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
+usage: canon schema [<PATH>]* [--schemas | --error <CODE> | --errors | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add --json
@@ -253,7 +253,7 @@ canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref
    keys are the option names in camelCase plus `operands` (the scenario id);
    every element is validated before the first write, so a bad element
    writes nothing and `error.field` names it (`/1/case`).
-   `canon schema scenario new --json` shows `input`: the schema of one document and a complete `example`.
+   `canon schema scenario new --json` shows `input` (its limits and a complete `example`); `canon schema scenario new --schemas --json` gives `Input`, the schema of one document.
    (`scenario new --from` is gone.) When the gate asks for a missing case
    (`require_cases`), add a new scenario; never retag an existing one. Every
    bug fix adds or extends a scenario. Canon indexes added, edited or deleted

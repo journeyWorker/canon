@@ -216,6 +216,12 @@ fn may_name_help_json(path: &str) -> bool {
     path == "CHANGELOG.md" || ["docs/research/", ".canon/", "crates/canon-cli/tests/", "conformance/"].iter().any(|prefix| path.starts_with(prefix))
 }
 
+/// Whether `line` recommends `--help` (or `-h`) with `--json` as a call: one quoted or backticked string (or a whole line of a code block) of
+/// `canon … --help … --json`.
+fn recommends_help_json(line: &str) -> bool {
+    line.split(['`', '"', '\'']).any(|call| call.contains("canon ") && (call.contains("--help") || call.contains(" -h")) && call.contains("--json"))
+}
+
 #[test]
 fn atip_helpjson_09_no_text_of_the_repository_recommends_help_with_json() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -228,11 +234,55 @@ fn atip_helpjson_09_no_text_of_the_repository_recommends_help_with_json() {
         seen += 1;
         for (number, line) in text.lines().enumerate() {
             // One call is one quoted or backticked string (or a whole line of a code block): `canon … --help … --json`.
-            if line.split(['`', '"', '\'']).any(|call| call.contains("canon ") && (call.contains("--help") || call.contains(" -h")) && call.contains("--json")) {
+            if recommends_help_json(line) {
                 found.push(format!("{path}:{}: {}", number + 1, line.trim()));
             }
         }
     }
     assert!(seen > 100, "the search read the repository's text files ({seen})");
     assert!(found.is_empty(), "these lines name `--help` with `--json`; the machine description is `canon schema`:\n{}", found.join("\n"));
+}
+
+/// What is wrong with the text help `text` a person gets from `--help` (the first line points at `canon schema --json` and `canon skills show`).
+fn text_help_problems(text: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if text.lines().next() != Some(canon_cli::spec::HELP_POINTER) {
+        problems.push("the first line does not point at schema and skills show".to_string());
+    }
+    if text.trim_start().starts_with('{') {
+        problems.push("the text help is a JSON document".to_string());
+    }
+    problems
+}
+
+/// atip.helpjson.10 (the failure path of F4): a guide, script or page that recommends `--help --json` (or `-h`, in any order) as the machine
+/// description is found by the repository guard; a text help or version that lost its pointer, became JSON or grew a second line is found too; the
+/// text answers of the built binary pass both.
+#[test]
+fn atip_helpjson_10_a_guide_that_recommends_help_with_json_or_a_text_help_that_lost_its_pointer_is_found() {
+    for recommended in [
+        "Run `canon finding close --help --json` to see the options.",
+        "    canon --json --help",
+        "call \"canon -h finding --json\" first",
+        "$ canon schema --json && canon search --help --json",
+    ] {
+        assert!(recommends_help_json(recommended), "a recommendation goes unseen: {recommended}");
+    }
+    for fine in ["Run `canon schema finding close --json` to see the options.", "`canon finding close --help` prints the text help", "canon --version prints one line", "pass --help --json to your own tool"] {
+        assert!(!recommends_help_json(fine), "a line that recommends nothing is flagged: {fine}");
+    }
+    assert_eq!(text_help_problems("Usage: canon [OPTIONS]\n"), ["the first line does not point at schema and skills show"]);
+    assert_eq!(text_help_problems("{\"ok\":false}"), ["the first line does not point at schema and skills show", "the text help is a JSON document"]);
+    let dir = repo();
+    for args in [&["--help"][..], &["-h"], &["finding", "--help"], &["finding", "close", "-h"]] {
+        let out = canon(dir.path(), args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}: {}", stderr(&out));
+        assert_eq!(text_help_problems(&stdout(&out)), Vec::<String>::new(), "{args:?}");
+    }
+    // A request for text that names no command still fails, and the version line is exactly one line.
+    let out = canon(dir.path(), &["nosuch", "--help"]);
+    assert_ne!(out.status.code(), Some(0), "an unknown command asked for help is no help: {}", stdout(&out));
+    for flag in ["--version", "-V"] {
+        assert_eq!(stdout(&canon(dir.path(), &[flag])).lines().count(), 1, "{flag}");
+    }
 }

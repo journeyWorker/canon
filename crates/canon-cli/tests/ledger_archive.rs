@@ -328,5 +328,5 @@ fn a_custom_ledger_root_has_no_archive_and_compact_says_so() {
     std::fs::write(dir.path().join("canon.yaml"), CANON_YAML.replace(".canon/ledger", "records")).unwrap();
     let refused = canon(dir.path(), &["ledger", "compact"]);
     assert_eq!(refused.status.code(), Some(2), "{}", out(&refused));
-    assert!(out(&refused).contains("LEDGER_ARCHIVE_UNAVAILABLE"), "{}", out(&refused));
+    assert!(out(&refused).contains("LEDGER_ARCHIVE_INVALID"), "{}", out(&refused));
 }

@@ -478,7 +478,8 @@ pub fn needs_config(command: &str) -> bool {
 }
 
 /// The repo root a command that needs canon state runs against, or the
-/// `CONFIG_REQUIRED` refusal when no `canon.yaml` is there. `repo` is `--repo`
+/// `CONFIG_REQUIRED` refusal when no `canon.yaml` is there (`CONFIG_INVALID` when something that is no file, a directory, stands in its
+/// place: a wrong path is the file's to fix, not a missing file). `repo` is `--repo`
 /// as given (absent: the nearest ancestor of the current directory holding a
 /// `canon.yaml`; present: that directory, no search).
 pub fn require_config(repo: Option<&Path>) -> Result<PathBuf, CliError> {
@@ -487,8 +488,14 @@ pub fn require_config(repo: Option<&Path>) -> Result<PathBuf, CliError> {
         Some(dir) => dir.to_path_buf(),
         None => discover_repo_root(),
     };
-    if root.join("canon.yaml").is_file() {
-        return Ok(root);
+    match std::fs::metadata(root.join("canon.yaml")) {
+        Ok(meta) if meta.is_file() => return Ok(root),
+        Ok(_) => {
+            return Err(CliError::refused("CONFIG_INVALID", format!("`{}` is not a file", root.join("canon.yaml").display())).reason("CANON_YAML")
+                .field("--repo")
+                .hint("replace it with the repository's canon.yaml file (`canon init` writes one), then run the command again"));
+        }
+        Err(_) => {}
     }
     let searched = if repo.is_none() { format!("`{}` and its parent directories", root.display()) } else { format!("`{}`", root.display()) };
     Err(CliError::refused("CONFIG_REQUIRED", format!("no canon.yaml in {searched}"))

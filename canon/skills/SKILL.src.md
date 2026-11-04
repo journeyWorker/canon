@@ -211,17 +211,27 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   your complete command set, every option of every leaf included. Run `canon schema <command> --json` only for a
   command it does not list, or after a `USAGE` refusal (read `error.field`
   and `error.expected` first). `canon schema --json` is the tree of every group and command
-  with its `effect` and `x-canon.roles` (`--as <role>` lists one role's, and `x-canon.as` names it); `canon schema <group> --json` lists a group's
-  commands; `canon schema <command> --json` is one command in full: `options` (each with
-  `valueType`, a typed `default`, `possibleValues`, `env`, `flagOnly`), `errors`, `outputs`
-  with the JSON Schema of each report in `schemas`, `input` (the schema of one `--input`
-  document and a complete `example`) and `examples`. The first line of every `--help`
-  points at it.
+  with its `effect` and `x-canon.roles` (`--as <role>` lists one role's, and `x-canon.as` names it);
+  its `options` define once the options that two or more commands share (`--repo`, `--as`, `--actor`, …)
+  and a command names them. `canon schema <group> --json` lists a group's
+  commands; `canon schema <command> --json` is the call surface of one command and nothing
+  else: `options` (each name of a tree option, or an object with `valueType`, a typed
+  `default`, `possibleValues`, `env`, `flagOnly`), `operands`, `constraints`, `validators`, `errors`,
+  `outputs`, `input` (what one `--input` document is and a complete `example`) and `examples`.
+  A member at its default is absent. `--json` is always accepted, `--input` when the command
+  has `input`, `--fields` when an output has `fields`, and the codes `USAGE` (with canon's
+  finer `*_INVALID`/`*_REQUIRED` argument codes), `INTERNAL`, `INPUT_*`, `BATCH_INCOMPLETE`,
+  `PLAN_STALE` (with `--commit`) and `CURSOR_INVALID` (with `--cursor`) can come without
+  being listed. `--commit` and `--plan-digest` are listed on exactly the commands that offer
+  them: a command that lists `commit` previews on a bare run. `canon schema <command> --schemas --json`
+  gives the JSON Schema of each report in `schemas`, `Input` (the schema of one `--input`
+  document) and `rejects` (what each validator refuses, in order); `#/schemas/<Name>` in
+  the command document resolves there. The first line of every `--help` points at it.
 - Pass `--json` and read stdout as one document, nothing on stderr. Success is
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in
   `data`). `meta` carries `tool`, `toolVersion`, `contract` (`atip/1`),
-  `contractVersion` (`1.2`), `schemaVersion`,
+  `contractVersion` (`1.4`), `schemaVersion`,
   `command`, and when present `next`, `warnings` (`[{code, message}]`) and
   `page`; a repeated write that changed nothing reports `data.unchanged: true`.
   Absent members are omitted, never `null` or `[]` (a value you sent empty comes back as `received: ""`).
@@ -282,7 +292,7 @@ its own code, `error.field` pointing at `/<i>/<key>` and no `data`. An element t
 it names does not exist) stops the batch: exit 1, `BATCH_INCOMPLETE`, `error.field` exactly `/<i>`, the element
 `failed` with its own `error` (no `data`), the later ones `skipped`, and the earlier ones done (not undone). Re-running the same batch reports the finished elements
 `unchanged`. A typo in a key is refused (`INPUT_INVALID`, `field` naming the key), never dropped; a document with several problems reports them all, the first as the error (`field` is the first `error.details` entry's) and every one in `error.details` in the order the document wrote its keys, and a value outside a closed set is `INPUT_INVALID` too (`reason` `INVALID_VALUE`, `field` the key), not `USAGE`. Every non-empty line of an NDJSON file is a document (a `#` line is not a comment). Integers compare by number: `1`, `"1"` and `--round +1` are one value, `"+1"`, `"0x1"` and `1.0` in a document are `INVALID_VALUE`, and an integer beyond ±9007199254740991 is refused as a number and as a string, in a document (`INVALID_VALUE`, `field` its pointer) and on the command line (`USAGE`). `--input` may give a required option and the command line only the operand; an option given in both with different values is `INPUT_CONFLICT` at the key's pointer. A repeatable option's none is the key left out: `[]` is refused (`INPUT_INVALID`, `reason` `INVALID_VALUE`, `field` the key's pointer), as is `[]` for any other option and for `operands`.
-`canon schema <command> --json` shows the leaf's `input`: the schema of one document and a complete `example`.
+`canon schema <command> --json` shows the leaf's `input` (what one document is, and a complete `example`); `canon schema <command> --schemas --json` gives `Input`, the JSON Schema of one document.
 
 ```text
 canon scenario new --input '[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Wrong password","case":"failure"}]'

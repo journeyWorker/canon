@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:39:22.150004Z",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "kind": "review",
+  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by_the_next"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "854c3aac46022a401d7d2fc349f68c7345fd0ec0067b8c9f6697d983992563f0",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/specs/kind=feature/area=authoring/migrate.feature"
+  },
+  "review_id": "01M6K5PHN6E4D4X0HGNXGV9ZZN",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "authoring.migrate.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

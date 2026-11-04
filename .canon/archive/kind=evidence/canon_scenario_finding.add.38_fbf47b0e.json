@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:18:47.822581Z",
+  "attachments": [
+    {
+      "case": "finding_add_38_a_finding_added_with_a_review_id_points_at_that_review_and_a_query_shows_the_id",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    }
+  ],
+  "code_tree": "84454e6621e493af02ddc9c1cd5b2158249ee38a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "91a47e478825254994473672e759b11ec606c931",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 369,
+  "scenario_id": "finding.add.38",
+  "schema": 1,
+  "staging_id": "b0d96ff3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

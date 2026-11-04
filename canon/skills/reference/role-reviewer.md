@@ -143,7 +143,7 @@ canon review scenario auth.login.01 --actor alice --role reviewer --original-spe
 ```
 ```text
 # Describe canon's own commands
-usage: canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
+usage: canon schema [<PATH>]* [--schemas | --error <CODE> | --errors | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add --json
@@ -297,7 +297,7 @@ Ask with the harness question tool (`ask` in omp, `AskUserQuestion` in Claude
 Code, otherwise in the chat): accept the gap, or not. Only an explicit
 approval counts; a question or a condition is not one, and no answer records
 nothing. Then record it from a session that did not attest the evidence
-(`DIVERGENCE_ACCEPT_REFUSED` otherwise): `canon divergence accept <ids> --actor
+(`DIVERGENCE_DENIED` otherwise): `canon divergence accept <ids> --actor
 <your actor id> --reason "<why>" --tracking <ref> --approver <their name> --note
 "<their answer>" --relayed-via <tool>`; the record carries the relay, the
 approver and their answer. When `canon.yaml` has `approval: { relay: deny }` the

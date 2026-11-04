@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T09:40:30.629524Z",
+  "code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "kind": "review",
+  "pin": "f2dfd479b72aba7fb5981aa262576785a0beae62",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codestored_12_a_fault_in_canon_yaml_is_the_configs_and_a_path_in_the_wrong_state_is_told_as_what_it_is"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ed17cf60fe308323f42db4274bba68d8ecebf277cfc4c1e3ad86d2cbc7dffd39",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-stored/brief.md"
+  },
+  "review_id": "01M6JYWX95EWPXPJEW2F508MJD",
+  "reviewer": "rev-0-36-stored",
+  "scenario_id": "atip.codestored.12",
+  "schema": 2,
+  "worktree_dirty": false
+}

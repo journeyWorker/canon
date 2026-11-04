@@ -94,7 +94,7 @@ pub fn run_promote_with_evidence(
     let learn_config = match LearnConfig::from_manifest(&canon_yaml_text) {
         Ok(config) => config,
         Err(err) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy promote", json));
+            return ExitCode::from(crate::read_cause::config_error(err.to_string()).emit("canon strategy promote", json));
         }
     };
 
@@ -116,14 +116,14 @@ pub fn run_promote_with_evidence(
                 }
             };
             if let Some(signature) = signature_path {
-                match std::fs::read_to_string(signature) {
+                match canon_store::eio::read_to_string(signature) {
                     Ok(value) => {
                         approval.signature = Some(value);
                         approval.signer_key.get_or_insert_with(|| approval.approver_identity.clone());
                         approval.integrity_digest = approval.recomputed_integrity_digest();
                     }
                     Err(error) => {
-                        return ExitCode::from(CliError::refused("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy promote", json));
+                        return ExitCode::from(CliError::refused(crate::read_cause::signature_code(&error), format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy promote", json));
                     }
                 }
             }
@@ -142,7 +142,7 @@ pub fn run_promote_with_evidence(
     let decision = match promotion_decision(&repo, &learn_config, &strategy_store, strategy_id) {
         Ok(decision) => decision,
         Err(err) => {
-            return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json));
+            return ExitCode::from(CliError::failed("STRATEGY_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json));
         }
     };
     // A promotion writes the strategy store and the strategy files: refused before the first write. A blocked or already-recorded one writes nothing here.
@@ -216,7 +216,7 @@ pub fn run_promote_with_evidence(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json);
+            CliError::failed("STRATEGY_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json);
             ExitCode::from(1)
         }
     }
@@ -320,14 +320,14 @@ pub fn run_approval_payload(repo: &Path, strategy_id: &StrategyId, evaluation_pa
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy approval-payload", json));
+            return ExitCode::from(crate::read_cause::config_error(error.to_string()).emit("canon strategy approval-payload", json));
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
     let Some(candidate) = (match store.find_by_id(strategy_id) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy approval-payload", json));
+            return ExitCode::from(crate::read_cause::repo_error(error.to_string()).emit("canon strategy approval-payload", json));
         }
     }) else {
         return ExitCode::from(CliError::refused("STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy approval-payload", json));
@@ -397,7 +397,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy rollback", json));
+            return ExitCode::from(crate::read_cause::config_error(error.to_string()).emit("canon strategy rollback", json));
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
@@ -408,7 +408,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
             return ExitCode::from(CliError::refused("STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy rollback", json));
         }
         Err(error) => {
-            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));
+            return ExitCode::from(crate::read_cause::repo_error(error.to_string()).emit("canon strategy rollback", json));
         }
     }
     let contradicting = match contradicting.map(canon_learn::TrajectoryId::parse).transpose() {
@@ -425,14 +425,14 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
                 return ExitCode::from(CliError::refused("TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory against the recorded trajectories, or omit it").emit("canon strategy rollback", json));
             }
             Err(error) => {
-                return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));
+                return ExitCode::from(crate::read_cause::repo_error(format!("cannot verify contradicting trajectory: {error}")).emit("canon strategy rollback", json));
             }
         }
     }
-    let signature = match std::fs::read_to_string(signature_path) {
+    let signature = match canon_store::eio::read_to_string(signature_path) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::refused("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy rollback", json));
+            return ExitCode::from(CliError::refused(crate::read_cause::signature_code(&error), format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy rollback", json));
         }
     };
     let approved_at = match chrono::DateTime::parse_from_rfc3339(approved_at) {
@@ -462,10 +462,46 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Err(error) => {
-            CliError::failed("LEARN_ROLLBACK_FAILED", error.to_string()).hint("the message names the cause; fix it and run `canon strategy rollback` again").emit("canon strategy rollback", json);
-            ExitCode::from(1)
+        // The signature, the signer and the verifier are judged before anything is recorded (exit 2), each by its own condition; a failure of the
+        // record is a failure of the work (exit 1).
+        Err(canon_learn::LearnError::InvalidPromotionEvidence(evidence)) => ExitCode::from(rollback_refusal(&evidence, reason, actor).emit("canon strategy rollback", json)),
+        Err(error) => ExitCode::from(CliError::failed("STRATEGY_ROLLBACK_FAILED", error.to_string()).hint("the message names the cause; fix it and run `canon strategy rollback` again").emit("canon strategy rollback", json)),
+    }
+}
+
+/// The next step when the policy or the allowed-signers file it names is wrong, and when the system will not read it.
+const POLICY_FIX: &str = "fix `.canon/policy.yaml` and the allowed-signers file it names, then run `canon strategy rollback` again; nothing was recorded";
+const POLICY_UNREADABLE: &str = "make `.canon/policy.yaml` and the allowed-signers file it names readable (wait a moment if the system failed the read), then run `canon strategy rollback` again; nothing was recorded";
+
+/// The refusal of a rollback the signature check turned away, by the condition that failed (nothing was recorded in any of them):
+/// - a blank `--reason` or `--actor` is `STRATEGY_ARGUMENT_INVALID`, naming the argument;
+/// - a policy that names no `approval.allowed_signers` verifier is `STRATEGY_VERIFIER_REQUIRED`;
+/// - a policy that cannot be used, or an allowed-signers file that cannot be read, is the config's: `CONFIG_DENIED` when the system refuses
+///   the read, `CONFIG_UNAVAILABLE` when a repeat can pass, `CONFIG_INVALID` (reason `POLICY`) otherwise;
+/// - an actor the allowed-signers file does not list is `STRATEGY_SIGNER_DENIED`;
+/// - an empty signature file is `STRATEGY_SIGNATURE_REQUIRED`;
+/// - only a signature that does not verify is `STRATEGY_SIGNATURE_INVALID`.
+fn rollback_refusal(evidence: &canon_learn::PromotionEvidenceError, reason: &str, actor: &str) -> CliError {
+    use canon_learn::PromotionEvidenceError as Evidence;
+    let message = evidence.to_string();
+    match evidence {
+        Evidence::RollbackReasonAndActor => {
+            let field = if reason.trim().is_empty() { "--reason" } else if actor.trim().is_empty() { "--actor" } else { "--reason" };
+            CliError::refused("STRATEGY_ARGUMENT_INVALID", message).field(field).hint("pass a non-blank --reason and --actor, then run `canon strategy rollback` again; nothing was recorded")
         }
+        Evidence::NoVerifierConfigured | Evidence::RollbackUnauthenticated => CliError::refused("STRATEGY_VERIFIER_REQUIRED", message)
+            .hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and have the human approve it with `canon policy approve`, then run `canon strategy rollback` again; nothing was recorded"),
+        Evidence::AllowedSigners(canon_gate::AllowedSignersError::Read { .. }) | Evidence::AllowedSignersUnreadable(_) => {
+            let error = crate::read_cause::config_error(message);
+            let hint = if error.code == "CONFIG_INVALID" { POLICY_FIX } else { POLICY_UNREADABLE };
+            let error = if error.code == "CONFIG_INVALID" { error.reason("POLICY") } else { error };
+            error.hint(hint)
+        }
+        Evidence::AllowedSigners(_) => CliError::refused("CONFIG_INVALID", message).reason("POLICY").hint(POLICY_FIX),
+        Evidence::RollbackActorNotListed => CliError::refused("STRATEGY_SIGNER_DENIED", message)
+            .hint("pass an --actor the policy's allowed_signers file lists, or have the human add the actor's key to it and approve the policy, then run `canon strategy rollback` again; nothing was recorded"),
+        Evidence::RollbackSignatureRequired => CliError::refused("STRATEGY_SIGNATURE_REQUIRED", message).hint("the --signature-file is empty: sign the rollback's payload with the actor's key and pass the armored signature, then run `canon strategy rollback` again; nothing was recorded"),
+        _ => CliError::refused("STRATEGY_SIGNATURE_INVALID", message).hint("sign the rollback again with a key the policy's allowed_signers lists for the actor, then run `canon strategy rollback` again; nothing was recorded"),
     }
 }
 
@@ -478,17 +514,12 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
 /// tell apart (`STRATEGY_DEMOTION_FAILED`).
 ///
 /// `demoted` is the strategy the refused run demoted (a contradicting trajectory turned an active strategy off): that is an effect
-/// the refusal came after, so the answer is `STOPPED_MIDWAY` (spec 8.3.2) with the refusal as its reason, and its first next step reads
+/// the refusal came after, so the answer is `STRATEGY_INCOMPLETE` (spec 8.3.2) with the refusal as its reason, and its first next step reads
 /// what was done. A refusal that changed nothing is exit 2.
 fn report_block(decision: &PromotionDecision, demotion_failure: Option<&str>, demoted: Option<StrategyId>, json: bool) -> ExitCode {
     if let (Some(id), None) = (demoted, demotion_failure) {
-        crate::json_out::prepend_next(crate::status::NextStep {
-            command: format!("canon strategy promote {id} --dry-run --json"),
-            why: "read what the run already did (the strategy was demoted by a contradicting trajectory) before running anything again".into(),
-            actor: crate::status::StepActor::Agent,
-            role: Some(crate::role::Role::Orchestrator),
-        });
-        let error = CliError::failed("STOPPED_MIDWAY", format!("the strategy was demoted, then the promotion gate blocked it: {}", decision.reason()))
+        crate::incomplete::read_first(&format!("canon strategy promote {id} --dry-run --json"), "read what the run already did (the strategy was demoted by a contradicting trajectory) before running anything again");
+        let error = CliError::failed("STRATEGY_INCOMPLETE", format!("the strategy was demoted, then the promotion gate blocked it: {}", decision.reason()))
             .reason("STRATEGY_PROMOTION_INVALID")
             .hint("the strategy stays demoted: read it with `canon strategy promote <id> --dry-run`, then record the evidence the gate asks for (`canon ingest records`)");
         return ExitCode::from(error.emit("canon strategy promote", json));
@@ -546,5 +577,28 @@ mod tests {
     #[test]
     fn a_malformed_strategy_id_is_refused_in_its_old_words() {
         assert_eq!(parse_strategy_id("nope").unwrap_err().to_string(), "invalid id \"nope\": invalid length");
+    }
+
+    /// atip.codesplit.06: each condition the signature check of a rollback fails on is the code of its own condition (the real calls are the test of
+    /// `spec030_reads.rs`); an operating-system error that a repeat can pass, which no real call can provoke, is `CONFIG_UNAVAILABLE` (retryable).
+    #[test]
+    fn atip_codesplit_06_each_condition_of_a_refused_rollback_has_its_own_code() {
+        use canon_learn::PromotionEvidenceError as Evidence;
+        let code = |evidence: Evidence| {
+            let error = rollback_refusal(&evidence, "regressed", "alice");
+            (error.code, error.exit, error.retryable)
+        };
+        let eio = || std::io::Error::from_raw_os_error(5);
+        assert_eq!(code(Evidence::RollbackActorNotListed), ("STRATEGY_SIGNER_DENIED", 2, false));
+        assert_eq!(code(Evidence::RollbackSignatureRequired), ("STRATEGY_SIGNATURE_REQUIRED", 2, false));
+        assert_eq!(code(Evidence::NoVerifierConfigured), ("STRATEGY_VERIFIER_REQUIRED", 2, false));
+        assert_eq!(code(Evidence::RollbackReasonAndActor), ("STRATEGY_ARGUMENT_INVALID", 2, false));
+        assert_eq!(code(Evidence::AllowedSignersUnreadable(eio())), ("CONFIG_UNAVAILABLE", 2, true));
+        assert_eq!(code(Evidence::AllowedSignersUnreadable(std::io::Error::from_raw_os_error(13))), ("CONFIG_DENIED", 2, false));
+        assert_eq!(code(Evidence::AllowedSignersUnreadable(std::io::Error::from_raw_os_error(2))), ("CONFIG_INVALID", 2, false));
+        assert_eq!(code(Evidence::AllowedSigners(canon_gate::AllowedSignersError::Read { path: "policy.yaml".into(), source: eio() })), ("CONFIG_UNAVAILABLE", 2, true));
+        assert_eq!(code(Evidence::AllowedSigners(canon_gate::AllowedSignersError::Empty)), ("CONFIG_INVALID", 2, false));
+        let blank = |reason: &str, actor: &str| rollback_refusal(&Evidence::RollbackReasonAndActor, reason, actor);
+        assert_eq!((blank(" ", "alice").field_name(), blank("r", " ").field_name()), (Some("--reason"), Some("--actor")));
     }
 }

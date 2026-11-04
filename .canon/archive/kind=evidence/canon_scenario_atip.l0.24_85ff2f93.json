@@ -1,0 +1,206 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T11:26:25.561613Z",
+  "attachments": [
+    {
+      "case": "atip_l0_24_a_directory_that_cannot_be_written_refuses_with_exit_2_and_changes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_a_write_that_fails_after_the_first_record_is_exit_1_write_failed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_change_new_refuses_a_read_only_change_store_before_creating_the_change",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_dispatch_begin_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_ingest_records_into_a_read_only_trajectory_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_artifacts_store_into_a_read_only_blob_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_dispatch_end_into_a_read_only_manifest_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_plugin_sync_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_export_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_divergence_resolve_and_defer_into_a_read_only_ledger_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_ingest_plans_into_a_read_only_change_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_context_pack_add_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_gate_promote_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_inventory_sync_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_ledger_compact_refuses_a_read_only_ledger_before_moving_a_version",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_tier_age_and_purge_refuse_a_read_only_store_before_moving_or_removing_a_record",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_report_snapshot_into_a_read_only_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_report_build_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_skills_install_into_a_read_only_repo_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_prompt_add_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_subject_adopt_and_unadopt_into_a_read_only_ledger_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_subject_move_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_subject_new_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "strategy::atip_l0_24_strategy_rollback_into_a_read_only_strategy_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "strategy::atip_l0_24_strategy_promote_into_a_read_only_strategy_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    },
+    {
+      "case": "atip_l0_24_ingest_sessions_into_a_read_only_hot_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c45e769084bec2f134c1fb7a6cb9941749500d86619202dbc04290892e8f412e"
+    }
+  ],
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "e78850731e858b7cae70a3e4244a0670b081c25a",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 544,
+  "scenario_id": "atip.l0.24",
+  "schema": 1,
+  "staging_id": "baad10ca",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

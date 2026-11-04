@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:47:55.469439Z",
+  "attachments": [
+    {
+      "case": "atip_readwrites_06_dashboard_is_declared_a_server_that_serves_until_signalled",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bb82c9e1c6b76698626b6bb0df8573b2e4428a591de964e09a7c1f8d1675acd8"
+    }
+  ],
+  "code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "9f601a4ffd4bedd1d3b0587f43a49308b22bc66d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 157,
+  "scenario_id": "atip.readwrites.06",
+  "schema": 1,
+  "staging_id": "430d1feb",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

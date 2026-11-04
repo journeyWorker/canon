@@ -121,7 +121,8 @@ Outside git, or in a repository with no commit, the write is refused with
 Many findings at once: `--input` takes inline JSON, a file or `-`; an array
 (or NDJSON) is a batch validated before any write. Keys are the option
 names in camelCase (`change`, `actor`, `resolutionRev`); `canon schema
-finding add --json` shows `input`: the schema of one document and a complete `example`. An identical
+finding add --json` shows `input` (its limits and a complete `example`) and `canon schema finding add
+--schemas --json` gives `Input`, the schema of one document. An identical
 repeat is `unchanged` (`data.unchanged`) and writes nothing; a different
 finding under an occupied key is `FINDING_EXISTS`.
 

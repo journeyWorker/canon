@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev-b"
+  },
+  "at": "2026-11-04T10:42:21.763009Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/read_cause.rs:37",
+  "introduced_by": "ae941277f52c0177c640f51c0aa3f5b28545b085",
+  "kind": "finding",
+  "reviewed_sha": "401ecbcad1607f3d3352b54c9f12e88a52b63fe1",
+  "reviewer": "rev-0-36-refusals",
+  "round": 2,
+  "scenario_ids": [
+    "atip.codestored.11"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] `of_io` tests `raw_os_error() == Some(5)` before the error kind and the comment says 'EIO is 5 on every platform canon runs on'. canon ships x86_64-pc-windows-msvc (build-native.yml, publish.yml), where os error 5 is ERROR_ACCESS_DENIED: std maps it to ErrorKind::PermissionDenied [INFERENCE: std source, not run on Windows; CI tests run on ubuntu only, so nothing would catch it]. On Windows every refused read (and `of_text` on '(os error 5)' texts) would become the subject's `*_UNAVAILABLE` with retryable true, the inverse of the ATIP 1.3 rule these codes implement (DENIED is not retryable). One-line fix: match `e.kind()` first (PermissionDenied -> Denied) and apply the raw-5 EIO test only after, or under `#[cfg(unix)]`; the unit tests use `from_raw_os_error(13)` for denied, so they are unix-only too (say so, or build the errors from ErrorKind). Blast radius: all 14 `_UNAVAILABLE` codes and every `*_DENIED` the helpers pick.",
+  "worktree_dirty": false
+}

@@ -483,7 +483,7 @@ fn atip_planjcs_07_a_wait_that_runs_out_refuses_and_a_killed_holder_releases_the
     let out = canon_in(root, &commit_args(&args, &digest), &[("CANON_TEST_REPO_LOCK_WAIT_MS".to_string(), "300".to_string())]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let body = json_of(&out);
-    assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some("REPO_WRITE_BUSY"), Some(true)), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some("REPO_LOCK_UNAVAILABLE"), Some(true)), "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("again in a moment"), "{body}");
     assert_eq!(tree(root), before, "a commit that waited in vain started nothing");
     drop(held);
@@ -513,10 +513,10 @@ fn atip_planjcs_08_only_a_run_that_writes_takes_the_lock() {
     preview.push("--json".to_string());
     for (what, call) in [("a read", words(&["status", "--json"])), ("a preview", preview), ("a dry run", words(&["inventory", "sync", "--dry-run", "--json"])), ("init --check", words(&["init", "--check", "--json"]))] {
         let out = canon_in(root, &call, &short);
-        assert_ne!(json_of(&out)["error"]["code"], "REPO_WRITE_BUSY", "{what} does not wait for the lock: {}", text(&out));
+        assert_ne!(json_of(&out)["error"]["code"], "REPO_LOCK_UNAVAILABLE", "{what} does not wait for the lock: {}", text(&out));
     }
     let writer = canon_in(root, &words(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]), &short);
-    assert_eq!(json_of(&writer)["error"]["code"], "REPO_WRITE_BUSY", "a writer waits for the lock: {}", text(&writer));
+    assert_eq!(json_of(&writer)["error"]["code"], "REPO_LOCK_UNAVAILABLE", "a writer waits for the lock: {}", text(&writer));
     assert_eq!(writer.status.code(), Some(2));
     assert!(!root.join(".canon/ledger/kind=subject").exists(), "and wrote nothing");
     drop(_held);
@@ -854,12 +854,208 @@ fn atip_planjcs_13_the_report_schemas_hold_the_preview_and_their_minor_is_raised
         let minor: u32 = report.split('.').nth(1).unwrap().parse().unwrap();
         assert!(minor >= 1 && report.starts_with("1."), "{command}: {report}");
         let name = doc["outputs"][0]["schemaRef"].as_str().unwrap().rsplit('/').next().unwrap();
-        let schema = &doc["schemas"][name];
+        let mut schemas_args = args.clone();
+        schemas_args.insert(schemas_args.len() - 1, "--schemas".to_string());
+        let schemas = json_of(&canon_in(Path::new("."), &schemas_args, &[]));
+        let schemas = &schemas["data"]["schemas"];
+        let schema = &schemas[name];
         for member in ["planDigest", "effects", "committed"] {
             assert!(schema["properties"].get(member).is_some(), "{command} has {member}: {schema}");
         }
         assert_eq!(schema["properties"]["effects"]["items"]["$ref"], "#/schemas/Effect", "{command}");
-        let effect = &doc["schemas"]["Effect"]["properties"];
+        let effect = &schemas["Effect"]["properties"];
         assert!(["action", "path", "record", "detail"].iter().all(|key| effect.get(key).is_some()), "{command}: {effect}");
     }
+}
+
+/// `canon` run with `args` and `stdin` as its standard input, in `root`.
+fn canon_with_stdin(root: &Path, args: &[String], env: &[(String, String)], stdin: &str) -> Output {
+    use std::io::Write as _;
+    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    command.args(args).current_dir(root).env_remove("CANON_ROLE").env("CANON_ACTOR", "canon").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let mut child = command.spawn().expect("spawn canon");
+    child.stdin.take().expect("stdin").write_all(stdin.as_bytes()).expect("write stdin");
+    child.wait_with_output().expect("canon runs")
+}
+
+/// atip.planjcs.17: the commit call of a preview is its own words: a call that came by `--input` is written as argv options with no `--input`, a
+/// value that starts with a dash stays with its option, the command is the tool and the argv, it is the call on the line plus `--commit` and
+/// `--plan-digest`, and each way of giving the call commits that plan with the call the preview names.
+#[test]
+fn atip_planjcs_17_the_commit_call_of_a_preview_carries_a_document_as_argv_options_and_a_dash_value_with_its_option() {
+    // One fresh purge for each way of giving the call: its preview, the commit call it names, and that call run as it is.
+    for (way, repo_word) in [("line", None), ("inline", None), ("stdin", None), ("dash", Some("--repo=-dash"))] {
+        let case = purge_case();
+        let cutoff = case.args.last().cloned().expect("the cutoff");
+        let parent = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(&case.root, parent.path().join("-dash")).unwrap();
+        let (cwd, repo_args): (&Path, Vec<String>) = match repo_word {
+            Some(word) => (parent.path(), vec![word.to_string()]),
+            None => (case.root.as_path(), Vec::new()),
+        };
+        let document = json!({ "kind": "trajectory", "before": cutoff }).to_string();
+        let preview_args = |extra: &[&str]| -> Vec<String> {
+            let mut args = case.args.clone();
+            args.extend(repo_args.iter().cloned());
+            args.extend(extra.iter().map(ToString::to_string));
+            args.push("--json".to_string());
+            args
+        };
+        // The call on the line is the reference: the arguments as options, then `--commit` and `--plan-digest=<digest>`.
+        let reference = json_of(&canon_in(cwd, &preview_args(&[]), &case.env));
+        let digest = reference["data"]["planDigest"].as_str().unwrap().to_string();
+        let preview = match way {
+            "line" => reference.clone(),
+            "inline" => json_of(&canon_in(cwd, &words(&["purge", "--input", &document, "--json"]), &case.env)),
+            "stdin" => json_of(&canon_with_stdin(cwd, &words(&["purge", "--input", "-", "--json"]), &case.env, &document)),
+            _ => json_of(&canon_in(cwd, &preview_args(&[]), &case.env)),
+        };
+        assert_eq!(preview["ok"], true, "{way}: {preview}");
+        assert_eq!(preview["data"]["planDigest"], digest.as_str(), "{way}: a call and its document are one plan");
+        let commit = next_argv(&preview);
+        assert_eq!(commit, next_argv(&reference), "{way}: the same commit call whichever way the call was given");
+        assert!(commit.iter().all(|word| word != "--input" && !word.starts_with("--input=") && word != "-" && !word.contains('{')), "{way}: no --input and no document in the commit call: {commit:?}");
+        let mut want: Vec<String> = ["purge".to_string(), "--kind=trajectory".to_string(), format!("--before={cutoff}"), "--commit".to_string(), format!("--plan-digest={digest}"), "--json".to_string()].to_vec();
+        want.extend(repo_args.iter().cloned());
+        let (mut got, mut expected) = (commit.clone(), want);
+        got.sort();
+        expected.sort();
+        assert_eq!(got, expected, "{way}: the call on the line plus --commit and --plan-digest");
+        assert!(commit.last().is_some_and(|word| word == "--json"), "{way}: {commit:?}");
+        let mut line = vec!["canon".to_string()];
+        line.extend(commit.iter().cloned());
+        assert_eq!(atip::split_argv(preview["meta"]["next"][0]["command"].as_str().expect("a command")), line, "{way}: the command is the tool and the argv");
+        if repo_word.is_some() {
+            assert!(commit[1..].iter().all(|word| word.starts_with("--")), "{way}: every word after the command is an option with its value inside, none is a bare value: {commit:?}");
+        }
+        // The commit call the preview names, run as it is, commits that plan and makes its effects.
+        let before = tree(&case.root);
+        let done = canon_in(cwd, &commit, &case.env);
+        assert_eq!(done.status.code(), Some(0), "{way}: {}", text(&done));
+        let body = json_of(&done);
+        assert_eq!((body["data"]["committed"].clone(), body["data"]["planDigest"].clone()), (Value::Bool(true), Value::from(digest.as_str())), "{way}: {body}");
+        assert_ne!(tree(&case.root), before, "{way}: the commit made its effects");
+        // And the call on the line with `--commit --plan-digest` is that same call: on a repository in the same state it commits too.
+        let again = purge_case();
+        let again_args = {
+            let mut args = again.args.clone();
+            args.extend(repo_args.iter().cloned());
+            args
+        };
+        let again_cwd: &Path = if repo_word.is_some() {
+            std::os::unix::fs::symlink(&again.root, parent.path().join("-dash-again")).unwrap();
+            parent.path()
+        } else {
+            again.root.as_path()
+        };
+        let mut preview_again = again_args.clone();
+        if repo_word.is_some() {
+            *preview_again.last_mut().unwrap() = "--repo=-dash-again".to_string();
+        }
+        preview_again.push("--json".to_string());
+        let digest_again = json_of(&canon_in(again_cwd, &preview_again, &again.env))["data"]["planDigest"].as_str().unwrap().to_string();
+        let mut commit_again = preview_again.clone();
+        commit_again.pop();
+        commit_again.extend(["--commit".to_string(), format!("--plan-digest={digest_again}"), "--json".to_string()]);
+        let done = canon_in(again_cwd, &commit_again, &again.env);
+        assert_eq!(done.status.code(), Some(0), "{way}: the call on the line plus --commit --plan-digest commits: {}", text(&done));
+        assert_eq!(json_of(&done)["data"]["committed"], true, "{way}");
+    }
+}
+
+/// atip.planjcs.18: `--commit` without `--plan-digest` and `--plan-digest` without `--commit` are refused on each of the six commands, naming the option that
+/// is missing, and write nothing; both with the digest of the plan commits, and neither previews.
+#[test]
+fn atip_planjcs_18_a_commit_without_a_digest_and_a_digest_without_a_commit_are_refused_naming_the_missing_option() {
+    for case in six() {
+        let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
+        let before = tree(&case.root);
+        for (what, extra, missing) in [("--commit alone", vec!["--commit".to_string()], "--plan-digest"), ("--plan-digest alone", vec![format!("--plan-digest={digest}")], "--commit")] {
+            let words: Vec<&str> = extra.iter().map(String::as_str).collect();
+            let out = case.run(&words);
+            assert_eq!(out.status.code(), Some(2), "{} {what}: {}", case.leaf, text(&out));
+            let body = json_of(&out);
+            assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some(missing)), "{} {what}: {body}", case.leaf);
+            assert!(body.get("data").is_none(), "{} {what}: a refusal has no data", case.leaf);
+            assert_eq!(tree(&case.root), before, "{} {what}: nothing was written", case.leaf);
+        }
+        // Neither is a preview, and the digest of the plan with the commit is the only way through.
+        assert_eq!(case.preview()["data"]["committed"], false, "{}: neither is a preview", case.leaf);
+        assert_eq!(tree(&case.root), before, "{}: a preview writes nothing", case.leaf);
+        let done = case.commit_with(&digest);
+        assert_eq!(done.status.code(), Some(0), "{}: both, with the plan's digest, commit: {}", case.leaf, text(&done));
+        assert_eq!(json_of(&done)["data"]["committed"], true, "{}", case.leaf);
+    }
+}
+
+/// `args` (a command and its options) with the options in the reverse order: each `--name value` apart or as `--name=value`.
+fn options_reversed(args: &[String], joined: bool) -> Vec<String> {
+    let at = args.iter().position(|word| word.starts_with("--")).unwrap_or(args.len());
+    let mut groups: Vec<Vec<String>> = Vec::new();
+    for word in &args[at..] {
+        match groups.last_mut() {
+            Some(group) if !word.starts_with("--") && group.len() == 1 => group.push(word.clone()),
+            _ => groups.push(vec![word.clone()]),
+        }
+    }
+    let mut out = args[..at].to_vec();
+    for group in groups.into_iter().rev() {
+        match (joined, group.as_slice()) {
+            (true, [name, value]) => out.push(format!("{name}={value}")),
+            _ => out.extend(group),
+        }
+    }
+    out
+}
+
+/// atip.planjcs.19: the digest of a preview covers every input of the plan, and only the order and the spelling of the options leave it alone: the
+/// call written another way is the same plan and commits with the digest, a changed value or a changed state the plan read is `PLAN_STALE`, and
+/// nothing is written by the refusal.
+#[test]
+fn atip_planjcs_19_a_digest_covers_every_input_and_only_the_order_and_spelling_of_the_options_leave_it_alone() {
+    // The same call in another order or spelling is the same plan: one digest, and that digest commits it.
+    for case in six() {
+        let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
+        let variants = [("options reversed", options_reversed(&case.args, false)), ("--name=value", options_reversed(&case.args, true))];
+        for (what, args) in &variants {
+            let mut call = args.clone();
+            call.push("--json".to_string());
+            let out = canon_in(&case.root, &call, &case.env);
+            assert_eq!(out.status.code(), Some(0), "{} {what}: {}", case.leaf, text(&out));
+            assert_eq!(json_of(&out)["data"]["planDigest"], digest.as_str(), "{} {what}: the same plan, the same digest", case.leaf);
+        }
+        let mut commit = variants[1].1.clone();
+        commit.extend(["--commit".to_string(), format!("--plan-digest={digest}"), "--json".to_string()]);
+        let done = canon_in(&case.root, &commit, &case.env);
+        assert_eq!(done.status.code(), Some(0), "{}: the digest commits the call written another way: {}", case.leaf, text(&done));
+        assert_eq!(json_of(&done)["data"]["committed"], true, "{}", case.leaf);
+    }
+    // A changed value is another plan: the digest of the first is `PLAN_STALE` for the second, which writes nothing.
+    let case = purge_case();
+    let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
+    let mut other = case.args.clone();
+    *other.last_mut().unwrap() = (Utc::now() - chrono::Duration::days(2)).to_rfc3339();
+    let mut other_commit = other.clone();
+    other_commit.extend(["--commit".to_string(), format!("--plan-digest={digest}"), "--json".to_string()]);
+    let before = tree(&case.root);
+    let out = canon_in(&case.root, &other_commit, &case.env);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert_eq!(json_of(&out)["error"]["code"], "PLAN_STALE");
+    assert_eq!(tree(&case.root), before, "a changed value writes nothing");
+    // A changed state the plan read is another plan on every command that has such a state, though the effects are the same.
+    let mut changed = 0;
+    for case in six().into_iter().filter(|case| case.change.is_some()) {
+        let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
+        (case.change.as_ref().unwrap())();
+        let before = tree(&case.root);
+        let out = case.commit_with(&digest);
+        assert_eq!(out.status.code(), Some(2), "{}: {}", case.leaf, text(&out));
+        assert_eq!(json_of(&out)["error"]["code"], "PLAN_STALE", "{}", case.leaf);
+        assert_eq!(tree(&case.root), before, "{}: a changed state writes nothing", case.leaf);
+        changed += 1;
+    }
+    assert!(changed >= 4, "the commands that read state: {changed}");
 }

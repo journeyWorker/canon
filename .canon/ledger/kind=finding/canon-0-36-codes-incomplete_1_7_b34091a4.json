@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:26:03.102350Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "disposition": "fixed",
+  "introduced_by": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "kind": "finding",
+  "reason": "re-reviewed at 73e2b1a0",
+  "resolution_code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "resolution_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards] Judgments of the implementer's calls. PROMOTION_FAILED kept FAILED: the stated reason (the staged record stays staged, where the ordinary flow takes it) holds just as well for the refusal case that became EVIDENCE/FINDING/DIVERGENCE_INCOMPLETE, so the line between the two is the presence of a refusal code to name as the reason, not the effect; accept, but the CHANGELOG sentence 'judged a failure, not an incomplete work' reads as a different principle than the one applied; reword it to 'no refusal to name'. TIER_FAILED/TIER_INCOMPLETE by recount: accept; two limits: a record that crosses the aging threshold between the plan and the recount makes left >= planned and reports FAILED after a partial move, and a recount that cannot be made is read as part-way, which is the safe side. STRATEGY_PROMOTION_FAILED: both sites checked, the unapproved path is one fs::write, the approved path removes its file again when the store update fails; accept. EVIDENCE_STORE_FAILED merged into ARTIFACTS_STORE_FAILED: accept (retryable yes, record or batch rolled back; stored blobs are content-addressed and harmless). ARTIFACTS_STORE_INCOMPLETE retryable yes: verified with a real call, the repeat stored the missing blob and reported alreadyStored 1. Kept *_FAILED names that can still leave effects: init -> SKILLS_FAILED/WRITE_FAILED after canon.yaml was written (the 0.35 contract author's decision, tests atip_midway_04/05, meta.next still leads with the read) and INVENTORY_FAILED on a store error after an earlier root was indexed; accept the first, the second is the same defect as the inventory finding.",
+  "worktree_dirty": false
+}

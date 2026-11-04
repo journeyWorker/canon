@@ -334,3 +334,111 @@ fn plugin_sync_from_a_subdirectory_resolves_the_repo_root_tier() {
     let records = query_scenarios_with_plugin(dir.path());
     assert_eq!(scenario_record(&records, "idolive.hub.01")["overlay"]["porting.coverage"]["covered"], true);
 }
+
+/// atip.incomplete.08: `plugin sync` writes the overlay record of each candidate; when it could not write one (the second, by the debug seam
+/// `plugin-second-candidate`) the records it wrote stay and the answer is `PLUGIN_SYNC_INCOMPLETE`: exit 1, not retryable, `data.roots` names each
+/// error and what was written, `meta.next` leads with `canon status`. Syncing again, nothing stopping it, writes the candidate that was left and finds the
+/// first already there.
+#[test]
+fn atip_incomplete_08_a_plugin_sync_that_could_not_write_a_candidate_is_incomplete_and_the_written_ones_stay(
+) {
+    let dir = tempfile::tempdir().unwrap();
+    write_repo(dir.path());
+    sync_inventory(dir.path());
+    let stopped = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["plugin", "sync", "porting", "--repo", ".", "--json"])
+        .env("CANON_TEST_STOP_AT", "plugin-second-candidate")
+        .current_dir(dir.path())
+        .output()
+        .expect("spawn canon binary");
+    assert_eq!(
+        stopped.status.code(),
+        Some(1),
+        "{}{}",
+        stdout(&stopped),
+        stderr(&stopped)
+    );
+    let body: Value = serde_json::from_slice(&stopped.stdout).expect("one JSON document");
+    assert_eq!(
+        (
+            body["error"]["code"].as_str(),
+            body["error"]["retryable"].as_bool()
+        ),
+        (Some("PLUGIN_SYNC_INCOMPLETE"), Some(false)),
+        "{body}"
+    );
+    assert_eq!(
+        (
+            body["data"]["clean"].as_bool(),
+            body["data"]["written"].as_u64()
+        ),
+        (Some(false), Some(1)),
+        "{body}"
+    );
+    let errors = body["data"]["roots"][0]["errors"]
+        .as_array()
+        .expect("data.roots[].errors");
+    assert_eq!(errors.len(), 1, "{body}");
+    assert_eq!(
+        body["meta"]["next"][0]["argv"],
+        serde_json::json!(["status", "--json"]),
+        "{body}"
+    );
+    assert_eq!(
+        query_scenarios_with_plugin(dir.path())
+            .iter()
+            .filter(|record| record["overlay"]["porting.coverage"].is_object())
+            .count(),
+        1,
+        "the candidate it wrote stays"
+    );
+
+    let again = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["plugin", "sync", "porting", "--repo", ".", "--json"])
+        .current_dir(dir.path())
+        .output()
+        .expect("spawn canon binary");
+    assert_eq!(
+        again.status.code(),
+        Some(0),
+        "{}{}",
+        stdout(&again),
+        stderr(&again)
+    );
+    let done: Value = serde_json::from_slice(&again.stdout).expect("one JSON document");
+    assert_eq!(
+        (
+            done["data"]["written"].as_u64(),
+            done["data"]["deduped"].as_u64()
+        ),
+        (Some(1), Some(1)),
+        "{done}"
+    );
+}
+
+/// atip.incomplete.08 (nothing written): a plugin sync whose every candidate fails (the debug seam `plugin-every-candidate`) wrote nothing, so it is
+/// `WRITE_FAILED` (exit 1, one failure of the work that kept nothing), never `PLUGIN_SYNC_INCOMPLETE`, with `data.roots` naming each error and no
+/// `meta.next` read of what was written; its preview wrote nothing either and answers the refusal of what it could not check (exit 2), and the
+/// seam that fails the second candidate leaves a preview alone.
+#[test]
+fn atip_incomplete_08_a_plugin_sync_that_wrote_nothing_is_not_incomplete_and_a_preview_never_is() {
+    let dir = tempfile::tempdir().unwrap();
+    write_repo(dir.path());
+    sync_inventory(dir.path());
+    let run = |extra: &[&str], stop: &str| Command::new(env!("CARGO_BIN_EXE_canon")).args(["plugin", "sync", "porting", "--repo", ".", "--json"]).args(extra).env("CANON_TEST_STOP_AT", stop).current_dir(dir.path()).output().expect("spawn canon binary");
+    let failed = run(&[], "plugin-every-candidate");
+    let body: Value = serde_json::from_slice(&failed.stdout).expect("one JSON document");
+    assert_eq!(failed.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["data"]["written"].as_u64()), (Some("WRITE_FAILED"), Some(0)), "{body}");
+    assert!(body["data"]["roots"][0]["errors"].as_array().is_some_and(|errors| !errors.is_empty()), "{body}");
+    assert!(body["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| step["argv"] != serde_json::json!(["status", "--json"]))), "{body}");
+    assert_eq!(query_scenarios_with_plugin(dir.path()).iter().filter(|record| record["overlay"]["porting.coverage"].is_object()).count(), 0, "nothing was written");
+
+    let preview = run(&["--dry-run"], "plugin-every-candidate");
+    let preview_body: Value = serde_json::from_slice(&preview.stdout).expect("one JSON document");
+    assert_eq!(preview.status.code(), Some(2), "{preview_body}");
+    assert!(preview_body["error"]["code"].as_str().is_some_and(|code| code != "PLUGIN_SYNC_INCOMPLETE" && code.starts_with("REPO_")), "{preview_body}");
+
+    let untouched = run(&["--dry-run"], "plugin-second-candidate");
+    assert_eq!(untouched.status.code(), Some(0), "{}{}", stdout(&untouched), stderr(&untouched));
+}

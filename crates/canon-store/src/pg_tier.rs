@@ -261,13 +261,20 @@ impl PgTier {
     /// through the strict path.
     pub fn connect(dsn: &str, schema: &str) -> Result<Self, StoreError> {
         validate_schema_ident(schema)?;
+        // An empty or malformed DSN is a value the caller wrote, which no wait fixes: `StoreError::Policy`, not a backend that did not answer.
+        if dsn.trim().is_empty() {
+            return Err(StoreError::Policy("the Postgres DSN is empty; set it to a `postgres://user:password@host:port/database` URL".to_string()));
+        }
+        if let Err(e) = dsn.parse::<sqlx::postgres::PgConnectOptions>() {
+            return Err(StoreError::Policy(format!("the Postgres DSN is malformed ({e}); set it to a `postgres://user:password@host:port/database` URL")));
+        }
         let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
         let pool = rt.block_on(async {
             let pool = sqlx::postgres::PgPoolOptions::new()
                 .max_connections(5)
                 .connect(dsn)
                 .await
-                .map_err(|e| StoreError::tier_unavailable(Rung::Hot, Some(Backend::Postgres), e.to_string()))?;
+                .map_err(|e| StoreError::tier_unreachable(Rung::Hot, Some(Backend::Postgres), e.to_string()))?;
             // All three DDL statements run inside ONE transaction
             // holding `pg_advisory_xact_lock`, so a concurrent
             // bootstrap of the same schema waits instead of racing the

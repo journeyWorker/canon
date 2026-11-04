@@ -61,14 +61,15 @@ fn every_node_of_the_clap_tree_is_in_the_spec_and_the_reverse() {
     spec_commands.sort_unstable();
     assert_eq!(spec_commands, tree_commands.iter().map(String::as_str).collect::<Vec<_>>());
     // `commands` holds one document for each leaf of the tree and no group.
-    let leaves: BTreeSet<&str> = doc["tree"]["commands"].as_array().expect("tree").iter().filter(|n| n["kind"] == "command").map(|n| n["command"].as_str().expect("command")).collect();
+    let leaves: BTreeSet<&str> = doc["tree"]["commands"].as_array().expect("tree").iter().filter(|n| n["kind"] != "group").map(|n| n["command"].as_str().expect("command")).collect();
     let documented: BTreeSet<&str> = doc["commands"].as_array().expect("commands").iter().map(|n| n["command"].as_str().expect("command")).collect();
     assert_eq!(leaves, documented);
 }
 
 #[test]
 fn a_command_document_says_everything_an_agent_needs() {
-    let doc = spec::generate();
+    // What the commands declare, in the full model form (the file holds the 1.4 form of the same documents).
+    let doc = spec::model();
     let commands = doc["commands"].as_array().expect("commands");
     for node in commands {
         let command = node["command"].as_str().expect("command");
@@ -125,9 +126,11 @@ fn the_relations_the_guides_draw_are_the_constraints_of_the_documents() {
 fn no_embedded_schema_names_its_own_base_uri() {
     let doc = spec::generate();
     let mut checked = 0;
-    for command in doc["commands"].as_array().expect("commands") {
-        for (name, schema) in command["schemas"].as_object().expect("schemas") {
-            assert!(schema.get("$id").is_none() && schema.get("$schema").is_none() && schema.get("$defs").is_none(), "`{}` {name}", command["command"]);
+    // The schemas live in the file's `schemas` map, one `--schemas` answer per command; a command document holds none.
+    assert!(doc["commands"].as_array().expect("commands").iter().all(|command| command.get("schemas").is_none()));
+    for (command, answer) in doc["schemas"].as_object().expect("schemas") {
+        for (name, schema) in answer["schemas"].as_object().expect("the schemas of the answer") {
+            assert!(schema.get("$id").is_none() && schema.get("$schema").is_none() && schema.get("$defs").is_none(), "`{command}` {name}");
             checked += 1;
         }
     }
@@ -137,6 +140,7 @@ fn no_embedded_schema_names_its_own_base_uri() {
 #[test]
 fn the_spec_carries_what_d2_promises() {
     let doc = spec::generate();
+    let model = spec::model();
     for key in ["_doNotEdit", "specVersion", "cli", "envVars", "exitTable", "contract", "contractVersion", "errors", "warnings", "removed", "tree", "commands", "records"] {
         assert!(doc.get(key).is_some(), "the spec has no `{key}`");
     }
@@ -147,7 +151,8 @@ fn the_spec_carries_what_d2_promises() {
     for name in ["CANON_ROLE", "CANON_ACTOR", "CANON_SKILLS_SOURCE"] {
         assert!(env_names.contains(&name), "{name} is not in the spec");
     }
-    assert!(doc["commands"].as_array().expect("commands").iter().all(|c| c["options"].as_array().expect("options").iter().any(|o| o["name"] == "as")), "every command lists the inherited --as");
+    assert!(model["commands"].as_array().expect("commands").iter().all(|c| c["options"].as_array().expect("options").iter().any(|o| o["name"] == "as")), "every command declares the inherited --as");
+    assert!(doc["tree"]["options"].as_array().expect("the tree's shared options").iter().any(|o| o["name"] == "as") && doc["commands"].as_array().expect("commands").iter().all(|c| c["options"].as_array().is_some_and(|options| options.iter().any(|o| o == "as" || o["name"] == "as"))), "the file names the shared --as on every command (or defines its own)");
     let codes: Vec<u64> = doc["exitTable"].as_array().expect("exitTable").iter().map(|e| e["code"].as_u64().expect("a code")).collect();
     assert_eq!(codes, [0, 1, 2]);
     let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
@@ -195,7 +200,9 @@ fn every_env_var_the_sources_read_is_in_the_spec_or_the_internal_allowlist() {
         for (i, _) in live.match_indices("\"CANON_") {
             let rest = &live[i + 1..];
             let name: String = rest.chars().take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_').collect();
-            if rest[name.len()..].starts_with('"') {
+            // A name that is a reason of a registered code (`CANON_YAML`, the reason of `CONFIG_INVALID`) is a reason, not a variable.
+            let is_reason = canon_cli::cli_error::all_codes().iter().any(|info| info.reasons.iter().any(|r| r.reason == name));
+            if rest[name.len()..].starts_with('"') && !is_reason {
                 read.insert(name);
             }
         }

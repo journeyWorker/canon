@@ -121,12 +121,13 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
     let listing = schema(base.path(), home.path(), &[]);
-    let leaves: Vec<String> = listing["commands"].as_array().unwrap().iter().filter(|c| c["kind"] == "command").map(|c| c["command"].as_str().unwrap().to_string()).collect();
+    let leaves: Vec<String> = listing["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group").map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
     for (name, _) in NEEDS_STATE.iter().chain(SKIPPED) {
         assert!(leaves.iter().any(|l| l == name), "`{name}` is not a command");
     }
 
+    let model = canon_cli::spec::model()["commands"].as_array().expect("the model's commands").clone();
     let mut problems = Vec::new();
     for leaf in &leaves {
         let path: Vec<&str> = leaf.split(' ').collect();
@@ -181,7 +182,9 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
             (Some(code), Some(_)) => {
                 let body: Value = serde_json::from_slice(&out.stdout).unwrap_or(Value::Null);
                 let error = body["error"]["code"].as_str().unwrap_or_default();
-                let codes: Vec<&str> = detail["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+                // The command's declared codes: the model lists every one, the 1.4 document omits the implied ones.
+                let declared = model.iter().find(|doc| doc["command"] == leaf.as_str()).expect("the model has the command");
+                let codes: Vec<&str> = declared["errors"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
                 let exit_of_error = canon_cli::cli_error::all_codes().iter().find(|info| info.code == error).map(|info| i64::from(info.exit));
                 if error == "USAGE" || !codes.contains(&error) || exit_of_error != Some(i64::from(code)) {
                     problems.push(format!("{leaf}: exit {code} with `{error}` is not a documented refusal (codes {codes:?}): {example}"));

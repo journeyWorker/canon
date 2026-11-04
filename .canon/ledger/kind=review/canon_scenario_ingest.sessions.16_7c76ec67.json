@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-audit",
+    "role": "reviewer",
+    "session_id": "s-0-36-audit-rev"
+  },
+  "at": "2026-11-04T18:21:55.284740Z",
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "kind": "review",
+  "pin": "4b1732a54c54fc3b84f257210a1c362255dd004f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too",
+          "junit:ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too",
+          "junit:ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "6be35f0e1459c8ac603fe34756c59666708024922de502c6a12546c5570ed183",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-evidence-audit/brief.md"
+  },
+  "review_id": "01M6KWQMPM8S51WY259VBGR796",
+  "reviewer": "rev-0-36-audit",
+  "scenario_id": "ingest.sessions.16",
+  "schema": 2,
+  "worktree_dirty": false
+}

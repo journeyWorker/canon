@@ -158,7 +158,7 @@ test("report.dashboard.13: the request carries the name and answer once and each
 
 test("report.dashboard.14: a refused multi-brief approval names each refused brief and says to read it again", () => {
   const failure = {
-    code: "BRIEF_APPROVE_REFUSED",
+    code: "BRIEF_INVALID",
     message: "1 of 3 briefs refused, so none was approved",
     hint: "reload this page to read the briefs named as they are now",
     refused: [{ changeId: "b", code: "BRIEF_PAGE_STALE", message: "b changed after this page loaded it" }],
@@ -177,7 +177,7 @@ test("report.dashboard.14: refusal text from the server is shown as text, never 
 });
 
 test("atip/1: an error without a hint member has no hint, and a null hint is tolerated", () => {
-  const absent = approveFailure({ error: { code: "BRIEF_APPROVE_REFUSED", message: "none approved" }, data: { refused: [{ changeId: "b", code: "C", message: "m" }] } }, 409);
+  const absent = approveFailure({ error: { code: "BRIEF_INVALID", message: "none approved", details: [{ code: "C", message: "`b`: m" }] } }, 409);
   expect(absent.hint).toBeUndefined();
   expect(absent.refused).toEqual([{ changeId: "b", code: "C", message: "m" }]);
   expect(toHtml(renderApproveError(absent, null))).not.toContain("finding-hint");

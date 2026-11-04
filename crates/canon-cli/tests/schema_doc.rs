@@ -249,6 +249,189 @@ fn parse_problem(example: &str) -> Option<String> {
 }
 
 // ----------------------------------------------------------------------------------------------------------
+// The rules of the 1.4 form (contract Annex S2) for the tree and the command documents the file holds.
+
+/// The reserved option names a 1.4 command document lists by name beside the tree's shared ones.
+const RESERVED_NAMED: [&str; 2] = ["commit", "plan-digest"];
+
+/// A value of a 1.4 document that is the default of its member, and so is absent.
+fn default_members(owner: &str, object: &Value, problems: &mut Vec<String>) {
+    let name = object["name"].as_str().unwrap_or_default();
+    let value_type = object["valueType"].as_str().unwrap_or("string");
+    for flag in ["required", "repeatable", "variadic", "flagOnly", "async"] {
+        if object.get(flag) == Some(&json!(false)) {
+            problems.push(format!("{owner}: `{name}` lists {flag}: false"));
+        }
+    }
+    match (value_type, object.get("default")) {
+        (_, Some(Value::Null)) => problems.push(format!("{owner}: `{name}` lists a null default")),
+        ("switch", Some(Value::Bool(false))) | ("count", Some(Value::Number(_))) if object["default"] == json!(0) || object["default"] == json!(false) => problems.push(format!("{owner}: `{name}` lists the default of its type")),
+        _ => {}
+    }
+    if object.get("valueType") == Some(&json!("string")) {
+        problems.push(format!("{owner}: `{name}` lists valueType string"));
+    }
+    if object.get("valueName").and_then(Value::as_str) == Some(&name.to_uppercase().replace('-', "_")) {
+        problems.push(format!("{owner}: `{name}` lists its upper-cased name as valueName"));
+    }
+    for (key, value) in object.as_object().into_iter().flatten() {
+        if value.as_array().is_some_and(Vec::is_empty) {
+            problems.push(format!("{owner}: `{name}` lists an empty {key}"));
+        }
+    }
+}
+
+/// The rules of the 1.4 form for `tree` (a 1.4 tree document's `data`), `commands` (1.4 command documents) and `schemas` (command -> the `--schemas` answer's data): one line per violation.
+fn form_problems(tree: &Value, commands: &[Value], schemas: &Value) -> Vec<String> {
+    let mut problems = Vec::new();
+    let shared: Vec<&str> = tree["options"].as_array().into_iter().flatten().map(|option| option["name"].as_str().expect("a shared option has a name")).collect();
+    for option in tree["options"].as_array().into_iter().flatten() {
+        default_members("tree", option, &mut problems);
+    }
+    let mut uses: BTreeMap<&str, usize> = BTreeMap::new();
+    for entry in tree["commands"].as_array().into_iter().flatten() {
+        if entry.get("path").is_some() {
+            problems.push(format!("tree entry `{}` has `path`", entry["command"]));
+        }
+        if entry["kind"] == "command" {
+            problems.push(format!("tree entry `{}` has kind command", entry["command"]));
+        }
+    }
+    let model = canon_cli::spec::model();
+    let model_commands = model["commands"].as_array().expect("the model's commands");
+    for doc in commands {
+        let command = doc["command"].as_str().unwrap_or_default();
+        let owner = format!("`{command}`");
+        for member in ["path", "schemas"] {
+            if doc.get(member).is_some() {
+                problems.push(format!("{owner}: has `{member}`"));
+            }
+        }
+        for validator in doc["validators"].as_array().into_iter().flatten() {
+            if validator.get("rejects").is_some() {
+                problems.push(format!("{owner}: a validator has `rejects`"));
+            }
+        }
+        for key in ["schemaRef", "argumentsRef", "option"] {
+            if key != "argumentsRef" && doc["input"].get(key).is_some() {
+                problems.push(format!("{owner}: input has `{key}`"));
+            }
+        }
+        if doc["input"].get("batch") == Some(&json!(false)) {
+            problems.push(format!("{owner}: input lists batch: false"));
+        }
+        for output in doc["outputs"].as_array().into_iter().flatten() {
+            if output["kind"] == "report" || output["schemaVersion"] == "1.0" {
+                problems.push(format!("{owner}: an output lists the default kind report or schemaVersion 1.0"));
+            }
+        }
+        for (key, value) in doc.as_object().into_iter().flatten() {
+            if value.as_array().is_some_and(Vec::is_empty) || value.as_object().is_some_and(serde_json::Map::is_empty) {
+                problems.push(format!("{owner}: lists an empty {key}"));
+            }
+        }
+        let mut named: Vec<&str> = Vec::new();
+        for option in doc["options"].as_array().into_iter().flatten() {
+            match option {
+                Value::String(name) => {
+                    named.push(name);
+                    *uses.entry(name).or_default() += 1;
+                    if !shared.contains(&name.as_str()) && !RESERVED_NAMED.contains(&name.as_str()) {
+                        problems.push(format!("{owner}: names `{name}`, which is neither a tree option nor a reserved option"));
+                    }
+                }
+                object => {
+                    let name = object["name"].as_str().unwrap_or_default();
+                    named.push(name);
+                    default_members(&owner, object, &mut problems);
+                    if ["json", "input", "fields"].contains(&name) && (name == "json" || (name == "input" && doc["input"].is_object()) || (name == "fields" && doc["outputs"].as_array().into_iter().flatten().any(|output| output.get("fields").is_some()))) {
+                        problems.push(format!("{owner}: lists the implied --{name}"));
+                    }
+                }
+            }
+        }
+        for operand in doc["operands"].as_array().into_iter().flatten() {
+            default_members(&owner, operand, &mut problems);
+        }
+        let errors = names(doc, "errors");
+        let mut implied = vec!["USAGE", "INTERNAL"];
+        if doc["input"].is_object() {
+            implied.extend(["INPUT_INVALID", "INPUT_CONFLICT", "INPUT_TOO_LARGE"]);
+        }
+        if doc["input"]["batch"] == true {
+            implied.push("BATCH_INCOMPLETE");
+        }
+        if named.contains(&"commit") {
+            implied.push("PLAN_STALE");
+        }
+        if named.contains(&"cursor") {
+            implied.push("CURSOR_INVALID");
+        }
+        for code in implied {
+            if errors.iter().any(|known| known == code) {
+                problems.push(format!("{owner}: lists the implied code {code}"));
+            }
+        }
+        for code in &errors {
+            if canon_cli::cli_error::code_info(code).is_none() {
+                problems.push(format!("{owner}: the error `{code}` is not in the registry"));
+            }
+        }
+        if named.contains(&"commit") != named.contains(&"plan-digest") {
+            problems.push(format!("{owner}: lists --commit and --plan-digest apart"));
+        }
+        // The `--schemas` answer of the command: every ref resolves, `Input` is the derivation, `rejects` follow the validators.
+        let answer = &schemas[command];
+        let held = answer["schemas"].as_object().cloned().unwrap_or_default();
+        let mut refs: Vec<String> = Vec::new();
+        for output in doc["outputs"].as_array().into_iter().flatten() {
+            for key in ["schemaRef", "eventRef"] {
+                refs.extend(output[key].as_str().map(str::to_string));
+            }
+        }
+        for key in ["schemaRef", "argumentsRef"] {
+            refs.extend(doc["input"][key].as_str().map(str::to_string));
+        }
+        for reference in &refs {
+            if !ref_name(reference).is_some_and(|name| held.contains_key(name)) {
+                problems.push(format!("{owner}: the ref {reference} does not resolve in the --schemas answer"));
+            }
+        }
+        for (name, schema) in &held {
+            let wrapper = json!({ "schemas": answer["schemas"].clone() });
+            if let Err(reason) = member_validator(&wrapper, name) {
+                problems.push(format!("{owner}: {reason}"));
+            }
+            let _ = &schema;
+        }
+        let model_doc = model_commands.iter().find(|model_doc| model_doc["command"] == command).expect("the model has the command");
+        if doc["input"].is_object() {
+            let typed = canon_cli::spec::command(&canon_cli::spec::built_root(), &command.split(' ').map(str::to_string).collect::<Vec<_>>()).expect("the model has the command");
+            if held.get("Input") != Some(&atip::fragment::derived_fragment(&typed.operands, &typed.options)) {
+                problems.push(format!("{owner}: `Input` is not the derivation from the options"));
+            }
+        } else if held.contains_key("Input") {
+            problems.push(format!("{owner}: has `Input` and no input"));
+        }
+        let validators = model_doc["validators"].as_array().cloned().unwrap_or_default();
+        let rejects = answer["rejects"].as_array().cloned();
+        let wanted: Option<Vec<Value>> = (!validators.is_empty()).then(|| validators.iter().map(|validator| validator["rejects"].clone()).collect());
+        if rejects != wanted {
+            problems.push(format!("{owner}: rejects are not the validators' rejects in order"));
+        }
+    }
+    // A shared option is named by at least two commands, and every one defined in the tree is named by some.
+    for name in shared {
+        match uses.get(name) {
+            None | Some(0) => problems.push(format!("tree option `{name}` is named by no command")),
+            Some(1) => problems.push(format!("tree option `{name}` is named by one command only")),
+            _ => {}
+        }
+    }
+    problems
+}
+
+// ----------------------------------------------------------------------------------------------------------
 // atip.schemadoc.01 — F1: the tree
 
 /// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L2, lists 27 groups and 78 commands once, a
@@ -259,24 +442,26 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     assert_eq!(code, Some(0));
     assert_eq!(first["data"]["kind"], "tree");
     assert_eq!(first["data"]["level"], "L2");
-    assert_eq!(first["meta"]["schemaVersion"], "1.2");
+    assert_eq!(first["meta"]["schemaVersion"], "1.4");
+    assert_eq!(first["meta"]["contractVersion"], "1.4");
     assert_eq!(first["meta"]["command"], "schema");
     assert_eq!(atip::schema_doc_problems(&first), Vec::<String>::new());
     assert!(first["data"].get("roles").is_none(), "the old top-level roles member is gone");
     let entries = first["data"]["commands"].as_array().expect("commands");
-    let kinds: Vec<&str> = entries.iter().map(|entry| entry["kind"].as_str().expect("kind")).collect();
+    let kinds: Vec<&str> = entries.iter().map(|entry| if entry["kind"] == "group" { "group" } else { "command" }).collect();
+    assert!(entries.iter().all(|entry| entry["kind"] != "command" && entry.get("path").is_none()), "a 1.4 tree entry has no `kind: command` and no `path`");
     assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 78));
     let ids: Vec<&str> = entries.iter().map(|entry| entry["command"].as_str().expect("command")).collect();
     assert_eq!(ids.iter().collect::<BTreeSet<_>>().len(), ids.len(), "every id once");
     for (at, entry) in entries.iter().enumerate() {
-        assert_eq!(names(entry, "path").join(" "), entry["command"].as_str().expect("command"));
+        assert!(entry["summary"].is_string(), "{entry}");
         if entry["kind"] == "group" {
             assert!(entry.get("effect").is_none(), "a group has no effect");
         } else {
             assert!(entry["effect"].is_string(), "a command has one: {entry}");
             assert!(entry["x-canon"]["roles"].is_array(), "the roles of a command are x-canon.roles: {entry}");
             let parent = &ids[..at].iter().rev().find(|id| entry["command"].as_str().expect("command").starts_with(&format!("{id} "))).copied();
-            if entry["path"].as_array().expect("path").len() > 1 {
+            if entry["command"].as_str().expect("command").contains(' ') {
                 assert!(parent.is_some(), "a group comes before its command: {entry}");
             }
         }
@@ -293,11 +478,11 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     assert_eq!(atip::schema_doc_problems(&reviewer), Vec::<String>::new());
     assert!(first["data"].get("x-canon").is_none(), "an unfiltered tree has no x-canon");
     for entry in listed {
-        if entry["kind"] == "command" {
+        if entry["kind"] != "group" {
             assert!(names(&entry["x-canon"], "roles").contains(&"reviewer".to_string()), "{entry}");
         } else {
             let prefix = format!("{} ", entry["command"].as_str().expect("command"));
-            assert!(listed.iter().any(|other| other["kind"] == "command" && other["command"].as_str().is_some_and(|c| c.starts_with(&prefix))), "a group is listed only for a command it holds: {entry}");
+            assert!(listed.iter().any(|other| other["kind"] != "group" && other["command"].as_str().is_some_and(|c| c.starts_with(&prefix))), "a group is listed only for a command it holds: {entry}");
         }
     }
     let by_env = run(&["schema", "--json"], dir.path(), Some("reviewer"));
@@ -332,7 +517,9 @@ fn atip_schemadoc_03_a_group_lists_its_children_and_a_path_in_words_or_one_strin
     let (code, group, _) = answer(&["schema", "finding", "--json"]);
     assert_eq!(code, Some(0));
     assert_eq!(group["data"]["kind"], "group");
-    assert_eq!((group["data"]["command"].clone(), group["data"]["path"].clone()), (json!("finding"), json!(["finding"])));
+    assert_eq!(group["data"]["command"], "finding");
+    assert!(group["data"].get("path").is_none(), "a 1.4 group has no `path`: {group}");
+    assert!(group["data"]["commands"].as_array().expect("commands").iter().all(|entry| entry.get("path").is_none() && entry["kind"] != "command"));
     assert_eq!(atip::schema_doc_problems(&group), Vec::<String>::new());
     let children: Vec<&str> = group["data"]["commands"].as_array().expect("commands").iter().map(|entry| entry["command"].as_str().expect("command")).collect();
     assert_eq!(children, ["finding add", "finding close", "finding list"]);
@@ -395,7 +582,7 @@ fn atip_schemadoc_03_a_group_under_as_lists_what_the_roles_tree_lists() {
             args.extend(path.iter().map(String::as_str));
             args.extend(["--as", role, "--json"]);
             let (code, answer) = json(&args);
-            let wanted: Vec<&Value> = entries.iter().filter(|entry| entry["path"].as_array().is_some_and(|p| p.len() == path.len() + 1 && p[..path.len()] == group["path"].as_array().expect("path")[..])).collect();
+            let wanted: Vec<&Value> = entries.iter().filter(|entry| entry["command"].as_str().is_some_and(|c| c.starts_with(&format!("{} ", group["command"].as_str().expect("command"))) && c.split(' ').count() == path.len() + 1)).collect();
             if wanted.is_empty() {
                 refused += 1;
                 assert_eq!((code, answer["error"]["code"].clone(), answer["error"]["field"].clone()), (Some(2), json!("UNKNOWN_COMMAND"), json!("command")), "{role} {path:?}");
@@ -655,7 +842,7 @@ fn atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation
 fn atip_schemadoc_07_errors_outputs_and_schemas_hold_together_in_every_command_document() {
     let mut problems = Vec::new();
     for doc in COMMANDS.iter() {
-        let envelope = json!({ "ok": true, "data": doc, "meta": { "tool": "canon", "toolVersion": "0.0.0", "contract": "atip/1", "contractVersion": "1.2", "schemaVersion": "1.2", "command": "schema" } });
+        let envelope = json!({ "ok": true, "data": doc, "meta": { "tool": "canon", "toolVersion": "0.0.0", "contract": "atip/1", "contractVersion": "1.4", "schemaVersion": "1.4", "command": "schema" } });
         problems.extend(atip::schema_doc_problems(&envelope).into_iter().map(|problem| format!("`{}`: {problem}", doc["command"])));
         problems.extend(rule_problems(doc));
         for code in names(doc, "errors") {
@@ -832,31 +1019,44 @@ fn spec_file() -> Value {
 #[test]
 fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command() {
     let file = spec_file();
-    assert_eq!(file["tree"], *TREE);
+    let root = canon_cli::spec::built_root();
+    let described = canon_cli::spec::described(&root, None).expect("described");
+    assert_eq!(file["tree"], described.tree().to_value());
     assert_eq!(file["tree"]["level"], "L2");
+    assert_eq!(file["contractVersion"], "1.4");
+    // The file is the 1.4 form: the tree and the command documents hold no `path`, and the schemas live in their own map.
     let commands = file["commands"].as_array().expect("commands");
     assert_eq!(commands.len(), 78);
     let dir = tempfile::tempdir().expect("tempdir");
+    let mut problems = form_problems(&file["tree"], commands, &file["schemas"]);
     for doc in commands {
-        let path = names(doc, "path");
+        let command = doc["command"].as_str().expect("command").to_string();
+        let path: Vec<&str> = command.split(' ').collect();
         let mut args: Vec<&str> = vec!["schema"];
-        args.extend(path.iter().map(String::as_str));
+        args.extend(path.iter().copied());
         args.push("--json");
         let out = run(&args, dir.path(), None);
         assert_eq!(out.status.code(), Some(0), "{args:?}");
         let text = String::from_utf8(out.stdout).expect("text");
         let answer: Value = serde_json::from_str(&text).expect("JSON");
-        assert_eq!(answer["data"], *doc, "`{}`: the file and the answer differ", doc["command"]);
-        // The bytes of `data` in the answer are the bytes the generator serializes.
-        let root = canon_cli::spec::built_root();
-        let generated = serde_json::to_string(&canon_cli::spec::command(&root, &path).expect("built")).expect("serializes");
+        assert_eq!(answer["data"], *doc, "`{command}`: the file and the answer differ");
+        // The bytes of `data` in the answer are the bytes the serializer writes.
+        let generated = described.command(&command).expect("a command document").to_line();
         let printed = &text[text.find("\"data\":").expect("data") + "\"data\":".len()..text.rfind(",\"meta\":").expect("meta")];
-        assert_eq!(printed, generated, "`{}`", doc["command"]);
+        assert_eq!(printed, generated, "`{command}`");
+        // The `schemas` map of the file holds what `--schemas` answers.
+        args.insert(args.len() - 1, "--schemas");
+        let out = run(&args, dir.path(), None);
+        assert_eq!(out.status.code(), Some(0), "{args:?}");
+        let answer: Value = serde_json::from_slice(&out.stdout).expect("JSON");
+        assert_eq!(answer["data"], file["schemas"][&command], "`{command}`: the file's schemas and the --schemas answer differ");
+        assert_eq!(answer["data"]["kind"], "schemas");
     }
-    assert_eq!(file["specVersion"], "2");
-    for old in ["globalOptions", "schemas"] {
-        assert!(file.get(old).is_none(), "the file has no top-level `{old}`: every command carries its own");
-    }
+    assert_eq!(file["schemas"].as_object().expect("schemas").len(), commands.len(), "the file's schemas map has one answer per command");
+    assert!(problems.is_empty(), "{}", { problems.sort(); problems.join("\n") });
+    assert_eq!(file["specVersion"], canon_cli::spec::SPEC_VERSION);
+    assert_eq!(file["specVersion"], "3");
+    assert!(file.get("globalOptions").is_none(), "the file has no top-level `globalOptions`");
 }
 
 /// The files whose text must not use a name the L1 documents dropped: guides, the website, the evaluation scripts and

@@ -139,7 +139,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relayed approval is a relation: its role, its actor and its answer are validators over --relayed-via, the environment is declared on --as and --actor, and the human's blank answer has its own code
     Given a built canon
     When canon schema brief approve, policy approve, divergence accept and migrate run
-    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INVALID or POLICY_APPROVAL_REFUSED
+    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INVALID
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:12Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema
@@ -149,7 +149,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relayed approval without a role, an actor or an answer, and a blank human answer, are refused in an empty directory with their codes, and CANON_ACTOR and CANON_ROLE fill the first two
     Given an empty directory with an empty HOME and no CANON_ROLE or CANON_ACTOR
     When brief approve and policy approve run relayed without a role, with a role and no actor, and with a blank approver or note, and unrelayed with a blank answer; then with CANON_ROLE and CANON_ACTOR set
-    Then each refusal is exit 2 with its code (USAGE naming --relayed-via, --actor, --approver or --note, APPROVAL_INVALID, POLICY_APPROVAL_REFUSED) and writes nothing; with the two variables set the call goes on to the repository and answers CONFIG_REQUIRED
+    Then each refusal is exit 2 with its code (USAGE naming --relayed-via, --actor, --approver or --note, APPROVAL_INVALID) and writes nothing; with the two variables set the call goes on to the repository and answers CONFIG_REQUIRED
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:16Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema

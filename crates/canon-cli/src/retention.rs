@@ -41,6 +41,53 @@ pub enum RetentionError {
     Tiers(#[from] tiers::TierCliError),
 }
 
+/// What to do about a refusal of [`tiers_code`].
+fn tiers_hint(code: &str) -> &'static str {
+    match code {
+        "RETENTION_TIERS_REQUIRED" => "set the variables the message names for the tier (or add its `tiers:` entry to canon.yaml)",
+        "RETENTION_TIERS_CORRUPT" => "restore the damaged object the message names from a copy, or remove it",
+        "RETENTION_TIERS_UNAVAILABLE" => "check that the tier backends are reachable (wait a moment if the system failed the read)",
+        "RETENTION_TIERS_DENIED" => "make the file the message names readable by this user",
+        _ => "fix the tier or policy problem the message names in canon.yaml",
+    }
+}
+
+/// The code of a purge or export that could not open or read the tiers before it began, by what is wrong:
+/// - a tier that is not attached or not configured (its endpoint, DSN or credentials are unset, or canon.yaml has no entry for it) is
+///   `RETENTION_TIERS_REQUIRED`: waiting does not set them;
+/// - a stored object that does not decode (a Parquet file canon wrote) is `RETENTION_TIERS_CORRUPT`;
+/// - a backend that is down or does not answer is `RETENTION_TIERS_UNAVAILABLE`, which can be tried again: a SQL or object-store error, or a
+///   Postgres DSN that is set and cannot be reached (the settings are there, so waiting can help where it cannot for an unset one);
+/// - a policy, routing entry or config the caller wrote that cannot be used is `RETENTION_TIERS_INVALID`.
+///
+/// An operating-system error is told by its cause (`read_cause`): a read the system refuses is `RETENTION_TIERS_DENIED`, a path that is
+/// not there or is no file or directory (the caller's wrong path) is `RETENTION_TIERS_INVALID`, and only an error a repeat can pass
+/// (`EIO`, an interrupted or timed-out call) is `RETENTION_TIERS_UNAVAILABLE`, like a backend that is down.
+fn tiers_code(error: &RetentionError) -> &'static str {
+    use crate::read_cause::{of_io, Cause};
+    use canon_store::tier::StoreError;
+    let by_cause = |io: &std::io::Error| match of_io(io) {
+        Cause::Denied => "RETENTION_TIERS_DENIED",
+        Cause::Unavailable => "RETENTION_TIERS_UNAVAILABLE",
+        Cause::NotFound | Cause::WrongPath | Cause::Other => "RETENTION_TIERS_INVALID",
+    };
+    let by_store = |store: &StoreError| match store {
+        StoreError::Io(io) => by_cause(io),
+        StoreError::TierUnavailable { configured: true, .. } => "RETENTION_TIERS_UNAVAILABLE",
+        StoreError::TierUnavailable { configured: false, .. } | StoreError::BackendUnattached { .. } => "RETENTION_TIERS_REQUIRED",
+        StoreError::Parquet(_) => "RETENTION_TIERS_CORRUPT",
+        StoreError::Sql(_) | StoreError::ObjectStore(_) => "RETENTION_TIERS_UNAVAILABLE",
+        _ => "RETENTION_TIERS_INVALID",
+    };
+    match error {
+        RetentionError::Io(io) | RetentionError::Tiers(tiers::TierCliError::ReadCanonYaml { source: io, .. }) => by_cause(io),
+        RetentionError::Store(store) | RetentionError::Tiers(tiers::TierCliError::Store(store)) => by_store(store),
+        RetentionError::Learn(canon_learn::LearnError::Parquet(_)) => "RETENTION_TIERS_CORRUPT",
+        RetentionError::Learn(canon_learn::LearnError::Io(io)) => by_cause(io),
+        _ => "RETENTION_TIERS_INVALID",
+    }
+}
+
 fn actor() -> String {
     std::env::var("CANON_ACTOR")
         .ok()
@@ -138,7 +185,7 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
 fn loaded_registry(repo: &Path, kind: RecordKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
     let yaml = resolve_canon_yaml(repo);
     let loaded = if read_only { tiers::build_lenient_tiers_for_kind_read(&yaml, kind)? } else { tiers::build_lenient_tiers_for_kind(&yaml, kind)? };
-    let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
+    let registry = loaded.into_registry();
     Ok((yaml, registry))
 }
 
@@ -299,12 +346,20 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
                 targets.extend(learn.map(|config| yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(repo).join(&config.root).join("trajectories")));
             }
             for target in &targets {
-                crate::write_mode::check_writable(target).map_err(|cause| RetentionError::Refusal(Box::new(crate::write_mode::unavailable(target, &cause))))?;
+                crate::write_mode::check_writable(target).map_err(|cause| RetentionError::Refusal(Box::new(crate::write_mode::unwritable(target, &cause))))?;
             }
         }
         deleting.set(commit);
+        // `purge-before-delete` (a debug build's test seam, `incomplete::injected_stop`): the purge fails before it deleted any record.
+        if let Some(stop) = crate::incomplete::injected_stop("purge-before-delete").filter(|_| commit) {
+            return Err(RetentionError::Store(canon_store::tier::StoreError::Io(stop)));
+        }
         // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
         let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
+        if let Some(stop) = crate::incomplete::injected_stop("purge-after-delete").filter(|_| commit) {
+            // The deletion in the tiers is done, and the step after it stops (the test seam stands for the learn store, which a trajectory purge empties next).
+            return Err(RetentionError::PartialPurge { matched: outcome.rungs.iter().map(|r| r.matched).sum(), deleted: outcome.rungs.iter().map(|r| r.deleted).sum(), reason: stop.to_string() });
+        }
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
         let learn_counts = if let Some(store) = learn_store {
@@ -353,9 +408,21 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             if matched > 0 || deleted > 0 {
                 let _ = append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted);
             }
-            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, a failure is a failure during the work (exit 1).
-            let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { "RETENTION_PURGE_REFUSED" };
-            let error = CliError::refused(code, err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
+            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2). A commit that stops after it deleted something is
+            // `RETENTION_PURGE_INCOMPLETE` (exit 1, what was deleted stays deleted); one that stopped before the first record was deleted (the error carries the
+            // counts) is answered by its cause like the refusals before it.
+            let incomplete = deleting.get() && deleted > 0;
+            let code = if incomplete { "RETENTION_PURGE_INCOMPLETE" } else { tiers_code(&err) };
+            if incomplete {
+                crate::incomplete::read_status("read what the purge deleted before it stopped (`data` names the counts): what was deleted stays deleted");
+            }
+            let hint = if incomplete {
+                format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`")
+            } else {
+                format!("{}, then run `{base}` again and commit its plan with `--commit --plan-digest <planDigest>`", tiers_hint(code))
+            };
+            let error = CliError::refused(code, err.to_string()).hint(hint);
+            let error = if incomplete { error.reason("WRITE_FAILED") } else { error };
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
                     Some(partial_purge_report(kind, before, *matched, *deleted, &err.to_string()))
@@ -491,7 +558,10 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         // names the file; otherwise the manifest, which is what a text-mode run prints or writes to the file.
         let answer = if dry_run { "ExportPreviewReport" } else if json_output && out.is_some() { "ExportWrittenReport" } else { "ExportReport" };
         let chosen = crate::fields::choose_output("export", Some(answer), fields, None).map_err(ExportFailure::Refused)?;
-        ensure_sensitive(repo, include_sensitive)?;
+        ensure_sensitive(repo, include_sensitive).map_err(|error| match error {
+            RetentionError::Message(message) => ExportFailure::Refused(CliError::refused("RETENTION_EXPORT_DENIED", message).hint("ask the human to set `query.allow_sensitive: true` in .canon/policy.yaml, or export without --include-sensitive")),
+            other => ExportFailure::from(other),
+        })?;
         let (_, registry) = loaded_registry(repo, kind, true)?;
         let mut query = TierQuery::kind(kind);
         if let Some(after) = after { query = query.since(after); }
@@ -534,11 +604,11 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         };
         // The destination is checked before anything is written, for a preview as for a run: an output that cannot be created refuses with nothing written and no audit line.
         if let Some(path) = out.filter(|path| !fs::read(path).is_ok_and(|held| held == encoded)) {
-            crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(path, &e)))?;
+            crate::write_mode::check_creatable(path, false).and_then(|()| crate::write_mode::check_writable(path)).map_err(|e| ExportFailure::Refused(crate::write_mode::unwritable(path, &e)))?;
         }
         // A real run appends one audit line; a repo whose audit file cannot take it is refused the same way. A preview appends none.
         if let Some(path) = audit_path(repo).filter(|_| !dry_run) {
-            crate::write_mode::check_writable(&path).map_err(|e| ExportFailure::Refused(crate::write_mode::unavailable(&path, &e)))?;
+            crate::write_mode::check_writable(&path).map_err(|e| ExportFailure::Refused(crate::write_mode::unwritable(&path, &e)))?;
         }
         if dry_run {
             if json_output {
@@ -601,8 +671,9 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         }
         Err(ExportFailure::Retention(err)) => {
             // The ledger is read and the destination is checked before anything is written (exit 2); once the manifest is being written the same errors are a failure during the work (exit 1).
-            let code = if writing { "RETENTION_EXPORT_FAILED" } else { "RETENTION_EXPORT_REFUSED" };
-            CliError::refused(code, err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
+            let code = if writing { "RETENTION_EXPORT_FAILED" } else { tiers_code(&err) };
+            let hint = if writing { "check that the destination is writable and the ledger is readable, then run `canon export` again".to_string() } else { format!("{}, then run `canon export` again", tiers_hint(code)) };
+            CliError::refused(code, err.to_string()).hint(hint).emit("canon export", json_output)
         }
     }
 }
@@ -631,6 +702,35 @@ pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// atip.codestored.13: the code of a refusal to open the tiers is told by what is wrong, and only a backend that does not answer or an error a
+    /// repeat can pass is retryable (`UNAVAILABLE`).
+    #[test]
+    fn atip_codestored_13_the_tiers_code_is_told_by_what_is_wrong() {
+        use canon_store::policy::{Backend, Rung};
+        use canon_store::tier::StoreError;
+        let store = |error: StoreError| RetentionError::Store(error);
+        for (error, code) in [
+            (store(StoreError::BackendUnattached { backend: Backend::Postgres, reason: "no live DSN".into() }), "RETENTION_TIERS_REQUIRED"),
+            (store(StoreError::tier_unavailable(Rung::Hot, Some(Backend::Postgres), "no live DSN")), "RETENTION_TIERS_REQUIRED"),
+            // atip.reasons.14: a DSN that is set and cannot be reached is a tier that is down, and an unset one is a tier that is not configured.
+            (store(StoreError::tier_unreachable(Rung::Hot, Some(Backend::Postgres), "error communicating with database")), "RETENTION_TIERS_UNAVAILABLE"),
+            (store(StoreError::tier_unavailable(Rung::Cold, None, "no tiers.cold entry")), "RETENTION_TIERS_REQUIRED"),
+            (store(StoreError::Parquet("Invalid Parquet file. Corrupt footer".into())), "RETENTION_TIERS_CORRUPT"),
+            (RetentionError::Learn(canon_learn::LearnError::Parquet("Invalid Parquet file. Corrupt footer".into())), "RETENTION_TIERS_CORRUPT"),
+            (store(StoreError::Sql("connection refused".into())), "RETENTION_TIERS_UNAVAILABLE"),
+            (store(StoreError::ObjectStore("timed out".into())), "RETENTION_TIERS_UNAVAILABLE"),
+            (RetentionError::Io(std::io::Error::from_raw_os_error(5)), "RETENTION_TIERS_UNAVAILABLE"),
+            (store(StoreError::Io(std::io::Error::from_raw_os_error(13))), "RETENTION_TIERS_DENIED"),
+            (RetentionError::Learn(canon_learn::LearnError::Io(std::io::Error::from_raw_os_error(13))), "RETENTION_TIERS_DENIED"),
+            (RetentionError::Io(std::io::Error::from_raw_os_error(2)), "RETENTION_TIERS_INVALID"),
+            (RetentionError::Io(std::io::Error::from_raw_os_error(21)), "RETENTION_TIERS_INVALID"),
+            (store(StoreError::Policy("bad tier".into())), "RETENTION_TIERS_INVALID"),
+        ] {
+            assert_eq!(tiers_code(&error), code, "{error}");
+            assert_eq!(crate::cli_error::code_info(code).map(|info| info.retryable), Some(code.ends_with("_UNAVAILABLE")), "{code}");
+        }
+    }
 
     #[test]
     fn sensitive_export_requires_explicit_policy() {

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-refusals-fix",
+    "role": "implementer",
+    "session_id": "s-0-36-refusals-fix"
+  },
+  "at": "2026-11-04T10:08:48.851756Z",
+  "attachments": [
+    {
+      "case": "atip_helpjson_02_the_root_and_a_group_are_refused_with_the_schema_call_of_their_path",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "e9cb74c023ab9b2ae65cb7f9ea743b4078c5bd03c50a8db9c8ada1e084db1f12"
+    }
+  ],
+  "code_tree": "c9a5819061188acb352b7288b65c62ad458fcd38",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "56499ba18041cda113a7cf2dcff93d6b13026848",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 65,
+  "scenario_id": "atip.helpjson.02",
+  "schema": 1,
+  "staging_id": "457617e0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

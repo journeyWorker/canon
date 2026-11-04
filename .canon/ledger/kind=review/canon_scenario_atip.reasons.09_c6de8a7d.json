@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T13:50:10.939504Z",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "kind": "review",
+  "pin": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_reasons_09_the_changelog_table_is_the_registry_and_stopped_midway_and_its_reason_are_gone"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0a30404b232c12d90efeacc7413f8e7cf229d86e20090e4141d6216bc5832e2f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-code-reasons/brief.md"
+  },
+  "review_id": "01M6KD62FVRKHYGBRAT343KWHV",
+  "reviewer": "rev-0-36-reasons",
+  "scenario_id": "atip.reasons.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

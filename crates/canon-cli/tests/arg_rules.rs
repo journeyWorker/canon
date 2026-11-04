@@ -398,11 +398,11 @@ fn atip_constraints_04_every_refusal_of_an_argument_in_the_sources_is_classified
 /// atip.constraints.04: a refusal added to a handler that no document declares and no table classifies fails the survey.
 #[test]
 fn atip_constraints_04_a_new_handler_check_that_no_document_declares_is_found() {
-    let seeded = "fn run_add() {\n    let _ = CliError::refused(\"EVIDENCE_INVALID_ARGUMENT\", \"--a needs --b\");\n}\n";
+    let seeded = "fn run_add() {\n    let _ = CliError::refused(\"EVIDENCE_ARGUMENT_REQUIRED\", \"--a needs --b\");\n}\n";
     let problems = survey_problems(&[("evidence_seeded.rs", seeded)]);
-    assert!(problems.iter().any(|problem| problem.contains("evidence_seeded.rs:run_add:EVIDENCE_INVALID_ARGUMENT#1")), "{problems:?}");
+    assert!(problems.iter().any(|problem| problem.contains("evidence_seeded.rs:run_add:EVIDENCE_ARGUMENT_REQUIRED#1")), "{problems:?}");
     // The same text in a test module is not a site.
-    let in_tests = "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn b() { let _ = \"EVIDENCE_INVALID_ARGUMENT\"; }\n}\n";
+    let in_tests = "fn a() {}\n#[cfg(test)]\nmod tests {\n    fn b() { let _ = \"EVIDENCE_ARGUMENT_REQUIRED\"; }\n}\n";
     assert!(!survey_problems(&[("evidence_seeded.rs", in_tests)]).iter().any(|problem| problem.contains("evidence_seeded.rs")), "a test module is not read");
 }
 

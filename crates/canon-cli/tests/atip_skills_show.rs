@@ -151,7 +151,9 @@ fn atip_skillsshow_04_the_old_members_are_gone_and_the_schema_is_held() {
     extra["version"] = json!("0.35.0");
     assert!(!atip::guide_problems(&extra).is_empty(), "only `x-` members are open");
     // The schema of the report is the contract's, by `$id`; one changed character of the vendored copy is caught by the digest.
-    let doc = json_of(&canon_in(empty.path(), &["schema", "skills", "show", "--json"]));
+    let model = canon_cli::spec::model();
+    let model_doc = model["commands"].as_array().unwrap().iter().find(|doc| doc["command"] == "skills show").unwrap();
+    let doc = serde_json::json!({ "data": model_doc });
     assert_eq!(doc["data"]["schemas"]["SkillsShowReport"]["$ref"], "https://atip.dev/1/guide.schema.json");
     assert_eq!(doc["data"]["outputs"][0]["kind"], "artifact");
     assert_eq!(doc["data"]["outputs"][0]["schemaVersion"], "2.0");

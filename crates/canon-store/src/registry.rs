@@ -71,6 +71,9 @@ pub struct TierRegistry {
     hot: Option<Arc<dyn Tier>>,
     cold: Option<Arc<dyn Tier>>,
     git: Option<Arc<GitTier>>,
+    /// The rungs whose settings are all there and whose backend did not answer when it was attached (a Postgres DSN that is set and cannot be
+    /// reached), with why: [`Self::handle`] answers them as [`StoreError::tier_unreachable`], not as a tier that is not configured.
+    unreachable: std::collections::BTreeMap<Rung, String>,
 }
 
 impl std::fmt::Debug for TierRegistry {
@@ -123,7 +126,15 @@ impl TierRegistry {
         let local = resolve(Rung::Local);
         let hot = resolve(Rung::Hot);
         let cold = resolve(Rung::Cold);
-        Self { policy, local, hot, cold, git }
+        Self { policy, local, hot, cold, git, unreachable: std::collections::BTreeMap::new() }
+    }
+
+    /// Names `rung` as a tier whose settings are all there and whose backend did not answer when it was attached, and says why: the error
+    /// of a use of it is then [`StoreError::tier_unreachable`] (`configured` is true), not the error of a tier that is not configured.
+    #[must_use]
+    pub fn with_unreachable(mut self, rung: Rung, reason: impl Into<String>) -> Self {
+        self.unreachable.insert(rung, reason.into());
+        self
     }
 
     fn slot(&self, rung: Rung) -> &Option<Arc<dyn Tier>> {
@@ -137,6 +148,9 @@ impl TierRegistry {
     fn handle(&self, rung: Rung) -> Result<Arc<dyn Tier>, StoreError> {
         self.slot(rung).clone().ok_or_else(|| {
             let backend = self.policy.tiers.get(&rung).map(BackendConfig::backend);
+            if let Some(reason) = self.unreachable.get(&rung) {
+                return StoreError::tier_unreachable(rung, backend, reason.clone());
+            }
             let reason = match backend {
                 Some(b) => b.default_unattached_reason().to_string(),
                 None => format!("no `tiers.{}` in canon.yaml", rung.as_str()),
@@ -618,6 +632,29 @@ routing:
         let text = err.to_string().to_lowercase();
         assert!(text.contains("hot"), "{text}");
         assert!(text.contains("postgres"), "{text}");
+    }
+
+    /// atip.reasons.14: a rung whose settings were all there and whose backend did not answer is `configured` (a tier that is down, which waiting can
+    /// help); one that is simply not attached is not (an unset DSN, which waiting does not set).
+    #[test]
+    fn handle_tells_a_rung_that_did_not_answer_from_one_that_is_not_configured() {
+        let yaml = r#"
+tiers:
+  hot:
+    backend: postgres
+    dsn_env: CANON_PG_DSN
+    schema: canon_v1
+routing:
+  task: hot
+"#;
+        let attached = |registry: TierRegistry| match registry.query(&TierQuery::kind(RecordKind::Task)).unwrap_err() {
+            StoreError::TierUnavailable { configured, reason, .. } => (configured, reason),
+            other => panic!("expected TierUnavailable, got {other:?}"),
+        };
+        let plain = TierRegistry::new(TierPolicy::from_yaml(yaml).unwrap(), None, None, None, None);
+        assert!(!attached(plain).0, "no DSN: the tier is not configured");
+        let down = TierRegistry::new(TierPolicy::from_yaml(yaml).unwrap(), None, None, None, None).with_unreachable(Rung::Hot, "connection refused");
+        assert_eq!(attached(down), (true, "connection refused".to_string()), "a DSN that is set and does not answer");
     }
 
     /// s27 spec: a routed rung with NO `tiers.<rung>` block at all

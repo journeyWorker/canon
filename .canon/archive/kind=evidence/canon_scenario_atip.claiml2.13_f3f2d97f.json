@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-incomplete",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-incomplete"
+  },
+  "at": "2026-11-04T12:18:47.822581Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_13_the_release_section_carries_every_change_of_the_release_once_and_the_evidence_list",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "62113960762c5a53e495a6ff98e444c27873ba2bd9dc96695edec70742097c75"
+    }
+  ],
+  "code_tree": "84454e6621e493af02ddc9c1cd5b2158249ee38a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "91a47e478825254994473672e759b11ec606c931",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 220,
+  "scenario_id": "atip.claiml2.13",
+  "schema": 1,
+  "staging_id": "f520c6d8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

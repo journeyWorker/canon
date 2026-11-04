@@ -40,8 +40,30 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             } else {
                 let missing_provenance = outcome.roots.iter().flat_map(|root| &root.violations).any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
                 let hint = with_provenance_fix("data.roots names each violation; fix them, then run `canon inventory sync` again", missing_provenance);
-                let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint(hint);
-                ExitCode::from(error.emit_with_data_and_meta("canon inventory sync", json, &data, coverage.meta()))
+                // `INVENTORY_INCOMPLETE` needs work done before the stop: a commit that indexed an earlier root; its reason is the refusal the stopped root met (`INVENTORY_INVALID`).
+                if !outcome.dry_run && outcome.total_written() > 0 {
+                    crate::incomplete::read_status("read what `inventory sync` indexed before it stopped: the roots before the unindexed one stay indexed, `data.roots` says per root");
+                    let error = CliError::failed("INVENTORY_INCOMPLETE", "a spec root was left unindexed on violations or duplicate scenarios; nothing was written for it, and the roots before it are indexed").reason("INVENTORY_INVALID").hint(hint);
+                    return ExitCode::from(error.emit_with_data_and_meta("canon inventory sync", json, &data, coverage.meta()));
+                }
+                // A sync that indexed nothing (and every preview) refuses before its work (spec 7.2.2, 8.3): exit 2, no `data`, each violation and duplicate in `error.details`.
+                let hint = hint.replace("data.roots names each violation", "error.details names each violation");
+                let message = if outcome.dry_run { "a spec root would be left unindexed on violations or duplicate scenarios; this was a preview and nothing was written" } else { "a spec root has violations or duplicate scenarios, so the sync indexed nothing" };
+                let refused = |text: String| CliError::refused("INVENTORY_INVALID", text).hint(hint.clone());
+                let mut items: Vec<CliError> = Vec::new();
+                for root in &outcome.roots {
+                    for v in &root.violations {
+                        items.push(refused(format!("root `{}`: [{}] {} — {}", root.id, v.class.as_str(), v.path.display(), v.detail)).reason("VIOLATIONS"));
+                    }
+                    for e in &root.sync_errors {
+                        items.push(refused(format!("root `{}`: [duplicate-scenario] {e}", root.id)).reason("DUPLICATE_SCENARIOS"));
+                    }
+                }
+                let top = if outcome.roots.iter().any(|root| !root.violations.is_empty()) { refused(message.to_string()).reason("VIOLATIONS") } else { refused(message.to_string()).reason("DUPLICATE_SCENARIOS") };
+                let mut all = vec![top.clone()];
+                all.extend(items);
+                let error = if all.len() > 1 { top.details(all) } else { top };
+                ExitCode::from(error.emit("canon inventory sync", json))
             }
         }
         Err(err) => {
@@ -49,8 +71,30 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
                 return ExitCode::from(error.emit("canon inventory sync", json));
             }
             // The specs config, canon.yaml and the index lock are resolved before any record is read or written (exit 2); a store error comes while the sync works (exit 1).
-            let code = if matches!(err, crate::inventory::InventoryError::Store(_)) { "INVENTORY_FAILED" } else { "INVENTORY_REFUSED" };
-            ExitCode::from(CliError::refused(code, err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again").emit("canon inventory sync", json))
+            let (code, reason) = match &err {
+                crate::inventory::InventoryError::Store(_) => ("INVENTORY_FAILED", None),
+                crate::inventory::InventoryError::Stopped { .. } => ("INVENTORY_INCOMPLETE", Some("INVENTORY_FAILED")),
+                crate::inventory::InventoryError::Config(_) => ("CONFIG_INVALID", Some("SPECS")),
+                crate::inventory::InventoryError::CanonYaml(_) => {
+                    let code = crate::read_cause::config_error(err.to_string()).code;
+                    (code, (code == "CONFIG_INVALID").then_some("CANON_YAML"))
+                }
+                crate::inventory::InventoryError::Locked(_) => ("INVENTORY_INDEX_UNAVAILABLE", None),
+                crate::inventory::InventoryError::Unavailable(error) => (error.code, None),
+            };
+            if code == "INVENTORY_INCOMPLETE" {
+                crate::incomplete::read_status("read what `inventory sync` indexed before it stopped: the records of the roots before the failing one stay indexed");
+            }
+            let hint = match code {
+                "INVENTORY_INDEX_UNAVAILABLE" => "another canon process holds the scenario index: wait for it to finish, then run `canon inventory sync` again",
+                _ => "fix the problems the message names, then run `canon inventory sync` again",
+            };
+            let error = CliError::refused(code, err.to_string()).hint(hint);
+            let error = match reason {
+                Some(reason) => error.reason(reason),
+                None => error,
+            };
+            ExitCode::from(error.emit("canon inventory sync", json))
         }
     }
 }

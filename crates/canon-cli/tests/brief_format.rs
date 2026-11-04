@@ -566,7 +566,7 @@ fn context_status_87_the_readers_warn_and_lead_with_canon_migrate() {
         assert!(warnings.iter().any(|w| w["message"].as_str().unwrap().contains("0.30") && w["message"].as_str().unwrap().contains("canon migrate") && w["code"].is_string()), "{args:?}: {warnings:?}");
         assert_eq!(doc["meta"]["next"][0]["command"], "canon migrate --json", "{args:?}: {}", doc["meta"]);
         assert_eq!(doc["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--json"]), "{args:?}: {}", doc["meta"]);
-        assert!(doc["error"].is_null() || doc["error"]["code"] != "CONFIG_UNREADABLE", "{args:?}: {doc}");
+        assert!(doc["error"].is_null() || doc["error"]["code"] != "CONFIG_INVALID", "{args:?}: {doc}");
     }
     // An approved old brief whose digest matches still reads approved.
     let status = json(&ok(r, &["status", "--json"]));
@@ -645,7 +645,7 @@ fn evidence_add_131_is_refused_when_a_brief_it_judges_is_old_format_and_an_overr
             let out = canon_as(r, Some("implementer"), &args);
             assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
             let doc = json(&out);
-            assert_eq!(doc["error"]["code"], "OLD_BRIEF_FORMAT", "{doc}");
+            assert_eq!(doc["error"]["code"], "BRIEF_MIGRATION_REQUIRED", "{doc}");
             assert!(doc["error"]["message"].as_str().unwrap().contains("canon migrate"), "{doc}");
         }
         assert_eq!(tree(r), before, "nothing was written");
@@ -671,12 +671,12 @@ fn evidence_add_131_every_governing_change_of_the_subject_is_checked() {
     let out = canon_as(r, Some("implementer"), &["evidence", "add", "--scenario", "cart.add.01", "--project", "root", "--class", "test-run", "--ref", "cargo test", "--verdict", "faithful", "--role", "implementer", "--summary", "ran", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
     let doc = json(&out);
-    assert_eq!(doc["error"]["code"], "OLD_BRIEF_FORMAT", "{doc}");
+    assert_eq!(doc["error"]["code"], "BRIEF_MIGRATION_REQUIRED", "{doc}");
     assert!(doc["error"]["message"].as_str().unwrap().contains("`b`"), "the old brief the evidence does not answer to is named: {doc}");
     assert_eq!(tree(r), before);
 }
 
-/// scenario new --flow reads a brief's flow steps: an old-format brief is refused with OLD_BRIEF_FORMAT.
+/// scenario new --flow reads a brief's flow steps: an old-format brief is refused with BRIEF_MIGRATION_REQUIRED.
 #[test]
 fn authoring_brief_check_25_scenario_new_flow_refuses_an_old_format_brief_with_its_code() {
     let dir = repo(None);
@@ -685,7 +685,7 @@ fn authoring_brief_check_25_scenario_new_flow_refuses_an_old_format_brief_with_i
     write_brief(r, "x", &old_brief("A", false, ""));
     let out = canon_as(r, Some("implementer"), &["scenario", "new", "cart.add.07", "--title", "t", "--subject", "demo", "--change", "x", "--flow", "F1", "--case", "happy", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
-    assert_eq!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT", "{}", out_text(&out));
+    assert_eq!(json(&out)["error"]["code"], "BRIEF_MIGRATION_REQUIRED", "{}", out_text(&out));
 }
 
 /// subject.lifecycle.47
@@ -705,7 +705,7 @@ fn subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_
     // `demo` answers for the approved change `a`; `draft` is never approved, untagged and no chore: not judged, so the ship
     // is refused by the gate for its own reasons (uncovered flows), never for the old format.
     let out = canon(r, &["subject", "move", "demo", "--to", "shipped", "--json"]);
-    assert_ne!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT", "a change the subject does not answer for never blocks: {}", out_text(&out));
+    assert_ne!(json(&out)["error"]["code"], "BRIEF_MIGRATION_REQUIRED", "a change the subject does not answer for never blocks: {}", out_text(&out));
     assert!(out_text(&out).contains("SUBJECT_APPROVAL_REQUIRED"), "{}", out_text(&out));
     // Once the old brief carries an Approved line the subject answers for it: the ship is refused naming it, nothing moves.
     write_brief(r, "draft", &approved(&old_brief("D", false, "")));
@@ -713,7 +713,7 @@ fn subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_
     let out = canon(r, &["subject", "move", "demo", "--to", "shipped", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
     let doc = json(&out);
-    assert_eq!(doc["error"]["code"], "OLD_BRIEF_FORMAT", "{doc}");
+    assert_eq!(doc["error"]["code"], "BRIEF_MIGRATION_REQUIRED", "{doc}");
     assert!(doc["error"]["message"].as_str().unwrap().contains("`draft`"), "{doc}");
     let after = tree(r);
     let changed: Vec<&String> = after.keys().chain(before.keys()).filter(|k| after.get(*k) != before.get(*k)).collect();
@@ -747,7 +747,7 @@ fn subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_
     let out = canon(r, &["subject", "move", "plain", "--to", "verifying", "--reason", "the spec changed", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
     let doc = json(&out);
-    assert_eq!(doc["error"]["code"], "OLD_BRIEF_FORMAT", "{doc}");
+    assert_eq!(doc["error"]["code"], "BRIEF_MIGRATION_REQUIRED", "{doc}");
     assert!(doc["error"]["message"].as_str().unwrap().contains("`pl`"), "{doc}");
     let unchanged = tree(r) == before;
     assert_eq!((status_of("plain"), unchanged), ("shipped".to_string(), true), "a refused reopen leaves the subject shipped and writes nothing");
@@ -761,7 +761,7 @@ fn subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_
     }
     let out = canon(r, &["subject", "move", "other", "--to", "shipped", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
-    assert_eq!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT");
+    assert_eq!(json(&out)["error"]["code"], "BRIEF_MIGRATION_REQUIRED");
     assert_eq!(status_of("other"), "verifying");
 }
 
@@ -776,7 +776,7 @@ fn review_add_103_a_change_review_pins_a_new_chore_brief_and_refuses_an_old_form
     write_brief(r, "k", &old_chore("K"));
     let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
-    assert_eq!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT");
+    assert_eq!(json(&out)["error"]["code"], "BRIEF_MIGRATION_REQUIRED");
     write_brief(r, "k", NEW_CHORE);
     let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer"]);
     assert!(out.status.success(), "{}", out_text(&out));
