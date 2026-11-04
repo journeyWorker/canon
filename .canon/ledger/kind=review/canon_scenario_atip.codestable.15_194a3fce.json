@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-2"
+  },
+  "at": "2026-11-04T19:06:32.681221Z",
+  "code_tree": "757c3cd8d917388538b53346e20947471a8b0603",
+  "kind": "review",
+  "pin": "9f95de7594ca404f213e27afa1fb4cc41bcf9ac4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codestable_15_an_upgrade_note_that_leaves_a_caller_a_moved_exit_or_a_command_out_fails"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "38bd1e3ef91a79c96c9b20d8595070f61c3346509528827cdc67d73ad408bc79",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-table/brief.md"
+  },
+  "review_id": "01M6KZ9BB9E50VA075CKRKRQBB",
+  "reviewer": "rev-0-36-flowfix",
+  "scenario_id": "atip.codestable.15",
+  "schema": 2,
+  "worktree_dirty": false
+}
