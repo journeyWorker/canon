@@ -1,4 +1,4 @@
-//! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4`: canon declares atip/1 1.4 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-18`; `canon-0-36-atip-dep` moved the checker to the atip repository).
+//! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4`: canon declares atip/1 1.4 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-20`; `canon-0-36-atip-dep` moved the checker to the atip repository).
 //!
 //! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.4 --deep`
 //! on the committed fixture, which `just atip-deep` and the job `atip` run (`just atip` runs it without `--deep`), and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
@@ -136,34 +136,101 @@ fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_4() {
     assert!(ci.split_whitespace().any(|word| word == "atip-deep"), "just ci runs the recipe atip-deep, as the job does: {ci}");
 }
 
-#[test]
-fn atip_claiml2_09_the_fixture_claims_1_4_and_lists_what_the_l2_rows_need() {
-    let fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
-    assert_eq!(fixture["contractVersion"], "1.4");
-    assert_eq!(fixture["notRun"], json!(["dashboard"]));
-    let prepare = fixture["prepare"].as_array().expect("prepare");
-    assert_eq!(prepare[0], json!(["git", "init", "-q"]));
-    assert!(prepare[1].as_array().is_some_and(|step| step.iter().any(|word| word == "--allow-empty")), "an empty commit: {prepare:?}");
-    let commands = fixture["commands"].as_object().expect("commands");
-    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
-        assert!(commands[id]["preview"].as_array().is_some_and(|previews| !previews.is_empty()), "the preview of {id}");
-    }
-    for id in ["export", "finding close"] {
-        for key in ["ok", "batchFailsAt", "batchFailsFirst"] {
-            assert!(commands[id][key].as_array().is_some_and(|cases| !cases.is_empty()), "{id}.{key}");
-        }
-    }
-    for id in ["export", "query"] {
-        assert_eq!(commands[id]["allowedEffects"], json!([".canon/audit/access.jsonl"]), "{id}");
-    }
-    // The destructive commands the schema lists are the ones the fixture previews.
+/// The commands the schema calls destructive, sorted: the ones the fixture must preview.
+fn destructive_commands() -> Vec<String> {
     let dir = tempfile::tempdir().expect("tempdir");
     let schema = canon_in(dir.path(), &["schema", "--json"]);
     let mut destructive: Vec<String> = schema["data"]["commands"].as_array().expect("commands").iter().filter(|entry| entry["effect"] == "destructive").map(|entry| entry["command"].as_str().expect("a name").to_string()).collect();
     destructive.sort();
+    destructive
+}
+
+/// What canon's fixture lacks of what the L2 rows need: the declaration, `prepare`, `notRun`, a preview for each destructive command, the batch cases and `allowedEffects`. One line per missing item, empty when the fixture has them all.
+fn fixture_problems(fixture: &Value, destructive: &[String]) -> Vec<String> {
+    let mut problems = Vec::new();
+    if fixture["contractVersion"] != "1.4" {
+        problems.push("contractVersion is not 1.4".to_string());
+    }
+    if fixture["notRun"] != json!(["dashboard"]) {
+        problems.push("notRun does not name dashboard".to_string());
+    }
+    let prepare = fixture["prepare"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let repository = prepare.first() == Some(&json!(["git", "init", "-q"]));
+    let empty_commit = prepare.get(1).and_then(Value::as_array).is_some_and(|step| step.iter().any(|word| word == "--allow-empty"));
+    if !(repository && empty_commit) {
+        problems.push("prepare does not make a git repository with one empty commit".to_string());
+    }
+    let Some(commands) = fixture["commands"].as_object() else {
+        problems.push("commands is missing".to_string());
+        return problems;
+    };
+    let has = |id: &str, key: &str| commands.get(id).is_some_and(|entry| entry[key].as_array().is_some_and(|cases| !cases.is_empty()));
+    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+        if !has(id, "preview") {
+            problems.push(format!("{id} has no preview"));
+        }
+    }
+    for id in ["export", "finding close"] {
+        for key in ["ok", "batchFailsAt", "batchFailsFirst"] {
+            if !has(id, key) {
+                problems.push(format!("{id} has no {key}"));
+            }
+        }
+    }
+    for id in ["export", "query"] {
+        if commands.get(id).is_none_or(|entry| entry["allowedEffects"] != json!([".canon/audit/access.jsonl"])) {
+            problems.push(format!("{id} has no allowedEffects"));
+        }
+    }
+    // The destructive commands the schema lists are the ones the fixture previews.
     let mut previewed: Vec<String> = commands.iter().filter(|(_, entry)| entry.get("preview").is_some()).map(|(id, _)| id.clone()).collect();
     previewed.sort();
-    assert_eq!(previewed, destructive, "every destructive command has a preview in the fixture");
+    if previewed != destructive {
+        problems.push(format!("the commands with a preview are {previewed:?}, the destructive ones are {destructive:?}"));
+    }
+    problems
+}
+
+#[test]
+fn atip_claiml2_09_the_fixture_claims_1_4_and_lists_what_the_l2_rows_need() {
+    let fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
+    assert_eq!(fixture_problems(&fixture, &destructive_commands()), Vec::<String>::new());
+}
+
+#[test]
+fn atip_claiml2_19_a_fixture_missing_a_required_item_is_refused_by_the_fixture_test() {
+    let committed: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
+    let destructive = destructive_commands();
+    assert_eq!(fixture_problems(&committed, &destructive), Vec::<String>::new(), "the committed fixture has every item");
+    // Each item taken out, or lowered, is found by itself and by its name.
+    let mut broken: Vec<(String, Value, &'static str)> = Vec::new();
+    let mut without = |name: &str, found: &'static str, change: &dyn Fn(&mut Value)| {
+        let mut fixture = committed.clone();
+        change(&mut fixture);
+        broken.push((name.to_string(), fixture, found));
+    };
+    without("contractVersion lowered to 1.3", "contractVersion", &|f| f["contractVersion"] = json!("1.3"));
+    without("prepare removed", "prepare", &|f| drop(f.as_object_mut().expect("object").remove("prepare")));
+    without("prepare without the empty commit", "prepare", &|f| f["prepare"] = json!([["git", "init", "-q"]]));
+    without("notRun removed", "notRun", &|f| drop(f.as_object_mut().expect("object").remove("notRun")));
+    without("notRun without dashboard", "notRun", &|f| f["notRun"] = json!([]));
+    without("commands removed", "commands", &|f| drop(f.as_object_mut().expect("object").remove("commands")));
+    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+        without(&format!("the preview of {id} removed"), "has no preview", &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove("preview")));
+    }
+    for id in ["export", "finding close"] {
+        for key in ["batchFailsAt", "batchFailsFirst"] {
+            without(&format!("{id}.{key} removed"), key, &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove(key)));
+        }
+    }
+    for id in ["export", "query"] {
+        without(&format!("the allowedEffects of {id} removed"), "allowedEffects", &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove("allowedEffects")));
+    }
+    for (name, fixture, found) in &broken {
+        let problems = fixture_problems(fixture, &destructive);
+        assert!(problems.iter().any(|problem| problem.contains(found)), "{name}: the fixture test must name `{found}`: {problems:?}");
+    }
+    assert!(broken.len() >= 17, "every kind of item is taken out once: {}", broken.len());
 }
 
 /// The part of the CHANGELOG that is the release being prepared (the section `## 0.35.0`).

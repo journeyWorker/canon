@@ -143,3 +143,25 @@ Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs 
     Given the sources of every crate of the workspace, and canon init run with a terminal on stdin and stderr in a repo with a .claude directory
     When the sources are scanned for /dev/tty, a prompt library, a terminal-mode call and every read of stdin, and init runs
     Then none of the first three is found, the only read of stdin is --input - (a terminal is refused with STDIN_TTY), init prints no question, and it installs for claude and records it
+
+  # canon: {"schema":1,"at":"2026-11-04T18:27:18Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-claim-l2.F4
+  @atip.claiml2.19
+  Scenario: A fixture missing a required item, or claiming another minor, is refused by the fixture test
+    Given canon's committed fixture, which has contractVersion 1.4, prepare, notRun, a preview for each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
+    When each of those items is taken out of a copy, or contractVersion is lowered to 1.3, and the fixture test reads the copy
+    Then the committed fixture has no problem, and every copy is refused with a problem that names the missing item
+
+  # canon: {"schema":1,"at":"2026-11-04T18:27:23Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix"}}
+  @subject:atip-contract
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-35-claim-l2.F3
+  @atip.claiml2.20
+  Scenario: Lowering the declared minor, the fixture's contractVersion, the job's or a recipe's --contract below the others fails the agreement check
+    Given the declared minor, the fixture's contractVersion, the job atip and the recipes atip and atip-deep, which all say 1.4
+    When one of the five is lowered to 1.3, or the job gives no minor
+    Then the agreement check finds exactly the lowered one by name, and the missing declaration as a job that gives no minor, so the L2 run on canon cannot pass with a lowered contract

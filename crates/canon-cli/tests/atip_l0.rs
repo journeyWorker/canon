@@ -837,3 +837,57 @@ fn atip_l0_31_every_error_object_passes_the_contract_error_schema() {
     assert!(atip::error_problems(&body).is_empty(), "an empty hint and field are left out: {body}");
     assert_eq!(body["received"], "", "an empty value the caller sent is reported as it was: {body}");
 }
+
+#[test]
+fn atip_l0_32_an_envelope_or_error_with_a_null_or_empty_optional_member_fails_the_contract_schema() {
+    let repo = scratch_repo();
+    let success = json(&canon(repo.path(), &["status", "--json"]));
+    let failure = json(&canon(repo.path(), &["subject", "show", "nosuch", "--json"]));
+    assert_eq!(failure["ok"], false, "{failure}");
+    // What canon prints passes, so each refusal below is the planted member alone.
+    assert_eq!(atip::envelope_problems(&success), Vec::<String>::new(), "{success}");
+    assert_eq!(atip::envelope_problems(&failure), Vec::<String>::new(), "{failure}");
+    assert_eq!(atip::error_problems(&failure["error"]), Vec::<String>::new(), "{failure}");
+
+    let meta_members: [(&str, Value); 8] = [
+        ("meta.warnings: []", serde_json::json!({"warnings": []})),
+        ("meta.fields: []", serde_json::json!({"fields": []})),
+        ("meta.context.repo: null", serde_json::json!({"context": {"repo": null}})),
+        ("meta.command: null", serde_json::json!({"command": null})),
+        ("meta.output: null", serde_json::json!({"output": null})),
+        ("meta.page: null", serde_json::json!({"page": null})),
+        ("meta.coverage: null", serde_json::json!({"coverage": null})),
+        ("meta: null", Value::Null),
+    ];
+    for (name, planted) in &meta_members {
+        for base in [&success, &failure] {
+            let mut document = base.clone();
+            match planted {
+                Value::Null => document["meta"] = Value::Null,
+                members => {
+                    for (key, value) in members.as_object().expect("a member") {
+                        document["meta"][key] = value.clone();
+                    }
+                }
+            }
+            assert!(!atip::envelope_problems(&document).is_empty(), "{name} on `ok: {}` passes the envelope schema: {document}", base["ok"]);
+        }
+    }
+
+    let error_members: [(&str, &str, Value); 8] = [
+        ("hint", "null", Value::Null),
+        ("hint", "\"\"", serde_json::json!("")),
+        ("field", "null", Value::Null),
+        ("field", "\"\"", serde_json::json!("")),
+        ("expected", "[]", serde_json::json!([])),
+        ("suggestions", "[]", serde_json::json!([])),
+        ("details", "[]", serde_json::json!([])),
+        ("reason", "null", Value::Null),
+    ];
+    for (member, shown, planted) in &error_members {
+        let mut document = failure.clone();
+        document["error"][member] = planted.clone();
+        assert!(!atip::error_problems(&document["error"]).is_empty(), "error.{member}: {shown} passes the error schema: {document}");
+        assert!(!atip::envelope_problems(&document).is_empty(), "error.{member}: {shown} passes the envelope schema: {document}");
+    }
+}

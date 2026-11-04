@@ -300,3 +300,13 @@ Feature: ATIP L0 output contract
     Given the failures of every code path the tests drive: usage, unknown command, input, cursor, refusals and a panic
     When each error object is validated against the vendored error schema
     Then every one passes, and none has an empty or null member
+
+  # canon: {"schema":1,"at":"2026-11-04T18:27:09Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-33-atip-l0.F2
+  @atip.l0.32
+  Scenario: An envelope or error with a null or empty optional member fails the contract schema
+    Given a status answer and a failure answer that pass the contract's envelope schema
+    When a member with no value is planted in each: an empty warnings, fields, expected, suggestions or details list, a null or empty hint or field, a null command, output, page, coverage, reason or context value, and a null meta
+    Then the envelope schema and the error schema refuse each one, and the unchanged answers pass
