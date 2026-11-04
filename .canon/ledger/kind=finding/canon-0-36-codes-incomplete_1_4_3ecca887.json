@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T11:38:09.805464Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/gate.rs:1484-1545",
+  "introduced_by": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "kind": "finding",
+  "reviewed_sha": "e05288fa0f370e1708775ff19242dfecd994dd0a",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[standards] `cargo fmt --all` leftovers: about 335 added lines in 22 files are formatting-only, outside the change's own edits (token-wise identical to the old lines, only line breaks and trailing commas differ), against a repo that keeps long lines and has no rustfmt config. Measured by tokenising 7d75ac0b and e05288fa and counting added lines whose tokens equal the old tokens: gate.rs 59 (tests at 1484-1545 reflowed to add one string argument), tests/artifacts_object_store.rs 66, tests/old_names.rs 40, tests/strategy_promote.rs 21, src/artifacts.rs 24 (match arm at 558, struct literal at 609-619, two assert_eq at 729-739), src/input.rs 21 (1300-1327), cli_error.rs 16, tests/migrate.rs 15, retention.rs 15 (352-357 `let outcome = if commit {..}`, 417-429), tests/schema.rs 9, tests/init.rs 7, run/inventory.rs 7, run/tier.rs 7 (27-32, the `reads` chain), plugin_sync.rs 5, migrate.rs 4, exit_registry.rs 5, schema_codes.rs 4, init.rs 2, run/plugin.rs 3, ledger.rs 2, scaffold.rs 1, codes_names.rs 2. They bury the real edit in every hunk and will conflict with the other 0.36 branches that touch the same files (code-reasons, codes-table). The new files (incomplete.rs, atip_incomplete.rs) are formatted as the tool left them and are not the issue. Fix: revert each formatting-only line to the 7d75ac0b layout and keep only the semantic edit (a `git diff -w --word-diff` pass per file shows what to restore); verify with the tokenising script that no added line is layout-only.",
+  "worktree_dirty": false
+}
