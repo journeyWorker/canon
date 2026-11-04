@@ -519,7 +519,7 @@ fn atip_codestable_12_the_upgrade_note_covers_the_four_callers_the_moved_exits_a
     }
     let pure = rows.iter().filter(|row| row.exit_before == 1 && row.exit_after.iter().all(|exit| *exit == 2)).count();
     assert!(note.contains("the first list above") && note.contains(&format!("The {pure} codes")), "the note counts the moved exits");
-    for command in ["subject move", "gate promote", "task done", "evidence add", "brief approve", "strategy promote", "ingest plans", "dashboard", "context-pack add"] {
+    for command in ["subject move", "gate promote", "task done", "evidence add", "brief approve", "strategy promote", "strategy approval-payload", "ingest plans", "dispatch begin", "dispatch end", "divergence defer", "divergence resolve", "dashboard", "context-pack add"] {
         assert!(note.contains(&format!("`{command}`")), "the note does not name `{command}` among the commands whose exit moved");
     }
     // The refusals that carry `error.details` instead of `data`.
@@ -532,4 +532,35 @@ fn atip_codestable_12_the_upgrade_note_covers_the_four_callers_the_moved_exits_a
     // A removed code and the absence of an alias.
     assert!(note.contains("`STOPPED_MIDWAY`, which is gone"), "the note says the reserved code is gone");
     assert!(note.contains("There is no alias"), "the note says there is no alias");
+}
+
+/// The lines of `section` that name a gone code (`gone_codes_in`) as if it were current: not a row of a table (the old-name column), not the
+/// lists under the table, and not a sentence that says the name is gone, replaced, renamed or 0.35's.
+fn current_gone_code_lines(section: &str) -> Vec<String> {
+    const SAYS_GONE: [&str; 12] = ["gone", "0.35", "replace", "renamed", "left the registry", "no longer", "removed", "retired", "a script", "a branch on", "a retry loop", "does not list"];
+    section
+        .lines()
+        .filter(|line| !line.starts_with('|'))
+        .filter(|line| !["- **Gone**", "- **Exit 1", "- **Merge", "- **Split", "- **Renamed", "- **Removed"].iter().any(|bullet| line.starts_with(bullet)))
+        .flat_map(|line| line.split(". ").map(str::to_string).collect::<Vec<_>>())
+        .filter(|sentence| !SAYS_GONE.iter().any(|word| sentence.to_lowercase().contains(word)))
+        .filter_map(|sentence| {
+            let codes = gone_codes_in(&sentence);
+            (!codes.is_empty()).then(|| format!("{codes:?}: {}", sentence.chars().take(160).collect::<String>()))
+        })
+        .collect()
+}
+
+/// atip.codestable.13: in the Unreleased section, outside the old-name column of the table and the lists under it, no paragraph names a removed code as
+/// current behaviour (`STOPPED_MIDWAY` was described as live by two stage paragraphs after the codes were replaced); the guard finds one that does.
+#[test]
+fn atip_codestable_13_no_paragraph_names_a_removed_code_as_current() {
+    let changelog = changelog();
+    let problems = current_gone_code_lines(unreleased(&changelog));
+    assert!(problems.is_empty(), "paragraphs of the Unreleased section name a removed code as current: {problems:#?}");
+    // The guard can fail: a stage paragraph that still says the old code, and one that says it is gone.
+    let stale = "A command whose promotion the gate refused is `STOPPED_MIDWAY` (exit 1, reason `PROMOTION_INVALID`).";
+    assert_eq!(current_gone_code_lines(stale).len(), 1, "a removed code named as live is found");
+    assert!(current_gone_code_lines("`STOPPED_MIDWAY` is gone: the `_INCOMPLETE` codes replace it.").is_empty());
+    assert!(current_gone_code_lines("| `STOPPED_MIDWAY` | `INIT_INCOMPLETE` | split |").is_empty(), "the old-name column of the table is the one place");
 }

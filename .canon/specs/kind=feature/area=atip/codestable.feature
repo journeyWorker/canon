@@ -120,3 +120,13 @@ Feature: atip: the replacement table and the upgrade note of the 0.36 error code
     Given the CHANGELOG's upgrade note and the table's list of exits that moved
     When the note is read
     Then it speaks to the four callers, names each code of the list, names gate promote, subject move, task done and brief approve for the refusals that carry error.details, says STOPPED_MIDWAY is gone and says no alias exists
+
+  # canon: {"schema":1,"at":"2026-11-04T14:42:37Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-36-codes-table.F2
+  @atip.codestable.13
+  Scenario: No paragraph of the Unreleased section names a removed code as current behaviour
+    Given the Unreleased section of the CHANGELOG, outside the old-name column of the table and the lists under it
+    When each sentence that names a code the registry no longer holds is read
+    Then it says the name is gone, replaced, renamed or a caller's old name, and a stage paragraph that still names STOPPED_MIDWAY as the code of a stop is found by the guard

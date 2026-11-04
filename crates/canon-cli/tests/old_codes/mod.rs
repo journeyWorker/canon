@@ -1,6 +1,6 @@
 //! The error codes of 0.35 that 0.36 removed from the registry (`canon-0-36-codes-table`).
 //!
-//! The 0.35 registry is data: `tests/fixtures/codes-0.35.txt` holds its 179 names, taken once from the 0.35 release, because the old names
+//! The 0.35 registry is data: `tests/fixtures/codes-0.35.tsv` holds its 179 names, taken once from the 0.35 release, because the old names
 //! are in no registry view any more and cannot be derived. A name is *gone* when the error registry no longer holds it. A name that a
 //! warning of the warning registry still carries is not searched for (spec 7.2.1: a condition applies only to `error.code`), and a name
 //! the error registry still holds is a name that stayed. The CHANGELOG's replacement table is the one place that spells the gone names.
