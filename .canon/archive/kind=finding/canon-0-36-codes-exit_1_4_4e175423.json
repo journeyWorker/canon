@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:54.789178Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/gate.rs:promote_after_stage; crates/canon-cli/src/learn.rs:report_block; crates/canon-cli/src/schema_codes.rs",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "STOPPED_MIDWAY for stop-after-effect is not tracked for removal. codes-exit adds three emit sites beyond `canon init`: `promote_after_stage` (evidence add, finding add, finding close, divergence add: record staged, gate refuses, reason PROMOTION_INVALID) and `strategy promote` (strategy demoted, then blocked, reason STRATEGY_PROMOTION_INVALID), and registers two new reasons under STOPPED_MIDWAY. The approved codes-incomplete brief says init is the only emitter and names only INIT_INCOMPLETE with the three SKILLS/CONFIG reasons, so these sites would be migrated to INIT_INCOMPLETE (wrong subject) or missed; its table has no PROMOTION_INCOMPLETE or STRATEGY_PROMOTION_INCOMPLETE row. The choice itself (exit 1, reason = the refusal, first next step reads what was done) is right for now, but the human has to extend the codes-incomplete brief (I cannot edit briefs) and the codes-table/code-reasons CHANGELOG notes, or add a source scan that fails until STOPPED_MIDWAY is gone. Also, ERROR_CODES rows in schema_codes.rs list STOPPED_MIDWAY only for init and strategy promote, not for evidence add, finding add, finding close or divergence add, which emit it.",
+  "worktree_dirty": false
+}

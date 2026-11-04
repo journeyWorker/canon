@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:29.948280Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "evidence/add.feature:520,610,863; skills/install.feature:191",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.91",
+    "evidence.add.101",
+    "evidence.add.124",
+    "skills.install.44"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Four scenario texts were renamed but keep `exits 1` for a code that is now exit 2, so the sentence is false against its own bound test: evidence.add.91 (`exits 1 with the code EVIDENCE_NOTE_INVALID`), evidence.add.101 (`each add exits 1 with BRIEF_APPROVAL_REQUIRED, or BRIEF_APPROVAL_STALE`), evidence.add.124 (`exits 1 with BRIEF_APPROVAL_STALE ... nothing is staged`) and skills.install.44 (`each call exits 1 with BRIEF_APPROVAL_REQUIRED`). Change `exits 1` to `exits 2` in those four sentences; the review of each stays unsigned until then (they are not a pure rename).",
+  "worktree_dirty": false
+}

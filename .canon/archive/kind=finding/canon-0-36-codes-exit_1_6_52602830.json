@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:55.402547Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_codeexit.rs:atip_codeexit_01,atip_codeexit_05",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "atip.codeexit.01 and .05 are under-proved. 01 (`each call that the table refuses before it starts`, brief F1: every refusal code has a real call that exits 2 with no data and leaves the work tree and .canon/ unchanged) runs two calls, BRIEF_APPROVAL_REQUIRED and TASK_EVIDENCE_REQUIRED; EVIDENCE_NOTE_INVALID, EVIDENCE_CONTRACT_CONFLICT, EVIDENCE_REPORT_CONFLICT, POLICY_APPROVAL_STALE, TASK_EVIDENCE_INVALID, STRATEGY_EVALUATION_INVALID, STRATEGY_PROMOTION_INVALID, DIVERGENCE_INVALID, CONTEXT_OBJECT_CONFLICT and DISPATCH_RUN_UNAVAILABLE have no binary-level no-data/no-write check, and a gate-wide guard that no exit-2 envelope carries `data` does not exist (print_failure_with_meta accepts data for any code). 05 is a test that searches evidence.rs for the text `judge_evidence_body(body)` before a `let` line; it does not run a batch. The behaviour is proved by unit test `evidence_add_115_*` under another name. Add a debug assertion in the failure printer that a code with exit 2 has no data, run each refusal of the table in 01, and name a land_batch test for 05 (a binary-level batch cannot make the gate refuse a body the CLI builds, so the function-level test is the right one).",
+  "worktree_dirty": false
+}
