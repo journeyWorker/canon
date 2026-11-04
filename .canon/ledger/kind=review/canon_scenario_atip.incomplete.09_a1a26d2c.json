@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T13:05:57.699973Z",
+  "code_tree": "50b56872df3bf2fa8e8bec57fd6ef23d8422a8c0",
+  "kind": "review",
+  "pin": "c45bf157bb171766684e1e838f063a11fe22e8db",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_incomplete_09_a_spec_root_left_unindexed_after_an_earlier_one_was_indexed_is_incomplete_with_its_reason",
+          "junit:atip_incomplete_09_a_store_failure_after_an_earlier_root_was_indexed_is_incomplete_and_one_before_any_is_inventory_failed",
+          "junit:atip_incomplete_09_a_sync_that_indexed_nothing_answers_the_corpus_refusal_and_a_preview_never_answers_incomplete"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "134a9fa55bb3462deacd3056cabb4142d901e45f2923e0da126169bb6359c746",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
+  },
+  "review_id": "01M6KAN3E3VB0JJA1HJW7468GN",
+  "reviewer": "rev-0-36-incomplete",
+  "scenario_id": "atip.incomplete.09",
+  "schema": 2,
+  "worktree_dirty": false
+}
