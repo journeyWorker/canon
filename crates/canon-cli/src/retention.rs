@@ -349,7 +349,22 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         }
         deleting.set(commit);
         // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
-        let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
+        let outcome = if commit {
+            RetentionService::new(&loaded_registry(repo, kind, false)?.1)
+                .purge(kind, before, false)?
+        } else {
+            preflight
+        };
+        if let Some(stop) =
+            crate::incomplete::injected_stop("purge-after-delete").filter(|_| commit)
+        {
+            // The deletion in the tiers is done, and the step after it stops (the test seam stands for the learn store, which a trajectory purge empties next).
+            return Err(RetentionError::PartialPurge {
+                matched: outcome.rungs.iter().map(|r| r.matched).sum(),
+                deleted: outcome.rungs.iter().map(|r| r.deleted).sum(),
+                reason: stop.to_string(),
+            });
+        }
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
         let learn_counts = if let Some(store) = learn_store {
@@ -398,9 +413,20 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             if matched > 0 || deleted > 0 {
                 let _ = append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted);
             }
-            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, a failure is a failure during the work (exit 1).
-            let code = if deleting.get() { "RETENTION_PURGE_FAILED" } else { tiers_code(&err) };
-            let hint = if deleting.get() { format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`") } else { format!("{}, then run `{base}` again and commit its plan with `--commit --plan-digest <planDigest>`", tiers_hint(code)) };
+            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, it stops part-way (exit 1, what was deleted stays deleted).
+            let code = if deleting.get() {
+                "RETENTION_PURGE_INCOMPLETE"
+            } else {
+                tiers_code(&err)
+            };
+            if deleting.get() {
+                crate::incomplete::read_status("read what the purge deleted before it stopped (`data` names the counts): what was deleted stays deleted");
+            }
+            let hint = if deleting.get() {
+                format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`")
+            } else {
+                format!("{}, then run `{base}` again and commit its plan with `--commit --plan-digest <planDigest>`", tiers_hint(code))
+            };
             let error = CliError::refused(code, err.to_string()).hint(hint);
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {

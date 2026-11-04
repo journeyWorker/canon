@@ -268,12 +268,22 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
             continue;
         }
         let lines = code_lines(&file);
-        // `gate::promote_after_stage(command, …)` emits `PROMOTE_FAILED` under
+        // `gate::promote_after_stage(command, incomplete, …)` emits `PROMOTION_FAILED` and the `<SUBJECT>_INCOMPLETE` code it is given under
         // the command its caller passes.
         for line in &lines {
             if let Some(i) = line.find("promote_after_stage(\"canon ") {
                 let rest = &line[i + "promote_after_stage(\"".len()..];
-                promoters.insert(rest[..rest.find('"').expect("closing quote")].trim_start_matches("canon ").to_string());
+                let end = rest.find('"').expect("closing quote");
+                let incomplete = rest[end + 1..]
+                    .trim_start_matches(", \"")
+                    .split('"')
+                    .next()
+                    .expect("the incomplete code literal")
+                    .to_string();
+                promoters.insert((
+                    rest[..end].trim_start_matches("canon ").to_string(),
+                    incomplete,
+                ));
             }
         }
         let mut file_has_codes = false;
@@ -286,6 +296,10 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
                     continue;
                 }
                 if PARSER_CODES.contains(code) && name == "run/entry.rs" {
+                    continue;
+                }
+                // The `_INCOMPLETE` code a `promote_after_stage("canon …", code, …)` call is given is the call's command's, added below with the promoters.
+                if line.contains("promote_after_stage(\"canon ") {
                     continue;
                 }
                 file_has_codes = true;
@@ -345,11 +359,19 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
     for leaf in HUMAN_ONLY_LEAVES {
         table.get_mut(leaf).expect("leaf has a row").insert("ACTOR_DENIED");
     }
-    for command in promoters {
+    for (command, incomplete) in promoters {
         for leaf in leaves_under(&command) {
-            table.get_mut(leaf).expect("leaf has a row").insert("PROMOTE_FAILED");
-            // The same call stops after the record it staged when the gate then refuses it: `STOPPED_MIDWAY` (`promote_after_stage`).
-            table.get_mut(leaf).expect("leaf has a row").insert("STOPPED_MIDWAY");
+            table
+                .get_mut(leaf)
+                .expect("leaf has a row")
+                .insert("PROMOTION_FAILED");
+            // The same call stops after the record it staged when the gate then refuses it: the subject's `_INCOMPLETE` code (`promote_after_stage`).
+            let code = all_codes()
+                .iter()
+                .find(|info| info.code == incomplete)
+                .unwrap_or_else(|| panic!("`{incomplete}` is no registered code"))
+                .code;
+            table.get_mut(leaf).expect("leaf has a row").insert(code);
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));

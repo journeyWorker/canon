@@ -114,13 +114,13 @@ pub(crate) fn before_first_write(e: &ArtifactStoreError) -> bool {
 
 /// The code `evidence add` reports when binding or storing a bound file fails:
 /// `EVIDENCE_BINDING_STALE` for a file that changed since it was bound, the code of [`store_code`] (exit 2) when the store could
-/// not be used before anything was written, `EVIDENCE_STORE_FAILED` (exit 1) when a write to it failed; the reason is the one
+/// not be used before anything was written, `ARTIFACTS_STORE_FAILED` (exit 1) when a write to it failed and nothing was kept; the reason is the one
 /// [`store_code`] gives.
 pub(crate) fn evidence_store_code(e: &ArtifactStoreError) -> (&'static str, Option<&'static str>) {
     match e {
         ArtifactStoreError::Changed { .. } => ("EVIDENCE_BINDING_STALE", None),
         _ if before_first_write(e) => store_code(e),
-        _ => ("EVIDENCE_STORE_FAILED", None),
+        _ => ("ARTIFACTS_STORE_FAILED", None),
     }
 }
 
@@ -555,9 +555,16 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
         race_hook(&blob.path, uploaded);
         let outcome = match std::fs::File::open(&blob.path).map_err(ArtifactStoreError::from).and_then(|file| object.upload(&blob.digest, file)) {
             Ok(outcome) => outcome,
-            Err(e @ (ArtifactStoreError::Remote { .. } | ArtifactStoreError::Unattached { .. })) => {
-                return CliError::failed("ARTIFACTS_STORE_FAILED", format!("uploading {} failed after {uploaded} upload(s): {e}", store.display(&blob.digest)))
-                    .hint(format!("{OBJECT_STORE_HINT}; no local blob was removed, and a second run resumes where this one stopped"))
+            Err(
+                e @ (ArtifactStoreError::Remote { .. } | ArtifactStoreError::Unattached { .. }),
+            ) => {
+                if uploaded > 0 {
+                    // The store stopped answering after uploads landed: the move stops here, and those uploads stay.
+                    stopped.push((store_error(&e).code, format!("uploading {} failed after {uploaded} upload(s): {e}; the blobs after it were not tried", store.display(&blob.digest))));
+                    break;
+                }
+                return CliError::failed("ARTIFACTS_STORE_FAILED", format!("uploading {} failed: {e}", store.display(&blob.digest)))
+                    .hint(format!("{OBJECT_STORE_HINT}; nothing was uploaded or removed, so the same call can run again"))
                     .emit("canon artifacts move", json);
             }
             Err(ArtifactStoreError::Changed { actual, .. }) => {
@@ -597,15 +604,27 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             // Nothing was uploaded, so nothing was written: a refusal like a blob that does not hash to its name in the plan.
             return refuse("ARTIFACTS_BLOB_CORRUPT", message, &format!("{}; nothing was uploaded or removed and canon.yaml is unchanged", blob_hint("ARTIFACTS_BLOB_CORRUPT")));
         }
-        // Uploads were made, so the command did work and stopped: the failure carries what was uploaded and says to read the state first.
-        let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded, already_in_store: already, removed_local: 0, config_written: false, gitignore_added: false, skipped, plan: plan.committed() };
+        // Uploads were made, so the command did work and stopped: `ARTIFACTS_INCOMPLETE` (one `_INCOMPLETE` per subject, the reason says
+        // what stopped it) carries what was uploaded in `data` and says to read the state first.
+        let report = ArtifactsMoveReport {
+            backend: to.to_string(),
+            blobs: blobs.len(),
+            uploaded,
+            already_in_store: already,
+            removed_local: 0,
+            config_written: false,
+            gitignore_added: false,
+            skipped,
+            plan: plan.committed(),
+        };
+        crate::incomplete::read_first("canon artifacts verify --json", "read what the stopped move left: the blobs it uploaded are in the store, no local blob was removed and canon.yaml is unchanged");
         crate::json_out::prepend_next(crate::status::NextStep {
             command: format!("canon artifacts move --tier {to} --json"),
-            why: "read what the stopped move left: the blobs it uploaded are in the store (`skip` effects of a new plan), no local blob was removed and canon.yaml is unchanged".into(),
+            why: "preview a new plan once the cause is dealt with: the uploaded blobs are `skip` effects of it (the same --plan-digest is stale now)".into(),
             actor: crate::status::StepActor::Agent,
             role: None,
         });
-        return CliError::failed("STOPPED_MIDWAY", format!("stopped after {uploaded} upload(s): {message}"))
+        return CliError::failed("ARTIFACTS_INCOMPLETE", format!("stopped after {uploaded} upload(s): {message}"))
             .reason(stopped[0].0)
             .hint("the uploads stay in the store, no local blob was removed and canon.yaml is unchanged; read the state, deal with the blob or object the message names, then preview and commit a new plan (the same --plan-digest is stale now)")
             .emit_with_data("canon artifacts move", json, &report);
@@ -698,7 +717,7 @@ mod tests {
 
     /// atip.codesplit.02: a bound file that changed while it was read is `EVIDENCE_BINDING_STALE` (exit 2, not retryable: it binds once what produced
     /// the file is run again); a store that could not be used before anything was written keeps the store's own code, and a write that failed is
-    /// `EVIDENCE_STORE_FAILED` (exit 1).
+    /// `ARTIFACTS_STORE_FAILED` (exit 1).
     #[test]
     fn atip_codesplit_02_a_bound_file_that_changed_is_evidence_binding_stale() {
         let changed = ArtifactStoreError::Changed { expected: "sha256:a".to_string(), actual: "sha256:b".to_string() };
@@ -707,7 +726,16 @@ mod tests {
         use crate::cli_error::CliErrorExt as _;
         let stale = crate::cli_error::CliError::refused("EVIDENCE_BINDING_STALE", "m");
         assert_eq!((stale.exit, stale.retryable), (2, false));
-        assert_eq!(evidence_store_code(&ArtifactStoreError::UnsafeStoreDir), ("ARTIFACTS_STORE_INVALID", None));
-        assert_eq!(evidence_store_code(&ArtifactStoreError::Remote { tier: "cold".to_string(), reason: "down".to_string() }), ("EVIDENCE_STORE_FAILED", None));
+        assert_eq!(
+            evidence_store_code(&ArtifactStoreError::UnsafeStoreDir),
+            ("ARTIFACTS_STORE_INVALID", None)
+        );
+        assert_eq!(
+            evidence_store_code(&ArtifactStoreError::Remote {
+                tier: "cold".to_string(),
+                reason: "down".to_string()
+            }),
+            ("ARTIFACTS_STORE_FAILED", None)
+        );
     }
 }

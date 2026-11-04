@@ -1228,7 +1228,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             // feeds a checkbox flip, a scenario-only one feeds
             // `canon gate check`'s spec-coverage pass. Naming the wrong
             // one would send an operator to a command that cannot apply.
-            let settled = crate::gate::promote_after_stage(&args.full(), &ledger_root, &receipt.location, promote, args.json);
+            let settled = crate::gate::promote_after_stage(&args.full(), "EVIDENCE_INCOMPLETE", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
             let stale = print_stale_reviews(&stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
             if settled.exit_code() == 0 {
@@ -1941,8 +1941,11 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     for (path, sha256) in &files {
         let observed = store.observe(&repo, sha256, false);
         if let Observed::Unavailable(why) = &observed {
-            // Nothing written yet: the store is a prerequisite that is not there; after a blob was written it is a failure during the work.
-            let code = if !dry_run && !stored.is_empty() { "ARTIFACTS_STORE_FAILED" } else { "ARTIFACTS_STORE_UNAVAILABLE" };
+            // Nothing written yet: the store is a prerequisite that is not there; after a blob was stored it is the command stopping part-way.
+            let code = if !dry_run && !stored.is_empty() { "ARTIFACTS_STORE_INCOMPLETE" } else { "ARTIFACTS_STORE_UNAVAILABLE" };
+            if code == "ARTIFACTS_STORE_INCOMPLETE" {
+                crate::incomplete::read_first("canon artifacts verify --json", "read which bound files the store holds now: the blobs this run stored stay, and the same call stores the rest");
+            }
             return CliError::refused(code, format!("could not check {}: {why}", store.display(sha256)))
                 .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
                 .emit("canon artifacts store", json);
@@ -1971,16 +1974,23 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
             stored.push(format!("{} <- {path}", store.display(sha256)));
             continue;
         }
-        let outcome = match &store {
-            ArtifactStore::Local => lock.as_ref().expect("the lock is taken whenever there is a file").store(sha256, file),
-            ArtifactStore::Object(object) => object.upload(sha256, file),
+        // `artifacts-store-second` (a debug build's test seam, `incomplete::injected_stop`): the write of the second blob fails once one was stored.
+        let outcome = match (crate::incomplete::injected_stop("artifacts-store-second").filter(|_| !stored.is_empty()), &store) {
+            (Some(stop), _) => Err(ArtifactStoreError::from(stop)),
+            (None, ArtifactStore::Local) => lock.as_ref().expect("the lock is taken whenever there is a file").store(sha256, file),
+            (None, ArtifactStore::Object(object)) => object.upload(sha256, file),
         };
         match outcome {
             Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", store.display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
             Err(ArtifactStoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
             Err(e) => {
-                return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
+                // Blobs this run stored stay: the call stopped part-way and the same call stores the rest. With none stored, nothing was kept.
+                let code = if stored.is_empty() { "ARTIFACTS_STORE_FAILED" } else { "ARTIFACTS_STORE_INCOMPLETE" };
+                if !stored.is_empty() {
+                    crate::incomplete::read_first("canon artifacts verify --json", "read which bound files the store holds now: the blobs this run stored stay, and the same call stores the rest");
+                }
+                return CliError::refused(code, format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
             }
         }
     }

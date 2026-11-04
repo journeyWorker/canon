@@ -581,7 +581,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
 /// (`SKILLS_SOURCE_NOT_FOUND`: the skill source, `SKILLS_ARGUMENT_INVALID`: the providers, `CONFIG_INVALID`: the `skills:` section; `WRITE_DENIED` or `WRITE_INVALID`: a target that
 /// cannot be written) or a failure (`SKILLS_FAILED`), and `init` says the same with what its step order changes (spec 8.3,
 /// 8.3.2): by this step the run has written `canon.yaml` and the files beside it, so nothing can be an exit 2 any more.
-/// - the refusal of an argument (`SKILLS_SOURCE_NOT_FOUND`, `SKILLS_ARGUMENT_INVALID`, `CONFIG_INVALID`) is `STOPPED_MIDWAY` with that code as its reason;
+/// - the refusal of an argument (`SKILLS_SOURCE_NOT_FOUND`, `SKILLS_ARGUMENT_INVALID`, `CONFIG_INVALID`) is `INIT_INCOMPLETE` with that code as its reason;
 /// - a target that cannot be written is the I/O category's code for the work, `WRITE_FAILED`, which keeps its name;
 /// - any other failure is `SKILLS_FAILED`.
 ///
@@ -615,7 +615,11 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
     });
     let hint = format!("read what init wrote with `canon status`, fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset; the skill directories must be writable), then run `canon skills install`; it follows skills.providers", skills::CANONICAL_SOURCE_ENV);
     match said {
-        "CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => CliError::failed("STOPPED_MIDWAY", message).hint(hint).reason(said),
+        "CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => {
+            CliError::failed("INIT_INCOMPLETE", message)
+                .hint(hint)
+                .reason(said)
+        }
         "WRITE_DENIED" | "WRITE_INVALID" => CliError::failed("WRITE_FAILED", message).hint(hint),
         _ => CliError::failed("SKILLS_FAILED", message).hint(hint),
     }
@@ -698,7 +702,7 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 ///   refuse (exit `2`) before anything is written.
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
-///   exits `1`: `STOPPED_MIDWAY` when `canon skills install` would have
+///   exits `1`: `INIT_INCOMPLETE` when `canon skills install` would have
 ///   refused its arguments (the reason is that refusal's code),
 ///   `WRITE_FAILED` when a target cannot be written, `SKILLS_FAILED`
 ///   otherwise, and `meta.next` leads with `canon status`. A rerun never

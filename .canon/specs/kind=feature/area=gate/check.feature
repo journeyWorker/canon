@@ -520,8 +520,8 @@ Feature: gate check
   Scenario: Gate install-hooks refuses a repo that is no directory and an unreadable timeout and writes nothing
     Given a git work tree with a canon.yaml and a plain file afile
     When canon gate install-hooks is run with --repo afile, with --repo naming a directory that does not exist (also with --dry-run), with --timeout abc, or with an option it does not have
-    Then --repo afile exits 2 with HOOKS_INSTALL_FAILED saying afile is not a directory
-    And the missing directory exits 2 with HOOKS_INSTALL_FAILED and is not created
+    Then --repo afile exits 2 with HOOKS_REPO_INVALID saying afile is not a directory
+    And the missing directory exits 2 with HOOKS_REPO_INVALID and is not created
     And --timeout abc exits 2 with USAGE naming the --timeout field, and the unknown option exits 2
     And the tree is unchanged after each
 

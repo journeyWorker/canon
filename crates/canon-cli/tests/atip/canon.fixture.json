@@ -608,12 +608,29 @@
       "retryable": false
     },
     {
+      "code": "ARTIFACTS_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "ARTIFACTS_BLOB_CORRUPT",
+        "ARTIFACTS_STORE_DENIED",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE"
+      ],
+      "retryable": false
+    },
+    {
       "code": "ARTIFACTS_STORE_DENIED",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "ARTIFACTS_STORE_FAILED",
+      "exit": 1,
+      "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_STORE_INCOMPLETE",
       "exit": 1,
       "retryable": true
     },
@@ -937,6 +954,14 @@
       "retryable": false
     },
     {
+      "code": "DIVERGENCE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "PROMOTION_INVALID"
+      ],
+      "retryable": false
+    },
+    {
       "code": "DIVERGENCE_INVALID",
       "exit": 2,
       "retryable": false
@@ -1001,6 +1026,14 @@
       "retryable": false
     },
     {
+      "code": "EVIDENCE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "PROMOTION_INVALID"
+      ],
+      "retryable": false
+    },
+    {
       "code": "EVIDENCE_NOTE_INVALID",
       "exit": 2,
       "retryable": false
@@ -1019,11 +1052,6 @@
       "code": "EVIDENCE_STALE",
       "exit": 2,
       "retryable": false
-    },
-    {
-      "code": "EVIDENCE_STORE_FAILED",
-      "exit": 1,
-      "retryable": true
     },
     {
       "code": "FEATURE_EXISTS",
@@ -1048,6 +1076,14 @@
     {
       "code": "FINDING_EXISTS",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "FINDING_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "PROMOTION_INVALID"
+      ],
       "retryable": false
     },
     {
@@ -1101,7 +1137,7 @@
       "retryable": true
     },
     {
-      "code": "HOOKS_INSTALL_FAILED",
+      "code": "HOOKS_INSTALL_INCOMPLETE",
       "exit": 1,
       "retryable": false
     },
@@ -1128,6 +1164,16 @@
     {
       "code": "INIT_ARGUMENT_INVALID",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "INIT_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "CONFIG_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
+        "SKILLS_SOURCE_NOT_FOUND"
+      ],
       "retryable": false
     },
     {
@@ -1166,13 +1212,17 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_ABORTED",
+      "code": "INVENTORY_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "INVENTORY_FAILED",
+      "code": "INVENTORY_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "DUPLICATE_SCENARIOS",
+        "VIOLATIONS"
+      ],
       "retryable": false
     },
     {
@@ -1186,32 +1236,12 @@
       "retryable": false
     },
     {
-      "code": "LEARN_PROMOTION_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
       "code": "LEDGER_ARCHIVE_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "LEDGER_COMPACT_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_INDEX_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_PINS_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_STOPPED",
+      "code": "LEDGER_COMPACT_INCOMPLETE",
       "exit": 1,
       "retryable": false
     },
@@ -1223,6 +1253,16 @@
     {
       "code": "MIGRATION_DENIED",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "MIGRATION_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "INDEX",
+        "PINS",
+        "STOPPED"
+      ],
       "retryable": false
     },
     {
@@ -1271,7 +1311,7 @@
       "retryable": false
     },
     {
-      "code": "PLUGIN_SYNC_ERRORS",
+      "code": "PLUGIN_SYNC_INCOMPLETE",
       "exit": 1,
       "retryable": false
     },
@@ -1321,7 +1361,7 @@
       "retryable": true
     },
     {
-      "code": "PROMOTE_FAILED",
+      "code": "PROMOTION_FAILED",
       "exit": 1,
       "retryable": false
     },
@@ -1399,7 +1439,7 @@
       "retryable": false
     },
     {
-      "code": "RETENTION_PURGE_FAILED",
+      "code": "RETENTION_PURGE_INCOMPLETE",
       "exit": 1,
       "retryable": false
     },
@@ -1557,19 +1597,6 @@
       "retryable": true
     },
     {
-      "code": "STOPPED_MIDWAY",
-      "exit": 1,
-      "reasons": [
-        "ARTIFACTS_BLOB_CORRUPT",
-        "CONFIG_INVALID",
-        "PROMOTION_INVALID",
-        "SKILLS_ARGUMENT_INVALID",
-        "SKILLS_SOURCE_NOT_FOUND",
-        "STRATEGY_PROMOTION_INVALID"
-      ],
-      "retryable": false
-    },
-    {
       "code": "STRATEGY_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
@@ -1590,8 +1617,21 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "STRATEGY_PROMOTION_INVALID"
+      ],
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_NOT_FOUND",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_PROMOTION_FAILED",
+      "exit": 1,
       "retryable": false
     },
     {
@@ -1706,6 +1746,11 @@
     },
     {
       "code": "TIER_FAILED",
+      "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "TIER_INCOMPLETE",
       "exit": 1,
       "retryable": false
     },

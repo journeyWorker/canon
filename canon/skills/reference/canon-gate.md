@@ -790,8 +790,10 @@ It installs no git hook: copy the script into git's `pre-commit` hook
 agent hook files and the script, also under `--dry-run`. In `--json`,
 `installed` is true when an agent hook file changed and
 `preCommitScriptWritten` when the script was written. A `--repo` that is not an
-existing directory exits 2 with `HOOKS_INSTALL_FAILED` (also under `--dry-run`)
-and creates nothing.
+existing directory exits 2 with `HOOKS_REPO_INVALID` (also under `--dry-run`)
+and creates nothing. When the install writes the first hook file and then cannot
+write the second, it exits 1 with `HOOKS_INSTALL_INCOMPLETE`: the first file
+stays, `meta.next` leads with `canon status`, then run the install again.
 
 Prefer this over hand-editing `settings.json`/`hooks.json`.
 

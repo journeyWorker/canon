@@ -1393,7 +1393,7 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
     }
     let committed = safe_plan.committed();
     if let Err(e) = revert_apply(&repo, &plan) {
-        return CliError::refused("MIGRATE_STOPPED", e).hint("the backup is intact: fix what the message names, then run `canon migrate --revert` again").emit("canon migrate", json);
+        return crate::migrate::stopped("STOPPED", e, "the backup is intact: fix what the message names, then run `canon migrate --revert` again").emit("canon migrate", json);
     }
     log.line(format!("canon migrate --revert: restored {} path(s) and removed {} from {relative}/", committed.effects.iter().filter(|e| e.action == "restore").count(), committed.effects.iter().filter(|e| e.action == "remove").count()));
     if json {

@@ -132,7 +132,7 @@ fn row(code: &str) -> (u8, bool) {
 /// during it is exit 1. `INIT_SKILL_INSTALL_FAILED`, the one of the
 /// thirteen decided "only during the work", is not in the registry since
 /// 0.35: it was the failure of a later step that met a refusal after earlier
-/// steps made their effects, which is `STOPPED_MIDWAY` (spec 8.3.2,
+/// steps made their effects, which is `INIT_INCOMPLETE` (spec 8.3.2,
 /// `atip.midway`), the other twelve hold their decided exits.
 #[test]
 fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
@@ -141,14 +141,14 @@ fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
         // split: the failure during the work is the old code, exit 1; the precondition is the partner below.
         ("ARTIFACTS_STORE_FAILED", 1),
         ("ARTIFACTS_STORE_UNAVAILABLE", 2), // the precondition partner of ARTIFACTS_STORE_FAILED
-        ("EVIDENCE_STORE_FAILED", 1),
-        ("HOOKS_INSTALL_FAILED", 1),
+        ("ARTIFACTS_STORE_INCOMPLETE", 1), // the store that stopped part-way; `EVIDENCE_STORE_FAILED` merged into `ARTIFACTS_STORE_FAILED`
+        ("HOOKS_INSTALL_INCOMPLETE", 1),
         ("INVENTORY_FAILED", 1),
         ("POLICY_APPROVAL_FAILED", 1),
         ("RETENTION_EXPORT_FAILED", 1),
-        ("RETENTION_PURGE_FAILED", 1),
+        ("RETENTION_PURGE_INCOMPLETE", 1),
         // only during the work: exit 1.
-        ("MIGRATE_PINS_FAILED", 1),
+        ("MIGRATION_INCOMPLETE", 1),
         // only before the work: exit 2.
         ("LEDGER_ARCHIVE_INVALID", 2),
         ("PLUGIN_REQUIRED", 2),
@@ -193,7 +193,12 @@ fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
         assert_eq!(row(code).0, exit, "{code}");
     }
     // The splits that keep a retry meaningful say so.
-    assert!(row("ARTIFACTS_STORE_FAILED").1 && row("ARTIFACTS_STORE_UNAVAILABLE").1 && row("EVIDENCE_STORE_FAILED").1 && !row("ARTIFACTS_STORE_REQUIRED").1);
+    assert!(
+        row("ARTIFACTS_STORE_FAILED").1
+            && row("ARTIFACTS_STORE_UNAVAILABLE").1
+            && row("ARTIFACTS_STORE_INCOMPLETE").1
+            && !row("ARTIFACTS_STORE_REQUIRED").1
+    );
 }
 
 fn canon(dir: &Path, args: &[&str]) -> Output {

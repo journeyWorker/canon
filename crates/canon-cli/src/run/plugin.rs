@@ -29,7 +29,12 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
                 }
                 ExitCode::SUCCESS
             } else {
-                let error = CliError::failed("PLUGIN_SYNC_ERRORS", "some candidates could not be written").hint("data.roots names each error");
+                crate::incomplete::read_status("read what `plugin sync` wrote before it stopped: the candidates it wrote stay, `data.roots` names each one it could not write");
+                let error = CliError::failed(
+                    "PLUGIN_SYNC_INCOMPLETE",
+                    "some candidates could not be written",
+                )
+                .hint("data.roots names each error; the candidates that were written stay");
                 ExitCode::from(error.emit_with_data("canon plugin sync", json, &data))
             }
         }

@@ -24,8 +24,14 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
         Ok(planned) => planned,
         Err(err) => return failed(err.to_string()),
     };
-    let root = canon_yaml_path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
-    let reads = Reads::new().digest("canon.yaml", path_digest(root, &canon_yaml_path)).set("records", &scanned);
+    let root = canon_yaml_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(std::path::Path::new("."));
+    let reads = Reads::new()
+        .digest("canon.yaml", path_digest(root, &canon_yaml_path))
+        .set("records", &scanned);
+    let planned_moves = effects.len();
     let plan = match Plan::new("tier age", effects, reads) {
         Ok(plan) => plan,
         Err(err) => return ExitCode::from(err.emit("canon tier age", json)),
@@ -68,6 +74,22 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
             }
             ExitCode::SUCCESS
         }
-        Err(err) => failed(err.to_string()),
+        Err(err) => {
+            // Moving began: a record that left its tier stays moved. The plan's moves are counted again; fewer left means the run stopped part-way
+            // (`TIER_INCOMPLETE`), as many means it failed before a record left (`TIER_FAILED`). A recount that cannot be made is read as part-way.
+            let left = crate::tiers::build_tiers_for_read(&canon_yaml_path)
+                .ok()
+                .and_then(|loaded| crate::tier::preview(&loaded).ok())
+                .map(|(_, effects, _)| effects.len());
+            if left.is_some_and(|left| left >= planned_moves) {
+                return failed(err.to_string());
+            }
+            crate::incomplete::read_status("read what the aging moved before it stopped: records that left their tier stay moved, the rest are still where they were");
+            ExitCode::from(
+                CliError::failed("TIER_INCOMPLETE", err.to_string())
+                    .hint("what moved stays moved: check the `tiers` settings in canon.yaml and that the destinations are reachable, then preview with `canon tier age` and move the rest with `--commit --plan-digest <DIGEST>`")
+                    .emit("canon tier age", json),
+            )
+        }
     }
 }

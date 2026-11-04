@@ -45,10 +45,18 @@ pub fn compact(repo: &Path, dry_run: bool) -> Result<Vec<KindCompaction>, CliErr
         )
         .hint("name the local tier's root `<dir>/ledger` in canon.yaml (`tiers.local.root`, default `.canon/ledger`) to archive superseded versions"));
     }
-    tier.compact(dry_run).map_err(|e| {
-        CliError::failed("LEDGER_COMPACT_FAILED", e.to_string())
-            .hint("fix what the message names (a read-only ledger or archive, a full disk), then run `canon ledger compact` again; versions already moved stay in the archive")
-    })
+    let incomplete = |cause: String| {
+        CliError::failed("LEDGER_COMPACT_INCOMPLETE", cause)
+            .hint("fix what the message names (a read-only ledger or archive, a full disk), then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>`; versions already moved stay in the archive")
+    };
+    let kinds = tier
+        .compact(dry_run)
+        .map_err(|e| incomplete(e.to_string()))?;
+    // `ledger-compact-after-move` (a debug build's test seam, `incomplete::injected_stop`): the compaction stops once the versions are moved.
+    match crate::incomplete::injected_stop("ledger-compact-after-move").filter(|_| !dry_run) {
+        Some(stop) => Err(incomplete(stop.to_string())),
+        None => Ok(kinds),
+    }
 }
 
 fn kib(bytes: u64) -> String {
@@ -207,7 +215,12 @@ pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     }
     let kinds = match compact(&repo_dir, false) {
         Ok(kinds) => kinds,
-        Err(e) => return e.emit(CMD, json),
+        Err(e) => {
+            if e.code == "LEDGER_COMPACT_INCOMPLETE" {
+                crate::incomplete::read_status("read what the compaction moved before it stopped: versions already moved stay in the archive, the rest are still in the ledger");
+            }
+            return e.emit(CMD, json);
+        }
     };
     if kinds.iter().all(|k| k.moved == 0) {
         crate::json_out::mark_unchanged();

@@ -291,7 +291,7 @@ Feature: authoring init
   Scenario: A missing skill source override keeps the recorded choice and names the install to run
     Given an empty repository holding a .pi directory, and CANON_SKILLS_SOURCE naming a directory that does not exist
     When canon init runs with no terminal and no --providers
-    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 1 with STOPPED_MIDWAY whose reason is SKILLS_SOURCE_NOT_FOUND
+    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 1 with INIT_INCOMPLETE whose reason is SKILLS_SOURCE_NOT_FOUND
     And canon skills install, run without the override, projects pi from canon.yaml with the stub the binary carries
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}

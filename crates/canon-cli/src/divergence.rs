@@ -209,9 +209,10 @@ pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate:
             return CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence add", json);
         }
     };
-    let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
+    let outcome = crate::gate::promote_after_stage("canon divergence add", "DIVERGENCE_INCOMPLETE", &gate_ctx.ledger_root, &location, promote, json);
     crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
-    if json {
+    // A stop after the record was staged answered with its error already (`DIVERGENCE_INCOMPLETE`): no success envelope follows it.
+    if json && outcome.exit_code() == 0 {
         crate::json_out::data("divergence add", &DivergenceAddReport { landing: outcome.landing(&location) });
     }
     outcome.exit_code()

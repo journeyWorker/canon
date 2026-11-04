@@ -1025,7 +1025,7 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
             }
         }
         Err(e) => {
-            CliError::refused("PROMOTE_FAILED", e.to_string()).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`").emit("canon gate promote", json)
+            CliError::refused("PROMOTION_FAILED", e.to_string()).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`").emit("canon gate promote", json)
         }
     }
 }
@@ -1117,27 +1117,41 @@ impl StagedOutcome {
 /// record. Reads the outcome off the report, which carries only that
 /// record: committed (or recovered) means promoted, and the caller's
 /// one success line names the committed path; refused means it is
-/// still staged, and the refusal lines are printed here.
-pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &str, promote: bool, json: bool) -> StagedOutcome {
+/// still staged, and the refusal lines are printed here. A refusal after the staging is `incomplete` (the `<SUBJECT>_INCOMPLETE`
+/// code of the record's subject) with the gate's code as its reason.
+pub(crate) fn promote_after_stage(
+    command: &str,
+    incomplete: &'static str,
+    ledger_root: &Path,
+    location: &str,
+    promote: bool,
+    json: bool,
+) -> StagedOutcome {
     if !promote {
         return StagedOutcome::Staged;
+    }
+    // `promote-staged-corrupt` (a debug build's test seam, `incomplete::injected_stop`): another process damages the staged file between the staging and
+    // the promotion, so the gate refuses the record it was just given and the record stays staged.
+    if let Some(stop) = crate::incomplete::injected_stop("promote-staged-corrupt") {
+        let _ = std::fs::write(
+            evidence_staging_dir(ledger_root).join(location),
+            format!("{{ {stop}"),
+        );
     }
     match try_promote(ledger_root, location) {
         Ok(target) => StagedOutcome::Promoted { target },
         Err(refusal) => {
             crate::say_raw!(json, "{}", refusal.lines);
             // The record was staged before the gate refused it, so it stays staged: the command stopped after an effect (spec 8.3.2),
-            // and the refusal is the reason. A promotion that failed for another cause (`PROMOTE_FAILED`) keeps its own code.
+            // and the refusal is the reason. A promotion that failed for another cause (`PROMOTION_FAILED`) keeps its own code.
             let error = if refusal.data.is_some() {
-                crate::json_out::prepend_next(crate::status::NextStep {
-                    command: "canon gate promote --dry-run --json".into(),
-                    why: "read what is staged and why the gate refuses it before running anything again".into(),
-                    actor: crate::status::StepActor::Agent,
-                    role: Some(crate::role::Role::Orchestrator),
-                });
+                crate::incomplete::read_first(
+                    "canon gate promote --dry-run --json",
+                    "read what is staged and why the gate refuses it before running anything again",
+                );
                 // The causes the gate named stay: each is an entry of `details` with its own code, the first being the error itself.
                 let details = refusal.error.detail_errors().to_vec();
-                let stopped = CliError::failed("STOPPED_MIDWAY", format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
+                let stopped = CliError::failed(incomplete, format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
                     .reason(refusal.error.code)
                     .hint("fix the record the message names and run `canon gate promote` (the refused record is still staged); do not add it again");
                 if details.len() > 1 { stopped.details(details) } else { stopped }
@@ -1183,7 +1197,7 @@ fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreErr
                 data: Some(promote_report(&report, false)),
             })),
         },
-        Err(e) => Err(Box::new(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None })),
+        Err(e) => Err(Box::new(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTION_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None })),
     }
 }
 
@@ -1323,16 +1337,32 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         }
     }
 
+    // One write that fails and left nothing written is the I/O category's `WRITE_FAILED`; the second file failing after the first was
+    // written is the install stopping part-way, `HOOKS_INSTALL_INCOMPLETE`, and the first file stays.
     let claude_outcome = match install_into(&claude_path, &entry, dry_run) {
         Ok(o) => o,
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+            return CliError::refused("WRITE_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
-    let codex_outcome = match install_into(&codex_path, &entry, dry_run) {
+    let codex_result = match crate::incomplete::injected_stop("hooks-second-file") {
+        Some(stop) if !dry_run => Err(stop.to_string()),
+        _ => install_into(&codex_path, &entry, dry_run).map_err(|e| e.to_string()),
+    };
+    let codex_outcome = match codex_result {
         Ok(o) => o,
+        Err(e) if !dry_run && matches!(claude_outcome, InstallOutcome::Installed) => {
+            crate::incomplete::read_status(&format!(
+                "read what the install wrote before it stopped: {} is installed, {} is not",
+                claude_path.display(),
+                codex_path.display()
+            ));
+            return CliError::failed("HOOKS_INSTALL_INCOMPLETE", format!("installed the hook in {}, but could not write {}: {e}", claude_path.display(), codex_path.display()))
+                .hint("the first hook file stays installed; check that the other hook file and its directory are writable, then run `canon gate install-hooks` again")
+                .emit("canon gate install-hooks", json);
+        }
         Err(e) => {
-            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+            return CliError::refused("WRITE_FAILED", e).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
 
@@ -1451,16 +1481,48 @@ mod tests {
         // no promote on write may commit it.
         let bystander = stage(&ledger_root, Actor::new("other", RoleId::parse("reviewer").unwrap()));
 
-        let kept = stage(&ledger_root, Actor::new("impl", RoleId::parse("implementer").unwrap()));
-        assert_eq!(promote_after_stage("t", &ledger_root, &kept, false, false), StagedOutcome::Staged);
-        assert!(evidence_staging_dir(&ledger_root).join(&kept).exists(), "not asked to promote: nothing moves");
+        let kept = stage(
+            &ledger_root,
+            Actor::new("impl", RoleId::parse("implementer").unwrap()),
+        );
+        assert_eq!(
+            promote_after_stage(
+                "t",
+                "EVIDENCE_INCOMPLETE",
+                &ledger_root,
+                &kept,
+                false,
+                false
+            ),
+            StagedOutcome::Staged
+        );
+        assert!(
+            evidence_staging_dir(&ledger_root).join(&kept).exists(),
+            "not asked to promote: nothing moves"
+        );
 
-        let promoted = promote_after_stage("t", &ledger_root, &kept, true, false);
-        let StagedOutcome::Promoted { target } = &promoted else { panic!("promoted: {promoted:?}") };
-        assert!(ledger_root.join(target).is_file(), "the outcome names the committed record: {target}");
-        assert_ne!(target, &kept, "promotion assigns the committed record its own name");
-        assert_eq!(promoted.landed(&kept), format!("wrote {target}"), "the success line names one path, the committed one");
-        assert_eq!(StagedOutcome::Staged.landed(&kept), format!("staged {kept}"));
+        let promoted =
+            promote_after_stage("t", "EVIDENCE_INCOMPLETE", &ledger_root, &kept, true, false);
+        let StagedOutcome::Promoted { target } = &promoted else {
+            panic!("promoted: {promoted:?}")
+        };
+        assert!(
+            ledger_root.join(target).is_file(),
+            "the outcome names the committed record: {target}"
+        );
+        assert_ne!(
+            target, &kept,
+            "promotion assigns the committed record its own name"
+        );
+        assert_eq!(
+            promoted.landed(&kept),
+            format!("wrote {target}"),
+            "the success line names one path, the committed one"
+        );
+        assert_eq!(
+            StagedOutcome::Staged.landed(&kept),
+            format!("staged {kept}")
+        );
         assert!(!evidence_staging_dir(&ledger_root).join(&kept).exists());
         assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "promoting this record leaves another author's staged");
 
@@ -1469,8 +1531,18 @@ mod tests {
         // bystander beside it stays untouched rather than being promoted
         // in its place.
         let refused = stage(&ledger_root, Actor::new_unattributed("legacy-writer"));
-        let outcome = promote_after_stage("t", &ledger_root, &refused, true, false);
-        assert_eq!((outcome.exit_code(), outcome.suffix()), (1, crate::write_mode::STAGED_FOR_GATE_PROMOTE));
+        let outcome = promote_after_stage(
+            "t",
+            "EVIDENCE_INCOMPLETE",
+            &ledger_root,
+            &refused,
+            true,
+            false,
+        );
+        assert_eq!(
+            (outcome.exit_code(), outcome.suffix()),
+            (1, crate::write_mode::STAGED_FOR_GATE_PROMOTE)
+        );
         assert_eq!(outcome, StagedOutcome::Refused);
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");
         assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "a refusal promotes nothing else either");

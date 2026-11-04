@@ -296,8 +296,20 @@ pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Opt
                     if !dry_run && !candidates.is_empty() {
                         crate::write_mode::check_writable(&ctx.ledger_root).map_err(|cause| PluginSyncError::Unavailable(crate::write_mode::unwritable(&ctx.ledger_root, &cause)))?;
                     }
-                    for body in candidates {
-                        let receipt = if dry_run { check_overlay(&git, decl, &body) } else { write_overlay(&git, decl, body) };
+                    for (index, body) in candidates.into_iter().enumerate() {
+                        // `plugin-second-candidate` (a debug build's test seam, `incomplete::injected_stop`): the write of the second candidate fails.
+                        if let Some(stop) = (!dry_run && index == 1)
+                            .then(|| crate::incomplete::injected_stop("plugin-second-candidate"))
+                            .flatten()
+                        {
+                            outcome.errors.push(stop.to_string());
+                            continue;
+                        }
+                        let receipt = if dry_run {
+                            check_overlay(&git, decl, &body)
+                        } else {
+                            write_overlay(&git, decl, body)
+                        };
                         match receipt {
                             Ok(receipt) if receipt.deduped => outcome.deduped += 1,
                             Ok(_) => outcome.written += 1,

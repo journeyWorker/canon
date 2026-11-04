@@ -142,7 +142,7 @@ pub fn run_promote_with_evidence(
     let decision = match promotion_decision(&repo, &learn_config, &strategy_store, strategy_id) {
         Ok(decision) => decision,
         Err(err) => {
-            return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json));
+            return ExitCode::from(CliError::failed("STRATEGY_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json));
         }
     };
     // A promotion writes the strategy store and the strategy files: refused before the first write. A blocked or already-recorded one writes nothing here.
@@ -216,7 +216,7 @@ pub fn run_promote_with_evidence(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json);
+            CliError::failed("STRATEGY_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json);
             ExitCode::from(1)
         }
     }
@@ -514,17 +514,12 @@ fn rollback_refusal(evidence: &canon_learn::PromotionEvidenceError, reason: &str
 /// tell apart (`STRATEGY_DEMOTION_FAILED`).
 ///
 /// `demoted` is the strategy the refused run demoted (a contradicting trajectory turned an active strategy off): that is an effect
-/// the refusal came after, so the answer is `STOPPED_MIDWAY` (spec 8.3.2) with the refusal as its reason, and its first next step reads
+/// the refusal came after, so the answer is `STRATEGY_INCOMPLETE` (spec 8.3.2) with the refusal as its reason, and its first next step reads
 /// what was done. A refusal that changed nothing is exit 2.
 fn report_block(decision: &PromotionDecision, demotion_failure: Option<&str>, demoted: Option<StrategyId>, json: bool) -> ExitCode {
     if let (Some(id), None) = (demoted, demotion_failure) {
-        crate::json_out::prepend_next(crate::status::NextStep {
-            command: format!("canon strategy promote {id} --dry-run --json"),
-            why: "read what the run already did (the strategy was demoted by a contradicting trajectory) before running anything again".into(),
-            actor: crate::status::StepActor::Agent,
-            role: Some(crate::role::Role::Orchestrator),
-        });
-        let error = CliError::failed("STOPPED_MIDWAY", format!("the strategy was demoted, then the promotion gate blocked it: {}", decision.reason()))
+        crate::incomplete::read_first(&format!("canon strategy promote {id} --dry-run --json"), "read what the run already did (the strategy was demoted by a contradicting trajectory) before running anything again");
+        let error = CliError::failed("STRATEGY_INCOMPLETE", format!("the strategy was demoted, then the promotion gate blocked it: {}", decision.reason()))
             .reason("STRATEGY_PROMOTION_INVALID")
             .hint("the strategy stays demoted: read it with `canon strategy promote <id> --dry-run`, then record the evidence the gate asks for (`canon ingest records`)");
         return ExitCode::from(error.emit("canon strategy promote", json));

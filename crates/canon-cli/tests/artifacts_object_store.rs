@@ -246,9 +246,21 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
     let add = repo.canon_s3(&args, &env);
     assert_eq!(add.status.code(), Some(1), "the store was opened and the upload failed: {}", text(&add));
     let body = stdout_json(&add);
-    assert_eq!(body["error"]["code"], "EVIDENCE_STORE_FAILED");
-    assert!(body["error"]["hint"].as_str().unwrap().contains("reachable"), "{body}");
-    assert_eq!(std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence")).unwrap().count(), before, "no record was written");
+    assert_eq!(body["error"]["code"], "ARTIFACTS_STORE_FAILED");
+    assert!(
+        body["error"]["hint"]
+            .as_str()
+            .unwrap()
+            .contains("reachable"),
+        "{body}"
+    );
+    assert_eq!(
+        std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence"))
+            .unwrap()
+            .count(),
+        before,
+        "no record was written"
+    );
 }
 
 #[test]
@@ -556,11 +568,12 @@ fn atip_codestored_07_a_store_directory_in_the_wrong_state_is_invalid_or_denied_
 }
 
 /// atip.codestored.07 (`artifacts move --commit` and a blob that changes under it): a blob another process rewrites after the plan was made, once
-/// blobs have been uploaded, is `STOPPED_MIDWAY` (exit 1, not retryable, reason `ARTIFACTS_BLOB_CORRUPT`, `data` what was uploaded, `meta.next` the
+/// blobs have been uploaded, is `ARTIFACTS_INCOMPLETE` (exit 1, not retryable, reason `ARTIFACTS_BLOB_CORRUPT`, `data` what was uploaded, `meta.next` the
 /// read of the state): the uploads stay, no local blob is removed, canon.yaml is unchanged, and the same `--plan-digest` is stale; one rewritten
 /// before anything was uploaded is the refusal `ARTIFACTS_BLOB_CORRUPT` (exit 2). The rewrite is the debug seam `CANON_TEST_BLOB_RACE_AFTER`.
 #[test]
-fn atip_codestored_07_a_blob_rewritten_after_uploads_began_is_stopped_midway_and_before_any_is_a_refusal() {
+fn atip_codestored_07_a_blob_rewritten_after_uploads_began_is_incomplete_and_before_any_is_a_refusal(
+) {
     let repo = new_repo(None);
     let blobs: [&[u8]; 3] = [V1, br#"{"at":"2026-10-10T15:00:00Z","checks":15}"#, br#"{"at":"2026-10-10T16:00:00Z","checks":14}"#];
     for (index, bytes) in blobs.iter().enumerate() {
@@ -578,13 +591,68 @@ fn atip_codestored_07_a_blob_rewritten_after_uploads_began_is_stopped_midway_and
     let out = commit(&[("CANON_TEST_BLOB_RACE_AFTER", "1")]);
     let body = stdout_json(&out);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
-    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["retryable"].as_bool()), (Some("STOPPED_MIDWAY"), Some("ARTIFACTS_BLOB_CORRUPT"), Some(false)), "{body}");
-    assert_eq!((body["data"]["uploaded"].as_u64(), body["data"]["removedLocal"].as_u64(), body["data"]["configWritten"].as_bool()), (Some(2), Some(0), Some(false)), "data says what was uploaded: {body}");
-    assert!(body["meta"]["next"][0]["command"].as_str().is_some_and(|command| command.starts_with("canon artifacts move --tier cold")), "the first next step reads the state: {body}");
-    assert!(body["error"]["hint"].as_str().unwrap().contains("uploads stay"), "{body}");
-    assert_eq!(blobs.iter().filter(|bytes| repo.object(bytes).exists()).count(), 2, "the uploads stay");
-    assert_eq!(blobs.iter().filter(|bytes| std::fs::read(repo.local_blob(bytes)).unwrap() != **bytes).count(), 1, "the rewritten blob is not moved");
-    assert!(blobs.iter().all(|bytes| repo.local_blob(bytes).exists()), "no local blob was removed");
+    assert_eq!(
+        (
+            body["error"]["code"].as_str(),
+            body["error"]["reason"].as_str(),
+            body["error"]["retryable"].as_bool()
+        ),
+        (
+            Some("ARTIFACTS_INCOMPLETE"),
+            Some("ARTIFACTS_BLOB_CORRUPT"),
+            Some(false)
+        ),
+        "{body}"
+    );
+    assert_eq!(
+        (
+            body["data"]["uploaded"].as_u64(),
+            body["data"]["removedLocal"].as_u64(),
+            body["data"]["configWritten"].as_bool()
+        ),
+        (Some(2), Some(0), Some(false)),
+        "data says what was uploaded: {body}"
+    );
+    assert_eq!(
+        (
+            body["meta"]["next"][0]["argv"].clone(),
+            body["meta"]["next"][1]["command"]
+                .as_str()
+                .map(|command| command.starts_with("canon artifacts move --tier cold"))
+        ),
+        (
+            serde_json::json!(["artifacts", "verify", "--json"]),
+            Some(true)
+        ),
+        "the first next step reads the state, the preview of a new plan follows: {body}"
+    );
+    assert!(
+        body["error"]["hint"]
+            .as_str()
+            .unwrap()
+            .contains("uploads stay"),
+        "{body}"
+    );
+    assert_eq!(
+        blobs
+            .iter()
+            .filter(|bytes| repo.object(bytes).exists())
+            .count(),
+        2,
+        "the uploads stay"
+    );
+    assert_eq!(
+        blobs
+            .iter()
+            .filter(|bytes| std::fs::read(repo.local_blob(bytes)).unwrap() != **bytes)
+            .count(),
+        1,
+        "the rewritten blob is not moved"
+    );
+    assert!(
+        blobs.iter().all(|bytes| repo.local_blob(bytes).exists()),
+        "no local blob was removed"
+    );
     assert_eq!(repo.canon_yaml(), yaml, "canon.yaml is unchanged");
 
     // Whatever rewrote the blob puts its bytes back and goes away. The same invocation, unchanged, still cannot pass: the uploads turned the plan's

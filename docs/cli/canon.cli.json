@@ -451,6 +451,7 @@
         "ARTIFACTS_BLOB_CORRUPT",
         "ARTIFACTS_BLOB_DENIED",
         "ARTIFACTS_DIGEST_INVALID",
+        "ARTIFACTS_INCOMPLETE",
         "ARTIFACTS_STORE_DENIED",
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_INVALID",
@@ -462,7 +463,6 @@
         "CONFIG_REQUIRED",
         "CONFIG_UNAVAILABLE",
         "EVIDENCE_BINDING_STALE",
-        "EVIDENCE_STORE_FAILED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -470,7 +470,6 @@
         "PLAN_STALE",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
-        "STOPPED_MIDWAY",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_FAILED",
@@ -743,6 +742,7 @@
         "ARTIFACTS_DIGEST_INVALID",
         "ARTIFACTS_STORE_DENIED",
         "ARTIFACTS_STORE_FAILED",
+        "ARTIFACTS_STORE_INCOMPLETE",
         "ARTIFACTS_STORE_INVALID",
         "ARTIFACTS_STORE_REQUIRED",
         "ARTIFACTS_STORE_UNAVAILABLE",
@@ -1254,6 +1254,7 @@
         "ARTIFACTS_BLOB_DENIED",
         "ARTIFACTS_DIGEST_INVALID",
         "ARTIFACTS_STORE_DENIED",
+        "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_INVALID",
         "ARTIFACTS_STORE_REQUIRED",
         "ARTIFACTS_STORE_UNAVAILABLE",
@@ -1264,7 +1265,6 @@
         "CONFIG_REQUIRED",
         "CONFIG_UNAVAILABLE",
         "EVIDENCE_BINDING_STALE",
-        "EVIDENCE_STORE_FAILED",
         "INTERNAL",
         "ROLE_INVALID",
         "USAGE"
@@ -9232,16 +9232,16 @@
         "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_CONFLICT",
         "DIVERGENCE_DENIED",
+        "DIVERGENCE_INCOMPLETE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
-        "STOPPED_MIDWAY",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_FAILED",
@@ -11618,6 +11618,7 @@
         "EVIDENCE_BINDING_NOT_FOUND",
         "EVIDENCE_BINDING_UNAVAILABLE",
         "EVIDENCE_CONTRACT_CONFLICT",
+        "EVIDENCE_INCOMPLETE",
         "EVIDENCE_NOTE_INVALID",
         "EVIDENCE_REPORT_CONFLICT",
         "EVIDENCE_REQUIRED",
@@ -11627,7 +11628,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "PROMOTION_INVALID",
         "REPO_DENIED",
         "REPO_INVALID",
@@ -11635,7 +11636,6 @@
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
-        "STOPPED_MIDWAY",
         "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_INVALID",
         "TASK_EVIDENCE_INVALID",
@@ -13107,6 +13107,7 @@
         "EVIDENCE_BINDING_NOT_FOUND",
         "EVIDENCE_BINDING_UNAVAILABLE",
         "EVIDENCE_CONTRACT_CONFLICT",
+        "EVIDENCE_INCOMPLETE",
         "EVIDENCE_NOTE_INVALID",
         "EVIDENCE_REPORT_CONFLICT",
         "EVIDENCE_REQUIRED",
@@ -13116,7 +13117,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "PROMOTION_INVALID",
         "REPO_DENIED",
         "REPO_INVALID",
@@ -13124,7 +13125,6 @@
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "SPEC_ROOT_NOT_FOUND",
-        "STOPPED_MIDWAY",
         "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_INVALID",
         "TASK_EVIDENCE_INVALID",
@@ -14194,7 +14194,7 @@
         "INTERNAL",
         "RETENTION_EXPORT_DENIED",
         "RETENTION_EXPORT_FAILED",
-        "RETENTION_PURGE_FAILED",
+        "RETENTION_PURGE_INCOMPLETE",
         "RETENTION_TIERS_CORRUPT",
         "RETENTION_TIERS_DENIED",
         "RETENTION_TIERS_INVALID",
@@ -15755,6 +15755,7 @@
         "CONFIG_UNAVAILABLE",
         "FINDING_ARGUMENT_INVALID",
         "FINDING_EXISTS",
+        "FINDING_INCOMPLETE",
         "FINDING_INTRODUCED_REQUIRED",
         "FINDING_RESOLUTION_REV_CONFLICT",
         "FINDING_REVIEW_NOT_FOUND",
@@ -15763,14 +15764,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "REPO_DENIED",
         "REPO_INVALID",
         "REPO_LOCK_UNAVAILABLE",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "SCENARIO_NOT_FOUND",
-        "STOPPED_MIDWAY",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_FAILED",
@@ -16738,6 +16738,7 @@
         "CONFIG_UNAVAILABLE",
         "FINDING_ARGUMENT_INVALID",
         "FINDING_CONFLICT",
+        "FINDING_INCOMPLETE",
         "FINDING_INTRODUCED_REQUIRED",
         "FINDING_NOT_FOUND",
         "FINDING_REASON_REQUIRED",
@@ -16747,13 +16748,12 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "REPO_DENIED",
         "REPO_INVALID",
         "REPO_LOCK_UNAVAILABLE",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
-        "STOPPED_MIDWAY",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_FAILED",
@@ -18049,7 +18049,7 @@
         "HOOKS_FILE_CONFLICT",
         "HOOKS_FILE_DENIED",
         "HOOKS_FILE_UNAVAILABLE",
-        "HOOKS_INSTALL_FAILED",
+        "HOOKS_INSTALL_INCOMPLETE",
         "HOOKS_REPO_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -18572,11 +18572,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "PROMOTION_INVALID",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
-        "STOPPED_MIDWAY",
         "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_INVALID",
         "TASK_EVIDENCE_INVALID",
@@ -21732,6 +21731,7 @@
         "CONFIG_REQUIRED",
         "INIT_AGENTS_MD_CONFLICT",
         "INIT_ARGUMENT_INVALID",
+        "INIT_INCOMPLETE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -21744,7 +21744,6 @@
         "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
         "SKILLS_SOURCE_NOT_FOUND",
-        "STOPPED_MIDWAY",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_FAILED",
@@ -22367,8 +22366,8 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "INVENTORY_ABORTED",
         "INVENTORY_FAILED",
+        "INVENTORY_INCOMPLETE",
         "INVENTORY_INDEX_UNAVAILABLE",
         "LAYOUT_MIGRATION_REQUIRED",
         "REPO_LOCK_UNAVAILABLE",
@@ -22940,7 +22939,7 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "LEDGER_ARCHIVE_INVALID",
-        "LEDGER_COMPACT_FAILED",
+        "LEDGER_COMPACT_INCOMPLETE",
         "PLAN_STALE",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
@@ -23307,11 +23306,9 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "MIGRATE_INDEX_FAILED",
-        "MIGRATE_PINS_FAILED",
-        "MIGRATE_STOPPED",
         "MIGRATION_CONFLICT",
         "MIGRATION_DENIED",
+        "MIGRATION_INCOMPLETE",
         "MIGRATION_INVALID",
         "MIGRATION_UNAVAILABLE",
         "PLAN_STALE",
@@ -23681,7 +23678,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`)."
+              "description": "The rebuild's own report when it found the corpus unclean (`MIGRATION_INCOMPLETE`, reason `INDEX`)."
             },
             "indexRecordsWritten": {
               "format": "uint",
@@ -23810,7 +23807,7 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "PLUGIN_REQUIRED",
-        "PLUGIN_SYNC_ERRORS",
+        "PLUGIN_SYNC_INCOMPLETE",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
@@ -26002,7 +25999,7 @@
         "PLAN_STALE",
         "REPO_LOCK_UNAVAILABLE",
         "RETENTION_EXPORT_DENIED",
-        "RETENTION_PURGE_FAILED",
+        "RETENTION_PURGE_INCOMPLETE",
         "RETENTION_TIERS_CORRUPT",
         "RETENTION_TIERS_DENIED",
         "RETENTION_TIERS_INVALID",
@@ -34656,13 +34653,13 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
-        "LEARN_PROMOTION_FAILED",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
-        "STOPPED_MIDWAY",
         "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_FILE_INVALID",
+        "STRATEGY_INCOMPLETE",
+        "STRATEGY_PROMOTION_FAILED",
         "STRATEGY_PROMOTION_INVALID",
         "STRATEGY_SIGNATURE_DENIED",
         "STRATEGY_SIGNATURE_INVALID",
@@ -39387,14 +39384,13 @@
         "PLAN_CORPUS_INVALID",
         "PLAN_CORPUS_UNAVAILABLE",
         "PLAN_DOCUMENT_INVALID",
-        "PROMOTE_FAILED",
+        "PROMOTION_FAILED",
         "PROMOTION_INVALID",
         "REPO_DENIED",
         "REPO_INVALID",
         "REPO_LOCK_UNAVAILABLE",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
-        "STOPPED_MIDWAY",
         "TASK_EVIDENCE_INVALID",
         "TASK_EVIDENCE_REQUIRED",
         "TASK_ID_INVALID",
@@ -39880,6 +39876,7 @@
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "TIER_FAILED",
+        "TIER_INCOMPLETE",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_INVALID"
@@ -40529,6 +40526,40 @@
       "retryable": false
     },
     {
+      "code": "ARTIFACTS_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), deal with what the reason names, then preview and commit a new plan; the same `--commit --plan-digest` is refused as `PLAN_STALE`.",
+      "meaning": "`artifacts move --commit` uploaded some blobs and then stopped, because a later blob was rewritten or cannot be read, or the object store stopped answering; the uploads stay, no local blob was removed and canon.yaml is unchanged (`data` says what was uploaded, the reason says what stopped it)",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon artifacts verify`, the first `meta.next` step), find out what rewrote the blob or damaged the object, then preview and commit a new plan: running the same `--commit --plan-digest` again is refused as `PLAN_STALE`.",
+          "meaning": "`canon artifacts move --commit` uploaded blobs, then a later blob was rewritten by another process while it was uploaded, or its object already in the store does not verify; the uploads stay, no local blob was removed and canon.yaml is unchanged (`data` says what was uploaded)",
+          "reason": "ARTIFACTS_BLOB_CORRUPT"
+        },
+        {
+          "fix": "Read what was done (`canon artifacts verify`), make the blob the message names readable, then preview and commit a new plan.",
+          "meaning": "`canon artifacts move --commit` uploaded blobs, then a later local blob could not be read because this user may not read it; the uploads stay, no local blob was removed and canon.yaml is unchanged",
+          "reason": "ARTIFACTS_STORE_DENIED"
+        },
+        {
+          "fix": "Read what was done (`canon artifacts verify`), replace what the message names with a real blob or remove it, then preview and commit a new plan.",
+          "meaning": "`canon artifacts move --commit` uploaded blobs, then a later local blob turned out to be no regular file; the uploads stay, no local blob was removed and canon.yaml is unchanged",
+          "reason": "ARTIFACTS_STORE_INVALID"
+        },
+        {
+          "fix": "Read what was done (`canon artifacts verify`), set the tier's endpoint, credentials and bucket again, then preview and commit a new plan.",
+          "meaning": "`canon artifacts move --commit` uploaded blobs, then the object-store tier could not be attached any more; the uploads stay, no local blob was removed and canon.yaml is unchanged",
+          "reason": "ARTIFACTS_STORE_REQUIRED"
+        },
+        {
+          "fix": "Read what was done (`canon artifacts verify`), wait for the object store to answer, then preview and commit a new plan: running the same `--commit --plan-digest` again is refused as `PLAN_STALE`.",
+          "meaning": "`canon artifacts move --commit` uploaded blobs, then the object store stopped answering, or a later local blob could not be read in a way a repeat can pass; the uploads stay, no local blob was removed and canon.yaml is unchanged",
+          "reason": "ARTIFACTS_STORE_UNAVAILABLE"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "ARTIFACTS_STORE_DENIED",
       "exit": 2,
       "fix": "Make `.canon/artifacts/sha256` and the directory above it readable and writable by this user, then run the command again.",
@@ -40539,7 +40570,14 @@
       "code": "ARTIFACTS_STORE_FAILED",
       "exit": 1,
       "fix": "Check that the artifact store is writable and reachable and has space, then run the command again.",
-      "meaning": "writing or uploading a blob to the artifact store failed after the command started writing; what was already stored stays, and a second run resumes",
+      "meaning": "writing or uploading a blob to the artifact store failed and nothing it wrote was kept: a record or batch that bound the file was rolled back, or no blob had been stored yet",
+      "retryable": true
+    },
+    {
+      "code": "ARTIFACTS_STORE_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was stored first (the first `meta.next` step), check that the artifact store is writable and reachable and has space, then run the same command again to store the rest.",
+      "meaning": "`artifacts store` stored some blobs and then a later write or check of the store failed; the stored blobs stay and a repeat of the same call stores the rest",
       "retryable": true
     },
     {
@@ -41048,6 +41086,20 @@
       "retryable": false
     },
     {
+      "code": "DIVERGENCE_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), fix the record the message names, then run `canon gate promote`; do not add the divergence again.",
+      "meaning": "`divergence add` staged the divergence record and then the gate refused to promote it; the record stays staged and was not committed; `reason` is the gate's refusal",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), fix the record the message names, then run `canon gate promote`; the refused record is still staged, so do not add it again.",
+          "meaning": "`canon divergence add` staged the divergence record and the gate then refused to promote it, so the record stays staged and was not committed",
+          "reason": "PROMOTION_INVALID"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "DIVERGENCE_INVALID",
       "exit": 2,
       "fix": "Resolve the gate rule the error names, then run `canon gate promote --kind divergence` again.",
@@ -41144,6 +41196,20 @@
       "retryable": false
     },
     {
+      "code": "EVIDENCE_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), fix the record the message names, then run `canon gate promote`; do not add the evidence again.",
+      "meaning": "`evidence add` or `evidence audit` staged the evidence record and then the gate refused to promote it; the record stays staged and was not committed; `reason` is the gate's refusal",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), fix the record the message names, then run `canon gate promote`; the refused record is still staged, so do not add it again.",
+          "meaning": "`canon evidence add` staged the evidence record and the gate then refused to promote it, so the record stays staged and was not committed",
+          "reason": "PROMOTION_INVALID"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "EVIDENCE_NOTE_INVALID",
       "exit": 2,
       "fix": "Rewrite the note to state only what was actually run, without fabrication markers or unsupported verified claims.",
@@ -41170,13 +41236,6 @@
       "fix": "Record the evidence again (`canon evidence add`), then run the command again.",
       "meaning": "the evidence a review or an approval rests on is out of date: the spec, the code or the report changed since it was recorded; nothing was written",
       "retryable": false
-    },
-    {
-      "code": "EVIDENCE_STORE_FAILED",
-      "exit": 1,
-      "fix": "Check the artifact store is reachable and writable, then run the command again.",
-      "meaning": "a bound file could not be written to the artifact store after the store was opened; the batch or record was rolled back",
-      "retryable": true
     },
     {
       "code": "FEATURE_EXISTS",
@@ -41211,6 +41270,20 @@
       "exit": 2,
       "fix": "Choose an unused seq for that change and round.",
       "meaning": "a finding already holds that change, round and seq",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), fix the record the message names, then run `canon gate promote`; do not add the finding again.",
+      "meaning": "`finding add` or `finding close` staged the finding record and then the gate refused to promote it; the record stays staged and was not committed; `reason` is the gate's refusal",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), fix the record the message names, then run `canon gate promote`; the refused record is still staged, so do not add it again.",
+          "meaning": "`canon finding add` or `canon finding close` staged the finding record and the gate then refused to promote it, so the record stays staged and was not committed",
+          "reason": "PROMOTION_INVALID"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41284,10 +41357,10 @@
       "retryable": true
     },
     {
-      "code": "HOOKS_INSTALL_FAILED",
+      "code": "HOOKS_INSTALL_INCOMPLETE",
       "exit": 1,
-      "fix": "Check that the hook file and its directory are writable, then run `canon gate install-hooks` again.",
-      "meaning": "a hook file could not be written after the install began",
+      "fix": "Read what was written first (the first `meta.next` step), check that the other hook file and its directory are writable, then run `canon gate install-hooks` again.",
+      "meaning": "`gate install-hooks` wrote one hook file and then could not write the next; the file it wrote stays",
       "retryable": false
     },
     {
@@ -41323,6 +41396,30 @@
       "exit": 2,
       "fix": "Pass a supported language and skill providers to `canon init`.",
       "meaning": "an `init` option is invalid (language or skill providers)",
+      "retryable": false
+    },
+    {
+      "code": "INIT_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what init wrote first (the first `meta.next` step), act on the fix of the reason, then run `canon skills install`; do not run `canon init` again.",
+      "meaning": "`init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because `canon skills install` refuses what it was given; what init wrote stays; `reason` is that refusal",
+      "reasons": [
+        {
+          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)",
+          "reason": "CONFIG_INVALID"
+        },
+        {
+          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown",
+          "reason": "SKILLS_ARGUMENT_INVALID"
+        },
+        {
+          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md",
+          "reason": "SKILLS_SOURCE_NOT_FOUND"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41413,17 +41510,29 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_ABORTED",
-      "exit": 1,
-      "fix": "Fix the violations or duplicate scenarios listed in data.roots, then run `canon inventory sync` again.",
-      "meaning": "`inventory sync` aborted a spec root on violations or duplicate scenarios; data.roots names each",
-      "retryable": false
-    },
-    {
       "code": "INVENTORY_FAILED",
       "exit": 1,
       "fix": "Fix the store problem the error names, then run `canon inventory sync` again.",
       "meaning": "the scenario index could not be built: the record store failed while `inventory sync` was reading or writing records",
+      "retryable": false
+    },
+    {
+      "code": "INVENTORY_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step and `data.roots`), fix what the reason names, then run `canon inventory sync` again.",
+      "meaning": "`inventory sync` left a spec root unindexed on violations or duplicate scenarios; the roots before it stay indexed and `data.roots` names each result; the reason says which stopped it",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`, `data.roots`), remove the duplicate scenario the root names, then run `canon inventory sync` again.",
+          "meaning": "`inventory sync` left a spec root unindexed because it declares the same scenario twice and no root had a violation; the roots before it stay indexed (`data.roots` says per root)",
+          "reason": "DUPLICATE_SCENARIOS"
+        },
+        {
+          "fix": "Read what was done (`canon status`, `data.roots`), fix the violations the root names, then run `canon inventory sync` again.",
+          "meaning": "`inventory sync` left a spec root unindexed because its corpus has format violations; the roots before it stay indexed (`data.roots` says per root and names each violation)",
+          "reason": "VIOLATIONS"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41441,13 +41550,6 @@
       "retryable": false
     },
     {
-      "code": "LEARN_PROMOTION_FAILED",
-      "exit": 1,
-      "fix": "Read the error message, fix its cause, then run `canon strategy promote` again.",
-      "meaning": "the strategy could not be promoted",
-      "retryable": false
-    },
-    {
       "code": "LEDGER_ARCHIVE_INVALID",
       "exit": 2,
       "fix": "Point --ledger-root at a directory named `ledger`, or rename the ledger directory so it has an archive.",
@@ -41455,31 +41557,10 @@
       "retryable": false
     },
     {
-      "code": "LEDGER_COMPACT_FAILED",
+      "code": "LEDGER_COMPACT_INCOMPLETE",
       "exit": 1,
-      "fix": "Fix the file-system problem the error names, then run `canon ledger compact` again to move the rest.",
-      "meaning": "a superseded version could not be moved to the archive; what moved stays moved",
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_INDEX_FAILED",
-      "exit": 1,
-      "fix": "Run `canon inventory sync` to rebuild the scenario index.",
-      "meaning": "files moved but the scenario index was not rebuilt; run `canon inventory sync`",
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_PINS_FAILED",
-      "exit": 1,
-      "fix": "Run `canon migrate` again to pin the reviews to their evidence.",
-      "meaning": "files moved but the reviews were not pinned to what their evidence says; run `canon migrate` again",
-      "retryable": false
-    },
-    {
-      "code": "MIGRATE_STOPPED",
-      "exit": 1,
-      "fix": "Run `canon migrate` again to finish the rest.",
-      "meaning": "`migrate` stopped partway, after it had begun changing the repo; running it again finishes the rest",
+      "fix": "Read what was done first (the first `meta.next` step), fix the file-system problem the error names, then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
+      "meaning": "a superseded version could not be moved to the archive, so the compaction stopped with versions left in the ledger; what moved stays moved",
       "retryable": false
     },
     {
@@ -41494,6 +41575,30 @@
       "exit": 2,
       "fix": "Make the system temporary directory writable by this user, then run `canon migrate` again.",
       "meaning": "`migrate` cannot use the scratch directory its preview needs, so it cannot judge the renamed ledger; nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "MIGRATION_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), act on the fix of the reason, then run `canon migrate` again to finish the rest.",
+      "meaning": "`migrate` stopped after it had begun changing the repo; what it changed stays changed; the reason says where it stopped (`STOPPED` while moving, `INDEX` while rebuilding the scenario index, `PINS` while pinning the reviews)",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), run `canon inventory sync` and fix what it reports, then run `canon migrate` again.",
+          "meaning": "`canon migrate` moved the files, then the scenario index could not be rebuilt or its rebuild found problems; what moved stays moved",
+          "reason": "INDEX"
+        },
+        {
+          "fix": "Read what was done (`canon status`), fix what the message names, then run `canon migrate` again; it finishes the reviews.",
+          "meaning": "`canon migrate` moved the files and rebuilt the index, then the reviews could not be pinned to what their evidence says; what moved stays moved",
+          "reason": "PINS"
+        },
+        {
+          "fix": "Read what was done (`canon status`), fix what the message names, then run `canon migrate` again; it finishes the rest.",
+          "meaning": "`canon migrate` (or `canon migrate --revert`) stopped part-way, after it had begun changing the repo; what it changed stays changed and the originals are in `.canon/migrate-backup/`",
+          "reason": "STOPPED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41556,14 +41661,14 @@
       "code": "PLUGIN_REQUIRED",
       "exit": 2,
       "fix": "Install the plugin and check that it declares an overlay, then run `canon plugin sync` again.",
-      "meaning": "`plugin sync` needs a plugin that is installed under `.canon/plugins/`, has an overlay source registered for it and declares an overlay; one of these is missing and nothing was written (a candidate that cannot be written is PLUGIN_SYNC_ERRORS)",
+      "meaning": "`plugin sync` needs a plugin that is installed under `.canon/plugins/`, has an overlay source registered for it and declares an overlay; one of these is missing and nothing was written (a candidate that cannot be written is PLUGIN_SYNC_INCOMPLETE)",
       "retryable": false
     },
     {
-      "code": "PLUGIN_SYNC_ERRORS",
+      "code": "PLUGIN_SYNC_INCOMPLETE",
       "exit": 1,
-      "fix": "Fix each error listed in data.roots, then run `canon plugin sync` again.",
-      "meaning": "`plugin sync` could not write some candidates; data.roots names each error",
+      "fix": "Read what was done first (the first `meta.next` step and `data.roots`), fix each error listed in data.roots, then run `canon plugin sync` again.",
+      "meaning": "`plugin sync` could not write some candidates; the ones it wrote stay and data.roots names each error",
       "retryable": false
     },
     {
@@ -41630,10 +41735,10 @@
       "retryable": true
     },
     {
-      "code": "PROMOTE_FAILED",
+      "code": "PROMOTION_FAILED",
       "exit": 1,
       "fix": "Fix the ledger problem the error names, then run `canon gate promote` again.",
-      "meaning": "a staged record was written but promoting it to the ledger failed",
+      "meaning": "a staged record was written but promoting it to the ledger failed; nothing reached the ledger and the record stays staged, where `gate promote` takes it",
       "retryable": false
     },
     {
@@ -41742,9 +41847,9 @@
       "retryable": false
     },
     {
-      "code": "RETENTION_PURGE_FAILED",
+      "code": "RETENTION_PURGE_INCOMPLETE",
       "exit": 1,
-      "fix": "Fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
+      "fix": "Read what was done first (the first `meta.next` step), fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
       "meaning": "the purge stopped after it began deleting: what was deleted stays deleted (`data` names the counts)",
       "retryable": false
     },
@@ -41966,45 +42071,6 @@
       "retryable": true
     },
     {
-      "code": "STOPPED_MIDWAY",
-      "exit": 1,
-      "fix": "Read what was done first (the first `meta.next` step reads it), then act on the fix of the reason; never run the same command again unread.",
-      "meaning": "a command that works in steps stopped after an earlier step made its effects, because a later step met what the command refuses before its work; `reason` is the code of that refusal, and the message and `meta.next` say what was already done",
-      "reasons": [
-        {
-          "fix": "Read what was done (`canon status`, the first `meta.next` step), find out what rewrote the blob or damaged the object, then preview and commit a new plan: running the same `--commit --plan-digest` again is refused as `PLAN_STALE`.",
-          "meaning": "`canon artifacts move --commit` uploaded blobs, then a later blob was rewritten by another process while it was uploaded, could not be read, or its object already in the store does not verify; the uploads stay, no local blob was removed and canon.yaml is unchanged (`data` says what was uploaded)",
-          "reason": "ARTIFACTS_BLOB_CORRUPT"
-        },
-        {
-          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
-          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)",
-          "reason": "CONFIG_INVALID"
-        },
-        {
-          "fix": "Read what was done (`canon status`), fix the record the message names, then run `canon gate promote`; the refused record is still staged, so do not add it again.",
-          "meaning": "a command staged a record and the gate then refused to promote it, so the record stays staged and was not committed",
-          "reason": "PROMOTION_INVALID"
-        },
-        {
-          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
-          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown",
-          "reason": "SKILLS_ARGUMENT_INVALID"
-        },
-        {
-          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
-          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md",
-          "reason": "SKILLS_SOURCE_NOT_FOUND"
-        },
-        {
-          "fix": "Read what was done (`canon status`, `canon strategy promote <id> --dry-run`), then record the evidence the gate asks for (`canon ingest records`).",
-          "meaning": "`canon strategy promote` demoted an active strategy because a contradicting trajectory turned it off, and then the promotion gate blocked the promotion, so the strategy stays demoted",
-          "reason": "STRATEGY_PROMOTION_INVALID"
-        }
-      ],
-      "retryable": false
-    },
-    {
       "code": "STRATEGY_ARGUMENT_INVALID",
       "exit": 2,
       "fix": "Correct the `canon strategy` flag value; see `canon schema` for the command's options.",
@@ -42033,10 +42099,31 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), then record the evidence the gate asks for (`canon ingest records`).",
+      "meaning": "`strategy promote` demoted an active strategy that a contradicting trajectory turned off, and then the promotion gate blocked it; the strategy stays demoted; `reason` is the gate's refusal",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`, `canon strategy promote <id> --dry-run`), then record the evidence the gate asks for (`canon ingest records`).",
+          "meaning": "`canon strategy promote` demoted an active strategy because a contradicting trajectory turned it off, and then the promotion gate blocked the promotion, so the strategy stays demoted",
+          "reason": "STRATEGY_PROMOTION_INVALID"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_NOT_FOUND",
       "exit": 2,
       "fix": "Pass the id of an existing strategy.",
       "meaning": "no strategy with that id; `strategy rollback` and `strategy approval-payload` look the id up first",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_PROMOTION_FAILED",
+      "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon strategy promote` again.",
+      "meaning": "the strategy could not be promoted: its record or file could not be read or written, and nothing of the promotion was kept",
       "retryable": false
     },
     {
@@ -42207,7 +42294,14 @@
       "code": "TIER_FAILED",
       "exit": 1,
       "fix": "Read the error message, fix its cause, then run tier aging again.",
-      "meaning": "tier aging failed",
+      "meaning": "tier aging failed before it moved any record, or a move failed and no record had left its tier",
+      "retryable": false
+    },
+    {
+      "code": "TIER_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), fix the cause the error names, then preview with `canon tier age` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
+      "meaning": "tier aging stopped after it began moving records: what moved stays moved",
       "retryable": false
     },
     {

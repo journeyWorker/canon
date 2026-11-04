@@ -40,8 +40,27 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             } else {
                 let missing_provenance = outcome.roots.iter().flat_map(|root| &root.violations).any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
                 let hint = with_provenance_fix("data.roots names each violation; fix them, then run `canon inventory sync` again", missing_provenance);
-                let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint(hint);
-                ExitCode::from(error.emit_with_data_and_meta("canon inventory sync", json, &data, coverage.meta()))
+                crate::incomplete::read_status("read what `inventory sync` indexed before it stopped: the roots before the unindexed one stay indexed, `data.roots` says per root");
+                // The reason says which stopped the sync: a root with violations, else one that declares a scenario twice.
+                let reason = if outcome.roots.iter().any(|root| !root.violations.is_empty()) {
+                    "VIOLATIONS"
+                } else {
+                    "DUPLICATE_SCENARIOS"
+                };
+                let message = if outcome.dry_run {
+                    "a spec root would be left unindexed on violations or duplicate scenarios; this was a preview and nothing was written"
+                } else {
+                    "a spec root was left unindexed on violations or duplicate scenarios; nothing was written for it, and the roots before it are indexed"
+                };
+                let error = CliError::failed("INVENTORY_INCOMPLETE", message)
+                    .reason(reason)
+                    .hint(hint);
+                ExitCode::from(error.emit_with_data_and_meta(
+                    "canon inventory sync",
+                    json,
+                    &data,
+                    coverage.meta(),
+                ))
             }
         }
         Err(err) => {

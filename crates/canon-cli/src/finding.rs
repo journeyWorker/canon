@@ -734,7 +734,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     }
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
-            let settled = crate::gate::promote_after_stage("canon finding add", &ledger_root, &receipt.location, promote, args.json);
+            let settled = crate::gate::promote_after_stage("canon finding add", "FINDING_INCOMPLETE", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(
                 args.json,
                 "canon finding add: {} — {} round {} seq {} ({}, {}) — {}",
@@ -1032,7 +1032,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     }
     match staging.write(&RawWrite(RawRecord(body))) {
         Ok(receipt) => {
-            let settled = crate::gate::promote_after_stage("canon finding close", &ledger_root, &receipt.location, promote, args.json);
+            let settled = crate::gate::promote_after_stage("canon finding close", "FINDING_INCOMPLETE", &ledger_root, &receipt.location, promote, args.json);
             crate::say!(
                 args.json,
                 "canon finding close: {} — {} round {} seq {} ({} → {}) — {}",

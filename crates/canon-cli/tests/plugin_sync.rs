@@ -334,3 +334,84 @@ fn plugin_sync_from_a_subdirectory_resolves_the_repo_root_tier() {
     let records = query_scenarios_with_plugin(dir.path());
     assert_eq!(scenario_record(&records, "idolive.hub.01")["overlay"]["porting.coverage"]["covered"], true);
 }
+
+/// atip.incomplete.08: `plugin sync` writes the overlay record of each candidate; when it could not write one (the second, by the debug seam
+/// `plugin-second-candidate`) the records it wrote stay and the answer is `PLUGIN_SYNC_INCOMPLETE`: exit 1, not retryable, `data.roots` names each
+/// error and what was written, `meta.next` leads with `canon status`. Syncing again, nothing stopping it, writes the candidate that was left and finds the
+/// first already there.
+#[test]
+fn atip_incomplete_08_a_plugin_sync_that_could_not_write_a_candidate_is_incomplete_and_the_written_ones_stay(
+) {
+    let dir = tempfile::tempdir().unwrap();
+    write_repo(dir.path());
+    sync_inventory(dir.path());
+    let stopped = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["plugin", "sync", "porting", "--repo", ".", "--json"])
+        .env("CANON_TEST_STOP_AT", "plugin-second-candidate")
+        .current_dir(dir.path())
+        .output()
+        .expect("spawn canon binary");
+    assert_eq!(
+        stopped.status.code(),
+        Some(1),
+        "{}{}",
+        stdout(&stopped),
+        stderr(&stopped)
+    );
+    let body: Value = serde_json::from_slice(&stopped.stdout).expect("one JSON document");
+    assert_eq!(
+        (
+            body["error"]["code"].as_str(),
+            body["error"]["retryable"].as_bool()
+        ),
+        (Some("PLUGIN_SYNC_INCOMPLETE"), Some(false)),
+        "{body}"
+    );
+    assert_eq!(
+        (
+            body["data"]["clean"].as_bool(),
+            body["data"]["written"].as_u64()
+        ),
+        (Some(false), Some(1)),
+        "{body}"
+    );
+    let errors = body["data"]["roots"][0]["errors"]
+        .as_array()
+        .expect("data.roots[].errors");
+    assert_eq!(errors.len(), 1, "{body}");
+    assert_eq!(
+        body["meta"]["next"][0]["argv"],
+        serde_json::json!(["status", "--json"]),
+        "{body}"
+    );
+    assert_eq!(
+        query_scenarios_with_plugin(dir.path())
+            .iter()
+            .filter(|record| record["overlay"]["porting.coverage"].is_object())
+            .count(),
+        1,
+        "the candidate it wrote stays"
+    );
+
+    let again = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["plugin", "sync", "porting", "--repo", ".", "--json"])
+        .current_dir(dir.path())
+        .output()
+        .expect("spawn canon binary");
+    assert_eq!(
+        again.status.code(),
+        Some(0),
+        "{}{}",
+        stdout(&again),
+        stderr(&again)
+    );
+    let done: Value = serde_json::from_slice(&again.stdout).expect("one JSON document");
+    assert_eq!(
+        (
+            done["data"]["written"].as_u64(),
+            done["data"]["deduped"].as_u64()
+        ),
+        (Some(1), Some(1)),
+        "{done}"
+    );
+}

@@ -152,7 +152,7 @@ One row per leaf. Columns: command id; operand; required options; optional optio
 
 | Command | Operand | Required options | Optional options | Exclusive, dependent, notes | Effect; idempotency; roles | Output | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `canon inventory sync` | — | — | `--spec-root <DIR>`; `--dry-run` | `--spec-root` overrides `specs.roots[]` entirely: one ad hoc root with the id `root`; a relative path resolves under the repo root | write; replay-safe (an unchanged corpus writes nothing); roles I O | report `InventorySyncReport`; exit 1 = violations or duplicates in a root (`INVENTORY_ABORTED`, nothing written for it) | `canon inventory sync` |
+| `canon inventory sync` | — | — | `--spec-root <DIR>`; `--dry-run` | `--spec-root` overrides `specs.roots[]` entirely: one ad hoc root with the id `root`; a relative path resolves under the repo root | write; replay-safe (an unchanged corpus writes nothing); roles I O | report `InventorySyncReport`; exit 1 = violations or duplicates in a root (`INVENTORY_INCOMPLETE`, nothing written for it) | `canon inventory sync` |
 
 ### `gate`
 
@@ -243,7 +243,7 @@ One row per leaf. Columns: command id; operand; required options; optional optio
 
 | Command | Operand | Required options | Optional options | Exclusive, dependent, notes | Effect; idempotency; roles | Output | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `canon plugin sync` | `<PLUGIN_ID>` — 1, required, a `.canon/plugins/<id>/plugin.yaml` id (D1 r1) | — | `--spec-root <DIR>`; `--dry-run` | The plugin must resolve, have a registered overlay source and own at least one overlay. `--spec-root` as in `inventory sync` | write; replay-safe (content-digest dedup reports `deduped`); roles O | report `PluginSyncReport` (`roots[]`); exit 1 = per-candidate write errors (`PLUGIN_SYNC_ERRORS`) | `canon plugin sync my-plugin` |
+| `canon plugin sync` | `<PLUGIN_ID>` — 1, required, a `.canon/plugins/<id>/plugin.yaml` id (D1 r1) | — | `--spec-root <DIR>`; `--dry-run` | The plugin must resolve, have a registered overlay source and own at least one overlay. `--spec-root` as in `inventory sync` | write; replay-safe (content-digest dedup reports `deduped`); roles O | report `PluginSyncReport` (`roots[]`); exit 1 = per-candidate write errors (`PLUGIN_SYNC_INCOMPLETE`) | `canon plugin sync my-plugin` |
 
 ### `skills`
 

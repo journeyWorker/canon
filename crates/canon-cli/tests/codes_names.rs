@@ -4,35 +4,14 @@
 
 use atip::Minor;
 
-/// The codes that do not follow the rule yet, and the change of 0.36 that renames each.
-const NOT_YET_RENAMED: &[&str] = &[
-    "INVENTORY_ABORTED",
-    "MIGRATE_STOPPED",
-    "PLUGIN_SYNC_ERRORS",
-    "STOPPED_MIDWAY",
-];
+/// The codes that do not follow the rule yet: none. `canon-0-36-codes-incomplete` renamed the last four (`INVENTORY_ABORTED`, `MIGRATE_STOPPED`,
+/// `PLUGIN_SYNC_ERRORS` and the reserved midway code) into `<SUBJECT>_INCOMPLETE` codes; `canon-0-36-codes-table` checks that the list stays empty.
+const NOT_YET_RENAMED: &[&str] = &[];
 
-/// The codes that pass the name rule (or are listed above) and that `canon-0-36-codes-incomplete` still changes: the exit-1 codes that say a failure
-/// after work started, which that change merges into one `*_INCOMPLETE` per subject or renames with a reason (issue #135). `canon-0-36-codes-refusals`
-/// and `-stored` are done and left nothing here. The name check does not see these codes, so they are listed. `canon-0-36-codes-incomplete` deletes
-/// its codes from this list; `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
-const NOT_YET_RECLASSIFIED: &[&str] = &[
-    // canon-0-36-codes-incomplete
-    "ARTIFACTS_STORE_FAILED",
-    "EVIDENCE_STORE_FAILED",
-    "HOOKS_INSTALL_FAILED",
-    "INVENTORY_ABORTED",
-    "LEARN_PROMOTION_FAILED",
-    "LEDGER_COMPACT_FAILED",
-    "MIGRATE_INDEX_FAILED",
-    "MIGRATE_PINS_FAILED",
-    "MIGRATE_STOPPED",
-    "PLUGIN_SYNC_ERRORS",
-    "PROMOTE_FAILED",
-    "RETENTION_PURGE_FAILED",
-    "STOPPED_MIDWAY",
-    "TIER_FAILED",
-];
+/// The codes that pass the name rule and that a change of 0.36 still reclassifies: none. `canon-0-36-codes-incomplete` took the exit-1 codes that say a
+/// failure after work started into one `*_INCOMPLETE` per subject (or its `*_FAILED` when nothing was kept), and left nothing here (issue #135).
+/// `canon-0-36-codes-table` requires `NOT_YET_RENAMED` and this list to be empty.
+const NOT_YET_RECLASSIFIED: &[&str] = &[];
 
 /// atip.codenames.04: every code of the second list is in the registry (a code a change already renamed is taken off), and none of the
 /// `canon-0-36-codes-exit` codes is on either list.

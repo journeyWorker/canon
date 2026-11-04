@@ -21,8 +21,26 @@ const RENAMED_EXIT_CODES: &[&str] = &["ADAPTER_EXECUTION_NOT_AUTHORIZED", "ADAPT
 /// warning of the same situation keeps the name (spec 7.2.1: a condition applies only to `error.code`).
 const RENAMED_STORED_CODES: &[&str] = &["ARTIFACTS_STORE_UNREACHABLE", "BRIEF_UNREADABLE", "EVIDENCE_STORE_UNAVAILABLE", "LEARN_SIGNATURE_UNREADABLE", "LEDGER_ARCHIVE_UNAVAILABLE", "PLAN_CORPUS_UNREADABLE", "REPO_UNREADABLE", "REPO_WRITE_BUSY", "SPEC_ROOTS_UNREADABLE", "TASK_ROW_NOT_FOUND", "WRITE_UNAVAILABLE"];
 
-/// Error codes 0.35 moved to `STOPPED_MIDWAY` (`atip.midway`; each has a replacement in the CHANGELOG's table).
+/// Error codes 0.35 moved to the reserved midway code (`atip.midway`; each has a replacement in the CHANGELOG's table).
 const MOVED_CODES: &[&str] = &["INIT_SKILL_INSTALL_FAILED"];
+
+/// Error codes `canon-0-36-codes-incomplete` replaced (each has a replacement in the CHANGELOG's table): the reserved midway code, now one
+/// `<SUBJECT>_INCOMPLETE` per subject, and the exit-1 codes that said a stop after work began under another name. `ARTIFACTS_STORE_FAILED`,
+/// `TIER_FAILED` and `PROMOTION_FAILED` are not here: those names stay or are new.
+const REPLACED_INCOMPLETE_CODES: &[&str] = &[
+    "EVIDENCE_STORE_FAILED",
+    "HOOKS_INSTALL_FAILED",
+    "INVENTORY_ABORTED",
+    "LEARN_PROMOTION_FAILED",
+    "LEDGER_COMPACT_FAILED",
+    "MIGRATE_INDEX_FAILED",
+    "MIGRATE_PINS_FAILED",
+    "MIGRATE_STOPPED",
+    "PLUGIN_SYNC_ERRORS",
+    "PROMOTE_FAILED",
+    "RETENTION_PURGE_FAILED",
+    "STOPPED_MIDWAY",
+];
 
 /// `meta` keys 0.33 deleted, each a whole word or dotted path.
 const OLD_KEYS: &[&str] = &["canonVersion", "hasMore", "meta.unchanged", "meta.waitingOn", "meta.nextOmitted", "meta.hotStore", "meta.context.role", "meta.context.actor", "meta.next[].why"];
@@ -71,7 +89,16 @@ fn word_in(text: &str, word: &str) -> bool {
 /// `meta.canonVersion` is gone), which a guide shows when it prints that report.
 fn old_names_in(text: &str) -> Vec<&'static str> {
     let text = text.replace("\"canonVersion\"", "\"statusReportMember\"");
-    OLD_CODES.iter().chain(RENAMED_CODES).chain(RENAMED_EXIT_CODES).chain(RENAMED_STORED_CODES).chain(OLD_KEYS).copied().filter(|old| word_in(&text, old)).collect()
+    OLD_CODES
+        .iter()
+        .chain(RENAMED_CODES)
+        .chain(RENAMED_EXIT_CODES)
+        .chain(RENAMED_STORED_CODES)
+        .chain(REPLACED_INCOMPLETE_CODES)
+        .chain(OLD_KEYS)
+        .copied()
+        .filter(|old| word_in(&text, old))
+        .collect()
 }
 
 fn collect(dir: &Path, extensions: &[&str], skip: &[&str], out: &mut Vec<PathBuf>) {
@@ -148,14 +175,19 @@ fn atip_l0_27_the_check_catches_an_old_shape_that_comes_back() {
 
 /// Every moved code `text` spells.
 fn moved_names_in(text: &str) -> Vec<&'static str> {
-    MOVED_CODES.iter().copied().filter(|moved| word_in(text, moved)).collect()
+    MOVED_CODES
+        .iter()
+        .chain(REPLACED_INCOMPLETE_CODES)
+        .copied()
+        .filter(|moved| word_in(text, moved))
+        .collect()
 }
 
 /// atip.midway.11: no guide, website page, dashboard source, eval script, design document, scenario outside `area=atip`, README or
-/// the sources of canon spells a code 0.35 moved to `STOPPED_MIDWAY`; the CHANGELOG's replacement table and the history of a change
-/// are the only places that spell them.
+/// the sources of canon spells a code that was moved to the reserved midway code in 0.35 or replaced by a `<SUBJECT>_INCOMPLETE` code in 0.36;
+/// the CHANGELOG's replacement table and the history of a change are the only places that spell them.
 #[test]
-fn atip_midway_11_no_consumer_spells_a_code_that_moved_to_stopped_midway() {
+fn atip_midway_11_no_consumer_spells_a_code_that_moved_or_was_replaced_by_an_incomplete_code() {
     let mut files = consumers();
     let root = repo_root();
     let skip = ["node_modules", "dist", "target", ".git", "__pycache__"];
@@ -175,10 +207,37 @@ fn atip_midway_11_no_consumer_spells_a_code_that_moved_to_stopped_midway() {
 /// atip.midway.11: the check catches a moved code that comes back, and does not take a longer name for it.
 #[test]
 fn atip_midway_11_the_check_catches_a_moved_code_that_comes_back() {
-    assert_eq!(moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_SOURCE_NOT_FOUND"), Vec::<&str>::new());
-    assert_eq!(moved_names_in("run again: INIT_SKILL_INSTALL_FAILED"), ["INIT_SKILL_INSTALL_FAILED"]);
-    assert_eq!(moved_names_in(r#"{"code": "INIT_SKILL_INSTALL_FAILED", "exit": 1}"#), ["INIT_SKILL_INSTALL_FAILED"]);
-    assert_eq!(moved_names_in("MY_INIT_SKILL_INSTALL_FAILED_TOO is another name"), Vec::<&str>::new());
+    assert_eq!(
+        moved_names_in("exits 1 with INIT_INCOMPLETE, reason SKILLS_SOURCE_NOT_FOUND"),
+        Vec::<&str>::new()
+    );
+    assert_eq!(
+        moved_names_in("exits 1 with STOPPED_MIDWAY, reason SKILLS_SOURCE_NOT_FOUND"),
+        ["STOPPED_MIDWAY"],
+        "the reserved code came back"
+    );
+    assert_eq!(
+        moved_names_in("MIGRATE_STOPPED and MIGRATE_PINS_FAILED"),
+        ["MIGRATE_PINS_FAILED", "MIGRATE_STOPPED"]
+    );
+    assert_eq!(
+        moved_names_in(
+            "MY_STOPPED_MIDWAY_TOO is another name, MIGRATION_INCOMPLETE is the new one"
+        ),
+        Vec::<&str>::new()
+    );
+    assert_eq!(
+        moved_names_in("run again: INIT_SKILL_INSTALL_FAILED"),
+        ["INIT_SKILL_INSTALL_FAILED"]
+    );
+    assert_eq!(
+        moved_names_in(r#"{"code": "INIT_SKILL_INSTALL_FAILED", "exit": 1}"#),
+        ["INIT_SKILL_INSTALL_FAILED"]
+    );
+    assert_eq!(
+        moved_names_in("MY_INIT_SKILL_INSTALL_FAILED_TOO is another name"),
+        Vec::<&str>::new()
+    );
 }
 
 /// `canon-0-36-codes-rename`, `atip.codenames.06`: no guide, website page, dashboard source, eval script, design document, scenario outside
@@ -190,9 +249,20 @@ fn atip_codenames_06_no_consumer_spells_a_renamed_code() {
     assert!(files.len() > 40, "the scan found {} files: a consumer directory moved", files.len());
     let mut hits = Vec::new();
     for file in &files {
-        let Ok(text) = std::fs::read_to_string(file) else { continue };
-        for old in RENAMED_CODES.iter().chain(RENAMED_EXIT_CODES).chain(RENAMED_STORED_CODES).filter(|old| word_in(&text, old)) {
-            hits.push(format!("{} spells `{old}`", file.strip_prefix(repo_root()).unwrap_or(file).display()));
+        let Ok(text) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        for old in RENAMED_CODES
+            .iter()
+            .chain(RENAMED_EXIT_CODES)
+            .chain(RENAMED_STORED_CODES)
+            .chain(REPLACED_INCOMPLETE_CODES)
+            .filter(|old| word_in(&text, old))
+        {
+            hits.push(format!(
+                "{} spells `{old}`",
+                file.strip_prefix(repo_root()).unwrap_or(file).display()
+            ));
         }
     }
     assert!(hits.is_empty(), "renamed codes left in consumers: {hits:#?}");
