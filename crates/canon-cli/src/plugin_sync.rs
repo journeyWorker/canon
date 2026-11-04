@@ -297,19 +297,12 @@ pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Opt
                         crate::write_mode::check_writable(&ctx.ledger_root).map_err(|cause| PluginSyncError::Unavailable(crate::write_mode::unwritable(&ctx.ledger_root, &cause)))?;
                     }
                     for (index, body) in candidates.into_iter().enumerate() {
-                        // `plugin-second-candidate` (a debug build's test seam, `incomplete::injected_stop`): the write of the second candidate fails.
-                        if let Some(stop) = (!dry_run && index == 1)
-                            .then(|| crate::incomplete::injected_stop("plugin-second-candidate"))
-                            .flatten()
-                        {
+                        // `plugin-second-candidate` and `plugin-every-candidate` (a debug build's test seams, `incomplete::injected_stop`): the write of the second candidate, or the write or check of each, fails.
+                        if let Some(stop) = crate::incomplete::injected_stop("plugin-every-candidate").or_else(|| (!dry_run && index == 1).then(|| crate::incomplete::injected_stop("plugin-second-candidate")).flatten()) {
                             outcome.errors.push(stop.to_string());
                             continue;
                         }
-                        let receipt = if dry_run {
-                            check_overlay(&git, decl, &body)
-                        } else {
-                            write_overlay(&git, decl, body)
-                        };
+                        let receipt = if dry_run { check_overlay(&git, decl, &body) } else { write_overlay(&git, decl, body) };
                         match receipt {
                             Ok(receipt) if receipt.deduped => outcome.deduped += 1,
                             Ok(_) => outcome.written += 1,

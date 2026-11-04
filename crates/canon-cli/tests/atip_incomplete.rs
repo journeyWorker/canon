@@ -176,7 +176,7 @@ fn first_step_problems(envelope: &Value, command: &str, root: &Path, source: &Pa
 /// under it. `BATCH_INCOMPLETE` is the batch's own core code and is not in the table.
 const INCOMPLETE: &[(&str, bool, &[&str])] = &[
     (
-        "ARTIFACTS_INCOMPLETE",
+        "ARTIFACTS_MOVE_INCOMPLETE",
         false,
         &[
             "ARTIFACTS_BLOB_CORRUPT",
@@ -186,12 +186,12 @@ const INCOMPLETE: &[(&str, bool, &[&str])] = &[
             "ARTIFACTS_STORE_UNAVAILABLE",
         ],
     ),
-    ("ARTIFACTS_STORE_INCOMPLETE", true, &[]),
-    ("CHANGE_ADOPTION_INCOMPLETE", false, &[]),
+    ("ARTIFACTS_STORE_INCOMPLETE", true, &["ARTIFACTS_STORE_FAILED", "ARTIFACTS_STORE_UNAVAILABLE"]),
+    ("CHANGE_ADOPTION_INCOMPLETE", false, &["WRITE_FAILED"]),
     ("DIVERGENCE_INCOMPLETE", false, &["PROMOTION_INVALID"]),
     ("EVIDENCE_INCOMPLETE", false, &["PROMOTION_INVALID"]),
     ("FINDING_INCOMPLETE", false, &["PROMOTION_INVALID"]),
-    ("HOOKS_INSTALL_INCOMPLETE", false, &[]),
+    ("HOOKS_INSTALL_INCOMPLETE", false, &["WRITE_FAILED"]),
     (
         "INIT_INCOMPLETE",
         false,
@@ -201,26 +201,22 @@ const INCOMPLETE: &[(&str, bool, &[&str])] = &[
             "SKILLS_SOURCE_NOT_FOUND",
         ],
     ),
-    (
-        "INVENTORY_INCOMPLETE",
-        false,
-        &["DUPLICATE_SCENARIOS", "VIOLATIONS"],
-    ),
-    ("LEDGER_COMPACT_INCOMPLETE", false, &[]),
+    ("INVENTORY_INCOMPLETE", false, &["DUPLICATE_SCENARIOS", "INVENTORY_FAILED", "VIOLATIONS"]),
+    ("LEDGER_COMPACT_INCOMPLETE", false, &["REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE", "WRITE_FAILED"]),
     ("MIGRATION_INCOMPLETE", false, &["INDEX", "PINS", "STOPPED"]),
-    ("PLUGIN_SYNC_INCOMPLETE", false, &[]),
-    ("RETENTION_PURGE_INCOMPLETE", false, &[]),
+    ("PLUGIN_SYNC_INCOMPLETE", false, &["WRITE_FAILED"]),
+    ("RETENTION_PURGE_INCOMPLETE", false, &["WRITE_FAILED"]),
     (
         "STRATEGY_INCOMPLETE",
         false,
         &["STRATEGY_PROMOTION_INVALID"],
     ),
-    ("TIER_INCOMPLETE", false, &[]),
+    ("TIER_INCOMPLETE", false, &["WRITE_FAILED"]),
 ];
 
 /// The codes whose reasons are the codes of the refusals the later step met (the others name where the work stopped).
 const REFUSAL_REASONS: &[&str] = &[
-    "ARTIFACTS_INCOMPLETE",
+    "ARTIFACTS_MOVE_INCOMPLETE",
     "DIVERGENCE_INCOMPLETE",
     "EVIDENCE_INCOMPLETE",
     "FINDING_INCOMPLETE",
@@ -427,6 +423,10 @@ fn atip_midway_01_the_reserved_code_is_gone_and_each_incomplete_code_is_register
             "{code} validates against the contract's registry-entry schema"
         );
     }
+    // A sync that indexed nothing answers the corpus's own check result: exit 1 with `data.roots`, the reasons `INVENTORY_INCOMPLETE` shares.
+    let invalid = code_info("INVENTORY_CHECK_FAILED").expect("registered");
+    assert_eq!((invalid.exit, invalid.retryable), (1, false));
+    assert_eq!(invalid.reasons.iter().map(|reason| reason.reason).collect::<Vec<_>>(), ["DUPLICATE_SCENARIOS", "VIOLATIONS"]);
     let gone = plain(
         dir.path(),
         &["schema", "--error", "STOPPED_MIDWAY", "--json"],
@@ -605,7 +605,7 @@ fn atip_incomplete_11_a_leaf_lists_one_incomplete_code_of_its_own_and_two_fail_t
         ("finding close", "FINDING_INCOMPLETE"),
         ("divergence add", "DIVERGENCE_INCOMPLETE"),
         ("strategy promote", "STRATEGY_INCOMPLETE"),
-        ("artifacts move", "ARTIFACTS_INCOMPLETE"),
+        ("artifacts move", "ARTIFACTS_MOVE_INCOMPLETE"),
         ("artifacts store", "ARTIFACTS_STORE_INCOMPLETE"),
         ("gate install-hooks", "HOOKS_INSTALL_INCOMPLETE"),
         ("purge", "RETENTION_PURGE_INCOMPLETE"),
@@ -621,7 +621,7 @@ fn atip_incomplete_11_a_leaf_lists_one_incomplete_code_of_its_own_and_two_fail_t
     doubled.push((
         "made up".to_string(),
         vec![
-            "ARTIFACTS_INCOMPLETE".to_string(),
+            "ARTIFACTS_MOVE_INCOMPLETE".to_string(),
             "ARTIFACTS_STORE_INCOMPLETE".to_string(),
             "BATCH_INCOMPLETE".to_string(),
         ],
@@ -635,7 +635,7 @@ fn atip_incomplete_11_a_leaf_lists_one_incomplete_code_of_its_own_and_two_fail_t
     let batch_only = vec![(
         "made up".to_string(),
         vec![
-            "ARTIFACTS_INCOMPLETE".to_string(),
+            "ARTIFACTS_MOVE_INCOMPLETE".to_string(),
             "BATCH_INCOMPLETE".to_string(),
         ],
     )];
@@ -931,7 +931,7 @@ enum Class {
 const AUDIT: &[(&str, Class, &str)] = &[
     ("ADAPTER_AUTHORIZATION_FAILED", Class::Answer, "`adapter authorize` answered that the response does not authorize execution"),
     ("ADAPTER_VALIDATION_FAILED", Class::Answer, "`adapter validate`'s negative answer on an envelope"),
-    ("ARTIFACTS_INCOMPLETE", Class::Incomplete, "`artifacts move --commit` uploaded blobs, then a later blob changed, could not be read or the store stopped answering: the uploads stay, nothing was removed, canon.yaml is unchanged (the owner's one code per subject for the move; the reason says what stopped it)"),
+    ("ARTIFACTS_MOVE_INCOMPLETE", Class::Incomplete, "`artifacts move --commit` uploaded blobs, then a later blob changed, could not be read or the store stopped answering: the uploads stay, nothing was removed, canon.yaml is unchanged"),
     ("ARTIFACTS_STORE_FAILED", Class::Failed, "a blob write or upload failed and nothing was kept: `evidence add` rolled the record or batch back (the code `EVIDENCE_STORE_FAILED` merged into), `artifacts store` and `artifacts move` had stored nothing yet"),
     ("ARTIFACTS_STORE_INCOMPLETE", Class::Incomplete, "`artifacts store` stored some blobs, then a later write or check of the store failed: the stored blobs stay and a repeat of the same call stores the rest"),
     ("ARTIFACTS_VERIFY_FAILED", Class::Answer, "`artifacts verify` found a bound file missing or altered"),
@@ -951,6 +951,7 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("INGEST_FAILED", Class::Failed, "an ingest read or write failed; the importer writes a record whole or not at all"),
     ("INIT_INCOMPLETE", Class::Incomplete, "`init` wrote canon.yaml and the files beside it, then the skill install met what `canon skills install` refuses: what init wrote stays"),
     ("INTERNAL", Class::Internal, "a bug of canon"),
+    ("INVENTORY_CHECK_FAILED", Class::Answer, "`inventory sync` read a corpus that fails its check (violations or a scenario declared twice) and indexed nothing in this run, or this was a preview: the check's negative answer, with `data.roots`"),
     ("INVENTORY_FAILED", Class::Failed, "the record store failed while the index was read or written"),
     ("INVENTORY_INCOMPLETE", Class::Incomplete, "`inventory sync` left a spec root unindexed on violations or duplicate scenarios: the roots before it stay indexed and `data.roots` says per root; a preview reports the same code with nothing written, as the answer of the sync it previews"),
     ("LEDGER_COMPACT_INCOMPLETE", Class::Incomplete, "a version could not be moved to the archive, so the compaction stopped with versions left in the ledger: what moved stays moved"),
@@ -1226,8 +1227,8 @@ const IO_CODES: [(&str, bool); 8] = [
     ("WRITE_FAILED", false),
 ];
 
-/// What is wrong with the failure codes of `rows`: each is registered at exit 1 with its retryability, has no reason of its own, and is no reason
-/// of an `_INCOMPLETE` code (an I/O failure is a failure of the work, not the name of a refusal).
+/// What is wrong with the failure codes of `rows`: each is registered at exit 1 with its retryability and has no reason of its own. An `_INCOMPLETE`
+/// code with no refusal to name carries the code of the step that failed as its reason (`WRITE_FAILED`), so a failure code may be one.
 fn io_problems(rows: &[CodeInfo]) -> Vec<String> {
     let mut problems = Vec::new();
     for (code, retryable) in IO_CODES {
@@ -1244,17 +1245,12 @@ fn io_problems(rows: &[CodeInfo]) -> Vec<String> {
         if !row.reasons.is_empty() {
             problems.push(format!("{code} has a reason of its own"));
         }
-        for incomplete in rows.iter().filter(|row| row.code.ends_with("_INCOMPLETE")) {
-            if incomplete.find_reason(code).is_some() {
-                problems.push(format!("{code} is a reason of {}", incomplete.code));
-            }
-        }
     }
     problems
 }
 
-/// atip.midway.10: the failure codes of the work keep their names, their exit 1 and their retryability, none is a reason of an `_INCOMPLETE` code,
-/// and none has a reason of its own.
+/// atip.midway.10: the failure codes of the work keep their names, their exit 1 and their retryability, and none has a reason of its own; every
+/// reason of an `_INCOMPLETE` code is a registered code (the refusal it met, or the failure of the step that stopped).
 #[test]
 fn atip_midway_10_the_io_failure_codes_keep_their_names_exits_and_retryability() {
     let problems = io_problems(all_codes());
@@ -1341,18 +1337,16 @@ fn atip_midway_13_an_io_failure_code_that_moves_or_is_absorbed_fails_the_check()
         io_problems(&reasoned),
         ["INVENTORY_FAILED has a reason of its own"]
     );
-    let absorbed = changed("TIER_INCOMPLETE", &|row| CodeInfo {
+    // A failure code is the reason of a stop that has no refusal to name: that is no fault of the failure code.
+    let as_reason = changed("TIER_INCOMPLETE", &|row| CodeInfo {
         reasons: &WRITE_FAILED_AS_REASON,
         ..*row
     });
-    assert_eq!(
-        io_problems(&absorbed),
-        ["WRITE_FAILED is a reason of TIER_INCOMPLETE"]
-    );
+    assert!(io_problems(&as_reason).is_empty());
 }
 
 /// atip.midway.12: the adoption writes the subject record, then the change record. When the second store write fails (the change store
-/// is read-only, which no up-front check can see in an object store), the failure keeps `CHANGE_ADOPTION_INCOMPLETE` (exit 1, no reason, one code
+/// is read-only, which no up-front check can see in an object store), the failure keeps `CHANGE_ADOPTION_INCOMPLETE` (exit 1, reason `WRITE_FAILED`, one code
 /// per subject): the first record stays and the repair `canon subject adopt` completes it.
 #[cfg(unix)]
 #[test]
@@ -1451,7 +1445,7 @@ fn atip_midway_12_a_half_written_adoption_keeps_change_adoption_incomplete_and_i
         envelope["error"]["code"], "CHANGE_ADOPTION_INCOMPLETE",
         "{envelope}"
     );
-    assert!(envelope["error"].get("reason").is_none(), "{envelope}");
+    assert_eq!(envelope["error"]["reason"], "WRITE_FAILED", "{envelope}");
     assert!(envelope["error"]["hint"].as_str().is_some_and(|hint| hint.contains("canon subject adopt demo-subject --change s36-demo")), "{envelope}");
     assert_eq!(
         code_info("CHANGE_ADOPTION_INCOMPLETE").map(|row| (row.exit, row.retryable)),
@@ -1829,7 +1823,7 @@ fn atip_incomplete_03_an_artifact_store_that_stops_after_a_blob_is_incomplete_an
         (Some("ARTIFACTS_STORE_INCOMPLETE"), Some(true)),
         "{body}"
     );
-    assert!(body["error"].get("reason").is_none(), "{body}");
+    assert_eq!(body["error"]["reason"], "ARTIFACTS_STORE_FAILED", "{body}");
     assert_eq!(
         body["meta"]["next"][0]["argv"],
         serde_json::json!(["artifacts", "verify", "--json"]),
@@ -1894,7 +1888,7 @@ fn atip_incomplete_04_a_hook_install_that_stops_after_the_first_file_is_incomple
         (Some("HOOKS_INSTALL_INCOMPLETE"), Some(false)),
         "{body}"
     );
-    assert!(body["error"].get("reason").is_none(), "{body}");
+    assert_eq!(body["error"]["reason"], "WRITE_FAILED", "{body}");
     assert_eq!(
         body["meta"]["next"][0]["argv"],
         serde_json::json!(["status", "--json"]),
@@ -1940,6 +1934,26 @@ fn atip_incomplete_04_a_hook_install_that_stops_after_the_first_file_is_incomple
         &[("CANON_TEST_STOP_AT", "hooks-second-file")],
     );
     assert_eq!(preview.status.code(), Some(0), "{}", text(&preview));
+}
+
+/// atip.incomplete.04 (the third step): the pre-commit script is written after both hook files; when its write fails (the debug seam `hooks-script`)
+/// the hook files stay and the answer is `HOOKS_INSTALL_INCOMPLETE` with the reason `WRITE_FAILED` and `meta.next` leading with `canon status`, not
+/// `WRITE_FAILED` alone; the rerun without the seam writes the script.
+#[test]
+fn atip_incomplete_04_a_script_write_that_fails_after_both_hook_files_is_incomplete() {
+    let dir = repo_with_scenario();
+    let repo = dir.path();
+    let out = canon_env(repo, &["gate", "install-hooks", "--json"], None, &[("CANON_TEST_STOP_AT", "hooks-script")]);
+    let body = document(&out);
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["retryable"].as_bool()), (Some("HOOKS_INSTALL_INCOMPLETE"), Some("WRITE_FAILED"), Some(false)), "{body}");
+    assert!(body["error"]["message"].as_str().is_some_and(|message| message.contains("failed to write")), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["status", "--json"]), "{body}");
+    assert!(repo.join(".claude/settings.json").is_file() && repo.join(".codex/hooks.json").is_file(), "both hook files stay installed");
+
+    // The rerun without the seam writes the script and exits 0.
+    let rerun = canon_env(repo, &["gate", "install-hooks", "--json"], None, &[]);
+    assert_eq!(rerun.status.code(), Some(0), "{}", text(&rerun));
 }
 
 // ------------------------------------------------------------------ purge, compaction and tier aging
@@ -2343,6 +2357,64 @@ fn atip_incomplete_07_tier_aging_that_stops_after_records_moved_is_incomplete_an
     );
 }
 
+/// atip.incomplete.05 (nothing deleted): a purge that fails before it deleted its first record (the debug seam `purge-before-delete`) is answered by
+/// its cause, the refusal `RETENTION_TIERS_INVALID` (exit 2), never `RETENTION_PURGE_INCOMPLETE`: nothing was deleted, no `meta.next` read of what
+/// was deleted, and the records stay.
+#[test]
+fn atip_incomplete_05_a_purge_that_fails_before_it_deleted_anything_is_not_incomplete() {
+    let fixture = support::Fixture::new(ROUTING, AGING);
+    std::fs::create_dir_all(fixture.root.path().join(".canon/learn")).unwrap();
+    old_trajectories(&fixture);
+    let root = fixture.root.path();
+    let cutoff = (chrono::Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+    let r2 = fixture.r2_root().display().to_string();
+    let env = [("CANON_R2_LOCAL_ROOT", r2.as_str())];
+    let digest = digest_of(&canon_env(root, &["purge", "--kind", "trajectory", "--before", &cutoff, "--json"], None, &env));
+    let seam = [("CANON_R2_LOCAL_ROOT", r2.as_str()), ("CANON_TEST_STOP_AT", "purge-before-delete")];
+    let out = canon_env(root, &["purge", "--kind", "trajectory", "--before", &cutoff, "--commit", "--plan-digest", &digest, "--json"], None, &seam);
+    let body = document(&out);
+    assert_eq!(out.status.code(), Some(2), "{body}");
+    assert_eq!(body["error"]["code"], "RETENTION_TIERS_INVALID", "{body}");
+    assert!(body["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| step["argv"] != serde_json::json!(["status", "--json"]))), "{body}");
+    assert_eq!(trajectories_in_ledger(&fixture), 2, "nothing was deleted");
+}
+
+/// atip.incomplete.06 (nothing moved): a ledger whose kind directories this user may not read makes the compaction fail in its read of the ledger,
+/// before the first move, and a preview never moves. Neither is `LEDGER_COMPACT_INCOMPLETE`: the answer is the refusal of the read
+/// (`REPO_DENIED`, exit 2), with no `meta.next` read of what moved, and nothing moved. (Skipped for a user the mode does not stop, such as root.)
+#[cfg(unix)]
+#[test]
+fn atip_incomplete_06_a_compaction_that_cannot_read_the_ledger_before_it_moved_anything_is_not_incomplete() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = compactable();
+    let root = fixture.root.path();
+    let kinds: Vec<PathBuf> = std::fs::read_dir(fixture.git_root()).unwrap().flatten().map(|entry| entry.path()).filter(|path| path.is_dir() && path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("kind="))).collect();
+    assert!(!kinds.is_empty());
+    for kind in &kinds {
+        std::fs::set_permissions(kind, std::fs::Permissions::from_mode(0o000)).unwrap();
+    }
+    let restore = || {
+        for kind in &kinds {
+            let _ = std::fs::set_permissions(kind, std::fs::Permissions::from_mode(0o755));
+        }
+    };
+    if std::fs::read_dir(&kinds[0]).is_ok() {
+        restore();
+        return;
+    }
+    let preview = canon_env(root, &["ledger", "compact", "--json"], None, &[]);
+    let commit = canon_env(root, &["ledger", "compact", "--commit", "--plan-digest", "sha256:0000000000000000000000000000000000000000000000000000000000000000", "--json"], None, &[]);
+    restore();
+    for (what, out) in [("preview", preview), ("commit", commit)] {
+        let body = document(&out);
+        assert_eq!(out.status.code(), Some(2), "{what}: {body}");
+        assert_eq!(body["error"]["code"], "REPO_DENIED", "{what}: {body}");
+        assert!(body["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| step["argv"] != serde_json::json!(["status", "--json"]))), "{what}: {body}");
+    }
+    assert_eq!(archived(&fixture), 0, "nothing moved");
+}
+
 // ------------------------------------------------------------------ inventory
 
 const PROVENANCE: &str = "  # canon: {\"schema\":1,\"at\":\"2026-07-10T00:00:00Z\",\"actor\":{\"agent_id\":\"canon-fmt\"}}";
@@ -2363,90 +2435,114 @@ fn write(dir: &Path, rel: &str, body: &str) {
     std::fs::write(path, body).unwrap();
 }
 
-/// atip.incomplete.09: `inventory sync` indexes each spec root in turn; a root it leaves unindexed (the second one, here) is `INVENTORY_INCOMPLETE`:
-/// exit 1, not retryable, the reason `DUPLICATE_SCENARIOS` for a root that declares a scenario twice and `VIOLATIONS` for one with format violations,
-/// `data.roots` says per root (the first one was indexed), `meta.next` leads with `canon status`; a corpus without either exits 0.
-#[test]
-fn atip_incomplete_09_a_spec_root_left_unindexed_is_incomplete_with_its_reason_and_the_earlier_root_stays_indexed(
-) {
-    let dir = tempfile::tempdir().unwrap();
-    let repo = dir.path();
-    write(repo, "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\nspecs:\n  roots:\n    - id: first\n      root: first\n    - id: second\n      root: second\n");
-    write(
-        repo,
-        "first/kind=feature/area=one/a.feature",
-        &feature("one a", &["one.a.01"]),
-    );
+const TWO_ROOTS: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\nspecs:\n  roots:\n    - id: first\n      root: first\n    - id: second\n      root: second\n";
 
-    // A second root that declares the same scenario twice.
-    write(
-        repo,
-        "second/kind=feature/area=two/b.feature",
-        &feature("two b", &["two.b.01", "two.b.01"]),
-    );
+/// A repository with two spec roots, the first clean and the second holding `second` as its corpus.
+fn two_roots(second: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "canon.yaml", TWO_ROOTS);
+    write(dir.path(), "first/kind=feature/area=one/a.feature", &feature("one a", &["one.a.01"]));
+    write(dir.path(), "second/kind=feature/area=two/b.feature", second);
+    dir
+}
+
+fn ledger_has_scenarios(repo: &Path) -> bool {
+    std::fs::read_dir(repo.join(".canon/ledger/kind=scenario")).is_ok_and(|entries| entries.count() > 0)
+}
+
+/// atip.incomplete.09: `inventory sync` indexes each spec root in turn. A commit that indexed an earlier root and then left a later one unindexed is
+/// `INVENTORY_INCOMPLETE` (exit 1, not retryable, the reason `DUPLICATE_SCENARIOS` or `VIOLATIONS`, `data.roots` per root, `meta.next` leading with
+/// `canon status`) and the earlier root's records stay. When this run indexed nothing before the stop (the earlier root was indexed by a run before),
+/// the answer is the corpus's own check result `INVENTORY_CHECK_FAILED` (exit 1, the same reasons, `data.roots` kept), not an `_INCOMPLETE` code. A corpus with neither is indexed
+/// whole.
+#[test]
+fn atip_incomplete_09_a_spec_root_left_unindexed_after_an_earlier_one_was_indexed_is_incomplete_with_its_reason() {
+    let dir = two_roots(&feature("two b", &["two.b.01", "two.b.01"]));
+    let repo = dir.path();
     let out = canon_env(repo, &["inventory", "sync", "--json"], None, &[]);
     let body = document(&out);
     assert_eq!(out.status.code(), Some(1), "{body}");
-    assert_eq!(
-        (
-            body["error"]["code"].as_str(),
-            body["error"]["reason"].as_str(),
-            body["error"]["retryable"].as_bool()
-        ),
-        (
-            Some("INVENTORY_INCOMPLETE"),
-            Some("DUPLICATE_SCENARIOS"),
-            Some(false)
-        ),
-        "{body}"
-    );
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["retryable"].as_bool()), (Some("INVENTORY_INCOMPLETE"), Some("DUPLICATE_SCENARIOS"), Some(false)), "{body}");
     let roots = body["data"]["roots"].as_array().expect("data.roots");
     assert_eq!(roots.len(), 2, "{body}");
-    assert!(
-        roots[0]["written"]
-            .as_u64()
-            .is_some_and(|written| written > 0),
-        "the first root was indexed: {body}"
-    );
-    assert_eq!(
-        roots[1]["written"].as_u64(),
-        Some(0),
-        "the second was not: {body}"
-    );
-    assert_eq!(
-        body["meta"]["next"][0]["argv"],
-        serde_json::json!(["status", "--json"]),
-        "{body}"
-    );
-    assert!(
-        std::fs::read_dir(repo.join(".canon/ledger/kind=scenario")).is_ok_and(|entries| entries.count() > 0),
-        "the earlier root's records stay"
-    );
+    assert!(roots[0]["written"].as_u64().is_some_and(|written| written > 0), "the first root was indexed: {body}");
+    assert_eq!(roots[1]["written"].as_u64(), Some(0), "the second was not: {body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["status", "--json"]), "{body}");
+    assert!(ledger_has_scenarios(repo), "the earlier root's records stay");
 
-    // A second root whose corpus has a violation (a scenario with no provenance line).
-    write(
-        repo,
-        "second/kind=feature/area=two/b.feature",
-        "Feature: two b\n\n  @two.b.01\n  Scenario: two\n    Given a step\n",
-    );
+    // The first root is indexed now: a rerun writes nothing before it meets the second root again, so the answer is the corpus's refusal.
+    let again = canon_env(repo, &["inventory", "sync", "--json"], None, &[]);
+    let again_body = document(&again);
+    assert_eq!(again.status.code(), Some(1), "{again_body}");
+    assert_eq!((again_body["error"]["code"].as_str(), again_body["error"]["reason"].as_str(), again_body["error"]["retryable"].as_bool()), (Some("INVENTORY_CHECK_FAILED"), Some("DUPLICATE_SCENARIOS"), Some(false)), "{again_body}");
+    assert!(again_body["data"]["roots"].is_array(), "data.roots says per root: {again_body}");
+
+    // A second root with a violation (a scenario with no provenance line).
+    write(repo, "second/kind=feature/area=two/b.feature", "Feature: two b\n\n  @two.b.01\n  Scenario: two\n    Given a step\n");
+    let violated = canon_env(repo, &["inventory", "sync", "--json"], None, &[]);
+    let violated_body = document(&violated);
+    assert_eq!(violated.status.code(), Some(1), "{violated_body}");
+    assert_eq!((violated_body["error"]["code"].as_str(), violated_body["error"]["reason"].as_str()), (Some("INVENTORY_CHECK_FAILED"), Some("VIOLATIONS")), "{violated_body}");
+
+    // A corpus without either is indexed whole.
+    write(repo, "second/kind=feature/area=two/b.feature", &feature("two b", &["two.b.01"]));
+    let done = canon_env(repo, &["inventory", "sync", "--json"], None, &[]);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+}
+
+/// atip.incomplete.09 (nothing indexed): one spec root with a violation, the usual case, indexes nothing: `INVENTORY_CHECK_FAILED` (exit 1, reason
+/// `VIOLATIONS`, not retryable) with `data.roots` and a hint that fixes the corpus, never `INVENTORY_INCOMPLETE`, no read-what-was-indexed
+/// `meta.next`, and no ledger is created. The preview of a sync that would stop on a second root after indexing the first says it is a preview and
+/// answers the same refusal, with nothing written.
+#[test]
+fn atip_incomplete_09_a_sync_that_indexed_nothing_answers_the_corpus_refusal_and_a_preview_never_answers_incomplete() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    write(repo, "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\nspecs:\n  roots:\n    - id: first\n      root: first\n");
+    write(repo, "first/kind=feature/area=one/a.feature", "Feature: one a\n\n  @one.a.01\n  Scenario: no provenance\n    Given a step\n");
     let out = canon_env(repo, &["inventory", "sync", "--json"], None, &[]);
     let body = document(&out);
     assert_eq!(out.status.code(), Some(1), "{body}");
-    assert_eq!(
-        (
-            body["error"]["code"].as_str(),
-            body["error"]["reason"].as_str()
-        ),
-        (Some("INVENTORY_INCOMPLETE"), Some("VIOLATIONS")),
-        "{body}"
-    );
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["retryable"].as_bool()), (Some("INVENTORY_CHECK_FAILED"), Some("VIOLATIONS"), Some(false)), "{body}");
+    assert_eq!(body["data"]["roots"][0]["written"].as_u64(), Some(0), "{body}");
+    assert!(body["error"]["message"].as_str().is_some_and(|message| message.contains("indexed nothing")), "the message follows the real outcome: {body}");
+    assert!(body["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| step["argv"] != serde_json::json!(["status", "--json"]))), "no read of what was indexed: {body}");
+    assert!(!repo.join(".canon/ledger").exists(), "nothing was written");
 
-    // A corpus without either is indexed whole.
-    write(
-        repo,
-        "second/kind=feature/area=two/b.feature",
-        &feature("two b", &["two.b.01"]),
-    );
+    // A preview over two roots (the second duplicates a scenario): never `_INCOMPLETE`, says it is a preview, writes nothing.
+    let two = two_roots(&feature("two b", &["two.b.01", "two.b.01"]));
+    let preview = canon_env(two.path(), &["inventory", "sync", "--dry-run", "--json"], None, &[]);
+    let preview_body = document(&preview);
+    assert_eq!(preview.status.code(), Some(1), "{preview_body}");
+    assert_eq!((preview_body["error"]["code"].as_str(), preview_body["error"]["reason"].as_str()), (Some("INVENTORY_CHECK_FAILED"), Some("DUPLICATE_SCENARIOS")), "{preview_body}");
+    assert!(preview_body["error"]["message"].as_str().is_some_and(|message| message.contains("preview")), "{preview_body}");
+    assert!(preview_body["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| step["argv"] != serde_json::json!(["status", "--json"]))), "{preview_body}");
+    assert!(!ledger_has_scenarios(two.path()), "a preview writes nothing");
+}
+
+/// atip.incomplete.09 (the store): the record store failing while a later root is indexed (the debug seam `inventory-second-root`) is
+/// `INVENTORY_INCOMPLETE` with the reason `INVENTORY_FAILED` when an earlier root was indexed by this run, and `INVENTORY_FAILED` (exit 1) when
+/// nothing was indexed before the failure (the first root was indexed by a run before).
+#[test]
+fn atip_incomplete_09_a_store_failure_after_an_earlier_root_was_indexed_is_incomplete_and_one_before_any_is_inventory_failed() {
+    let dir = two_roots(&feature("two b", &["two.b.01"]));
+    let repo = dir.path();
+    let seam = [("CANON_TEST_STOP_AT", "inventory-second-root")];
+    let out = canon_env(repo, &["inventory", "sync", "--json"], None, &seam);
+    let body = document(&out);
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str(), body["error"]["retryable"].as_bool()), (Some("INVENTORY_INCOMPLETE"), Some("INVENTORY_FAILED"), Some(false)), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["status", "--json"]), "{body}");
+    assert!(ledger_has_scenarios(repo), "the earlier root's records stay");
+
+    // The first root is indexed by the run before: the same failure indexed nothing in this run.
+    let again = canon_env(repo, &["inventory", "sync", "--json"], None, &seam);
+    let again_body = document(&again);
+    assert_eq!(again.status.code(), Some(1), "{again_body}");
+    assert_eq!(again_body["error"]["code"], "INVENTORY_FAILED", "{again_body}");
+    assert!(again_body["error"].get("reason").is_none(), "{again_body}");
+
+    // Without the seam the sync finishes.
     let done = canon_env(repo, &["inventory", "sync", "--json"], None, &[]);
     assert_eq!(done.status.code(), Some(0), "{}", text(&done));
 }

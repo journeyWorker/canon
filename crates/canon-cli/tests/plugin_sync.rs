@@ -415,3 +415,30 @@ fn atip_incomplete_08_a_plugin_sync_that_could_not_write_a_candidate_is_incomple
         "{done}"
     );
 }
+
+/// atip.incomplete.08 (nothing written): a plugin sync whose every candidate fails (the debug seam `plugin-every-candidate`) wrote nothing, so it is
+/// `WRITE_FAILED` (exit 1, one failure of the work that kept nothing), never `PLUGIN_SYNC_INCOMPLETE`, with `data.roots` naming each error and no
+/// `meta.next` read of what was written; its preview wrote nothing either and answers the refusal of what it could not check (exit 2), and the
+/// seam that fails the second candidate leaves a preview alone.
+#[test]
+fn atip_incomplete_08_a_plugin_sync_that_wrote_nothing_is_not_incomplete_and_a_preview_never_is() {
+    let dir = tempfile::tempdir().unwrap();
+    write_repo(dir.path());
+    sync_inventory(dir.path());
+    let run = |extra: &[&str], stop: &str| Command::new(env!("CARGO_BIN_EXE_canon")).args(["plugin", "sync", "porting", "--repo", ".", "--json"]).args(extra).env("CANON_TEST_STOP_AT", stop).current_dir(dir.path()).output().expect("spawn canon binary");
+    let failed = run(&[], "plugin-every-candidate");
+    let body: Value = serde_json::from_slice(&failed.stdout).expect("one JSON document");
+    assert_eq!(failed.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["data"]["written"].as_u64()), (Some("WRITE_FAILED"), Some(0)), "{body}");
+    assert!(body["data"]["roots"][0]["errors"].as_array().is_some_and(|errors| !errors.is_empty()), "{body}");
+    assert!(body["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| step["argv"] != serde_json::json!(["status", "--json"]))), "{body}");
+    assert_eq!(query_scenarios_with_plugin(dir.path()).iter().filter(|record| record["overlay"]["porting.coverage"].is_object()).count(), 0, "nothing was written");
+
+    let preview = run(&["--dry-run"], "plugin-every-candidate");
+    let preview_body: Value = serde_json::from_slice(&preview.stdout).expect("one JSON document");
+    assert_eq!(preview.status.code(), Some(2), "{preview_body}");
+    assert!(preview_body["error"]["code"].as_str().is_some_and(|code| code != "PLUGIN_SYNC_INCOMPLETE" && code.starts_with("REPO_")), "{preview_body}");
+
+    let untouched = run(&["--dry-run"], "plugin-second-candidate");
+    assert_eq!(untouched.status.code(), Some(0), "{}{}", stdout(&untouched), stderr(&untouched));
+}

@@ -348,22 +348,15 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             }
         }
         deleting.set(commit);
+        // `purge-before-delete` (a debug build's test seam, `incomplete::injected_stop`): the purge fails before it deleted any record.
+        if let Some(stop) = crate::incomplete::injected_stop("purge-before-delete").filter(|_| commit) {
+            return Err(RetentionError::Store(canon_store::tier::StoreError::Io(stop)));
+        }
         // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
-        let outcome = if commit {
-            RetentionService::new(&loaded_registry(repo, kind, false)?.1)
-                .purge(kind, before, false)?
-        } else {
-            preflight
-        };
-        if let Some(stop) =
-            crate::incomplete::injected_stop("purge-after-delete").filter(|_| commit)
-        {
+        let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
+        if let Some(stop) = crate::incomplete::injected_stop("purge-after-delete").filter(|_| commit) {
             // The deletion in the tiers is done, and the step after it stops (the test seam stands for the learn store, which a trajectory purge empties next).
-            return Err(RetentionError::PartialPurge {
-                matched: outcome.rungs.iter().map(|r| r.matched).sum(),
-                deleted: outcome.rungs.iter().map(|r| r.deleted).sum(),
-                reason: stop.to_string(),
-            });
+            return Err(RetentionError::PartialPurge { matched: outcome.rungs.iter().map(|r| r.matched).sum(), deleted: outcome.rungs.iter().map(|r| r.deleted).sum(), reason: stop.to_string() });
         }
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
@@ -413,21 +406,21 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             if matched > 0 || deleted > 0 {
                 let _ = append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted);
             }
-            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2); once the commit starts deleting, it stops part-way (exit 1, what was deleted stays deleted).
-            let code = if deleting.get() {
-                "RETENTION_PURGE_INCOMPLETE"
-            } else {
-                tiers_code(&err)
-            };
-            if deleting.get() {
+            // The tiers are opened and the plan is read and gated before anything is deleted (exit 2). A commit that stops after it deleted something is
+            // `RETENTION_PURGE_INCOMPLETE` (exit 1, what was deleted stays deleted); one that stopped before the first record was deleted (the error carries the
+            // counts) is answered by its cause like the refusals before it.
+            let incomplete = deleting.get() && deleted > 0;
+            let code = if incomplete { "RETENTION_PURGE_INCOMPLETE" } else { tiers_code(&err) };
+            if incomplete {
                 crate::incomplete::read_status("read what the purge deleted before it stopped (`data` names the counts): what was deleted stays deleted");
             }
-            let hint = if deleting.get() {
+            let hint = if incomplete {
                 format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`")
             } else {
                 format!("{}, then run `{base}` again and commit its plan with `--commit --plan-digest <planDigest>`", tiers_hint(code))
             };
             let error = CliError::refused(code, err.to_string()).hint(hint);
+            let error = if incomplete { error.reason("WRITE_FAILED") } else { error };
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
                     Some(partial_purge_report(kind, before, *matched, *deleted, &err.to_string()))

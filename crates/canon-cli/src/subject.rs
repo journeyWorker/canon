@@ -702,7 +702,7 @@ fn unadopt_change(
             // Past the subject's write, the unlink is half done: a failure after the work began (exit 1), with the repair that finishes it.
             if on_subject && !dry_run {
                 let message = format!("subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `{repair}`", subject_id.as_str(), change_id.as_str());
-                return Ok(UnadoptOutcome::Failed(CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the unlink: run `{repair}`"))));
+                return Ok(UnadoptOutcome::Failed(CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).reason("WRITE_FAILED").hint(format!("finish the unlink: run `{repair}`"))));
             }
             return Err(unwritten(format!("failed to record the unadoption: {e}; nothing was written")));
         }
@@ -759,7 +759,7 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
         let message = e.describe(change_id, subject_id, &repair);
         // One record written and the other not is a failure after the work began (exit 1), with the repair that finishes it.
         if e.subject_written {
-            CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
+            CliError::failed("CHANGE_ADOPTION_INCOMPLETE", message).reason("WRITE_FAILED").hint(format!("finish the adoption: run `{repair}`"))
         } else {
             refused(crate::read_cause::write_code_of_text(&message), message)
         }

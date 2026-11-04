@@ -45,18 +45,54 @@ pub fn compact(repo: &Path, dry_run: bool) -> Result<Vec<KindCompaction>, CliErr
         )
         .hint("name the local tier's root `<dir>/ledger` in canon.yaml (`tiers.local.root`, default `.canon/ledger`) to archive superseded versions"));
     }
-    let incomplete = |cause: String| {
-        CliError::failed("LEDGER_COMPACT_INCOMPLETE", cause)
-            .hint("fix what the message names (a read-only ledger or archive, a full disk), then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>`; versions already moved stay in the archive")
-    };
-    let kinds = tier
-        .compact(dry_run)
-        .map_err(|e| incomplete(e.to_string()))?;
+    let mut kinds: Vec<KindCompaction> = Vec::new();
+    let mut moved = 0usize;
+    for kind in canon_store::archive::ARCHIVED_KINDS {
+        // The kind is read first (a preview of its own): a failure there came before this kind moved anything.
+        let scanned = match tier.compact_kind(kind, true) {
+            Ok(report) => report,
+            Err(e) => return Err(compact_stop(crate::read_cause::repo_error(e.to_string()), moved)),
+        };
+        if dry_run {
+            kinds.push(scanned);
+            continue;
+        }
+        match tier.compact_kind(kind, false) {
+            Ok(done) => {
+                moved += done.moved;
+                kinds.push(done);
+            }
+            Err(e) => {
+                // The move failed: versions of this kind already moved when a recount finds fewer left than the scan did.
+                let left = tier.compact_kind(kind, true).map(|report| report.superseded).ok();
+                let partial = if left.is_some_and(|left| left < scanned.superseded) { moved + 1 } else { moved };
+                return Err(compact_stop(CliError::failed("WRITE_FAILED", e.to_string()).hint(MOVE_HINT), partial));
+            }
+        }
+    }
     // `ledger-compact-after-move` (a debug build's test seam, `incomplete::injected_stop`): the compaction stops once the versions are moved.
-    match crate::incomplete::injected_stop("ledger-compact-after-move").filter(|_| !dry_run) {
-        Some(stop) => Err(incomplete(stop.to_string())),
+    match crate::incomplete::injected_stop("ledger-compact-after-move").filter(|_| !dry_run && moved > 0) {
+        Some(stop) => Err(compact_stop(CliError::failed("WRITE_FAILED", stop.to_string()).hint(MOVE_HINT), moved)),
         None => Ok(kinds),
     }
+}
+
+const MOVE_HINT: &str = "fix the file-system problem the message names (a read-only ledger or archive, a full disk), then run `canon ledger compact` again";
+
+/// The answer of a compaction that stopped on `cause`, a refusal (a read that failed) or `WRITE_FAILED` (a move that failed), after `moved`
+/// versions moved: with none moved the cause is the answer (no work was done, so nothing is incomplete); after one or more it is
+/// `LEDGER_COMPACT_INCOMPLETE`, whose reason is the code of the step that failed, and what moved stays in the archive.
+fn compact_stop(cause: CliError, moved: usize) -> CliError {
+    if moved == 0 {
+        return cause;
+    }
+    let reason = match cause.code {
+        "REPO_DENIED" | "REPO_UNAVAILABLE" | "WRITE_FAILED" => cause.code,
+        _ => "REPO_INVALID",
+    };
+    CliError::failed("LEDGER_COMPACT_INCOMPLETE", cause.message)
+        .reason(reason)
+        .hint("fix what the message names (a read-only ledger or archive, a full disk), then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>`; versions already moved stay in the archive")
 }
 
 fn kib(bytes: u64) -> String {

@@ -40,27 +40,19 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             } else {
                 let missing_provenance = outcome.roots.iter().flat_map(|root| &root.violations).any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
                 let hint = with_provenance_fix("data.roots names each violation; fix them, then run `canon inventory sync` again", missing_provenance);
-                crate::incomplete::read_status("read what `inventory sync` indexed before it stopped: the roots before the unindexed one stay indexed, `data.roots` says per root");
                 // The reason says which stopped the sync: a root with violations, else one that declares a scenario twice.
-                let reason = if outcome.roots.iter().any(|root| !root.violations.is_empty()) {
-                    "VIOLATIONS"
+                let reason = if outcome.roots.iter().any(|root| !root.violations.is_empty()) { "VIOLATIONS" } else { "DUPLICATE_SCENARIOS" };
+                // `INVENTORY_INCOMPLETE` needs work done before the stop: a commit that indexed an earlier root. A preview writes nothing, and a
+                // sync whose first unindexed root came before any other was indexed wrote nothing: both answer the corpus's own refusal.
+                let error = if !outcome.dry_run && outcome.total_written() > 0 {
+                    crate::incomplete::read_status("read what `inventory sync` indexed before it stopped: the roots before the unindexed one stay indexed, `data.roots` says per root");
+                    CliError::failed("INVENTORY_INCOMPLETE", "a spec root was left unindexed on violations or duplicate scenarios; nothing was written for it, and the roots before it are indexed").reason(reason).hint(hint)
+                } else if outcome.dry_run {
+                    CliError::failed("INVENTORY_CHECK_FAILED", "a spec root would be left unindexed on violations or duplicate scenarios; this was a preview and nothing was written").reason(reason).hint(hint)
                 } else {
-                    "DUPLICATE_SCENARIOS"
+                    CliError::failed("INVENTORY_CHECK_FAILED", "a spec root has violations or duplicate scenarios, so the sync indexed nothing").reason(reason).hint(hint)
                 };
-                let message = if outcome.dry_run {
-                    "a spec root would be left unindexed on violations or duplicate scenarios; this was a preview and nothing was written"
-                } else {
-                    "a spec root was left unindexed on violations or duplicate scenarios; nothing was written for it, and the roots before it are indexed"
-                };
-                let error = CliError::failed("INVENTORY_INCOMPLETE", message)
-                    .reason(reason)
-                    .hint(hint);
-                ExitCode::from(error.emit_with_data_and_meta(
-                    "canon inventory sync",
-                    json,
-                    &data,
-                    coverage.meta(),
-                ))
+                ExitCode::from(error.emit_with_data_and_meta("canon inventory sync", json, &data, coverage.meta()))
             }
         }
         Err(err) => {
@@ -70,11 +62,15 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             // The specs config, canon.yaml and the index lock are resolved before any record is read or written (exit 2); a store error comes while the sync works (exit 1).
             let (code, reason) = match &err {
                 crate::inventory::InventoryError::Store(_) => ("INVENTORY_FAILED", None),
+                crate::inventory::InventoryError::Stopped { .. } => ("INVENTORY_INCOMPLETE", Some("INVENTORY_FAILED")),
                 crate::inventory::InventoryError::Config(_) => ("CONFIG_INVALID", Some("SPECS")),
                 crate::inventory::InventoryError::CanonYaml(_) => (crate::read_cause::config_error(err.to_string()).code, None),
                 crate::inventory::InventoryError::Locked(_) => ("INVENTORY_INDEX_UNAVAILABLE", None),
                 crate::inventory::InventoryError::Unavailable(error) => (error.code, None),
             };
+            if code == "INVENTORY_INCOMPLETE" {
+                crate::incomplete::read_status("read what `inventory sync` indexed before it stopped: the records of the roots before the failing one stay indexed");
+            }
             let hint = match code {
                 "INVENTORY_INDEX_UNAVAILABLE" => "another canon process holds the scenario index: wait for it to finish, then run `canon inventory sync` again",
                 _ => "fix the problems the message names, then run `canon inventory sync` again",

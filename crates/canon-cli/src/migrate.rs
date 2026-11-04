@@ -537,12 +537,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     // gone, which the openspec reader then reads as the repo root.
     if drop_source && plan.drop_source.is_some() {
         if let Err(e) = remove_dropped_source(&repo, &plan, git, &mut log) {
-            return stopped(
-                "STOPPED",
-                format!("{e}; canon.yaml no longer lists the source, so remove it by hand"),
-                "remove the source from canon.yaml by hand, then run `canon migrate` again",
-            )
-            .emit("canon migrate", json);
+            return stopped("STOPPED", format!("{e}; canon.yaml no longer lists the source, so remove it by hand"), "remove the source from canon.yaml by hand, then run `canon migrate` again").emit("canon migrate", json);
         }
     }
 

@@ -20,8 +20,8 @@ pub(crate) fn read_status(why: &str) {
 
 /// Debug builds only, the tests' seam (like `CANON_TEST_BLOB_RACE_AFTER`): `CANON_TEST_STOP_AT=<step>` makes the named step of a command that works
 /// in steps fail with an I/O error after the steps before it made their real effects, as a disk or a store that gives out part-way would. The
-/// steps are `hooks-second-file`, `artifacts-store-second`, `promote-staged-corrupt`, `purge-after-delete`, `ledger-compact-after-move`, `tier-age-after-move`,
-/// `plugin-second-candidate` and `migrate-pins`. A release build has no seam: the result is always `None`.
+/// steps are `hooks-second-file`, `hooks-script`, `artifacts-store-second`, `promote-staged-corrupt`, `purge-after-delete`, `ledger-compact-after-move`, `tier-age-after-move`,
+/// `plugin-second-candidate`, `plugin-every-candidate`, `purge-before-delete`, `inventory-second-root` and `migrate-pins`. A release build has no seam: the result is always `None`.
 pub(crate) fn injected_stop(step: &str) -> Option<std::io::Error> {
     #[cfg(debug_assertions)]
     {

@@ -522,11 +522,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
     let out = commit(repo);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
-    assert!(
-        text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write"),
-        "{}",
-        text(&out)
-    );
+    assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write"), "{}", text(&out));
     assert!(text(&out).contains("canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "never half-written");
     assert!(repo.join(NEW_FEATURE).is_file() && repo.join(".canon/changes/add-cart/brief.md").is_file(), "the moves happened before the write failed");
@@ -568,18 +564,8 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
     let out = commit(repo);
     set_mode(&repo.join(".canon/changes"), 0o755);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
-    assert!(
-        text(&out).contains(
-            "canon: MIGRATION_INCOMPLETE: failed to write .canon/changes/checkout/brief.md"
-        ),
-        "{}",
-        text(&out)
-    );
-    assert_eq!(
-        read(repo, "canon.yaml"),
-        yaml,
-        "the source canon init wrote stays while the approval is not copied"
-    );
+    assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
+    assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());
 
     let out = ok_commit(repo);

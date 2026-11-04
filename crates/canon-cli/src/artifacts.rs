@@ -555,9 +555,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
         race_hook(&blob.path, uploaded);
         let outcome = match std::fs::File::open(&blob.path).map_err(ArtifactStoreError::from).and_then(|file| object.upload(&blob.digest, file)) {
             Ok(outcome) => outcome,
-            Err(
-                e @ (ArtifactStoreError::Remote { .. } | ArtifactStoreError::Unattached { .. }),
-            ) => {
+            Err(e @ (ArtifactStoreError::Remote { .. } | ArtifactStoreError::Unattached { .. })) => {
                 if uploaded > 0 {
                     // The store stopped answering after uploads landed: the move stops here, and those uploads stay.
                     stopped.push((store_error(&e).code, format!("uploading {} failed after {uploaded} upload(s): {e}; the blobs after it were not tried", store.display(&blob.digest))));
@@ -604,19 +602,9 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             // Nothing was uploaded, so nothing was written: a refusal like a blob that does not hash to its name in the plan.
             return refuse("ARTIFACTS_BLOB_CORRUPT", message, &format!("{}; nothing was uploaded or removed and canon.yaml is unchanged", blob_hint("ARTIFACTS_BLOB_CORRUPT")));
         }
-        // Uploads were made, so the command did work and stopped: `ARTIFACTS_INCOMPLETE` (one `_INCOMPLETE` per subject, the reason says
+        // Uploads were made, so the command did work and stopped: `ARTIFACTS_MOVE_INCOMPLETE` (one `_INCOMPLETE` per subject, the reason says
         // what stopped it) carries what was uploaded in `data` and says to read the state first.
-        let report = ArtifactsMoveReport {
-            backend: to.to_string(),
-            blobs: blobs.len(),
-            uploaded,
-            already_in_store: already,
-            removed_local: 0,
-            config_written: false,
-            gitignore_added: false,
-            skipped,
-            plan: plan.committed(),
-        };
+        let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded, already_in_store: already, removed_local: 0, config_written: false, gitignore_added: false, skipped, plan: plan.committed() };
         crate::incomplete::read_first("canon artifacts verify --json", "read what the stopped move left: the blobs it uploaded are in the store, no local blob was removed and canon.yaml is unchanged");
         crate::json_out::prepend_next(crate::status::NextStep {
             command: format!("canon artifacts move --tier {to} --json"),
@@ -624,7 +612,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
             actor: crate::status::StepActor::Agent,
             role: None,
         });
-        return CliError::failed("ARTIFACTS_INCOMPLETE", format!("stopped after {uploaded} upload(s): {message}"))
+        return CliError::failed("ARTIFACTS_MOVE_INCOMPLETE", format!("stopped after {uploaded} upload(s): {message}"))
             .reason(stopped[0].0)
             .hint("the uploads stay in the store, no local blob was removed and canon.yaml is unchanged; read the state, deal with the blob or object the message names, then preview and commit a new plan (the same --plan-digest is stale now)")
             .emit_with_data("canon artifacts move", json, &report);
@@ -726,16 +714,7 @@ mod tests {
         use crate::cli_error::CliErrorExt as _;
         let stale = crate::cli_error::CliError::refused("EVIDENCE_BINDING_STALE", "m");
         assert_eq!((stale.exit, stale.retryable), (2, false));
-        assert_eq!(
-            evidence_store_code(&ArtifactStoreError::UnsafeStoreDir),
-            ("ARTIFACTS_STORE_INVALID", None)
-        );
-        assert_eq!(
-            evidence_store_code(&ArtifactStoreError::Remote {
-                tier: "cold".to_string(),
-                reason: "down".to_string()
-            }),
-            ("ARTIFACTS_STORE_FAILED", None)
-        );
+        assert_eq!(evidence_store_code(&ArtifactStoreError::UnsafeStoreDir), ("ARTIFACTS_STORE_INVALID", None));
+        assert_eq!(evidence_store_code(&ArtifactStoreError::Remote { tier: "cold".to_string(), reason: "down".to_string() }), ("ARTIFACTS_STORE_FAILED", None));
     }
 }

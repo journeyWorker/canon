@@ -200,7 +200,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         let error = if let Some(refusal) = e.unavailable {
             refusal
         } else if e.subject_written {
-            CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message).hint(format!("finish the adoption: run `{repair}`"))
+            CliError::refused("CHANGE_ADOPTION_INCOMPLETE", message).reason("WRITE_FAILED").hint(format!("finish the adoption: run `{repair}`"))
         } else {
             CliError::refused("WRITE_FAILED", message).hint("check that the path is writable and the disk has room, then run the command again")
         };

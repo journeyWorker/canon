@@ -1297,34 +1297,14 @@ mod tests {
     fn atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error() {
         let child = json!({"ok": false, "error": {"code": "INIT_INCOMPLETE", "reason": "SKILLS_ARGUMENT_INVALID", "message": "wrote canon.yaml, then the install was refused", "retryable": false}});
         let element = error_of(&child, &map(), "/items/0");
-        assert_eq!(
-            (
-                element.code,
-                element.reason_name(),
-                element.exit,
-                element.retryable
-            ),
-            ("INIT_INCOMPLETE", Some("SKILLS_ARGUMENT_INVALID"), 1, false)
-        );
+        assert_eq!((element.code, element.reason_name(), element.exit, element.retryable), ("INIT_INCOMPLETE", Some("SKILLS_ARGUMENT_INVALID"), 1, false));
         let item = serde_json::to_value(element.body()).expect("an error body serializes");
-        assert_eq!(
-            (item["code"].clone(), item["reason"].clone()),
-            (json!("INIT_INCOMPLETE"), json!("SKILLS_ARGUMENT_INVALID")),
-            "{item}"
-        );
+        assert_eq!((item["code"].clone(), item["reason"].clone()), (json!("INIT_INCOMPLETE"), json!("SKILLS_ARGUMENT_INVALID")), "{item}");
         let batch = incomplete(&element, 0);
         assert_eq!((batch.code, batch.exit), ("BATCH_INCOMPLETE", 1));
-        assert!(
-            batch.message.contains("INIT_INCOMPLETE"),
-            "{}",
-            batch.message
-        );
+        assert!(batch.message.contains("INIT_INCOMPLETE"), "{}", batch.message);
         let made_up = json!({"ok": false, "error": {"code": "INIT_INCOMPLETE", "reason": "MADE_UP", "message": "m", "retryable": false}});
-        assert_eq!(
-            error_of(&made_up, &map(), "/items/0").reason_name(),
-            None,
-            "an unregistered reason is dropped, so the item error stays one the registry holds"
-        );
+        assert_eq!(error_of(&made_up, &map(), "/items/0").reason_name(), None, "an unregistered reason is dropped, so the item error stays one the registry holds");
         let plain = json!({"ok": false, "error": {"code": "WRITE_FAILED", "message": "m", "retryable": false}});
         assert_eq!(error_of(&plain, &map(), "/items/0").reason_name(), None);
     }

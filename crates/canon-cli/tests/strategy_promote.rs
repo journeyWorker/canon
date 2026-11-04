@@ -181,20 +181,9 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     let written_at = git_tier_file(dir.path(), &id);
 
     let refused = run_promote(dir.path(), &id, &["--json"]);
-    assert_eq!(
-        refused.status.code(),
-        Some(1),
-        "direct promotion without approval must be refused"
-    );
-    assert!(
-        error_code(&refused).starts_with("STRATEGY_PROMOTION"),
-        "the refusal carries a promotion error code: {}",
-        error_code(&refused)
-    );
-    assert!(
-        !written_at.exists(),
-        "refused direct promotion must not write the git-tier file"
-    );
+    assert_eq!(refused.status.code(), Some(1), "direct promotion without approval must be refused");
+    assert!(error_code(&refused).starts_with("STRATEGY_PROMOTION"), "the refusal carries a promotion error code: {}", error_code(&refused));
+    assert!(!written_at.exists(), "refused direct promotion must not write the git-tier file");
 
     let (evaluation_path, approval_path, evaluation, approval) = write_approved_bundle(dir.path(), &candidate, &private_key);
     let output = run_promote(dir.path(), &id, &["--evaluation", evaluation_path.to_str().unwrap(), "--approval", approval_path.to_str().unwrap()]);
@@ -343,15 +332,8 @@ fn the_per_role_promotion_config_in_canon_yaml_drives_the_gate() {
     seed_trajectories(dir.path(), 1, VerdictOutcome::Success);
 
     let output = run_promote(dir.path(), &id, &["--json"]);
-    assert!(
-        !output.status.success(),
-        "direct promotion must still require approval"
-    );
-    assert!(
-        error_code(&output).starts_with("STRATEGY_PROMOTION"),
-        "{}",
-        error_code(&output)
-    );
+    assert!(!output.status.success(), "direct promotion must still require approval");
+    assert!(error_code(&output).starts_with("STRATEGY_PROMOTION"), "{}", error_code(&output));
     assert!(
         !git_tier_file(dir.path(), &id).exists(),
         "configured statistical gate must not bypass activation approval"

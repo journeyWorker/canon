@@ -99,7 +99,7 @@ Feature: atip: the INCOMPLETE codes of a command that stopped after its earlier 
   Scenario: The failure codes of the work keep their names, exits and retryability
     Given the failure codes of the work: WRITE_FAILED, ARTIFACTS_STORE_FAILED, PROMOTION_FAILED, TIER_FAILED and the other *_FAILED codes that write
     When the registry is read
-    Then each keeps its name, exit 1 and retryability, has no reason, and is no reason of an INCOMPLETE code
+    Then each keeps its name, exit 1 and retryability, and has no reason of its own, and every reason of an INCOMPLETE code is a registered code (the refusal it met, or the failure code of the step that stopped)
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:49Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:atip-contract
@@ -119,15 +119,15 @@ Feature: atip: the INCOMPLETE codes of a command that stopped after its earlier 
   Scenario: A half-written adoption keeps CHANGE_ADOPTION_INCOMPLETE and its repair completes the link
     Given a change store that cannot be written after the subject record was written
     When canon subject adopt runs, then its repair runs
-    Then the first exits 1 with CHANGE_ADOPTION_INCOMPLETE, no reason, naming the repair, and the repair completes the link and a third run writes nothing
+    Then the first exits 1 with CHANGE_ADOPTION_INCOMPLETE, the reason WRITE_FAILED, naming the repair, and the repair completes the link and a third run writes nothing
 
   # canon: {"schema":1,"at":"2026-11-03T04:59:34Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
   @subject:tier-storage
   @case:failure
   @flow:canon-0-35-canon-stopped-midway.F4
   @atip.midway.13
-  Scenario: A failure code of the work that is made a reason of an INCOMPLETE code, given a reason, a refusal's exit or another retryability fails the check of the failure codes
-    Given the registry with a failure code removed, moved to exit 2, made retryable or not, given a reason, or named as a reason of an INCOMPLETE code
+  Scenario: A failure code of the work that is removed, given a reason, a refusal's exit or another retryability fails the check of the failure codes
+    Given the registry with a failure code removed, moved to exit 2, made retryable or not, or given a reason
     When the check of the failure codes runs on each
     Then each fault is named with its own message, and the registry as it stands passes
 

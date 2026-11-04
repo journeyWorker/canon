@@ -72,15 +72,8 @@ fn a_command_lists_the_codes_it_can_emit_and_a_read_lists_no_writes_codes() {
     let context = errors(&["context"]);
     let finding_list = errors(&["finding", "list"]);
     assert!(context.contains(&"USAGE".to_string()) && finding_list.contains(&"USAGE".to_string()));
-    assert!(
-        finding_list.contains(&"CURSOR_INVALID".to_string()),
-        "a command that pages lists the cursor refusal"
-    );
-    assert!(
-        !context.contains(&"CURSOR_INVALID".to_string())
-            && !context.contains(&"INPUT_INVALID".to_string()),
-        "{context:?}"
-    );
+    assert!(finding_list.contains(&"CURSOR_INVALID".to_string()), "a command that pages lists the cursor refusal");
+    assert!(!context.contains(&"CURSOR_INVALID".to_string()) && !context.contains(&"INPUT_INVALID".to_string()), "{context:?}");
     // `PROMOTION_FAILED` and `FINDING_INCOMPLETE` (exit 1) are codes `finding add` lists.
     assert!(errors(&["finding", "add"]).contains(&"PROMOTION_FAILED".to_string()));
     assert!(errors(&["finding", "add"]).contains(&"FINDING_INCOMPLETE".to_string()));

@@ -185,7 +185,7 @@ A write target that cannot be written keeps `WRITE_DENIED` and `WRITE_INVALID`: 
 
 | Call | before | now |
 |---|---|---|
-| `artifacts move --commit`, a blob another process rewrites after blobs were uploaded | `ARTIFACTS_STORE_UNAVAILABLE` (exit 2, retryable), after the uploads; the same `--plan-digest` then answers `PLAN_STALE` | `ARTIFACTS_INCOMPLETE` (exit 1, not retryable), reason `ARTIFACTS_BLOB_CORRUPT` (also for an object in the store that does not verify; the code of the read error for a blob that cannot be read), `data` what was uploaded, `meta.next` the read of the state; the uploads stay, no local blob is removed, canon.yaml is unchanged |
+| `artifacts move --commit`, a blob another process rewrites after blobs were uploaded | `ARTIFACTS_STORE_UNAVAILABLE` (exit 2, retryable), after the uploads; the same `--plan-digest` then answers `PLAN_STALE` | `ARTIFACTS_MOVE_INCOMPLETE` (exit 1, not retryable), reason `ARTIFACTS_BLOB_CORRUPT` (also for an object in the store that does not verify; the code of the read error for a blob that cannot be read), `data` what was uploaded, `meta.next` the read of the state; the uploads stay, no local blob is removed, canon.yaml is unchanged |
 | the same race before anything was uploaded | `ARTIFACTS_STORE_UNAVAILABLE` | `ARTIFACTS_BLOB_CORRUPT` (exit 2): nothing was written |
 | `artifacts move`, a store directory that is a symlink or a regular file | `ARTIFACTS_STORE_UNAVAILABLE` (retryable) | `ARTIFACTS_STORE_INVALID` |
 | `artifacts move`, a store directory this user may not enter | `ARTIFACTS_STORE_INVALID` | `ARTIFACTS_STORE_DENIED` (**new**) |
@@ -257,30 +257,31 @@ A write target that cannot be written keeps `WRITE_DENIED` and `WRITE_INVALID`: 
 
 | 0.35 | 0.36 | `reason` | exit | retryable |
 |---|---|---|---|---|
-| `ARTIFACTS_STORE_FAILED` (a write that stopped after blobs were stored) | `ARTIFACTS_STORE_INCOMPLETE`; `ARTIFACTS_STORE_FAILED` stays for a write that kept nothing | | 1 | yes |
+| `ARTIFACTS_STORE_FAILED` (a write that stopped after blobs were stored) | `ARTIFACTS_STORE_INCOMPLETE`; `ARTIFACTS_STORE_FAILED` stays for a write that kept nothing | `ARTIFACTS_STORE_FAILED`, `ARTIFACTS_STORE_UNAVAILABLE` (`ARTIFACTS_STORE_INCOMPLETE`) | 1 | yes |
 | `EVIDENCE_STORE_FAILED` | `ARTIFACTS_STORE_FAILED` (the record or batch is rolled back) | | 1 | yes |
-| `HOOKS_INSTALL_FAILED` | `HOOKS_INSTALL_INCOMPLETE` (the second hook file failed after the first was written); a first file that fails is `WRITE_FAILED` | | 1 | no |
-| `INVENTORY_ABORTED` | `INVENTORY_INCOMPLETE` | `VIOLATIONS`, `DUPLICATE_SCENARIOS` | 1 | no |
+| `HOOKS_INSTALL_FAILED` | `HOOKS_INSTALL_INCOMPLETE` (the second hook file, or the pre-commit script after the hook files, failed after a file was written); a first file that fails is `WRITE_FAILED` | `WRITE_FAILED` | 1 | no |
+| `INVENTORY_ABORTED` | `INVENTORY_INCOMPLETE` when this run indexed an earlier root before it stopped on a later one (or the store failed then: reason `INVENTORY_FAILED`); `INVENTORY_CHECK_FAILED` (the corpus's check result, nothing written, `data.roots` kept) when nothing was indexed before it, and for every preview | `VIOLATIONS`, `DUPLICATE_SCENARIOS` (`INVENTORY_FAILED` for the store) | 1 | no |
 | `LEARN_PROMOTION_FAILED` | `STRATEGY_PROMOTION_FAILED` (read at both sites: nothing of the promotion is kept) | | 1 | no |
-| `LEDGER_COMPACT_FAILED` | `LEDGER_COMPACT_INCOMPLETE` | | 1 | no |
+| `LEDGER_COMPACT_FAILED` | `LEDGER_COMPACT_INCOMPLETE` after at least one version moved; a read of the ledger that fails before the first move, and every preview, is the refusal of the read (`REPO_DENIED`, `REPO_UNAVAILABLE`, `REPO_INVALID`, exit 2), a move that fails with none moved is `WRITE_FAILED` | `REPO_DENIED`, `REPO_INVALID`, `REPO_UNAVAILABLE`, `WRITE_FAILED` | 1 | no |
 | `MIGRATE_INDEX_FAILED` | `MIGRATION_INCOMPLETE` | `INDEX` | 1 | no |
 | `MIGRATE_PINS_FAILED` | `MIGRATION_INCOMPLETE` | `PINS` | 1 | no |
 | `MIGRATE_STOPPED` | `MIGRATION_INCOMPLETE` | `STOPPED` | 1 | no |
-| `PLUGIN_SYNC_ERRORS` | `PLUGIN_SYNC_INCOMPLETE` | | 1 | no |
-| `PROMOTE_FAILED` | `PROMOTION_FAILED` (the staged record stays staged, where the ordinary flow takes it: judged a failure, not an incomplete work) | | 1 | no |
-| `RETENTION_PURGE_FAILED` | `RETENTION_PURGE_INCOMPLETE` | | 1 | no |
-| `STOPPED_MIDWAY` | `INIT_INCOMPLETE` (`SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID`), `EVIDENCE_INCOMPLETE`, `FINDING_INCOMPLETE`, `DIVERGENCE_INCOMPLETE` (each: `PROMOTION_INVALID`, the gate's refusal of the record that was staged), `STRATEGY_INCOMPLETE` (`STRATEGY_PROMOTION_INVALID`, the strategy stays demoted), `ARTIFACTS_INCOMPLETE` (`artifacts move --commit`: `ARTIFACTS_BLOB_CORRUPT`, `ARTIFACTS_STORE_DENIED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_REQUIRED`, `ARTIFACTS_STORE_UNAVAILABLE`) | the refusal's code | 1 | no |
-| `TIER_FAILED` | `TIER_INCOMPLETE` (records moved before it stopped); `TIER_FAILED` stays for a run that failed before a record left its tier | | 1 | no |
+| `PLUGIN_SYNC_ERRORS` | `PLUGIN_SYNC_INCOMPLETE` when some candidates were written and others were not; `WRITE_FAILED` when none was written; a preview that cannot check a candidate is the refusal of the read (`REPO_INVALID`, exit 2) | `WRITE_FAILED` | 1 | no |
+| `PROMOTE_FAILED` | `PROMOTION_FAILED` (the promotion failed and there is no refusal of the gate to name as a reason; a refusal after the record was staged is the subject's INCOMPLETE code, and the staged record stays staged in both) | | 1 | no |
+| `RETENTION_PURGE_FAILED` | `RETENTION_PURGE_INCOMPLETE` after at least one record was deleted; a purge that fails before the first deletion is answered by its cause (`RETENTION_TIERS_*`, exit 2) | `WRITE_FAILED` | 1 | no |
+| `STOPPED_MIDWAY` | `INIT_INCOMPLETE` (`SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID`), `EVIDENCE_INCOMPLETE`, `FINDING_INCOMPLETE`, `DIVERGENCE_INCOMPLETE` (each: `PROMOTION_INVALID`, the gate's refusal of the record that was staged), `STRATEGY_INCOMPLETE` (`STRATEGY_PROMOTION_INVALID`, the strategy stays demoted), `ARTIFACTS_MOVE_INCOMPLETE` (`artifacts move --commit`: `ARTIFACTS_BLOB_CORRUPT`, `ARTIFACTS_STORE_DENIED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_REQUIRED`, `ARTIFACTS_STORE_UNAVAILABLE`) | the refusal's code | 1 | no |
+| `TIER_FAILED` | `TIER_INCOMPLETE` (records moved before it stopped); `TIER_FAILED` stays for a run that failed before a record left its tier | `WRITE_FAILED` (`TIER_INCOMPLETE`) | 1 | no |
 
-`CHANGE_ADOPTION_INCOMPLETE` and the batch's `BATCH_INCOMPLETE` keep their names. One `_INCOMPLETE` code per subject: a command lists at most one of its own. A refusal of the gate before anything is written stays exit 2 (`PROMOTION_INVALID` of `gate promote`); only a refusal after the record was staged is `_INCOMPLETE`. A batch element that stops so is `failed` with its own `_INCOMPLETE` code and reason, and the batch is `BATCH_INCOMPLETE`.
+`CHANGE_ADOPTION_INCOMPLETE` and the batch's `BATCH_INCOMPLETE` keep their names (the former now carries the reason `WRITE_FAILED`). Every `_INCOMPLETE` code has reasons: the code of the refusal a later step met, or, where there is none to name, the code of the step that failed. One `_INCOMPLETE` code per subject: a command lists at most one of its own. A refusal of the gate before anything is written stays exit 2 (`PROMOTION_INVALID` of `gate promote`); only a refusal after the record was staged is `_INCOMPLETE`. A batch element that stops so is `failed` with its own `_INCOMPLETE` code and reason, and the batch is `BATCH_INCOMPLETE`.
 
 | Call | 0.35 | now |
 |---|---|---|
-| `artifacts move --commit`, the object store stops answering after blobs were uploaded | `ARTIFACTS_STORE_FAILED` (retryable) | `ARTIFACTS_INCOMPLETE` (not retryable), reason `ARTIFACTS_STORE_UNAVAILABLE`, `data` what was uploaded; the same `--plan-digest` is `PLAN_STALE`; with nothing uploaded yet it stays `ARTIFACTS_STORE_FAILED` |
-| `artifacts move --commit`, a blob another process rewrites after blobs were uploaded | `STOPPED_MIDWAY`, reason `ARTIFACTS_BLOB_CORRUPT` | `ARTIFACTS_INCOMPLETE`, reason `ARTIFACTS_BLOB_CORRUPT` (and `ARTIFACTS_STORE_DENIED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_UNAVAILABLE` for a blob that cannot be read after uploads) |
+| `artifacts move --commit`, the object store stops answering after blobs were uploaded | `ARTIFACTS_STORE_FAILED` (retryable) | `ARTIFACTS_MOVE_INCOMPLETE` (not retryable), reason `ARTIFACTS_STORE_UNAVAILABLE`, `data` what was uploaded; the same `--plan-digest` is `PLAN_STALE`; with nothing uploaded yet it stays `ARTIFACTS_STORE_FAILED` |
+| `artifacts move --commit`, a blob another process rewrites after blobs were uploaded | `STOPPED_MIDWAY`, reason `ARTIFACTS_BLOB_CORRUPT` | `ARTIFACTS_MOVE_INCOMPLETE`, reason `ARTIFACTS_BLOB_CORRUPT` (and `ARTIFACTS_STORE_DENIED`, `ARTIFACTS_STORE_INVALID`, `ARTIFACTS_STORE_UNAVAILABLE` for a blob that cannot be read after uploads) |
 | `artifacts store` stops after a blob was stored | `ARTIFACTS_STORE_FAILED` | `ARTIFACTS_STORE_INCOMPLETE`, retryable: the same call stores the rest |
 | `gate install-hooks`, the first hook file cannot be written | `HOOKS_INSTALL_FAILED` | `WRITE_FAILED`: one write that kept nothing |
-| `inventory sync --dry-run` on a corpus with violations | `INVENTORY_ABORTED` | `INVENTORY_INCOMPLETE`, as the preview of the sync it previews |
+| `ledger compact` over a ledger directory this user may not read (or its preview) | `LEDGER_COMPACT_FAILED` | `REPO_DENIED` (exit 2): no version moved |
+| `inventory sync` (or its `--dry-run`) on a corpus with violations, one root | `INVENTORY_ABORTED` (exit 1) | `INVENTORY_CHECK_FAILED` (exit 1, a check's result): nothing was indexed, so nothing is incomplete; with an earlier root indexed by the commit, `INVENTORY_INCOMPLETE` |
 | `tier age --commit` | `TIER_FAILED` for every failure | `TIER_INCOMPLETE` when records already moved (the plan's moves are counted again), `TIER_FAILED` when none did |
 
 **Upgrade note:** a script that matched `STOPPED_MIDWAY` matches the `_INCOMPLETE` code of the command now and reads `reason` as before; a script that matched a `*_FAILED`, `*_ABORTED`, `*_ERRORS` or `*_STOPPED` name of the table reads `meta.next[0]` (the read of what was done) before it repeats anything, and treats the `retryable` of the registry as the answer to whether to repeat it.

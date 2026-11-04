@@ -608,7 +608,7 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_INCOMPLETE",
+      "code": "ARTIFACTS_MOVE_INCOMPLETE",
       "exit": 1,
       "reasons": [
         "ARTIFACTS_BLOB_CORRUPT",
@@ -632,6 +632,10 @@
     {
       "code": "ARTIFACTS_STORE_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "ARTIFACTS_STORE_FAILED",
+        "ARTIFACTS_STORE_UNAVAILABLE"
+      ],
       "retryable": true
     },
     {
@@ -729,6 +733,9 @@
     {
       "code": "CHANGE_ADOPTION_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -1139,6 +1146,9 @@
     {
       "code": "HOOKS_INSTALL_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -1212,6 +1222,15 @@
       "retryable": false
     },
     {
+      "code": "INVENTORY_CHECK_FAILED",
+      "exit": 1,
+      "reasons": [
+        "DUPLICATE_SCENARIOS",
+        "VIOLATIONS"
+      ],
+      "retryable": false
+    },
+    {
       "code": "INVENTORY_FAILED",
       "exit": 1,
       "retryable": false
@@ -1221,6 +1240,7 @@
       "exit": 1,
       "reasons": [
         "DUPLICATE_SCENARIOS",
+        "INVENTORY_FAILED",
         "VIOLATIONS"
       ],
       "retryable": false
@@ -1243,6 +1263,12 @@
     {
       "code": "LEDGER_COMPACT_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_UNAVAILABLE",
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -1313,6 +1339,9 @@
     {
       "code": "PLUGIN_SYNC_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -1441,6 +1470,9 @@
     {
       "code": "RETENTION_PURGE_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {
@@ -1752,6 +1784,9 @@
     {
       "code": "TIER_INCOMPLETE",
       "exit": 1,
+      "reasons": [
+        "WRITE_FAILED"
+      ],
       "retryable": false
     },
     {

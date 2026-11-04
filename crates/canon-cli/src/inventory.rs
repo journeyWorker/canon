@@ -94,6 +94,9 @@ pub enum InventoryError {
     /// changed (`WRITE_DENIED` or `WRITE_INVALID`).
     #[error("{}", .0.message)]
     Unavailable(crate::cli_error::CliError),
+    /// The record store failed after `indexed` records of earlier spec roots were written: the sync stopped part-way and they stay.
+    #[error("the store failed after {indexed} record(s) of the spec roots before this one were indexed: {cause}")]
+    Stopped { indexed: usize, cause: String },
 }
 
 /// `canon.yaml`'s `specs:` section, parsed STRICTLY
@@ -458,11 +461,23 @@ fn sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>, dry_run: bool
     let corpus = corpus_ids(&roots, &scans);
 
     let mut outcomes = Vec::with_capacity(roots.len());
-    for (spec_root, scanned) in roots.iter().zip(&scans) {
-        let outcome = if dry_run {
-            plan_one_root(|| latest_index(&tier).map(std::borrow::Cow::Owned), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?.outcome
+    for (index, (spec_root, scanned)) in roots.iter().zip(&scans).enumerate() {
+        // `inventory-second-root` (a debug build's test seam, `incomplete::injected_stop`): the store fails while the second root is indexed.
+        let injected = (!dry_run && index == 1).then(|| crate::incomplete::injected_stop("inventory-second-root")).flatten();
+        let result = if let Some(stop) = injected {
+            Err(InventoryError::Store(StoreError::Io(stop)))
+        } else if dry_run {
+            plan_one_root(|| latest_index(&tier).map(std::borrow::Cow::Owned), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None).map(|plan| plan.outcome)
         } else {
-            sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?
+            sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)
+        };
+        let outcome = match result {
+            Ok(outcome) => outcome,
+            // A store error after an earlier root was indexed: the sync stopped part-way, and what it wrote stays.
+            Err(InventoryError::Store(cause)) if outcomes.iter().any(|done: &RootSyncOutcome| done.written > 0) => {
+                return Err(InventoryError::Stopped { indexed: outcomes.iter().map(|done| done.written).sum(), cause: cause.to_string() });
+            }
+            Err(other) => return Err(other),
         };
         outcomes.push(outcome);
     }

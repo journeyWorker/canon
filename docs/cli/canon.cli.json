@@ -451,7 +451,7 @@
         "ARTIFACTS_BLOB_CORRUPT",
         "ARTIFACTS_BLOB_DENIED",
         "ARTIFACTS_DIGEST_INVALID",
-        "ARTIFACTS_INCOMPLETE",
+        "ARTIFACTS_MOVE_INCOMPLETE",
         "ARTIFACTS_STORE_DENIED",
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_INVALID",
@@ -14203,6 +14203,7 @@
         "ROLE_INVALID",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -22366,6 +22367,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
+        "INVENTORY_CHECK_FAILED",
         "INVENTORY_FAILED",
         "INVENTORY_INCOMPLETE",
         "INVENTORY_INDEX_UNAVAILABLE",
@@ -22941,10 +22943,14 @@
         "LEDGER_ARCHIVE_INVALID",
         "LEDGER_COMPACT_INCOMPLETE",
         "PLAN_STALE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -23808,10 +23814,14 @@
         "LAYOUT_MIGRATION_REQUIRED",
         "PLUGIN_REQUIRED",
         "PLUGIN_SYNC_INCOMPLETE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -26008,6 +26018,7 @@
         "ROLE_INVALID",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -35846,6 +35857,7 @@
         "SUBJECT_NOT_FOUND",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -38295,6 +38307,7 @@
         "SUBJECT_NOT_FOUND",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -38673,6 +38686,7 @@
         "SUBJECT_NOT_FOUND",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -39879,6 +39893,7 @@
         "TIER_INCOMPLETE",
         "USAGE",
         "WRITE_DENIED",
+        "WRITE_FAILED",
         "WRITE_INVALID"
       ],
       "examples": [
@@ -40526,7 +40541,7 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_INCOMPLETE",
+      "code": "ARTIFACTS_MOVE_INCOMPLETE",
       "exit": 1,
       "fix": "Read what was done first (the first `meta.next` step), deal with what the reason names, then preview and commit a new plan; the same `--commit --plan-digest` is refused as `PLAN_STALE`.",
       "meaning": "`artifacts move --commit` uploaded some blobs and then stopped, because a later blob was rewritten or cannot be read, or the object store stopped answering; the uploads stay, no local blob was removed and canon.yaml is unchanged (`data` says what was uploaded, the reason says what stopped it)",
@@ -40577,7 +40592,19 @@
       "code": "ARTIFACTS_STORE_INCOMPLETE",
       "exit": 1,
       "fix": "Read what was stored first (the first `meta.next` step), check that the artifact store is writable and reachable and has space, then run the same command again to store the rest.",
-      "meaning": "`artifacts store` stored some blobs and then a later write or check of the store failed; the stored blobs stay and a repeat of the same call stores the rest",
+      "meaning": "`artifacts store` stored some blobs and then a later write or check of the store failed; the stored blobs stay and a repeat of the same call stores the rest; the reason is the code of the step that failed",
+      "reasons": [
+        {
+          "fix": "Read what was stored (`canon artifacts verify`), check that the artifact store is writable and has space, then run the same command again to store the rest.",
+          "meaning": "`canon artifacts store` stored some blobs, then the write of a later blob failed; the stored blobs stay",
+          "reason": "ARTIFACTS_STORE_FAILED"
+        },
+        {
+          "fix": "Read what was stored (`canon artifacts verify`), wait for the store to answer, then run the same command again to store the rest.",
+          "meaning": "`canon artifacts store` stored some blobs, then the check of a later blob in the store failed; the stored blobs stay",
+          "reason": "ARTIFACTS_STORE_UNAVAILABLE"
+        }
+      ],
       "retryable": true
     },
     {
@@ -40723,6 +40750,13 @@
       "exit": 1,
       "fix": "Run the repair command named in the hint to finish the link between the change and its subject.",
       "meaning": "an adoption or unlink stopped between its two records, after the first was written, so the subject and the change disagree about their link; the hint names the command that finishes it",
+      "reasons": [
+        {
+          "fix": "Run the repair command named in the hint to finish the link between the change and its subject.",
+          "meaning": "the adoption or unlink wrote its first record, then the write of the second failed, so the subject and the change disagree about their link",
+          "reason": "WRITE_FAILED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41359,8 +41393,15 @@
     {
       "code": "HOOKS_INSTALL_INCOMPLETE",
       "exit": 1,
-      "fix": "Read what was written first (the first `meta.next` step), check that the other hook file and its directory are writable, then run `canon gate install-hooks` again.",
-      "meaning": "`gate install-hooks` wrote one hook file and then could not write the next; the file it wrote stays",
+      "fix": "Read what was written first (the first `meta.next` step), check that the path the message names is writable, then run `canon gate install-hooks` again.",
+      "meaning": "`gate install-hooks` wrote a hook file and then could not write the next file or the pre-commit script; what it wrote stays",
+      "reasons": [
+        {
+          "fix": "Read what was written (`canon status`), check that the path the message names is writable, then run `canon gate install-hooks` again.",
+          "meaning": "`canon gate install-hooks` wrote a hook file (or the first two), then the write of the next file, or of the pre-commit script, failed; what it wrote stays",
+          "reason": "WRITE_FAILED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41510,6 +41551,25 @@
       "retryable": false
     },
     {
+      "code": "INVENTORY_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Fix what the reason names in the root `data.roots` lists, then run `canon inventory sync` again.",
+      "meaning": "the corpus `inventory sync` read failed its check: a spec root has format violations or declares a scenario twice, and this run indexed nothing before it (or this was a preview); `data.roots` names each result, and a sync that indexed an earlier root first is INVENTORY_INCOMPLETE",
+      "reasons": [
+        {
+          "fix": "Remove the duplicate scenario the root names, then run `canon inventory sync` again.",
+          "meaning": "a spec root declares the same scenario twice and none was indexed before it, or the preview found it (`data.roots` says per root); nothing was written",
+          "reason": "DUPLICATE_SCENARIOS"
+        },
+        {
+          "fix": "Fix the violations `data.roots` names (`canon fmt` repairs what it can), then run `canon inventory sync` again.",
+          "meaning": "a spec root's corpus has format violations and none was indexed before it, or the preview found them (`data.roots` names each one); nothing was written",
+          "reason": "VIOLATIONS"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "INVENTORY_FAILED",
       "exit": 1,
       "fix": "Fix the store problem the error names, then run `canon inventory sync` again.",
@@ -41520,16 +41580,21 @@
       "code": "INVENTORY_INCOMPLETE",
       "exit": 1,
       "fix": "Read what was done first (the first `meta.next` step and `data.roots`), fix what the reason names, then run `canon inventory sync` again.",
-      "meaning": "`inventory sync` left a spec root unindexed on violations or duplicate scenarios; the roots before it stay indexed and `data.roots` names each result; the reason says which stopped it",
+      "meaning": "`inventory sync` indexed some spec roots and then stopped on one (violations, duplicate scenarios, or a store failure); the records of the roots before it stay and `data.roots` names each result; the reason says which stopped it",
       "reasons": [
         {
           "fix": "Read what was done (`canon status`, `data.roots`), remove the duplicate scenario the root names, then run `canon inventory sync` again.",
-          "meaning": "`inventory sync` left a spec root unindexed because it declares the same scenario twice and no root had a violation; the roots before it stay indexed (`data.roots` says per root)",
+          "meaning": "`inventory sync` indexed some spec roots, then left a root unindexed because it declares the same scenario twice and no root had a violation (`data.roots` says per root)",
           "reason": "DUPLICATE_SCENARIOS"
         },
         {
+          "fix": "Read what was done (`canon status`), fix what the message names, then run `canon inventory sync` again.",
+          "meaning": "`inventory sync` indexed some spec roots, then the record store failed while it indexed a later one; the records of the earlier roots stay",
+          "reason": "INVENTORY_FAILED"
+        },
+        {
           "fix": "Read what was done (`canon status`, `data.roots`), fix the violations the root names, then run `canon inventory sync` again.",
-          "meaning": "`inventory sync` left a spec root unindexed because its corpus has format violations; the roots before it stay indexed (`data.roots` says per root and names each violation)",
+          "meaning": "`inventory sync` indexed some spec roots, then left a root unindexed because its corpus has format violations (`data.roots` says per root and names each violation)",
           "reason": "VIOLATIONS"
         }
       ],
@@ -41559,8 +41624,30 @@
     {
       "code": "LEDGER_COMPACT_INCOMPLETE",
       "exit": 1,
-      "fix": "Read what was done first (the first `meta.next` step), fix the file-system problem the error names, then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
-      "meaning": "a superseded version could not be moved to the archive, so the compaction stopped with versions left in the ledger; what moved stays moved",
+      "fix": "Read what was done first (the first `meta.next` step), fix the problem the error names, then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
+      "meaning": "a compaction moved some superseded versions to the archive and then stopped, on a read of the ledger or a move that failed: what moved stays moved; the reason is the code of the step that failed",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), make the ledger directory the message names readable, then preview again with `canon ledger compact`.",
+          "meaning": "`canon ledger compact --commit` moved some versions, then a later kind of the ledger could not be read because this user may not read it; what moved stays in the archive",
+          "reason": "REPO_DENIED"
+        },
+        {
+          "fix": "Read what was done (`canon status`), fix what the message names, then preview again with `canon ledger compact`.",
+          "meaning": "`canon ledger compact --commit` moved some versions, then a later kind of the ledger could not be read (a path that is no directory, or a tier that cannot be attached); what moved stays in the archive",
+          "reason": "REPO_INVALID"
+        },
+        {
+          "fix": "Read what was done (`canon status`), wait a moment, then preview again with `canon ledger compact`.",
+          "meaning": "`canon ledger compact --commit` moved some versions, then the system failed a read of the ledger in a way a repeat can pass; what moved stays in the archive",
+          "reason": "REPO_UNAVAILABLE"
+        },
+        {
+          "fix": "Read what was done (`canon status`), fix the file-system problem the message names, then preview again with `canon ledger compact`.",
+          "meaning": "`canon ledger compact --commit` moved some versions, then a later move into the archive failed; what moved stays in the archive",
+          "reason": "WRITE_FAILED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41668,7 +41755,14 @@
       "code": "PLUGIN_SYNC_INCOMPLETE",
       "exit": 1,
       "fix": "Read what was done first (the first `meta.next` step and `data.roots`), fix each error listed in data.roots, then run `canon plugin sync` again.",
-      "meaning": "`plugin sync` could not write some candidates; the ones it wrote stay and data.roots names each error",
+      "meaning": "`plugin sync` wrote some candidates and could not write others; the ones it wrote stay and data.roots names each error",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`, `data.roots`), fix each error `data.roots` lists, then run `canon plugin sync` again.",
+          "meaning": "`canon plugin sync` wrote some overlay records, then could not write others (`data.roots` names each error); the written ones stay",
+          "reason": "WRITE_FAILED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41850,7 +41944,14 @@
       "code": "RETENTION_PURGE_INCOMPLETE",
       "exit": 1,
       "fix": "Read what was done first (the first `meta.next` step), fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
-      "meaning": "the purge stopped after it began deleting: what was deleted stays deleted (`data` names the counts)",
+      "meaning": "the purge stopped after it deleted some records: what was deleted stays deleted (`data` names the counts)",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), fix the file-system problem the message names, then preview again with `canon purge` and commit its new plan.",
+          "meaning": "`canon purge --commit` deleted some records, then a later deletion failed (`data` names the counts); what was deleted stays deleted",
+          "reason": "WRITE_FAILED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -42301,7 +42402,14 @@
       "code": "TIER_INCOMPLETE",
       "exit": 1,
       "fix": "Read what was done first (the first `meta.next` step), fix the cause the error names, then preview with `canon tier age` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
-      "meaning": "tier aging stopped after it began moving records: what moved stays moved",
+      "meaning": "tier aging stopped after it moved some records: what moved stays moved",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon status`), fix the cause the message names, then preview again with `canon tier age` and commit its new plan.",
+          "meaning": "tier aging moved some records, then a later move failed; what moved stays moved",
+          "reason": "WRITE_FAILED"
+        }
+      ],
       "retryable": false
     },
     {

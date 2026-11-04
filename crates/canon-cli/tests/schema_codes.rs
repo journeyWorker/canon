@@ -117,7 +117,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/inventory.rs", &["inventory sync"]),
     // `refusal_code`: the code a refused response file or policy takes, emitted by both commands.
     ("adapter.rs", &["adapter validate", "adapter authorize"]),
-    ("run/plugin.rs", &[]),
+    ("run/plugin.rs", &["plugin sync"]),
     ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
     ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
@@ -274,16 +274,8 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
             if let Some(i) = line.find("promote_after_stage(\"canon ") {
                 let rest = &line[i + "promote_after_stage(\"".len()..];
                 let end = rest.find('"').expect("closing quote");
-                let incomplete = rest[end + 1..]
-                    .trim_start_matches(", \"")
-                    .split('"')
-                    .next()
-                    .expect("the incomplete code literal")
-                    .to_string();
-                promoters.insert((
-                    rest[..end].trim_start_matches("canon ").to_string(),
-                    incomplete,
-                ));
+                let incomplete = rest[end + 1..].trim_start_matches(", \"").split('"').next().expect("the incomplete code literal").to_string();
+                promoters.insert((rest[..end].trim_start_matches("canon ").to_string(), incomplete));
             }
         }
         let mut file_has_codes = false;
@@ -361,16 +353,9 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
     }
     for (command, incomplete) in promoters {
         for leaf in leaves_under(&command) {
-            table
-                .get_mut(leaf)
-                .expect("leaf has a row")
-                .insert("PROMOTION_FAILED");
+            table.get_mut(leaf).expect("leaf has a row").insert("PROMOTION_FAILED");
             // The same call stops after the record it staged when the gate then refuses it: the subject's `_INCOMPLETE` code (`promote_after_stage`).
-            let code = all_codes()
-                .iter()
-                .find(|info| info.code == incomplete)
-                .unwrap_or_else(|| panic!("`{incomplete}` is no registered code"))
-                .code;
+            let code = all_codes().iter().find(|info| info.code == incomplete).unwrap_or_else(|| panic!("`{incomplete}` is no registered code")).code;
             table.get_mut(leaf).expect("leaf has a row").insert(code);
         }
     }

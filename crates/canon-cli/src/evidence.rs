@@ -1946,9 +1946,8 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
             if code == "ARTIFACTS_STORE_INCOMPLETE" {
                 crate::incomplete::read_first("canon artifacts verify --json", "read which bound files the store holds now: the blobs this run stored stay, and the same call stores the rest");
             }
-            return CliError::refused(code, format!("could not check {}: {why}", store.display(sha256)))
-                .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
-                .emit("canon artifacts store", json);
+            let error = CliError::refused(code, format!("could not check {}: {why}", store.display(sha256))).hint(canon_gate::artifact_store::OBJECT_STORE_HINT);
+            return if code == "ARTIFACTS_STORE_INCOMPLETE" { error.reason("ARTIFACTS_STORE_UNAVAILABLE") } else { error }.emit("canon artifacts store", json);
         }
         if observed.as_str() == sha256 {
             already += 1;
@@ -1990,7 +1989,8 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
                 if !stored.is_empty() {
                     crate::incomplete::read_first("canon artifacts verify --json", "read which bound files the store holds now: the blobs this run stored stay, and the same call stores the rest");
                 }
-                return CliError::refused(code, format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
+                let error = CliError::refused(code, format!("could not write {}: {e}", store.display(sha256))).hint(e.hint());
+                return if code == "ARTIFACTS_STORE_INCOMPLETE" { error.reason("ARTIFACTS_STORE_FAILED") } else { error }.emit("canon artifacts store", json);
             }
         }
     }

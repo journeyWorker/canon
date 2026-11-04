@@ -740,14 +740,8 @@ fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry(
 
     let out = init_with_source(&[], &repo, &tmp.path().join("missing"));
     assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
-    assert!(
-        stderr(&out).starts_with("canon: INIT_INCOMPLETE: "),
-        "{}",
-        stderr(&out)
-    );
-    assert!(std::fs::read_to_string(repo.join("canon.yaml"))
-        .unwrap()
-        .ends_with("skills:\n  providers: [pi]\n"));
+    assert!(stderr(&out).starts_with("canon: INIT_INCOMPLETE: "), "{}", stderr(&out));
+    assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [pi]\n"));
     assert!(projected(&repo).is_empty());
 
     // Without the override directory the retry installs the stub the binary carries.

@@ -193,12 +193,7 @@ fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
         assert_eq!(row(code).0, exit, "{code}");
     }
     // The splits that keep a retry meaningful say so.
-    assert!(
-        row("ARTIFACTS_STORE_FAILED").1
-            && row("ARTIFACTS_STORE_UNAVAILABLE").1
-            && row("ARTIFACTS_STORE_INCOMPLETE").1
-            && !row("ARTIFACTS_STORE_REQUIRED").1
-    );
+    assert!(row("ARTIFACTS_STORE_FAILED").1 && row("ARTIFACTS_STORE_UNAVAILABLE").1 && row("ARTIFACTS_STORE_INCOMPLETE").1 && !row("ARTIFACTS_STORE_REQUIRED").1);
 }
 
 fn canon(dir: &Path, args: &[&str]) -> Output {

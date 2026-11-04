@@ -29,7 +29,7 @@ Feature: atip incomplete
   Scenario: An artifact store that stops after a blob was stored is ARTIFACTS_STORE_INCOMPLETE, retryable, and the same call stores the rest
     Given a repository with two bound artifacts whose store was emptied, and a debug-build seam that fails the second blob write after one was stored
     When artifacts store runs with the seam, then again without it
-    Then the first exits 1 with ARTIFACTS_STORE_INCOMPLETE, retryable true, no reason, meta.next leading with artifacts verify and one blob stored; the second exits 0 and the store holds both
+    Then the first exits 1 with ARTIFACTS_STORE_INCOMPLETE, retryable true, the reason ARTIFACTS_STORE_FAILED, meta.next leading with artifacts verify and one blob stored; the second exits 0 and the store holds both
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:12Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -38,8 +38,8 @@ Feature: atip incomplete
   @atip.incomplete.04
   Scenario: A hook install that stops after the first file is HOOKS_INSTALL_INCOMPLETE and one that wrote nothing is WRITE_FAILED
     Given a git repository and a debug-build seam that fails the write of the second hook file
-    When gate install-hooks runs with the seam, then without it, then with it again over the finished install, then as a preview with it
-    Then the first exits 1 with HOOKS_INSTALL_INCOMPLETE, not retryable, meta.next leading with status, the Claude hook file installed and the Codex one not written; the second finishes the install; the third exits 1 with WRITE_FAILED and no reason because nothing of its own was kept; the preview exits 0
+    When gate install-hooks runs with the seam, then without it, then with it again over the finished install, then as a preview with it, then on a fresh repository with a seam that fails the pre-commit script after both hook files
+    Then the first exits 1 with HOOKS_INSTALL_INCOMPLETE, the reason WRITE_FAILED, not retryable, meta.next leading with status, the Claude hook file installed and the Codex one not written; the second finishes the install; the third exits 1 with WRITE_FAILED and no reason because nothing of its own was kept; the preview exits 0; the script failure exits 1 with HOOKS_INSTALL_INCOMPLETE and the reason WRITE_FAILED, both hook files installed, and the rerun writes the script. The reason of every other stop here is WRITE_FAILED too
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:17Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -48,8 +48,8 @@ Feature: atip incomplete
   @atip.incomplete.05
   Scenario: A purge that stops after it deleted is RETENTION_PURGE_INCOMPLETE and its digest is stale
     Given a repository with two trajectories past the cutoff and a debug-build seam that stops the purge once the tiers were deleted
-    When purge runs with the seam on the plan it previewed, then the same digest again, then on a second repository without the seam
-    Then the first exits 1 with RETENTION_PURGE_INCOMPLETE, not retryable, data naming the counts, meta.next leading with status and the records gone; the same digest exits 2 with PLAN_STALE; the unstopped purge exits 0 and deletes the same records
+    When purge runs with the seam on the plan it previewed, then the same digest again, then on a second repository without the seam, then with a seam that fails the purge before it deleted anything
+    Then the first exits 1 with RETENTION_PURGE_INCOMPLETE, the reason WRITE_FAILED, not retryable, data naming the counts, meta.next leading with status and the records gone; the same digest exits 2 with PLAN_STALE; the unstopped purge exits 0 and deletes the same records; the purge that deleted nothing exits 2 with RETENTION_TIERS_INVALID, never RETENTION_PURGE_INCOMPLETE, and the records stay
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:21Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -58,8 +58,8 @@ Feature: atip incomplete
   @atip.incomplete.06
   Scenario: A compaction that stops after it moved is LEDGER_COMPACT_INCOMPLETE and its digest is stale
     Given a ledger of three versions of one subject with an empty archive and a debug-build seam that stops the compaction once the versions moved
-    When ledger compact runs with the seam on the plan it previewed, then the same digest again, then on a second ledger without the seam
-    Then the first exits 1 with LEDGER_COMPACT_INCOMPLETE, not retryable, meta.next leading with status and the superseded versions in the archive; the same digest exits 2 with PLAN_STALE; the unstopped compaction exits 0 and moves the same versions
+    When ledger compact runs with the seam on the plan it previewed, then the same digest again, then on a second ledger without the seam, then as a preview and as a commit over a ledger whose kind directories are mode 000
+    Then the first exits 1 with LEDGER_COMPACT_INCOMPLETE, the reason WRITE_FAILED, not retryable, meta.next leading with status and the superseded versions in the archive; the same digest exits 2 with PLAN_STALE; the unstopped compaction exits 0 and moves the same versions; over the unreadable ledger the preview and the commit exit 2 with REPO_DENIED, never LEDGER_COMPACT_INCOMPLETE, with no read-what-moved next, and nothing moved
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:26Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -69,7 +69,7 @@ Feature: atip incomplete
   Scenario: Tier aging that stops after records moved is TIER_INCOMPLETE and one that moved none is TIER_FAILED
     Given a repository with two trajectories past the aging threshold and one recent, and a debug-build seam that stops the aging once the records moved
     When tier age runs with the cold tier not attached, then with the seam on the plan it previewed
-    Then the first exits 1 with TIER_FAILED, not retryable, and every record is where it was; the second exits 1 with TIER_INCOMPLETE, not retryable, meta.next leading with status and only the recent record left in the tier
+    Then the first exits 1 with TIER_FAILED, not retryable, and every record is where it was; the second exits 1 with TIER_INCOMPLETE, the reason WRITE_FAILED, not retryable, meta.next leading with status and only the recent record left in the tier
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:30Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -78,18 +78,18 @@ Feature: atip incomplete
   @atip.incomplete.08
   Scenario: A plugin sync that could not write a candidate is PLUGIN_SYNC_INCOMPLETE and the written ones stay
     Given the porting plugin with two candidates and a debug-build seam that fails the write of the second
-    When plugin sync runs with the seam, then without it
-    Then the first exits 1 with PLUGIN_SYNC_INCOMPLETE, not retryable, data.roots naming the error and one written, meta.next leading with status and one overlay record stored; the second exits 0, writes the left candidate and finds the first already there
+    When plugin sync runs with the seam, then without it, then with a seam that fails every candidate, as a write and as a preview
+    Then the first exits 1 with PLUGIN_SYNC_INCOMPLETE, the reason WRITE_FAILED, not retryable, data.roots naming the error and one written, meta.next leading with status and one overlay record stored; the second exits 0, writes the left candidate and finds the first already there; when every candidate fails the write exits 1 with WRITE_FAILED, written 0 and no read-what-was-written next, and the preview exits 2 with a REPO_ refusal, never PLUGIN_SYNC_INCOMPLETE
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:35Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
   @case:failure
   @flow:canon-0-36-codes-incomplete.F3
   @atip.incomplete.09
-  Scenario: A spec root left unindexed is INVENTORY_INCOMPLETE with the reason VIOLATIONS or DUPLICATE_SCENARIOS and the earlier root stays indexed
+  Scenario: A spec root left unindexed after an earlier root was indexed is INVENTORY_INCOMPLETE, and with nothing indexed it is the check's INVENTORY_CHECK_FAILED
     Given two spec roots whose first is clean and whose second declares one scenario twice, then has a scenario without provenance, then is clean
-    When inventory sync runs on each corpus
-    Then the first two exit 1 with INVENTORY_INCOMPLETE, not retryable, the reasons DUPLICATE_SCENARIOS and VIOLATIONS, data.roots saying the first root was indexed and the second was not, meta.next leading with status and the first root's records stored; the third exits 0
+    When inventory sync runs on each corpus, then on a single root with a violation, then as a preview over the first corpus, then with a seam that fails the store while the second root is indexed, on a fresh repository and again over the indexed one
+    Then the first exits 1 with INVENTORY_INCOMPLETE, not retryable, the reason DUPLICATE_SCENARIOS, data.roots saying the first root was indexed and the second was not, meta.next leading with status and the first root's records stored; the rerun, the violation and the single root index nothing in the run and exit 1 with INVENTORY_CHECK_FAILED, the reasons DUPLICATE_SCENARIOS and VIOLATIONS, a message that says nothing was indexed, no read-what-was-indexed next and no ledger created; the preview exits 1 with INVENTORY_CHECK_FAILED saying it is a preview and writes nothing; the store failure exits 1 with INVENTORY_INCOMPLETE and the reason INVENTORY_FAILED on the fresh repository and with INVENTORY_FAILED over the indexed one; a clean corpus exits 0
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:40Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
