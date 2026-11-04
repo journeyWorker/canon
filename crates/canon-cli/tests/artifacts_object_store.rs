@@ -556,7 +556,7 @@ fn atip_codestored_07_a_store_directory_in_the_wrong_state_is_invalid_or_denied_
 }
 
 /// atip.codestored.07 (`artifacts move --commit` and a blob that changes under it): a blob another process rewrites after the plan was made, once
-/// blobs have been uploaded, is `ARTIFACTS_INCOMPLETE` (exit 1, not retryable, reason `ARTIFACTS_BLOB_CORRUPT`, `data` what was uploaded, `meta.next` the
+/// blobs have been uploaded, is `ARTIFACTS_MOVE_INCOMPLETE` (exit 1, not retryable, reason `ARTIFACTS_BLOB_CORRUPT`, `data` what was uploaded, `meta.next` the
 /// read of the state): the uploads stay, no local blob is removed, canon.yaml is unchanged, and the same `--plan-digest` is stale; one rewritten
 /// before anything was uploaded is the refusal `ARTIFACTS_BLOB_CORRUPT` (exit 2). The rewrite is the debug seam `CANON_TEST_BLOB_RACE_AFTER`.
 #[test]

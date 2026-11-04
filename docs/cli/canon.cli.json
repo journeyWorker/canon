@@ -22367,10 +22367,10 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "INVENTORY_CHECK_FAILED",
         "INVENTORY_FAILED",
         "INVENTORY_INCOMPLETE",
         "INVENTORY_INDEX_UNAVAILABLE",
+        "INVENTORY_INVALID",
         "LAYOUT_MIGRATION_REQUIRED",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
@@ -41551,25 +41551,6 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_CHECK_FAILED",
-      "exit": 1,
-      "fix": "Fix what the reason names in the root `data.roots` lists, then run `canon inventory sync` again.",
-      "meaning": "the corpus `inventory sync` read failed its check: a spec root has format violations or declares a scenario twice, and this run indexed nothing before it (or this was a preview); `data.roots` names each result, and a sync that indexed an earlier root first is INVENTORY_INCOMPLETE",
-      "reasons": [
-        {
-          "fix": "Remove the duplicate scenario the root names, then run `canon inventory sync` again.",
-          "meaning": "a spec root declares the same scenario twice and none was indexed before it, or the preview found it (`data.roots` says per root); nothing was written",
-          "reason": "DUPLICATE_SCENARIOS"
-        },
-        {
-          "fix": "Fix the violations `data.roots` names (`canon fmt` repairs what it can), then run `canon inventory sync` again.",
-          "meaning": "a spec root's corpus has format violations and none was indexed before it, or the preview found them (`data.roots` names each one); nothing was written",
-          "reason": "VIOLATIONS"
-        }
-      ],
-      "retryable": false
-    },
-    {
       "code": "INVENTORY_FAILED",
       "exit": 1,
       "fix": "Fix the store problem the error names, then run `canon inventory sync` again.",
@@ -41583,19 +41564,14 @@
       "meaning": "`inventory sync` indexed some spec roots and then stopped on one (violations, duplicate scenarios, or a store failure); the records of the roots before it stay and `data.roots` names each result; the reason says which stopped it",
       "reasons": [
         {
-          "fix": "Read what was done (`canon status`, `data.roots`), remove the duplicate scenario the root names, then run `canon inventory sync` again.",
-          "meaning": "`inventory sync` indexed some spec roots, then left a root unindexed because it declares the same scenario twice and no root had a violation (`data.roots` says per root)",
-          "reason": "DUPLICATE_SCENARIOS"
-        },
-        {
           "fix": "Read what was done (`canon status`), fix what the message names, then run `canon inventory sync` again.",
           "meaning": "`inventory sync` indexed some spec roots, then the record store failed while it indexed a later one; the records of the earlier roots stay",
           "reason": "INVENTORY_FAILED"
         },
         {
           "fix": "Read what was done (`canon status`, `data.roots`), fix the violations the root names, then run `canon inventory sync` again.",
-          "meaning": "`inventory sync` indexed some spec roots, then left a root unindexed because its corpus has format violations (`data.roots` says per root and names each violation)",
-          "reason": "VIOLATIONS"
+          "meaning": "`inventory sync` indexed some spec roots, then left a root unindexed because its corpus has format violations or declares a scenario twice (`data.roots` says per root and names each violation)",
+          "reason": "INVENTORY_INVALID"
         }
       ],
       "retryable": false
@@ -41606,6 +41582,25 @@
       "fix": "Wait for the other canon process, then run `canon inventory sync` again.",
       "meaning": "`inventory sync` could not take the scenario-index lock because another canon process holds it; nothing was written",
       "retryable": true
+    },
+    {
+      "code": "INVENTORY_INVALID",
+      "exit": 2,
+      "fix": "Fix each violation `error.details` names (`canon fmt` repairs what it can), then run `canon inventory sync` again.",
+      "meaning": "`inventory sync` (or its preview) indexed nothing because a spec root has format violations or declares a scenario twice; nothing was written and `error.details` names each violation and duplicate by root; a sync that indexed an earlier root first is INVENTORY_INCOMPLETE",
+      "reasons": [
+        {
+          "fix": "Remove the duplicate scenario the detail names, then run `canon inventory sync` again.",
+          "meaning": "a spec root declares the same scenario twice and the sync indexed nothing (`error.details` names each duplicate by root); nothing was written",
+          "reason": "DUPLICATE_SCENARIOS"
+        },
+        {
+          "fix": "Fix the violations `error.details` names (`canon fmt` repairs what it can), then run `canon inventory sync` again.",
+          "meaning": "a spec root's corpus has format violations and the sync indexed nothing (`error.details` names each one by root); nothing was written",
+          "reason": "VIOLATIONS"
+        }
+      ],
+      "retryable": false
     },
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",

@@ -1222,15 +1222,6 @@
       "retryable": false
     },
     {
-      "code": "INVENTORY_CHECK_FAILED",
-      "exit": 1,
-      "reasons": [
-        "DUPLICATE_SCENARIOS",
-        "VIOLATIONS"
-      ],
-      "retryable": false
-    },
-    {
       "code": "INVENTORY_FAILED",
       "exit": 1,
       "retryable": false
@@ -1239,9 +1230,8 @@
       "code": "INVENTORY_INCOMPLETE",
       "exit": 1,
       "reasons": [
-        "DUPLICATE_SCENARIOS",
         "INVENTORY_FAILED",
-        "VIOLATIONS"
+        "INVENTORY_INVALID"
       ],
       "retryable": false
     },
@@ -1249,6 +1239,15 @@
       "code": "INVENTORY_INDEX_UNAVAILABLE",
       "exit": 2,
       "retryable": true
+    },
+    {
+      "code": "INVENTORY_INVALID",
+      "exit": 2,
+      "reasons": [
+        "DUPLICATE_SCENARIOS",
+        "VIOLATIONS"
+      ],
+      "retryable": false
     },
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",

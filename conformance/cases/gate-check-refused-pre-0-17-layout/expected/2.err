@@ -1,0 +1,4 @@
+canon: INVENTORY_INVALID: a spec root has violations or duplicate scenarios, so the sync indexed nothing
+  hint: error.details names each violation; fix them, then run `canon inventory sync` again
+  problem: : a spec root has violations or duplicate scenarios, so the sync indexed nothing
+  problem: : root `root`: [layout-grammar] features — spec root `<repo>/specs` is on the pre-0.17 layout (`features/kind=feature/area=cart/add.feature` sits under `features/`); canon reads `kind=feature/area=<area>/<surface>.feature` directly under the root, and `canon migrate` moves `features/kind=feature/` there

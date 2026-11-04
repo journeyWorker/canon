@@ -1135,10 +1135,7 @@ pub(crate) fn promote_after_stage(command: &str, incomplete: &'static str, ledge
             // The record was staged before the gate refused it, so it stays staged: the command stopped after an effect (spec 8.3.2),
             // and the refusal is the reason. A promotion that failed for another cause (`PROMOTION_FAILED`) keeps its own code.
             let error = if refusal.data.is_some() {
-                crate::incomplete::read_first(
-                    "canon gate promote --dry-run --json",
-                    "read what is staged and why the gate refuses it before running anything again",
-                );
+                crate::incomplete::read_first("canon gate promote --dry-run --json", "read what is staged and why the gate refuses it before running anything again");
                 // The causes the gate named stay: each is an entry of `details` with its own code, the first being the error itself.
                 let details = refusal.error.detail_errors().to_vec();
                 let stopped = CliError::failed(incomplete, format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))

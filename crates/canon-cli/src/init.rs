@@ -615,11 +615,7 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
     });
     let hint = format!("read what init wrote with `canon status`, fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset; the skill directories must be writable), then run `canon skills install`; it follows skills.providers", skills::CANONICAL_SOURCE_ENV);
     match said {
-        "CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => {
-            CliError::failed("INIT_INCOMPLETE", message)
-                .hint(hint)
-                .reason(said)
-        }
+        "CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => CliError::failed("INIT_INCOMPLETE", message).hint(hint).reason(said),
         "WRITE_DENIED" | "WRITE_INVALID" => CliError::failed("WRITE_FAILED", message).hint(hint),
         _ => CliError::failed("SKILLS_FAILED", message).hint(hint),
     }

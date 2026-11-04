@@ -164,7 +164,9 @@ specs:
   whole root aborts, 0 writes, violations reported.
 - **A root on the pre-0.17 layout** (a `.feature` file under
   `<root>/features/`) → a `layout-grammar` violation at path `features`;
-  the root aborts, 0 writes, exit 1. Run `canon migrate`. An empty
+  the root aborts, 0 writes, exit 2 (`INVENTORY_INVALID`, each violation in
+  `error.details`; exit 1 `INVENTORY_INCOMPLETE` when an earlier root was
+  indexed first). Run `canon migrate`. An empty
   leftover `features/` directory is not a refusal.
 - **A duplicate `scenario_id`** within one root → that root aborts, 0
   writes, reported as a sync error (a distinct lane from fmt violations).

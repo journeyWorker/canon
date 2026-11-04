@@ -84,7 +84,6 @@ pub fn apply(loaded: tiers::LoadedTiers, planned: &[AgeRuleReport]) -> Result<Ve
     let policy = loaded.policy.clone();
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
     let age_reports = registry.age_all()?;
-
     // `tier-age-after-move` (a debug build's test seam, `incomplete::injected_stop`): the aging stops once the records are moved.
     if let Some(stop) = crate::incomplete::injected_stop("tier-age-after-move") {
         return Err(TierAgeError::Store(StoreError::Io(stop)));

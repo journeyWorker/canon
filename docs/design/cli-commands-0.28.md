@@ -152,7 +152,7 @@ One row per leaf. Columns: command id; operand; required options; optional optio
 
 | Command | Operand | Required options | Optional options | Exclusive, dependent, notes | Effect; idempotency; roles | Output | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `canon inventory sync` | — | — | `--spec-root <DIR>`; `--dry-run` | `--spec-root` overrides `specs.roots[]` entirely: one ad hoc root with the id `root`; a relative path resolves under the repo root | write; replay-safe (an unchanged corpus writes nothing); roles I O | report `InventorySyncReport`; exit 1 = violations or duplicates in a root (`INVENTORY_INCOMPLETE`, nothing written for it) | `canon inventory sync` |
+| `canon inventory sync` | — | — | `--spec-root <DIR>`; `--dry-run` | `--spec-root` overrides `specs.roots[]` entirely: one ad hoc root with the id `root`; a relative path resolves under the repo root | write; replay-safe (an unchanged corpus writes nothing); roles I O | report `InventorySyncReport`; exit 2 = violations or duplicates in a root with nothing indexed (`INVENTORY_INVALID`, details in `error.details`); exit 1 = a root left unindexed after an earlier root was indexed (`INVENTORY_INCOMPLETE`) | `canon inventory sync` |
 
 ### `gate`
 
