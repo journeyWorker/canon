@@ -2,14 +2,17 @@
   "actor": {
     "agent_id": "rev-0-36-flowfix",
     "role": "reviewer",
-    "session_id": "s-0-36-flowfix-rev-3"
+    "session_id": "s-0-36-flowfix-rev-4"
   },
-  "at": "2026-11-04T19:54:13.551461Z",
+  "at": "2026-11-04T20:16:34.843360Z",
   "change_id": "canon-0-36-codes-refusals",
   "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
-  "disposition": "open",
+  "disposition": "fixed",
   "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
   "kind": "finding",
+  "resolution_code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "resolution_sha": "2fb67c4fa49964b3cc86f280c183345970d4ad0d",
+  "resolution_worktree_dirty": false,
   "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
   "reviewer": "rev-0-36-flowfix",
   "round": 3,

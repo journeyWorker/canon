@@ -2,12 +2,12 @@
   "actor": {
     "agent_id": "rev-0-36-flowfix",
     "role": "reviewer",
-    "session_id": "s-0-36-flowfix-rev-3"
+    "session_id": "s-0-36-flowfix-rev-4"
   },
-  "at": "2026-11-04T19:55:26.076004Z",
-  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "at": "2026-11-04T20:16:43.714951Z",
+  "code_tree": "60e72b3a26b60e8d5889a3148613d94a6218d1e4",
   "kind": "review",
-  "pin": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "pin": "bafd9bcce1bf3ce02726fb13b529394934535bb0",
   "pins": {
     "checks": [
       {
@@ -18,14 +18,14 @@
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "0cf5d040add0103489747dd2ec0d1b0e69a94b1922f43fbed7624bebc105a3de",
+    "scenario_digest": "cefdc2669e4dff2358cc615a7233feec85245d785f2cb732d1966e43fbfccc75",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
   },
-  "review_id": "01M6M22VZWHWVYQD57RH1A85GP",
+  "review_id": "01M6M39VP28DWH4X7NV63JW7PP",
   "reviewer": "rev-0-36-flowfix",
   "scenario_id": "atip.codesplit.10",
   "schema": 2,
