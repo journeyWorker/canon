@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-dep",
+    "role": "implementer",
+    "session_id": "s-0-36-atip-dep"
+  },
+  "at": "2026-11-04T00:43:35.208819Z",
+  "attachments": [
+    {
+      "path": "target/gateclean/0-36-atip-dep-contract11-12.txt",
+      "sha256": "a4e48490d244317fb4bd4c17ee3f0063b78b682251541f148b0babd85d385549"
+    }
+  ],
+  "code_tree": "96bc5485cc3a5d17b0c978ad311586937c0823c3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "bun test packages/dashboard/test/envelope-tolerance.test.ts; bun test packages/cli/test/launcher.test.ts; python3 -m unittest evals.dogfood.test_trace_check"
+  },
+  "evidence_sha": "76527f029f421486f61921917c39488e214b296e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 111,
+  "scenario_id": "atip.contract11.12",
+  "schema": 1,
+  "staging_id": "28bcca11",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
