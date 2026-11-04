@@ -498,40 +498,98 @@ fn atip_codestable_11_the_table_of_changed_scenarios_has_a_row_for_each_and_name
     assert!(diff_problems(&diff.replacen("| name only |", "| typo only |", 1), &scenarios).iter().any(|p| p.contains("typo only")));
 }
 
+/// What is wrong with the upgrade note of `changelog`: it speaks to the four callers, names each exit that moved and each command whose refusal
+/// carries details, says `STOPPED_MIDWAY` is gone and says there is no alias.
+fn note_problems(changelog: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    let section = unreleased(changelog);
+    let Some(note_start) = section.find("**Upgrade note: a script, hook, guide or dashboard") else { return vec!["the Unreleased section has no upgrade note".to_string()] };
+    let note = &section[note_start..section[note_start..].find("\n\n**").map_or(section.len(), |at| note_start + at)];
+    for caller in ["- **Scripts and CI that read `error.code`.**", "- **Scripts and hooks that read the exit.**", "- **Agent guides and prompts.**", "- **The dashboard and what reads its API.**"] {
+        if !note.contains(caller) {
+            problems.push(format!("the note has no entry `{caller}`"));
+        }
+    }
+    // Every code whose exit moved from 1 to 2 is named, in the table's list and in the note's own words by command.
+    let rows = replacement_table(changelog).expect("the replacement table reads");
+    let moved: Vec<&str> = rows.iter().filter(|row| row.exit_before == 1 && row.exit_after.contains(&2)).map(|row| row.old.as_str()).collect();
+    if moved.len() < 26 {
+        problems.push(format!("the codes whose exit moved: {}", moved.len()));
+    }
+    let list = bullet_codes(changelog, "- **Exit 1 → 2**");
+    for code in &moved {
+        if !list.contains(*code) {
+            problems.push(format!("the list of moved exits lacks {code}"));
+        }
+    }
+    let pure = rows.iter().filter(|row| row.exit_before == 1 && row.exit_after.iter().all(|exit| *exit == 2)).count();
+    if !(note.contains("the first list above") && note.contains(&format!("The {pure} codes"))) {
+        problems.push("the note does not count the moved exits".to_string());
+    }
+    for command in ["subject move", "gate promote", "task done", "evidence add", "brief approve", "strategy promote", "strategy approval-payload", "ingest plans", "dispatch begin", "dispatch end", "divergence defer", "divergence resolve", "dashboard", "context-pack add"] {
+        if !note.contains(&format!("`{command}`")) {
+            problems.push(format!("the note does not name `{command}` among the commands whose exit moved"));
+        }
+    }
+    // The refusals that carry `error.details` instead of `data`.
+    match note.find("- **Refusals carry `error.details`, not `data`.**") {
+        None => problems.push("the note has no entry on details".to_string()),
+        Some(at) => {
+            let details = &note[at..];
+            let details = &details[..details.find("\n- **").unwrap_or(details.len())];
+            for command in ["gate promote", "subject move", "task done", "brief approve"] {
+                if !details.contains(&format!("`{command}")) {
+                    problems.push(format!("the entry on details does not name `{command}`"));
+                }
+            }
+            if !(details.contains("`error.details[]`") && details.contains("`data.refused`")) {
+                problems.push("the entry on details does not name `error.details[]` and `data.refused`".to_string());
+            }
+        }
+    }
+    if !note.contains("`STOPPED_MIDWAY`, which is gone") {
+        problems.push("the note does not say the reserved code is gone".to_string());
+    }
+    if !note.contains("There is no alias") {
+        problems.push("the note does not say there is no alias".to_string());
+    }
+    problems
+}
+
 /// atip.codestable.12: the upgrade note speaks to the four callers and names each exit that moved and each command whose refusal carries details.
 #[test]
 fn atip_codestable_12_the_upgrade_note_covers_the_four_callers_the_moved_exits_and_the_details_commands() {
+    assert_eq!(note_problems(&changelog()), Vec::<String>::new());
+}
+
+/// atip.codestable.15 (the failure path of F5): an upgrade note that leaves a caller, a moved code, a command that carries details, the gone code or the
+/// word on aliases out fails the note check with the missing part named, and a CHANGELOG with no note fails it too.
+#[test]
+fn atip_codestable_15_an_upgrade_note_that_leaves_a_caller_a_moved_exit_or_a_command_out_fails() {
     let changelog = changelog();
-    let section = unreleased(&changelog);
-    let note_start = section.find("**Upgrade note: a script, hook, guide or dashboard").expect("the upgrade note");
-    let note = &section[note_start..section[note_start..].find("\n\n**").map_or(section.len(), |at| note_start + at)];
-    // The four callers.
-    for caller in ["- **Scripts and CI that read `error.code`.**", "- **Scripts and hooks that read the exit.**", "- **Agent guides and prompts.**", "- **The dashboard and what reads its API.**"] {
-        assert!(note.contains(caller), "the note has no entry `{caller}`");
-    }
-    // Every code whose exit moved from 1 to 2 is named, in the table's list and in the note's own words by command.
-    let rows = replacement_table(&changelog).expect("the replacement table reads");
-    let moved: Vec<&str> = rows.iter().filter(|row| row.exit_before == 1 && row.exit_after.contains(&2)).map(|row| row.old.as_str()).collect();
-    assert!(moved.len() >= 26, "the codes whose exit moved: {}", moved.len());
-    let list = bullet_codes(&changelog, "- **Exit 1 → 2**");
-    for code in &moved {
-        assert!(list.contains(*code), "the list of moved exits lacks {code}");
-    }
-    let pure = rows.iter().filter(|row| row.exit_before == 1 && row.exit_after.iter().all(|exit| *exit == 2)).count();
-    assert!(note.contains("the first list above") && note.contains(&format!("The {pure} codes")), "the note counts the moved exits");
-    for command in ["subject move", "gate promote", "task done", "evidence add", "brief approve", "strategy promote", "strategy approval-payload", "ingest plans", "dispatch begin", "dispatch end", "divergence defer", "divergence resolve", "dashboard", "context-pack add"] {
-        assert!(note.contains(&format!("`{command}`")), "the note does not name `{command}` among the commands whose exit moved");
-    }
-    // The refusals that carry `error.details` instead of `data`.
-    let details = &note[note.find("- **Refusals carry `error.details`, not `data`.**").expect("the entry on details")..];
-    let details = &details[..details.find("\n- **").unwrap_or(details.len())];
-    for command in ["gate promote", "subject move", "task done", "brief approve"] {
-        assert!(details.contains(&format!("`{command}")), "the entry on details does not name `{command}`");
-    }
-    assert!(details.contains("`error.details[]`") && details.contains("`data.refused`"));
-    // A removed code and the absence of an alias.
-    assert!(note.contains("`STOPPED_MIDWAY`, which is gone"), "the note says the reserved code is gone");
-    assert!(note.contains("There is no alias"), "the note says there is no alias");
+    let broken = |from: &str, to: &str| {
+        assert!(changelog.contains(from), "the CHANGELOG has no `{from}` to break");
+        note_problems(&changelog.replacen(from, to, 1))
+    };
+    assert!(broken("- **The dashboard and what reads its API.**", "- **Dashboards.**").contains(&"the note has no entry `- **The dashboard and what reads its API.**`".to_string()));
+    assert!(broken("- **Agent guides and prompts.**", "- **Prompts.**").iter().any(|p| p.contains("Agent guides and prompts")));
+    assert!(broken("There is no alias", "There may be an alias").contains(&"the note does not say there is no alias".to_string()));
+    assert!(broken("`STOPPED_MIDWAY`, which is gone", "`STOPPED_MIDWAY`, which stays").contains(&"the note does not say the reserved code is gone".to_string()));
+    assert!(broken("- **Refusals carry `error.details`, not `data`.**", "- **Refusals carry details.**").contains(&"the note has no entry on details".to_string()));
+    let without_note = changelog.replacen("**Upgrade note: a script, hook, guide or dashboard", "**Release note", 1);
+    assert_eq!(note_problems(&without_note), ["the Unreleased section has no upgrade note"]);
+    // A moved code missing from the list under the table, and a command the note stopped naming.
+    let list_start = changelog.find("- **Exit 1 → 2**").expect("the list of moved exits");
+    let first_code = changelog[list_start..].split('`').nth(1).expect("a code of the list").to_string();
+    let mut without_code = changelog.clone();
+    let line_end = list_start + changelog[list_start..].find('\n').unwrap();
+    without_code.replace_range(list_start..line_end, &changelog[list_start..line_end].replacen(&format!("`{first_code}`"), "", 1));
+    assert!(note_problems(&without_code).iter().any(|p| p.contains(&format!("lacks {first_code}"))), "{:?}", note_problems(&without_code));
+    let note_start = changelog.find("**Upgrade note: a script, hook, guide or dashboard").unwrap();
+    let mut without_command = changelog.clone();
+    let note_end = note_start + changelog[note_start..].find("\n\n**").unwrap_or(changelog.len() - note_start);
+    without_command.replace_range(note_start..note_end, &changelog[note_start..note_end].replace("`dispatch begin`", "dispatch begin"));
+    assert!(note_problems(&without_command).iter().any(|p| p.contains("`dispatch begin`")), "{:?}", note_problems(&without_command));
 }
 
 /// The lines of `section` that name a gone code (`gone_codes_in`) as if it were current: not a row of a table (the old-name column), not the
@@ -563,4 +621,36 @@ fn atip_codestable_13_no_paragraph_names_a_removed_code_as_current() {
     assert_eq!(current_gone_code_lines(stale).len(), 1, "a removed code named as live is found");
     assert!(current_gone_code_lines("`STOPPED_MIDWAY` is gone: the `_INCOMPLETE` codes replace it.").is_empty());
     assert!(current_gone_code_lines("| `STOPPED_MIDWAY` | `INIT_INCOMPLETE` | split |").is_empty(), "the old-name column of the table is the one place");
+}
+
+/// atip.codestable.14 (the failure path of F4): a table of changed scenarios that miscounts its rows, repeats a scenario, names one the specs lack, leaves
+/// the kind out or the change unsaid, or has a row with a missing cell is found, so a table cannot stand for reviews it does not list; and a table
+/// with a scenario of the specs dropped is found by the count.
+#[test]
+fn atip_codestable_14_a_table_of_changed_scenarios_that_miscounts_or_misnames_a_row_is_found() {
+    let diff = std::fs::read_to_string(repo_root().join(SCENARIO_DIFF)).expect("the table of changed scenarios");
+    let scenarios = scenario_tags();
+    assert_eq!(diff_problems(&diff, &scenarios), Vec::<String>::new());
+    let first = diff.lines().find(|line| line.starts_with("| @")).unwrap();
+    let cells: Vec<&str> = first.split('|').map(str::trim).collect();
+    let (id, kind, what) = (cells[1], cells[3], cells[4]);
+    // A row dropped: the header counts one more than the table has.
+    let dropped = diff_problems(&diff.replacen(first, "", 1), &scenarios);
+    assert!(dropped.iter().any(|p| p.starts_with("the header counts")), "{dropped:?}");
+    // A header that counts one row too many or too few.
+    let header = diff.lines().find(|line| line.starts_with("Scenarios changed: ")).unwrap();
+    let declared: usize = header.trim_start_matches("Scenarios changed: ").trim().parse().unwrap();
+    let overcount = diff_problems(&diff.replacen(header, &format!("Scenarios changed: {}", declared + 1), 1), &scenarios);
+    assert!(overcount.iter().any(|p| p.starts_with("the header counts")), "{overcount:?}");
+    // A scenario twice, a scenario the specs lack, a kind not in the vocabulary, a change left unsaid, and a row short of a cell.
+    assert_eq!(diff_problems(&diff.replacen(first, &format!("{first}\n{first}"), 1), &scenarios).iter().filter(|p| p.contains(&format!("{id} has two rows"))).count(), 1);
+    assert!(diff_problems(&diff.replacen(id, "@no.such.99", 1), &scenarios).iter().any(|p| p.contains("@no.such.99 is no scenario")));
+    assert!(diff_problems(&diff.replacen(first, &first.replacen(&format!("| {kind} |"), "| |", 1), 1), &scenarios).iter().any(|p| p.contains(id)));
+    assert!(diff_problems(&diff.replacen(first, &first.replacen(&format!("| {what} |"), "| |", 1), 1), &scenarios).iter().any(|p| p.contains(id)));
+    let short = first.replacen(&format!(" {} |", cells[2]), "", 1);
+    assert!(diff_problems(&diff.replacen(first, &short, 1), &scenarios).iter().any(|p| p.contains("does not have four cells")), "a row short of a cell goes unseen");
+    // A scenario of the specs missing from the specs' tag set: the row that names it is found.
+    let mut fewer = scenarios.clone();
+    fewer.remove(id);
+    assert!(diff_problems(&diff, &fewer).iter().any(|p| p.contains(&format!("{id} is no scenario of the specs"))));
 }

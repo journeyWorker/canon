@@ -8,6 +8,7 @@
 //! Tests are named by scenario id (`atip_codestored_01_…` proves `atip.codestored.01`). A test that needs a read-only file says that it is skipped
 //! as root, which ignores file modes, and does not pass without running.
 
+mod old_codes;
 mod support;
 
 use std::collections::BTreeMap;
@@ -576,24 +577,90 @@ fn atip_codestored_09_the_registry_has_the_new_codes_and_not_the_old_names() {
     assert!(all_codes().iter().all(|info| !info.code.ends_with("_UNREADABLE")), "no error code is called UNREADABLE");
 }
 
+/// The four old names that still name a warning: their rows are in the table too, but the registry holds them as warnings.
+const WARNING_NAMES: [&str; 4] = ["CONFIG_UNREADABLE", "DISPATCH_MANIFEST_MISMATCH", "DISPATCH_MANIFEST_UNREADABLE", "POLICY_APPROVAL_UNREADABLE"];
+
+/// The codes this change registers that the CHANGELOG must name, with what each replaced.
+const REGISTERED_BY_THIS_CHANGE: [&str; 17] = [
+    "ARTIFACTS_STORE_DENIED", "RETENTION_TIERS_CORRUPT", "RETENTION_TIERS_REQUIRED", "ADAPTER_FILE_UNAVAILABLE", "BRIEF_UNAVAILABLE", "CONFIG_UNAVAILABLE",
+    "DISPATCH_MANIFEST_UNAVAILABLE", "EVIDENCE_BINDING_UNAVAILABLE", "HOOKS_FILE_UNAVAILABLE", "MIGRATION_UNAVAILABLE", "PLAN_CORPUS_UNAVAILABLE", "POLICY_APPROVAL_UNAVAILABLE",
+    "POLICY_UNAVAILABLE", "REPO_UNAVAILABLE", "REVIEW_ARTIFACT_UNAVAILABLE", "SPEC_ROOT_UNAVAILABLE", "STRATEGY_SIGNATURE_UNAVAILABLE",
+];
+
+/// What is wrong with the `unreleased` section of the CHANGELOG as the replacement of the old `*_UNREADABLE` and like names: each old name has a row
+/// whose second column names its new codes, and each code this change registers is named.
+fn changelog_problems(unreleased: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for old in OLD_NAMES.iter().chain(&WARNING_NAMES) {
+        let Some(row) = unreleased.lines().find(|line| line.starts_with(&format!("| `{old}`"))) else {
+            problems.push(format!("the CHANGELOG has no row for {old}"));
+            continue;
+        };
+        let columns: Vec<&str> = row.split('|').collect();
+        if !columns.get(2).is_some_and(|new| new.contains('`')) {
+            problems.push(format!("{old}: the row names no replacement: {row}"));
+        }
+    }
+    for code in REGISTERED_BY_THIS_CHANGE {
+        if !unreleased.contains(&format!("`{code}`")) {
+            problems.push(format!("the CHANGELOG does not name {code}"));
+        }
+    }
+    problems
+}
+
 /// atip.codestored.10: the CHANGELOG has the replacement table: each old name of the table appears in its first column with its new codes beside it.
 #[test]
 fn atip_codestored_10_the_changelog_replaces_every_old_name_with_its_new_codes() {
     let changelog = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
     let unreleased = changelog.split("\n## 0.35.0").next().unwrap();
-    for old in OLD_NAMES.iter().chain(&["CONFIG_UNREADABLE", "DISPATCH_MANIFEST_MISMATCH", "DISPATCH_MANIFEST_UNREADABLE", "POLICY_APPROVAL_UNREADABLE"]) {
-        let row = unreleased.lines().find(|line| line.starts_with(&format!("| `{old}`"))).unwrap_or_else(|| panic!("the CHANGELOG has no row for {old}"));
-        let columns: Vec<&str> = row.split('|').collect();
-        assert!(columns.get(2).is_some_and(|new| new.contains("`")), "{old}: the row names its replacement: {row}");
+    assert_eq!(changelog_problems(unreleased), Vec::<String>::new());
+}
+
+/// The codes of `new_codes` that break the rule that only an `UNAVAILABLE` code is retryable: one that is retryable and is not `UNAVAILABLE`, and one
+/// that is `UNAVAILABLE` and is not retryable.
+fn retry_problems<'a>(new_codes: impl IntoIterator<Item = (&'a str, bool)>) -> Vec<String> {
+    new_codes
+        .into_iter()
+        .filter(|(code, retryable)| *retryable != code.ends_with("_UNAVAILABLE"))
+        .map(|(code, retryable)| format!("{code} is {}retryable", if retryable { "" } else { "not " }))
+        .collect()
+}
+
+/// atip.codestored.14 (the failure path of F5): an old name brought back into a guide, a row of the replacement table that is deleted or names no new code,
+/// a code of this change the CHANGELOG stopped naming, a retryable code that is not `UNAVAILABLE` and an `UNAVAILABLE` code that is not retryable are each
+/// found by the checks; the CHANGELOG and the registry as they stand pass.
+#[test]
+fn atip_codestored_14_a_revived_old_name_a_missing_row_or_a_wrong_retry_value_is_found() {
+    use canon_cli::cli_error::code_info;
+    // An old name in a guide: each of the eleven names the registry no longer holds is named by the old-names guard; the names of warnings are not.
+    for old in OLD_NAMES {
+        assert_eq!(old_codes::gone_codes_in(&format!("the guide says to branch on {old} after a failed read")), [old], "{old} revived in a guide goes unseen");
     }
-    // Every code this change registers is named in the CHANGELOG, with what it replaced.
-    for code in [
-        "ARTIFACTS_STORE_DENIED", "RETENTION_TIERS_CORRUPT", "RETENTION_TIERS_REQUIRED", "ADAPTER_FILE_UNAVAILABLE", "BRIEF_UNAVAILABLE", "CONFIG_UNAVAILABLE",
-        "DISPATCH_MANIFEST_UNAVAILABLE", "EVIDENCE_BINDING_UNAVAILABLE", "HOOKS_FILE_UNAVAILABLE", "MIGRATION_UNAVAILABLE", "PLAN_CORPUS_UNAVAILABLE", "POLICY_APPROVAL_UNAVAILABLE",
-        "POLICY_UNAVAILABLE", "REPO_UNAVAILABLE", "REVIEW_ARTIFACT_UNAVAILABLE", "SPEC_ROOT_UNAVAILABLE", "STRATEGY_SIGNATURE_UNAVAILABLE",
-    ] {
-        assert!(unreleased.contains(&format!("`{code}`")), "the CHANGELOG does not name {code}");
-    }
+    assert_eq!(old_codes::gone_codes_in("a warning still named CONFIG_UNREADABLE and a refusal REPO_DENIED"), Vec::<&str>::new());
+    // A CHANGELOG that lost a row, a replacement or a code of this change.
+    let changelog = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
+    let unreleased = changelog.split("\n## 0.35.0").next().unwrap();
+    assert_eq!(changelog_problems(unreleased), Vec::<String>::new());
+    let row = unreleased.lines().find(|line| line.starts_with("| `REPO_UNREADABLE`")).expect("the row of REPO_UNREADABLE");
+    assert_eq!(changelog_problems(&unreleased.replacen(&format!("{row}\n"), "", 1)), ["the CHANGELOG has no row for REPO_UNREADABLE"]);
+    let new_cell = row.split('|').nth(2).unwrap();
+    let bare = row.replacen(new_cell, " none ", 1);
+    assert_eq!(changelog_problems(&unreleased.replacen(row, &bare, 1)).first().map(String::as_str), Some(format!("REPO_UNREADABLE: the row names no replacement: {bare}").as_str()));
+    let without_unavailable = unreleased.replace("`REPO_UNAVAILABLE`", "`REPO_UNAVAIL`");
+    assert!(changelog_problems(&without_unavailable).contains(&"the CHANGELOG does not name REPO_UNAVAILABLE".to_string()));
+    // The retry rule: the codes of the table as they stand pass, and a wrong value of either kind is named.
+    let rows = old_codes::replacement_table(&changelog).expect("the replacement table reads");
+    let names: Vec<&str> = OLD_NAMES.iter().chain(&WARNING_NAMES).copied().collect();
+    let new_codes: Vec<(&str, bool)> = rows
+        .iter()
+        .filter(|row| names.contains(&row.old.as_str()))
+        .flat_map(|row| row.new.iter())
+        .map(|code| (code.as_str(), code_info(code).unwrap_or_else(|| panic!("{code} is not registered")).retryable))
+        .collect();
+    assert!(new_codes.len() > 30, "the table names the new codes of the old names: {}", new_codes.len());
+    assert_eq!(retry_problems(new_codes.iter().copied()), Vec::<String>::new());
+    assert_eq!(retry_problems([("WRITE_DENIED", true), ("REPO_UNAVAILABLE", false), ("REPO_LOCK_UNAVAILABLE", true)]), ["WRITE_DENIED is retryable", "REPO_UNAVAILABLE is not retryable"]);
 }
 
 // ------------------------------------------------------------------ a fault in canon.yaml, and a path in the wrong state

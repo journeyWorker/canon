@@ -130,3 +130,13 @@ Feature: atip codestored
     Given a repository whose hot tier names a Postgres server with its DSN variable unset, and a trajectory file that is not a Parquet file
     When export and purge run
     Then export exits 2 with RETENTION_TIERS_REQUIRED and purge with RETENTION_TIERS_CORRUPT, neither is retryable, each hint says what to do, and nothing is written; only a backend that does not answer or an error a repeat can pass is RETENTION_TIERS_UNAVAILABLE
+
+  # canon: {"schema":1,"at":"2026-11-05T09:00:02Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-36-codes-stored.F5
+  @atip.codestored.14
+  Scenario: An old *_UNREADABLE name revived in a guide, a replacement row deleted or left with no new code, or a wrong retry value is found
+    Given the eleven old names the registry no longer holds, the CHANGELOG's replacement rows and the new codes of the table
+    When a guide sentence names an old name, a row is deleted, a row's new-code cell is emptied, a code of this change is dropped from the CHANGELOG and a retryable code that is not UNAVAILABLE is given
+    Then the old-names guard names each revived name, the CHANGELOG check names each missing row, replacement and code, the retry rule names each wrong value, and the CHANGELOG and registry as they stand pass

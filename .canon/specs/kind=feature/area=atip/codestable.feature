@@ -130,3 +130,23 @@ Feature: atip: the replacement table and the upgrade note of the 0.36 error code
     Given the Unreleased section of the CHANGELOG, outside the old-name column of the table and the lists under it
     When each sentence that names a code the registry no longer holds is read
     Then it says the name is gone, replaced, renamed or a caller's old name, and a stage paragraph that still names STOPPED_MIDWAY as the code of a stop is found by the guard
+
+  # canon: {"schema":1,"at":"2026-11-05T09:00:03Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-36-codes-table.F4
+  @atip.codestable.14
+  Scenario: A table of changed scenarios that miscounts, repeats, misnames or leaves a cell out is found
+    Given the table of changed scenarios kept beside the change and the scenarios of the specs
+    When a row is dropped, the header count is raised, a row is repeated, a scenario id is made up, a kind or a change is blanked, a cell is removed and a scenario leaves the specs
+    Then the table as it stands passes and each fault is named, so a gate check cannot be called clean on a table that does not list the reviews it asks for
+
+  # canon: {"schema":1,"at":"2026-11-05T09:00:04Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-36-codes-table.F5
+  @atip.codestable.15
+  Scenario: An upgrade note that leaves a caller, a moved exit, a details command, the gone code or the word on aliases out fails the note check
+    Given the CHANGELOG's upgrade note and the list of the exits that moved
+    When an entry for a caller is renamed, the no-alias sentence is changed, the sentence on STOPPED_MIDWAY is changed, the entry on details is renamed, a moved code is dropped from the list, a command is no longer named and the note is removed
+    Then the note as it stands passes and each missing part is named, so the release owner cannot release on a note that lacks it

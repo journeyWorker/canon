@@ -156,3 +156,26 @@ fn atip_contract11_16_a_group_option_that_is_not_tool_wide_or_has_no_value_is_st
     let refused = json(&canon(dir.path(), &["skills", "--repo", ".", "show", "canon", "--json"]));
     assert_eq!((refused["error"]["code"].as_str(), refused["error"]["field"].as_str()), (Some("USAGE"), Some("--repo")), "{refused}");
 }
+
+/// atip.contract11.17 (the failure path of F1): an envelope a caller would read that has `contractVersion` without `contract`, says `"1.0"` or names another
+/// contract is refused by the envelope schema, so a build that drops `contract` or lowers the version in a success, a refusal or a registry answer
+/// fails the test, and the version every shipped envelope names is the one canon declares; the shipped envelopes
+/// of each kind pass.
+#[test]
+fn atip_contract11_17_an_envelope_without_the_contract_or_with_version_1_0_or_another_contract_fails_the_envelope_schema() {
+    let dir = repo();
+    for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["schema", "--errors", "--json"]] {
+        let envelope = json(&canon(dir.path(), &args));
+        assert_eq!(atip::envelope_problems(&envelope), Vec::<String>::new(), "{args:?}: the shipped envelope passes");
+        assert_eq!((envelope["meta"]["contract"].as_str(), envelope["meta"]["contractVersion"].as_str()), (Some("atip/1"), Some("1.4")), "{args:?}");
+        for (fault, change) in [
+            ("contract removed", Box::new(|meta: &mut serde_json::Map<String, Value>| drop(meta.remove("contract"))) as Box<dyn Fn(&mut serde_json::Map<String, Value>)>),
+            ("contractVersion 1.0", Box::new(|meta| drop(meta.insert("contractVersion".into(), Value::from("1.0"))))),
+            ("contract of another family", Box::new(|meta| drop(meta.insert("contract".into(), Value::from("atip/2"))))),
+        ] {
+            let mut broken = envelope.clone();
+            change(broken["meta"].as_object_mut().expect("meta is an object"));
+            assert!(!atip::envelope_problems(&broken).is_empty(), "{args:?}: an envelope with {fault} must fail the envelope schema: {broken}");
+        }
+    }
+}

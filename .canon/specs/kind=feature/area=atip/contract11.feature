@@ -150,3 +150,13 @@ Feature: ATIP 1.1 contract
     Given a repo
     When canon finding --bogus --json, canon finding --repo --json, canon finding --as --json and canon skills --repo . show canon --json run
     Then each exits 2 with USAGE and the field is --bogus, --repo, --as and --repo, and none is COMMAND_REQUIRED
+
+  # canon: {"schema":1,"at":"2026-11-05T09:00:00Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-34-atip-1-1.F1
+  @atip.contract11.17
+  Scenario: An envelope with contractVersion and no contract, with contractVersion 1.0 or with another contract fails the envelope schema, whether a success, a refusal or a registry answer
+    Given the envelopes of canon status, canon nosuch and canon schema --errors
+    When meta.contract is removed, meta.contractVersion is set to 1.0 and meta.contract is set to atip/2, each in turn
+    Then the shipped envelopes pass the contract envelope schema and carry contract atip/1 and the contractVersion canon declares, and each broken envelope fails the schema

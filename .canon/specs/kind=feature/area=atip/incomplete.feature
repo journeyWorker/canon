@@ -120,3 +120,13 @@ Feature: atip incomplete
     Given the CHANGELOG section of the release and the list of the codes this change replaced and added
     When the replacement table is checked, then with a row dropped, then with an INCOMPLETE code left out
     Then every replaced code has a row and every INCOMPLETE code is said; the dropped row and the left-out code are each named
+
+  # canon: {"schema":1,"at":"2026-11-05T09:00:01Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-36-codes-incomplete.F6
+  @atip.incomplete.13
+  Scenario: A replacement table row with a retry value the registry does not give, a code the registry lacks, or no row or two rows for a replaced code fails the check
+    Given the CHANGELOG's replacement table and the codes this change replaced
+    When one row's retry value after the arrow is flipped, a new code is misspelled, a row is deleted and a row is doubled, each in turn
+    Then the table as it stands passes and each fault is named with its row

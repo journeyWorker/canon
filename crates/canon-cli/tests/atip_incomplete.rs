@@ -4,6 +4,7 @@
 //! need a step to fail after its predecessors really wrote use the debug seam `CANON_TEST_STOP_AT=<step>` (`incomplete::injected_stop`).
 //! Each test names the scenario it proves (`atip.midway.NN` and `atip.incomplete.NN`).
 
+mod old_codes;
 mod support;
 
 use std::collections::BTreeSet;
@@ -2609,4 +2610,63 @@ fn atip_incomplete_12_the_changelog_replacement_table_covers_every_replaced_code
         changelog_problems(&without_code),
         ["the section never says TIER_INCOMPLETE"]
     );
+}
+
+/// What is wrong with the retry values of the rows of the replaced codes of `changelog`'s replacement table: each row of [`GONE`] has one row, names
+/// only registered codes, and says after the arrow the retryable values the registry gives those codes, which are the `_INCOMPLETE` table's for
+/// an `_INCOMPLETE` code.
+fn retry_problems(changelog: &str) -> Vec<String> {
+    let rows = match old_codes::replacement_table(changelog) {
+        Ok(rows) => rows,
+        Err(problem) => return vec![problem],
+    };
+    let mut problems = Vec::new();
+    for old in GONE {
+        if *old == "INIT_SKILL_INSTALL_FAILED" {
+            continue;
+        }
+        let matching: Vec<_> = rows.iter().filter(|row| row.old == *old).collect();
+        let [row] = matching.as_slice() else {
+            problems.push(format!("{old} has {} rows", matching.len()));
+            continue;
+        };
+        let mut expected = BTreeSet::new();
+        for code in &row.new {
+            match code_info(code) {
+                None => problems.push(format!("the row of {old} names {code}, which the registry lacks")),
+                Some(info) => {
+                    if code.ends_with("_INCOMPLETE") && INCOMPLETE.iter().any(|(name, retryable, _)| name == code && *retryable != info.retryable) {
+                        problems.push(format!("{code} is retryable {} in the registry and {} in the table of the incomplete codes", info.retryable, !info.retryable));
+                    }
+                    expected.insert(info.retryable);
+                }
+            }
+        }
+        let said: BTreeSet<bool> = row.retryable_after.iter().copied().collect();
+        if said != expected {
+            problems.push(format!("the row of {old} says retryable {said:?} after, the registry says {expected:?}"));
+        }
+    }
+    problems
+}
+
+/// atip.incomplete.13 (the failure path of F6): a replacement table whose row of a replaced code gives a retry value the registry does not, names a
+/// code the registry lacks, or is missing or doubled fails the check with the row named; the table as it stands passes.
+#[test]
+fn atip_incomplete_13_a_table_row_with_the_wrong_retry_value_or_no_registered_code_fails_the_check() {
+    let changelog = old_codes::changelog();
+    assert_eq!(retry_problems(&changelog), Vec::<String>::new());
+    let row_of = |old: &str| changelog.lines().find(|line| line.starts_with(&format!("| `{old}` |"))).unwrap_or_else(|| panic!("no row for {old}")).to_string();
+    let pins = row_of("MIGRATE_PINS_FAILED");
+    let wrong_retry = changelog.replacen(&pins, &pins.replace("| no → no |", "| no → yes |"), 1);
+    assert_eq!(retry_problems(&wrong_retry), ["the row of MIGRATE_PINS_FAILED says retryable {true} after, the registry says {false}"]);
+    let store = row_of("EVIDENCE_STORE_FAILED");
+    let wrong_retry = changelog.replacen(&store, &store.replace("| yes → yes |", "| yes → no |"), 1);
+    assert_eq!(retry_problems(&wrong_retry), ["the row of EVIDENCE_STORE_FAILED says retryable {false} after, the registry says {true}"]);
+    let unregistered = changelog.replacen(&pins, &pins.replace("`MIGRATION_INCOMPLETE`", "`MIGRATION_STOPPED_INCOMPLETE`"), 1);
+    assert!(retry_problems(&unregistered).contains(&"the row of MIGRATE_PINS_FAILED names MIGRATION_STOPPED_INCOMPLETE, which the registry lacks".to_string()), "{:?}", retry_problems(&unregistered));
+    let dropped = changelog.replacen(&format!("{pins}\n"), "", 1);
+    assert_eq!(retry_problems(&dropped), ["MIGRATE_PINS_FAILED has 0 rows"]);
+    let doubled = changelog.replacen(&pins, &format!("{pins}\n{pins}"), 1);
+    assert_eq!(retry_problems(&doubled), ["MIGRATE_PINS_FAILED has 2 rows"]);
 }
