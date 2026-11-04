@@ -841,9 +841,15 @@ pub(crate) fn declared_ids(repo: &Path) -> Result<(BTreeSet<String>, BTreeSet<St
 fn configured_plan_sources(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
     // Missing/unreadable canon.yaml: fail-soft (no config at all is a
     // legitimate first-run state) -- zero sources, same as an absent
-    // `plans:` section.
-    let Ok(text) = std::fs::read_to_string(canon_yaml_path) else {
-        return Ok(Vec::new());
+    // `plans:` section. A read the system failed in a way a repeat can
+    // pass is not "no config": answering zero sources would hide a `plans:`
+    // section that is there, so it is the error (`PLAN_CORPUS_UNAVAILABLE`).
+    let text = match canon_store::eio::read_to_string(canon_yaml_path) {
+        Ok(text) => text,
+        Err(e) if crate::read_cause::of_io(&e) == crate::read_cause::Cause::Unavailable => {
+            return Err(PlansError::Config(format!("cannot read `{}`: {e}", canon_yaml_path.display())));
+        }
+        Err(_) => return Ok(Vec::new()),
     };
     // A PRESENT but non-YAML canon.yaml fails LOUD -- a syntax typo in
     // a canon.yaml meant to set `plans.sources` must never silently

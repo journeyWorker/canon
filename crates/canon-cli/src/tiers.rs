@@ -95,6 +95,9 @@ pub struct LoadedTiers {
     /// the configured env-var name — instead of a bare "tiers
     /// unreachable" guess.
     pub unavailable_reasons: BTreeMap<Rung, String>,
+    /// The rungs of [`Self::unavailable_reasons`] whose settings were all there and whose backend did not answer (a Postgres DSN that is set
+    /// and cannot be reached), with the connect error: a tier that is down, which waiting can help, not one that is not configured.
+    pub unreachable: BTreeMap<Rung, String>,
 }
 
 /// `canon_yaml_path`'s own directory (not the process's CWD) -- the
@@ -129,7 +132,7 @@ pub fn build_tiers_for_read(canon_yaml_path: &Path) -> Result<LoadedTiers, TierC
 
 fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTiers, TierCliError> {
     let display_path = canon_yaml_path.display().to_string();
-    let yaml = std::fs::read_to_string(canon_yaml_path)
+    let yaml = canon_store::eio::read_to_string(canon_yaml_path)
         .map_err(|source| TierCliError::ReadCanonYaml { path: display_path.clone(), source })?;
     let base = project_dir(canon_yaml_path);
     let policy = TierPolicy::from_yaml_at(&yaml, base).map_err(|source| TierCliError::Policy { path: display_path, source })?;
@@ -186,7 +189,7 @@ fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTie
         }
     }
 
-    Ok(LoadedTiers { policy, git, pg, r2, sqlite, unavailable_reasons: BTreeMap::new() })
+    Ok(LoadedTiers { policy, git, pg, r2, sqlite, unavailable_reasons: BTreeMap::new(), unreachable: BTreeMap::new() })
 }
 
 /// Attach `cfg`'s postgres-backed tier, degrading a genuine
@@ -367,7 +370,7 @@ pub(crate) fn build_lenient_tiers_for_kinds_read(canon_yaml_path: &Path, kinds: 
 
 fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKind], read_only: bool) -> Result<LoadedTiers, TierCliError> {
     let display_path = canon_yaml_path.display().to_string();
-    let yaml = std::fs::read_to_string(canon_yaml_path)
+    let yaml = canon_store::eio::read_to_string(canon_yaml_path)
         .map_err(|source| TierCliError::ReadCanonYaml { path: display_path.clone(), source })?;
     let base = project_dir(canon_yaml_path);
     let policy = TierPolicy::from_yaml_at(&yaml, base).map_err(|source| TierCliError::Policy { path: display_path, source })?;
@@ -377,6 +380,7 @@ fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKin
     let mut r2 = None;
     let mut sqlite = None;
     let mut unavailable_reasons: BTreeMap<Rung, String> = BTreeMap::new();
+    let mut unreachable: BTreeMap<Rung, String> = BTreeMap::new();
 
     // The local rung's backend always attaches unconditionally,
     // independent of any `kind`'s own routing (design D2/R1).
@@ -386,6 +390,9 @@ fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKin
             let (tier, reason) = attach_postgres(cfg)?;
             pg = tier;
             if let Some(reason) = reason {
+                if std::env::var(&cfg.dsn_env).is_ok() {
+                    unreachable.insert(Rung::Local, reason.clone());
+                }
                 unavailable_reasons.insert(Rung::Local, reason);
             }
         }
@@ -432,6 +439,9 @@ fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKin
                 let (tier, reason) = attach_postgres(cfg)?;
                 pg = tier;
                 if let Some(reason) = reason {
+                    if std::env::var(&cfg.dsn_env).is_ok() {
+                        unreachable.insert(rung, reason.clone());
+                    }
                     unavailable_reasons.insert(rung, reason);
                 }
             }
@@ -453,7 +463,7 @@ fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKin
         }
     }
 
-    Ok(LoadedTiers { policy, git, pg, r2, sqlite, unavailable_reasons })
+    Ok(LoadedTiers { policy, git, pg, r2, sqlite, unavailable_reasons, unreachable })
 }
 
 /// [`build_lenient_tiers_for_kind`] for a command that only reads

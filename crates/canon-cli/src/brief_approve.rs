@@ -208,7 +208,7 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
         .reason("BLOCKERS")
         .hint("run `canon brief check`, clear the blockers it lists, then ask the human to approve"));
     }
-    let text = std::fs::read_to_string(&path).map_err(|e| refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{}`: {e}", checked.brief)))?;
+    let text = canon_store::eio::read_to_string(&path).map_err(|e| crate::read_cause::brief_unreadable(refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{}`: {e}", checked.brief))))?;
     if let Some(expected) = item.expected_sha256 {
         verify_bytes(&checked.brief, Some(text.as_bytes()), expected)?;
     }
@@ -233,7 +233,7 @@ fn verify_shown(change: &ChangeId, brief: &str, path: &Path, shown: &BTreeMap<St
     let Some(digest) = shown.get(change.as_str()) else {
         return Err(CliError::refused("USAGE", format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", change.as_str())).field("--digest").hint(hint_for("RELAY_DIGEST_STALE")));
     };
-    let text = std::fs::read_to_string(path).map_err(|e| refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{brief}`: {e}")))?;
+    let text = canon_store::eio::read_to_string(path).map_err(|e| crate::read_cause::brief_unreadable(refuse(crate::read_cause::brief_code(&e), &format!("cannot read `{brief}`: {e}"))))?;
     let now = approval_digest(&text);
     if digest.eq_ignore_ascii_case(&now) {
         return Ok(());

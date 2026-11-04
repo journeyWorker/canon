@@ -53,10 +53,11 @@ fn tiers_hint(code: &str) -> &'static str {
 }
 
 /// The code of a purge or export that could not open or read the tiers before it began, by what is wrong:
-/// - a tier that is not attached or not configured (its endpoint or credentials are unset, or canon.yaml has no entry for it) is
+/// - a tier that is not attached or not configured (its endpoint, DSN or credentials are unset, or canon.yaml has no entry for it) is
 ///   `RETENTION_TIERS_REQUIRED`: waiting does not set them;
 /// - a stored object that does not decode (a Parquet file canon wrote) is `RETENTION_TIERS_CORRUPT`;
-/// - a backend that is down or does not answer (a SQL or object-store error) is `RETENTION_TIERS_UNAVAILABLE`, which can be tried again;
+/// - a backend that is down or does not answer is `RETENTION_TIERS_UNAVAILABLE`, which can be tried again: a SQL or object-store error, or a
+///   Postgres DSN that is set and cannot be reached (the settings are there, so waiting can help where it cannot for an unset one);
 /// - a policy, routing entry or config the caller wrote that cannot be used is `RETENTION_TIERS_INVALID`.
 ///
 /// An operating-system error is told by its cause (`read_cause`): a read the system refuses is `RETENTION_TIERS_DENIED`, a path that is
@@ -72,7 +73,8 @@ fn tiers_code(error: &RetentionError) -> &'static str {
     };
     let by_store = |store: &StoreError| match store {
         StoreError::Io(io) => by_cause(io),
-        StoreError::TierUnavailable { .. } | StoreError::BackendUnattached { .. } => "RETENTION_TIERS_REQUIRED",
+        StoreError::TierUnavailable { configured: true, .. } => "RETENTION_TIERS_UNAVAILABLE",
+        StoreError::TierUnavailable { configured: false, .. } | StoreError::BackendUnattached { .. } => "RETENTION_TIERS_REQUIRED",
         StoreError::Parquet(_) => "RETENTION_TIERS_CORRUPT",
         StoreError::Sql(_) | StoreError::ObjectStore(_) => "RETENTION_TIERS_UNAVAILABLE",
         _ => "RETENTION_TIERS_INVALID",
@@ -183,7 +185,8 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
 fn loaded_registry(repo: &Path, kind: RecordKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
     let yaml = resolve_canon_yaml(repo);
     let loaded = if read_only { tiers::build_lenient_tiers_for_kind_read(&yaml, kind)? } else { tiers::build_lenient_tiers_for_kind(&yaml, kind)? };
-    let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
+    let unreachable = loaded.unreachable;
+    let registry = unreachable.into_iter().fold(TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite), |registry, (rung, reason)| registry.with_unreachable(rung, reason));
     Ok((yaml, registry))
 }
 
@@ -711,6 +714,8 @@ mod tests {
         for (error, code) in [
             (store(StoreError::BackendUnattached { backend: Backend::Postgres, reason: "no live DSN".into() }), "RETENTION_TIERS_REQUIRED"),
             (store(StoreError::tier_unavailable(Rung::Hot, Some(Backend::Postgres), "no live DSN")), "RETENTION_TIERS_REQUIRED"),
+            // atip.reasons.14: a DSN that is set and cannot be reached is a tier that is down, and an unset one is a tier that is not configured.
+            (store(StoreError::tier_unreachable(Rung::Hot, Some(Backend::Postgres), "error communicating with database")), "RETENTION_TIERS_UNAVAILABLE"),
             (store(StoreError::tier_unavailable(Rung::Cold, None, "no tiers.cold entry")), "RETENTION_TIERS_REQUIRED"),
             (store(StoreError::Parquet("Invalid Parquet file. Corrupt footer".into())), "RETENTION_TIERS_CORRUPT"),
             (RetentionError::Learn(canon_learn::LearnError::Parquet("Invalid Parquet file. Corrupt footer".into())), "RETENTION_TIERS_CORRUPT"),

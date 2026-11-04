@@ -113,6 +113,7 @@ impl CliErrorExt for CliError {
 
     fn emit(&self, command: &str, json: bool) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
+        debug_assert!(code_info(self.code).is_some_and(|info| info.exit == self.exit && info.retryable == self.retryable), "{} answers exit {} and retryable {}, not its registry row's: a reason never changes either (spec 7.6)", self.code, self.exit, self.retryable);
         debug_assert!(self.reason_name().is_none_or(|reason| code_info(self.code).is_some_and(|info| info.find_reason(reason).is_some())), "reason {:?} is not registered under {} in cli_error::all_codes()", self.reason_name(), self.code);
         if json {
             crate::json_out::print_failure::<crate::json_out::NoData>(command, self, None);
@@ -128,6 +129,7 @@ impl CliErrorExt for CliError {
 
     fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: Value) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
+        debug_assert!(code_info(self.code).is_some_and(|info| info.exit == self.exit && info.retryable == self.retryable), "{} answers exit {} and retryable {}, not its registry row's: a reason never changes either (spec 7.6)", self.code, self.exit, self.retryable);
         // A refusal (exit 2) changed nothing and carries no `data` (spec 8.3, 6.4). Every test that runs the debug binary observes this.
         debug_assert!(self.exit != EXIT_REFUSED, "{} is a refusal (exit 2): it carries no data", self.code);
         if json {
@@ -279,9 +281,9 @@ const FINDING_INCOMPLETE_REASONS: &[ReasonInfo] = &[
 ];
 
 const INIT_INCOMPLETE_REASONS: &[ReasonInfo] = &[
-    ReasonInfo { reason: "CONFIG_INVALID", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)", fix: "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again." },
-    ReasonInfo { reason: "SKILLS_ARGUMENT_INVALID", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown", fix: "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again." },
-    ReasonInfo { reason: "SKILLS_SOURCE_NOT_FOUND", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md", fix: "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again." },
+    ReasonInfo { reason: "CONFIG_INVALID", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)", fix: "Read what init wrote (`canon status`), make the `skills:` section of canon.yaml a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), then run `canon skills install`; do not run `canon init` again." },
+    ReasonInfo { reason: "SKILLS_ARGUMENT_INVALID", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown", fix: "Read what init wrote (`canon status`), name only providers of claude, codex, omp, pi in `skills.providers` of canon.yaml (or pass `--providers` to `canon skills install`), then run `canon skills install`; do not run `canon init` again." },
+    ReasonInfo { reason: "SKILLS_SOURCE_NOT_FOUND", meaning: "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md", fix: "Read what init wrote (`canon status`), point CANON_SKILLS_SOURCE at a directory that holds a SKILL.src.md or unset it, then run `canon skills install`; do not run `canon init` again." },
 ];
 
 const INVENTORY_INCOMPLETE_REASONS: &[ReasonInfo] = &[
@@ -311,6 +313,7 @@ const BRIEF_CHECK_FAILED_REASONS: &[ReasonInfo] = &[
 const BRIEF_INVALID_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "BLOCKERS", meaning: "the brief has blocker findings, so the human cannot approve it yet", fix: "Resolve every blocker finding (`canon brief check` lists them), then ask the human to approve again." },
     ReasonInfo { reason: "UNAPPROVABLE", meaning: "the brief's text cannot take an `Approved:` line (for example an open code fence)", fix: "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again." },
+    ReasonInfo { reason: "UNREADABLE", meaning: "brief.md cannot be read as the brief: a directory stands where the file belongs, or the file is not UTF-8 text", fix: "Put the change's brief.md, a UTF-8 text file, where the message says, then run the command again." },
 ];
 
 const CONTEXT_INPUT_INVALID_REASONS: &[ReasonInfo] = &[
@@ -319,6 +322,7 @@ const CONTEXT_INPUT_INVALID_REASONS: &[ReasonInfo] = &[
 
 const CONFIG_INVALID_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "ARTIFACT_STORE", meaning: "the `artifact_store:` section of canon.yaml (or the tier it names) is present but unusable", fix: "Fix the `artifact_store:` section of canon.yaml (`canon init --check` names the problem), or set `artifact_store: { backend: local }`, then run the command again." },
+    ReasonInfo { reason: "CANON_YAML", meaning: "canon.yaml itself is present but unusable: it does not parse, is not a mapping, or is no file, in a part no other reason of this code names (`specs:`, `skills:`, `artifact_store:`, the tiers and the dashboard have their own)", fix: "Fix canon.yaml so it parses (`canon init --check` names the problem), then run the command again." },
     ReasonInfo { reason: "DASHBOARD", meaning: "the dashboard's canon.yaml section is present but unusable", fix: "Fix the dashboard section of canon.yaml, then start the dashboard again." },
     ReasonInfo { reason: "POLICY", meaning: "`.canon/policy.yaml` is present but unusable: its `adapter_capabilities` section, or the `approval.allowed_signers` setting a `strategy rollback` reads (or the allowed-signers file it names), is malformed", fix: "Fix the policy file the message names, then run the command again." },
     ReasonInfo { reason: "SKILLS", meaning: "the `skills:` section of canon.yaml is present but malformed", fix: "Make the `skills:` section a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), or pass --providers." },
@@ -348,6 +352,11 @@ const SUBJECT_CONFLICT_REASONS: &[ReasonInfo] = &[
     ReasonInfo { reason: "APPROVED_BRIEF", meaning: "the change carries an approved brief, which is the subject's approved scope, so it stays adopted", fix: "Leave the change adopted, or unadopt only a change nobody approved." },
     ReasonInfo { reason: "FLOW_TAGGED", meaning: "a scenario the subject owns is tagged `@flow:<change>.*`, so unadopting the change would make it fall back to an older approval", fix: "Remove or retag the `@flow:<change>.*` tags on those scenarios first, then unadopt again." },
     ReasonInfo { reason: "TRANSITION", meaning: "the status change is not an allowed transition", fix: "Check the subject's status with `canon subject show` and request an allowed transition." },
+];
+
+const SUBJECT_INVALID_REASONS: &[ReasonInfo] = &[
+    ReasonInfo { reason: "MALFORMED_EVIDENCE", meaning: "a record the gate reads to judge the transition does not parse or lacks a required field, so it counts as no evidence and the gate fails closed", fix: "Fix or remove the record `error.details` names, then run `canon subject move` again." },
+    ReasonInfo { reason: "OPEN_BLOCKER", meaning: "an open `blocker` finding sits on a change the subject adopts, and the review policy blocks the transition on open findings", fix: "Close the blocker finding (`canon finding close`) once it is fixed, then run `canon subject move` again." },
 ];
 
 const REPORT_CHECK_FAILED_REASONS: &[ReasonInfo] = &[
@@ -519,8 +528,8 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "RETENTION_TIERS_CORRUPT", meaning: "a stored object of a tier a purge or export reads does not decode (a Parquet file canon wrote is damaged); nothing was deleted or written", exit: 2, retryable: false, fix: "Restore the damaged object the error names from a copy, or remove it, then run the command again.", reasons: &[] },
     CodeInfo { code: "RETENTION_TIERS_DENIED", meaning: "a file the tiers of a purge or export need (canon.yaml, a ledger directory) exists but this user may not read it; nothing was deleted or written", exit: 2, retryable: false, fix: "Make the file the error names readable by this user, then run the command again.", reasons: &[] },
     CodeInfo { code: "RETENTION_TIERS_INVALID", meaning: "the tiers cannot be used for a purge or export: the policy, a routing entry or the learn retention config is malformed, or a path they name is missing or no directory; nothing was deleted or written", exit: 2, retryable: false, fix: "Fix the tier or policy problem the error names in canon.yaml, then run the command again.", reasons: &[] },
-    CodeInfo { code: "RETENTION_TIERS_REQUIRED", meaning: "a tier a purge or export needs is not attached or not configured: its backend's endpoint or credentials are unset, or canon.yaml has no entry for it; nothing was deleted or written, and waiting does not help", exit: 2, retryable: false, fix: "Set the variables the error names for the tier (or add its `tiers:` entry to canon.yaml), then run the command again.", reasons: &[] },
-    CodeInfo { code: "RETENTION_TIERS_UNAVAILABLE", meaning: "a tier's backend a purge or export reads is down or does not answer (a SQL or object-store error), or the system failed the read of a file in a way a repeat can pass; nothing was deleted or written", exit: 2, retryable: true, fix: "Check that the tier backends are reachable, then run the command again.", reasons: &[] },
+    CodeInfo { code: "RETENTION_TIERS_REQUIRED", meaning: "a tier a purge or export needs is not attached or not configured: its backend's endpoint, DSN or credentials are unset, or canon.yaml has no entry for it; nothing was deleted or written, and waiting does not help", exit: 2, retryable: false, fix: "Set the variables the error names for the tier (or add its `tiers:` entry to canon.yaml), then run the command again.", reasons: &[] },
+    CodeInfo { code: "RETENTION_TIERS_UNAVAILABLE", meaning: "a tier's backend a purge or export reads is down or does not answer (a SQL or object-store error, or a Postgres DSN that is set and cannot be reached), or the system failed the read of a file in a way a repeat can pass; nothing was deleted or written", exit: 2, retryable: true, fix: "Check that the tier backends are reachable, then run the command again.", reasons: &[] },
     CodeInfo { code: "RETRIEVE_INVALID", meaning: "`retrieve` could not start: the domain/subject cannot be turned into a regime key (the scope flags that conflict, are missing or disagree with --role are `USAGE`); a store outage is not an error here, it serves empty guidance (exit 0)", exit: 2, retryable: false, fix: "Check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name, then run the retrieval again.", reasons: &[] },
     CodeInfo { code: "REVIEW_ARGUMENT_INVALID", meaning: "a `review scenario` or `review change` argument is missing or contradicts another", exit: 2, retryable: false, fix: "Add the missing `canon review` argument or drop the one that contradicts another.", reasons: &[] },
     CodeInfo { code: "REVIEW_ARTIFACT_DENIED", meaning: "a review artifact lies outside the repository, or this user may not read it", exit: 2, retryable: false, fix: "Copy the file anywhere under the repository (or make it readable) and bind that path.", reasons: &[] },
@@ -566,7 +575,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "SUBJECT_ARGUMENT_INVALID", meaning: "a `subject` argument is malformed", exit: 2, retryable: false, fix: "Correct the malformed `canon subject` argument.", reasons: &[] },
     CodeInfo { code: "SUBJECT_CONFLICT", meaning: "the requested change conflicts with the subject's state: a status transition that is not allowed, an unadopt of an approved or flow-tagged change", exit: 2, retryable: false, fix: "Check the subject with `canon subject show` and request what its state allows.", reasons: SUBJECT_CONFLICT_REASONS },
     CodeInfo { code: "SUBJECT_EXISTS", meaning: "a subject with that id already exists", exit: 2, retryable: false, fix: "Choose a different subject id, or use the existing subject (`canon subject show`).", reasons: &[] },
-    CodeInfo { code: "SUBJECT_INVALID", meaning: "the status transition breaks a rule of the gate that is not a missing approval, review or evidence; error.details names each cause when there are several", exit: 2, retryable: false, fix: "Fix each cause error.details names (the error itself when it names one), then run `canon subject move` again.", reasons: &[] },
+    CodeInfo { code: "SUBJECT_INVALID", meaning: "the status transition breaks a rule of the gate that is not a missing approval, review or evidence; error.details names each cause when there are several", exit: 2, retryable: false, fix: "Fix each cause error.details names (the error itself when it names one), then run `canon subject move` again.", reasons: SUBJECT_INVALID_REASONS },
     CodeInfo { code: "SUBJECT_NOT_FOUND", meaning: "no subject with that id", exit: 2, retryable: false, fix: "Pass the id of an existing subject; `canon status` lists the subjects.", reasons: &[] },
     CodeInfo { code: "SUBJECT_REASON_REQUIRED", meaning: "reopening a shipped subject needs --reason", exit: 2, retryable: false, fix: "Pass --reason when reopening a shipped subject with `canon subject move`.", reasons: &[] },
     CodeInfo { code: "TASK_EVIDENCE_INVALID", meaning: "the evidence or typed atom for the task is invalid", exit: 2, retryable: false, fix: "Correct the task's evidence or typed atom named in the error, then run `canon task done` again.", reasons: &[] },

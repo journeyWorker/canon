@@ -76,7 +76,7 @@ pub fn approval_state(repo: &Path) -> ApprovalState {
     let Ok(policy) = fs::read(repo.join(paths::POLICY_FILE)) else {
         return ApprovalState::NoPolicy;
     };
-    let text = match fs::read_to_string(repo.join(paths::POLICY_APPROVAL_FILE)) {
+    let text = match canon_store::eio::read_to_string(repo.join(paths::POLICY_APPROVAL_FILE)) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return ApprovalState::Unapproved,
         Err(e) => return ApprovalState::Unreadable { detail: e.to_string() },
@@ -315,7 +315,7 @@ pub fn record_at(repo: &Path, by: &str, note: Option<&str>, approved_at: &str, r
         return Err(PolicyApprovalError::BlankApprover);
     }
     let policy_path = repo.join(paths::POLICY_FILE);
-    let policy = match fs::read(&policy_path) {
+    let policy = match canon_store::eio::read(&policy_path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(PolicyApprovalError::NoPolicy { path: policy_path });

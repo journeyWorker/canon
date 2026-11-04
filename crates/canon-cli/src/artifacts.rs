@@ -283,7 +283,7 @@ fn local_blobs(repo: &Path) -> std::io::Result<(Vec<LocalBlob>, Vec<String>)> {
         Err(e) => return Err(e),
     }
     let (mut blobs, mut skipped) = (Vec::new(), Vec::new());
-    for entry in std::fs::read_dir(&dir)? {
+    for entry in canon_store::eio::read_dir(&dir)? {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
         if entry.file_type()?.is_file() && is_sha256_hex(&name) {
@@ -463,7 +463,7 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     let mut problems: Vec<(&'static str, String)> = Vec::new();
     let mut moving = MovePlan { effects: Vec::new(), verified: Vec::new(), already: 0 };
     for blob in &blobs {
-        let local = match std::fs::File::open(&blob.path).and_then(sha256_reader) {
+        let local = match canon_store::eio::open(&blob.path).and_then(sha256_reader) {
             Ok(actual) if actual == blob.digest => actual,
             Ok(actual) => {
                 problems.push(("ARTIFACTS_BLOB_CORRUPT", format!("{}: its bytes hash to {actual}, not its name; it is not moved", blob.digest)));

@@ -13,6 +13,7 @@ pub mod archive;
 pub mod artifact_blobs;
 pub mod atomic;
 pub mod cursor;
+pub mod eio;
 pub mod file_lock;
 pub mod fold;
 pub mod git_tier;

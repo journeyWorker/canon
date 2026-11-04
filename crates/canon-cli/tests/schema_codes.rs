@@ -39,6 +39,7 @@ const HELPER_SITES: &[(&str, &[&str])] = &[
     ("read_cause::repo_error(", &["CONFIG_INVALID", "REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE"]),
     ("read_cause::repo_io_error(", &["REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE"]),
     ("read_cause::brief_code(", &["BRIEF_DENIED", "BRIEF_INVALID", "BRIEF_NOT_FOUND", "BRIEF_UNAVAILABLE"]),
+    ("read_cause::brief_read_error(", &["BRIEF_DENIED", "BRIEF_INVALID", "BRIEF_NOT_FOUND", "BRIEF_UNAVAILABLE"]),
     ("read_cause::spec_root_dir_code(", &["SPEC_ROOT_DENIED", "SPEC_ROOT_INVALID", "SPEC_ROOT_UNAVAILABLE"]),
     ("read_cause::write_code_of_text(", &["WRITE_DENIED", "WRITE_INVALID"]),
     ("read_cause::signature_code(", &["STRATEGY_SIGNATURE_DENIED", "STRATEGY_SIGNATURE_INVALID", "STRATEGY_SIGNATURE_NOT_FOUND", "STRATEGY_SIGNATURE_UNAVAILABLE"]),
@@ -56,9 +57,19 @@ const HELPER_SITES: &[(&str, &[&str])] = &[
 /// What `artifacts::store_code` answers for a store that cannot be used before anything is written.
 const ARTIFACT_STORE_CODES: &[&str] = &["ARTIFACTS_DIGEST_INVALID", "ARTIFACTS_STORE_DENIED", "ARTIFACTS_STORE_INVALID", "ARTIFACTS_STORE_REQUIRED", "ARTIFACTS_STORE_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID", "CONFIG_UNAVAILABLE"];
 
+/// The functions whose caller emits the codes they answer, though no `emit("canon …")` sits beside the call (`error.to_cli_error()` is a call
+/// the scan cannot follow): the marker of the call, the codes it can answer, and the commands that make it. A code a command can emit is
+/// listed by `canon schema <command>` whether the scan reads it as a literal or through one of these.
+const CALL_SITES: &[(&str, &[&str], &[&str])] = &[
+    // `dispatch::validate_task_binding` admits a `--task` against the plan corpus; `DispatchError::to_cli_error` gives its codes.
+    ("dispatch::validate_task_binding(", &["TASK_NOT_FOUND", "PLAN_SOURCES_REQUIRED", "PLAN_CORPUS_DENIED", "PLAN_CORPUS_INVALID", "PLAN_CORPUS_UNAVAILABLE"], &["evidence add", "evidence approval-payload"]),
+    // `query_failure`: a read of the ledger the system failed, before the query had anything to leave half done.
+    ("read_cause::unavailable_before_work(", &["REPO_UNAVAILABLE"], &["query"]),
+];
+
 /// Whether `line` calls a helper that can answer `code`.
 fn helper_answers(line: &str, code: &str) -> bool {
-    HELPER_SITES.iter().any(|(marker, codes)| line.contains(marker) && codes.contains(&code))
+    HELPER_SITES.iter().any(|(marker, codes)| line.contains(marker) && codes.contains(&code)) || CALL_SITES.iter().any(|(marker, codes, _)| line.contains(marker) && codes.contains(&code))
 }
 
 /// Codes registered ahead of the commands that emit them (none: every code is emitted).
@@ -164,7 +175,7 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("SCENARIO_INDEX_REQUIRED", "evidence approval-payload"), ("POLICY_APPROVAL_CORRUPT", "subject move"), ("POLICY_APPROVAL_DENIED", "subject move")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_INVALID", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("SCENARIO_INDEX_REQUIRED", "evidence approval-payload"), ("POLICY_APPROVAL_CORRUPT", "subject move"), ("POLICY_APPROVAL_DENIED", "subject move"), ("QUERY_FAILED", "query")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
@@ -295,6 +306,13 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
                     continue;
                 }
                 file_has_codes = true;
+                // A call of a function that answers codes for the command its caller is: the commands the table names, whatever the file's defaults are.
+                if let Some((_, _, commands)) = CALL_SITES.iter().find(|(marker, codes, _)| line.contains(marker) && codes.contains(code)) {
+                    for target in commands.iter().flat_map(|command| leaves_under(command)) {
+                        table.get_mut(target).expect("leaf has a row").insert(code);
+                    }
+                    continue;
+                }
                 let window = &lines[i..(i + 1 + EMIT_WINDOW).min(lines.len())];
                 let spliced = SPLICED.iter().find(|(c, _)| c == code).map(|(_, command)| command.to_string());
                 let targets: Vec<&'static str> = match window.iter().find_map(|l| emitted_command(l)).or(spliced) {

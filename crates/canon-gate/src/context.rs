@@ -116,7 +116,7 @@ pub enum CanonYamlError {
 /// [`TierPolicy::from_yaml_at`]: canon_store::policy::TierPolicy::from_yaml_at
 fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolicy>, CanonYamlError> {
     let path = repo.join("canon.yaml");
-    let content = match std::fs::read_to_string(&path) {
+    let content = match canon_store::eio::read_to_string(&path) {
         Ok(content) => content,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(source) => return Err(CanonYamlError::Read { path, source }),

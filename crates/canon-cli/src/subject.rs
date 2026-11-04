@@ -1130,7 +1130,7 @@ pub fn run_move(
             hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
         }
         hints.extend(pending_note.iter().cloned());
-        let causes = blocking.iter().chain(&waivable).map(|v| crate::gate_refusal::Cause { code: crate::gate_refusal::subject_code(v.class), message: v.line() }).collect();
+        let causes = blocking.iter().chain(&waivable).map(|v| crate::gate_refusal::Cause::of_class(v.class, v.line())).collect();
         return crate::gate_refusal::refusal(causes, &hints.join("; ")).emit("canon subject move", json);
     }
 
@@ -1162,7 +1162,7 @@ pub fn run_move(
             } else if !reverify.is_empty() {
                 fixes.push("record evidence again for the scenarios named with `canon evidence add --project <root> --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`, one each (a review stays current while the verdicts and checks are the same)".to_string());
             }
-            let causes = waivable.iter().map(|v| crate::gate_refusal::Cause { code: crate::gate_refusal::subject_code(v.class), message: v.line() }).collect();
+            let causes = waivable.iter().map(|v| crate::gate_refusal::Cause::of_class(v.class, v.line())).collect();
             return crate::gate_refusal::refusal(
                 causes,
                 &format!(

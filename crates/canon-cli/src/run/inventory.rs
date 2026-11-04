@@ -75,7 +75,10 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
                 crate::inventory::InventoryError::Store(_) => ("INVENTORY_FAILED", None),
                 crate::inventory::InventoryError::Stopped { .. } => ("INVENTORY_INCOMPLETE", Some("INVENTORY_FAILED")),
                 crate::inventory::InventoryError::Config(_) => ("CONFIG_INVALID", Some("SPECS")),
-                crate::inventory::InventoryError::CanonYaml(_) => (crate::read_cause::config_error(err.to_string()).code, None),
+                crate::inventory::InventoryError::CanonYaml(_) => {
+                    let code = crate::read_cause::config_error(err.to_string()).code;
+                    (code, (code == "CONFIG_INVALID").then_some("CANON_YAML"))
+                }
                 crate::inventory::InventoryError::Locked(_) => ("INVENTORY_INDEX_UNAVAILABLE", None),
                 crate::inventory::InventoryError::Unavailable(error) => (error.code, None),
             };

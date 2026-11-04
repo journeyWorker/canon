@@ -1144,7 +1144,7 @@ impl Drop for EndLock {
 /// share this function's identity rungs, which is where a false
 /// attribution would actually come from.
 pub(crate) fn read_dispatched_manifest(manifest_path: &Path, run_id: RunId) -> Result<Run, DispatchError> {
-    let text = match std::fs::read_to_string(manifest_path) {
+    let text = match canon_store::eio::read_to_string(manifest_path) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(DispatchError::NoSuchRun { run_id: run_id.to_string(), path: manifest_path.display().to_string() });

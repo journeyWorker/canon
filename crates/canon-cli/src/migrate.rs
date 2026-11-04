@@ -302,46 +302,46 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let mut log = crate::json_out::Log::new(json);
     let repo = resolve_repo_root(repo);
     let canon_yaml = repo.join("canon.yaml");
-    let Ok(text) = fs::read_to_string(&canon_yaml) else {
-        return CliError::refused("CONFIG_REQUIRED", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).hint("run `canon init` in the repository root first").emit("canon migrate", json);
+    let text = match canon_store::eio::read_to_string(&canon_yaml) {
+        Ok(text) => text,
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            return crate::read_cause::config_error(format!("cannot read `{}`: {e}", canon_yaml.display())).emit("canon migrate", json);
+        }
+        Err(_) => {
+            return CliError::refused("CONFIG_REQUIRED", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).hint("run `canon init` in the repository root first").emit("canon migrate", json);
+        }
     };
     let git = in_git_work_tree(&repo);
     // 0.30 `ledger-naming`: the old world is recorded and the renaming planned first; every other step reads the renamed ledger.
     let names = match migrate_names::plan(&repo, &text) {
         Ok(names) => names,
         Err(e) => {
-            return CliError::refused("MIGRATION_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return preview_refusal(e.clone(), "fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let renamed_config = match migrate_names::rewrite_config(&text) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("CONFIG_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("CONFIG_INVALID", e.clone()).reason("CANON_YAML").hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let plan = match plan(&repo, &renamed_config) {
         Ok(plan) => plan,
         Err(e) => {
-            return CliError::refused("MIGRATION_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return preview_refusal(e.clone(), "fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let config = match render_config(&renamed_config, &plan, plan.roots.len(), plan.drop_source.is_some()) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("CONFIG_INVALID", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("CONFIG_INVALID", e.clone()).reason("CANON_YAML").hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     // The renamed ledger is judged in a scratch copy (the review pins, the chore reviews of the briefs).
     let world = match names.renames().then(|| migrate_names::scratch(&repo, &renamed_config, &names)).transpose() {
         Ok(world) => world,
         Err(e) => {
-            let code = crate::read_cause::migration_code_of_text(&e);
-            let hint = match code {
-                "MIGRATION_DENIED" => "check that the system temp directory is writable, then run `canon migrate` again",
-                "MIGRATION_UNAVAILABLE" => "the system failed a call on the preview's files in a way a repeat can pass: wait a moment, then run `canon migrate` again; nothing was changed",
-                _ => "check that the system temp directory is a directory and that the ledger's files are valid, then run `canon migrate` again; nothing was changed",
-            };
-            return CliError::refused(code, e).hint(hint).emit("canon migrate", json);
+            return preview_refusal(e, "check that the system temp directory is a directory and that the ledger's files are valid, then run `canon migrate` again; nothing was changed").emit("canon migrate", json);
         }
     };
     let view = world.as_ref().map_or(repo.as_path(), |w| w.path());
@@ -358,7 +358,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let view_ledger = world.as_ref().map_or_else(|| real_ledger.clone(), |w| w.ledger_root().to_path_buf());
     let briefs = match migrate_briefs::plan(&repo, &view_ledger, &ledger_prefix) {
         Ok(briefs) => briefs,
-        Err(e) => return CliError::refused("MIGRATION_INVALID", e).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
+        Err(e) => return preview_refusal(e, "fix what the message names, then run `canon migrate` again").emit("canon migrate", json),
     };
     if git {
         let mut moved_paths = plan.moved_paths.clone();
@@ -1467,6 +1467,18 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Previ
             stopped("INDEX", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`"), "run `canon inventory sync` and fix what it reports").emit("canon migrate", json)
         }
     }
+}
+
+/// A refusal of the plan or its preview, made before anything was changed: `MIGRATION_DENIED` when the system refused a call on a file the
+/// plan reads, `MIGRATION_UNAVAILABLE` when it failed one in a way a repeat can pass, `MIGRATION_INVALID` otherwise, with `invalid_hint`.
+fn preview_refusal(message: String, invalid_hint: &str) -> CliError {
+    let code = crate::read_cause::migration_code_of_text(&message);
+    let hint = match code {
+        "MIGRATION_DENIED" => "check that the repository's ledger and the system temp directory are readable and writable by this user, then run `canon migrate` again; nothing was changed",
+        "MIGRATION_UNAVAILABLE" => "the system failed a call on the files the plan reads in a way a repeat can pass: wait a moment, then run `canon migrate` again; nothing was changed",
+        _ => invalid_hint,
+    };
+    CliError::refused(code, message).hint(hint)
 }
 
 /// `canon migrate` stopped after it had begun changing the repo: `MIGRATION_INCOMPLETE`, whose `reason` says where it stopped (`STOPPED` while

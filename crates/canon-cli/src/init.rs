@@ -592,7 +592,8 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
     if dry_run {
         let hint = format!("fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset), then run the command again", skills::CANONICAL_SOURCE_ENV);
         return match said {
-            code @ ("CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" | "WRITE_DENIED" | "WRITE_INVALID") => CliError::refused(code, error.to_string()).hint(hint),
+            "CONFIG_INVALID" => CliError::refused("CONFIG_INVALID", error.to_string()).reason("SKILLS").hint(hint),
+            code @ ("SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" | "WRITE_DENIED" | "WRITE_INVALID") => CliError::refused(code, error.to_string()).hint(hint),
             _ => CliError::failed("SKILLS_FAILED", error.to_string()).hint(hint),
         };
     }

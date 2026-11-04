@@ -116,7 +116,7 @@ pub fn run_promote_with_evidence(
                 }
             };
             if let Some(signature) = signature_path {
-                match std::fs::read_to_string(signature) {
+                match canon_store::eio::read_to_string(signature) {
                     Ok(value) => {
                         approval.signature = Some(value);
                         approval.signer_key.get_or_insert_with(|| approval.approver_identity.clone());
@@ -429,7 +429,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
             }
         }
     }
-    let signature = match std::fs::read_to_string(signature_path) {
+    let signature = match canon_store::eio::read_to_string(signature_path) {
         Ok(value) => value,
         Err(error) => {
             return ExitCode::from(CliError::refused(crate::read_cause::signature_code(&error), format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy rollback", json));

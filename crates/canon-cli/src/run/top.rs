@@ -5,6 +5,12 @@ use crate::cli_error::{CliError, CliErrorExt as _};
 use crate::cli::top::QueryArgs;
 use std::process::ExitCode;
 
+/// The error of a query that could not read the ledger: `REPO_UNAVAILABLE` (exit 2, retryable) when the system failed the read in a way a
+/// repeat can pass, because a query only reads and no work is left half done (spec 8.3); `QUERY_FAILED` for any other failure.
+fn query_failure(message: &str) -> CliError {
+    crate::read_cause::unavailable_before_work(message).unwrap_or_else(|| CliError::failed("QUERY_FAILED", message).hint("run `canon inventory sync` to rebuild the index, then run the query again"))
+}
+
 /// `plugin: None` calls the EXACT SAME [`crate::query::run`] path this
 /// function used before sensitive query output was added. The selected
 /// formatter receives the already-policy-validated `include_sensitive` bit,
@@ -37,7 +43,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json))
+                ExitCode::from(query_failure(&err.to_string()).emit("canon query", json))
             }
         };
     };
@@ -67,7 +73,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json))
+            ExitCode::from(query_failure(&err.to_string()).emit("canon query", json))
         }
     }
 }

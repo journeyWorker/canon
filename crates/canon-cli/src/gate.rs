@@ -1035,10 +1035,10 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
 pub(crate) fn refused_promotion(refused: &[canon_gate::promote::Refused]) -> CliError {
     let mut causes: Vec<crate::gate_refusal::Cause> = refused
         .iter()
-        .map(|r| crate::gate_refusal::Cause { code: crate::gate_refusal::PROMOTION_CODE, message: format!("{}: {}", r.violation.subject, r.violation.detail) })
+        .map(|r| crate::gate_refusal::Cause::new(crate::gate_refusal::PROMOTION_CODE, format!("{}: {}", r.violation.subject, r.violation.detail)))
         .collect();
     if causes.is_empty() {
-        causes.push(crate::gate_refusal::Cause { code: "PROMOTION_INVALID", message: "promotion landed nothing".to_string() });
+        causes.push(crate::gate_refusal::Cause::new("PROMOTION_INVALID", "promotion landed nothing".to_string()));
     }
     crate::gate_refusal::refusal(causes, "the records stay staged: fix each one the error names (or re-add it), then run `canon gate promote` again")
 }
@@ -1412,7 +1412,7 @@ fn any_canon_gate_command(settings: &serde_json::Value) -> bool {
 /// The settings of an existing hook file, `{}` when there is none (or its text is not JSON, which the install replaces); a file the system will not
 /// read is the error, so it is told as what it is (`HOOKS_FILE_DENIED`, `HOOKS_FILE_UNAVAILABLE`) before anything is written.
 fn read_hook_settings(path: &Path) -> std::io::Result<serde_json::Value> {
-    match std::fs::read_to_string(path) {
+    match canon_store::eio::read_to_string(path) {
         Ok(text) => Ok(serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({}))),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
         Err(e) => Err(e),

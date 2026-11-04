@@ -378,7 +378,7 @@ fn plan_files(repo: &Path, ledger: &Path, plan: &mut Plan) -> Result<(), String>
                 if file.extension().is_none_or(|e| e != "json") || !canon_store::partition::is_old_layout_path(&relative) {
                     continue;
                 }
-                let old_bytes = std::fs::read(&file).map_err(|e| format!("cannot read `{}`: {e}", rel(repo, &file)))?;
+                let old_bytes = canon_store::eio::read(&file).map_err(|e| format!("cannot read `{}`: {e}", rel(repo, &file)))?;
                 let renamed = rename_one(&root, &relative, &kind_dir, &old_bytes)?;
                 let new_bytes = renamed.bytes.clone().unwrap_or_else(|| old_bytes.clone());
                 match destinations.get(&renamed.to) {
@@ -897,8 +897,8 @@ pub fn scratch(repo: &Path, config: &str, plan: &Plan) -> Result<Scratch, String
                 let from = rel(repo, &file);
                 let (to, bytes) = match moved.get(&from) {
                     Some(m) if m.rewritten => (m.to.clone(), m.new_bytes.clone()),
-                    Some(m) => (m.to.clone(), std::fs::read(&file).map_err(|e| e.to_string())?),
-                    None => (from, std::fs::read(&file).map_err(|e| e.to_string())?),
+                    Some(m) => (m.to.clone(), canon_store::eio::read(&file).map_err(|e| e.to_string())?),
+                    None => (from, canon_store::eio::read(&file).map_err(|e| e.to_string())?),
                 };
                 let target = dir.join(&to);
                 if copied.insert(to) {

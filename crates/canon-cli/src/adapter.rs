@@ -416,7 +416,7 @@ impl ValidationSummary {
 /// Read and validate one response file without executing anything.
 pub fn validate_response<P: AsRef<Path>>(path: P) -> Result<ValidationSummary, AdapterError> {
     let path = path.as_ref();
-    let bytes = fs::read(path).map_err(|source| AdapterError::Io {
+    let bytes = canon_store::eio::read(path).map_err(|source| AdapterError::Io {
         path: path.display().to_string(),
         source,
     })?;
@@ -464,7 +464,7 @@ fn default_none() -> String { "none".into() }
 
 /// Authorize a validated response against `.canon/policy.yaml`; this never executes anything.
 pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo: R) -> Result<AuthorizationResult, AdapterError> {
-    let response = parse_response(fs::read(response_path.as_ref()).map_err(|source| AdapterError::Io { path: response_path.as_ref().display().to_string(), source })?)?;
+    let response = parse_response(canon_store::eio::read(response_path.as_ref()).map_err(|source| AdapterError::Io { path: response_path.as_ref().display().to_string(), source })?)?;
     let policy_path = repo.as_ref().join(".canon/policy.yaml");
     let text = fs::read_to_string(&policy_path).unwrap_or_default();
     let root: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| AdapterError::Policy(format!("malformed policy: {e}")))?;

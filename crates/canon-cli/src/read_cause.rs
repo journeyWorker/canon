@@ -33,21 +33,41 @@ pub(crate) enum Cause {
     Other,
 }
 
-/// The cause an I/O error names.
+/// The cause an I/O error names: the kind it carries first, then the raw operating-system number.
 pub(crate) fn of_io(e: &std::io::Error) -> Cause {
-    if e.raw_os_error() == Some(EIO) {
-        return Cause::Unavailable;
-    }
-    match e.kind() {
+    cause_of(e.kind(), e.raw_os_error())
+}
+
+/// [`of_io`] on what an error carries. The kind decides first, because a raw number means something else on another platform: `5` is `EIO`
+/// on a unix system and `ERROR_ACCESS_DENIED` on Windows, which reports it as [`ErrorKind::PermissionDenied`]. Only a unix error with no
+/// kind of its own (`Uncategorized`) is read by its number.
+fn cause_of(kind: ErrorKind, raw: Option<i32>) -> Cause {
+    match kind {
         ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => Cause::Denied,
         ErrorKind::NotFound => Cause::NotFound,
         ErrorKind::IsADirectory | ErrorKind::NotADirectory => Cause::WrongPath,
         ErrorKind::Interrupted | ErrorKind::WouldBlock | ErrorKind::TimedOut => Cause::Unavailable,
-        _ => Cause::Other,
+        _ => raw_cause(raw),
     }
 }
 
-/// `EIO` is 5 on every platform canon runs on.
+/// The cause of a raw operating-system number whose kind named none: `EIO` on a unix system, nothing elsewhere.
+#[cfg(unix)]
+fn raw_cause(raw: Option<i32>) -> Cause {
+    if raw == Some(EIO) {
+        Cause::Unavailable
+    } else {
+        Cause::Other
+    }
+}
+
+#[cfg(not(unix))]
+fn raw_cause(_raw: Option<i32>) -> Cause {
+    Cause::Other
+}
+
+/// `EIO` is 5 on a unix system; on Windows 5 is `ERROR_ACCESS_DENIED`.
+#[cfg_attr(not(unix), allow(dead_code))]
 const EIO: i32 = 5;
 
 /// The cause named by the last `(os error N)` of an error's text; [`Cause::Other`] when the text carries none.
@@ -69,7 +89,7 @@ pub(crate) fn config_error(message: impl Into<String>) -> CliError {
     match of_text(&message) {
         Cause::Denied => CliError::refused("CONFIG_DENIED", message).hint("make canon.yaml (and the policy file the message names) readable by this user, then run the command again"),
         Cause::Unavailable => CliError::refused("CONFIG_UNAVAILABLE", message).hint("the system failed the read of canon.yaml (or the policy file the message names) in a way a repeat can pass: wait a moment, then run the command again"),
-        _ => CliError::refused("CONFIG_INVALID", message).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"),
+        _ => CliError::refused("CONFIG_INVALID", message).reason("CANON_YAML").hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"),
     }
 }
 
@@ -109,6 +129,14 @@ pub(crate) fn repo_io_error(message: impl Into<String>) -> CliError {
     }
 }
 
+/// A read that failed before any work was done: the repository's retryable `REPO_UNAVAILABLE` when the system failed it in a way a repeat can
+/// pass, and `None` for any other failure, which the caller answers with its own `_FAILED` or `_INCOMPLETE` code. A command that failed
+/// before it began changes nothing, so it is a refusal (exit 2, retryable) and not a failure (spec 8.3); only a failure after work started is
+/// the command's `_FAILED` or `_INCOMPLETE`.
+pub(crate) fn unavailable_before_work(message: &str) -> Option<CliError> {
+    (of_text(message) == Cause::Unavailable).then(|| CliError::refused("REPO_UNAVAILABLE", message).hint(REPO_UNAVAILABLE_HINT))
+}
+
 /// The codes a subject has for a file it cannot read: the one for each cause of [`Cause`] it tells apart.
 pub(crate) struct FileCodes {
     pub denied: &'static str,
@@ -140,6 +168,22 @@ const SIGNATURE_FILE: FileCodes = FileCodes { denied: "STRATEGY_SIGNATURE_DENIED
 /// way a repeat can pass), or `BRIEF_INVALID` (a directory stands where the file belongs, or it is not UTF-8 text).
 pub(crate) fn brief_code(e: &std::io::Error) -> &'static str {
     BRIEF_FILE.of(e)
+}
+
+/// A `BRIEF_INVALID` that came from reading brief.md says why with the reason `UNREADABLE` (a directory stands where the file belongs, or it
+/// is not UTF-8 text); the codes of the other causes of a read have one situation each and no reason. The other reasons of the code
+/// (`UNAPPROVABLE`, `BLOCKERS`) are about the text that was read.
+pub(crate) fn brief_unreadable(error: CliError) -> CliError {
+    if error.code == "BRIEF_INVALID" {
+        error.reason("UNREADABLE")
+    } else {
+        error
+    }
+}
+
+/// The error of a brief.md the system could not read: [`brief_code`] of the cause, with [`brief_unreadable`]'s reason.
+pub(crate) fn brief_read_error(e: &std::io::Error, message: impl Into<String>) -> CliError {
+    brief_unreadable(CliError::failed(brief_code(e), message))
 }
 
 /// The code of a detached signature file that cannot be read: the caller named it with `--signature-file`, so a path that is not there
@@ -333,5 +377,59 @@ mod tests {
         assert_eq!(policy_approval_code_of_text("expected value at line 1 column 1"), "POLICY_APPROVAL_CORRUPT");
         assert_eq!(migration_code_of_text(&text), "MIGRATION_UNAVAILABLE");
         assert_eq!(migration_code_of_text("could not create /tmp/x: Permission denied (os error 13)"), "MIGRATION_DENIED");
+    }
+
+    /// atip.reasons.10: the kind of an error decides before its raw number, because `5` is `EIO` on a unix system and `ERROR_ACCESS_DENIED` on
+    /// Windows, which reports it as `PermissionDenied`: an error of that kind with raw `5` is a refused read, never one a repeat can pass; the raw
+    /// `EIO` is read only for an error whose kind names no cause, and only on a unix system.
+    #[test]
+    fn atip_reasons_10_the_kind_of_an_error_is_read_before_its_raw_number() {
+        assert_eq!(cause_of(ErrorKind::PermissionDenied, Some(EIO)), Cause::Denied, "Windows: 5 is ERROR_ACCESS_DENIED");
+        assert_eq!(cause_of(ErrorKind::ReadOnlyFilesystem, Some(EIO)), Cause::Denied);
+        assert_eq!(cause_of(ErrorKind::NotFound, Some(EIO)), Cause::NotFound);
+        assert_eq!(cause_of(ErrorKind::IsADirectory, Some(EIO)), Cause::WrongPath);
+        assert_eq!(cause_of(ErrorKind::TimedOut, None), Cause::Unavailable, "a kind a repeat can pass needs no number");
+        assert_eq!(cause_of(ErrorKind::PermissionDenied, None), Cause::Denied);
+        // An error with no kind of its own is `Other`, and its raw number is read only where `5` is `EIO`.
+        #[cfg(unix)]
+        {
+            assert_eq!(cause_of(ErrorKind::Other, Some(EIO)), Cause::Unavailable);
+            assert_eq!(of_io(&std::io::Error::from_raw_os_error(EIO)), Cause::Unavailable);
+            assert_eq!(of_text("cannot read x: Input/output error (os error 5)"), Cause::Unavailable);
+        }
+        #[cfg(not(unix))]
+        {
+            assert_eq!(cause_of(ErrorKind::Other, Some(EIO)), Cause::Other, "no raw EIO outside a unix system");
+        }
+        assert_eq!(cause_of(ErrorKind::Other, None), Cause::Other);
+        assert_eq!(cause_of(ErrorKind::InvalidData, Some(22)), Cause::Other);
+    }
+
+    /// atip.reasons.11: a read the system failed before any work was done is `REPO_UNAVAILABLE` (a refusal, exit 2, retryable); any other failure has no
+    /// answer here and is the caller's own `_FAILED` or `_INCOMPLETE`.
+    #[test]
+    fn atip_reasons_11_only_a_read_the_system_failed_for_a_repeat_to_pass_is_unavailable_before_work() {
+        let error = unavailable_before_work(&format!("io: {}", eio())).expect("an EIO before any work is a refusal");
+        assert_eq!((error.code, error.exit, error.retryable), ("REPO_UNAVAILABLE", 2, true));
+        for other in ["io: Permission denied (os error 13)", "json: expected value at line 1 column 1", "no such record"] {
+            assert!(unavailable_before_work(other).is_none(), "{other}");
+        }
+    }
+
+    /// atip.reasons.05: canon.yaml that cannot be used is `CONFIG_INVALID` with the reason `CANON_YAML`; a refused read and a read a repeat can pass
+    /// have their own codes and no reason.
+    #[test]
+    fn atip_reasons_05_a_canon_yaml_that_cannot_be_used_is_config_invalid_with_its_reason() {
+        let invalid = config_error("canon.yaml is not valid YAML: mapping values are not allowed here");
+        assert_eq!((invalid.code, invalid.reason_name(), invalid.exit, invalid.retryable), ("CONFIG_INVALID", Some("CANON_YAML"), 2, false));
+        let denied = config_error(format!("cannot read `canon.yaml`: {}", std::io::Error::from_raw_os_error(13)));
+        assert_eq!((denied.code, denied.reason_name()), ("CONFIG_DENIED", None));
+        let unavailable = config_error(format!("cannot read `canon.yaml`: {}", eio()));
+        assert_eq!((unavailable.code, unavailable.reason_name(), unavailable.retryable), ("CONFIG_UNAVAILABLE", None, true));
+        // A brief that cannot be read as text says why; the other causes of a read keep their codes and have no reason.
+        let not_text = brief_read_error(&io(ErrorKind::InvalidData), "cannot read `brief.md`");
+        assert_eq!((not_text.code, not_text.reason_name()), ("BRIEF_INVALID", Some("UNREADABLE")));
+        let denied = brief_read_error(&io(ErrorKind::PermissionDenied), "cannot read `brief.md`");
+        assert_eq!((denied.code, denied.reason_name()), ("BRIEF_DENIED", None));
     }
 }

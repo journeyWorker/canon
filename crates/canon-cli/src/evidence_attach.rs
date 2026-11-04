@@ -900,7 +900,7 @@ fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Pat
         .map(|c| c.as_os_str().to_string_lossy().into_owned())
         .collect::<Vec<_>>()
         .join("/");
-    let file = std::fs::File::open(&resolved)
+    let file = canon_store::eio::open(&resolved)
         .map_err(|e| BindError::io(format!("open {}: {e}", path.display()), "check the file is readable by this user (permissions) and not locked by another process", &e))?;
     let size = file
         .metadata()

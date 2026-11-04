@@ -491,7 +491,7 @@ pub fn require_config(repo: Option<&Path>) -> Result<PathBuf, CliError> {
     match std::fs::metadata(root.join("canon.yaml")) {
         Ok(meta) if meta.is_file() => return Ok(root),
         Ok(_) => {
-            return Err(CliError::refused("CONFIG_INVALID", format!("`{}` is not a file", root.join("canon.yaml").display()))
+            return Err(CliError::refused("CONFIG_INVALID", format!("`{}` is not a file", root.join("canon.yaml").display())).reason("CANON_YAML")
                 .field("--repo")
                 .hint("replace it with the repository's canon.yaml file (`canon init` writes one), then run the command again"));
         }

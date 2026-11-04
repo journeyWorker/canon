@@ -141,7 +141,7 @@ const SPLIT: &[(&str, i64, bool, &[&str])] = &[
     ("BRIEF_MIGRATION_REQUIRED", 2, false, &[]),
     ("BRIEF_REQUIRED", 2, false, &[]),
     ("CHANGE_NOT_FOUND", 2, false, &[]),
-    ("CONFIG_INVALID", 2, false, &["ARTIFACT_STORE", "DASHBOARD", "POLICY", "SKILLS", "SPECS", "TIERS"]),
+    ("CONFIG_INVALID", 2, false, &["ARTIFACT_STORE", "CANON_YAML", "DASHBOARD", "POLICY", "SKILLS", "SPECS", "TIERS"]),
     ("DISPATCH_CONFLICT", 2, false, &["ALREADY_ENDED", "NOT_RUNNING"]),
     ("DIVERGENCE_CONFLICT", 2, false, &["NOT_DIVERGENT"]),
     ("DIVERGENCE_DENIED", 2, false, &["NOT_REVIEWER", "SELF_ATTESTED"]),

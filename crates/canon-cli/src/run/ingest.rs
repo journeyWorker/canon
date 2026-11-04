@@ -173,7 +173,7 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
                 crate::plans::PlansError::Unavailable(error) => error.clone(),
                 // Several malformed constructs are `error.details`, one entry each: nothing was persisted.
                 crate::plans::PlansError::SourcesInvalid(causes) => crate::gate_refusal::refusal(
-                    causes.iter().map(|cause| crate::gate_refusal::Cause { code: "INGEST_SOURCE_INVALID", message: cause.clone() }).collect(),
+                    causes.iter().map(|cause| crate::gate_refusal::Cause::new("INGEST_SOURCE_INVALID", cause.clone())).collect(),
                     "fix the plan source named (a `root:` that points one level too high is the usual cause), then run `canon ingest plans` again; nothing was persisted",
                 ),
                 _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),

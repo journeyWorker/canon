@@ -286,6 +286,40 @@ A write target that cannot be written keeps `WRITE_DENIED` and `WRITE_INVALID`: 
 
 **Upgrade note:** a script that matched `STOPPED_MIDWAY` matches the `_INCOMPLETE` code of the command now and reads `reason` as before; a script that matched a `*_FAILED`, `*_ABORTED`, `*_ERRORS` or `*_STOPPED` name of the table reads `meta.next[0]` (the read of what was done) before it repeats anything, and treats the `retryable` of the registry as the answer to whether to repeat it.
 
+**A reason belongs to one code, is registered under it, and never changes the exit or `retryable`** (`canon-0-36-code-reasons`, scenarios `atip.reasons.01-14`; atip/1 spec 7.6 and 15.3, the contract author's 1.3 rules, issue #135 section 5). Where several next actions share one code, the `reason` says which: `{reason, meaning, fix}`, registered under the code, upper-case words and underscores, unique inside the code, and the same name may stand under another code (`BLOCKERS` is a reason of both `BRIEF_CHECK_FAILED` and `BRIEF_INVALID`). A `reason` is never in the place of a code and never changes the exit or `retryable` of its code (a different `retryable` is a different code: `ARTIFACTS_STORE_UNAVAILABLE` is retryable, `ARTIFACTS_STORE_REQUIRED` is not; `PROMOTION_INVALID` is exit 2, `PROMOTION_FAILED` exit 1). The names the contract resolved by namespace stay: `EXPIRED` (`CURSOR_INVALID`), `STALE` (`REPORT_CHECK_FAILED`), `UNREADABLE` (`INPUT_INVALID`). A debug build refuses to answer a `reason` its code does not register, or an exit or `retryable` that is not the registry row's, so every test that runs the binary proves both. `canon schema --error <CODE> --json` lists the reasons of a code with the `fix` of each.
+
+| Code | Reasons now | New | Renamed | Gone |
+|---|---|---|---|---|
+| `BRIEF_CHECK_FAILED` | `BLOCKERS` | | | |
+| `BRIEF_INVALID` | `BLOCKERS`, `UNAPPROVABLE`, `UNREADABLE` | `UNREADABLE` | | |
+| `CONFIG_INVALID` | `ARTIFACT_STORE`, `CANON_YAML`, `DASHBOARD`, `POLICY`, `SKILLS`, `SPECS`, `TIERS` | `CANON_YAML` | | |
+| `CONTEXT_INPUT_INVALID` | `SECRET` | | | |
+| `DISPATCH_CONFLICT` | `ALREADY_ENDED`, `NOT_RUNNING` | | | |
+| `DIVERGENCE_CONFLICT` | `NOT_DIVERGENT` | | | |
+| `DIVERGENCE_DENIED` | `NOT_REVIEWER`, `SELF_ATTESTED` | | | |
+| `INIT_INCOMPLETE` | `CONFIG_INVALID`, `SKILLS_ARGUMENT_INVALID`, `SKILLS_SOURCE_NOT_FOUND` | | `SKILLS_INVALID_ARGUMENT` → `SKILLS_ARGUMENT_INVALID` | `SKILLS_INVALID_ARGUMENT` (a reason of `STOPPED_MIDWAY`, which is gone) |
+| `INVENTORY_INCOMPLETE` | `DUPLICATE_SCENARIOS`, `VIOLATIONS` | | | |
+| `MIGRATION_INCOMPLETE` | `INDEX`, `PINS`, `STOPPED` | | | |
+| `REPORT_CHECK_FAILED` | `STALE` | | | |
+| `SKILLS_CHECK_FAILED` | `DRIFT` | | | |
+| `SUBJECT_CONFLICT` | `APPROVED_BRIEF`, `FLOW_TAGGED`, `TRANSITION` | | | |
+| `SUBJECT_INVALID` | `MALFORMED_EVIDENCE`, `OPEN_BLOCKER` | `MALFORMED_EVIDENCE`, `OPEN_BLOCKER` | | |
+
+The reasons of the brief's table that `canon-0-36-code-reasons` settled differently, and why: `SUBJECT_CONFLICT` keeps `APPROVED_BRIEF` and `FLOW_TAGGED` (the brief's starting table named them `UNADOPT_APPROVED_BRIEF` and `UNADOPT_FLOW_TAGGED`: the code's only other reason is `TRANSITION`, and the name of the command is not part of a situation) and has no reason for an adoption refusal, because `subject adopt` has none; `BRIEF_INVALID` has `UNREADABLE` for the read of a brief.md that is no file or no UTF-8 text, the one situation of the code that said nothing; `CONFIG_INVALID` has `CANON_YAML` (canon.yaml itself, the part no other reason names), so a wrong `specs:` section, a wrong policy and a wrong canon.yaml are three reasons; `REPORT_CHECK_FAILED` keeps `STALE` for a report that is missing or out of date, because the next action is the same; `SUBJECT_INVALID` has `MALFORMED_EVIDENCE` and `OPEN_BLOCKER` and no more. The gate's 11 violation kinds are not 11 reasons: three (`uncovered-cell`, `unreviewed-promotion`, `unevidenced-flip`) are `SUBJECT_APPROVAL_REQUIRED`, `stale-evidence` is `EVIDENCE_STALE`, `old-layout` is `LAYOUT_MIGRATION_REQUIRED`, and of the six that are `SUBJECT_INVALID` only the two `subject move` raises (`malformed-evidence`, `open-blocker`) are reasons, because each asks for a different fix; `trust-below-required`, `flagged`, `fabricated-evidence` and `false-success` are reported by `gate check` and `gate task` as data and are raised by no transition. Each entry of `error.details` of a refused transition carries its own code and, for those two, its reason.
+
+**An error that began no work and was an `EIO`-style read failure is the subject's `_UNAVAILABLE`** (`canon-0-36-code-reasons`, scenarios `atip.reasons.10-14`; the contract author's 1.3 rule: a command that failed before it did any work is a refusal, exit 2). These calls answered a code of exit 1, or the wrong code, for a read the system failed in a way a repeat can pass:
+
+| Call | 0.35 answered | now |
+|---|---|---|
+| `canon query` (every kind, with or without `--plugin`) | `QUERY_FAILED` (exit 1) | `REPO_UNAVAILABLE` (exit 2, retryable); `QUERY_FAILED` stays for any other failure |
+| `canon migrate` (the canon.yaml, the plan and the preview of the ledger) | `CONFIG_REQUIRED` (canon.yaml unreadable), `MIGRATION_INVALID` (a file of the plan) | `CONFIG_DENIED`, `CONFIG_UNAVAILABLE` or `CONFIG_INVALID` by the cause of the canon.yaml read; `MIGRATION_DENIED`, `MIGRATION_UNAVAILABLE` or `MIGRATION_INVALID` by the cause of the plan's file; `CONFIG_REQUIRED` only when canon.yaml is not there |
+| `canon dispatch begin --task`, `canon evidence add --task` and the commands that read the plan corpus, on an `EIO` of canon.yaml | `PLAN_SOURCES_REQUIRED` (the `plans:` section was read as absent) | `PLAN_CORPUS_UNAVAILABLE` (exit 2, retryable) |
+| `canon purge` and `canon export`, with a Postgres DSN that is set and cannot be reached | `RETENTION_TIERS_REQUIRED` (the same as an unset DSN) | `RETENTION_TIERS_UNAVAILABLE` (exit 2, retryable); `RETENTION_TIERS_REQUIRED` stays for an unset DSN, a credential or a `tiers.<rung>` that is not there |
+
+`CONFIG_INVALID` of every call now carries a reason (the parse of canon.yaml and a canon.yaml that is no file were without one); `canon init --dry-run` with a wrong `skills:` section keeps `SKILLS`. `read_cause::of_io` reads the kind of an I/O error before its raw number, because `5` is `EIO` on a unix system and `ERROR_ACCESS_DENIED` on Windows (an error of kind `PermissionDenied` with raw `5` is `*_DENIED` there); the raw `EIO` is read only on unix.
+
+**`canon schema` lists every code a command can emit** (`canon-0-36-code-reasons`, scenario `atip.reasons.13`). `canon schema evidence approval-payload` and `canon schema evidence add` did not list `TASK_NOT_FOUND`, `PLAN_SOURCES_REQUIRED` and the three `PLAN_CORPUS_*` codes, because the scan that derives the lists did not follow `error.to_cli_error()` of the plan-corpus admission of `--task`; the table of calls it cannot follow (`CALL_SITES` in `tests/schema_codes.rs`) names them for both commands, and a test calls each command with the failures and checks that the code it answered is in `canon schema <command>`.
+
 ### Contributors
 
 **The `atip` crate and the checker (`atip check`) are the atip repository's** (`canon-0-36-atip-dep`, https://github.com/journeyWorker/atip, issue #134). Nothing canon prints changes: the stdout and the exit status of every command, every `canon schema` answer (`--json`, `--errors`, `--warnings`, each command and each code), `docs/cli/canon.cli.json` and the conformance corpus are byte for byte the 0.35.0 ones.

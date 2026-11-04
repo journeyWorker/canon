@@ -267,7 +267,7 @@ impl PgTier {
                 .max_connections(5)
                 .connect(dsn)
                 .await
-                .map_err(|e| StoreError::tier_unavailable(Rung::Hot, Some(Backend::Postgres), e.to_string()))?;
+                .map_err(|e| StoreError::tier_unreachable(Rung::Hot, Some(Backend::Postgres), e.to_string()))?;
             // All three DDL statements run inside ONE transaction
             // holding `pg_advisory_xact_lock`, so a concurrent
             // bootstrap of the same schema waits instead of racing the
