@@ -517,7 +517,7 @@
       }
     }
   },
-  "contractVersion": "1.2",
+  "contractVersion": "1.4",
   "globalOptions": [
     [
       "--repo",

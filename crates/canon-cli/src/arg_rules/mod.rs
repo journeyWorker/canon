@@ -100,7 +100,7 @@ const PORTED: &[(&str, &[Rule])] = &[
     ("query", &[Rule::at_most_one(&["plugin", "history"])]),
     ("review change", &[Rule::exactly_one(&["upstream-ref", "original-spec-ref"])]),
     ("review scenario", &[Rule::exactly_one(&["upstream-ref", "original-spec-ref"])]),
-    ("schema", &[Rule::at_most_one(&["path", "errors", "error", "warnings", "warning"])]),
+    ("schema", &[Rule::at_most_one(&["schemas", "errors", "error", "warnings", "warning"]), Rule::at_most_one(&["path", "errors", "error", "warnings", "warning"])]),
 ];
 
 /// The pairs of options a flattened group of arguments gives every command that has it: `--promote` and `--no-promote` of

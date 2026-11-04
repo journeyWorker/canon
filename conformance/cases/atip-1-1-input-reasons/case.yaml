@@ -1,4 +1,4 @@
-description: "atip/1 1.1 (0.34), declared as 1.2 since 0.35: every `--input` fault is INPUT_INVALID or INPUT_TOO_LARGE with the contract's reserved `error.reason` and no `x-canon`: NOT_JSON, EMPTY, UNREADABLE, NOT_OBJECT, BATCH_UNSUPPORTED, UNKNOWN_KEY, FLAG_ONLY_KEY, INVALID_VALUE and TOO_MANY_ITEMS, each with exit 2, and every envelope names contractVersion 1.2"
+description: "atip/1 1.1 (0.34), carried into the contract canon declares now (1.4, since 0.36): every `--input` fault is INPUT_INVALID or INPUT_TOO_LARGE with the contract's reserved `error.reason` and no `x-canon`: NOT_JSON, EMPTY, UNREADABLE, NOT_OBJECT, BATCH_UNSUPPORTED, UNKNOWN_KEY, FLAG_ONLY_KEY, INVALID_VALUE and TOO_MANY_ITEMS, each with exit 2, and every envelope names the declared contractVersion 1.4"
 env: { CANON_ACTOR: canon }
 steps:
   - args: [init, --no-agents-md, --no-policy]

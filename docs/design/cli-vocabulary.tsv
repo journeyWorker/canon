@@ -108,6 +108,7 @@ round	N	review round
 run	RUN_ID	dispatch run
 run-outcome	RUN_OUTCOME	how a dispatch run ended
 scenario	SCENARIO_ID	scenario
+schemas	-	mode: print the JSON Schemas a command's refs reach
 seq	N	sequence number within a round
 session	SESSION_ID	agent session
 severity	SEVERITY	severity of a finding

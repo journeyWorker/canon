@@ -37,7 +37,7 @@ canon adapter validate --response adapter-response.json --json
 ```
 ```text
 # Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
-usage: canon artifacts move --tier <TIER> [--commit --plan-digest <DIGEST>] [--input]
+usage: canon artifacts move --tier <TIER> [--commit --plan-digest <VALUE>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -220,7 +220,7 @@ canon inventory sync --json
 ```
 ```text
 # Move superseded versions of every record out of the ledger into the archive
-usage: canon ledger compact [--commit --plan-digest <DIGEST>] [--input]
+usage: canon ledger compact [--commit --plan-digest <VALUE>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -228,7 +228,7 @@ canon ledger compact --json
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-usage: canon migrate [--commit --plan-digest <DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
+usage: canon migrate [--commit --plan-digest <VALUE>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -264,7 +264,7 @@ canon prompt show reviewer@v1 --json
 ```
 ```text
 # Remove allowlisted records older than a cutoff
-usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <DIGEST>] [--input]
+usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <VALUE>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash
@@ -314,7 +314,7 @@ canon retrieve --for-role reviewer --domain dev --limit 20 --json
 ```
 ```text
 # Describe canon's own commands
-usage: canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
+usage: canon schema [<PATH>]* [--schemas | --error <CODE> | --errors | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add --json
@@ -426,7 +426,7 @@ canon subject unadopt demo --change add-login --json
 ```
 ```text
 # Apply canon.yaml aging rules, moving old records to their destination tier
-usage: canon tier age [--commit --plan-digest <DIGEST>] [--input]
+usage: canon tier age [--commit --plan-digest <VALUE>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash

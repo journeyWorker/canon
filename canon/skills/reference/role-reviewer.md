@@ -143,7 +143,7 @@ canon review scenario auth.login.01 --actor alice --role reviewer --original-spe
 ```
 ```text
 # Describe canon's own commands
-usage: canon schema [<PATH>]* [--errors | --error <CODE> | --warning <CODE> | --warnings]
+usage: canon schema [<PATH>]* [--schemas | --error <CODE> | --errors | --warning <CODE> | --warnings]
 ```
 ```bash
 canon schema evidence add --json

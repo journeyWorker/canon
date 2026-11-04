@@ -2,10 +2,13 @@
 //! a completion script needs to know about `canon`, in one document, built
 //! from the clap tree ([`crate::cli::command`]) and the tables beside it.
 //!
-//! The documents are the contract's (atip/1 spec 10): [`tree`] (the groups and commands with `level`), [`group`]
-//! and [`command`] (one command with its options, outputs, input, examples and the JSON Schemas its refs name).
-//! `canon schema` prints them and the checked-in `docs/cli/canon.cli.json` holds them, from the same functions, so
-//! what the file says of a command and what `canon schema <COMMAND>` answers are one value.
+//! The documents are the contract's (atip/1 spec 9). [`tree`], [`group`] and [`command`] build the typed model of
+//! them in the full form (every member, `path`, the JSON Schemas its refs name, the `rejects` of each validator): the
+//! one thing the tests, the generators and the human text read. [`described`] hands that model to the contract crate's
+//! serializer, which writes the 1.4 form canon declares (the call surface only, defaults left out, shared options in
+//! the tree, the schemas in the `--schemas` answer). `canon schema` prints what [`described`] writes and the checked-in
+//! `docs/cli/canon.cli.json` holds it, from the same function, so what the file says of a command and what
+//! `canon schema <COMMAND>` answers are one value.
 //!
 //! - clap says each node's name, summary, operands and options (help, value name, typed default,
 //!   `possibleValues`, `env`); [`atip::project`] reads them and holds the parts every clap tool shares;
@@ -24,6 +27,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use atip::describe::Described;
 use atip::doc::{CommandDoc, EntryKind, GroupDoc, InputDoc, OperandDoc, OptionDoc, OutputDoc, OutputKind, TreeDoc, TreeEntry, ValidatorDoc, ValueType};
 use atip::domain::Domain;
 use atip::project::{self, Node};
@@ -36,8 +40,9 @@ use crate::role::Role;
 use crate::schema::{error_codes, example_for, meta_for};
 use crate::spec_facts::facts_for;
 
-/// The version of this document's own layout: `2` is the L1 shape (a tree and command documents in the contract's names).
-pub const SPEC_VERSION: &str = "2";
+/// The version of this document's own layout: `3` holds the documents in the 1.4 form (what `canon schema` answers) and, per
+/// command, the `--schemas` answer; `2` held the typed model in the 1.3 form.
+pub const SPEC_VERSION: &str = "3";
 
 /// The repo-relative path of the checked-in spec.
 pub const SPEC_PATH: &str = "docs/cli/canon.cli.json";
@@ -106,7 +111,7 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 }
 
 
-/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.2 --deep`
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.4 --deep`
 /// passes on the build: the check runs in CI beside the tests that build these documents (`just atip-deep`, the `atip` job).
 pub const LEVEL: &str = "L2";
 
@@ -282,9 +287,25 @@ fn errors_of(path: &str, options: &[OptionDoc], operands: &[OperandDoc], batch: 
     if has("cursor") {
         codes.insert(feature_codes::CURSOR.to_string());
     }
-    let arguments: Vec<(String, Option<String>)> = options.iter().map(|option| (option.name.clone(), option.value_name.clone())).chain(operands.iter().map(|operand| (operand.name.clone(), Some(operand.value_name.clone())))).collect();
-    codes.extend(crate::arg_rules::codes_for(path, &arguments).into_iter().map(str::to_string));
+    codes.extend(argument_codes(path, options, operands).into_iter().map(str::to_string));
     codes.into_iter().collect()
+}
+
+/// The codes the argument rules of `path` refuse with: its constraints', its validators' and its domains'.
+fn argument_codes(path: &str, options: &[OptionDoc], operands: &[OperandDoc]) -> Vec<&'static str> {
+    let arguments: Vec<(String, Option<String>)> = options.iter().map(|option| (option.name.clone(), option.value_name.clone())).chain(operands.iter().map(|operand| (operand.name.clone(), Some(operand.value_name.clone())))).collect();
+    crate::arg_rules::codes_for(path, &arguments)
+}
+
+/// `--commit` and `--plan-digest` mean what the contract says of them (spec 11), so the document lists them by their bare names
+/// (spec 9.5): the standard text and the standard placeholder stand for canon's own, which stay in `--help`.
+fn reserved_standard(option: &mut OptionDoc) {
+    if matches!(option.name.as_str(), "commit" | "plan-digest") {
+        if let Some(standard) = atip::describe::standard_help(&option.name) {
+            option.help = standard.to_string();
+        }
+        option.value_name = None;
+    }
 }
 
 /// The outputs of a command and the schemas they name.
@@ -378,6 +399,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
             option.default_note = default_note(path, &option.name).map(str::to_string);
         }
         option.domain = domain_of(path, &option.name, option.value_name.as_deref(), option.value_type, option.domain.take())?;
+        reserved_standard(&mut option);
         options.push(option);
     }
     let mut schemas = BTreeMap::new();
@@ -425,6 +447,39 @@ pub fn command(root: &Command, path: &[String]) -> Built<CommandDoc> {
 /// Every command document, in tree order: what the checked-in spec holds and what `canon schema <COMMAND>` answers.
 pub fn commands(root: &Command) -> Built<Vec<CommandDoc>> {
     project::nodes(root).iter().filter(|node| !node.is_group).map(command_of).collect()
+}
+
+/// The codes canon's argument rules refuse with in place of `USAGE` (a constraint's, a validator's, a domain's) that are registered at
+/// exit 2 with the condition `INVALID` or `REQUIRED`: its finer replacements of `USAGE` (spec 7.3.2), which a 1.4 command document
+/// implies and does not list in `errors`. A command's validators and domains name their own code, so nothing the document says is lost;
+/// a `_CONFLICT` code of a rule is no replacement and stays listed.
+fn usage_replacements(commands: &[CommandDoc]) -> BTreeSet<String> {
+    commands
+        .iter()
+        .flat_map(|doc| argument_codes(&doc.command, &doc.options, &doc.operands))
+        .filter(|code| crate::cli_error::code_info(code).is_some_and(|info| info.exit == 2) && atip::reserved_code(code, atip::Minor::V1_4).is_none())
+        .filter(|code| matches!(atip::Condition::of_code(code), Some((_, atip::Condition::Invalid | atip::Condition::Required))))
+        .map(str::to_string)
+        .collect()
+}
+
+/// The self-description of canon in the form of the minor it declares ([`crate::json_out::DECLARED_MINOR`]): the typed model of every
+/// command, handed to the contract crate's serializer. With `role` (`--as`) the tree and the groups list only that role's commands
+/// and say so in `x-canon.as`; the command documents and the shared options are the whole tool's, whatever the filter (a document
+/// answers the same to every caller).
+pub fn described(root: &Command, role: Option<Role>) -> Built<Described> {
+    let tree = tree(root, role)?;
+    let commands = commands(root)?;
+    let usage = usage_replacements(&commands);
+    let minor = atip::Minor::parse(crate::json_out::DECLARED_MINOR).map_err(|unknown| unknown.to_string())?;
+    let groups: Vec<String> = tree.commands.iter().filter(|entry| entry.kind == EntryKind::Group).map(|entry| entry.command.clone()).collect();
+    let mut described = Described::new(minor, tree.level.clone(), tree.commands, commands).map_err(|problem| problem.to_string())?.usage_replacements(usage).tree_extensions(tree.extensions);
+    if let Some(role) = role {
+        for group in groups {
+            described = described.group_extensions(group, BTreeMap::from([("x-canon".to_string(), json!({ "as": role.as_str() }))]));
+        }
+    }
+    Ok(described)
 }
 
 /// The clap tree of the whole CLI, built: the root every document is read from.
@@ -511,16 +566,37 @@ fn records() -> Value {
     json!({ "kinds": kinds, "families": families })
 }
 
-/// The whole spec.
+/// The whole spec. `tree` and `commands` are the documents `canon schema` answers (the 1.4 form), and `schemas` holds, per command, what
+/// `canon schema <COMMAND> --schemas` answers: the JSON Schemas the command's refs name, `Input` and the `rejects` of its validators.
 ///
 /// # Panics
 /// When a table or a declaration the documents are built from is incomplete (an unlisted custom parser, a default
 /// that does not parse, an option without help): that is a defect of this build, which `tests/schema_doc.rs` finds.
 pub fn generate() -> Value {
     let root = built_root();
+    let described = described(&root, None).expect("the command documents are built from tables the tests keep whole");
+    let names: Vec<String> = commands(&root).expect("the command documents are built from tables the tests keep whole").into_iter().map(|doc| doc.command).collect();
+    let commands: Vec<Value> = names.iter().map(|name| described.command(name).expect("every command has its document").to_value()).collect();
+    let schemas: BTreeMap<&str, Value> = names.iter().map(|name| (name.as_str(), described.schemas(name).expect("every command has its schemas answer").to_value())).collect();
+    assemble(&root, described.tree().to_value(), json!(commands), Some(json!(schemas)))
+}
+
+/// The spec with `tree` and `commands` in the full form of the typed model (every member of every option, `path`, the schemas inside the
+/// command document, the implied options and codes, the `rejects` of each validator) and no `schemas`: the one thing the tests of canon's
+/// own declarations and the generators of the guides read, so that they say what canon declares and not how the 1.4 form writes it.
+/// `docs/cli/canon.cli.json` holds [`generate`].
+///
+/// # Panics
+/// As [`generate`].
+pub fn model() -> Value {
+    let root = built_root();
     let tree = tree(&root, None).expect("the tree is built from tables the tests keep whole");
     let commands = commands(&root).expect("the command documents are built from tables the tests keep whole");
-    json!({
+    assemble(&root, json!(tree), json!(commands), None)
+}
+
+fn assemble(root: &Command, tree: Value, commands: Value, schemas: Option<Value>) -> Value {
+    let mut spec = json!({
         "_doNotEdit": "GENERATED from the clap tree and the tables beside it: do not edit. Regenerate with `CANON_BLESS_CLI_SPEC=1 cargo test -p canon-cli --test cli_spec`.",
         "specVersion": SPEC_VERSION,
         "cli": {
@@ -538,7 +614,11 @@ pub fn generate() -> Value {
         "tree": tree,
         "commands": commands,
         "records": records(),
-    })
+    });
+    if let Some(schemas) = schemas {
+        spec["schemas"] = schemas;
+    }
+    spec
 }
 
 /// [`generate`] as the text of `docs/cli/canon.cli.json`: pretty-printed, one

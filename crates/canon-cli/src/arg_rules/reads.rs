@@ -105,6 +105,15 @@ pub(crate) static TABLES: Tables = Tables {
         ),
         ("purge", &[Validator { arguments: &["before"], code: "USAGE", description: CALENDAR, rejects: &["canon purge --kind session --before 2026-02-30 --json"] }]),
         (
+            "schema",
+            &[Validator {
+                arguments: &["schemas", "path"],
+                code: "USAGE",
+                description: "`--schemas` answers for one command: `path` names a command, not a group and not nothing (the tree).",
+                rejects: &["canon schema --schemas --json", "canon schema finding --schemas --json"],
+            }],
+        ),
+        (
             "retrieve",
             &[Validator {
                 arguments: &["for-role", "regime"],
