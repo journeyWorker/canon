@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-table",
+    "role": "reviewer",
+    "session_id": "s-0-36-table-rev"
+  },
+  "at": "2026-11-04T14:37:22.547829Z",
+  "change_id": "canon-0-36-codes-table",
+  "code_tree": "6c825d1cbf7d1070f0a2daaca7523e0dd9f2ea67",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_codestable.rs:144-156; crates/canon-cli/tests/codes_names.rs:22-28",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "7ccaf06474d39b1eb92e7074546cc32197302409",
+  "reviewer": "rev-0-36-table",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestable.02",
+    "atip.codenames.04"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[standards] Two bound tests prove less than the scenario they are bound to. atip_codestable_02 (the only test the evidence of atip.codestable.02 names) spot-checks five rows and that each why is non-empty; the per-row comparison of before/after exit, retryable, reasons and kind that the scenario states is in table_problems, which only atip_codestable_01 calls. atip_codenames_04's only bound test covers the first half of the new Then (a name without a condition or with a wrong exit is refused); 'every code of the registry follows the rule with nothing exempt' lives in atip_codenames_03 and atip_codestable_05. The claims hold (I checked every row against schema --errors of this build and ran the tests), but a mutation of one row's exit-after fails 01 and leaves 02 green. Have 02 assert table_problems is empty, and have the codenames.04 test (or its scenario) cover or name the all-codes check.",
+  "worktree_dirty": false
+}

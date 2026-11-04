@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-table",
+    "role": "reviewer",
+    "session_id": "s-0-36-table-rev"
+  },
+  "at": "2026-11-04T14:38:18.131745Z",
+  "code_tree": "6c825d1cbf7d1070f0a2daaca7523e0dd9f2ea67",
+  "kind": "review",
+  "pin": "7ccaf06474d39b1eb92e7074546cc32197302409",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codestable_10_no_guide_says_exit_1_for_a_refusal"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e210103d28dd44f1d472ab99aa35c85160a7abe4d9063db39e9d022fcd864836",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-table/brief.md"
+  },
+  "review_id": "01M6KFY60KJPFK7GWVPJ72TX92",
+  "reviewer": "rev-0-36-table",
+  "scenario_id": "atip.codestable.10",
+  "schema": 2,
+  "worktree_dirty": false
+}

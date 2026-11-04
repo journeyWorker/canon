@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-table",
+    "role": "reviewer",
+    "session_id": "s-0-36-table-rev"
+  },
+  "at": "2026-11-04T14:37:19.752016Z",
+  "change_id": "canon-0-36-codes-table",
+  "code_tree": "6c825d1cbf7d1070f0a2daaca7523e0dd9f2ea67",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md (Unreleased, the codes-exit and codes-stored paragraphs)",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "7ccaf06474d39b1eb92e7074546cc32197302409",
+  "reviewer": "rev-0-36-table",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestable.12"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] Two stage paragraphs of the 0.36 CHANGELOG entry still state STOPPED_MIDWAY as the live behaviour of 0.36, against the table, the Gone list and the upgrade note of the same section: the codes-exit paragraph says a staged record whose promotion the gate refused 'is STOPPED_MIDWAY (exit 1, reason PROMOTION_INVALID)' and that strategy promote 'is STOPPED_MIDWAY with reason STRATEGY_PROMOTION_INVALID'; the codes-stored paragraph says a blob rewritten during upload 'is STOPPED_MIDWAY (reason ARTIFACTS_BLOB_CORRUPT)'. The old-name tests exempt the CHANGELOG, so nothing catches it; a release owner or script author reading top-down meets a code that 0.36 does not register. Rewrite them to EVIDENCE_INCOMPLETE, STRATEGY_INCOMPLETE and ARTIFACTS_MOVE_INCOMPLETE (or mark them 'was STOPPED_MIDWAY in the stage, now ...'). The table row, Gone list and upgrade note are right.",
+  "worktree_dirty": false
+}
