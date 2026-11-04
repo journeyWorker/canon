@@ -286,8 +286,18 @@ fn changelog_rows(changelog: &str) -> Vec<(String, String)> {
     let codes = |cell: &str| -> Vec<String> {
         cell.split('`').skip(1).step_by(2).filter(|c| !c.is_empty() && c.chars().all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')).map(str::to_string).collect()
     };
+    // The table of reasons (`| Code | Reasons now | …`) names reasons, not renames: its rows are not rows of old and new codes.
+    let mut in_reasons_table = false;
     rest[..end]
         .lines()
+        .filter(|line| {
+            if line.starts_with("| Code | Reasons now |") {
+                in_reasons_table = true;
+            } else if !line.starts_with('|') {
+                in_reasons_table = false;
+            }
+            !in_reasons_table
+        })
         .flat_map(|line| {
             let cells: Vec<&str> = line.split('|').map(str::trim).collect();
             match cells.as_slice() {

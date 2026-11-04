@@ -392,15 +392,13 @@ mod tests {
         assert_eq!(cause_of(ErrorKind::PermissionDenied, None), Cause::Denied);
         // An error with no kind of its own is `Other`, and its raw number is read only where `5` is `EIO`.
         #[cfg(unix)]
-        {
-            assert_eq!(cause_of(ErrorKind::Other, Some(EIO)), Cause::Unavailable);
-            assert_eq!(of_io(&std::io::Error::from_raw_os_error(EIO)), Cause::Unavailable);
-            assert_eq!(of_text("cannot read x: Input/output error (os error 5)"), Cause::Unavailable);
-        }
+        assert_eq!(cause_of(ErrorKind::Other, Some(EIO)), Cause::Unavailable);
+        #[cfg(unix)]
+        assert_eq!(of_io(&std::io::Error::from_raw_os_error(EIO)), Cause::Unavailable);
+        #[cfg(unix)]
+        assert_eq!(of_text("cannot read x: Input/output error (os error 5)"), Cause::Unavailable);
         #[cfg(not(unix))]
-        {
-            assert_eq!(cause_of(ErrorKind::Other, Some(EIO)), Cause::Other, "no raw EIO outside a unix system");
-        }
+        assert_eq!(cause_of(ErrorKind::Other, Some(EIO)), Cause::Other, "no raw EIO outside a unix system");
         assert_eq!(cause_of(ErrorKind::Other, None), Cause::Other);
         assert_eq!(cause_of(ErrorKind::InvalidData, Some(22)), Cause::Other);
     }
