@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-audit",
+    "role": "reviewer",
+    "session_id": "s-0-36-audit-rev"
+  },
+  "at": "2026-11-04T18:21:25.155746Z",
+  "change_id": "canon-0-36-evidence-audit",
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "kind": "review",
+  "pin": "4b1732a54c54fc3b84f257210a1c362255dd004f",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "b82bdd869c1d834c00ad901ba7055550ca102f0e8814b7f231dea82281cecd0d",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-evidence-audit/brief.md"
+  },
+  "review_id": "01M6KWPQ9314EQ12785S5JJ60K",
+  "reviewer": "rev-0-36-audit",
+  "schema": 2,
+  "worktree_dirty": false
+}

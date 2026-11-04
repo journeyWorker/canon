@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-audit",
+    "role": "reviewer",
+    "session_id": "s-0-36-audit-rev"
+  },
+  "at": "2026-11-04T18:21:11.279063Z",
+  "change_id": "canon-0-36-evidence-audit",
+  "code_tree": "6351a9f6f2b8bafcf85cd509563cd7109f30e7af",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4b1732a54c54fc3b84f257210a1c362255dd004f",
+  "reviewer": "rev-0-36-audit",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards: ingest.sessions.16 now binds 3 cases, one more than the 2 the table calls complete; ingest_sessions_16c (a ledger-routed subject write prints no hot-store line) has existed since 0.30 (a0c7f2197) and was never bound before, so it is an addition, not a lost case. It matches the scenario (hot store location printed only for hot-routed writes) and the junit passes it; the table row should say 2 lost-case re-bound plus 16c newly bound. Also context.capability.44 binds a test still named ..._refused_with_unknown_role though it asserts ROLE_INVALID (name stale, behavior correct). Blast radius: none; names only.",
+  "worktree_dirty": false
+}
