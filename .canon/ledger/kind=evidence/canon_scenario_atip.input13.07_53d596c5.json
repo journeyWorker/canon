@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-help-json",
+    "role": "implementer",
+    "session_id": "s-0-36-help-json"
+  },
+  "at": "2026-11-04T01:44:55.671443Z",
+  "attachments": [
+    {
+      "case": "atip_input13_07_the_largest_safe_integer_passes_the_integer_check_and_the_next_two_do_not_in_either_spelling",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3d3baaf59b41986adb1a2118c844421598f3c6e0b6d80fc0f1bffa1c10e00446"
+    }
+  ],
+  "code_tree": "808330e1a0cb21b91ca994f301403ab344bb5a39",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "c52934069403cca1e677a328cdd7d28fa1f4951a",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "atip.input13.07",
+  "schema": 1,
+  "staging_id": "228605b4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

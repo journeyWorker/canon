@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-help-json",
+    "role": "implementer",
+    "session_id": "s-0-36-help-json"
+  },
+  "at": "2026-11-04T01:45:06.160565Z",
+  "attachments": [
+    {
+      "case": "atip_input13_11_an_empty_array_for_a_repeatable_option_is_input_invalid_at_the_key_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3d3baaf59b41986adb1a2118c844421598f3c6e0b6d80fc0f1bffa1c10e00446"
+    }
+  ],
+  "code_tree": "808330e1a0cb21b91ca994f301403ab344bb5a39",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "c52934069403cca1e677a328cdd7d28fa1f4951a",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "atip.input13.11",
+  "schema": 1,
+  "staging_id": "12114503",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
