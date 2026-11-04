@@ -99,7 +99,7 @@ Feature: atip codesplit
   Scenario: The CHANGELOG has a row for each refusal code the change split that says what it became, the registry has those codes with the row's exit and retryability, and the old names are in no registry view
     Given the 28 codes of the change's table, the replacement table of the CHANGELOG, the registry, the errors of every command document and the guides
     When each row is read against the registry, canon schema --errors and canon schema --error <old name> run, and the guides are scanned for the old names
-    Then every code has one row naming the new codes of the brief's table that the registry kept (EVIDENCE_REQUIRED alone for EVIDENCE_REFUSED and none for SUBJECT_ADOPT_REFUSED, whose codes the change chose otherwise), each new code is registered with the row's exit and retryability, each reason of a row is registered under one of its new codes, the old names that no new code keeps are in no registry view and no errors list and are refused by schema --error as USAGE at --error, the BRIEF_APPROVE_REFUSED row says where the refusals of a batch are, and no guide spells an old name
+    Then every code has one row naming the new codes of the brief's table, each new code is registered with the row's exit and retryability, each reason of a row is registered under one of its new codes, the old names that no new code keeps are in no registry view and no errors list and are refused by schema --error as USAGE at --error, the BRIEF_APPROVE_REFUSED row says where the refusals of a batch are, and no guide spells an old name
 
   # canon: {"schema":1,"at":"2026-11-04T19:21:19Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
   @subject:atip-contract
