@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-table",
+    "role": "reviewer",
+    "session_id": "s-0-36-table-rev"
+  },
+  "at": "2026-11-04T15:29:21.851834Z",
+  "change_id": "canon-0-36-codes-table",
+  "code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=evidence (083f95f01)",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "083f95f016328fbfdf80d3f71ab843780e263099",
+  "reviewer": "rev-0-36-table",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[standards] The 757 evidence records of 083f95f01 (atip.codestable.01-13, atip.reasons.01-14 and the rest) say worktree_dirty true and code_tree 63d09218, but the code tree of ea5fd3886 (and of 083f95f01) is c981f839 (read-tree, drop .canon/, docs/**, *.md and the platformer spec root; the same method gave 6c825d1c for ff534b234, which matched its evidence). The commit message says 'from a fresh worktree at ea5fd3886', so the worktree held something the commit does not. The gate does not flag it, and the bound tests pass on the committed tree (I ran atip_codestable 01-13, codes_names, old_names and atip_codenames at c981f839: 9, 13, 4, 7 passed), so the claims hold, but the evidence does not prove the commit. Record it again from a clean worktree (worktree_dirty false, code_tree c981f839) or say what the extra content was.",
+  "worktree_dirty": false
+}
