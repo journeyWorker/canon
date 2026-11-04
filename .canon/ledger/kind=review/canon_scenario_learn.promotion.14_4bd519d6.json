@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:04:28.664613Z",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "kind": "review",
+  "pin": "dfe371b25787f3be0f8de97db7cb24593d0ad1bb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_signature_is_read_and_writes_nothing"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "67e66c735984f7457ac3394fec1ba8fe27f4d7b737e38c886c317845332b6d1c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
+  },
+  "review_id": "01M6JJHB3RX6BMK6HS8CFDY864",
+  "reviewer": "rev-0-36-refusals",
+  "scenario_id": "learn.promotion.14",
+  "schema": 2,
+  "worktree_dirty": false
+}

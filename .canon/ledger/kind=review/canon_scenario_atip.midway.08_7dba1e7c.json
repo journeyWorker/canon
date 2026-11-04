@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:04:28.664613Z",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "kind": "review",
+  "pin": "dfe371b25787f3be0f8de97db7cb24593d0ad1bb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_midway_08_a_batch_element_that_stops_midway_is_failed_with_its_reason_and_the_batch_is_incomplete",
+          "junit:input::tests::atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "a8bd8aafd98806d505f4059a1d19e0623d855a2339ebe966f04f8db8b366ba41",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
+  },
+  "review_id": "01M6JJHB3RX6BMK6HS8CFDY864",
+  "reviewer": "rev-0-36-refusals",
+  "scenario_id": "atip.midway.08",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:04:28.664613Z",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "kind": "review",
+  "pin": "dfe371b25787f3be0f8de97db7cb24593d0ad1bb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_midway_06_a_refusal_with_no_effect_is_exit_2_with_the_refusals_own_code"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c1c4d1a94cb255597ceaf6d3d9adc1d1188cafaaa44f15e8423476fa50b946a7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-refusals/brief.md"
+  },
+  "review_id": "01M6JJHB3RX6BMK6HS8CFDY864",
+  "reviewer": "rev-0-36-refusals",
+  "scenario_id": "atip.midway.06",
+  "schema": 2,
+  "worktree_dirty": false
+}
