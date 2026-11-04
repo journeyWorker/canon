@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-stored",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-stored"
+  },
+  "at": "2026-11-04T07:00:38.411025Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_07_warning_only_codes_are_in_the_warning_registry_and_dual_codes_in_both_with_one_meaning",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    }
+  ],
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d190c746c425a734d9a14ad505a43eba1bbeb16b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 173,
+  "scenario_id": "atip.contract11.07",
+  "schema": 1,
+  "staging_id": "f0193cab",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

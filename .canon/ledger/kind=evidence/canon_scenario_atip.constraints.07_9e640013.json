@@ -1,0 +1,101 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-stored",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-stored"
+  },
+  "at": "2026-11-04T07:00:38.411025Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_07_every_validator_refuses_every_call_it_rejects",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_one_change_with_two_digests_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_a_relayed_approval_without_its_digest_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_class_audit_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_evidence_audit_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_export_an_empty_window_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_finding_add_a_defect_without_its_origin_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_constraints_07_query_a_status_foreign_to_the_kind_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    }
+  ],
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d190c746c425a734d9a14ad505a43eba1bbeb16b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 331,
+  "scenario_id": "atip.constraints.07",
+  "schema": 1,
+  "staging_id": "8547de71",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

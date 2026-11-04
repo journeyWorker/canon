@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-stored",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-stored"
+  },
+  "at": "2026-11-04T07:00:38.411025Z",
+  "attachments": [
+    {
+      "case": "skills_install_60_a_dropped_file_replaced_by_a_symlink_is_kept_and_never_followed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "skills_install_60_install_keeps_a_dropped_file_whose_bytes_changed_and_reports_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    }
+  ],
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d190c746c425a734d9a14ad505a43eba1bbeb16b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 601,
+  "scenario_id": "skills.install.60",
+  "schema": 1,
+  "staging_id": "25942490",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

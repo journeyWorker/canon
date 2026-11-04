@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-stored",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-stored"
+  },
+  "at": "2026-11-04T07:00:38.411025Z",
+  "attachments": [
+    {
+      "case": "input::tests::atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    },
+    {
+      "case": "atip_midway_08_a_batch_element_that_stops_midway_is_failed_with_its_reason_and_the_batch_is_incomplete",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    }
+  ],
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d190c746c425a734d9a14ad505a43eba1bbeb16b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 131,
+  "scenario_id": "atip.midway.08",
+  "schema": 1,
+  "staging_id": "eaa1eee1",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

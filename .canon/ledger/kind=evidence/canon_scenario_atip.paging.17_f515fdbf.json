@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-stored",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-stored"
+  },
+  "at": "2026-11-04T07:00:38.411025Z",
+  "attachments": [
+    {
+      "case": "atip_paging_17_the_output_mode_does_not_bind_a_cursor_an_explicit_default_does_and_text_mode_checks_fields",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7cd272aee8f1094478a1812fe4d322ca0be7995b5d9a2c8f7ac605e0d2342548"
+    }
+  ],
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d190c746c425a734d9a14ad505a43eba1bbeb16b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 185,
+  "scenario_id": "atip.paging.17",
+  "schema": 1,
+  "staging_id": "5e4ec8df",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
