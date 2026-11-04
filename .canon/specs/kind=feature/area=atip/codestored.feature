@@ -65,6 +65,7 @@ Feature: atip codestored
   @subject:atip-contract
   @case:failure
   @flow:canon-0-36-codes-stored.F3
+  @flow:canon-0-35-crate-plan.F5
   @atip.codestored.07
   Scenario: An artifact store that cannot be used is told by its cause: REQUIRED, UNAVAILABLE, INVALID or CONFIG_INVALID, and a blob that cannot be read is not CORRUPT
     Given a repository with an object-store tier whose credentials are unset, one whose endpoint does not answer, one whose artifact_store section names no object-store tier, one whose store directory is a symlink, a regular file or unreadable, a local blob that is unreadable or broken, and a commit during which a blob is rewritten after blobs were uploaded or before any

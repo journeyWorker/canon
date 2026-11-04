@@ -1,4 +1,4 @@
-//! `canon-0-36-codes-refusals`, scenarios `atip.codesplit.01`-`.07`: the codes that said several refusals with one name say each with the code
+//! `canon-0-36-codes-refusals`, scenarios `atip.codesplit.01`-`.11`: the codes that said several refusals with one name say each with the code
 //! of its condition (atip/1 spec 7.2.2), and a reason names what differs inside one condition. Against the built `canon` binary; the codes
 //! of the other scenarios the split changed are asserted by the tests of those scenarios.
 
@@ -8,6 +8,9 @@ use std::process::{Command, Output};
 use std::time::Duration;
 
 use canon_store::file_lock::FileLock;
+
+mod old_codes;
+use old_codes::{changelog, gone_codes_in, replacement_table, Row};
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -411,4 +414,311 @@ fn atip_codesplit_07_a_file_or_lock_the_system_refuses_is_told_by_the_code_of_it
         drop(guard);
     }
     assert_eq!(tree(old.path()), before, "a refused preview writes nothing");
+}
+
+/// A complete English brief, so `canon brief approve` accepts it.
+fn clean_brief() -> String {
+    "# Change\n\n\
+## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n"
+        .to_string()
+}
+
+fn brief_file(dir: &Path, change: &str) -> PathBuf {
+    dir.join(format!(".canon/changes/{change}/brief.md"))
+}
+
+/// A repo with the subject `s` and the changes `a` (a clean brief), `c` (the skeleton `change new` wrote, whose blockers refuse an approval) and `d` (a clean
+/// brief that ends inside an open code fence, which cannot be approved either).
+fn approval_repo() -> TempDir {
+    let dir = repo();
+    let d = dir.path();
+    ok(d, &["subject", "new", "s", "--domain", "dev", "--title", "S"]);
+    for change in ["a", "c", "d"] {
+        ok(d, &["change", "new", change, "--subject", "s", "--title", change]);
+    }
+    std::fs::write(brief_file(d, "a"), clean_brief()).unwrap();
+    std::fs::write(brief_file(d, "d"), format!("{}\n```\nunclosed\n", clean_brief())).unwrap();
+    dir
+}
+
+const ANSWER: [&str; 4] = ["--approver", "Ana", "--note", "Go, all of them."];
+
+/// The briefs of `changes` as bytes: what a refused approval must leave as it found it.
+fn briefs(dir: &Path, changes: &[&str]) -> Vec<Vec<u8>> {
+    changes.iter().map(|change| std::fs::read(brief_file(dir, change)).unwrap()).collect()
+}
+
+/// atip.codesplit.08: an approval of several ids with some refused answers with the first refused id's own code and reason, one `details` entry for each
+/// refused id, no `data` (no `data.refused`) and exit 2, and writes nothing.
+#[test]
+fn atip_codesplit_08_a_batch_approval_with_refused_ids_answers_with_the_first_refused_ids_code_and_details() {
+    let dir = approval_repo();
+    let d = dir.path();
+    let before = briefs(d, &["a", "c", "d"]);
+    let tree_before = tree(d);
+
+    // Three briefs, two refused: the first refused is `c`, which has blockers.
+    let out = run(d, &[&["brief", "approve", "a", "c", "d"][..], &ANSWER].concat());
+    assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
+    let doc = body(&out);
+    assert!(doc.get("data").is_none(), "a refusal carries no data, so no data.refused either: {doc}");
+    let details = doc["error"]["details"].as_array().unwrap_or_else(|| panic!("each refused id is a detail: {doc}"));
+    assert_eq!(details.len(), 2, "two of the three briefs are refused: {doc}");
+    let named = |detail: &Value| detail["message"].as_str().unwrap().split('`').nth(1).unwrap().to_string();
+    assert_eq!(details.iter().map(named).collect::<Vec<_>>(), ["c", "d"], "in the order given");
+    assert!(details.iter().all(|detail| detail["code"] == "BRIEF_INVALID"), "{doc}");
+    let reasons: Vec<&str> = details.iter().map(|detail| detail["reason"].as_str().unwrap_or_else(|| panic!("a reason: {detail}"))).collect();
+    assert_eq!(reasons, ["BLOCKERS", "UNAPPROVABLE"], "a brief with blockers and one that cannot be approved are told apart");
+    assert_eq!((doc["error"]["code"].as_str(), doc["error"]["reason"].as_str()), (Some("BRIEF_INVALID"), Some("BLOCKERS")), "the first refused id's own code and reason: {doc}");
+    assert!(doc["error"]["message"].as_str().unwrap().starts_with("`c`"), "{doc}");
+    assert_eq!(doc["error"]["retryable"], false);
+    assert_eq!(briefs(d, &["a", "c", "d"]), before, "no brief changed, not even the one that could be approved");
+    assert_eq!(tree(d), tree_before, "nothing was written");
+
+    // An id that has no change is the first refused id: its own code is the answer, and the others are details after it.
+    let missing = body(&run(d, &[&["brief", "approve", "ghost", "c", "a"][..], &ANSWER].concat()));
+    assert_eq!((missing["error"]["code"].as_str(), missing["error"].get("reason")), (Some("BRIEF_NOT_FOUND"), None), "{missing}");
+    assert_eq!(missing["error"]["details"].as_array().unwrap().iter().map(|detail| detail["code"].as_str().unwrap()).collect::<Vec<_>>(), ["BRIEF_NOT_FOUND", "BRIEF_INVALID"], "{missing}");
+    assert!(missing.get("data").is_none(), "{missing}");
+    assert_eq!(tree(d), tree_before, "nothing was written");
+
+    // One refused id has no `details`: the error is the cause itself.
+    let single = body(&run(d, &[&["brief", "approve", "c"][..], &ANSWER].concat()));
+    assert_eq!((single["error"]["code"].as_str(), single["error"]["reason"].as_str()), (Some("BRIEF_INVALID"), Some("BLOCKERS")), "{single}");
+    assert!(single["error"].get("details").is_none(), "{single}");
+}
+
+/// atip.codesplit.09: the refused ids fixed one at a time, the same call approves them all with one entry each and no refusal.
+#[test]
+fn atip_codesplit_09_the_refused_ids_fixed_one_at_a_time_let_the_same_call_approve_them_all() {
+    let dir = approval_repo();
+    let d = dir.path();
+    let call = [&["brief", "approve", "a", "c", "d"][..], &ANSWER].concat();
+    assert_eq!(run(d, &call).status.code(), Some(2));
+    // `c` is fixed: the first refused id is now `d`.
+    std::fs::write(brief_file(d, "c"), clean_brief()).unwrap();
+    let after_c = body(&run(d, &call));
+    assert_eq!((after_c["error"]["code"].as_str(), after_c["error"]["reason"].as_str()), (Some("BRIEF_INVALID"), Some("UNAPPROVABLE")), "{after_c}");
+    assert!(after_c["error"].get("details").is_none(), "one refused id is the error itself: {after_c}");
+    // `d` is fixed too: all three are approved, in the order given, and the answer is data without a refusal.
+    std::fs::write(brief_file(d, "d"), clean_brief()).unwrap();
+    let approved = run(d, &call);
+    assert_eq!(approved.status.code(), Some(0), "{}", String::from_utf8_lossy(&approved.stdout));
+    let doc = body(&approved);
+    assert!(doc.get("error").is_none(), "{doc}");
+    let entries = doc["data"]["approvals"].as_array().unwrap_or_else(|| panic!("one entry for each id: {doc}"));
+    assert_eq!(entries.iter().map(|entry| entry["change"].as_str().unwrap()).collect::<Vec<_>>(), ["a", "c", "d"]);
+    assert!(entries.iter().all(|entry| entry["outcome"] == "written"), "each brief was written: {doc}");
+    assert!(doc["data"].get("refused").is_none(), "there is no data.refused: {doc}");
+    for change in ["a", "c", "d"] {
+        assert!(std::fs::read_to_string(brief_file(d, change)).unwrap().lines().any(|line| line.starts_with("Approved: Ana")), "{change} carries the approval");
+    }
+}
+
+/// The refusal codes `canon-0-36-codes-refusals` split, each with the codes of the table that the change's brief names and the CHANGELOG still shows, and the
+/// reasons the row carries.
+const SPLIT: [(&str, &[&str], &[&str]); 28] = [
+    ("ADAPTER_REFUSED", &["ADAPTER_FILE_NOT_FOUND", "ADAPTER_FILE_DENIED", "ADAPTER_FILE_INVALID", "CONFIG_INVALID"], &["POLICY"]),
+    ("ARTIFACTS_MOVE_REFUSED", &["ARTIFACTS_TIER_INVALID", "ARTIFACTS_BLOB_CORRUPT"], &[]),
+    ("BRIEF_APPROVE_REFUSED", &["BRIEF_NOT_FOUND", "BRIEF_INVALID"], &["BLOCKERS", "UNAPPROVABLE"]),
+    ("DISPATCH_ALREADY_ENDED", &["DISPATCH_CONFLICT"], &["ALREADY_ENDED"]),
+    ("DISPATCH_NOT_RUNNING", &["DISPATCH_CONFLICT"], &["NOT_RUNNING"]),
+    ("DIVERGENCE_ACCEPT_REFUSED", &["DIVERGENCE_DENIED", "DIVERGENCE_CONFLICT"], &["NOT_REVIEWER", "SELF_ATTESTED", "NOT_DIVERGENT"]),
+    ("EVIDENCE_APPROVAL_INVALID", &["EVIDENCE_APPROVAL_INVALID", "EVIDENCE_APPROVAL_REQUIRED"], &["MALFORMED", "SIGNATURE_MISMATCH"]),
+    ("EVIDENCE_BIND_REFUSED", &["EVIDENCE_BINDING_STALE", "EVIDENCE_BINDING_INVALID", "EVIDENCE_BINDING_NOT_FOUND", "EVIDENCE_BINDING_DENIED"], &[]),
+    ("EVIDENCE_INVALID_ARGUMENT", &["EVIDENCE_ARGUMENT_INVALID", "EVIDENCE_ARGUMENT_REQUIRED", "EVIDENCE_ARGUMENT_CONFLICT"], &[]),
+    ("EVIDENCE_REFUSED", &["EVIDENCE_REQUIRED"], &[]),
+    ("EVIDENCE_SCENARIO_NOT_INDEXED", &["SCENARIO_INDEX_REQUIRED"], &[]),
+    ("HOOKS_INSTALL_REFUSED", &["HOOKS_REPO_INVALID", "HOOKS_FILE_CONFLICT", "HOOKS_FILE_DENIED"], &[]),
+    ("INVENTORY_REFUSED", &["CONFIG_INVALID", "INVENTORY_INDEX_UNAVAILABLE"], &["SPECS"]),
+    ("LEARN_ROLLBACK_FAILED", &["STRATEGY_SIGNATURE_INVALID", "STRATEGY_ROLLBACK_FAILED"], &["POLICY"]),
+    ("MIGRATE_REFUSED", &["MIGRATION_INVALID", "MIGRATION_CONFLICT", "MIGRATION_DENIED", "CONFIG_INVALID"], &[]),
+    ("NO_BRIEF", &["BRIEF_REQUIRED"], &[]),
+    ("OLD_BRIEF_FORMAT", &["BRIEF_MIGRATION_REQUIRED"], &[]),
+    ("OLD_LAYOUT", &["LAYOUT_MIGRATION_REQUIRED"], &[]),
+    ("PLUGIN_SYNC_FAILED", &["CONFIG_INVALID", "PLUGIN_REQUIRED"], &["SPECS"]),
+    ("POLICY_APPROVAL_REFUSED", &["POLICY_REQUIRED", "POLICY_INVALID", "APPROVAL_INVALID"], &[]),
+    ("RETENTION_EXPORT_REFUSED", &["RETENTION_EXPORT_DENIED", "RETENTION_TIERS_UNAVAILABLE"], &[]),
+    ("RETENTION_PURGE_REFUSED", &["RETENTION_TIERS_UNAVAILABLE", "RETENTION_TIERS_INVALID"], &[]),
+    ("REVIEW_ARTIFACT_REFUSED", &["REVIEW_ARTIFACT_STALE", "REVIEW_ARTIFACT_INVALID", "REVIEW_ARTIFACT_NOT_FOUND", "REVIEW_ARTIFACT_DENIED"], &[]),
+    ("REVIEW_SCENARIO_NOT_INDEXED", &["SCENARIO_INDEX_REQUIRED"], &[]),
+    ("SKILLS_INVALID_ARGUMENT", &["SKILLS_ARGUMENT_INVALID", "SKILLS_SOURCE_NOT_FOUND", "CONFIG_INVALID"], &["SKILLS"]),
+    ("SUBJECT_ADOPT_REFUSED", &[], &[]),
+    ("SUBJECT_UNADOPT_REFUSED", &["SUBJECT_CONFLICT"], &["APPROVED_BRIEF", "FLOW_TAGGED"]),
+    ("TRACE_NOT_FOUND", &["TRACE_NOT_FOUND", "TRACE_CONFLICT"], &[]),
+];
+
+fn registered(code: &str) -> Option<&'static atip::CodeInfo> {
+    canon_cli::cli_error::all_codes().iter().find(|info| info.code == code)
+}
+
+/// What is wrong with the rows `changelog` has for the codes of [`SPLIT`]: a row missing or with one of the table's new codes left out, a new code
+/// the registry lacks or whose exit or retryability is not the row's, a reason none of the new codes registers or the row leaves out, and an old name
+/// the registry still holds although no new code of its row is that name. Empty when the rows are the registry's.
+fn refusal_rows_problems(changelog: &str) -> Vec<String> {
+    let rows: Vec<Row> = match replacement_table(changelog) {
+        Ok(rows) => rows,
+        Err(problem) => return vec![problem],
+    };
+    let mut problems = Vec::new();
+    for (old, expected, reasons) in SPLIT {
+        let found: Vec<&Row> = rows.iter().filter(|row| row.old == old).collect();
+        let [row] = found.as_slice() else {
+            problems.push(format!("the table has {} rows for `{old}`, not one", found.len()));
+            continue;
+        };
+        if row.new.is_empty() {
+            problems.push(format!("the row of `{old}` names no new code"));
+        }
+        for code in expected {
+            if !row.new.iter().any(|new| new == code) {
+                problems.push(format!("the row of `{old}` lacks `{code}`"));
+            }
+        }
+        let (mut exits, mut retryables) = (Vec::new(), Vec::new());
+        for new in &row.new {
+            match registered(new) {
+                Some(info) => {
+                    exits.push(info.exit);
+                    retryables.push(info.retryable);
+                }
+                None => problems.push(format!("the row of `{old}` names `{new}`, which the registry lacks")),
+            }
+        }
+        exits.sort_unstable();
+        exits.dedup();
+        retryables.sort_unstable();
+        retryables.dedup();
+        let mut shown_exits = row.exit_after.clone();
+        shown_exits.sort_unstable();
+        shown_exits.dedup();
+        let mut shown_retryables = row.retryable_after.clone();
+        shown_retryables.sort_unstable();
+        shown_retryables.dedup();
+        if shown_exits != exits || shown_retryables != retryables {
+            problems.push(format!("the row of `{old}` says exits {:?} and retryable {:?} after, the registry says {exits:?} and {retryables:?}", row.exit_after, row.retryable_after));
+        }
+        for reason in reasons {
+            if !row.reasons.iter().any(|shown| shown == reason) {
+                problems.push(format!("the row of `{old}` leaves out the reason `{reason}`"));
+            }
+        }
+        for reason in &row.reasons {
+            if !row.new.iter().filter_map(|new| registered(new)).any(|info| info.reasons.iter().any(|registry| registry.reason == reason)) {
+                problems.push(format!("the row of `{old}` names the reason `{reason}`, which none of its new codes registers"));
+            }
+        }
+        if row.new.iter().all(|new| new != old) && registered(old).is_some() {
+            problems.push(format!("`{old}` is still registered"));
+        }
+    }
+    problems
+}
+
+/// The gone names of [`SPLIT`] (the old names no new code of their row keeps).
+fn gone_names() -> Vec<&'static str> {
+    SPLIT.iter().map(|(old, ..)| *old).filter(|old| registered(old).is_none()).collect()
+}
+
+/// atip.codesplit.10: the CHANGELOG has a row for each split code that says what it became, the registry has those codes with the row's exit and retryability,
+/// and the old names are in no registry view and are refused by `schema --error`.
+#[test]
+fn atip_codesplit_10_the_changelog_rows_say_what_each_split_code_became_and_the_old_names_are_gone() {
+    let problems = refusal_rows_problems(&changelog());
+    assert!(problems.is_empty(), "the rows of the split codes are not the registry's: {problems:#?}");
+    let gone = gone_names();
+    assert_eq!(gone.len(), 26, "two old names stay as the name of one of their new codes (EVIDENCE_APPROVAL_INVALID, TRACE_NOT_FOUND): {gone:?}");
+    // A code that said several refusals is `split`, two names for one condition are `merged`, and a name made for its condition is `renamed`.
+    let rows = replacement_table(&changelog()).expect("the table reads");
+    for (old, ..) in SPLIT {
+        let row = rows.iter().find(|row| row.old == old).expect("a row");
+        assert!(["split", "merged", "renamed"].contains(&row.kind.as_str()), "{old}: {}", row.kind);
+    }
+    for (old, kind) in [("ADAPTER_REFUSED", "split"), ("BRIEF_APPROVE_REFUSED", "split"), ("MIGRATE_REFUSED", "split"), ("DISPATCH_ALREADY_ENDED", "merged"), ("DISPATCH_NOT_RUNNING", "merged"), ("NO_BRIEF", "renamed"), ("OLD_BRIEF_FORMAT", "renamed")] {
+        assert_eq!(rows.iter().find(|row| row.old == old).expect("a row").kind, kind, "{old}");
+    }
+    let brief_approve = rows.iter().find(|row| row.old == "BRIEF_APPROVE_REFUSED").unwrap();
+    assert!(brief_approve.why.contains("error.details"), "the row says where the other refusals of a batch are: {}", brief_approve.why);
+    // The registry views hold none of the old names, and `schema --error` refuses each.
+    let dir = repo();
+    let errors = body(&run(dir.path(), &["schema", "--errors"]));
+    let listed: Vec<&str> = errors["data"]["errors"].as_array().unwrap().iter().map(|row| row["code"].as_str().unwrap()).collect();
+    let documents = canon_cli::spec::model();
+    for old in &gone {
+        assert!(!listed.contains(old), "`{old}` is in the registry view");
+        for command in documents["commands"].as_array().unwrap() {
+            let in_errors = command["errors"].as_array().into_iter().flatten().any(|code| code == old);
+            assert!(!in_errors, "`{old}` is in the errors of {}", command["command"]);
+        }
+        refused(dir.path(), &["schema", "--error", old], "USAGE", None);
+    }
+    // No guide says a gone name as a current one.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut guides = vec![root.join("README.md"), root.join("ARCHITECTURE.md")];
+    let mut stack = vec![root.join("canon/skills")];
+    while let Some(next) = stack.pop() {
+        for entry in std::fs::read_dir(&next).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "md") {
+                guides.push(path);
+            }
+        }
+    }
+    assert!(guides.len() > 10, "the guides were found");
+    for guide in guides {
+        let text = std::fs::read_to_string(&guide).unwrap();
+        let spelled: Vec<&str> = gone_codes_in(&text).into_iter().filter(|code| gone.contains(code)).collect();
+        assert!(spelled.is_empty(), "{} spells {spelled:?}", guide.display());
+    }
+}
+
+/// `changelog` with the line of the row of `old` changed by `change` (the row is left alone when `change` returns it as it was).
+fn with_row_changed(changelog: &str, old: &str, change: impl Fn(&str) -> String) -> String {
+    let marker = format!("| `{old}` |");
+    let mut seen = false;
+    let lines: Vec<String> = changelog
+        .lines()
+        .map(|line| {
+            if !seen && line.starts_with(&marker) && line.matches('|').count() >= 8 {
+                seen = true;
+                change(line)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+    assert!(seen, "the CHANGELOG has a row of `{old}`");
+    lines.join("\n") + "\n"
+}
+
+/// atip.codesplit.11: a row left out, a new code dropped or misspelled, an exit that is not the registry's, a reason that no new code registers or one the row
+/// leaves out, and an old name brought back into a guide, are each found.
+#[test]
+fn atip_codesplit_11_a_row_that_is_not_the_registrys_or_an_old_name_that_comes_back_is_found() {
+    let real = changelog();
+    assert_eq!(refusal_rows_problems(&real), Vec::<String>::new());
+    let cases: Vec<(&str, String, &str)> = vec![
+        ("a row left out", with_row_changed(&real, "MIGRATE_REFUSED", |_| String::new()), "the table has 0 rows for `MIGRATE_REFUSED`"),
+        ("a new code dropped", with_row_changed(&real, "MIGRATE_REFUSED", |line| line.replace("`MIGRATION_DENIED`, ", "")), "the row of `MIGRATE_REFUSED` lacks `MIGRATION_DENIED`"),
+        ("a new code misspelled", with_row_changed(&real, "HOOKS_INSTALL_REFUSED", |line| line.replace("`HOOKS_FILE_DENIED`", "`HOOKS_FILE_FORBIDDEN`")), "which the registry lacks"),
+        ("an exit that is not the registry's", with_row_changed(&real, "DISPATCH_NOT_RUNNING", |line| line.replace("| 2 → 2 |", "| 2 → 1 |")), "the row of `DISPATCH_NOT_RUNNING` says exits [1]"),
+        ("a reason no new code registers", with_row_changed(&real, "DISPATCH_NOT_RUNNING", |line| line.replace("`NOT_RUNNING`", "`NOT_A_REASON`")), "`NOT_A_REASON`, which none of its new codes registers"),
+        ("a reason the row leaves out", with_row_changed(&real, "DISPATCH_ALREADY_ENDED", |line| line.replace("`ALREADY_ENDED`", "")), "leaves out the reason `ALREADY_ENDED`"),
+    ];
+    for (what, changelog, said) in cases {
+        let problems = refusal_rows_problems(&changelog);
+        assert!(problems.iter().any(|problem| problem.contains(said)), "{what} is found as `{said}`: {problems:?}");
+    }
+    // A guide that brings an old name back is named; a name that stays is not.
+    let gone = gone_names();
+    assert_eq!(gone_codes_in("the guide says MIGRATE_REFUSED and OLD_LAYOUT").into_iter().filter(|code| gone.contains(code)).collect::<Vec<_>>(), ["MIGRATE_REFUSED", "OLD_LAYOUT"]);
+    assert_eq!(gone_codes_in("a guide that says MIGRATION_INVALID and TRACE_NOT_FOUND").into_iter().filter(|code| gone.contains(code)).collect::<Vec<_>>(), Vec::<&str>::new());
 }

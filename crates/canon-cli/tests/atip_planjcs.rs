@@ -867,3 +867,95 @@ fn atip_planjcs_13_the_report_schemas_hold_the_preview_and_their_minor_is_raised
         assert!(["action", "path", "record", "detail"].iter().all(|key| effect.get(key).is_some()), "{command}: {effect}");
     }
 }
+
+/// `canon` run with `args` and `stdin` as its standard input, in `root`.
+fn canon_with_stdin(root: &Path, args: &[String], env: &[(String, String)], stdin: &str) -> Output {
+    use std::io::Write as _;
+    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    command.args(args).current_dir(root).env_remove("CANON_ROLE").env("CANON_ACTOR", "canon").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    for (key, value) in env {
+        command.env(key, value);
+    }
+    let mut child = command.spawn().expect("spawn canon");
+    child.stdin.take().expect("stdin").write_all(stdin.as_bytes()).expect("write stdin");
+    child.wait_with_output().expect("canon runs")
+}
+
+/// atip.planjcs.17: the commit call of a preview is its own words: a call that came by `--input` is written as argv options with no `--input`, a
+/// value that starts with a dash stays with its option, the command is the tool and the argv, and the call as it is commits that plan.
+#[test]
+fn atip_planjcs_17_the_commit_call_of_a_preview_carries_a_document_as_argv_options_and_a_dash_value_with_its_option() {
+    let case = purge_case();
+    let cutoff = case.args.last().cloned().expect("the cutoff");
+    let by_args = case.preview();
+    let digest = by_args["data"]["planDigest"].as_str().unwrap().to_string();
+    let document = json!({ "kind": "trajectory", "before": cutoff }).to_string();
+    let commit_of = |preview: &Value, what: &str| -> Vec<String> {
+        assert_eq!(preview["ok"], true, "{what}: {preview}");
+        assert_eq!(preview["data"]["planDigest"], digest.as_str(), "{what}: a call and its document are one plan");
+        let argv = next_argv(preview);
+        assert!(argv.iter().all(|word| word != "--input" && !word.starts_with("--input=") && word != "-" && !word.contains('{')), "{what}: no --input and no document in the commit call: {argv:?}");
+        assert!(argv.contains(&"--kind=trajectory".to_string()) && argv.contains(&format!("--before={cutoff}")), "{what}: the arguments are options: {argv:?}");
+        assert!(argv.contains(&"--commit".to_string()) && argv.contains(&format!("--plan-digest={digest}")) && argv.last().is_some_and(|word| word == "--json"), "{what}: {argv:?}");
+        let mut line = vec!["canon".to_string()];
+        line.extend(argv.iter().cloned());
+        assert_eq!(atip::split_argv(preview["meta"]["next"][0]["command"].as_str().expect("a command")), line, "{what}: the command is the tool and the argv");
+        argv
+    };
+    // The document inline, and on standard input.
+    let inline = json_of(&canon_in(&case.root, &words(&["purge", "--input", &document, "--json"]), &case.env));
+    let from_stdin = json_of(&canon_with_stdin(&case.root, &words(&["purge", "--input", "-", "--json"]), &case.env, &document));
+    let commit = commit_of(&inline, "inline");
+    assert_eq!(commit_of(&from_stdin, "stdin"), commit, "the same call whichever way the document came");
+    // The call as it is commits the plan, and a call run again with the plan done finds the digest stale.
+    let before = tree(&case.root);
+    let done = canon_in(&case.root, &commit, &case.env);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    assert_eq!(json_of(&done)["data"]["committed"], true);
+    assert_ne!(tree(&case.root), before, "the commit made its effects");
+    // A repository that is a directory called `-dash`: `--repo=-dash` is one word, so it is not read as an option of its own.
+    let case = purge_case();
+    let parent = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(&case.root, parent.path().join("-dash")).unwrap();
+    let dash = |extra: &[&str]| {
+        let mut args = case.args.clone();
+        args.push("--repo=-dash".to_string());
+        args.extend(extra.iter().map(ToString::to_string));
+        args.push("--json".to_string());
+        canon_in(parent.path(), &args, &case.env)
+    };
+    let preview = json_of(&dash(&[]));
+    let argv = next_argv(&preview);
+    assert!(argv.contains(&"--repo=-dash".to_string()), "{argv:?}");
+    assert!(argv[1..].iter().all(|word| word.starts_with("--")), "every word after the command is an option with its value inside, none is a bare value: {argv:?}");
+    let before = tree(&case.root);
+    let done = canon_in(parent.path(), &argv, &case.env);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    assert_eq!(json_of(&done)["data"]["committed"], true);
+    assert_ne!(tree(&case.root), before);
+}
+
+/// atip.planjcs.18: `--commit` without `--plan-digest` and `--plan-digest` without `--commit` are refused on each of the six commands, naming the option that
+/// is missing, and write nothing; both with the digest of the plan commits, and neither previews.
+#[test]
+fn atip_planjcs_18_a_commit_without_a_digest_and_a_digest_without_a_commit_are_refused_naming_the_missing_option() {
+    for case in six() {
+        let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
+        let before = tree(&case.root);
+        for (what, extra, missing) in [("--commit alone", vec!["--commit".to_string()], "--plan-digest"), ("--plan-digest alone", vec![format!("--plan-digest={digest}")], "--commit")] {
+            let words: Vec<&str> = extra.iter().map(String::as_str).collect();
+            let out = case.run(&words);
+            assert_eq!(out.status.code(), Some(2), "{} {what}: {}", case.leaf, text(&out));
+            let body = json_of(&out);
+            assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some(missing)), "{} {what}: {body}", case.leaf);
+            assert!(body.get("data").is_none(), "{} {what}: a refusal has no data", case.leaf);
+            assert_eq!(tree(&case.root), before, "{} {what}: nothing was written", case.leaf);
+        }
+        // Neither is a preview, and the digest of the plan with the commit is the only way through.
+        assert_eq!(case.preview()["data"]["committed"], false, "{}: neither is a preview", case.leaf);
+        assert_eq!(tree(&case.root), before, "{}: a preview writes nothing", case.leaf);
+        let done = case.commit_with(&digest);
+        assert_eq!(done.status.code(), Some(0), "{}: both, with the plan's digest, commit: {}", case.leaf, text(&done));
+        assert_eq!(json_of(&done)["data"]["committed"], true, "{}", case.leaf);
+    }
+}

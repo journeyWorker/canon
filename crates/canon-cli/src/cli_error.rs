@@ -699,7 +699,7 @@ mod fix_tests {
     }
 }
 
-/// `canon-0-35-crate-1-2` (`atip.crate12.08`): canon's own code table can carry a `<SUBJECT>_INCOMPLETE` row (spec 8.3.2) whose
+/// `canon-0-35-crate-1-2` (`atip.crate12.16` and `.17`): canon's own code table can carry a `<SUBJECT>_INCOMPLETE` row (spec 8.3.2) whose
 /// reasons are made from its exit-2 rows, with the helpers of the `atip` crate. The probe row has another name, so it
 /// stays a probe whatever canon registers.
 #[cfg(test)]
@@ -713,7 +713,7 @@ mod incomplete_probe {
     static WITH_PROBE: [CodeInfo; CODES.len() + 1] = with_row(CODES, PROBE);
 
     #[test]
-    fn atip_crate12_08_canons_code_table_gives_a_probe_row_every_exit_2_row_as_a_reason() {
+    fn atip_crate12_16_canons_code_table_gives_a_probe_row_every_exit_2_row_as_a_reason() {
         let refusals: Vec<&str> = CODES.iter().filter(|row| row.exit == EXIT_REFUSED).map(|row| row.code).collect();
         assert!(refusals.len() > 10, "canon has exit-2 rows");
         let reasons: Vec<&str> = REASONS.iter().map(|reason| reason.reason).collect();
@@ -732,5 +732,25 @@ mod incomplete_probe {
         let probe = find_code(&WITH_PROBE, "RUN_INCOMPLETE_PROBE").expect("the probe row");
         assert_eq!(probe.reasons.len(), refusals.len());
         assert_eq!(WITH_PROBE.len(), CODES.len() + 1);
+    }
+
+    #[test]
+    fn atip_crate12_17_a_reason_made_from_a_code_the_table_does_not_hold_or_in_a_table_of_the_wrong_length_stops_the_evaluation() {
+        use atip::{reason_of_code, CodeInfo};
+        use std::panic::catch_unwind;
+
+        // A code the table holds makes its reason: the code's name, and the row's own meaning and fix.
+        let row = find_code(CODES, "PLAN_STALE").expect("canon registers PLAN_STALE");
+        let reason = reason_of_code(CODES, "PLAN_STALE");
+        assert_eq!((reason.reason, reason.meaning, reason.fix), (row.code, row.meaning, row.fix));
+        // A code it does not hold makes none: the evaluation stops, as a constant of the table would not compile.
+        assert!(catch_unwind(|| reason_of_code(CODES, "NOT_A_CODE_OF_CANON")).is_err(), "no reason stands for a code the table lacks");
+        assert!(catch_unwind(|| reason_of_code(&[], "PLAN_STALE")).is_err(), "nor in a table that holds nothing");
+        // A length other than the number of exit-2 rows stops it, so a table that gained a row without its reasons does not build.
+        assert!(catch_unwind(|| reasons_with_exit::<1>(CODES, EXIT_REFUSED)).is_err(), "a reasons list of the wrong length");
+        // A probe row whose code the table already holds is not put in twice.
+        const ONE_MORE: usize = CODES.len() + 1;
+        let twice = CodeInfo { code: "PLAN_STALE", ..PROBE };
+        assert!(catch_unwind(|| with_row::<ONE_MORE>(CODES, twice)).is_err(), "a code the table already holds");
     }
 }

@@ -6,6 +6,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @lane:behavior
   @case:happy
   @flow:canon-0-35-plan-jcs.F1
+  @flow:canon-0-35-crate-plan.F2
   @atip.planjcs.01
   Scenario: The preview of each of the six destructive commands gives a planDigest of sha256: and 64 lower-case hex digits, the same plan the same digest, and the call in meta.next[0] commits it with committed true
     Given a repo set up for each of purge, artifacts move, migrate, migrate --revert, ledger compact and tier age, each with something to do
@@ -17,6 +18,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @lane:behavior
   @case:failure
   @flow:canon-0-35-plan-jcs.F1
+  @flow:canon-0-35-crate-plan.F3
   @atip.planjcs.02
   Scenario: A digest without the sha256: prefix and a digest that differs in one character are PLAN_STALE, exit 2, with nothing changed and the preview as meta.next[0], on the six commands
     Given the preview of each of the six commands and its digest
@@ -28,6 +30,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @lane:behavior
   @case:happy
   @flow:canon-0-35-plan-jcs.F1
+  @flow:canon-0-35-crate-plan.F1
   @atip.planjcs.03
   Scenario: The digest is sha256: and the SHA-256 of the RFC 8785 canonical JSON of {effects, inputs}, with the normalised arguments and the digests of what the plan read as inputs
     Given a purge preview over an empty ledger of one kind, whose arguments and canon.yaml are known
@@ -39,6 +42,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @lane:behavior
   @case:happy
   @flow:canon-0-35-plan-jcs.F2
+  @flow:canon-0-35-crate-plan.F3
   @atip.planjcs.04
   Scenario: The same arguments and the same inputs commit, one argument changed changes the digest, and a digest made for other arguments is PLAN_STALE for another call
     Given the preview of a purge and of a migrate
@@ -116,6 +120,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @lane:behavior
   @case:failure
   @flow:canon-0-35-plan-jcs.F4
+  @flow:canon-0-35-crate-plan.F1
   @atip.planjcs.11
   Scenario: A digest made the 0.34 way (SHA-256 hex of the effects, no prefix) is PLAN_STALE on the six commands, and the hint says to run the preview again
     Given the six commands and a digest made as 0.34 made it: the SHA-256 of the effects' JSON in 64 hex digits
@@ -138,6 +143,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @lane:behavior
   @case:happy
   @flow:canon-0-35-plan-jcs.F1
+  @flow:canon-0-35-crate-plan.F2
   @atip.planjcs.13
   Scenario: The report schemas of the five commands take the preview's members from the contract's Effect and raise the minor of schemaVersion
     Given canon schema of purge, artifacts move, migrate, ledger compact and tier age
@@ -176,3 +182,23 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
     Given the CHANGELOG entry of this version with each named part cut out in turn, an empty entry, and sources that hash the effects alone or make a digest without the prefix
     When the check of the upgrade note and of the digest code runs on each
     Then each missing part is named by its own name, the empty entry names every part, each faulty source is named, and the entry and source as they stand pass
+
+  # canon: {"schema":1,"at":"2026-11-04T19:20:56Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-crate-plan.F2
+  @atip.planjcs.17
+  Scenario: The commit call of a preview carries a call that came by --input as argv options with no --input, a value that starts with a dash stays with its option, and its command is the tool and the argv
+    Given a purge with records to delete whose arguments are given as a document inline and on standard input, and the same repository reached as --repo=-dash
+    When the preview runs and the call in meta.next[0] is read, split into words and run as it is
+    Then the call holds --kind=trajectory --before=<cutoff> --commit --plan-digest=<digest> --json and no --input and no document, is the same call whichever way the document came and for the arguments given on the line, the command splits into canon and the argv, the call commits that plan, and for -dash the call holds --repo=-dash as one word and commits
+
+  # canon: {"schema":1,"at":"2026-11-04T19:21:00Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
+  @subject:atip-contract
+  @case:failure
+  @flow:canon-0-35-crate-plan.F4
+  @atip.planjcs.18
+  Scenario: --commit without --plan-digest and --plan-digest without --commit are refused on each of the six commands, naming the option that is missing, and write nothing
+    Given each of the six destructive commands with something to do, and the digest of its preview
+    When the command runs with --commit alone and with --plan-digest alone, with neither, and with both
+    Then each lone option is exit 2 USAGE whose field is the other option, with no data and the tree unchanged, neither is a preview that writes nothing, and both with the plan's digest commit
