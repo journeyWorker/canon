@@ -71,7 +71,8 @@ canon subject new subject-domain-loop \
   subjects at once: `--input` takes inline JSON, a file or `-`; an array (or
   NDJSON) is a batch validated before any write, with `operands` holding the
   id and the other keys the option names in camelCase (`canon schema subject
-  new --json` shows `input`: the schema of one document and a complete `example`). Writing an identical subject
+  new --json` shows `input`, its limits and a complete `example`; `canon schema subject new --schemas --json`
+  gives `Input`, the schema of one document). Writing an identical subject
   again is a no-op reported `unchanged` (`data.unchanged`).
 
 ### 2. Retrieve subject-scoped strategy memory BEFORE working

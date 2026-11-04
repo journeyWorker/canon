@@ -35,7 +35,7 @@ fn canon_in(dir: &Path, args: &[&str]) -> Value {
 }
 
 #[test]
-fn atip_claiml2_01_every_envelope_declares_1_2_and_the_schema_tree_says_l2() {
+fn atip_claiml2_01_every_envelope_declares_1_4_and_the_schema_tree_says_l2() {
     let dir = tempfile::tempdir().expect("tempdir");
     assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.4");
     assert_eq!(canon_cli::spec::LEVEL, "L2");
@@ -59,7 +59,7 @@ fn spells_an_old_minor(text: &str) -> bool {
 }
 
 #[test]
-fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_1_1() {
+fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_an_earlier_minor() {
     assert!(spells_an_old_minor("\"contractVersion\": \"1.1\"") && spells_an_old_minor("`contractVersion` (`1.2`, on every envelope)") && spells_an_old_minor("{\\\"contractVersion\\\":\\\"1.3\\\"}"), "the detector sees the spellings");
     assert!(!spells_an_old_minor("\"contractVersion\": \"1.4\"") && !spells_an_old_minor("`contractVersion` (`1.4`)") && !spells_an_old_minor("contractVersion 1.9") && !spells_an_old_minor("contractVersion 1.2.1"));
     let root = repo_root();
@@ -115,7 +115,7 @@ fn recipe_lines(justfile: &str, name: &str) -> Vec<String> {
 }
 
 #[test]
-fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
+fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_4() {
     let root = repo_root();
     let workflow = read(&root.join(".github/workflows/test.yml"));
     let justfile = read(&root.join("justfile"));
@@ -137,7 +137,7 @@ fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_2() {
 }
 
 #[test]
-fn atip_claiml2_09_the_fixture_claims_1_2_and_lists_what_the_l2_rows_need() {
+fn atip_claiml2_09_the_fixture_claims_1_4_and_lists_what_the_l2_rows_need() {
     let fixture: Value = serde_json::from_str(&read(&fixture_path())).expect("the fixture is JSON");
     assert_eq!(fixture["contractVersion"], "1.4");
     assert_eq!(fixture["notRun"], json!(["dashboard"]));

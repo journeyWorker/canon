@@ -74,7 +74,7 @@ output	FILE	file to write instead of stdout
 override-reason	TEXT	reason for proceeding although refused
 owner-role	ROLE	role that owns a strategy
 parent-run	RUN_ID	run a run descends from
-plan-digest	DIGEST	digest of the previewed plan
+plan-digest	PLAN_DIGEST	digest of the previewed plan
 plan-source	DIR	plan source root
 plugin	PLUGIN_ID	plugin
 policy	LEVEL	policy level

@@ -4900,7 +4900,7 @@
           "schemaVersion": "1.2"
         }
       ],
-      "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
+      "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <PLAN_DIGEST>` deletes it",
       "validators": [
         {
           "arguments": [
@@ -8617,7 +8617,7 @@
     {
       "code": "LEDGER_COMPACT_INCOMPLETE",
       "exit": 1,
-      "fix": "Read what was done first (the first `meta.next` step), fix the problem the error names, then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
+      "fix": "Read what was done first (the first `meta.next` step), fix the problem the error names, then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <PLAN_DIGEST>` (the same digest is stale now).",
       "meaning": "a compaction moved some superseded versions to the archive and then stopped, on a read of the ledger or a move that failed: what moved stays moved; the reason is the code of the step that failed",
       "reasons": [
         {
@@ -8733,7 +8733,7 @@
     {
       "code": "PLAN_STALE",
       "exit": 2,
-      "fix": "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <DIGEST>`.",
+      "fix": "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <PLAN_DIGEST>`.",
       "meaning": "the plan recomputed under `--commit` no longer has the `--plan-digest` the preview printed; nothing was written",
       "retryable": false
     },
@@ -8936,7 +8936,7 @@
     {
       "code": "RETENTION_PURGE_INCOMPLETE",
       "exit": 1,
-      "fix": "Read what was done first (the first `meta.next` step), fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
+      "fix": "Read what was done first (the first `meta.next` step), fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <PLAN_DIGEST>`.",
       "meaning": "the purge stopped after it deleted some records: what was deleted stays deleted (`data` names the counts)",
       "reasons": [
         {
@@ -9411,7 +9411,7 @@
     {
       "code": "TIER_INCOMPLETE",
       "exit": 1,
-      "fix": "Read what was done first (the first `meta.next` step), fix the cause the error names, then preview with `canon tier age` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).",
+      "fix": "Read what was done first (the first `meta.next` step), fix the cause the error names, then preview with `canon tier age` and move the rest with `--commit --plan-digest <PLAN_DIGEST>` (the same digest is stale now).",
       "meaning": "tier aging stopped after it moved some records: what moved stays moved",
       "reasons": [
         {
@@ -38484,7 +38484,7 @@
       {
         "command": "purge",
         "effect": "destructive",
-        "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
+        "summary": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <PLAN_DIGEST>` deletes it",
         "x-canon": {
           "roles": [
             "orchestrator"

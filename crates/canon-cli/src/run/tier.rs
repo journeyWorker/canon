@@ -89,7 +89,7 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
                 return failed(err.to_string());
             }
             crate::incomplete::read_status("read what the aging moved before it stopped: records that left their tier stay moved, the rest are still where they were");
-            ExitCode::from(CliError::failed("TIER_INCOMPLETE", err.to_string()).reason("WRITE_FAILED").hint("what moved stays moved: check the `tiers` settings in canon.yaml and that the destinations are reachable, then preview with `canon tier age` and move the rest with `--commit --plan-digest <DIGEST>`").emit("canon tier age", json))
+            ExitCode::from(CliError::failed("TIER_INCOMPLETE", err.to_string()).reason("WRITE_FAILED").hint("what moved stays moved: check the `tiers` settings in canon.yaml and that the destinations are reachable, then preview with `canon tier age` and move the rest with `--commit --plan-digest <PLAN_DIGEST>`").emit("canon tier age", json))
         }
     }
 }

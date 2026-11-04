@@ -114,8 +114,9 @@ Fix it and the next command indexes the files (see `canon-inventory`).
 Many scenarios at once: `--input` takes inline JSON, a file or `-`. An
 array (or NDJSON) is a batch, validated whole before anything is written;
 each element holds `operands` (the scenario tag) and the other options as
-camelCase keys. `canon schema scenario new --json` shows `input`: the schema of one document
-and a complete `example`. There is no `--from`.
+camelCase keys. `canon schema scenario new --json` shows `input` (its limits and a complete
+`example`); `canon schema scenario new --schemas --json` gives `Input`, the schema of one
+document. There is no `--from`.
 
 ```text
 canon scenario new --input '[{"operands":["checkout.cart.01"],"title":"Adding an item raises the count","subject":"checkout-core","lane":"behavior","case":"happy"},{"operands":["checkout.cart.04"],"title":"Adding an out-of-stock item is refused","subject":"checkout-core","lane":"behavior","case":"failure"}]'

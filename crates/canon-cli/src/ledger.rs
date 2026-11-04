@@ -92,7 +92,7 @@ fn compact_stop(cause: CliError, moved: usize) -> CliError {
     };
     CliError::failed("LEDGER_COMPACT_INCOMPLETE", cause.message)
         .reason(reason)
-        .hint("fix what the message names (a read-only ledger or archive, a full disk), then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <DIGEST>`; versions already moved stay in the archive")
+        .hint("fix what the message names (a read-only ledger or archive, a full disk), then preview with `canon ledger compact` and move the rest with `--commit --plan-digest <PLAN_DIGEST>`; versions already moved stay in the archive")
 }
 
 fn kib(bytes: u64) -> String {

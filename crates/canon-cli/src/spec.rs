@@ -297,17 +297,6 @@ fn argument_codes(path: &str, options: &[OptionDoc], operands: &[OperandDoc]) ->
     crate::arg_rules::codes_for(path, &arguments)
 }
 
-/// `--commit` and `--plan-digest` mean what the contract says of them (spec 11), so the document lists them by their bare names
-/// (spec 9.5): the standard text and the standard placeholder stand for canon's own, which stay in `--help`.
-fn reserved_standard(option: &mut OptionDoc) {
-    if matches!(option.name.as_str(), "commit" | "plan-digest") {
-        if let Some(standard) = atip::describe::standard_help(&option.name) {
-            option.help = standard.to_string();
-        }
-        option.value_name = None;
-    }
-}
-
 /// The outputs of a command and the schemas they name.
 fn outputs_of(path: &str, batch: bool, schemas: &mut BTreeMap<String, Value>) -> Built<Vec<OutputDoc>> {
     let facts = facts_for(path).ok_or_else(|| format!("`{path}` has no row in the facts table"))?;
@@ -399,7 +388,6 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
             option.default_note = default_note(path, &option.name).map(str::to_string);
         }
         option.domain = domain_of(path, &option.name, option.value_name.as_deref(), option.value_type, option.domain.take())?;
-        reserved_standard(&mut option);
         options.push(option);
     }
     let mut schemas = BTreeMap::new();

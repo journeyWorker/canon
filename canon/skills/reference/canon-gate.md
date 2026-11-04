@@ -537,7 +537,8 @@ or `-`; an array (or NDJSON) is a batch, validated element by element before
 the first write (a refusal writes nothing, exit 2). Keys are the option
 names in camelCase plus `operands`: one object per scenario, with
 `scenario`, `class`, `ref` and `role`. `canon schema evidence add --json`
-shows `input`: the schema of one document and a complete `example`. Each element reports `written`,
+shows `input` (its limits and a complete `example`) and `canon schema evidence add --schemas --json`
+gives `Input`, the schema of one document. Each element reports `written`,
 `unchanged` or `failed` in `data.items[]`.
 
 `--rev <rev>` names the commit the evidence ran against (default `HEAD`).

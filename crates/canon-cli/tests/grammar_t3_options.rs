@@ -23,7 +23,7 @@ use serde_json::Value;
 /// the table's rows also use `STATUS` and `HASH`, the typed forms `JSON|FILE|-` and `FORMAT:PATH`, and the concept ids (`*_ID`).
 const PLACEHOLDERS: &[&str] = &[
     "DIR", "FILE", "PATH", "ID", "SHA", "N", "TIMESTAMP", "NAME", "TEXT", "URL", "KIND", "FIELDS", // D1
-    "REV", "DIGEST", "LIST", "TAG", "LEVEL", "TIER", "STATE", "SHELL", "KEY", "CURSOR", "CLASS", "CODE", "SEVERITY", "DISPOSITION", "RUN_OUTCOME", "REVIEW_OUTCOME", "RESULT", "VERDICT", "ROLE", "CHANGE_KIND", "FLOW_ID", "PATH_OR_EFFECT", "NAME@VERSION", // the table
+    "REV", "DIGEST", "PLAN_DIGEST", "LIST", "TAG", "LEVEL", "TIER", "STATE", "SHELL", "KEY", "CURSOR", "CLASS", "CODE", "SEVERITY", "DISPOSITION", "RUN_OUTCOME", "REVIEW_OUTCOME", "RESULT", "VERDICT", "ROLE", "CHANGE_KIND", "FLOW_ID", "PATH_OR_EFFECT", "NAME@VERSION", // the table
     "STATUS", "HASH", "JSON|FILE|-", "FORMAT:PATH", // used by table rows
 ];
 
@@ -56,14 +56,9 @@ fn all_options() -> Vec<(String, &'static Value)> {
     out
 }
 
-/// The value name an option shows. The model leaves `plan-digest`'s empty: it is a reserved option (contract 4.4.1) whose shape is fixed by
-/// the contract, and the contract's standard placeholder for it is `DIGEST` (`--commit --plan-digest <DIGEST>`, D7).
+/// The value name an option shows: the one its document gives, else the default one (the upper-cased name, `_` for `-`).
 fn value_name(option: &Value) -> Option<String> {
-    match option["valueName"].as_str() {
-        Some(value) => Some(value.to_string()),
-        None if option["name"] == "plan-digest" => Some("DIGEST".to_string()),
-        None => None,
-    }
+    option["valueName"].as_str().map(str::to_string)
 }
 
 fn name(option: &Value) -> &str {

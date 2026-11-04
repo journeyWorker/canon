@@ -2,7 +2,7 @@
 //! `migrate` (and `migrate --revert`), `ledger compact`, `tier age`.
 //!
 //! A bare run computes the plan and prints it: `effects[]`, the `planDigest` over them and what they were computed from,
-//! `committed: false`, exit 0, nothing written (no audit line either). `--commit --plan-digest <DIGEST>` computes the plan again
+//! `committed: false`, exit 0, nothing written (no audit line either). `--commit --plan-digest <PLAN_DIGEST>` computes the plan again
 //! and acts only when its digest is the one given; a plan that changed since is `PLAN_STALE` (exit 2) and nothing is written.
 //! The flags are [`SafetyArgs`](crate::cli::SafetyArgs), read as a [`Mode`].
 //!

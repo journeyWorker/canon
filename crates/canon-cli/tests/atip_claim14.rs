@@ -827,7 +827,28 @@ fn value_after<'a>(tokens: &'a [String], flag: &str) -> Option<&'a str> {
 // ---------------------------------------------------------------------------
 // The CHANGELOG entry (F7).
 
-const SIZE_ROWS: [&str; 6] = ["schema finding close", "schema finding list", "schema purge", "schema skills show", "schema (tree)", "schema (tree) + one command"];
+/// The five commands the entry measures, with the argv that prints each document, and the tree.
+const MEASURED: [(&str, &[&str]); 5] = [
+    ("finding close", &["schema", "finding", "close", "--json"]),
+    ("finding list", &["schema", "finding", "list", "--json"]),
+    ("purge", &["schema", "purge", "--json"]),
+    ("skills show", &["schema", "skills", "show", "--json"]),
+    ("evidence add", &["schema", "evidence", "add", "--json"]),
+];
+const TREE_ROW: &str = "schema (tree)";
+const SIZE_ROWS: [&str; 11] = [
+    "schema finding close",
+    "schema finding list",
+    "schema purge",
+    "schema skills show",
+    "schema evidence add",
+    TREE_ROW,
+    "schema (tree) + finding close",
+    "schema (tree) + finding list",
+    "schema (tree) + purge",
+    "schema (tree) + skills show",
+    "schema (tree) + evidence add",
+];
 const FORM_WORDS: [&str; 6] = ["declaration", "tree", "group", "command", "--schemas", "--help"];
 const ENTRY_HEADING: &str = "canon declares atip/1 1.4";
 
@@ -850,7 +871,7 @@ fn heading_level(line: &str) -> usize {
 /// Every problem of the CHANGELOG's `Unreleased` section: one entry whose heading names the declaration, its before/after table, the size rows (each 1.4
 /// size equal to a live measure and smaller than its 1.3 size, except the tree's) and the paragraph for the callers. `live` maps a row name to the
 /// sizes that row may state (the sum row may be the tree plus any one of the commands).
-fn changelog_problems(text: &str, live: &BTreeMap<&str, Vec<usize>>) -> Vec<String> {
+fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<String> {
     let mut found = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
     let Some(start) = lines.iter().position(|line| line.trim_end() == "## Unreleased") else { return vec!["there is no `## Unreleased` section".to_string()] };
@@ -876,6 +897,7 @@ fn changelog_problems(text: &str, live: &BTreeMap<&str, Vec<usize>>) -> Vec<Stri
             found.push(format!("the before/after table has no row for `{word}`"));
         }
     }
+    let mut stated: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for name in SIZE_ROWS {
         let Some(row) = rows.iter().find(|row| cells(row).first().is_some_and(|first| first.trim_matches('`').to_lowercase() == name)) else {
             found.push(format!("the table has no size row `{name}`"));
@@ -891,9 +913,26 @@ fn changelog_problems(text: &str, live: &BTreeMap<&str, Vec<usize>>) -> Vec<Stri
             Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4, the live measure is {sizes:?}")),
             None => found.push(format!("no live measure for `{name}`")),
         }
-        if name != "schema (tree)" && after >= before {
+        // A command document is smaller; the tree may grow (it holds the shared options); a sum may grow, with its reason.
+        if !name.contains("(tree)") && after >= before {
             found.push(format!("the size row `{name}` is not smaller: {after} bytes against {before}"));
         }
+        stated.insert(name, (before, after));
+    }
+    let mut grown = Vec::new();
+    if let Some(&(tree_before, _)) = stated.get(TREE_ROW) {
+        for (command, _) in MEASURED {
+            let (Some(&(command_before, _)), Some(&(sum_before, sum_after))) = (stated.get(format!("schema {command}").as_str()), stated.get(format!("{TREE_ROW} + {command}").as_str())) else { continue };
+            if sum_before != tree_before + command_before {
+                found.push(format!("the sum row `{TREE_ROW} + {command}` states {sum_before} bytes for 0.35, not the tree plus the command ({})", tree_before + command_before));
+            }
+            if sum_after >= sum_before {
+                grown.push(command);
+            }
+        }
+    }
+    if !grown.is_empty() && !entry.iter().any(|line| line.to_lowercase().contains("sharing")) {
+        found.push(format!("the sum for {grown:?} is not smaller and the entry gives no reason (the crate's sharing rule)"));
     }
     let paragraph = entry.iter().position(|line| line.trim_start_matches(['*', '_', '>', '-', ' ']).starts_with("Callers"));
     match paragraph {
@@ -917,29 +956,34 @@ fn live_size(dir: &Path, args: &[&str]) -> usize {
     text.len()
 }
 
-fn live_sizes(dir: &Path) -> BTreeMap<&'static str, Vec<usize>> {
-    let close = live_size(dir, &["schema", "finding", "close", "--json"]);
-    let list = live_size(dir, &["schema", "finding", "list", "--json"]);
-    let purge = live_size(dir, &["schema", "purge", "--json"]);
-    let skills = live_size(dir, &["schema", "skills", "show", "--json"]);
+fn live_sizes(dir: &Path) -> BTreeMap<String, Vec<usize>> {
     let tree = live_size(dir, &["schema", "--json"]);
-    BTreeMap::from([
-        ("schema finding close", vec![close]),
-        ("schema finding list", vec![list]),
-        ("schema purge", vec![purge]),
-        ("schema skills show", vec![skills]),
-        ("schema (tree)", vec![tree]),
-        ("schema (tree) + one command", vec![tree + close, tree + list, tree + purge, tree + skills]),
-    ])
+    let mut sizes = BTreeMap::from([(TREE_ROW.to_string(), vec![tree])]);
+    for (command, argv) in MEASURED {
+        let size = live_size(dir, argv);
+        sizes.insert(format!("schema {command}"), vec![size]);
+        sizes.insert(format!("{TREE_ROW} + {command}"), vec![tree + size]);
+    }
+    sizes
 }
 
-/// A complete entry in the format the check reads, stating `live` sizes and a 1.3 size 1000 bytes larger (the tree's smaller).
-fn complete_entry(live: &BTreeMap<&str, Vec<usize>>) -> String {
+/// A complete entry in the format the check reads, stating `live` sizes, a 1.3 size 1000 bytes larger for each command and one byte smaller
+/// for the tree (which grew), so that every sum is smaller.
+fn complete_entry(live: &BTreeMap<String, Vec<usize>>) -> String {
     let mut text = String::from("# Changelog\n\n## Unreleased\n\n### Added\n\n#### canon declares atip/1 1.4\n\nThe schema answer is the call surface.\n\n| | 0.35 | 0.36 |\n|---|---|---|\n| declaration | atip/1 1.2, L2 | atip/1 1.4, L2 |\n| `schema` tree | commands only | commands and shared options |\n| `schema <group>` | with `path` | without `path` |\n| `schema <command>` | schemas inline | call surface only |\n| `--schemas` | none | schemas, `Input`, `rejects` |\n| `--help --json` | text | refused |\n\n| answer | 0.35 bytes | 0.36 bytes |\n|---|---|---|\n");
+    let thousands = |number: usize| number.to_string().as_bytes().rchunks(3).rev().map(|digits| std::str::from_utf8(digits).unwrap()).collect::<Vec<_>>().join(",");
+    let tree_after = live[TREE_ROW][0];
+    let tree_before = tree_after - 1;
     for name in SIZE_ROWS {
         let after = live[name][0];
-        let before = if name == "schema (tree)" { after - 1 } else { after + 1000 };
-        text.push_str(&format!("| {name} | {} | {} |\n", before.to_string().as_bytes().rchunks(3).rev().map(|digits| std::str::from_utf8(digits).unwrap()).collect::<Vec<_>>().join(","), after));
+        let before = if name == TREE_ROW {
+            tree_before
+        } else if let Some(command) = name.strip_prefix("schema (tree) + ") {
+            tree_before + live[&format!("schema {command}")][0] + 1000
+        } else {
+            after + 1000
+        };
+        text.push_str(&format!("| {name} | {} | {} |\n", thousands(before), thousands(after)));
     }
     text.push_str("\nCallers that validated the self-description against the 1.3 schemas reject a 1.4 document; callers that read it without validating read a missing member as the default of the minor before.\n\n## 0.35.0 — 2026-11-04\n");
     text
@@ -1516,14 +1560,12 @@ fn atip_claim14_15_the_changelog_entry_states_the_measured_sizes_and_the_note_fo
 
 #[test]
 fn atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_callers_paragraph_is_missing() {
-    let live = BTreeMap::from([
-        ("schema finding close", vec![2000]),
-        ("schema finding list", vec![2500]),
-        ("schema purge", vec![3000]),
-        ("schema skills show", vec![1800]),
-        ("schema (tree)", vec![30000]),
-        ("schema (tree) + one command", vec![32000, 32500, 33000, 31800]),
-    ]);
+    let mut live = BTreeMap::from([(TREE_ROW.to_string(), vec![30000])]);
+    for (index, (command, _)) in MEASURED.iter().enumerate() {
+        let size = 2000 + 500 * index;
+        live.insert(format!("schema {command}"), vec![size]);
+        live.insert(format!("{TREE_ROW} + {command}"), vec![30000 + size]);
+    }
     let complete = complete_entry(&live);
     assert_eq!(changelog_problems(&complete, &live), Vec::<String>::new(), "the complete entry passes:\n{complete}");
 
@@ -1545,6 +1587,12 @@ fn atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_caller
     assert_found("a stated size that is not the live one", &changelog_problems(&wrong, &live), "live measure");
     let larger = with_row("schema purge", "2,999", live["schema purge"][0]);
     assert_found("a size that is not smaller than the 1.3 size", &changelog_problems(&larger, &live), "not smaller");
+    let grown = with_row("schema (tree) + purge", "1", live["schema (tree) + purge"][0]);
+    assert_found("a sum that grew without a reason", &changelog_problems(&grown, &live), "gives no reason");
+    let wrong_sum = with_row("schema (tree) + purge", "99,999", live["schema (tree) + purge"][0]);
+    assert_found("a 0.35 sum that is not the tree plus the command", &changelog_problems(&wrong_sum, &live), "not the tree plus the command");
+    let reasoned = grown.replace("\nCallers that", "\nA sum grew because the atip crate's sharing rule moves every shared option into the tree.\n\nCallers that");
+    assert!(!changelog_problems(&reasoned, &live).iter().any(|problem| problem.contains("gives no reason")), "a grown sum with its reason is accepted");
     let words = complete.replace(ENTRY_HEADING, "canon declares something");
     assert_found("an entry without the heading", &changelog_problems(&words, &live), "not one");
     let outside = complete.replace("## Unreleased", "## 0.99.0");

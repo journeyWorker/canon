@@ -37,8 +37,8 @@ canon adapter validate --response adapter-response.json --json
 ```
 ```text
 # Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
-usage: canon artifacts move --tier <TIER> [--commit --plan-digest <VALUE>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon artifacts move --tier <TIER> [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon artifacts move --tier cold --json
@@ -220,16 +220,16 @@ canon inventory sync --json
 ```
 ```text
 # Move superseded versions of every record out of the ledger into the archive
-usage: canon ledger compact [--commit --plan-digest <VALUE>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon ledger compact [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon ledger compact --json
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-usage: canon migrate [--commit --plan-digest <VALUE>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon migrate [--commit --plan-digest <PLAN_DIGEST>] [--revert | --relayed-via <NAME>] [--backup <DIR> (with --revert)] [--actor <ACTOR_ID> (with --relayed-via)] [--approver <NAME> (with --relayed-via)] [--note <TEXT> (with --relayed-via)] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon migrate --json
@@ -264,8 +264,8 @@ canon prompt show reviewer@v1 --json
 ```
 ```text
 # Remove allowlisted records older than a cutoff
-usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <VALUE>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon purge --kind session --before 2020-01-01T00:00:00Z --json
@@ -426,8 +426,8 @@ canon subject unadopt demo --change add-login --json
 ```
 ```text
 # Apply canon.yaml aging rules, moving old records to their destination tier
-usage: canon tier age [--commit --plan-digest <VALUE>] [--input]
-# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
+usage: canon tier age [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
 canon tier age --json
