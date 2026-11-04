@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:15:16.395027Z",
+  "code_tree": "4f723b17ff85c8d50a57882448c2bdb2e375b5de",
+  "kind": "review",
+  "pin": "e47a669f838ed90d7cc79a72c7b35a10931464d8",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_helpjson_09_no_text_of_the_repository_recommends_help_with_json"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ff96374e54fe09d3178d81e2c76c816112e0f95fc9de8b978d31a8a8cabee84f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-help-json/brief.md"
+  },
+  "review_id": "01M6J5DN5BSWV6G6B6VJGH329J",
+  "reviewer": "rev-0-36-codes",
+  "scenario_id": "atip.helpjson.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

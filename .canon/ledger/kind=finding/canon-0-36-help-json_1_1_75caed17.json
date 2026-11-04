@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:10.947476Z",
+  "change_id": "canon-0-36-help-json",
+  "code_tree": "fd5ff77d390f83b70a1ae4e08b732597b761c000",
+  "disposition": "open",
+  "introduced_by": "1c1d3e3d2a416e22a802e077da04c6e8915e6d23",
+  "kind": "finding",
+  "reviewed_sha": "fa242b1fec1d55f24f3549f4323f2a8d83c48e13",
+  "reviewer": "rev-0-36-codes",
+  "round": 1,
+  "scenario_ids": [
+    "atip.helpjson.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[standards] atip.helpjson.07 and its test still say the outside-a-repository answer is never CONFIG_MISSING. Since codes-rename the error is CONFIG_REQUIRED (CONFIG_MISSING is only the status warning), so assert_ne!(code, CONFIG_MISSING) in atip_helpjson.rs:196 can no longer fail and the scenario text names a code the error no longer has; the codes-rename guard exempts CONFIG_MISSING whole, so it did not flag them. The same-answer-in-and-out assertion on the next line still fails if the refusal reads the repo, so the behavior is proved; the name is the stale part. Blast radius: the scenario text (digest) and one assertion; no behavior.",
+  "worktree_dirty": false
+}

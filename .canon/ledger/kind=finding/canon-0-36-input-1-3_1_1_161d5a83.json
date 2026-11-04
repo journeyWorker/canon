@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:11.880999Z",
+  "change_id": "canon-0-36-input-1-3",
+  "code_tree": "4f723b17ff85c8d50a57882448c2bdb2e375b5de",
+  "disposition": "open",
+  "introduced_by": "9277cf69397defbbf46b3e8868ea46b5572a9e44",
+  "kind": "finding",
+  "reviewed_sha": "e47a669f838ed90d7cc79a72c7b35a10931464d8",
+  "reviewer": "rev-0-36-codes",
+  "round": 1,
+  "scenario_ids": [
+    "atip.input13.07",
+    "atip.input13.08"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec-fidelity] The brief's F3 acceptance says the largest safe integer 9007199254740991 passes; atip.input13.07 and .08 only show it is not an integer-range fault, using --round / a round document value, whose domain then refuses it with USAGE (the test finds the non-fault by a message substring and reason != INVALID_VALUE). An argument whose domain admits it exists: canon finding list --change b --limit 9007199254740991 answers ok (I ran it), and 9007199254740992 is refused beyond 2^53-1. The behavior is right; the check would not notice an off-by-one that moved the bound by one below the domain of round. Blast radius: the integer check of every leaf, shared by all of them.",
+  "worktree_dirty": false
+}

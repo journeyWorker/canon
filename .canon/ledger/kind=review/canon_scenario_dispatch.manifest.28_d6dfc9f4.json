@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:33.743738Z",
+  "code_tree": "4f723b17ff85c8d50a57882448c2bdb2e375b5de",
+  "kind": "review",
+  "pin": "e47a669f838ed90d7cc79a72c7b35a10931464d8",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:dispatch_manifest_28_dispatch_diff_outside_a_canon_repository_is_refused_and_writes_nothing"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "03ee687df5cbeba31dd109958da9c0623ed6434b6737f251818e2069ef48bfe2",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-rename/brief.md"
+  },
+  "review_id": "01M6J5CBGF5PFK6CA4QN14NQRP",
+  "reviewer": "rev-0-36-codes",
+  "scenario_id": "dispatch.manifest.28",
+  "schema": 2,
+  "worktree_dirty": false
+}

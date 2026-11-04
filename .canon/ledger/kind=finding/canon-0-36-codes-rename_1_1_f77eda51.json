@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:08.498197Z",
+  "change_id": "canon-0-36-codes-rename",
+  "code_tree": "fd5ff77d390f83b70a1ae4e08b732597b761c000",
+  "disposition": "open",
+  "introduced_by": "1c1d3e3d2a416e22a802e077da04c6e8915e6d23",
+  "kind": "finding",
+  "reviewed_sha": "fa242b1fec1d55f24f3549f4323f2a8d83c48e13",
+  "reviewer": "rev-0-36-codes",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codenames.03",
+    "atip.codenames.04"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[spec-fidelity] The brief says 81 codes stay on the list of codes still to rename (and 48 kept); the list holds 66 and 63 kept codes follow the rule. The list is right by the brief's own failure path (a listed code that follows the rule fails atip.codenames.04), and I checked all 129 non-renamed codes: 66 break the rule, 63 pass it. The 15-code gap are codes the issue 135 mapping marks ambiguous, merged or gap (e.g. ARTIFACTS_STORE_FAILED and EVIDENCE_STORE_FAILED to merge, HOOKS_INSTALL_FAILED, LEARN_PROMOTION_FAILED, LEARN_ROLLBACK_FAILED, TIER_FAILED, EVIDENCE_APPROVAL_INVALID, EVIDENCE_STORE_UNAVAILABLE, TASK_ROW_NOT_FOUND) yet they pass the name rule, so no ratchet tracks them. Blast radius: codes-exit, codes-refusals, codes-stored and codes-incomplete must take those 15 from their briefs by hand, and the empty-list check of codes-table cannot see them.",
+  "worktree_dirty": false
+}

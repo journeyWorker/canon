@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:10.142643Z",
+  "change_id": "canon-0-36-codes-rename",
+  "code_tree": "fd5ff77d390f83b70a1ae4e08b732597b761c000",
+  "disposition": "open",
+  "introduced_by": "1c1d3e3d2a416e22a802e077da04c6e8915e6d23",
+  "kind": "finding",
+  "reviewed_sha": "fa242b1fec1d55f24f3549f4323f2a8d83c48e13",
+  "reviewer": "rev-0-36-codes",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codenames.02"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] The failure path of atip.codenames.02 (a source that builds an old name fails the registry-match test) is proved by asserting that grammar_t5_errors.rs contains the text of a test name, not by making the test fail. Also every_code_a_source_builds_is_registered scans the needles CliError::refused(\", CliError::failed(\", refused(\" and failed(\" only, so a call through the helper refuse(\" (brief_approve.rs raises BRIEF_INVALID that way) is not matched against the registry. The old-names guard (old_names.rs) and the emission tests still cover those sites. Blast radius: a typo in a refuse(...) call site is caught only by an emission test of that code.",
+  "worktree_dirty": false
+}

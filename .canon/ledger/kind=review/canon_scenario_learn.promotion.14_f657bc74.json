@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:33.743738Z",
+  "code_tree": "4f723b17ff85c8d50a57882448c2bdb2e375b5de",
+  "kind": "review",
+  "pin": "e47a669f838ed90d7cc79a72c7b35a10931464d8",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_signature_is_read_and_writes_nothing"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "37007ee39f6a305d3a15a6cf4b943efda40cad7550ae39f89cf926ca261780f1",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-rename/brief.md"
+  },
+  "review_id": "01M6J5CBGF5PFK6CA4QN14NQRP",
+  "reviewer": "rev-0-36-codes",
+  "scenario_id": "learn.promotion.14",
+  "schema": 2,
+  "worktree_dirty": false
+}

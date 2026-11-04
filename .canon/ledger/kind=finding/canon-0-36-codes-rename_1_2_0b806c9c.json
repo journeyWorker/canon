@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:09.380628Z",
+  "change_id": "canon-0-36-codes-rename",
+  "code_tree": "fd5ff77d390f83b70a1ae4e08b732597b761c000",
+  "disposition": "open",
+  "introduced_by": "1c1d3e3d2a416e22a802e077da04c6e8915e6d23",
+  "kind": "finding",
+  "reviewed_sha": "fa242b1fec1d55f24f3549f4323f2a8d83c48e13",
+  "reviewer": "rev-0-36-codes",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codenames.01"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[standards] RETRIEVE_INVALID is the only one of the 50 renamed codes with no test that makes a real call raise it: exit_registry.rs only reads its registry row, which the brief says is no proof (F1 acceptance). The call does raise it (canon retrieve --for-role implementer --domain '' exits 2 RETRIEVE_INVALID, retryable false; one site, run/top.rs:224) and RETRIEVE_FAILED had no real-call test before either. Blast radius: a call site that stopped raising it would pass the registry tests.",
+  "worktree_dirty": false
+}

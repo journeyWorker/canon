@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-codes",
+    "role": "reviewer",
+    "session_id": "s-0-36-codes-rev"
+  },
+  "at": "2026-11-04T02:14:48.295193Z",
+  "code_tree": "4f723b17ff85c8d50a57882448c2bdb2e375b5de",
+  "kind": "review",
+  "pin": "e47a669f838ed90d7cc79a72c7b35a10931464d8",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codenames_01_a_call_that_raised_an_old_name_raises_the_new_one_with_the_same_exit_field_and_reason",
+          "junit:atip_codenames_01_a_task_of_a_plan_dialect_that_cannot_be_flipped_is_task_unsupported",
+          "junit:atip_codenames_01_skills_check_that_finds_drift_is_skills_check_failed_with_the_reason_drift"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f16b01bff1f0714e4be3e0eb477b718841da32286e05ae5e7fa1152e2a1869b5",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-rename/brief.md"
+  },
+  "review_id": "01M6J5CSQ7Q8QV4F5ZW1KNG0CD",
+  "reviewer": "rev-0-36-codes",
+  "scenario_id": "atip.codenames.01",
+  "schema": 2,
+  "worktree_dirty": false
+}
