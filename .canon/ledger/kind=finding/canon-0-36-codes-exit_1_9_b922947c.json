@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:56.333621Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/cli_error.rs; crates/canon-cli/src/gate.rs:promote_after_stage",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 9,
+  "severity": "note",
+  "summary": "BRIEF_APPROVE_REFUSED still says in the registry meaning and in `docs/cli/canon.cli.json` that `data.refused names each with its own code`; the several-ids refusal now has no data and the first cause's code (or BRIEF_APPROVE_REFUSED) with `error.details`. `promote_after_stage` tells a gate refusal from PROMOTE_FAILED by `refusal.data.is_some()` and then drops the refusal's `details` into the STOPPED_MIDWAY message; carry an explicit flag and the details instead. No test covers a `subject move` with two causes (details), EVIDENCE_STALE or LAYOUT_MIGRATION_REQUIRED for it, or SUBJECT_INVALID by a real call (only the exhaustive match in gate_refusal.rs and the registry test).",
+  "worktree_dirty": false
+}

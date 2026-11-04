@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:20:15.450020Z",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "kind": "review",
+  "pin": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:evidence_add_123_a_tagged_scenario_waits_only_for_its_tagged_changes"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "50864b486fe2e9bebb502e2f3b7f6f420f7801a30df615ca2d1e87b3787eb923",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-exit/brief.md"
+  },
+  "review_id": "01M6J94MTTYTE7DRAKPXHSG57B",
+  "reviewer": "rev-0-36-exit",
+  "scenario_id": "evidence.add.123",
+  "schema": 2,
+  "worktree_dirty": false
+}

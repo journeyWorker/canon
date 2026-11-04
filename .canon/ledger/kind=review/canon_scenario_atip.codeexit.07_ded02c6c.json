@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:20:15.450020Z",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "kind": "review",
+  "pin": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codeexit_07_a_check_command_that_cannot_start_is_exit_2_and_not_failed"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ff1301f31e8fd76c7061ad28d7db046c1c4f4bd4b8ac8a8afae1bdfc28234ede",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-exit/brief.md"
+  },
+  "review_id": "01M6J94MTTYTE7DRAKPXHSG57B",
+  "reviewer": "rev-0-36-exit",
+  "scenario_id": "atip.codeexit.07",
+  "schema": 2,
+  "worktree_dirty": false
+}

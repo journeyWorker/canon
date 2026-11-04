@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:29.637620Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/canon-gate.md:31,464,700",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Three shipped skill lines still say exit 1 for refusals that are now exit 2: canon-gate.md line 31 (`canon evidence add` refuses a fabricated note, `fabricated-evidence`, exit 1; now EVIDENCE_NOTE_INVALID exit 2), line 464 (a `faithful` verdict with a failed or skipped bound case refuses, exit 1; now EVIDENCE_REPORT_CONFLICT exit 2) and line 700 (`task done` with missing evidence, a Divergent verdict or a fabricated note exits 1; now TASK_EVIDENCE_REQUIRED/TASK_EVIDENCE_INVALID exit 2). The brief F5 and the audit ask for skill examples that branch on exit to be checked; the diff updated the code names but not these exit values. Fix the three lines and re-run `canon skills install` and the bless.",
+  "worktree_dirty": false
+}

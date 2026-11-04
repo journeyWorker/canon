@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:55.712636Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/gate_refusal.rs:promotion_code; CHANGELOG.md",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "Dead mapping: `promotion_code` and the CHANGELOG rows `PROMOTE_REFUSED -> EVIDENCE_STALE` and `-> LAYOUT_MIGRATION_REQUIRED` promise codes `gate promote` never raises (canon_gate::promote refuses only `malformed-evidence`, promote.rs:392), and the `DIVERGENCE_REFUSED -> EVIDENCE_STALE / LAYOUT_MIGRATION_REQUIRED` rows promise codes `divergence add/defer/resolve` never raise (divergence.rs emits only DIVERGENCE_INVALID, and the schema_codes rows do not list them). EVIDENCE_STALE and LAYOUT_MIGRATION_REQUIRED are registered for `gate promote` and `evidence add` anyway. This is the same `only what canon raises` rule the implementer applied to the *_APPROVAL_REQUIRED codes, which I accept (promotion, strategy and divergence gates have no approval class; registering them would invite a branch that never fires). Apply the rule to these too, in codes-table, or add a reachable case. If a stale promotion ever did arise, `.reason(EVIDENCE_STALE)` on STOPPED_MIDWAY would trip the debug reason assertion.",
+  "worktree_dirty": false
+}

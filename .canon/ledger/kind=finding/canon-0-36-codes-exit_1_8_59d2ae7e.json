@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:19:56.021887Z",
+  "change_id": "canon-0-36-codes-exit",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/evidence.rs:land_batch; crates/canon-cli/src/gate.rs",
+  "introduced_by": "030701e96eebda8cd3585529b39bc4e5cc704e35",
+  "kind": "finding",
+  "reviewed_sha": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "reviewer": "rev-0-36-exit",
+  "round": 1,
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "`land_batch` raises BATCH_INCOMPLETE without `data`, while the registry says `data.items gives each element's status` and the input batch path does give it. The branch is unreachable through the CLI today (judge_evidence_body only refuses a body that lacks actor.role or a scenario/task, which the command always supplies), so the order guarantee (judge all before the first write, inside the repository write lock that `evidence add` and `gate promote` hold for the whole call, write_lock::POLICY) holds but the after-write branch is untestable except by a unit test. The comments in land_batch and run_promote name scenarios atip.codeexit.07 and .04; the batch is .05 and promote is .03.",
+  "worktree_dirty": false
+}

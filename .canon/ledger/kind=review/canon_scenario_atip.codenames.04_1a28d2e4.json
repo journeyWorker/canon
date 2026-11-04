@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-exit",
+    "role": "reviewer",
+    "session_id": "s-0-36-exit-rev"
+  },
+  "at": "2026-11-04T03:20:15.450020Z",
+  "code_tree": "fd1e8c18fb20f8275319def81b07c9b0bc728663",
+  "kind": "review",
+  "pin": "26cb75b58a24267289e93a7f3032e196d665641e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codenames_04_a_listed_code_that_follows_the_rule_fails_the_test",
+          "junit:atip_codenames_04_a_name_without_a_condition_or_with_the_wrong_exit_is_refused_by_the_rule",
+          "junit:atip_codenames_04_the_list_of_codes_still_to_reclassify_holds_only_registered_codes"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c1e94cc6a0c942f0b8932c3f931f6fca535811f015022fec3e87257691309743",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-exit/brief.md"
+  },
+  "review_id": "01M6J94MTTYTE7DRAKPXHSG57B",
+  "reviewer": "rev-0-36-exit",
+  "scenario_id": "atip.codenames.04",
+  "schema": 2,
+  "worktree_dirty": false
+}
