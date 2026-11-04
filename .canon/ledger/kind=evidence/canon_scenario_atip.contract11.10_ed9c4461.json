@@ -1,0 +1,59 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:01:10.889469Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_contract11_10_the_rule_catches_prose_after_a_command_and_a_lowercase_placeholder",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_in_the_sources_is_a_command_line_a_template_or_prose",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_conformance_corpus_froze_follows_the_same_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    }
+  ],
+  "code_tree": "63d0921888897cc1c79c79ef3df27b5222696534",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "ea5fd38860a0f88b85fdf2974f4918d060c54740",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 260,
+  "scenario_id": "atip.contract11.10",
+  "schema": 1,
+  "staging_id": "1301bdcf",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

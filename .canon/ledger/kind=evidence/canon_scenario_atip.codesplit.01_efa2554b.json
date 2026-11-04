@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:01:10.889469Z",
+  "attachments": [
+    {
+      "case": "evidence::tests::atip_codesplit_01_a_surface_ref_that_gets_past_the_validator_is_an_invalid_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_codesplit_01_a_missing_subject_a_contradiction_and_an_empty_value_answer_with_their_own_condition",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_codesplit_01_a_task_that_names_no_task_is_task_not_found_for_the_payload_and_the_attestation_alike",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "atip_codesplit_01_each_code_of_the_split_is_registered_as_the_table_says_and_no_old_name_remains",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    }
+  ],
+  "code_tree": "63d0921888897cc1c79c79ef3df27b5222696534",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "ea5fd38860a0f88b85fdf2974f4918d060c54740",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 44,
+  "scenario_id": "atip.codesplit.01",
+  "schema": 1,
+  "staging_id": "374e5796",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

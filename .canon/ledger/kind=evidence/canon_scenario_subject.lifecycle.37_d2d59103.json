@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T15:01:10.889469Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_37_unadopt_refuses_an_approved_change",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    },
+    {
+      "case": "subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "84caad86dbf6c51addec0c419e42dd308a1298f315d598ddf92ce4b616eb9d82"
+    }
+  ],
+  "code_tree": "63d0921888897cc1c79c79ef3df27b5222696534",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "ea5fd38860a0f88b85fdf2974f4918d060c54740",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 931,
+  "scenario_id": "subject.lifecycle.37",
+  "schema": 1,
+  "staging_id": "e86c250b",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}
