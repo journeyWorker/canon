@@ -165,7 +165,7 @@ fn atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon
     assert!(deep.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{deep:?}");
     let quick = COMMAND.replace(" --deep", "");
     let recipe = just_recipe("atip");
-    assert!(recipe.iter().any(|line| *line == quick), "the recipe atip runs the job's command without --deep: {recipe:?}");
+    assert!(recipe.contains(&quick), "the recipe atip runs the job's command without --deep: {recipe:?}");
     assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{recipe:?}");
     assert_eq!(just_recipe("atip-install"), [INSTALL], "the recipe that installs the checker runs the job's command");
 }
