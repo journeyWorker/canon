@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-04T17:06:28Z",
-  "note": "휴가 중 승인 위임(2026-11-01 대화): 크기 표는 v0.35.0 기준, 명령 다섯 모두 트리+명령 합을 싣고 커진 경우 이유를 적음",
+  "approved_at": "2026-11-04T19:56:40Z",
+  "note": "휴가 중 승인 위임(2026-11-01 대화): F6 표를 리뷰된 동작에 맞춤(EVIDENCE_REFUSED, SUBJECT_ADOPT_REFUSED 행)",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",
