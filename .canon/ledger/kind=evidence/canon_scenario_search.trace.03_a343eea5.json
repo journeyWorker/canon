@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-refusals-fix",
+    "role": "implementer",
+    "session_id": "s-0-36-refusals-fix"
+  },
+  "at": "2026-11-04T09:02:21.075724Z",
+  "attachments": [
+    {
+      "case": "search_trace_03_tracing_a_review_id_starts_from_every_review_the_run_wrote_and_a_26_character_operand_with_no_review_is_read_as_a_sha_prefix",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b44b2ddee3a618e932817939ef666ee1ed483fc89a8ae3c8ec174a68a20cae09"
+    }
+  ],
+  "code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "481ea88dee39886ba8142a97598a0074b5cdc9d5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 93,
+  "scenario_id": "search.trace.03",
+  "schema": 1,
+  "staging_id": "2dba3787",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

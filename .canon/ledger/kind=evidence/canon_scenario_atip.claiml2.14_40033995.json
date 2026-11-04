@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-refusals-fix",
+    "role": "implementer",
+    "session_id": "s-0-36-refusals-fix"
+  },
+  "at": "2026-11-04T09:02:21.075724Z",
+  "attachments": [
+    {
+      "case": "atip_claiml2_14_an_entry_taken_out_of_the_release_section_fails_the_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b44b2ddee3a618e932817939ef666ee1ed483fc89a8ae3c8ec174a68a20cae09"
+    }
+  ],
+  "code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "481ea88dee39886ba8142a97598a0074b5cdc9d5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 182,
+  "scenario_id": "atip.claiml2.14",
+  "schema": 1,
+  "staging_id": "87b87b9b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
