@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T13:36:18.798494Z",
+  "attachments": [
+    {
+      "case": "atip_reasons_06_a_brief_that_cannot_be_read_and_a_brief_with_blockers_are_brief_invalid_with_their_own_reasons",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0a525d0cd1fba8ffca9e58f98721347bfd523b565d497f744dc3c3e25a78fac2"
+    }
+  ],
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "62e83e213ed43a97682ce347d4fd85036c34c4c2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "atip.reasons.06",
+  "schema": 1,
+  "staging_id": "41b89955",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-reasons",
+    "role": "implementer",
+    "session_id": "s-0-36-code-reasons"
+  },
+  "at": "2026-11-04T13:36:21.834999Z",
+  "attachments": [
+    {
+      "case": "atip_reasons_07_a_refused_transition_names_the_kind_that_asks_for_a_different_fix_and_every_detail_has_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0a525d0cd1fba8ffca9e58f98721347bfd523b565d497f744dc3c3e25a78fac2"
+    }
+  ],
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "62e83e213ed43a97682ce347d4fd85036c34c4c2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "atip.reasons.07",
+  "schema": 1,
+  "staging_id": "1d927665",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
