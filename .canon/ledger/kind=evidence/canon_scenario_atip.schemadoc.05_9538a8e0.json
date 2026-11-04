@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T01:45:59.386142Z",
+  "attachments": [
+    {
+      "case": "atip_schemadoc_05_an_option_that_an_environment_variable_fills_declares_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ba5a010ebe1bc917e181afdc3b128ff59397df4b19bf2fde7787fb1ec4695966"
+    },
+    {
+      "case": "atip_schemadoc_05_every_option_has_a_value_type_a_typed_default_and_no_id_suffix",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ba5a010ebe1bc917e181afdc3b128ff59397df4b19bf2fde7787fb1ec4695966"
+    },
+    {
+      "case": "atip_schemadoc_05_help_defaults_equal_the_documented_defaults_and_a_name_means_one_thing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ba5a010ebe1bc917e181afdc3b128ff59397df4b19bf2fde7787fb1ec4695966"
+    }
+  ],
+  "code_tree": "fd5ff77d390f83b70a1ae4e08b732597b761c000",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "1c1d3e3d2a416e22a802e077da04c6e8915e6d23",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 93,
+  "scenario_id": "atip.schemadoc.05",
+  "schema": 1,
+  "staging_id": "a385f34e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

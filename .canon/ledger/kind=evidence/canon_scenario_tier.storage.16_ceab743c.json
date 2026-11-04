@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-codes-rename",
+    "role": "implementer",
+    "session_id": "s-0-36-codes-rename"
+  },
+  "at": "2026-11-04T01:45:59.386142Z",
+  "attachments": [
+    {
+      "case": "tier_storage_16_purge_previews_the_removal_set_then_deletes_exactly_that_set_on_the_previewed_digest",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ba5a010ebe1bc917e181afdc3b128ff59397df4b19bf2fde7787fb1ec4695966"
+    }
+  ],
+  "code_tree": "fd5ff77d390f83b70a1ae4e08b732597b761c000",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "1c1d3e3d2a416e22a802e077da04c6e8915e6d23",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 133,
+  "scenario_id": "tier.storage.16",
+  "schema": 1,
+  "staging_id": "58a566ec",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
