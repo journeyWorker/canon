@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-3"
+  },
+  "at": "2026-11-04T19:54:45.254078Z",
+  "change_id": "canon-0-35-crate-cursor",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "disposition": "open",
+  "introduced_by": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "kind": "finding",
+  "reviewed_sha": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 2,
+  "scenario_ids": [
+    "atip.canoncursor.02",
+    "atip.canoncursor.04"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec-fidelity] The retags to canon-0-35-crate-cursor.F5 (atip.canoncursor.02 and .04) cover half of F5: canon declares 1.4 and so binds by the 1.2 rules, and .02 (CANON_ROLE and an explicit default bind) and .04 (--all in place of --limit is not bound) prove exactly that half. F5's other half, the same arguments under 1.1 binding --all and ignoring the environment, has no canon-observable form (canon never runs as a 1.1 tool) and stays the crate's own test (atip_cratecursor_03 and 11). Signed because every Then step of both scenarios is proven; recorded so the brief check does not read F5 as proven for 1.1. Blast radius: a canon regression that bound --all or dropped the environment from the binding would fail .02 and .04; a crate regression in the 1.1 rules would not fail anything in canon.",
+  "worktree_dirty": false
+}

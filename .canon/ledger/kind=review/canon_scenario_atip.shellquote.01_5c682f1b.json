@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev-3"
+  },
+  "at": "2026-11-04T19:55:11.287632Z",
+  "code_tree": "c4bdd1b015eb3957e624f586a6b53eb5a6571371",
+  "kind": "review",
+  "pin": "a021655ea315d001c8bae17fed94592b0f3c6b3d",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_shellquote_01_a_word_with_an_apostrophe_is_closed_escaped_and_reopened_and_a_safe_word_stays_bare"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "2cb11bc5a4040bffe922ceb67115b3f1974f765026388e85bd0b9e19b12fe31b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-35-crate-shell/brief.md"
+  },
+  "review_id": "01M6M22DHQPCRMNR8XXBT85N2C",
+  "reviewer": "rev-0-36-flowfix",
+  "scenario_id": "atip.shellquote.01",
+  "schema": 2,
+  "worktree_dirty": false
+}
