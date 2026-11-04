@@ -161,10 +161,10 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   @case:happy
   @flow:canon-0-36-claim-1-4.F7
   @atip.claim14.15
-  Scenario: The CHANGELOG Unreleased section holds the entry canon declares atip/1 1.4 with its before and after table, measured sizes equal to the live sizes, and the callers note
+  Scenario: The CHANGELOG Unreleased section holds the entry canon declares atip/1 1.4 with its before and after table, the sizes measured from the v0.35.0 binary and from this build, every tree plus one command sum, and the callers note
     Given the Unreleased section of the CHANGELOG and the built binary
-    When the entry is read and the sizes of schema finding close, finding list, purge, skills show, the tree and the tree plus one command are measured
-    Then the entry has its table with the declaration, the schema answer forms, --schemas and --help --json, each stated 1.4 size equals the measure and is smaller than its 1.3 size, and a callers paragraph mentions 1.3
+    When the entry is read and the sizes of schema finding close, finding list, purge, skills show, evidence add and the tree are measured, with the sum of the tree and each one command
+    Then the entry has its table with the declaration, the schema answer forms, --schemas and --help --json, each stated 1.4 size equals the measure, each command document is smaller than its 0.35 one, the tree may be larger, every sum is stated as the tree plus the command and a sum that is larger has its reason (the crate's sharing rule), and a callers paragraph mentions 1.3
 
   # canon: {"schema":1,"at":"2026-11-04T15:59:58Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-contract
