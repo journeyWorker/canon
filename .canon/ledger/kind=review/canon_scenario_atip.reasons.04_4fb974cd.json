@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T15:29:04.426607Z",
+  "code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "kind": "review",
+  "pin": "083f95f016328fbfdf80d3f71ab843780e263099",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_reasons_04_each_gate_violation_kind_has_the_code_and_the_reason_the_audit_says",
+          "junit:atip_reasons_04_the_audit_refuses_a_code_with_several_next_actions_and_no_reasons_and_one_action_under_two_reasons",
+          "junit:atip_reasons_04_the_audit_table_and_the_registry_list_the_same_reasons_for_every_code_and_the_schema_says_them"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "1e4bb400725486b1ac529e838804715f12b69682bb7c47c7dcc688872505288d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-code-reasons/brief.md"
+  },
+  "review_id": "01M6KJV4XAJQT1NZ72ZE117D2N",
+  "reviewer": "rev-0-36-reasons",
+  "scenario_id": "atip.reasons.04",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T15:29:04.426607Z",
+  "code_tree": "c981f839f20339ac08b606919d608744761426fb",
+  "kind": "review",
+  "pin": "083f95f016328fbfdf80d3f71ab843780e263099",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_reasons_07_a_refused_transition_names_the_kind_that_asks_for_a_different_fix_and_every_detail_has_its_own_code",
+          "junit:atip_reasons_07_the_emit_assertion_checks_every_detail_entry"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "27d45723be3f4b8d36f45098a62ec8504ab1d93f6b64c432a2bec139588bb688",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-code-reasons/brief.md"
+  },
+  "review_id": "01M6KJV4XAJQT1NZ72ZE117D2N",
+  "reviewer": "rev-0-36-reasons",
+  "scenario_id": "atip.reasons.07",
+  "schema": 2,
+  "worktree_dirty": false
+}
