@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T13:49:40.740228Z",
+  "change_id": "canon-0-36-code-reasons",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/top.rs:10-12",
+  "introduced_by": "b524c40a4efbb63df3f3e515e987872918912612",
+  "kind": "finding",
+  "reviewed_sha": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "reviewer": "rev-0-36-reasons",
+  "round": 1,
+  "scenario_ids": [
+    "atip.reasons.14"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] The unreachable-DSN plumbing (TierRegistry::with_unreachable, LoadedTiers.unreachable) is wired only through retention::loaded_registry. With a postgres hot tier and CANON_PG_DSN set to an unreachable host, query --kind session still answers QUERY_FAILED exit 1 with the message 'hot tier (postgres) is not attached (no live DSN)', which is false (the DSN is set), and tier age answers TIER_FAILED exit 1 'not attached (pool timed out ...)'. Both are reads that failed before any work, the class this change moved to _UNAVAILABLE for query's ledger EIO. Not asked for by the carried-over item (purge and export), so not blocking; say so in the CHANGELOG row of RETENTION_TIERS_UNAVAILABLE, or route query's tier build through the same registry (REPO_UNAVAILABLE) so the message stops saying 'no live DSN' for a DSN that is set.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-reasons",
+    "role": "reviewer",
+    "session_id": "s-0-36-reasons-rev"
+  },
+  "at": "2026-11-04T13:49:27.671200Z",
+  "change_id": "canon-0-36-code-reasons",
+  "code_tree": "020edc99463ff2f757fbc136510ab73cd1d3b63a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/plans.rs:841-856",
+  "introduced_by": "b524c40a4efbb63df3f3e515e987872918912612",
+  "kind": "finding",
+  "reviewed_sha": "8463b240921a0f6ea9683e2c7b200bf71e20308e",
+  "reviewer": "rev-0-36-reasons",
+  "round": 1,
+  "scenario_ids": [
+    "atip.reasons.12"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] The 'silent no plans' is only closed for EIO. configured_plan_sources still answers Ok(empty) for every other read error: with canon.yaml chmod 000, dispatch begin --task c#1 answers PLAN_SOURCES_REQUIRED 'this repo configures no plan sources' (observed), and a canon.yaml that is a directory or not UTF-8 does the same. The comment in the function gives the reason for EIO (answering zero sources hides a plans: section that is there); it holds for a denied or wrong-kind read as much. Only NotFound is the legitimate first-run state. Suggest: Ok(empty) for NotFound only, PlansError::Config for any other kind (PLAN_CORPUS_DENIED / _INVALID by cause, as plan documents already do).",
+  "worktree_dirty": false
+}
