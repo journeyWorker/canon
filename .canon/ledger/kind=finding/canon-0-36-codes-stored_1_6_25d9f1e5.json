@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T09:40:18.224046Z",
+  "change_id": "canon-0-36-codes-stored",
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "disposition": "fixed",
+  "introduced_by": "ae941277f52c0177c640f51c0aa3f5b28545b085",
+  "kind": "finding",
+  "resolution_code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "resolution_sha": "f2dfd479b72aba7fb5981aa262576785a0beae62",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "4ea21af84a4cad334690b6662e01ba946daace8b",
+  "reviewer": "rev-0-36-stored",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.07"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "[standards] A permission refusal on the artifact store directory is filed as ARTIFACTS_STORE_INVALID. ATIP 1.3 (context rules): a permission problem is DENIED. Driven: `chmod 000 .canon/artifacts/sha256` (and `.canon/artifacts`), `canon artifacts move --tier cold --json` -> exit 2 ARTIFACTS_STORE_INVALID 'cannot read the local artifact store: Permission denied (os error 13)'; `store_code` maps `Io` of cause Denied or WrongPath to ARTIFACTS_STORE_INVALID, and the registry meaning of that code is a symlink ('not a real directory'), not a refused read. The only DENIED code of the artifact family is ARTIFACTS_BLOB_DENIED (a blob, not the store directory), and `evidence add` on the same repo answers WRITE_DENIED, so the same fault has three codes by command. This needs the owner: add ARTIFACTS_STORE_DENIED, or say in the registry and the brief that a store directory the system refuses is INVALID. Not one of the three approved new codes.",
+  "worktree_dirty": false
+}

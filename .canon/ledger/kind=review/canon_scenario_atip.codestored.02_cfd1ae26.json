@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T09:40:30.629524Z",
+  "code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "kind": "review",
+  "pin": "f2dfd479b72aba7fb5981aa262576785a0beae62",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codestored_02_a_config_is_told_by_its_cause",
+          "junit:atip_codestored_02_a_detached_signature_that_cannot_be_read_is_denied_invalid_or_not_found_by_its_cause",
+          "junit:atip_codestored_02_a_plan_document_that_cannot_be_read_is_denied_and_one_without_the_row_is_invalid",
+          "junit:atip_codestored_02_a_spec_root_on_disk_is_denied_or_invalid_and_a_malformed_specs_section_is_the_configs",
+          "junit:atip_codestored_02_sync_retention_and_policy_approve_tell_a_refused_read_from_a_broken_file",
+          "junit:read_cause::tests::atip_codestored_02_a_cause_is_read_from_the_os_error_in_the_error_or_its_text",
+          "junit:read_cause::tests::atip_codestored_02_the_helpers_give_the_code_of_the_cause"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "fa2b7284b35d2f0798a13efd7851b7e921ff2b9c3f62805a7fbb1e7087f6cf04",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-stored/brief.md"
+  },
+  "review_id": "01M6JYWX95EWPXPJEW2F508MJD",
+  "reviewer": "rev-0-36-stored",
+  "scenario_id": "atip.codestored.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

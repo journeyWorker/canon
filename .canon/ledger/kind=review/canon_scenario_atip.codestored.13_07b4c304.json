@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T09:40:30.629524Z",
+  "code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "kind": "review",
+  "pin": "f2dfd479b72aba7fb5981aa262576785a0beae62",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_does_not_decode_is_corrupt",
+          "junit:retention::tests::atip_codestored_13_the_tiers_code_is_told_by_what_is_wrong"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bec25769631c6c28eeb45e58a19bf6dcf94f3eca3f7fe101586a6fce63ac8859",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-36-codes-stored/brief.md"
+  },
+  "review_id": "01M6JYWX95EWPXPJEW2F508MJD",
+  "reviewer": "rev-0-36-stored",
+  "scenario_id": "atip.codestored.13",
+  "schema": 2,
+  "worktree_dirty": false
+}

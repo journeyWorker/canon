@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-stored",
+    "role": "reviewer",
+    "session_id": "s-0-36-stored-rev"
+  },
+  "at": "2026-11-04T09:40:17.098362Z",
+  "change_id": "canon-0-36-codes-stored",
+  "code_tree": "c5e3806744e604803aeea8898d8fd1f44abfee76",
+  "disposition": "fixed",
+  "introduced_by": "ae941277f52c0177c640f51c0aa3f5b28545b085",
+  "kind": "finding",
+  "resolution_code_tree": "20a9e09475e7c649b925e8e0b8b236256495f384",
+  "resolution_sha": "f2dfd479b72aba7fb5981aa262576785a0beae62",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "4ea21af84a4cad334690b6662e01ba946daace8b",
+  "reviewer": "rev-0-36-stored",
+  "round": 1,
+  "scenario_ids": [
+    "atip.codestored.02"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The bound test of atip.codestored.02 does not exercise the signature file or the spec file the scenario names. `atip_codestored_02_a_config_a_signature_and_a_spec_file_are_told_by_their_cause` (name and doc comment say signature and spec file) only varies canon.yaml and runs `inventory sync`; the evidence record binds that test plus two `read_cause` unit tests that restate the helper's own mapping (tautology). No test at all reaches STRATEGY_SIGNATURE_DENIED, SPEC_ROOT_DENIED or SPEC_ROOT_INVALID, PLAN_CORPUS_DENIED or PLAN_CORPUS_INVALID, PLAN_DOCUMENT_INVALID (the last two I drove by hand and they answer as the brief says: `task done` on an unreadable tasks.md -> PLAN_CORPUS_DENIED, on a row that is absent -> PLAN_DOCUMENT_INVALID, both exit 2). spec030_reads covers only the signature NOT_FOUND and INVALID, unbound. Fix: tests (skipped as root with the message) for a signature file at mode 000 and for an unreadable plan document, and bind them to this scenario; rewrite the scenario's Then or the test name so they say what is proved. Blast radius: the SPEC_ROOT_* pair is also wrong in its cause, see finding 7.",
+  "worktree_dirty": false
+}
