@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-4",
+    "role": "implementer",
+    "session_id": "s-0-36-claim-1-4"
+  },
+  "at": "2026-11-04T16:32:16.161730Z",
+  "attachments": [
+    {
+      "case": "atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_l0_13_every_warning_site_names_a_registered_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_l0_13_every_warning_the_status_report_produces_has_a_registered_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_l0_13_no_warning_macro_call_lacks_a_code_literal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_l0_13_a_warning_code_has_the_registry_shape_of_a_warning_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    },
+    {
+      "case": "atip_l0_13_status_json_carries_coded_warnings_in_meta_and_plain_lines_in_data",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "f257ea64d67ac9e696d56031c66e90a6dc065e6b030fa221b23552c59c905ae6"
+    }
+  ],
+  "code_tree": "1a7e5489a2fa6ba2c22e4911438181e75f895c06",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "5d9c3a6a70c16b3251dcddbc196a2de3a0ff0c41",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 683,
+  "scenario_id": "atip.l0.13",
+  "schema": 1,
+  "staging_id": "295d9da7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
