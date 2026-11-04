@@ -195,7 +195,9 @@ fn every_env_var_the_sources_read_is_in_the_spec_or_the_internal_allowlist() {
         for (i, _) in live.match_indices("\"CANON_") {
             let rest = &live[i + 1..];
             let name: String = rest.chars().take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_').collect();
-            if rest[name.len()..].starts_with('"') {
+            // A name that is a reason of a registered code (`CANON_YAML`, the reason of `CONFIG_INVALID`) is a reason, not a variable.
+            let is_reason = canon_cli::cli_error::all_codes().iter().any(|info| info.reasons.iter().any(|r| r.reason == name));
+            if rest[name.len()..].starts_with('"') && !is_reason {
                 read.insert(name);
             }
         }

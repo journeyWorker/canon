@@ -696,7 +696,8 @@
       "exit": 2,
       "reasons": [
         "BLOCKERS",
-        "UNAPPROVABLE"
+        "UNAPPROVABLE",
+        "UNREADABLE"
       ],
       "retryable": false
     },
@@ -788,6 +789,7 @@
       "exit": 2,
       "reasons": [
         "ARTIFACT_STORE",
+        "CANON_YAML",
         "DASHBOARD",
         "POLICY",
         "SKILLS",
@@ -1738,6 +1740,10 @@
     {
       "code": "SUBJECT_INVALID",
       "exit": 2,
+      "reasons": [
+        "MALFORMED_EVIDENCE",
+        "OPEN_BLOCKER"
+      ],
       "retryable": false
     },
     {

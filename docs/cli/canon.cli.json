@@ -11628,6 +11628,10 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "PLAN_CORPUS_DENIED",
+        "PLAN_CORPUS_INVALID",
+        "PLAN_CORPUS_UNAVAILABLE",
+        "PLAN_SOURCES_REQUIRED",
         "PROMOTION_FAILED",
         "PROMOTION_INVALID",
         "REPO_DENIED",
@@ -11639,6 +11643,7 @@
         "SUBJECT_APPROVAL_REQUIRED",
         "SUBJECT_INVALID",
         "TASK_EVIDENCE_INVALID",
+        "TASK_NOT_FOUND",
         "TYPED_ATOMS_INVALID",
         "USAGE",
         "WRITE_DENIED",
@@ -12822,9 +12827,14 @@
         "EVIDENCE_ARGUMENT_REQUIRED",
         "EVIDENCE_REQUIRED",
         "INTERNAL",
+        "PLAN_CORPUS_DENIED",
+        "PLAN_CORPUS_INVALID",
+        "PLAN_CORPUS_UNAVAILABLE",
+        "PLAN_SOURCES_REQUIRED",
         "ROLE_INVALID",
         "SCENARIO_INDEX_REQUIRED",
         "SPEC_ROOT_NOT_FOUND",
+        "TASK_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED"
       ],
@@ -26470,6 +26480,7 @@
         "INTERNAL",
         "QUERY_ARGUMENT_INVALID",
         "QUERY_FAILED",
+        "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE"
       ],
@@ -40699,6 +40710,11 @@
           "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
           "meaning": "the brief's text cannot take an `Approved:` line (for example an open code fence)",
           "reason": "UNAPPROVABLE"
+        },
+        {
+          "fix": "Put the change's brief.md, a UTF-8 text file, where the message says, then run the command again.",
+          "meaning": "brief.md cannot be read as the brief: a directory stands where the file belongs, or the file is not UTF-8 text",
+          "reason": "UNREADABLE"
         }
       ],
       "retryable": false
@@ -40832,6 +40848,11 @@
           "fix": "Fix the `artifact_store:` section of canon.yaml (`canon init --check` names the problem), or set `artifact_store: { backend: local }`, then run the command again.",
           "meaning": "the `artifact_store:` section of canon.yaml (or the tier it names) is present but unusable",
           "reason": "ARTIFACT_STORE"
+        },
+        {
+          "fix": "Fix canon.yaml so it parses (`canon init --check` names the problem), then run the command again.",
+          "meaning": "canon.yaml itself is present but unusable: it does not parse, is not a mapping, or is no file, in a part no other reason of this code names (`specs:`, `skills:`, `artifact_store:`, the tiers and the dashboard have their own)",
+          "reason": "CANON_YAML"
         },
         {
           "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
@@ -41446,17 +41467,17 @@
       "meaning": "`init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because `canon skills install` refuses what it was given; what init wrote stays; `reason` is that refusal",
       "reasons": [
         {
-          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "fix": "Read what init wrote (`canon status`), make the `skills:` section of canon.yaml a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), then run `canon skills install`; do not run `canon init` again.",
           "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)",
           "reason": "CONFIG_INVALID"
         },
         {
-          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "fix": "Read what init wrote (`canon status`), name only providers of claude, codex, omp, pi in `skills.providers` of canon.yaml (or pass `--providers` to `canon skills install`), then run `canon skills install`; do not run `canon init` again.",
           "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown",
           "reason": "SKILLS_ARGUMENT_INVALID"
         },
         {
-          "fix": "Read what init wrote (`canon status`), fix what the message names, then run `canon skills install`; do not run `canon init` again.",
+          "fix": "Read what init wrote (`canon status`), point CANON_SKILLS_SOURCE at a directory that holds a SKILL.src.md or unset it, then run `canon skills install`; do not run `canon init` again.",
           "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the skill source (the directory CANON_SKILLS_SOURCE names) does not exist or holds no SKILL.src.md",
           "reason": "SKILLS_SOURCE_NOT_FOUND"
         }
@@ -41974,14 +41995,14 @@
       "code": "RETENTION_TIERS_REQUIRED",
       "exit": 2,
       "fix": "Set the variables the error names for the tier (or add its `tiers:` entry to canon.yaml), then run the command again.",
-      "meaning": "a tier a purge or export needs is not attached or not configured: its backend's endpoint or credentials are unset, or canon.yaml has no entry for it; nothing was deleted or written, and waiting does not help",
+      "meaning": "a tier a purge or export needs is not attached or not configured: its backend's endpoint, DSN or credentials are unset, or canon.yaml has no entry for it; nothing was deleted or written, and waiting does not help",
       "retryable": false
     },
     {
       "code": "RETENTION_TIERS_UNAVAILABLE",
       "exit": 2,
       "fix": "Check that the tier backends are reachable, then run the command again.",
-      "meaning": "a tier's backend a purge or export reads is down or does not answer (a SQL or object-store error), or the system failed the read of a file in a way a repeat can pass; nothing was deleted or written",
+      "meaning": "a tier's backend a purge or export reads is down or does not answer (a SQL or object-store error, or a Postgres DSN that is set and cannot be reached), or the system failed the read of a file in a way a repeat can pass; nothing was deleted or written",
       "retryable": true
     },
     {
@@ -42335,6 +42356,18 @@
       "exit": 2,
       "fix": "Fix each cause error.details names (the error itself when it names one), then run `canon subject move` again.",
       "meaning": "the status transition breaks a rule of the gate that is not a missing approval, review or evidence; error.details names each cause when there are several",
+      "reasons": [
+        {
+          "fix": "Fix or remove the record `error.details` names, then run `canon subject move` again.",
+          "meaning": "a record the gate reads to judge the transition does not parse or lacks a required field, so it counts as no evidence and the gate fails closed",
+          "reason": "MALFORMED_EVIDENCE"
+        },
+        {
+          "fix": "Close the blocker finding (`canon finding close`) once it is fixed, then run `canon subject move` again.",
+          "meaning": "an open `blocker` finding sits on a change the subject adopts, and the review policy blocks the transition on open findings",
+          "reason": "OPEN_BLOCKER"
+        }
+      ],
       "retryable": false
     },
     {
