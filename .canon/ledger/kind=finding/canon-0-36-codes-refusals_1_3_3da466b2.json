@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:03:53.337515Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_codesplit.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4983b3208c9177bded50efe00dc90220c03fe49f",
+  "reviewer": "rev-0-36-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] Acceptance lines of the brief and legs of atip.codesplit.01-05 have no test that exercises them: (a) F3 'an unreadable response file is ADAPTER_FILE_DENIED, run as non-root, skipped with a message as root' has no test (ADAPTER_FILE_DENIED appears only in the registry tables; I ran it by hand with chmod 000 and it answers correctly); (b) F3 'with the index lock held, inventory sync is INVENTORY_INDEX_UNAVAILABLE' has none (by hand, holding flock on .canon/scenario-index.lock, it answers after 30 s, exit 2); (c) codesplit.02 promises EVIDENCE_BINDING_STALE and REVIEW_ARTIFACT_STALE and its doc comment cites 'the unit tests of artifacts.rs', but no test anywhere reaches those two codes (grep: only the two mapping arms in artifacts.rs:83 and review.rs:475); (d) codesplit.03 promises the reason NOT_RUNNING; no test reaches it; (e) codesplit.04 names `plugin sync` and the test never runs it; (f) codesplit.05 names `evidence add` answering SCENARIO_INDEX_REQUIRED and the `canon inventory sync` leg of the fix; the test runs neither. Also with no test: HOOKS_FILE_DENIED, MIGRATION_DENIED, POLICY_INVALID, RETENTION_TIERS_UNAVAILABLE/INVALID, ARTIFACTS_TIER_INVALID emission. Add the tests (the stale legs may be unit tests of `evidence_store_code`/the review mapping on a constructed `ArtifactStoreError::Changed`) or cut the legs from the scenario text. codesplit.02-05 are left unsigned until then.",
+  "worktree_dirty": false
+}

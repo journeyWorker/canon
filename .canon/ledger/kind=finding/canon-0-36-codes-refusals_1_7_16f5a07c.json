@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-36-refusals-rev"
+  },
+  "at": "2026-11-04T06:03:59.883322Z",
+  "change_id": "canon-0-36-codes-refusals",
+  "code_tree": "d47d368cb18e577373ce8dfb015ee523c30f3cba",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/cli_error.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "4983b3208c9177bded50efe00dc90220c03fe49f",
+  "reviewer": "rev-0-36-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards] Registry and hint texts that no longer say what the call sites do: APPROVAL_INVALID's meaning and fix still read '`brief approve` got an empty or multi-line --by or --note' / 'Pass ... --approver and --note to `canon brief approve`' (--by went in 0.28; `policy approve` with a blank --approver now emits it and so does an evidence approver) so `canon schema --error APPROVAL_INVALID` misdirects a policy caller; INVENTORY_INDEX_UNAVAILABLE is retryable but the call's hint is the generic 'fix the problems the message names, then run again' (no 'wait'); the subject adopt/unadopt NOT_FOUND refusals keep the generic 'fix what the message names' hint. Reword them.",
+  "worktree_dirty": false
+}
