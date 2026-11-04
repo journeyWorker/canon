@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev"
+  },
+  "at": "2026-11-04T18:40:46.161663Z",
+  "code_tree": "1a4b9e6c3c6d893d3ee046015816857f27417fa0",
+  "kind": "review",
+  "pin": "15d319179e78d0d448d146b1492138dfaa6245cb",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_l0_32_an_envelope_or_error_with_a_null_or_empty_optional_member_fails_the_contract_schema"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "667014f5e44af074403f909450c384e9dc2c511cdf4d85ceed43b00aaec82119",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-33-atip-l0/brief.md"
+  },
+  "review_id": "01M6KXT52HS4YZMY7K2QF8N502",
+  "reviewer": "rev-0-36-flowfix",
+  "scenario_id": "atip.l0.32",
+  "schema": 2,
+  "worktree_dirty": false
+}

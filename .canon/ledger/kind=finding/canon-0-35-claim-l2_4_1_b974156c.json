@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-flowfix",
+    "role": "reviewer",
+    "session_id": "s-0-36-flowfix-rev"
+  },
+  "at": "2026-11-04T18:40:41.551242Z",
+  "change_id": "canon-0-35-claim-l2",
+  "code_tree": "1a4b9e6c3c6d893d3ee046015816857f27417fa0",
+  "disposition": "open",
+  "introduced_by": "0087d142aa539bd7dda9687996ea533a9953d9f2",
+  "kind": "finding",
+  "reviewed_sha": "15d319179e78d0d448d146b1492138dfaa6245cb",
+  "reviewer": "rev-0-36-flowfix",
+  "round": 4,
+  "scenario_ids": [
+    "atip.claiml2.19"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards (atip.claiml2.19 Then 2: 'every copy is refused with a problem that names the missing item'): the loop asserts a problem contains the key or phrase (found = 'has no preview', 'allowedEffects', 'batchFailsAt'), not the command, so a fixture_problems that checked only one of the five preview ids or one of export/query would stay green; the per-command removals are not pinned. Run: removing notRun or lowering contractVersion in the committed fixture fails atip_claiml2_09 and _19 as they should. Blast radius: the destructive-set equality (previewed != destructive) in fixture_problems is exercised by atip_claiml2_09 only; the six-vs-five brief count is already finding 3.1.",
+  "worktree_dirty": false
+}
