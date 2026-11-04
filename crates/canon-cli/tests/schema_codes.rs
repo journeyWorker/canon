@@ -63,7 +63,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // The typed-atom errors `canon evidence add` reports with `task done`'s grading;
     // `promote_after_stage`'s command comes from its caller.
     ("gate.rs", &["task done", "evidence add", "evidence audit", "gate promote"]),
-    // The codes a gate's refusals take (`subject_code`, `promotion_code`): `subject move` and the promotions.
+    // The codes a gate's refusals take (`subject_code`, `refused_promotion`): `subject move` and the promotions.
     ("gate_refusal.rs", &["subject move", "gate promote", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
     // `require_spec_root`: the refusal of a `--project` no configured spec root carries, made by every write command that takes one.
@@ -316,6 +316,8 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
     for command in promoters {
         for leaf in leaves_under(&command) {
             table.get_mut(leaf).expect("leaf has a row").insert("PROMOTE_FAILED");
+            // The same call stops after the record it staged when the gate then refuses it: `STOPPED_MIDWAY` (`promote_after_stage`).
+            table.get_mut(leaf).expect("leaf has a row").insert("STOPPED_MIDWAY");
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));

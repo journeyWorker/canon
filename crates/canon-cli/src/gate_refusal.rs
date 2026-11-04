@@ -4,7 +4,7 @@
 //!
 //! The condition is the violation's class: a missing approval, review or evidence is `<TARGET>_APPROVAL_REQUIRED`, evidence that
 //! went out of date is `EVIDENCE_STALE`, a ledger in an old layout is `LAYOUT_MIGRATION_REQUIRED`, and any other rule is `<TARGET>_INVALID`.
-//! A target maps the classes its gate can raise: promotion raises only `malformed-evidence`, so it has no `_APPROVAL_REQUIRED` code.
+//! Only `subject move` raises all the classes; promotion raises only `malformed-evidence`.
 
 use canon_gate::FailureClass;
 
@@ -20,14 +20,9 @@ pub(crate) fn subject_code(class: FailureClass) -> &'static str {
     }
 }
 
-/// The code of a refusal of a promotion (`gate promote`, a record promoted as it is added) for a gate violation of `class`.
-pub(crate) fn promotion_code(class: FailureClass) -> &'static str {
-    match class {
-        FailureClass::StaleEvidence => "EVIDENCE_STALE",
-        FailureClass::OldLayout => "LAYOUT_MIGRATION_REQUIRED",
-        _ => "PROMOTION_INVALID",
-    }
-}
+/// The code of a refusal of a promotion (`gate promote`, a record promoted as it is added): `gate promote` meets only records the staging read
+/// refuses (`malformed-evidence`), so it has the one code and no `*_APPROVAL_REQUIRED` or `EVIDENCE_STALE` of its own.
+pub(crate) const PROMOTION_CODE: &str = "PROMOTION_INVALID";
 
 /// One cause of a refusal: its code and its message.
 pub(crate) struct Cause {

@@ -335,12 +335,16 @@ struct RawPlanSource {
 /// pass over every configured plan source, in config/one-shot order
 /// (module doc).
 fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
-    run_pass_for(repo, dialect, source, dry_run, !dry_run)
+    run_pass_for(repo, dialect, source, dry_run, !dry_run, false)
 }
 
 /// [`run_pass`], with `will_write` saying whether the import this pass previews goes on to persist: a preview that will be followed by a write takes the
 /// stores' writability check first, so a refusal does not even open the hot store.
-fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool, will_write: bool) -> Result<PlansOutcome, PlansError> {
+///
+/// `judge_only` reads and parses the sources without opening any store: the sources are judged before a store (a sqlite hot rung creates its
+/// file as it opens) is touched, so a refusal leaves the tree as it was. Every admitted candidate then counts as persisted, which is what a
+/// preview of a writable store answers.
+fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool, will_write: bool, judge_only: bool) -> Result<PlansOutcome, PlansError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
 
@@ -357,7 +361,12 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
     if will_write {
         crate::write_mode::check_kinds_writable(&canon_yaml_path, &[RecordKind::Change, RecordKind::Task]).map_err(PlansError::Unavailable)?;
     }
-    let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
+    let (store, git_root) = if judge_only {
+        (None, configured_git_root(&repo, &canon_yaml_path)?)
+    } else {
+        let (store, git_root) = open_store(&repo, &canon_yaml_path)?;
+        (Some(store), git_root)
+    };
 
     // F2 / design note: the digest below must never include this
     // driver's OWN repo-local write surface (the git ledger root, the
@@ -445,8 +454,10 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
             admit_source_candidates(&mut seen_change_ids, changes, tasks);
         let duplicate_change_id = duplicate_change_ids.len();
 
-        let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } =
-            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome, dry_run)?;
+        let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } = match &store {
+            Some(store) => persist_candidates(store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome, dry_run)?,
+            None => Persisted { changes_persisted: accepted_changes.len(), changes_unwritten: 0, tasks_persisted: accepted_tasks.len(), tasks_unwritten: 0 },
+        };
 
         // s23 durable-import-diagnostics: a malformed-nonzero,
         // zero-persisted pass produced no durable evidence at all --
@@ -518,7 +529,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: b
     // A source that yields nothing usable is a refusal, and a refusal changes nothing (spec 8.3, 11.2): the sources are judged by a
     // preview pass before the first record is persisted.
     if !dry_run {
-        refuse_unusable_sources(&run_pass_for(repo, dialect, source, true, true)?)?;
+        refuse_unusable_sources(&run_pass_for(repo, dialect, source, true, true, true)?)?;
     }
     let outcome = run_pass(repo, dialect, source, dry_run)?;
     refuse_unusable_sources(&outcome)?;
@@ -557,6 +568,19 @@ fn refuse_unusable_sources(outcome: &PlansOutcome) -> Result<(), PlansError> {
 /// (every candidate lands in the `unwritten` seam) rather than a hard
 /// failure — a genuinely malformed (present but unparseable) canon.yaml
 /// still fails loud via `TierPolicy::from_yaml`.
+/// The root of the git tier canon.yaml configures, read from the policy alone (no tier is built, so nothing is created).
+fn configured_git_root(repo: &Path, canon_yaml_path: &Path) -> Result<Option<PathBuf>, PlansError> {
+    let text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    let policy = TierPolicy::from_yaml_at(&text, repo)?;
+    Ok(policy.tiers.values().find_map(|cfg| match cfg {
+        canon_store::policy::BackendConfig::Git(cfg) => Some(repo.join(&cfg.root)),
+        _ => None,
+    }))
+}
+
 fn open_store(repo: &Path, canon_yaml_path: &Path) -> Result<(TierRegistry, Option<PathBuf>), PlansError> {
     let canon_yaml_text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
     let policy = if canon_yaml_text.trim().is_empty() {

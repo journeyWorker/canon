@@ -1030,11 +1030,11 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
 }
 
 /// The refusal of a promotion the gate refused: exit 2, the first record's code, and an entry of `error.details` for each record when
-/// there are several (`atip.codeexit.04`). No `data`: the refusals are the answer.
+/// there are several (`atip.codeexit.03`). No `data`: the refusals are the answer.
 pub(crate) fn refused_promotion(refused: &[canon_gate::promote::Refused]) -> CliError {
     let mut causes: Vec<crate::gate_refusal::Cause> = refused
         .iter()
-        .map(|r| crate::gate_refusal::Cause { code: crate::gate_refusal::promotion_code(r.violation.class), message: format!("{}: {}", r.violation.subject, r.violation.detail) })
+        .map(|r| crate::gate_refusal::Cause { code: crate::gate_refusal::PROMOTION_CODE, message: format!("{}: {}", r.violation.subject, r.violation.detail) })
         .collect();
     if causes.is_empty() {
         causes.push(crate::gate_refusal::Cause { code: "PROMOTION_INVALID", message: "promotion landed nothing".to_string() });
@@ -1134,9 +1134,12 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
                     actor: crate::status::StepActor::Agent,
                     role: Some(crate::role::Role::Orchestrator),
                 });
-                CliError::failed("STOPPED_MIDWAY", format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
+                // The causes the gate named stay: each is an entry of `details` with its own code, the first being the error itself.
+                let details = refusal.error.detail_errors().to_vec();
+                let stopped = CliError::failed("STOPPED_MIDWAY", format!("the record is staged, but promotion refused it, so it stays staged: {}", refusal.error.message))
                     .reason(refusal.error.code)
-                    .hint("fix the record the message names and run `canon gate promote` (the refused record is still staged); do not add it again")
+                    .hint("fix the record the message names and run `canon gate promote` (the refused record is still staged); do not add it again");
+                if details.len() > 1 { stopped.details(details) } else { stopped }
             } else {
                 refusal.error
             };

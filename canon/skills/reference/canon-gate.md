@@ -28,7 +28,7 @@ Every violation carries one of these stable, grep-able strings:
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon task done <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
-| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (refused with `fabricated-evidence`, exit 1). |
+| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (refused with `fabricated-evidence`, `EVIDENCE_NOTE_INVALID`, exit 2). |
 | `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted — or closed `fixed` while an evidenced scenario of the subject has no evidence recorded after the close (re-verification). Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
 | `false-success` | The latest audit record (`canon evidence audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
@@ -461,7 +461,7 @@ mentions. Each bound case is its own attachment with its name and
 outcome. `--report-case <name>` (repeatable; a Rust test by its
 function name) ADDS cases; it never hides the scenario's own. No match,
 or a `--report-case` naming no case, refuses (exit 2); a `faithful`
-verdict when ANY bound case failed or was skipped refuses (exit 1). Files
+verdict when ANY bound case failed or was skipped refuses (exit 2). Files
 must be inside the repository, are recorded by relative path, and are
 stored (see Bound evidence stays provable).
 
@@ -697,7 +697,7 @@ aggregates every record bound to the task, on one line:
 (the latest `--summary`, or a default naming the latest passing record).
 Every other path — missing evidence, a `Divergent` verdict, a fabricated
 note on any of the task's records — leaves the row byte-unchanged and
-exits `1` with the blocking violation on stderr. After a flip, the plan
+exits `2` with the blocking violation on stderr. After a flip, the plan
 source is re-ingested so the record store's task status agrees with the
 checkbox (`canon query --kind task` reads `done`); a failed re-ingest is
 a stderr warning naming `canon ingest plans`, never a failed flip.

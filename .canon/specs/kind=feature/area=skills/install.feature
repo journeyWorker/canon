@@ -189,7 +189,7 @@ Feature: skills install
   Scenario: An unapproved brief blocks attestation until the human's answer is recorded, and the approval is never assumed
     Given a verifying subject whose only adopted change has a brief with no Approved line, and whose scenarios are tagged for it or none of its changes is approved
     When canon evidence add runs for any of the subject's scenarios, with no override reason
-    Then each call exits 1 with BRIEF_APPROVAL_REQUIRED naming the change's brief.md, so nothing is attested for that scope
+    Then each call exits 2 with BRIEF_APPROVAL_REQUIRED naming the change's brief.md, so nothing is attested for that scope
     And once the human's answer is recorded with canon brief approve, alone or with other ids in one call, the same call succeeds
     And an approved brief edited afterwards refuses again with BRIEF_APPROVAL_STALE naming the brief
 

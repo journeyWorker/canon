@@ -518,7 +518,7 @@ Feature: evidence add
   Scenario: A fabrication marker is refused the way every other gate-red refusal of evidence add is
     Given a summary holding "TBD" and a command result reading "n/a"
     When evidence is added with them
-    Then the command exits 1 with the code EVIDENCE_NOTE_INVALID and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
+    Then the command exits 2 with the code EVIDENCE_NOTE_INVALID and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
     And nothing is staged or committed
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -608,7 +608,7 @@ Feature: evidence add
   Scenario: A subject whose only change is unapproved, or whose approval was edited, still refuses evidence
     Given a verifying subject whose only change has a brief.md with no "Approved:" line, or an approved one edited since
     When evidence is added for an untagged scenario and for one tagged @flow: with that change
-    Then each add exits 1 with BRIEF_APPROVAL_REQUIRED, or BRIEF_APPROVAL_STALE for the edited approval, naming that brief.md
+    Then each add exits 2 with BRIEF_APPROVAL_REQUIRED, or BRIEF_APPROVAL_STALE for the edited approval, naming that brief.md
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:42Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:evidence-attestation
@@ -861,7 +861,7 @@ Feature: evidence add
   Scenario: An untagged scenario's evidence is refused when an approved governing change was edited since its approval
     Given a building subject owning a scenario with no @flow tag, adopting an approved change whose brief was edited after its approval
     When evidence is added for that scenario
-    Then it exits 1 with BRIEF_APPROVAL_STALE naming that brief.md and nothing is staged
+    Then it exits 2 with BRIEF_APPROVAL_STALE naming that brief.md and nothing is staged
     And once the brief is approved again the same add succeeds
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:28Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

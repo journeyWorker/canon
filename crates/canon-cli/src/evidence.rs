@@ -1546,9 +1546,22 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     }
     let stale_reviews = stale_review_notices(&mut gate_context, &records);
 
+    let bodies_len = bodies.len();
     let landed = match land_batch(repo, &ledger_root, &batch.files, bodies, promote, &mut |tier, write| tier.write(write)) {
         Ok(landed) => landed,
-        Err(error) => return error.emit("canon evidence add", args.json),
+        Err((error, None)) => return error.emit("canon evidence add", args.json),
+        // The batch stopped after it wrote: `data.items` says which records were written, which one stopped it and which were skipped (spec 11.11).
+        Err((error, Some(stopped))) => {
+            let mut items: Vec<crate::input::BatchItem<serde_json::Value>> = stopped
+                .done
+                .iter()
+                .enumerate()
+                .map(|(index, location)| crate::input::BatchItem { index, status: crate::input::ItemStatus::Written, data: Some(serde_json::json!({ "staged": location.staged, "promoted": location.promoted })), error: None })
+                .collect();
+            items.push(crate::input::BatchItem { index: stopped.index, status: crate::input::ItemStatus::Failed, data: None, error: Some(serde_json::to_value(error.body()).expect("an error body serializes")) });
+            items.extend((stopped.index + 1..bodies_len).map(|index| crate::input::BatchItem { index, status: crate::input::ItemStatus::Skipped, data: None, error: None }));
+            return error.emit_with_data("canon evidence add", args.json, &crate::input::BatchReport { items });
+        }
     };
     let json = args.json;
     crate::say!(json, "{}", crate::evidence_attach::stored_line(repo, "canon evidence add", batch.files.len(), landed.stored));
@@ -1596,6 +1609,7 @@ fn unzip3<A, B, C>(rows: impl Iterator<Item = (A, B, C)>) -> (Vec<A>, Vec<B>, Ve
 
 /// Where one record of a batch landed: its staging location, and its
 /// committed path when it was promoted.
+#[derive(Clone, Debug)]
 struct BatchLocation {
     staged: String,
     promoted: Option<String>,
@@ -1610,12 +1624,20 @@ struct LandedBatch {
 
 /// Write a batch (0.18 D1, 0.36): first judge the promotion gate of every body (with `promote`), so a body the gate refuses
 /// is refused before the first write: exit 2 with the gate's code for that record and `field` `/<index>`, nothing written
-/// (`atip.codeexit.07`). Then check that the staging (and, with `promote`, the committed) evidence directory can be written,
+/// (`atip.codeexit.05`). Then check that the staging (and, with `promote`, the committed) evidence directory can be written,
 /// store every bound file under the store lock, stage every body through `write`, then promote every staged record. A failure
 /// of the writing itself removes every record this call staged or promoted and every blob it newly stored (the lock is held
 /// throughout, so no other writer's blob is touched), and is returned as the error. A gate refusal while the records are
 /// promoted is not expected, since the gate was judged first; when it happens the records written so far stay, and the stop
 /// is `BATCH_INCOMPLETE` (exit 1). `write` is the staging write, `GitTier::write` outside tests.
+/// Where a batch stopped after it had written: the index of the record that stopped it and the locations of the ones before it.
+#[derive(Debug)]
+struct Stopped {
+    index: usize,
+    done: Vec<BatchLocation>,
+}
+
+/// [`land_batch_inner`], with the place the batch stopped after it had written (`BATCH_INCOMPLETE`, the only stop with an effect).
 fn land_batch(
     repo: &Path,
     ledger_root: &Path,
@@ -1623,6 +1645,19 @@ fn land_batch(
     bodies: Vec<serde_json::Value>,
     promote: bool,
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
+) -> Result<LandedBatch, (CliError, Option<Stopped>)> {
+    let mut stopped = None;
+    land_batch_inner(repo, ledger_root, files, bodies, promote, write, &mut stopped).map_err(|error| (error, stopped))
+}
+
+fn land_batch_inner(
+    repo: &Path,
+    ledger_root: &Path,
+    files: &[crate::evidence_attach::BoundFile],
+    bodies: Vec<serde_json::Value>,
+    promote: bool,
+    write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
+    stopped: &mut Option<Stopped>,
 ) -> Result<LandedBatch, CliError> {
     let rolled_back = |code: &'static str, message: String| CliError::refused(code, message).hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed");
     if promote {
@@ -1690,6 +1725,7 @@ fn land_batch(
                     let why = if refusal.lines.trim().is_empty() { refusal.error.message.clone() } else { refusal.lines.trim_end().to_string() };
                     let error = format!("promoting record {} of the batch ({}) was refused after the gate had passed it: {why}; the {} record(s) before it are promoted and the others stay staged", index + 1, location.staged, index);
                     let _ = held.stored();
+                    *stopped = Some(Stopped { index, done: locations[..index].to_vec() });
                     return Err(CliError::failed("BATCH_INCOMPLETE", error).hint("read what was done (`canon gate check`, `canon query --kind evidence`), then run `canon gate promote` to finish").field(format!("/{index}")));
                 }
             }
@@ -2322,7 +2358,7 @@ mod tests {
 
     /// evidence.add.115 and atip.codeexit.05: a batch that fails partway — its second record's staging write fails — leaves no committed
     /// record, no staged record and no new blob; a batch whose second record the promotion gate would refuse is refused before the first
-    /// write (exit 2, `PROMOTION_INVALID`, `field` `/1`), so nothing at all is written.
+    /// write (exit 2, `PROMOTION_INVALID`, `field` `/1`), so nothing at all is written. The same run is `atip_codeexit_05_*` below.
     #[test]
     fn evidence_add_115_a_batch_that_fails_partway_leaves_nothing_behind() {
         let tmp = repo_with_plan_corpus();
@@ -2345,7 +2381,7 @@ mod tests {
             }
             tier.write(write)
         };
-        let Err(error) = land_batch(repo, &ledger_root, &files, bodies(), true, &mut failing_second) else { panic!("the second write fails") };
+        let Err((error, _)) = land_batch(repo, &ledger_root, &files, bodies(), true, &mut failing_second) else { panic!("the second write fails") };
         assert_eq!((error.code, error.exit), ("WRITE_FAILED", 1), "{}", error.message);
         assert!(error.message.contains("staging record 2 of the batch failed: ") && error.message.contains("disk full"), "{}", error.message);
         assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "nothing staged, committed or stored");
@@ -2353,7 +2389,7 @@ mod tests {
         // The gate judges every record before the first write: the second has no role, so the batch is refused with that record's code,
         // `field` `/1`, and nothing is staged, committed or stored (atip.codeexit.05).
         let refused = vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", Actor::new_unattributed("legacy-writer"))];
-        let Err(error) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second record is refused") };
+        let Err((error, _)) = land_batch(repo, &ledger_root, &files, refused, true, &mut |tier, write| tier.write(write)) else { panic!("the second record is refused") };
         assert_eq!((error.code, error.exit), ("PROMOTION_INVALID", 2), "{}", error.message);
         assert!(error.message.contains("record 2 of the batch cannot be promoted"), "{}", error.message);
         assert_eq!(error.field_name(), Some("/1"), "the refused record is named by its index");
@@ -2367,11 +2403,71 @@ mod tests {
         std::fs::set_permissions(&staging_kind, readonly).unwrap();
         let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
         std::fs::set_permissions(&staging_kind, original).unwrap();
-        assert!(matches!(&outcome, Err(e) if e.code == "WRITE_UNAVAILABLE" && e.exit == 2 && e.message.contains("is read-only")), "{:?}", outcome.as_ref().err());
+        assert!(matches!(&outcome, Err((e, _)) if e.code == "WRITE_UNAVAILABLE" && e.exit == 2 && e.message.contains("is read-only")), "{:?}", outcome.as_ref().err());
         assert_eq!(blobs(), 0);
 
         let landed = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write)).unwrap();
         assert_eq!((landed.stored, landed.locations.len(), committed(repo).len(), blobs()), (1, 2, 2, 1), "the same batch lands whole");
         assert!(landed.locations.iter().all(|l| l.promoted.is_some()));
     }
+
+    fn batch_fixture() -> (tempfile::TempDir, std::path::PathBuf, Vec<crate::evidence_attach::BoundFile>) {
+        let tmp = repo_with_plan_corpus();
+        let repo = tmp.path();
+        let ledger_root = GateCtx::from_repo(repo).unwrap().ledger_root;
+        std::fs::write(repo.join("junit.xml"), "<testsuite/>").unwrap();
+        let files = crate::evidence_attach::bind_artifacts(repo, &[repo.join("junit.xml")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
+        (tmp, ledger_root, files)
+    }
+
+    /// atip.codeexit.05: a real batch run (`land_batch` over the real tiers) whose second record the gate refuses is refused before the first
+    /// write, whatever the records before it: exit 2, `PROMOTION_INVALID`, `field` `/1`, and not one staged file, committed record or blob.
+    #[test]
+    fn atip_codeexit_05_a_batch_whose_second_record_the_gate_refuses_writes_nothing() {
+        let (tmp, ledger_root, files) = batch_fixture();
+        let repo = tmp.path();
+        let before = (staged_count(repo), committed(repo).len());
+        let implementer = || Actor::new("impl", RoleId::parse("implementer").unwrap());
+        let mut writes = 0;
+        let bodies = vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", Actor::new_unattributed("legacy-writer"))];
+        let Err((error, stopped)) = land_batch(repo, &ledger_root, &files, bodies, true, &mut |tier, write| {
+            writes += 1;
+            tier.write(write)
+        }) else {
+            panic!("the second record is refused")
+        };
+        assert_eq!((error.code, error.exit, error.field_name()), ("PROMOTION_INVALID", 2, Some("/1")), "{}", error.message);
+        assert!(stopped.is_none(), "a refusal before the first write has no place it stopped at");
+        assert_eq!(writes, 0, "the write closure was never called");
+        assert_eq!((staged_count(repo), committed(repo).len()), before);
+        assert!(!canon_gate::artifact_store::store_dir(repo).exists() || std::fs::read_dir(canon_gate::artifact_store::store_dir(repo)).unwrap().next().is_none(), "no blob was stored");
+    }
+
+    /// atip.codeexit.05 (the stop after a write): a record the gate passed that is refused while promoted is `BATCH_INCOMPLETE` (exit 1) and
+    /// the place it stopped at is reported, so `data.items` says which records were written, which one stopped it and which were skipped.
+    #[test]
+    fn atip_codeexit_05_a_refusal_found_while_promoting_is_batch_incomplete_with_the_place_it_stopped() {
+        let (tmp, ledger_root, files) = batch_fixture();
+        let repo = tmp.path();
+        let implementer = || Actor::new("impl", RoleId::parse("implementer").unwrap());
+        let bodies = vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", implementer()), batch_body("cart.add.03", implementer())];
+        let staging = evidence_staging_dir(&ledger_root);
+        let mut calls = 0;
+        // The second record's staged file is damaged after it was written, which the gate's earlier judgement of the body could not see.
+        let Err((error, stopped)) = land_batch(repo, &ledger_root, &files, bodies, true, &mut |tier, write| {
+            calls += 1;
+            let receipt = tier.write(write)?;
+            if calls == 2 {
+                std::fs::write(staging.join(&receipt.location), b"{ not a record").unwrap();
+            }
+            Ok(receipt)
+        }) else {
+            panic!("the second record is refused when promoted")
+        };
+        assert_eq!((error.code, error.exit, error.field_name()), ("BATCH_INCOMPLETE", 1, Some("/1")), "{}", error.message);
+        let stopped = stopped.expect("the batch wrote before it stopped");
+        assert_eq!((stopped.index, stopped.done.len()), (1, 1), "the first record was promoted, the second stopped it");
+        assert_eq!(committed(repo).len(), 1, "the record before the stop stays committed");
+    }
+
 }

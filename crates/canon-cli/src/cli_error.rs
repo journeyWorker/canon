@@ -128,6 +128,8 @@ impl CliErrorExt for CliError {
 
     fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: Value) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
+        // A refusal (exit 2) changed nothing and carries no `data` (spec 8.3, 6.4). Every test that runs the debug binary observes this.
+        debug_assert!(self.exit != EXIT_REFUSED, "{} is a refusal (exit 2): it carries no data", self.code);
         if json {
             crate::json_out::print_failure_with_meta(command, self, Some(data), extra_meta);
         }
