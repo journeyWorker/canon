@@ -160,8 +160,12 @@ fn atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon
     assert!(job.iter().any(|run| run.contains("cargo build") && run.contains("-p canon-cli") && !run.contains("atip-check") && run.contains("--locked")), "the job builds canon only: {job:?}");
     assert!(job.iter().any(|run| run == COMMAND), "the job runs `{COMMAND}`: {job:?}");
     assert_eq!(job.iter().filter(|run| run.starts_with("atip check")).count(), 1, "the job runs the checker once: {job:?}");
+    let deep = just_recipe("atip-deep");
+    assert!(deep.iter().any(|line| line == COMMAND), "the recipe atip-deep runs the job's command: {deep:?}");
+    assert!(deep.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{deep:?}");
+    let quick = COMMAND.replace(" --deep", "");
     let recipe = just_recipe("atip");
-    assert!(recipe.iter().any(|line| line == COMMAND), "the recipe runs the same command: {recipe:?}");
+    assert!(recipe.iter().any(|line| *line == quick), "the recipe atip runs the job's command without --deep: {recipe:?}");
     assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{recipe:?}");
     assert_eq!(just_recipe("atip-install"), [INSTALL], "the recipe that installs the checker runs the job's command");
 }
