@@ -687,7 +687,7 @@ fn atip_schemadoc_05_every_option_has_a_value_type_a_typed_default_and_no_id_suf
             if option["required"] == true {
                 assert!(default.is_null(), "a required option has no default: `{command}` --{name}");
             }
-            assert_eq!(option.get("valueName").is_some(), !matches!(value_type, "switch" | "count") && name != "plan-digest", "`{command}` --{name}");
+            assert_eq!(option.get("valueName").is_some(), !matches!(value_type, "switch" | "count"), "`{command}` --{name}");
             assert_eq!(option.get("possibleValues").is_some(), value_type == "enum", "`{command}` --{name}");
             assert!(option["help"].as_str().is_some_and(|help| !help.is_empty()), "`{command}` --{name} has no help");
         }
