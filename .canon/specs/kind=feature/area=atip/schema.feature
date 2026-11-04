@@ -6,10 +6,10 @@ Feature: atip schema: the L1 self-description documents
   @case:happy
   @flow:canon-0-34-atip-schema-doc.F1
   @atip.schemadoc.01
-  Scenario: The schema tree is a tree document at level L1 that lists every group and command once, a group before its commands, and --as filters while CANON_ROLE does not
+  Scenario: The schema tree is a tree document at level L2 that lists every group and command once, a group before its commands, and --as filters while CANON_ROLE does not
     Given a built canon and no environment
     When canon schema --json runs twice, then with --as reviewer, and with CANON_ROLE=reviewer
-    Then data.kind is tree and level is L1; the 27 groups and 78 commands appear once each with a group before its commands; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; the unfiltered trees have no x-canon; CANON_ROLE changes nothing
+    Then data.kind is tree and level is L2; the 27 groups and 78 commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are 1.4; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; the unfiltered trees have no x-canon; CANON_ROLE changes nothing
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:12Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
@@ -69,7 +69,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: Every command document lists the codes of its features, names outputs that resolve in its schemas, and brief approve has three distinct outputs
     Given the command documents of every command
     When their errors, outputs and schemas are read and each document is checked against the contract schema and the rules of spec 10.13
-    Then the input commands list INPUT_INVALID, INPUT_CONFLICT and INPUT_TOO_LARGE, the paging ones CURSOR_INVALID, the committing ones PLAN_STALE; every schemaRef resolves and compiles; brief approve has three outputs with distinct refs, one of them the batch
+    Then the declaration lists INPUT_INVALID, INPUT_CONFLICT and INPUT_TOO_LARGE for the input commands, CURSOR_INVALID for the paging ones and PLAN_STALE for the committing ones, and the 1.4 document omits those implied codes; every schemaRef resolves in the --schemas answer and compiles; brief approve has three outputs with distinct refs, one of them the batch
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:31Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
@@ -89,7 +89,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The 47 input declarations hold a fragment schema without required or flag-only keys and an example that passes it, and every example parses with the real parser
     Given the 47 commands that take --input
     When the fragment, the arguments schema, the example and every example line are read
-    Then no fragment has a root required or a flag-only property, additionalProperties is false, the example passes both schemas, the 30 that had required publish it as argumentsRef, and every examples line parses with the real parser, ends with --json after the path and holds no placeholder or --input
+    Then no fragment has a root required or a flag-only property, additionalProperties is false, the example passes both Input of the --schemas answer and the arguments schema, the 30 that had required publish it as argumentsRef, and every examples line parses with the real parser, ends with --json after the path and holds no placeholder or --input
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:38Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
@@ -129,7 +129,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The checked-in spec holds the tree and, for every command, the document canon schema answers, and no consumer reads a name the old spec had
     Given the checked-in spec file and the guides, the website pages, the evaluation scripts and the design notes
     When canon schema <command> --json runs for every command and the files are scanned for the names the old spec had
-    Then the file holds the tree and, for each of the 78 commands, the document the answer carries, byte for byte; no guide, page, script or design note holds a member name the 0.33 spec had
+    Then the file holds the 1.4 tree and, for each of the 78 commands, the document the answer carries, byte for byte, and under schemas the --schemas answer of each command; the tree defines each shared option once and every 1.4 rule of the form holds; no guide, page, script or design note holds a member name the 0.33 spec had
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:51Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
