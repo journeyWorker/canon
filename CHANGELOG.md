@@ -79,6 +79,23 @@ A caller that branches on a code replaces the old name with the new one from the
 
 **Upgrade note:** a caller that read the machine description from `--help --json` read text. Run the `hint` instead: `canon schema <command> --json`. The version is `meta.toolVersion` of every answer. Nothing else prints differently, and the text help keeps its first line (`canon schema --json` and `canon skills show`). The guides, the website and the eval scripts never recommended `--help --json`; `atip.helpjson.09` fails if one starts to.
 
+**`--input` follows the 1.3 rules of atip/1 and refuses `[]`** (`canon-0-36-input-1-3`, scenarios `atip.input13.01-13`, spec 6.9, 10.5, 10.7, 10.11). The rules the 0.35 work already met are now proved by one test each (`atip_input13_01` to `_10`, `_13`); the one change is the empty array.
+
+| Rule | Behaviour (as in 0.35, now tested) |
+|---|---|
+| Step 3 reads argv alone | `canon finding close add-login --input '{"round":1,"seq":1,"disposition":"fixed"}'` passes: a document gives the required options, argv the operand. An unknown option or a malformed value on argv is its usual `USAGE`; an argument that differs from the document after normalisation is `INPUT_CONFLICT` at the document's pointer (`/round`, `/operands`, in a batch `/1/round`); what neither gives is missing after the merge |
+| Batch order | every item's checks that read no state run first (a fault in the last item is exit 2 at `/<last>/…`, no item ran); then the items run one at a time and the first failure stops the batch: exit 1 `BATCH_INCOMPLETE` at `/<index>`, the later items `skipped`, and the failed item's own `error` code says by its exit whether it had an effect (2: none) |
+| Integers | ±9007199254740991 is the range; 9007199254740992 and beyond are `INPUT_INVALID` (`INVALID_VALUE`, `field` the value's pointer, `received` as written) as a number and as a string, and `USAGE` at the option on argv |
+| Next page | the `meta.next` arguments as they stand; only `--limit` (`--all`) and `--fields` change. A changed filter, an environment value that changed, or an argument added that states the default (`--repo .`) is `CURSOR_INVALID` (`ARGUMENTS_CHANGED`) at `--cursor`: the contract leaves the explicit default to the tool, and canon keeps binding it. The guide says so |
+| Several problems | `error.field` is the first `error.details` entry's, and `details` lists every problem in the order the document wrote its keys; one problem has no `details` |
+
+| Call | 0.35 | now |
+|---|---|---|
+| `canon evidence add --input '{"artifact":[]}'` (or `[]` for any repeatable option: `--surface-ref`, `--report`, `--report-case`, `brief approve --digest`, `finding add --scenario`, `review … --artifact`) | read as no `artifact`: the call went on | exit 2 `INPUT_INVALID`, `reason` `INVALID_VALUE`, `field` `/artifact`, `hint` "write none by omitting the key"; nothing is written |
+| `[]` for an option that is not repeatable, or as `operands` | `INPUT_INVALID` `INVALID_VALUE` | unchanged |
+
+**Upgrade note:** a document that sent `"artifact": []` to mean none must leave the key out. The contract (10.5) allows either reading of `[]` and canon chooses the refusal, because a caller that wrote `[]` meant something and the empty reading hides it. In a batch the pointer carries the index (`/0/artifact`). The checker at `--contract 1.3` (the fixture with `contractVersion` `1.3`) passes every `L2.input-*` and `L2.batch-*` row on canon; the rows that still fail there are `L0.contract-version` (canon declares 1.2 until `canon-0-36-claim-1-4`) and `L1.code-names` (the code renames of `canon-0-36-codes-table`).
+
 ### Contributors
 
 **The `atip` crate and the checker (`atip check`) are the atip repository's** (`canon-0-36-atip-dep`, https://github.com/journeyWorker/atip, issue #134). Nothing canon prints changes: the stdout and the exit status of every command, every `canon schema` answer (`--json`, `--errors`, `--warnings`, each command and each code), `docs/cli/canon.cli.json` and the conformance corpus are byte for byte the 0.35.0 ones.

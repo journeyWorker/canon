@@ -764,9 +764,14 @@ fn setting(leaf: &Leaf, member: &Member, prefix: &str) -> Result<Setting, Vec<Cl
         },
         (Kind::Count, other) => Err(vec![invalid(format!("`{pointer}` must be a count, not {}", type_name(other)), SCHEMA_HINT).field(pointer).received(other.to_string())]),
         (Kind::Value, Value::Array(_)) if key.repeatable => {
+            let items = elements(&member.raw);
+            // None is written by omitting the key (spec 10.5): an empty array hides what the caller meant, so it is refused as the operands' is.
+            if items.is_empty() {
+                return Err(vec![invalid(format!("`{pointer}` is an empty array: omit the key to give none"), "write none by omitting the key").field(pointer)]);
+            }
             let mut problems = Vec::new();
             let mut values = Vec::new();
-            for (n, item) in elements(&member.raw).iter().enumerate() {
+            for (n, item) in items.iter().enumerate() {
                 match element(&key.spec, item, &format!("{pointer}/{n}")) {
                     Ok(value) => values.push(value),
                     Err(problem) => problems.push(problem),
