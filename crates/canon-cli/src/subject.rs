@@ -629,10 +629,10 @@ fn unadopt_change(
     let unwritten = |message: String| CliError::refused(crate::read_cause::write_code_of_text(&message), message).hint(hint);
     let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(unreadable)?;
     let Some(mut subject) = subject else {
-        return Err(CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).hint(hint));
+        return Err(CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).hint("author the subject with `canon subject new <id> --domain <domain> --title <title>`, or check the id against the subjects `canon status` lists, then run `canon subject unadopt` again"));
     };
     let Some(mut change) = change else {
-        return Err(CliError::refused("CHANGE_NOT_FOUND", format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())).hint(hint));
+        return Err(CliError::refused("CHANGE_NOT_FOUND", format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())).hint("import the change with `canon ingest plans`, or check the id against the changes `canon status` lists, then run `canon subject unadopt` again"));
     };
     let on_subject = subject.change_ids.contains(change_id);
     let on_change = change.subject_ids.contains(subject_id);
@@ -745,10 +745,10 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
     let refused = |code: &'static str, message: String| CliError::refused(code, message).hint("fix what the message names, then run `canon subject adopt` again");
     let (subject, change) = lookup_adoption(repo, subject_id, change_id).map_err(|message| crate::read_cause::repo_error(message).hint("fix what the message names, then run `canon subject adopt` again"))?;
     let Some(subject) = subject else {
-        return Err(refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())));
+        return Err(CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str())).hint("author the subject with `canon subject new <id> --domain <domain> --title <title>`, or check the id against the subjects `canon status` lists, then run `canon subject adopt` again"));
     };
     let Some(change) = change else {
-        return Err(refused("CHANGE_NOT_FOUND", format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())));
+        return Err(CliError::refused("CHANGE_NOT_FOUND", format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str())).hint("import the change with `canon ingest plans`, or check the id against the changes `canon status` lists, then run `canon subject adopt` again"));
     };
     let adopted = if dry_run { preview_adoption(repo, change, subject) } else { persist_adoption(repo, change, subject) };
     let (subject, change, wrote) = adopted.map_err(|e| {

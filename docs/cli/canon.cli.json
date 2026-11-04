@@ -11618,7 +11618,6 @@
         "EVIDENCE_BINDING_NOT_FOUND",
         "EVIDENCE_BINDING_UNAVAILABLE",
         "EVIDENCE_CONTRACT_CONFLICT",
-        "EVIDENCE_INVALID",
         "EVIDENCE_NOTE_INVALID",
         "EVIDENCE_REPORT_CONFLICT",
         "EVIDENCE_REQUIRED",
@@ -13108,7 +13107,6 @@
         "EVIDENCE_BINDING_NOT_FOUND",
         "EVIDENCE_BINDING_UNAVAILABLE",
         "EVIDENCE_CONTRACT_CONFLICT",
-        "EVIDENCE_INVALID",
         "EVIDENCE_NOTE_INVALID",
         "EVIDENCE_REPORT_CONFLICT",
         "EVIDENCE_REQUIRED",
@@ -23810,7 +23808,6 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "INVENTORY_INDEX_UNAVAILABLE",
         "LAYOUT_MIGRATION_REQUIRED",
         "PLUGIN_REQUIRED",
         "PLUGIN_SYNC_ERRORS",
@@ -34454,10 +34451,15 @@
         "REPO_INVALID",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
+        "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_EVALUATION_INVALID",
         "STRATEGY_FILE_INVALID",
         "STRATEGY_NOT_FOUND",
+        "STRATEGY_SIGNATURE_INVALID",
+        "STRATEGY_SIGNATURE_REQUIRED",
+        "STRATEGY_SIGNER_DENIED",
+        "STRATEGY_VERIFIER_REQUIRED",
         "USAGE"
       ],
       "examples": [
@@ -34665,7 +34667,10 @@
         "STRATEGY_SIGNATURE_DENIED",
         "STRATEGY_SIGNATURE_INVALID",
         "STRATEGY_SIGNATURE_NOT_FOUND",
+        "STRATEGY_SIGNATURE_REQUIRED",
         "STRATEGY_SIGNATURE_UNAVAILABLE",
+        "STRATEGY_SIGNER_DENIED",
+        "STRATEGY_VERIFIER_REQUIRED",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_INVALID"
@@ -35212,7 +35217,10 @@
         "STRATEGY_SIGNATURE_DENIED",
         "STRATEGY_SIGNATURE_INVALID",
         "STRATEGY_SIGNATURE_NOT_FOUND",
+        "STRATEGY_SIGNATURE_REQUIRED",
         "STRATEGY_SIGNATURE_UNAVAILABLE",
+        "STRATEGY_SIGNER_DENIED",
+        "STRATEGY_VERIFIER_REQUIRED",
         "TRAJECTORY_NOT_FOUND",
         "USAGE",
         "WRITE_DENIED",
@@ -40495,8 +40503,8 @@
     {
       "code": "APPROVAL_INVALID",
       "exit": 2,
-      "fix": "Pass a single-line, non-empty --approver and --note to `canon brief approve`.",
-      "meaning": "`brief approve` got an empty or multi-line --by or --note",
+      "fix": "Pass the human's own answer, each one non-empty line: --approver and --note to `canon brief approve`, --approver to `canon policy approve`.",
+      "meaning": "the human's answer an approval records is blank or not one line: `brief approve` got an empty or multi-line --approver or --note, or `policy approve` got a blank --approver",
       "retryable": false
     },
     {
@@ -40760,7 +40768,7 @@
         },
         {
           "fix": "Fix the policy file the message names, then run the command again.",
-          "meaning": "the adapter policy in `.canon/policy.yaml` (its `adapter_capabilities` section) is present but unusable",
+          "meaning": "`.canon/policy.yaml` is present but unusable: its `adapter_capabilities` section, or the `approval.allowed_signers` setting a `strategy rollback` reads (or the allowed-signers file it names), is malformed",
           "reason": "POLICY"
         },
         {
@@ -41133,13 +41141,6 @@
       "exit": 2,
       "fix": "Record evidence whose kind and ref match the task's typed evidence contract.",
       "meaning": "the record's kind and ref differ from the task's typed evidence contract",
-      "retryable": false
-    },
-    {
-      "code": "EVIDENCE_INVALID",
-      "exit": 2,
-      "fix": "Satisfy the evidence rule named in the error, then attest again.",
-      "meaning": "an evidence rule refuses the record: it breaks a rule of what evidence may say",
       "retryable": false
     },
     {
@@ -42063,7 +42064,7 @@
       "code": "STRATEGY_SIGNATURE_INVALID",
       "exit": 2,
       "fix": "Sign the rollback again with a key the policy lists, then run `canon strategy rollback` again.",
-      "meaning": "the detached signature of a strategy rollback does not verify; nothing was recorded",
+      "meaning": "the detached signature of a strategy rollback is there but does not verify against the actor's key; nothing was recorded",
       "retryable": false
     },
     {
@@ -42074,11 +42075,32 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_SIGNATURE_REQUIRED",
+      "exit": 2,
+      "fix": "Sign the rollback's payload with the actor's key and pass the armored signature, then run `canon strategy rollback` again.",
+      "meaning": "the --signature-file of a `strategy rollback` is empty, so there is no signature to check; nothing was recorded",
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_SIGNATURE_UNAVAILABLE",
       "exit": 2,
       "fix": "Wait a moment, then run the command again.",
       "meaning": "the detached signature file exists but the system failed the read in a way a repeat can pass (an I/O error, an interrupted or timed-out call)",
       "retryable": true
+    },
+    {
+      "code": "STRATEGY_SIGNER_DENIED",
+      "exit": 2,
+      "fix": "Pass an --actor the allowed_signers file lists, or have the human add the actor's key to it and approve the policy (`canon policy approve`), then run `canon strategy rollback` again.",
+      "meaning": "the --actor of a `strategy rollback` is not listed in the policy's allowed_signers file, so it may not sign a rollback; nothing was recorded",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_VERIFIER_REQUIRED",
+      "exit": 2,
+      "fix": "Set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and have the human approve it with `canon policy approve`, then run `canon strategy rollback` again.",
+      "meaning": "`.canon/policy.yaml` names no `approval.allowed_signers` verifier, so a `strategy rollback` cannot be checked; nothing was recorded",
+      "retryable": false
     },
     {
       "code": "SUBJECT_APPROVAL_REQUIRED",

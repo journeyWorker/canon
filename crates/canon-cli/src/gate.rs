@@ -1381,8 +1381,18 @@ fn any_canon_gate_command(settings: &serde_json::Value) -> bool {
     })
 }
 
+/// The settings of an existing hook file, `{}` when there is none (or its text is not JSON, which the install replaces); a file the system will not
+/// read is the error, so it is told as what it is (`HOOKS_FILE_DENIED`, `HOOKS_FILE_UNAVAILABLE`) before anything is written.
+fn read_hook_settings(path: &Path) -> std::io::Result<serde_json::Value> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => Ok(serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({}))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
+        Err(e) => Err(e),
+    }
+}
+
 fn install_into(path: &Path, entry: &HookEntry, dry_run: bool) -> std::io::Result<InstallOutcome> {
-    let mut settings = read_json_or_default(path);
+    let mut settings = read_hook_settings(path)?;
     let outcome = install_hooks(&mut settings, entry);
     if dry_run && matches!(outcome, InstallOutcome::Installed) {
         crate::write_mode::check_creatable(path, true)?;

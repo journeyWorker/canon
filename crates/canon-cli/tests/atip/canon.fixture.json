@@ -1001,11 +1001,6 @@
       "retryable": false
     },
     {
-      "code": "EVIDENCE_INVALID",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "EVIDENCE_NOTE_INVALID",
       "exit": 2,
       "retryable": false
@@ -1625,9 +1620,24 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_SIGNATURE_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "STRATEGY_SIGNATURE_UNAVAILABLE",
       "exit": 2,
       "retryable": true
+    },
+    {
+      "code": "STRATEGY_SIGNER_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_VERIFIER_REQUIRED",
+      "exit": 2,
+      "retryable": false
     },
     {
       "code": "SUBJECT_APPROVAL_REQUIRED",

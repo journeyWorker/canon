@@ -140,7 +140,7 @@ Feature: report dashboard
   Scenario: A selected brief edited after the page read it refuses the whole request and names it
     Given a briefs page that read three briefs and one of them edited afterwards
     When the page's request approves all three
-    Then the server answers 409 BRIEF_PAGE_STALE, the first refused brief's own code, with an error.details entry for the edited brief and no data
+    Then the server answers 409 BRIEF_PAGE_STALE, the refused brief's own code, with no error.details (one stale brief is the refusal itself; details is for several causes) and no data
     And none of the three briefs and no policy approval changed, and the page names the refused brief and says to read it again
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:14Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

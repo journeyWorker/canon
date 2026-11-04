@@ -617,18 +617,6 @@ impl ArgRefusal {
     }
 }
 
-impl From<String> for ArgRefusal {
-    fn from(message: String) -> Self {
-        Self { message, field: None, code: "EVIDENCE_INVALID" }
-    }
-}
-
-impl From<&str> for ArgRefusal {
-    fn from(message: &str) -> Self {
-        Self { message: message.to_string(), field: None, code: "EVIDENCE_INVALID" }
-    }
-}
-
 /// The audit an `--kind audit` invocation records, or `None` for every
 /// other kind (0.15 D3). The four evaluator/result flags are required
 /// with `--kind audit` and refused elsewhere; the declared-record flags
@@ -716,30 +704,32 @@ pub struct ApprovalPayloadArgs {
 
 type ApprovalBinding = (Vec<u8>, Vec<String>, Vec<String>);
 
-fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, ArgRefusal> {
+fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, ApprovalRefusal> {
     let subject = args.task_id.as_ref().map(ToString::to_string)
         .or_else(|| args.scenario_id.as_ref().map(ToString::to_string))
         .ok_or_else(|| ArgRefusal::subject_required("--task", "give --task or --scenario"))?;
     if args.scenario_id.is_some() && args.project_id.is_none() {
-        return Err(ArgRefusal::required("--project", "--scenario requires --project"));
+        return Err(ArgRefusal::required("--project", "--scenario requires --project").into());
     }
     if args.approval_by.is_empty() || args.approval_by.trim() != args.approval_by
         || first_row_line_break(&args.approval_by).is_some() {
-        return Err(ArgRefusal::at("--approver", "--approver must be a non-empty trimmed single-line identity"));
+        return Err(ArgRefusal::at("--approver", "--approver must be a non-empty trimmed single-line identity").into());
     }
     #[expect(clippy::map_err_ignore, reason = "the error is a fixed message string with no source slot; the chrono parse detail is not part of the pinned wording")]
     let at = args.approval_at.parse::<DateTime<Utc>>()
         .map_err(|_| ArgRefusal::at("--approval-at", "--approval-at must be an RFC3339 timestamp"))?;
-    if let Some(task) = &args.task_id {
-        crate::dispatch::validate_task_binding(repo, task).map_err(|error| error.to_string())?;
-    }
-    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha).map_err(|error| error.to_string())?;
+    // An argument that is wrong is refused before any state is read: a surface ref that is no repository-relative path or `effect:<slug>` is the
+    // same `EVIDENCE_ARGUMENT_INVALID` `canon evidence add` answers (the argument validator already stops one in the command line).
     for value in &args.surface_ref {
-        parse_surface_ref(value).map_err(|error| error.to_string())?;
-        if value.starts_with("effect:") {
-            surface.push(value.clone());
-        }
+        parse_surface_ref(value).map_err(|error| ArgRefusal::at("--surface-ref", format!("--surface-ref `{value}` is invalid: {error}")))?;
     }
+    // A task that names no task is the same refusal `canon evidence add` makes for it (`TASK_NOT_FOUND`, or the plan document's own code).
+    if let Some(task) = &args.task_id {
+        crate::dispatch::validate_task_binding(repo, task).map_err(|error| error.to_cli_error())?;
+    }
+    // The commit was resolved before this: a failure here is the repository's (git cannot run, the object is gone).
+    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha).map_err(|error| crate::read_cause::repo_error(error.to_string()))?;
+    surface.extend(args.surface_ref.iter().filter(|value| value.starts_with("effect:")).cloned());
     let surface = normalized_strings(&surface);
     let effects = normalized_strings(&surface.iter().filter_map(|value| value.strip_prefix("effect:").map(str::to_string)).collect::<Vec<_>>());
     let payload = approval_payload_bytes(&ApprovalPayload {
@@ -833,7 +823,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
             return error.emit("canon evidence approval-payload", args.json);
         }
     }
-    let bound = approval_binding(&repo, args).map_err(ApprovalRefusal::from).and_then(|bound| {
+    let bound = approval_binding(&repo, args).and_then(|bound| {
         ensure_scenario_indexed(&repo, args)?;
         Ok(bound)
     });
@@ -851,19 +841,20 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
                 CliError::refused("WRITE_FAILED", error.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon evidence approval-payload", false)
             }
         },
-        Err(ApprovalRefusal::NotIndexed(error)) => error.emit("canon evidence approval-payload", args.json),
+        Err(ApprovalRefusal::Refused(error)) => error.emit("canon evidence approval-payload", args.json),
         Err(ApprovalRefusal::Binding(error)) => {
-            error.name(CliError::refused(error.code, error.message.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)")).emit("canon evidence approval-payload", args.json)
+            error.name(CliError::refused(error.code, error.message.clone()).hint("fix what the message names, then run `canon evidence approval-payload` again (`canon schema evidence approval-payload` lists the arguments)")).emit("canon evidence approval-payload", args.json)
         }
     }
 }
 
 /// Why `approval-payload` printed no bytes.
 enum ApprovalRefusal {
-    /// The binding itself was refused (the refusal says which argument condition).
+    /// The binding itself was refused by an argument (the refusal says which argument condition).
     Binding(ArgRefusal),
-    /// The scenario is not in the scenario index (`SCENARIO_INDEX_REQUIRED`).
-    NotIndexed(CliError),
+    /// A refusal that has its own code: a task that names no task in the plan corpus (`TASK_NOT_FOUND`), a plan document or git state that
+    /// cannot be read, a scenario the index does not hold (`SCENARIO_INDEX_REQUIRED`).
+    Refused(CliError),
 }
 
 impl From<ArgRefusal> for ApprovalRefusal {
@@ -872,16 +863,22 @@ impl From<ArgRefusal> for ApprovalRefusal {
     }
 }
 
+impl From<CliError> for ApprovalRefusal {
+    fn from(error: CliError) -> Self {
+        Self::Refused(error)
+    }
+}
+
 /// Refuse a `--scenario` the scenario index does not hold: there is nothing a signer could attest to.
 fn ensure_scenario_indexed(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(), ApprovalRefusal> {
     let (Some(scenario), Some(project)) = (&args.scenario_id, &args.project_id) else {
         return Ok(());
     };
-    let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::NotIndexed(crate::read_cause::repo_error(e.clone())))?;
+    let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::Refused(crate::read_cause::repo_error(e.clone())))?;
     if canon_gate::spec_coverage::latest_scenarios(&context).iter().any(|s| &s.project_id == project && &s.scenario_id == scenario) {
         return Ok(());
     }
-    Err(ApprovalRefusal::NotIndexed(
+    Err(ApprovalRefusal::Refused(
         CliError::refused("SCENARIO_INDEX_REQUIRED", format!("scenario `{scenario}` is not in the scenario index of spec root `{project}`; no bytes were produced"))
             .hint("run `canon inventory sync` so the spec root's scenarios are indexed (and check the id), then run `canon evidence approval-payload` again"),
     ))
@@ -1135,7 +1132,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             json: args.json,
         }) {
             Ok(binding) => binding,
-            Err(error) => {
+            Err(ApprovalRefusal::Refused(error)) => return error.emit(&args.full(), args.json),
+            Err(ApprovalRefusal::Binding(error)) => {
                 return error.name(CliError::refused(error.code, error.message.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)")).emit(&args.full(), args.json);
             }
         };
@@ -2295,6 +2293,26 @@ mod tests {
         parse_surface_ref("../outside").unwrap_err();
         parse_surface_ref("/absolute/path").unwrap_err();
         parse_surface_ref("effect:Secret-Access").unwrap_err();
+    }
+
+    /// atip.codesplit.01: a `--surface-ref` that gets past the argument validator is `EVIDENCE_ARGUMENT_INVALID` with the field `--surface-ref`, the code
+    /// `canon evidence add` gives it, judged before any state is read (the repository here does not exist); never a catch-all.
+    #[test]
+    fn atip_codesplit_01_a_surface_ref_that_gets_past_the_validator_is_an_invalid_argument() {
+        let args = ApprovalPayloadArgs {
+            task_id: None,
+            scenario_id: Some(canon_model::ScenarioId::parse("auth.login.01").expect("a literal scenario id")),
+            project_id: Some(canon_model::ProjectId::parse("root").expect("a literal project id")),
+            run_id: None,
+            artifact_sha: canon_model::Sha::parse("a".repeat(40)).expect("a literal sha"),
+            surface_ref: vec!["../outside".to_string()],
+            approval_by: "alice".to_string(),
+            approval_at: "2030-01-01T00:00:00Z".to_string(),
+            json: true,
+        };
+        let Err(ApprovalRefusal::Binding(refusal)) = approval_binding(Path::new("/no/such/repository"), &args) else { panic!("the surface ref is refused as an argument") };
+        assert_eq!((refusal.code, refusal.field), ("EVIDENCE_ARGUMENT_INVALID", Some("--surface-ref")));
+        assert!(refusal.message.contains("../outside"), "{}", refusal.message);
     }
 
     /// LAYER ONE of the newline-injection fix (module doc): the exact

@@ -523,6 +523,16 @@ fn removed_from_corpus<'a>(latest: &'a BTreeMap<(ProjectId, ScenarioId), Scenari
 /// finish before giving up.
 const INDEX_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// How long a writer of the scenario index waits: [`INDEX_LOCK_WAIT`], or the milliseconds of `CANON_TEST_INDEX_LOCK_WAIT_MS` in a debug build
+/// (the tests' way to reach the end of the wait without waiting thirty seconds).
+fn index_lock_wait() -> std::time::Duration {
+    #[cfg(debug_assertions)]
+    if let Some(millis) = std::env::var("CANON_TEST_INDEX_LOCK_WAIT_MS").ok().and_then(|text| text.parse::<u64>().ok()) {
+        return std::time::Duration::from_millis(millis);
+    }
+    INDEX_LOCK_WAIT
+}
+
 /// The repo's scenario-index lock ([`paths::SCENARIO_INDEX_LOCK_FILE`]),
 /// held until this value is dropped.
 ///
@@ -539,7 +549,7 @@ struct IndexLock {
 
 /// Take [`IndexLock`] for the repo rooted at `repo`.
 fn lock_index(repo: &Path) -> Result<IndexLock, InventoryError> {
-    match FileLock::acquire(&repo.join(paths::SCENARIO_INDEX_LOCK_FILE), INDEX_LOCK_WAIT) {
+    match FileLock::acquire(&repo.join(paths::SCENARIO_INDEX_LOCK_FILE), index_lock_wait()) {
         Ok(lock) => Ok(IndexLock { _lock: lock }),
         Err(FileLockError::Busy(waited)) => Err(InventoryError::Locked(format!(
             "another canon process has been writing the scenario index for {}s (it holds `{}`); retry once it finishes",

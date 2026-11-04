@@ -253,9 +253,9 @@ Feature: skills install
   @case:failure
   @skills.install.55
   Scenario: A malformed skills section in canon.yaml fails loud
-    Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know
-    When canon skills install, check and doctor run with no provider named
-    Then each is refused with exit 2 (CONFIG_INVALID with the reason SKILLS, or SKILLS_ARGUMENT_INVALID for an unknown provider), naming the expected shape or the unknown provider
+    Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know, and a clean canon.yaml
+    When canon skills install, check and doctor run with no provider named, and with --providers naming an unknown provider
+    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), naming the expected shape or the unknown provider, and the unknown provider on the --providers flag of the clean canon.yaml is SKILLS_ARGUMENT_INVALID
     And nothing is projected and canon.yaml is byte-identical
     And a --skills-source directory that does not exist is refused the same way, exit 2 naming the option
     And canon init --check exits 1 reporting the skills section as FAIL with the same reason

@@ -117,16 +117,16 @@ The rows whose last column starts `1 → 2` or `1 or 2 → 2` are the codes that
 | `EVIDENCE_APPROVAL_INVALID` | `EVIDENCE_APPROVAL_REQUIRED` (a member of the four approval options is missing); `EVIDENCE_APPROVAL_INVALID` (malformed or the signature does not verify) | `MALFORMED`, `SIGNATURE_MISMATCH` |
 | `EVIDENCE_BIND_REFUSED` | `EVIDENCE_BINDING_STALE`, `EVIDENCE_BINDING_INVALID`, `EVIDENCE_BINDING_NOT_FOUND`, `EVIDENCE_BINDING_DENIED` (outside the repository) | |
 | `EVIDENCE_INVALID_ARGUMENT` | `EVIDENCE_ARGUMENT_INVALID`, `EVIDENCE_ARGUMENT_REQUIRED`, `EVIDENCE_ARGUMENT_CONFLICT`; `EVIDENCE_REQUIRED` when neither `--task` nor `--scenario` is given | |
-| `EVIDENCE_REFUSED` | `EVIDENCE_REQUIRED`, `EVIDENCE_INVALID`, `EVIDENCE_ARGUMENT_INVALID` | |
+| `EVIDENCE_REFUSED` | `EVIDENCE_REQUIRED`, `EVIDENCE_ARGUMENT_INVALID` (a malformed `--surface-ref` or `--approver`, in `evidence add` and `evidence approval-payload` alike), `TASK_NOT_FOUND` (a `--task` that names no task, as in `evidence add`), `REPO_INVALID` (a commit whose changed paths git cannot derive) | |
 | `EVIDENCE_SCENARIO_NOT_INDEXED`, `REVIEW_SCENARIO_NOT_INDEXED` | `SCENARIO_INDEX_REQUIRED` | |
 | `HOOKS_INSTALL_REFUSED` | `HOOKS_REPO_INVALID`, `HOOKS_FILE_CONFLICT`, `HOOKS_FILE_DENIED` | |
 | `INVENTORY_REFUSED` | `CONFIG_INVALID` (a malformed `specs:` section or a canon.yaml that does not parse); `CONFIG_DENIED` (canon.yaml that this user may not read); `INVENTORY_INDEX_UNAVAILABLE` (another process holds the index lock; retryable) | `SPECS` |
-| `LEARN_ROLLBACK_FAILED` | `STRATEGY_SIGNATURE_INVALID` (exit 2, nothing recorded); `STRATEGY_ROLLBACK_FAILED` (exit 1) | |
+| `LEARN_ROLLBACK_FAILED` | `STRATEGY_ARGUMENT_INVALID` (a blank `--reason` or `--actor`), `STRATEGY_VERIFIER_REQUIRED` (the policy names no `approval.allowed_signers`), `CONFIG_DENIED` / `CONFIG_UNAVAILABLE` / `CONFIG_INVALID` with the reason POLICY (a policy or an allowed-signers file that cannot be used), `STRATEGY_SIGNER_DENIED` (the actor is not listed), `STRATEGY_SIGNATURE_REQUIRED` (an empty signature file), `STRATEGY_SIGNATURE_INVALID` (a signature that does not verify), each exit 2 with nothing recorded; `STRATEGY_ROLLBACK_FAILED` (exit 1) | `POLICY` |
 | `MIGRATE_REFUSED` | `MIGRATION_INVALID`, `MIGRATION_CONFLICT`, `MIGRATION_DENIED` (the scratch directory); `CONFIG_INVALID` (a config that cannot be moved) | |
 | `NO_BRIEF` | `BRIEF_REQUIRED` | |
 | `OLD_BRIEF_FORMAT` | `BRIEF_MIGRATION_REQUIRED` | |
 | `OLD_LAYOUT` | `LAYOUT_MIGRATION_REQUIRED` | |
-| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`; `CONFIG_INVALID` (`specs:`, or a canon.yaml that does not parse); `CONFIG_DENIED`; `INVENTORY_INDEX_UNAVAILABLE` | `SPECS` |
+| `PLUGIN_SYNC_FAILED` | `PLUGIN_REQUIRED`; `CONFIG_INVALID` (`specs:`, or a canon.yaml that does not parse); `CONFIG_DENIED` | `SPECS` |
 | `POLICY_APPROVAL_REFUSED` | `POLICY_REQUIRED`, `POLICY_INVALID`, `POLICY_DENIED` (a policy this user may not read), `APPROVAL_INVALID` (a blank approver) | |
 | `RETENTION_EXPORT_REFUSED` | `RETENTION_EXPORT_DENIED`; `RETENTION_TIERS_DENIED` (a file the tiers need that this user may not read); `RETENTION_TIERS_UNAVAILABLE` (retryable: a backend down, or an operating-system error a repeat can pass); `RETENTION_TIERS_INVALID` | |
 | `RETENTION_PURGE_REFUSED` | `RETENTION_TIERS_UNAVAILABLE` (retryable); `RETENTION_TIERS_INVALID`. A preview exits 0 and is no refusal | |
@@ -201,6 +201,26 @@ A write target that cannot be written keeps `WRITE_DENIED` and `WRITE_INVALID`: 
 | `purge` or `export`, a stored Parquet object that does not decode | `RETENTION_TIERS_INVALID` or `RETENTION_TIERS_UNAVAILABLE` | `RETENTION_TIERS_CORRUPT` (**new**) |
 | a ledger record that does not parse | `LEDGER_CORRUPT` (registered, never answered) | no code: `LEDGER_CORRUPT` is removed; readers skip the record and warn |
 | `migrate`, a scratch directory that is no directory or a record it cannot use | `MIGRATION_DENIED` | `MIGRATION_INVALID` (`MIGRATION_DENIED` stays for a refused call) |
+
+**The review of `canon-0-36-codes-refusals` found seven places where a refusal had the wrong code or the wrong words** (scenarios `atip.codesplit.01-07`, `report.dashboard.14`, `skills.install.55`). Each is fixed and proved by a call of the binary:
+
+| Call | before | now |
+|---|---|---|
+| `evidence approval-payload --task <a task that names no task>` | `EVIDENCE_INVALID`, the hint to run `canon evidence add` again | `TASK_NOT_FOUND` (`PLAN_SOURCES_REQUIRED`, or the plan document's own code), the same as `evidence add`, with the hint of the task |
+| a `--surface-ref` that gets past the argument validator, in `evidence approval-payload` and in `evidence add` with an approval | `EVIDENCE_INVALID` | `EVIDENCE_ARGUMENT_INVALID`, field `--surface-ref`, judged before any state is read |
+| `evidence approval-payload`, a commit whose changed paths git cannot derive | `EVIDENCE_INVALID` | `REPO_INVALID` (`REPO_DENIED` or `REPO_UNAVAILABLE` by the cause) |
+| `EVIDENCE_INVALID`, `evidence approval-payload`'s hint | a code that matched no call site | no longer a code; its hint names `canon evidence approval-payload` |
+| `strategy rollback`, a blank `--reason` or `--actor` | `STRATEGY_SIGNATURE_INVALID` | `STRATEGY_ARGUMENT_INVALID`, field `--reason` or `--actor` |
+| `strategy rollback`, a policy with no `approval.allowed_signers` | `STRATEGY_SIGNATURE_INVALID` | `STRATEGY_VERIFIER_REQUIRED` (**new**) |
+| `strategy rollback`, an allowed-signers file or policy that cannot be used | `STRATEGY_SIGNATURE_INVALID` | `CONFIG_DENIED`, `CONFIG_UNAVAILABLE`, or `CONFIG_INVALID` with the reason `POLICY` |
+| `strategy rollback`, an actor the allowed-signers file does not list | `STRATEGY_SIGNATURE_INVALID` | `STRATEGY_SIGNER_DENIED` (**new**) |
+| `strategy rollback`, an empty signature file | `STRATEGY_SIGNATURE_INVALID` | `STRATEGY_SIGNATURE_REQUIRED` (**new**) |
+| `strategy rollback`, a signature that does not verify | `STRATEGY_SIGNATURE_INVALID` | `STRATEGY_SIGNATURE_INVALID`, unchanged: the one condition the code names |
+| `gate install-hooks`, a hook file this user may not read | `WRITE_DENIED` (the unreadable file was read as empty) | `HOOKS_FILE_DENIED` (`HOOKS_FILE_UNAVAILABLE` for an error a repeat can pass), before anything is written |
+| `plugin sync` | named `INVENTORY_INDEX_UNAVAILABLE` among its errors, with no index lock to wait for | does not name it: `plugin sync` takes no index lock |
+| `inventory sync` while another process holds the index | `INVENTORY_INDEX_UNAVAILABLE`, the hint `fix the problems the message names` | the same code, the hint says to wait for the other process |
+| `subject adopt` and `subject unadopt`, a subject or change that does not exist | the hint `fix what the message names` | the hint says to author the subject (`canon subject new`) or import the change (`canon ingest plans`), or to check the id |
+| `canon schema --error APPROVAL_INVALID` | read as `brief approve`'s `--by` or `--note` only | names `--approver` and `--note` of `brief approve` and `--approver` of `policy approve` |
 
 **`--help --json` and `--version --json` are refused** (`canon-0-36-help-json`, scenarios `atip.helpjson.01-09`, atip/1 spec 4.4.1). `--help` is text for people and `canon schema` is the machine description, so a call that asks for JSON and for help or the version no longer gets text: it gets the failure envelope, exit 2, `USAGE`, and a `hint` that names what to run. The path is resolved first, so an unknown word still answers `UNKNOWN_COMMAND`, wherever the flag sits. The rule does not wait for the 1.4 declaration: a 1.2 tool may answer `--help --json` with the `schema` document or with a refusal (4.4.1).
 

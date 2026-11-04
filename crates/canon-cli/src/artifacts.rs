@@ -684,7 +684,7 @@ fn race_hook(path: &Path, uploaded: usize) {
 mod tests {
     use canon_gate::artifact_store::{ArtifactConfigError, ArtifactStoreError};
 
-    use super::store_code;
+    use super::{evidence_store_code, store_code};
 
     /// atip.codestored.11: a canon.yaml the system fails to read in a way a repeat can pass is `CONFIG_UNAVAILABLE`; a refused read is
     /// `CONFIG_DENIED` and one that does not parse is `CONFIG_INVALID` with the reason `ARTIFACT_STORE`.
@@ -694,5 +694,20 @@ mod tests {
         assert_eq!(store_code(&read(5)), ("CONFIG_UNAVAILABLE", None));
         assert_eq!(store_code(&read(13)), ("CONFIG_DENIED", None));
         assert_eq!(store_code(&read(21)), ("CONFIG_INVALID", Some("ARTIFACT_STORE")));
+    }
+
+    /// atip.codesplit.02: a bound file that changed while it was read is `EVIDENCE_BINDING_STALE` (exit 2, not retryable: it binds once what produced
+    /// the file is run again); a store that could not be used before anything was written keeps the store's own code, and a write that failed is
+    /// `EVIDENCE_STORE_FAILED` (exit 1).
+    #[test]
+    fn atip_codesplit_02_a_bound_file_that_changed_is_evidence_binding_stale() {
+        let changed = ArtifactStoreError::Changed { expected: "sha256:a".to_string(), actual: "sha256:b".to_string() };
+        assert_eq!(evidence_store_code(&changed), ("EVIDENCE_BINDING_STALE", None));
+        assert_eq!(super::store_code(&changed), ("EVIDENCE_BINDING_STALE", None));
+        use crate::cli_error::CliErrorExt as _;
+        let stale = crate::cli_error::CliError::refused("EVIDENCE_BINDING_STALE", "m");
+        assert_eq!((stale.exit, stale.retryable), (2, false));
+        assert_eq!(evidence_store_code(&ArtifactStoreError::UnsafeStoreDir), ("ARTIFACTS_STORE_INVALID", None));
+        assert_eq!(evidence_store_code(&ArtifactStoreError::Remote { tier: "cold".to_string(), reason: "down".to_string() }), ("EVIDENCE_STORE_FAILED", None));
     }
 }

@@ -389,6 +389,68 @@ fn atip_codestored_02_a_detached_signature_that_cannot_be_read_is_denied_invalid
     assert_eq!(tree(repo), before, "a refused rollback writes nothing");
 }
 
+/// atip.codesplit.06: a `strategy rollback` the signature check turns away says which condition failed, each exit 2 with nothing recorded: a blank
+/// `--reason` is `STRATEGY_ARGUMENT_INVALID` (field `--reason`), a policy with no `approval.allowed_signers` is `STRATEGY_VERIFIER_REQUIRED`, a policy that does
+/// not parse or an allowed-signers file that is not there is `CONFIG_INVALID` with the reason `POLICY`, one this user may not read is `CONFIG_DENIED`, an
+/// actor the file does not list is `STRATEGY_SIGNER_DENIED`, an empty signature file is `STRATEGY_SIGNATURE_REQUIRED`, and only a signature that does not verify
+/// is `STRATEGY_SIGNATURE_INVALID` (the mapping of the operating-system errors that a repeat can pass is the unit test of `learn.rs`).
+#[test]
+fn atip_codesplit_06_a_rollback_the_signature_check_turns_away_says_which_condition_failed() {
+    use std::os::unix::fs::PermissionsExt;
+    let signing = Signing::new();
+    let repo = signing.repo.path();
+    let (candidate, _) = candidate_and_evaluation(repo);
+    let id = candidate.id.to_string();
+    fs::write(repo.join("bad.sig"), "not a signature\n").unwrap();
+    fs::write(repo.join("empty.sig"), "").unwrap();
+    let before = tree(repo);
+    let rollback = |reason: &str, actor: &str, signature: &str| {
+        canon(repo, &["strategy", "rollback", &id, "--reason", reason, "--actor", actor, "--signature-file", signature, "--approval-at", "2030-01-01T00:00:00Z", "--json"])
+    };
+    let refused = |out: Output, code: &str, reason: Option<&str>| -> Value {
+        let doc = json(&out);
+        assert_eq!(out.status.code(), Some(2), "{doc}");
+        assert_eq!((doc["error"]["code"].as_str(), doc["error"]["reason"].as_str(), doc["error"]["retryable"].as_bool()), (Some(code), reason, Some(false)), "{doc}");
+        assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
+        doc
+    };
+
+    // A blank reason is the caller's value, named by its field.
+    let blank = refused(rollback("  ", "alice", "bad.sig"), "STRATEGY_ARGUMENT_INVALID", None);
+    assert_eq!(blank["error"]["field"], "--reason", "{blank}");
+    // An actor the allowed-signers file does not list, and a signature file with nothing in it.
+    refused(rollback("regressed", "bob", "bad.sig"), "STRATEGY_SIGNER_DENIED", None);
+    refused(rollback("regressed", "alice", "empty.sig"), "STRATEGY_SIGNATURE_REQUIRED", None);
+    // A signature that is there and does not verify is the one INVALID.
+    refused(rollback("regressed", "alice", "bad.sig"), "STRATEGY_SIGNATURE_INVALID", None);
+
+    // The allowed-signers file this user may not read, and one that is not there.
+    let allowed = repo.join(".canon/allowed_signers");
+    let signers = fs::read(&allowed).unwrap();
+    fs::set_permissions(&allowed, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&allowed).is_err() {
+        refused(rollback("regressed", "alice", "bad.sig"), "CONFIG_DENIED", None);
+    } else {
+        eprintln!("skipped: this process can read a file whose mode is 000 (running as root?), so a refused read cannot be shown");
+    }
+    fs::set_permissions(&allowed, fs::Permissions::from_mode(0o644)).unwrap();
+    fs::remove_file(&allowed).unwrap();
+    refused(rollback("regressed", "alice", "bad.sig"), "CONFIG_INVALID", Some("POLICY"));
+    fs::write(&allowed, &signers).unwrap();
+
+    // A policy that does not parse, and one that names no verifier.
+    let policy = repo.join(".canon/policy.yaml");
+    let policy_text = fs::read_to_string(&policy).unwrap();
+    fs::write(&policy, "approval: [x\n").unwrap();
+    refused(rollback("regressed", "alice", "bad.sig"), "CONFIG_INVALID", Some("POLICY"));
+    fs::write(&policy, "{}\n").unwrap();
+    let required = refused(rollback("regressed", "alice", "bad.sig"), "STRATEGY_VERIFIER_REQUIRED", None);
+    assert!(required["error"]["hint"].as_str().unwrap().contains("allowed_signers"), "{required}");
+    fs::write(&policy, policy_text).unwrap();
+
+    assert_eq!(tree(repo), before, "a refused rollback writes nothing");
+}
+
 #[test]
 fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_signature_is_read_and_writes_nothing() {
     let signing = Signing::new();

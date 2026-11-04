@@ -93,8 +93,8 @@ exit 2
 --- stdout
 
 --- stderr
-canon evidence approval-payload: EVIDENCE_INVALID — --task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding
-hint: fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)
+canon evidence approval-payload: TASK_NOT_FOUND — --task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding
+hint: task ids look like <change_id>#<n>; open the change's plan document to find the right number
 
 $ canon evidence audit demo.login.01 --project root --ref audit.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --actor impl-1 --session s-2 --json
 exit 0

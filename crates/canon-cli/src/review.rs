@@ -474,11 +474,7 @@ fn write_reviews(
     }
     let held = crate::evidence_attach::store_files_held(repo, files).map_err(|(file, e)| {
         let message = format!("could not store {} in the artifact store: {e} ({})", file.resolved.display(), e.hint());
-        match &e {
-            canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => CliError::refused("REVIEW_ARTIFACT_STALE", message).hint(e.hint()),
-            _ if crate::artifacts::before_first_write(&e) => crate::artifacts::store_refusal(&e, message),
-            _ => CliError::refused("ARTIFACTS_STORE_FAILED", message).hint(e.hint()),
-        }
+        store_refusal(&e, message)
     })?;
     // Every refusal is behind us (an unwritable directory and a blob that cannot be stored are two): the index refresh this writer owes happens with the first review.
     crate::inventory::refresh_stale_index(repo, command);
@@ -507,6 +503,16 @@ fn write_reviews(
     Ok((held.stored(), written))
 }
 
+/// The refusal of a review whose bound file could not be stored: `REVIEW_ARTIFACT_STALE` for a file that changed while it was read, the code of
+/// the artifact store (exit 2) when the store could not be used before anything was written, `ARTIFACTS_STORE_FAILED` (exit 1) when a write to it failed.
+fn store_refusal(e: &canon_gate::artifact_store::ArtifactStoreError, message: String) -> CliError {
+    match e {
+        canon_gate::artifact_store::ArtifactStoreError::Changed { .. } => CliError::refused("REVIEW_ARTIFACT_STALE", message).hint(e.hint()),
+        _ if crate::artifacts::before_first_write(e) => crate::artifacts::store_refusal(e, message),
+        _ => CliError::refused("ARTIFACTS_STORE_FAILED", message).hint(e.hint()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use canon_model::{EvidenceRecord, EvidenceVerdict, Scenario, SpecDigest};
@@ -514,6 +520,21 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    /// atip.codesplit.02: a bound file that changed while it was read is `REVIEW_ARTIFACT_STALE` (exit 2, not retryable: the same bytes bind
+    /// once what produced the file is run again); a store that could not be used before anything was written keeps the store's own code, and a
+    /// write that failed is `ARTIFACTS_STORE_FAILED` (exit 1).
+    #[test]
+    fn atip_codesplit_02_a_bound_file_that_changed_is_review_artifact_stale() {
+        use canon_gate::artifact_store::ArtifactStoreError;
+        let changed = ArtifactStoreError::Changed { expected: "sha256:a".to_string(), actual: "sha256:b".to_string() };
+        let stale = store_refusal(&changed, "m".to_string());
+        assert_eq!((stale.code, stale.exit, stale.retryable), ("REVIEW_ARTIFACT_STALE", 2, false));
+        let unsafe_dir = store_refusal(&ArtifactStoreError::UnsafeStoreDir, "m".to_string());
+        assert_eq!((unsafe_dir.code, unsafe_dir.exit), ("ARTIFACTS_STORE_INVALID", 2));
+        let failed = store_refusal(&ArtifactStoreError::Remote { tier: "cold".to_string(), reason: "down".to_string() }, "m".to_string());
+        assert_eq!((failed.code, failed.exit), ("ARTIFACTS_STORE_FAILED", 1));
+    }
 
     /// atip.codestored.11: a review artifact whose read the system failed for a repeat to pass is `REVIEW_ARTIFACT_UNAVAILABLE` (retryable).
     #[test]

@@ -462,9 +462,46 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        // The signature, the approver and the verifier are judged before anything is recorded (exit 2); a failure of the record is a failure of the work (exit 1).
-        Err(error @ canon_learn::LearnError::InvalidPromotionEvidence(_)) => ExitCode::from(CliError::refused("STRATEGY_SIGNATURE_INVALID", error.to_string()).hint("sign the rollback again with a key the policy's allowed_signers lists for the actor, then run `canon strategy rollback` again; nothing was recorded").emit("canon strategy rollback", json)),
+        // The signature, the signer and the verifier are judged before anything is recorded (exit 2), each by its own condition; a failure of the
+        // record is a failure of the work (exit 1).
+        Err(canon_learn::LearnError::InvalidPromotionEvidence(evidence)) => ExitCode::from(rollback_refusal(&evidence, reason, actor).emit("canon strategy rollback", json)),
         Err(error) => ExitCode::from(CliError::failed("STRATEGY_ROLLBACK_FAILED", error.to_string()).hint("the message names the cause; fix it and run `canon strategy rollback` again").emit("canon strategy rollback", json)),
+    }
+}
+
+/// The next step when the policy or the allowed-signers file it names is wrong, and when the system will not read it.
+const POLICY_FIX: &str = "fix `.canon/policy.yaml` and the allowed-signers file it names, then run `canon strategy rollback` again; nothing was recorded";
+const POLICY_UNREADABLE: &str = "make `.canon/policy.yaml` and the allowed-signers file it names readable (wait a moment if the system failed the read), then run `canon strategy rollback` again; nothing was recorded";
+
+/// The refusal of a rollback the signature check turned away, by the condition that failed (nothing was recorded in any of them):
+/// - a blank `--reason` or `--actor` is `STRATEGY_ARGUMENT_INVALID`, naming the argument;
+/// - a policy that names no `approval.allowed_signers` verifier is `STRATEGY_VERIFIER_REQUIRED`;
+/// - a policy that cannot be used, or an allowed-signers file that cannot be read, is the config's: `CONFIG_DENIED` when the system refuses
+///   the read, `CONFIG_UNAVAILABLE` when a repeat can pass, `CONFIG_INVALID` (reason `POLICY`) otherwise;
+/// - an actor the allowed-signers file does not list is `STRATEGY_SIGNER_DENIED`;
+/// - an empty signature file is `STRATEGY_SIGNATURE_REQUIRED`;
+/// - only a signature that does not verify is `STRATEGY_SIGNATURE_INVALID`.
+fn rollback_refusal(evidence: &canon_learn::PromotionEvidenceError, reason: &str, actor: &str) -> CliError {
+    use canon_learn::PromotionEvidenceError as Evidence;
+    let message = evidence.to_string();
+    match evidence {
+        Evidence::RollbackReasonAndActor => {
+            let field = if reason.trim().is_empty() { "--reason" } else if actor.trim().is_empty() { "--actor" } else { "--reason" };
+            CliError::refused("STRATEGY_ARGUMENT_INVALID", message).field(field).hint("pass a non-blank --reason and --actor, then run `canon strategy rollback` again; nothing was recorded")
+        }
+        Evidence::NoVerifierConfigured | Evidence::RollbackUnauthenticated => CliError::refused("STRATEGY_VERIFIER_REQUIRED", message)
+            .hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and have the human approve it with `canon policy approve`, then run `canon strategy rollback` again; nothing was recorded"),
+        Evidence::AllowedSigners(canon_gate::AllowedSignersError::Read { .. }) | Evidence::AllowedSignersUnreadable(_) => {
+            let error = crate::read_cause::config_error(message);
+            let hint = if error.code == "CONFIG_INVALID" { POLICY_FIX } else { POLICY_UNREADABLE };
+            let error = if error.code == "CONFIG_INVALID" { error.reason("POLICY") } else { error };
+            error.hint(hint)
+        }
+        Evidence::AllowedSigners(_) => CliError::refused("CONFIG_INVALID", message).reason("POLICY").hint(POLICY_FIX),
+        Evidence::RollbackActorNotListed => CliError::refused("STRATEGY_SIGNER_DENIED", message)
+            .hint("pass an --actor the policy's allowed_signers file lists, or have the human add the actor's key to it and approve the policy, then run `canon strategy rollback` again; nothing was recorded"),
+        Evidence::RollbackSignatureRequired => CliError::refused("STRATEGY_SIGNATURE_REQUIRED", message).hint("the --signature-file is empty: sign the rollback's payload with the actor's key and pass the armored signature, then run `canon strategy rollback` again; nothing was recorded"),
+        _ => CliError::refused("STRATEGY_SIGNATURE_INVALID", message).hint("sign the rollback again with a key the policy's allowed_signers lists for the actor, then run `canon strategy rollback` again; nothing was recorded"),
     }
 }
 
@@ -545,5 +582,28 @@ mod tests {
     #[test]
     fn a_malformed_strategy_id_is_refused_in_its_old_words() {
         assert_eq!(parse_strategy_id("nope").unwrap_err().to_string(), "invalid id \"nope\": invalid length");
+    }
+
+    /// atip.codesplit.06: each condition the signature check of a rollback fails on is the code of its own condition (the real calls are the test of
+    /// `spec030_reads.rs`); an operating-system error that a repeat can pass, which no real call can provoke, is `CONFIG_UNAVAILABLE` (retryable).
+    #[test]
+    fn atip_codesplit_06_each_condition_of_a_refused_rollback_has_its_own_code() {
+        use canon_learn::PromotionEvidenceError as Evidence;
+        let code = |evidence: Evidence| {
+            let error = rollback_refusal(&evidence, "regressed", "alice");
+            (error.code, error.exit, error.retryable)
+        };
+        let eio = || std::io::Error::from_raw_os_error(5);
+        assert_eq!(code(Evidence::RollbackActorNotListed), ("STRATEGY_SIGNER_DENIED", 2, false));
+        assert_eq!(code(Evidence::RollbackSignatureRequired), ("STRATEGY_SIGNATURE_REQUIRED", 2, false));
+        assert_eq!(code(Evidence::NoVerifierConfigured), ("STRATEGY_VERIFIER_REQUIRED", 2, false));
+        assert_eq!(code(Evidence::RollbackReasonAndActor), ("STRATEGY_ARGUMENT_INVALID", 2, false));
+        assert_eq!(code(Evidence::AllowedSignersUnreadable(eio())), ("CONFIG_UNAVAILABLE", 2, true));
+        assert_eq!(code(Evidence::AllowedSignersUnreadable(std::io::Error::from_raw_os_error(13))), ("CONFIG_DENIED", 2, false));
+        assert_eq!(code(Evidence::AllowedSignersUnreadable(std::io::Error::from_raw_os_error(2))), ("CONFIG_INVALID", 2, false));
+        assert_eq!(code(Evidence::AllowedSigners(canon_gate::AllowedSignersError::Read { path: "policy.yaml".into(), source: eio() })), ("CONFIG_UNAVAILABLE", 2, true));
+        assert_eq!(code(Evidence::AllowedSigners(canon_gate::AllowedSignersError::Empty)), ("CONFIG_INVALID", 2, false));
+        let blank = |reason: &str, actor: &str| rollback_refusal(&Evidence::RollbackReasonAndActor, reason, actor);
+        assert_eq!((blank(" ", "alice").field_name(), blank("r", " ").field_name()), (Some("--reason"), Some("--actor")));
     }
 }

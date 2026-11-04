@@ -35,10 +35,14 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
         }
         Err(err) => {
             let error = match &err {
+                // `run_sync` reads the config and the spec roots and takes no scenario-index lock and writes no index, so no other variant can come
+                // from it; one that did would be a canon bug, not a lock to wait for.
+                crate::plugin_sync::PluginSyncError::Inventory(
+                    crate::inventory::InventoryError::Store(_) | crate::inventory::InventoryError::Locked(_) | crate::inventory::InventoryError::Unavailable(_),
+                ) => unreachable!("`plugin sync` takes no scenario-index lock and writes no index: {err}"),
                 crate::plugin_sync::PluginSyncError::Unavailable(error) => error.clone(),
                 crate::plugin_sync::PluginSyncError::Inventory(crate::inventory::InventoryError::Config(_)) => CliError::refused("CONFIG_INVALID", err.to_string()).reason("SPECS").hint("fix the `specs:` section of canon.yaml, then run `canon plugin sync` again"),
                 crate::plugin_sync::PluginSyncError::Inventory(crate::inventory::InventoryError::CanonYaml(_)) => crate::read_cause::config_error(err.to_string()),
-                crate::plugin_sync::PluginSyncError::Inventory(_) => CliError::refused("INVENTORY_INDEX_UNAVAILABLE", err.to_string()).hint("another canon process holds the scenario index; wait for it, then run `canon plugin sync` again"),
                 crate::plugin_sync::PluginSyncError::UnknownSource(_) | crate::plugin_sync::PluginSyncError::UnresolvedPlugin(_) | crate::plugin_sync::PluginSyncError::NoOverlay(_) => CliError::refused("PLUGIN_REQUIRED", err.to_string()).hint("check that the plugin is installed under `.canon/plugins/` and declares an overlay, then run `canon plugin sync` again"),
             };
             ExitCode::from(error.emit("canon plugin sync", json))

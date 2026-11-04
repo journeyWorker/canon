@@ -56,7 +56,11 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
                 crate::inventory::InventoryError::Locked(_) => ("INVENTORY_INDEX_UNAVAILABLE", None),
                 crate::inventory::InventoryError::Unavailable(error) => (error.code, None),
             };
-            let error = CliError::refused(code, err.to_string()).hint("fix the problems the message names, then run `canon inventory sync` again");
+            let hint = match code {
+                "INVENTORY_INDEX_UNAVAILABLE" => "another canon process holds the scenario index: wait for it to finish, then run `canon inventory sync` again",
+                _ => "fix the problems the message names, then run `canon inventory sync` again",
+            };
+            let error = CliError::refused(code, err.to_string()).hint(hint);
             let error = match reason {
                 Some(reason) => error.reason(reason),
                 None => error,
