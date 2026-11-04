@@ -62,9 +62,16 @@ const ARTIFACT_STORE_CODES: &[&str] = &["ARTIFACTS_DIGEST_INVALID", "ARTIFACTS_S
 /// listed by `canon schema <command>` whether the scan reads it as a literal or through one of these.
 const CALL_SITES: &[(&str, &[&str], &[&str])] = &[
     // `dispatch::validate_task_binding` admits a `--task` against the plan corpus; `DispatchError::to_cli_error` gives its codes.
-    ("dispatch::validate_task_binding(", &["TASK_NOT_FOUND", "PLAN_SOURCES_REQUIRED", "PLAN_CORPUS_DENIED", "PLAN_CORPUS_INVALID", "PLAN_CORPUS_UNAVAILABLE"], &["evidence add", "evidence approval-payload"]),
+    ("dispatch::validate_task_binding(", &["TASK_NOT_FOUND", "PLAN_SOURCES_REQUIRED", "PLAN_CORPUS_DENIED", "PLAN_CORPUS_INVALID", "PLAN_CORPUS_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID"], &["evidence add", "evidence approval-payload"]),
+    // `PlansError::cli_error`: the refusal for a canon.yaml the plan corpus could not read, for the commands that read the corpus and do not go
+    // through `validate_task_binding`.
+    ("Self::PlanConfig { error, .. } => error.code", &["PLAN_CORPUS_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID"], &["dispatch begin"]),
+    ("|plans_err| match plans_err.cli_error()", &["PLAN_CORPUS_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID"], &["task done"]),
+    ("err.cli_error().expect(", &["PLAN_CORPUS_UNAVAILABLE", "CONFIG_DENIED", "CONFIG_INVALID"], &["ingest plans"]),
     // `query_failure`: a read of the ledger the system failed, before the query had anything to leave half done.
     ("read_cause::unavailable_before_work(", &["REPO_UNAVAILABLE"], &["query"]),
+    // `query_failure`: a tier the caller configured wrongly (`policy: …`) is refused as the configuration, the same way every read of the repository is.
+    ("return crate::read_cause::repo_error(message);", &["CONFIG_INVALID", "REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE"], &["query"]),
 ];
 
 /// Whether `line` calls a helper that can answer `code`.

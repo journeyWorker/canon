@@ -112,9 +112,7 @@ impl CliErrorExt for CliError {
     }
 
     fn emit(&self, command: &str, json: bool) -> u8 {
-        debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
-        debug_assert!(code_info(self.code).is_some_and(|info| info.exit == self.exit && info.retryable == self.retryable), "{} answers exit {} and retryable {}, not its registry row's: a reason never changes either (spec 7.6)", self.code, self.exit, self.retryable);
-        debug_assert!(self.reason_name().is_none_or(|reason| code_info(self.code).is_some_and(|info| info.find_reason(reason).is_some())), "reason {:?} is not registered under {} in cli_error::all_codes()", self.reason_name(), self.code);
+        debug_assert_answerable(self);
         if json {
             crate::json_out::print_failure::<crate::json_out::NoData>(command, self, None);
         } else {
@@ -128,8 +126,7 @@ impl CliErrorExt for CliError {
     }
 
     fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: Value) -> u8 {
-        debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
-        debug_assert!(code_info(self.code).is_some_and(|info| info.exit == self.exit && info.retryable == self.retryable), "{} answers exit {} and retryable {}, not its registry row's: a reason never changes either (spec 7.6)", self.code, self.exit, self.retryable);
+        debug_assert_answerable(self);
         // A refusal (exit 2) changed nothing and carries no `data` (spec 8.3, 6.4). Every test that runs the debug binary observes this.
         debug_assert!(self.exit != EXIT_REFUSED, "{} is a refusal (exit 2): it carries no data", self.code);
         if json {
@@ -175,6 +172,31 @@ pub fn with_usage_hint<'a>(error: &'a CliError, command: &str) -> std::borrow::C
     let id = crate::json_out::command_id(command);
     let hint = if id.is_empty() { "canon schema --json".to_string() } else { format!("canon schema {id} --json") };
     std::borrow::Cow::Owned(error.clone().hint(hint))
+}
+
+/// A debug build's check of what an error answers, for the error and for every entry of its `error.details` (each is a code of its own, spec
+/// 7.2.2): the code is registered, its exit and `retryable` are the registry row's (a reason never changes either, spec 7.6), and a reason is one
+/// the code registers.
+fn debug_assert_answerable(error: &CliError) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    for each in std::iter::once(error).chain(error.detail_errors()) {
+        debug_assert!(is_registered(each.code), "error code {} is not in cli_error::all_codes()", each.code);
+        debug_assert!(
+            code_info(each.code).is_some_and(|info| info.exit == each.exit && info.retryable == each.retryable),
+            "{} answers exit {} and retryable {}, not its registry row's: a reason never changes either (spec 7.6)",
+            each.code,
+            each.exit,
+            each.retryable
+        );
+        debug_assert!(
+            each.reason_name().is_none_or(|reason| code_info(each.code).is_some_and(|info| info.find_reason(reason).is_some())),
+            "reason {:?} is not registered under {} in cli_error::all_codes()",
+            each.reason_name(),
+            each.code
+        );
+    }
 }
 
 fn is_registered(code: &str) -> bool {
@@ -355,6 +377,7 @@ const SUBJECT_CONFLICT_REASONS: &[ReasonInfo] = &[
 ];
 
 const SUBJECT_INVALID_REASONS: &[ReasonInfo] = &[
+    ReasonInfo { reason: "FALSE_SUCCESS", meaning: "a scenario the transition rests on has a latest audit that is `refuted`: an external evaluator found its declared success false, and a `faithful` verdict does not override it", fix: "Fix the behavior the audit refuted, re-attest it, record the evaluator's new audit (`canon evidence audit <SCENARIO_ID>`), then run `canon subject move` again." },
     ReasonInfo { reason: "MALFORMED_EVIDENCE", meaning: "a record the gate reads to judge the transition does not parse or lacks a required field, so it counts as no evidence and the gate fails closed", fix: "Fix or remove the record `error.details` names, then run `canon subject move` again." },
     ReasonInfo { reason: "OPEN_BLOCKER", meaning: "an open `blocker` finding sits on a change the subject adopts, and the review policy blocks the transition on open findings", fix: "Close the blocker finding (`canon finding close`) once it is fixed, then run `canon subject move` again." },
 ];
@@ -585,6 +608,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "TASK_UNSUPPORTED", meaning: "the plan dialect cannot flip this task", exit: 2, retryable: false, fix: "Mark the task done by hand in the plan document; this plan dialect cannot be flipped by canon.", reasons: &[] },
     CodeInfo { code: "TIER_FAILED", meaning: "tier aging failed before it moved any record, or a move failed and no record had left its tier", exit: 1, retryable: false, fix: "Read the error message, fix its cause, then run tier aging again.", reasons: &[] },
     CodeInfo { code: "TIER_INCOMPLETE", meaning: "tier aging stopped after it moved some records: what moved stays moved", exit: 1, retryable: false, fix: "Read what was done first (the first `meta.next` step), fix the cause the error names, then preview with `canon tier age` and move the rest with `--commit --plan-digest <DIGEST>` (the same digest is stale now).", reasons: TIER_INCOMPLETE_REASONS },
+    CodeInfo { code: "TIER_UNAVAILABLE", meaning: "tier aging could not read a tier before it moved any record: a tier backend whose settings are all there did not answer (a Postgres DSN that is set and cannot be reached), or the system failed the read of a file in a way a repeat can pass; nothing was moved", exit: 2, retryable: true, fix: "Wait a moment, check that the tier backends are reachable, then run tier aging again.", reasons: &[] },
     CodeInfo { code: "TRACE_CONFLICT", meaning: "the sha prefix `trace` was given is the start of more than one commit", exit: 2, retryable: false, fix: "Pass more characters of the commit sha; `expected` lists the candidates.", reasons: &[] },
     CodeInfo { code: "TRACE_NOT_FOUND", meaning: "no record says the id `trace` was given", exit: 2, retryable: false, fix: "Pass the key of a finding (`canon query --kind finding`), a review id a review printed, or enough characters of a commit sha to name one commit.", reasons: &[] },
     CodeInfo { code: "TRACE_OPERAND_INVALID", meaning: "`trace` was given something that is none of a review id, a commit sha or a finding key (a placeholder node's id is not one)", exit: 2, retryable: false, fix: "Pass a review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`).", reasons: &[] },

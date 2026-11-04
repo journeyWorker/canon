@@ -67,9 +67,9 @@ Feature: atip reasons
   @flow:canon-0-36-code-reasons.F4
   @atip.reasons.07
   Scenario: A transition the gate refuses names the kind that asks for a different fix, and every entry of details has its own code and a registered reason
-    Given a subject with an open blocker finding and the 11 violation kinds of the gate
-    When the subject moves and the kinds are mapped to their codes and reasons
-    Then the move is refused with SUBJECT_INVALID and the reason OPEN_BLOCKER, no data, every entry of details has its own registered code, and only the kinds that ask for a different fix under one code are reasons
+    Given a subject with an open blocker finding, then one at verifying with a refuted audit and a new blocker, and the 11 violation kinds of the gate
+    When the subject moves to verifying and to shipped, and the kinds are mapped to their codes and reasons
+    Then the first move is refused with SUBJECT_INVALID and the reason OPEN_BLOCKER, the ship with FALSE_SUCCESS and OPEN_BLOCKER as the entries of details, no data, every entry has its own registered code and reason (a debug build checks each entry), and only the kinds that ask for a different fix under one code are reasons
 
   # canon: {"schema":1,"at":"2026-11-04T11:59:03Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
@@ -118,8 +118,8 @@ Feature: atip reasons
   @atip.reasons.12
   Scenario: Every call site that reads answers its subject's UNAVAILABLE code for an EIO, shown through the real binary with the debug seam
     Given a repository with a brief, a scenario, evidence with an artifact, a dispatch run, a strategy and a ledger in the old layout, and the seam
-    When each command that reads a file or a directory runs with its path matched by the seam
-    Then each answers its subject's UNAVAILABLE code (exit 2, retryable, no data, the system's error in the message), the code is in canon schema for the command, and every UNAVAILABLE code of the registry is driven or is no read
+    When each command that reads a file or a directory runs with its path matched by the seam, and each reader of the plan corpus (dispatch begin, evidence add, evidence approval-payload, task done, ingest plans) runs with a canon.yaml that is refused, a directory or not UTF-8
+    Then the readers of the plan corpus answer PLAN_CORPUS_UNAVAILABLE, CONFIG_DENIED or CONFIG_INVALID by the cause, and each its subject's UNAVAILABLE code (exit 2, retryable, no data, the system's error in the message), the code is in canon schema for the command, and every UNAVAILABLE code of the registry is driven or is no read
 
   # canon: {"schema":1,"at":"2026-11-04T11:59:34Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
@@ -137,6 +137,6 @@ Feature: atip reasons
   @flow:canon-0-36-code-reasons.F5
   @atip.reasons.14
   Scenario: A Postgres DSN that is set and cannot be reached is RETENTION_TIERS_UNAVAILABLE, an unset one RETENTION_TIERS_REQUIRED
-    Given a canon.yaml whose hot tier is Postgres, and a DSN that is unset, then one that names a host that does not resolve
-    When export runs
-    Then the unset DSN is RETENTION_TIERS_REQUIRED and not retryable, the unreachable one is RETENTION_TIERS_UNAVAILABLE and retryable, with no data and nothing written
+    Given a canon.yaml whose hot tier is Postgres, and a DSN that is unset, then empty, then malformed, then one that names a host that does not resolve
+    When export, purge, query and tier age run
+    Then the unset DSN is RETENTION_TIERS_REQUIRED and not retryable, the unreachable one is RETENTION_TIERS_UNAVAILABLE and retryable (REPO_UNAVAILABLE for query, TIER_UNAVAILABLE for tier age, the message saying the tier did not answer), and an empty or malformed DSN is RETENTION_TIERS_INVALID (CONFIG_INVALID with reason TIERS for query and tier age) and not retryable, with no data and nothing written

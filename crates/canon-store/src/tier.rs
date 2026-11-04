@@ -270,7 +270,7 @@ pub enum StoreError {
         deleted: usize,
         reason: String,
     },
-    #[error("{}", tier_unavailable_message(*rung, *backend, reason))]
+    #[error("{}", tier_unavailable_message(*rung, *backend, reason, *configured))]
     TierUnavailable { rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: String, configured: bool },
     #[error("{} backend is not attached ({reason})", backend.as_str())]
     BackendUnattached { backend: crate::policy::Backend, reason: String },
@@ -305,8 +305,11 @@ fn partial_purge_message(rung: crate::policy::Rung, backend: crate::policy::Back
     )
 }
 
-fn tier_unavailable_message(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: &str) -> String {
+/// The text of a tier that cannot be used: `is not attached` when its settings are not there, and `did not answer` when they are and the backend
+/// did not (`canon-cli` reads the second as a read a repeat can pass).
+fn tier_unavailable_message(rung: crate::policy::Rung, backend: Option<crate::policy::Backend>, reason: &str, configured: bool) -> String {
     match backend {
+        Some(b) if configured => format!("{} tier ({}) did not answer ({reason})", rung.as_str(), b.as_str()),
         Some(b) => format!("{} tier ({}) is not attached ({reason})", rung.as_str(), b.as_str()),
         None => format!("{} tier is not configured ({reason})", rung.as_str()),
     }

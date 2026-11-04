@@ -158,6 +158,11 @@ pub enum PlansError {
     /// per construct, loud per configuration").
     #[error("{0}")]
     Config(String),
+    /// canon.yaml is there and cannot be read: the system refused it, failed it in a way a repeat can pass, or it is no UTF-8 file. Only a
+    /// canon.yaml that is not there is the first-run state with no plan sources; answering zero sources for any other read would hide a `plans:`
+    /// section that is there. [`PlansError::cli_error`] tells the causes apart.
+    #[error("cannot read `{path}`: {source}")]
+    CanonYamlRead { path: String, source: std::io::Error },
     #[error(transparent)]
     Policy(#[from] TierPolicyError),
     #[error(transparent)]
@@ -170,6 +175,18 @@ pub enum PlansError {
     /// (`INGEST_SOURCE_INVALID`, exit 2): one message per malformed construct, in the order of the sources.
     #[error("a plan source is malformed and yields nothing usable: {}", .0.join("; "))]
     SourcesInvalid(Vec<String>),
+}
+
+impl PlansError {
+    /// The refusal for a canon.yaml the plan corpus could not read (`PLAN_CORPUS_UNAVAILABLE`, `CONFIG_DENIED`, `CONFIG_INVALID`), the same
+    /// one for every command that reads the corpus (`dispatch begin --task`, `evidence add --task`, `task done`, `ingest plans`); `None` for any other
+    /// failure, which each command answers with its own code.
+    pub(crate) fn cli_error(&self) -> Option<crate::cli_error::CliError> {
+        match self {
+            Self::CanonYamlRead { source, .. } => Some(crate::read_cause::plan_canon_yaml_error(source, self.to_string())),
+            _ => None,
+        }
+    }
 }
 
 /// [`crate::tiers::build_lenient_tiers`]'s relocated error type
@@ -839,17 +856,16 @@ pub(crate) fn declared_ids(repo: &Path) -> Result<(BTreeSet<String>, BTreeSet<St
 /// the fail-soft-on-absent vs fail-loud-on-present split, mirroring
 /// `crate::ingest::IngestSourceConfig::load`'s established pattern).
 fn configured_plan_sources(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
-    // Missing/unreadable canon.yaml: fail-soft (no config at all is a
+    // A canon.yaml that is not there: fail-soft (no config at all is a
     // legitimate first-run state) -- zero sources, same as an absent
-    // `plans:` section. A read the system failed in a way a repeat can
-    // pass is not "no config": answering zero sources would hide a `plans:`
-    // section that is there, so it is the error (`PLAN_CORPUS_UNAVAILABLE`).
+    // `plans:` section. Any other failure of the read (the system refused
+    // it, failed it for a repeat to pass, a directory or not UTF-8 text) is
+    // not "no config": answering zero sources would hide a `plans:` section
+    // that is there, so it is the error.
     let text = match canon_store::eio::read_to_string(canon_yaml_path) {
         Ok(text) => text,
-        Err(e) if crate::read_cause::of_io(&e) == crate::read_cause::Cause::Unavailable => {
-            return Err(PlansError::Config(format!("cannot read `{}`: {e}", canon_yaml_path.display())));
-        }
-        Err(_) => return Ok(Vec::new()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => return Err(PlansError::CanonYamlRead { path: canon_yaml_path.display().to_string(), source }),
     };
     // A PRESENT but non-YAML canon.yaml fails LOUD -- a syntax typo in
     // a canon.yaml meant to set `plans.sources` must never silently

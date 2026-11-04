@@ -261,6 +261,13 @@ impl PgTier {
     /// through the strict path.
     pub fn connect(dsn: &str, schema: &str) -> Result<Self, StoreError> {
         validate_schema_ident(schema)?;
+        // An empty or malformed DSN is a value the caller wrote, which no wait fixes: `StoreError::Policy`, not a backend that did not answer.
+        if dsn.trim().is_empty() {
+            return Err(StoreError::Policy("the Postgres DSN is empty; set it to a `postgres://user:password@host:port/database` URL".to_string()));
+        }
+        if let Err(e) = dsn.parse::<sqlx::postgres::PgConnectOptions>() {
+            return Err(StoreError::Policy(format!("the Postgres DSN is malformed ({e}); set it to a `postgres://user:password@host:port/database` URL")));
+        }
         let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
         let pool = rt.block_on(async {
             let pool = sqlx::postgres::PgPoolOptions::new()

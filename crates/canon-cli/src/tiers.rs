@@ -100,6 +100,15 @@ pub struct LoadedTiers {
     pub unreachable: BTreeMap<Rung, String>,
 }
 
+impl LoadedTiers {
+    /// The registry of the tiers that attached, naming the rungs that did not answer ([`Self::unreachable`]) so a use of one is a tier that is
+    /// down (`configured`), not one that is not configured: the one way a command that reads through the tiers builds its registry.
+    pub fn into_registry(self) -> canon_store::registry::TierRegistry {
+        let Self { policy, git, pg, r2, sqlite, unreachable, .. } = self;
+        unreachable.into_iter().fold(canon_store::registry::TierRegistry::new(policy, git, pg, r2, sqlite), |registry, (rung, reason)| registry.with_unreachable(rung, reason))
+    }
+}
+
 /// `canon_yaml_path`'s own directory (not the process's CWD) -- the
 /// PROJECT root every `canon.yaml`-relative path (`tiers.local.root`,
 /// `tiers.<rung>.path` for a sqlite-backed rung, and s16's

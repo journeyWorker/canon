@@ -194,6 +194,11 @@ pub enum DispatchError {
     #[error("resolving --task `{task_id}` against the plan corpus: {detail}")]
     PlanCorpus { task_id: String, detail: String },
 
+    /// canon.yaml, where the plan corpus is configured, could not be read ([`crate::plans::PlansError::CanonYamlRead`]): the refusal is the
+    /// plan corpus's own for every command that reads it (`PLAN_CORPUS_UNAVAILABLE`, `CONFIG_DENIED` or `CONFIG_INVALID` by the cause).
+    #[error("resolving --task `{task_id}` against the plan corpus: {}", .error.message)]
+    PlanConfig { task_id: String, error: CliError },
+
     /// `canon dispatch end <id>` found no manifest for `<id>`.
     /// Names the id AND the path consulted, so the usual cause — a run
     /// begun against a DIFFERENT repo root — is readable straight off
@@ -287,6 +292,7 @@ impl DispatchError {
             | Self::TaskNotFound { .. }
             | Self::NoPlanSources { .. }
             | Self::PlanCorpus { .. }
+            | Self::PlanConfig { .. }
             | Self::NoSuchRun { .. }
             | Self::AlreadyEnded { .. }
             | Self::NotRunning { .. }
@@ -320,6 +326,7 @@ impl DispatchError {
             Self::TaskNotFound { .. } => "TASK_NOT_FOUND",
             Self::NoPlanSources { .. } => "PLAN_SOURCES_REQUIRED",
             Self::PlanCorpus { detail, .. } => crate::read_cause::plan_corpus_code_of_text(detail),
+            Self::PlanConfig { error, .. } => error.code,
             Self::NoSuchRun { .. } => "DISPATCH_RUN_NOT_FOUND",
             Self::AlreadyEnded { .. } | Self::NotRunning { .. } => "DISPATCH_CONFLICT",
             Self::RunIdMismatch { .. } => "DISPATCH_MANIFEST_CORRUPT",
@@ -339,6 +346,7 @@ impl DispatchError {
             Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task can resolve against it".to_string(),
             Self::PlanCorpus { detail, .. } if crate::read_cause::of_text(detail) == crate::read_cause::Cause::Unavailable => "the system failed the read of the plan document in a way a repeat can pass: wait a moment, then run the command again".to_string(),
             Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
+            Self::PlanConfig { error, .. } => error.hint_text().unwrap_or_default().to_string(),
             Self::NoSuchRun { .. } => "pass the run id `canon dispatch begin` printed for this repository".to_string(),
             Self::AlreadyEnded { .. } => "the run is closed; start a new one with `canon dispatch begin`".to_string(),
             Self::NotRunning { .. } => "only a run in the running state can be ended; start a new one with `canon dispatch begin`".to_string(),
@@ -358,6 +366,11 @@ impl DispatchError {
         match self {
             Self::AlreadyEnded { .. } => error = error.reason("ALREADY_ENDED"),
             Self::NotRunning { .. } => error = error.reason("NOT_RUNNING"),
+            Self::PlanConfig { error: inner, .. } => {
+                if let Some(reason) = inner.reason_name() {
+                    error = error.reason(reason);
+                }
+            }
             _ => {}
         }
         error
@@ -706,7 +719,10 @@ fn sha256_digest(bytes: &[u8]) -> String {
 pub(crate) fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchError> {
     let named = || task_id.as_str().to_string();
     let sources = crate::plans::load_plan_sources_from_config(&repo.join("canon.yaml"), repo)
-        .map_err(|e| DispatchError::PlanCorpus { task_id: named(), detail: e.to_string() })?;
+        .map_err(|e| match e.cli_error() {
+            Some(error) => DispatchError::PlanConfig { task_id: named(), error },
+            None => DispatchError::PlanCorpus { task_id: named(), detail: e.to_string() },
+        })?;
     if sources.is_empty() {
         return Err(DispatchError::NoPlanSources { task_id: named() });
     }

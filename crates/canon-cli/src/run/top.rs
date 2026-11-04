@@ -8,6 +8,10 @@ use std::process::ExitCode;
 /// The error of a query that could not read the ledger: `REPO_UNAVAILABLE` (exit 2, retryable) when the system failed the read in a way a
 /// repeat can pass, because a query only reads and no work is left half done (spec 8.3); `QUERY_FAILED` for any other failure.
 fn query_failure(message: &str) -> CliError {
+    // A tier the caller configured wrongly (a malformed or empty DSN: `policy: …`) is a refusal of the configuration, which waiting does not fix.
+    if message.starts_with("policy: ") {
+        return crate::read_cause::repo_error(message);
+    }
     crate::read_cause::unavailable_before_work(message).unwrap_or_else(|| CliError::failed("QUERY_FAILED", message).hint("run `canon inventory sync` to rebuild the index, then run the query again"))
 }
 

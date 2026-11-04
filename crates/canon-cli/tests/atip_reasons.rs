@@ -146,6 +146,7 @@ const AUDIT: &[Row] = &[
     ("SUBJECT_CONFLICT", "APPROVED_BRIEF", "leave the change adopted"),
     ("SUBJECT_CONFLICT", "FLOW_TAGGED", "retag the scenarios, then unadopt"),
     ("SUBJECT_CONFLICT", "TRANSITION", "ask for an allowed transition"),
+    ("SUBJECT_INVALID", "FALSE_SUCCESS", "fix the behavior the audit refuted and record a newer audit"),
     ("SUBJECT_INVALID", "MALFORMED_EVIDENCE", "fix or remove the unreadable record"),
     ("SUBJECT_INVALID", "OPEN_BLOCKER", "close the blocker finding"),
 ];
@@ -172,11 +173,11 @@ const GATE_AUDIT: &[(&str, &str, &str, &str)] = &[
     ("old-layout", "LAYOUT_MIGRATION_REQUIRED", "", "run canon migrate"),
     ("malformed-evidence", "SUBJECT_INVALID", "MALFORMED_EVIDENCE", "fix or remove the unreadable record"),
     ("open-blocker", "SUBJECT_INVALID", "OPEN_BLOCKER", "close the blocker finding"),
-    // Reported by `gate check` and `gate task` as data, raised by no transition: no reason until one raises them.
+    ("false-success", "SUBJECT_INVALID", "FALSE_SUCCESS", "fix the behavior the audit refuted and record a newer audit"),
+    // Reported by `gate check` as data, raised by no transition: no reason until one raises them.
     ("trust-below-required", "SUBJECT_INVALID", "", "raise the trust of the evidence"),
     ("flagged", "SUBJECT_INVALID", "", "ask the human to clear the flag"),
     ("fabricated-evidence", "SUBJECT_INVALID", "", "record the evidence again with its real result"),
-    ("false-success", "SUBJECT_INVALID", "", "record a newer audit"),
 ];
 
 fn audit_by_code() -> BTreeMap<&'static str, Vec<(&'static str, &'static str)>> {
@@ -283,18 +284,39 @@ fn atip_reasons_02_every_reason_a_source_raises_is_registered_and_every_register
     let unregistered: Vec<&String> = raised.iter().filter(|name| !registered.contains(name.as_str())).collect();
     assert!(unregistered.is_empty(), "raised as a reason and registered under no code: {unregistered:?}");
 
-    // A reason is raised by a literal, or is the code of a refusal that a later step met (`<SUBJECT>_INCOMPLETE`), or comes from the `atip` crate (the
-    // cursor's own reasons), or is chosen by a table the sources hold (the `reason` of a constraint row).
+    // A reason is raised where its code is: some source file names both `"CODE"` and `"REASON"`. A reason that is also the name of a code (the
+    // `_INCOMPLETE` codes say the code of the refusal a later step met: `WRITE_FAILED`, `REPO_DENIED`, `PROMOTION_INVALID`, ...) must be named there
+    // other than as the code itself being built (`refused("REPO_DENIED", …)`, `Cause::new("PROMOTION_INVALID", …)`, `code: "…"`), so a registered
+    // reason whose site was deleted is reported even when its name is still a live code in the same file. The cursor's own reasons come from the
+    // `atip` crate.
     let sources = raising_sources();
-    let literal = |name: &str| sources.iter().any(|(_, text)| text.contains(&format!("\"{name}\"")));
     let external: &[&str] = &["ARGUMENTS_CHANGED", "EXPIRED", "FOREIGN"];
+    const CODE_BUILDERS: [&str; 6] = ["refused(\"", "failed(\"", "refuse(\"", "Cause::new(\"", "code: \"", "code_info(\""];
+    let names_as_reason = |text: &str, name: &str| -> bool {
+        let quoted = format!("\"{name}\"");
+        let is_code = code_info(name).is_some();
+        text.match_indices(&quoted).any(|(at, _)| !is_code || !CODE_BUILDERS.iter().any(|builder| text[..at + 1].ends_with(builder)))
+    };
+    // The one reason raised from a variable: `promote_after_stage` gives the `_INCOMPLETE` code of the staged record the code of the gate's refusal
+    // as its reason (`.reason(refusal.error.code)`), which is `PROMOTION_INVALID` for the three subjects below.
+    let dynamic = |code: &str, name: &str| {
+        ["DIVERGENCE_INCOMPLETE", "EVIDENCE_INCOMPLETE", "FINDING_INCOMPLETE"].contains(&code)
+            && name == "PROMOTION_INVALID"
+            && sources.iter().any(|(file, text)| file.ends_with("gate.rs") && text.contains(".reason(refusal.error.code)"))
+    };
     let unraised: Vec<String> = all_codes()
         .iter()
         .flat_map(|info| info.reasons.iter().map(move |r| (info.code, r.reason)))
-        .filter(|(_, name)| !external.contains(name) && !literal(name))
+        .filter(|(_, name)| !external.contains(name))
+        .filter(|(code, name)| !dynamic(code, name) && !sources.iter().any(|(_, text)| text.contains(&format!("\"{code}\"")) && names_as_reason(text, name)))
         .map(|(code, name)| format!("{code}/{name}"))
         .collect();
-    assert!(unraised.is_empty(), "registered and raised by no site: {unraised:?}");
+    assert!(unraised.is_empty(), "registered and raised by no site (no source file names both the code and the reason): {unraised:?}");
+    // The check can fail: a reason no source names, and a code-named reason that sources name only as the code being built, are reported.
+    let phantom = [("CONFIG_INVALID", "NO_SUCH_REASON_ANYWHERE")];
+    assert!(phantom.iter().all(|(code, name)| !sources.iter().any(|(_, text)| text.contains(&format!("\"{code}\"")) && names_as_reason(text, name))));
+    assert!(!names_as_reason("CliError::refused(\"REPO_DENIED\", message)", "REPO_DENIED"), "building the code is not raising it as a reason");
+    assert!(names_as_reason("(\"ARTIFACTS_X\", Some(\"REPO_DENIED\"))", "REPO_DENIED"));
 }
 
 /// atip.reasons.03: a name may stand under several codes, because the namespace is the code's; the names the contract resolved by namespace stay.
@@ -499,8 +521,9 @@ fn atip_reasons_06_a_brief_that_cannot_be_read_and_a_brief_with_blockers_are_bri
 
 // ── F4: the gate ──
 
-/// atip.reasons.07: a transition the gate refuses for an open blocker finding answers `SUBJECT_INVALID` with the reason `OPEN_BLOCKER`; the entries
-/// of `error.details` each carry their own code and, where the code has reasons for the kind, the registered reason.
+/// atip.reasons.07: a transition the gate refuses answers `SUBJECT_INVALID` with the reason of the kind that asks for its own fix: `OPEN_BLOCKER`
+/// for an open blocker finding, and, when a ship is refused for several causes (an open blocker and a refuted audit), every entry of `error.details`
+/// carries its own code and its own registered reason (`OPEN_BLOCKER`, `FALSE_SUCCESS`), which the debug assertion of `emit` also checks.
 #[test]
 fn atip_reasons_07_a_refused_transition_names_the_kind_that_asks_for_a_different_fix_and_every_detail_has_its_own_code() {
     let dir = TempDir::new().unwrap();
@@ -515,15 +538,51 @@ fn atip_reasons_07_a_refused_transition_names_the_kind_that_asks_for_a_different
     assert!(document.get("data").is_none(), "a refusal carries no data: {document}");
     assert!(document["error"]["message"].as_str().unwrap().contains("open-blocker"), "{document}");
 
-    // Several causes: each is an entry with its own code, and a reason only if its code registers it.
-    for detail in document["error"].get("details").and_then(Value::as_array).into_iter().flatten().chain(std::iter::once(&document["error"])) {
+    // The blocker is fixed and the scenario evidenced: the subject reaches verifying.
+    ok(d, &["gate", "promote"]);
+    ok(d, &["evidence", "add", "--scenario", "cart.add.01", "--project", "root", "--class", "test-run", "--ref", "cargo test cart_add", "--role", "implementer", "--actor", "impl-agent", "--promote"]);
+    ok(d, &["subject", "move", "cart", "--to", "verifying"]);
+
+    // Several causes: an evaluator refutes the scenario and a reviewer raises a new blocker, so the ship is refused for both.
+    fs::create_dir_all(d.join("reports")).unwrap();
+    fs::write(d.join("reports/c.xml"), "<testsuite><testcase name=\"cart.add.01: x\"><failure/></testcase></testsuite>").unwrap();
+    let digest = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0";
+    ok(
+        d,
+        &["evidence", "audit", "cart.add.01", "--project", "root", "--ref", "testjack run 42", "--role", "auditor", "--actor", "testjack", "--evaluator", "testjack", "--evaluator-version", "1.4.0", "--evaluator-digest", digest, "--audit-result", "refuted", "--report", "junit:reports/c.xml", "--promote"],
+    );
+    ok(d, &["finding", "add", "--change", "c-cart", "--round", "2", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor", "rev", "--summary", "blocks again", "--promote"]);
+    let out = canon(d, &["subject", "move", "cart", "--to", "shipped"]);
+    let document = assert_refusal(&out, "SUBJECT_INVALID", Some("FALSE_SUCCESS"));
+    let details = document["error"]["details"].as_array().unwrap_or_else(|| panic!("several causes are details: {document}"));
+    let reasons: BTreeSet<&str> = details.iter().filter_map(|detail| detail["reason"].as_str()).collect();
+    assert_eq!(reasons, BTreeSet::from(["FALSE_SUCCESS", "OPEN_BLOCKER"]), "{document}");
+    for detail in details {
         let code = detail["code"].as_str().unwrap();
         let row = code_info(code).unwrap_or_else(|| panic!("{code} is not registered"));
-        assert_eq!(detail["retryable"], row.retryable, "{detail}");
-        if let Some(reason) = detail.get("reason").and_then(Value::as_str) {
-            assert!(row.reasons.iter().any(|r| r.reason == reason), "{code} does not register {reason}: {detail}");
-        }
+        assert_eq!((detail["retryable"].as_bool().unwrap_or(false), out.status.code()), (row.retryable, Some(i32::from(row.exit))), "{detail}");
+        let reason = detail["reason"].as_str().unwrap();
+        assert!(row.reasons.iter().any(|r| r.reason == reason), "{code} does not register {reason}: {detail}");
     }
+}
+
+/// atip.reasons.07 (failure path): the debug assertion of `emit` looks at every entry of `error.details`, not only at the error: an entry with a
+/// reason its code does not register, or with another exit or `retryable` than its row, fails the answer.
+#[cfg(debug_assertions)]
+#[test]
+fn atip_reasons_07_the_emit_assertion_checks_every_detail_entry() {
+    use canon_cli::cli_error::{CliError, CliErrorExt as _};
+    let good = CliError::refused("SUBJECT_INVALID", "a").reason("OPEN_BLOCKER");
+    let unregistered = CliError::refused("SUBJECT_INVALID", "b").reason("NOT_A_REASON");
+    let foreign = CliError::refused("SUBJECT_INVALID", "c").reason("BLOCKERS");
+    for bad in [unregistered, foreign] {
+        let all = vec![good.clone(), bad];
+        let top = good.clone().details(all);
+        let answered = std::panic::catch_unwind(|| top.emit("canon status", false));
+        assert!(answered.is_err(), "a detail entry with a reason its code does not register was answered");
+    }
+    let fine = good.clone().details(vec![good.clone(), CliError::refused("SUBJECT_INVALID", "d").reason("FALSE_SUCCESS")]);
+    assert!(std::panic::catch_unwind(|| fine.emit("canon status", false)).is_ok(), "registered reasons in details are answered");
 }
 
 fn copy_tree(from: &Path, to: &Path) {
@@ -541,20 +600,27 @@ fn copy_tree(from: &Path, to: &Path) {
 
 // ── F5: a reason never changes the exit or the retryable value ──
 
-/// atip.reasons.08: a reason does not change the exit or `retryable` of its code: every error built for a code and each of its reasons has the row's
-/// exit and `retryable`; a different `retryable` is a different code (`ARTIFACTS_STORE_UNAVAILABLE` / `_REQUIRED`) and so is a different exit
-/// (`PROMOTION_INVALID` / `_FAILED`).
+/// atip.reasons.08: a reason does not change the exit or `retryable` of its code. The guard is the debug assertion of `emit` (it compares both with
+/// the registry row for the error and every detail entry; `exit` and `retryable` are public fields, so a site could set them): every error built for
+/// a code and each of its reasons is answered as built, and the same error with the other exit, or the other `retryable`, is refused. A different
+/// `retryable` is a different code (`ARTIFACTS_STORE_UNAVAILABLE` / `_REQUIRED`) and so is a different exit (`PROMOTION_INVALID` / `_FAILED`).
 #[test]
 fn atip_reasons_08_a_reason_never_changes_the_exit_or_the_retryable_value_and_a_different_one_is_a_different_code() {
     use canon_cli::cli_error::{CliError, CliErrorExt as _};
+    #[cfg(debug_assertions)]
     for info in all_codes().iter().filter(|info| !info.reasons.is_empty()) {
         for r in info.reasons {
-            let error = CliError::refused(info.code, "x").reason(r.reason);
-            assert_eq!((error.exit, error.retryable), (info.exit, info.retryable), "{}/{}: the reason changed the exit or the retryable value", info.code, r.reason);
-            assert_eq!(error.reason_name(), Some(r.reason));
-            let body = error.body();
-            assert_eq!(body.reason.as_deref(), Some(r.reason));
-            assert_eq!(body.retryable, info.retryable);
+            let built = CliError::refused(info.code, "x").reason(r.reason);
+            assert_eq!((built.exit, built.retryable, built.reason_name()), (info.exit, info.retryable, Some(r.reason)), "{}/{}", info.code, r.reason);
+            let answered = std::panic::catch_unwind(|| built.emit("canon status", false));
+            assert!(answered.is_ok(), "{}/{}: an error with the row's exit and retryable was refused", info.code, r.reason);
+            let mut other_exit = CliError::refused(info.code, "x").reason(r.reason);
+            other_exit.exit = if info.exit == 1 { 2 } else { 1 };
+            let mut other_retryable = CliError::refused(info.code, "x").reason(r.reason);
+            other_retryable.retryable = !info.retryable;
+            for changed in [other_exit, other_retryable] {
+                assert!(std::panic::catch_unwind(|| changed.emit("canon status", false)).is_err(), "{}/{}: an error with another exit or retryable than its row was answered", info.code, r.reason);
+            }
         }
     }
     let unavailable = code_info("ARTIFACTS_STORE_UNAVAILABLE").unwrap();

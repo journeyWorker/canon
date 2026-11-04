@@ -435,8 +435,11 @@ pub(crate) struct LocatedTask {
 /// the sources consulted, minus the `canon task done: ` prefix: every
 /// location failure is a usage failure (exit `2`) for the flip, so the
 /// caller needs no further discrimination between them.
-fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
-    let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|e| e.to_string())?;
+fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, LocateFailure> {
+    let sources = crate::plans::load_plan_sources_for_gate(repo).map_err(|plans_err| match plans_err.cli_error() {
+        Some(error) => LocateFailure::Corpus(error),
+        None => LocateFailure::NotFound(plans_err.to_string()),
+    })?;
     if sources.is_empty() {
         // Distinct from "consulted N sources, none held it": this repo
         // has no `.canon/changes/` and declares `plans.sources: []`
@@ -445,16 +448,16 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
         // here would blame a dialect the operator never configured —
         // the same refusal `crate::dispatch::DispatchError::NoPlanSources`
         // already makes for `--task`.
-        return Err(format!(
+        return Err(LocateFailure::NotFound(format!(
             "this repo configures no plan sources (no `{}` and no `plans.sources` entries in canon.yaml), so no plan document exists for {task_id} to live in — write the change with `canon change new`, or list your external plans under `plans.sources`",
             canon_model::paths::CHANGES_DIR
-        ));
+        )));
     }
     let mut consulted: Vec<String> = Vec::new();
     for src in &sources {
         consulted.push(format!("{} @ {}", src.dialect(), src.root().display()));
         let Some(entry) = src.entry() else {
-            return Err(format!("`{}` is not a registered plan dialect", src.dialect()));
+            return Err(LocateFailure::NotFound(format!("`{}` is not a registered plan dialect", src.dialect())));
         };
         // A dialect that registered no write-back capability at all
         // cannot own a flip — skip it for location (a later source may
@@ -467,7 +470,14 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
             return Ok(LocatedTask { write_back, document_path: location.document_path, source_root: src.root().to_path_buf() });
         }
     }
-    Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
+    Err(LocateFailure::NotFound(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; "))))
+}
+
+/// Why [`locate_task`] found no task: the plan corpus could not be read (canon.yaml, answered with its own refusal: `PLAN_CORPUS_UNAVAILABLE`,
+/// `CONFIG_DENIED` or `CONFIG_INVALID`), or it was read and does not hold the task (`TASK_NOT_FOUND`).
+enum LocateFailure {
+    Corpus(CliError),
+    NotFound(String),
 }
 
 /// `canon task done`: the task row flipped, or already done.
@@ -512,8 +522,9 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     // SAME source).
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
-        Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.clone()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
+        Err(LocateFailure::Corpus(error)) => return error.emit("canon task done", json),
+        Err(LocateFailure::NotFound(e)) => {
+            return CliError::refused("TASK_NOT_FOUND", e).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
         }
     };
 

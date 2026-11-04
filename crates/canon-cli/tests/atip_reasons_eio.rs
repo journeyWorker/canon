@@ -271,6 +271,8 @@ fn atip_reasons_12_the_dispatch_manifest_the_plan_corpus_and_the_run_lock_are_un
         &["dispatch", "begin", "--regime", regime, "--role", "dev", "--task", "add-login#1"][..],
         &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "x", "--role", "implementer"],
         &["evidence", "approval-payload", "--task", "add-login#1", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"],
+        &["task", "done", "add-login#1"],
+        &["ingest", "plans"],
     ] {
         let leaf: Vec<&str> = command.iter().take(2).copied().collect();
         unavailable(&run(d, Some("*/canon.yaml"), &[], command), "PLAN_CORPUS_UNAVAILABLE", &leaf);
@@ -283,6 +285,60 @@ fn atip_reasons_12_the_dispatch_manifest_the_plan_corpus_and_the_run_lock_are_un
     let document = body(&out);
     assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("DISPATCH_RUN_UNAVAILABLE"), Some(true)), "{document}");
     assert!(schema_lists(&["dispatch", "end"], "DISPATCH_RUN_UNAVAILABLE"));
+}
+
+/// atip.reasons.12: every reader of the plan corpus answers the same for a canon.yaml it cannot read, by the cause: `PLAN_CORPUS_UNAVAILABLE` for an
+/// `EIO`, `CONFIG_DENIED` for a read the system refuses, `CONFIG_INVALID` (reason `CANON_YAML`) for a directory or text that is not UTF-8, and never
+/// "no plan sources" (`PLAN_SOURCES_REQUIRED`), `TASK_NOT_FOUND` or `INGEST_FAILED`; a canon.yaml that is not there is still the first-run state.
+#[test]
+fn atip_reasons_12_every_reader_of_the_plan_corpus_answers_by_the_cause_of_an_unreadable_canon_yaml() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = repo();
+    let d = dir.path();
+    let regime = "dev/canon/join-spine/9c93d024b1a2";
+    let readers: [(&[&str], &[&str]); 5] = [
+        (&["dispatch", "begin", "--regime", regime, "--role", "dev", "--task", "add-login#1"], &["dispatch", "begin"]),
+        (&["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "x", "--role", "implementer"], &["evidence", "add"]),
+        (&["evidence", "approval-payload", "--task", "add-login#1", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], &["evidence", "approval-payload"]),
+        (&["task", "done", "add-login#1"], &["task", "done"]),
+        (&["ingest", "plans"], &["ingest", "plans"]),
+    ];
+    let canon_yaml = d.join("canon.yaml");
+    let original = fs::read(&canon_yaml).unwrap();
+    let refusal = |out: &Output, code: &str, reason: Option<&str>, leaf: &[&str]| {
+        let document = body(out);
+        let row = code_info(code).unwrap();
+        assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"].get("reason").and_then(Value::as_str)), (Some(2), Some(code), reason), "{leaf:?}: {document}");
+        assert_eq!(document["error"]["retryable"].as_bool(), Some(row.retryable), "{leaf:?}: {document}");
+        assert!(document.get("data").is_none(), "a refusal carries no data: {document}");
+        assert!(schema_lists(leaf, code), "canon schema {leaf:?} does not list {code}");
+    };
+    for (command, leaf) in readers {
+        // Not UTF-8 text, and a directory where the file belongs: the file is no canon.yaml, whatever the command.
+        fs::write(&canon_yaml, b"\xff\xfe not utf-8").unwrap();
+        refusal(&run(d, None, &[], command), "CONFIG_INVALID", Some("CANON_YAML"), leaf);
+        fs::remove_file(&canon_yaml).unwrap();
+        fs::create_dir(&canon_yaml).unwrap();
+        refusal(&run(d, None, &[], command), "CONFIG_INVALID", Some("CANON_YAML"), leaf);
+        fs::remove_dir(&canon_yaml).unwrap();
+        fs::write(&canon_yaml, &original).unwrap();
+        // A read the system refuses (`evidence add` and `evidence approval-payload` take the code tree of the repository first, which git cannot take
+        // with an unreadable file: `COMMIT_REQUIRED`, before the plan corpus is read).
+        if leaf[0] != "evidence" {
+            fs::set_permissions(&canon_yaml, fs::Permissions::from_mode(0o000)).unwrap();
+            let refused = run(d, None, &[], command);
+            fs::set_permissions(&canon_yaml, fs::Permissions::from_mode(0o644)).unwrap();
+            if fs::read(&canon_yaml).is_ok() && fs::File::open(&canon_yaml).is_ok() && refused.status.code() == Some(2) {
+                // The test runs as a user the mode binds (root is not bound by it, and reads the file).
+                refusal(&refused, "CONFIG_DENIED", None, leaf);
+            }
+        }
+        // An EIO: the same refusal for all five, retryable.
+        unavailable(&run(d, Some("*/canon.yaml"), &[], command), "PLAN_CORPUS_UNAVAILABLE", leaf);
+    }
+    // `task done` for a task the corpus does not hold is still `TASK_NOT_FOUND`, and `ingest plans` with canon.yaml readable is still the import.
+    let absent = body(&run(d, None, &[], &["task", "done", "add-login#9"]));
+    assert_eq!(absent["error"]["code"], "TASK_NOT_FOUND", "{absent}");
 }
 
 /// atip.reasons.12: `dispatch diff` reads the records of the plan tasks and the runs and degrades: a read the system fails for a repeat to pass is the
@@ -393,7 +449,7 @@ fn atip_reasons_12_every_unavailable_code_is_driven_by_a_test_here_or_is_no_read
     const DRIVEN: &[&str] = &[
         "ADAPTER_FILE_UNAVAILABLE", "ARTIFACTS_STORE_UNAVAILABLE", "BRIEF_UNAVAILABLE", "CONFIG_UNAVAILABLE", "DISPATCH_DIFF_RECORDS_UNAVAILABLE", "DISPATCH_MANIFEST_UNAVAILABLE", "DISPATCH_RUN_UNAVAILABLE",
         "EVIDENCE_BINDING_UNAVAILABLE", "HOOKS_FILE_UNAVAILABLE", "MIGRATION_UNAVAILABLE", "PLAN_CORPUS_UNAVAILABLE", "POLICY_APPROVAL_UNAVAILABLE", "POLICY_UNAVAILABLE", "REPO_UNAVAILABLE",
-        "RETENTION_TIERS_UNAVAILABLE", "REVIEW_ARTIFACT_UNAVAILABLE", "SPEC_ROOT_UNAVAILABLE", "STRATEGY_SIGNATURE_UNAVAILABLE",
+        "RETENTION_TIERS_UNAVAILABLE", "REVIEW_ARTIFACT_UNAVAILABLE", "SPEC_ROOT_UNAVAILABLE", "STRATEGY_SIGNATURE_UNAVAILABLE", "TIER_UNAVAILABLE",
     ];
     // Not an operating-system read: another process holds a lock (`REPO_LOCK_UNAVAILABLE`, `INVENTORY_INDEX_UNAVAILABLE`), the port is taken
     // (`DASHBOARD_PORT_UNAVAILABLE`), or the dashboard's snapshot warning (`DASHBOARD_SNAPSHOT_UNAVAILABLE`), each proved by the tests of its command.
@@ -460,4 +516,47 @@ fn atip_reasons_14_a_postgres_dsn_that_is_set_and_unreachable_is_unavailable_and
     assert!(document.get("data").is_none(), "a refusal carries no data: {document}");
     assert!(!d.join("out.json").exists(), "nothing was written");
     assert!(schema_lists(&["export"], "RETENTION_TIERS_UNAVAILABLE") && schema_lists(&["export"], "RETENTION_TIERS_REQUIRED"));
+
+    // `query` and `tier age` read through the same tiers: a tier that did not answer is `*_UNAVAILABLE` for them too, and its message says the tier "did not
+    // answer" (the DSN is set), not that it is "not attached (no live DSN)".
+    let query = run(d, None, &dsn, &["query", "--kind", "session"]);
+    let document = unavailable_tier(&query, "REPO_UNAVAILABLE", &["query"]);
+    assert!(!document["error"]["message"].as_str().unwrap().contains("no live DSN"), "{document}");
+    let age = run(d, None, &dsn, &["tier", "age"]);
+    unavailable_tier(&age, "TIER_UNAVAILABLE", &["tier", "age"]);
+    // With the DSN unset they say "not attached": no refusal a repeat can pass.
+    let unset_query = body(&run(d, None, &[], &["query", "--kind", "session"]));
+    assert_eq!(unset_query["error"]["code"], "QUERY_FAILED", "{unset_query}");
+    assert!(unset_query["error"]["message"].as_str().unwrap().contains("is not attached"), "{unset_query}");
+
+    // A DSN that is set and empty or malformed is a value the caller wrote, which no wait fixes: `RETENTION_TIERS_INVALID` for purge and export (not
+    // retryable), `CONFIG_INVALID` (reason `TIERS`) for `query` and `tier age`. Only a well-formed DSN is tried at all.
+    for bad in ["", "not a dsn", "postgres://no-port-and-a-space here/x"] {
+        let dsn = [("CANON_PG_DSN", bad)];
+        for command in [&["export", "--kind", "session", "--output", "out.json"][..], &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z"]] {
+            let out = run(d, None, &dsn, command);
+            let document = body(&out);
+            assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("RETENTION_TIERS_INVALID"), Some(false)), "{bad:?} {command:?}: {document}");
+            assert!(document["error"]["message"].as_str().unwrap().contains("DSN"), "{document}");
+            assert!(document.get("data").is_none() && !d.join("out.json").exists(), "a refusal changes nothing: {document}");
+        }
+        for command in [&["query", "--kind", "session"][..], &["tier", "age"]] {
+            let out = run(d, None, &dsn, command);
+            let document = body(&out);
+            assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"]["reason"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("CONFIG_INVALID"), Some("TIERS"), Some(false)), "{bad:?} {command:?}: {document}");
+        }
+    }
+    assert!(schema_lists(&["export"], "RETENTION_TIERS_INVALID") && schema_lists(&["purge"], "RETENTION_TIERS_INVALID"));
+}
+
+/// [`unavailable`] for a tier that did not answer: the message is the tier's own, not the system's `EIO`.
+fn unavailable_tier(out: &Output, code: &str, command: &[&str]) -> Value {
+    let document = body(out);
+    let row = code_info(code).unwrap_or_else(|| panic!("{code} is not registered"));
+    assert!(row.retryable && row.exit == 2, "{code}");
+    assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some(code), Some(true)), "{document}");
+    assert!(document.get("data").is_none(), "a refusal carries no data: {document}");
+    assert!(document["error"]["message"].as_str().is_some_and(|m| m.contains("did not answer")), "{document}");
+    assert!(schema_lists(command, code), "canon schema {command:?} does not list {code}");
+    document
 }

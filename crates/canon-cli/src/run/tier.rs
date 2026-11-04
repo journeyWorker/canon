@@ -14,7 +14,19 @@ pub fn run(cmd: TierCommand) -> ExitCode {
 /// `canon tier age`: the bare run previews the moves; `--commit --plan-digest`
 /// applies exactly that plan.
 fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCode {
-    let failed = |err: String| ExitCode::from(CliError::failed("TIER_FAILED", err).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again").emit("canon tier age", json));
+    // A failure before a record moved that is a read the system failed, or a tier that did not answer, is a refusal a repeat can pass
+    // (`TIER_UNAVAILABLE`); any other is `TIER_FAILED`.
+    let failed = |err: String| {
+        let error = if err.starts_with("policy: ") {
+            // A tier the caller configured wrongly (a malformed or empty DSN) is a refusal of the configuration, which waiting does not fix.
+            crate::read_cause::repo_error(err)
+        } else if crate::read_cause::of_text(&err) == crate::read_cause::Cause::Unavailable || crate::read_cause::tier_did_not_answer(&err) {
+            CliError::refused("TIER_UNAVAILABLE", err).hint("the tiers or the system failed in a way a repeat can pass: wait a moment, check that the tier backends are reachable, then run `canon tier age` again")
+        } else {
+            CliError::failed("TIER_FAILED", err).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again")
+        };
+        ExitCode::from(error.emit("canon tier age", json))
+    };
     let canon_yaml_path = crate::context::resolve_canon_yaml(repo);
     let loaded = match crate::tiers::build_tiers_for_read(&canon_yaml_path) {
         Ok(loaded) => loaded,

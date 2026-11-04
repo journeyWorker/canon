@@ -1741,6 +1741,7 @@
       "code": "SUBJECT_INVALID",
       "exit": 2,
       "reasons": [
+        "FALSE_SUCCESS",
         "MALFORMED_EVIDENCE",
         "OPEN_BLOCKER"
       ],
@@ -1793,6 +1794,11 @@
         "WRITE_FAILED"
       ],
       "retryable": false
+    },
+    {
+      "code": "TIER_UNAVAILABLE",
+      "exit": 2,
+      "retryable": true
     },
     {
       "code": "TRACE_CONFLICT",

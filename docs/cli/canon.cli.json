@@ -6894,6 +6894,8 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "DISPATCH_ARGUMENT_INVALID",
         "DISPATCH_CONFLICT",
         "DISPATCH_MANIFEST_CORRUPT",
@@ -19130,6 +19132,8 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
         "INGEST_FAILED",
         "INGEST_SOURCE_INVALID",
@@ -19138,6 +19142,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
+        "PLAN_CORPUS_UNAVAILABLE",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE",
@@ -26475,11 +26480,14 @@
       "effect": "read",
       "effectNote": "appends one line to .canon/audit/access.jsonl; a refused run writes none",
       "errors": [
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
         "CURSOR_INVALID",
         "INTERNAL",
         "QUERY_ARGUMENT_INVALID",
         "QUERY_FAILED",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "USAGE"
@@ -39891,6 +39899,7 @@
       ],
       "effect": "destructive",
       "errors": [
+        "CONFIG_INVALID",
         "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -39898,10 +39907,14 @@
         "INTERNAL",
         "LAYOUT_MIGRATION_REQUIRED",
         "PLAN_STALE",
+        "REPO_DENIED",
+        "REPO_INVALID",
         "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
         "ROLE_INVALID",
         "TIER_FAILED",
         "TIER_INCOMPLETE",
+        "TIER_UNAVAILABLE",
         "USAGE",
         "WRITE_DENIED",
         "WRITE_FAILED",
@@ -42358,6 +42371,11 @@
       "meaning": "the status transition breaks a rule of the gate that is not a missing approval, review or evidence; error.details names each cause when there are several",
       "reasons": [
         {
+          "fix": "Fix the behavior the audit refuted, re-attest it, record the evaluator's new audit (`canon evidence audit <SCENARIO_ID>`), then run `canon subject move` again.",
+          "meaning": "a scenario the transition rests on has a latest audit that is `refuted`: an external evaluator found its declared success false, and a `faithful` verdict does not override it",
+          "reason": "FALSE_SUCCESS"
+        },
+        {
           "fix": "Fix or remove the record `error.details` names, then run `canon subject move` again.",
           "meaning": "a record the gate reads to judge the transition does not parse or lacks a required field, so it counts as no evidence and the gate fails closed",
           "reason": "MALFORMED_EVIDENCE"
@@ -42439,6 +42457,13 @@
         }
       ],
       "retryable": false
+    },
+    {
+      "code": "TIER_UNAVAILABLE",
+      "exit": 2,
+      "fix": "Wait a moment, check that the tier backends are reachable, then run tier aging again.",
+      "meaning": "tier aging could not read a tier before it moved any record: a tier backend whose settings are all there did not answer (a Postgres DSN that is set and cannot be reached), or the system failed the read of a file in a way a repeat can pass; nothing was moved",
+      "retryable": true
     },
     {
       "code": "TRACE_CONFLICT",

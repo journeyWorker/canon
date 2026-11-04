@@ -7,11 +7,12 @@
 //! Only `subject move` raises the classes; promotion raises only `malformed-evidence`.
 //!
 //! A class is a reason only where the next action differs inside one code (spec 7.6, the contract author's rule) and a transition raises it:
-//! `SUBJECT_INVALID` has the reasons `MALFORMED_EVIDENCE` (a record the gate fails closed on: fix or remove it) and `OPEN_BLOCKER` (close the
-//! blocker finding), the two classes `subject move` raises under it. The other four classes that map to it (`trust-below-required`, `flagged`,
-//! `fabricated-evidence`, `false-success`) are reported by `gate check` and `gate task` and raised by no transition, so they have no reason
-//! until one does. The five classes that name their own code (`SUBJECT_APPROVAL_REQUIRED`, `EVIDENCE_STALE`, `LAYOUT_MIGRATION_REQUIRED`)
-//! carry none, and promotion has one situation and no reason.
+//! `SUBJECT_INVALID` has the reasons `FALSE_SUCCESS` (fix the behavior and record a newer audit: `subject move --to shipped` raises it for a scenario
+//! whose latest audit is refuted), `MALFORMED_EVIDENCE` (a record the gate fails closed on: fix or remove it) and `OPEN_BLOCKER` (close the blocker
+//! finding), the three classes `subject move` raises under it. The other three classes that map to it (`trust-below-required`, `flagged`,
+//! `fabricated-evidence`) are reported by `gate check` as data and raised by no transition, so they have no reason until one does. The classes that
+//! name their own code (`SUBJECT_APPROVAL_REQUIRED`, `EVIDENCE_STALE`, `LAYOUT_MIGRATION_REQUIRED`) carry none, and promotion has one situation and
+//! no reason.
 
 use canon_gate::FailureClass;
 
@@ -27,13 +28,14 @@ pub fn subject_code(class: FailureClass) -> &'static str {
     }
 }
 
-/// The reason of a refusal of a status transition for a violation of `class`: the two classes a transition raises under `SUBJECT_INVALID` are
+/// The reason of a refusal of a status transition for a violation of `class`: the three classes a transition raises under `SUBJECT_INVALID` are
 /// told apart by what to fix; a class that has its own code, or that no transition raises, has none (module doc).
 pub fn subject_reason(class: FailureClass) -> Option<&'static str> {
     match class {
+        FailureClass::FalseSuccess => Some("FALSE_SUCCESS"),
         FailureClass::MalformedEvidence => Some("MALFORMED_EVIDENCE"),
         FailureClass::OpenBlocker => Some("OPEN_BLOCKER"),
-        FailureClass::TrustBelowRequired | FailureClass::Flagged | FailureClass::FabricatedEvidence | FailureClass::FalseSuccess => None,
+        FailureClass::TrustBelowRequired | FailureClass::Flagged | FailureClass::FabricatedEvidence => None,
         FailureClass::UnreviewedPromotion | FailureClass::UncoveredCell | FailureClass::UnevidencedFlip | FailureClass::StaleEvidence | FailureClass::OldLayout => None,
     }
 }

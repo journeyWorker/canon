@@ -171,6 +171,9 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
         Err(err) => {
             let error = match &err {
                 crate::plans::PlansError::Unavailable(error) => error.clone(),
+                // canon.yaml, where the sources are configured, cannot be read: nothing was persisted, and it is the refusal every plan-corpus
+                // reader gives (`PLAN_CORPUS_UNAVAILABLE`, `CONFIG_DENIED` or `CONFIG_INVALID`).
+                crate::plans::PlansError::CanonYamlRead { .. } => err.cli_error().expect("a canon.yaml read has its refusal"),
                 // Several malformed constructs are `error.details`, one entry each: nothing was persisted.
                 crate::plans::PlansError::SourcesInvalid(causes) => crate::gate_refusal::refusal(
                     causes.iter().map(|cause| crate::gate_refusal::Cause::new("INGEST_SOURCE_INVALID", cause.clone())).collect(),

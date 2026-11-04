@@ -129,12 +129,18 @@ pub(crate) fn repo_io_error(message: impl Into<String>) -> CliError {
     }
 }
 
+/// Whether the text of an error says a tier whose settings are all there did not answer (`canon_store`'s `TierUnavailable` with `configured`): a
+/// backend that is down, which a repeat can pass.
+pub(crate) fn tier_did_not_answer(text: &str) -> bool {
+    text.contains(") did not answer (")
+}
+
 /// A read that failed before any work was done: the repository's retryable `REPO_UNAVAILABLE` when the system failed it in a way a repeat can
 /// pass, and `None` for any other failure, which the caller answers with its own `_FAILED` or `_INCOMPLETE` code. A command that failed
 /// before it began changes nothing, so it is a refusal (exit 2, retryable) and not a failure (spec 8.3); only a failure after work started is
 /// the command's `_FAILED` or `_INCOMPLETE`.
 pub(crate) fn unavailable_before_work(message: &str) -> Option<CliError> {
-    (of_text(message) == Cause::Unavailable).then(|| CliError::refused("REPO_UNAVAILABLE", message).hint(REPO_UNAVAILABLE_HINT))
+    (of_text(message) == Cause::Unavailable || tier_did_not_answer(message)).then(|| CliError::refused("REPO_UNAVAILABLE", message).hint(REPO_UNAVAILABLE_HINT))
 }
 
 /// The codes a subject has for a file it cannot read: the one for each cause of [`Cause`] it tells apart.
@@ -201,6 +207,20 @@ const HOOKS_FILE: FileCodes = FileCodes { denied: "HOOKS_FILE_DENIED", invalid: 
 pub(crate) fn plan_corpus_code(e: &std::io::Error) -> &'static str {
     PLAN_CORPUS_FILE.of(e)
 }
+
+/// The refusal for a canon.yaml the plan corpus could not read, by the cause of `e`: `PLAN_CORPUS_UNAVAILABLE` when the system failed the read
+/// in a way a repeat can pass, `CONFIG_DENIED` when it refused it, `CONFIG_INVALID` (reason `CANON_YAML`) when it is no file or no UTF-8 text.
+pub(crate) fn plan_canon_yaml_error(e: &std::io::Error, message: impl Into<String>) -> CliError {
+    let message = message.into();
+    match of_io(e) {
+        Cause::Unavailable => CliError::refused("PLAN_CORPUS_UNAVAILABLE", message).hint(PLAN_CORPUS_UNAVAILABLE_HINT),
+        Cause::Denied => CliError::refused("CONFIG_DENIED", message).hint("make canon.yaml readable by this user, then run the command again"),
+        _ => CliError::refused("CONFIG_INVALID", message).reason("CANON_YAML").hint("make canon.yaml a UTF-8 text file that parses (`canon init --check` reports what is wrong), then run the command again"),
+    }
+}
+
+/// The next step of a plan corpus the system failed to read in a way a repeat can pass.
+pub(crate) const PLAN_CORPUS_UNAVAILABLE_HINT: &str = "the system failed the read of the plan corpus in a way a repeat can pass: wait a moment, then run the command again";
 
 /// [`plan_corpus_code`] for a failure known only as the text of the error.
 pub(crate) fn plan_corpus_code_of_text(text: &str) -> &'static str {

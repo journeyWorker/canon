@@ -11,7 +11,6 @@
 
 use canon_model::envelope::RecordKind;
 use canon_store::policy::Rung;
-use canon_store::registry::TierRegistry;
 use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Duration, Utc};
 
@@ -82,7 +81,7 @@ pub fn preview(loaded: &tiers::LoadedTiers) -> Result<Planned, TierAgeError> {
 /// Apply every aging rule (the real run), reporting `candidates` from `planned`.
 pub fn apply(loaded: tiers::LoadedTiers, planned: &[AgeRuleReport]) -> Result<Vec<AgeRuleReport>, TierAgeError> {
     let policy = loaded.policy.clone();
-    let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
+    let registry = loaded.into_registry();
     let age_reports = registry.age_all()?;
     // `tier-age-after-move` (a debug build's test seam, `incomplete::injected_stop`): the aging stops once the records are moved.
     if let Some(stop) = crate::incomplete::injected_stop("tier-age-after-move") {

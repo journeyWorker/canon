@@ -27,7 +27,6 @@ use canon_plugin::manifest::snapshot::OverlayDecl;
 use canon_plugin::{project_overlay, resolve_plugin_snapshot, Diagnostic as PluginDiagnostic};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
-use canon_store::registry::TierRegistry;
 use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -487,7 +486,7 @@ pub fn run(
     let canon_yaml_path = resolve_canon_yaml(repo);
     let loaded = tiers::build_lenient_tiers_for_kind_read(&canon_yaml_path, kind)?;
     let archive = if history && canon_store::archive::is_archived_kind(kind) { loaded.git.as_ref().and_then(GitTier::archive_tier) } else { None };
-    let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
+    let registry = loaded.into_registry();
 
     let mut query = TierQuery::kind(kind);
     if let Some(since) = since {
@@ -997,7 +996,7 @@ pub fn run_with_plugin(
     let project_dir = tiers::project_dir(&canon_yaml_path).to_path_buf();
     let git_root = loaded.git.as_ref().map(|g| g.root().to_path_buf());
 
-    let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
+    let registry = loaded.into_registry();
 
     let mut query = TierQuery::kind(kind);
     if let Some(since) = since {

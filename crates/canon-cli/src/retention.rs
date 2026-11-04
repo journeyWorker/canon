@@ -185,8 +185,7 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
 fn loaded_registry(repo: &Path, kind: RecordKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
     let yaml = resolve_canon_yaml(repo);
     let loaded = if read_only { tiers::build_lenient_tiers_for_kind_read(&yaml, kind)? } else { tiers::build_lenient_tiers_for_kind(&yaml, kind)? };
-    let unreachable = loaded.unreachable;
-    let registry = unreachable.into_iter().fold(TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite), |registry, (rung, reason)| registry.with_unreachable(rung, reason));
+    let registry = loaded.into_registry();
     Ok((yaml, registry))
 }
 
