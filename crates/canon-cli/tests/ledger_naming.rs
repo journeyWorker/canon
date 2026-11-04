@@ -647,7 +647,7 @@ fn ledger_naming_12_the_write_result_line_names_the_file_under_the_new_rule() {
 
 // ── ledger.naming.13 ─────────────────────────────────────────────────────
 
-/// ledger.naming.13: FINDING_SEQ_OCCUPIED quotes `<change id>_2_3`, and a promote refusal quotes the same key.
+/// ledger.naming.13: FINDING_EXISTS quotes `<change id>_2_3`, and a promote refusal quotes the same key.
 #[test]
 fn ledger_naming_13_messages_that_quote_a_key_quote_the_typed_key() {
     let dir = repo30(1);
@@ -657,7 +657,7 @@ fn ledger_naming_13_messages_that_quote_a_key_quote_the_typed_key() {
     let again = add("second");
     assert!(!again.status.success());
     let message = text(&again);
-    assert!(message.contains("FINDING_SEQ_OCCUPIED"), "{message}");
+    assert!(message.contains("FINDING_EXISTS"), "{message}");
     assert!(message.contains("add-login_2_3 is already occupied"), "the typed key: {message}");
     assert!(!message.contains("__0002") && !message.contains("0003"), "no 0.29 form: {message}");
 

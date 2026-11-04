@@ -6,7 +6,7 @@ brief the human answers once. You build nothing. Declare the role with
 then show your steps and count the rest under `waitingOn`. The approvals are
 the human's: `brief approve`, `policy approve`, `divergence accept` and the
 `migrate --commit` that re-binds `Approved:` lines refuse every agent role
-(`HUMAN_ONLY`, `retryable: false`) unless you record the answer the human gave
+(`ACTOR_DENIED`, `retryable: false`) unless you record the answer the human gave
 you in the conversation, with `--relayed-via <tool>` (step 4). Without a human's
 explicit answer you never run them, and you never remove or unset your role
 (`env -u CANON_ROLE`, dropping `--as`) to get past the refusal.
@@ -286,9 +286,9 @@ ids); the human step comes after it. A policy that no longer matches its approva
    show` and the dashboard name it. Never approve in their name without their
    answer, never write the answer for them, and never edit the policy to make
    the gate pass. A digest that differs from the brief now
-   (`RELAY_DIGEST_MISMATCH`) means the brief changed after they saw it: show
+   (`RELAY_DIGEST_STALE`) means the brief changed after they saw it: show
    it again and ask again; nothing was written. Without `--relayed-via` the call is
-   `HUMAN_ONLY`; with it and no role declared, `USAGE`. When `canon.yaml`
+   `ACTOR_DENIED`; with it and no role declared, `USAGE`. When `canon.yaml`
    turns relaying off (`approval: { relay: deny }`), the refusal names that key:
    report the human's call (`canon brief approve add-login --approver <their
    name> --note "<their own words>"`) and wait for them to run it. Never

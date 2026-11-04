@@ -514,7 +514,7 @@ nothing is written. A repeated slug counts once. With one slug the output is as
 before; with several, `--json` carries one entry per slug (`written`,
 `unchanged`, `failed`, `skipped`). A disk error while writing exits 1 and
 leaves the slugs already written approved. The call is human-only for every
-slug; the `HUMAN_ONLY` hint gives the human one line with all the slugs.
+slug; the `ACTOR_DENIED` hint gives the human one line with all the slugs.
 
 Without the change operand, the repo's only live change is read. The brief is the
 PRD `canon change new` writes; sections are found by their English `##`

@@ -373,7 +373,7 @@ fn finding_add_31_a_short_revision_that_names_no_commit_is_refused_and_nothing_i
         let out = f.run(&args);
         assert_eq!(out.status.code(), Some(2), "{flag}: {}{}", text(&out.stdout), text(&out.stderr));
         let body = json_of(&out);
-        assert_eq!(body["error"]["code"], "NO_COMMIT", "{flag}: {body}");
+        assert_eq!(body["error"]["code"], "COMMIT_REQUIRED", "{flag}: {body}");
         assert!(body["error"]["message"].as_str().unwrap().contains("deadbee"), "the refusal names the value: {body}");
     }
     assert_eq!(tree(r), before, "a refused add stages and commits nothing");
@@ -391,7 +391,7 @@ fn finding_close_08_a_fixed_close_records_head_by_default_and_refuses_a_revision
     let before = tree(r);
     let unheld = f.run(&["finding", "close", CHANGE, "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-rev", &"b".repeat(40), "--json"]);
     assert_eq!(unheld.status.code(), Some(2), "{}", text(&unheld.stdout));
-    assert_eq!(json_of(&unheld)["error"]["code"], "NO_COMMIT");
+    assert_eq!(json_of(&unheld)["error"]["code"], "COMMIT_REQUIRED");
     let wrong_disposition = f.run(&["finding", "close", CHANGE, "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--resolution-rev", "HEAD", "--json"]);
     assert_eq!(wrong_disposition.status.code(), Some(2), "{}", text(&wrong_disposition.stdout));
     assert_eq!(tree(r), before, "a refused close writes nothing");

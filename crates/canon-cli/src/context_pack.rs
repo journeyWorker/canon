@@ -58,10 +58,10 @@ impl ContextPackError {
     /// a bad input, `1` for an operational or integrity failure.
     pub fn to_cli_error(&self) -> CliError {
         match self {
-            Self::UnsafePath(_) => CliError::refused("CONTEXT_UNSAFE_PATH", self.to_string()).hint("use a repository-relative path that stays inside the repository (no `..`, no absolute path)"),
+            Self::UnsafePath(_) => CliError::refused("CONTEXT_PATH_INVALID", self.to_string()).hint("use a repository-relative path that stays inside the repository (no `..`, no absolute path)"),
             Self::InvalidManifestVersion(_) => CliError::refused("CONTEXT_MANIFEST_INVALID", self.to_string()).hint("set `manifestVersion` in the manifest to the version the message names, then run `canon context-pack add` again"),
-            Self::MissingInput(_) => CliError::refused("CONTEXT_INPUT_MISSING", self.to_string()).hint("create the missing file or remove it from the manifest, then run `canon context-pack add` again"),
-            Self::SecretDetected(_) => CliError::refused("CONTEXT_SECRET_DETECTED", self.to_string()).hint("remove the secret from the input, or drop the file from the manifest; canon never stores a detected secret"),
+            Self::MissingInput(_) => CliError::refused("CONTEXT_INPUT_NOT_FOUND", self.to_string()).hint("create the missing file or remove it from the manifest, then run `canon context-pack add` again"),
+            Self::SecretDetected(_) => CliError::refused("CONTEXT_INPUT_INVALID", self.to_string()).reason("SECRET").hint("remove the secret from the input, or drop the file from the manifest; canon never stores a detected secret"),
             Self::MissingPack(_) => CliError::refused("CONTEXT_PACK_NOT_FOUND", self.to_string()).hint("check the pack id (sha256:<64 hex digits>), or create the pack with `canon context-pack add --manifest <file>`"),
             Self::PromptBundle { .. } => CliError::refused("PROMPT_BUNDLE_INVALID", self.to_string()).hint("fix the bundle name, version or manifest (`canon schema prompt add` lists them), then run `canon prompt add` again"),
             Self::Serialize(_) => CliError::refused("SERIALIZE_FAILED", self.to_string()).hint("this is a canon bug: report it together with the command line that produced it"),

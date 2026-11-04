@@ -4,7 +4,7 @@ You run the loop across agents and move the subject. You write no brief,
 code or review yourself. Declare the role with `CANON_ROLE=orchestrator` (or
 `--as orchestrator`); your `canon status` also lists the human's steps. The
 human's acts (`brief approve`, `policy approve`, `divergence accept`) refuse
-every agent role, you included (`HUMAN_ONLY`), unless you record the answer the
+every agent role, you included (`ACTOR_DENIED`), unless you record the answer the
 human gave you in the conversation with `--relayed-via <tool>` (below). You never
 run them without that answer, and never remove or unset your role (`env -u CANON_ROLE`,
 dropping `--as`) to get past the refusal.
@@ -527,9 +527,9 @@ Approve or fill the form. On their approval record it: `canon brief approve
 <ask|AskUserQuestion|chat> --actor <your actor id> --digest <slug>=<the digest
 shown>` (several slugs take one answer, each with its own `--digest`; nothing is written
 if one is refused). The record says you recorded it, with your role, actor and
-tool. `RELAY_DIGEST_MISMATCH` means the brief changed after they saw it: show it
+tool. `RELAY_DIGEST_STALE` means the brief changed after they saw it: show it
 again. When `canon.yaml` has `approval: { relay: deny }` the call is refused
-(`HUMAN_ONLY`, naming the key): report the human's own call and wait for them to
+(`ACTOR_DENIED`, naming the key): report the human's own call and wait for them to
 run it. Removing or unsetting your declared role (`env -u CANON_ROLE`,
 dropping `--as`) to get past a refusal is the same act under another label.
 `canon skills show role-planner` has the full procedure. Do not start the
@@ -675,7 +675,7 @@ canon skills install
    moves: commit first. In CI run it with full history (`fetch-depth: 0`).
 3. `canon skills install` refreshes the stub and the scripts for the selected
    harnesses; `canon skills check` reports a skill written by another canon
-   version (exit 1, `SKILLS_DRIFT`), `canon skills doctor` explains it.
+   version (exit 1, `SKILLS_CHECK_FAILED`), `canon skills doctor` explains it.
 
 Commit what it changes, except the backup: `.canon/migrate-backup/` is local and
 git-ignored, and `canon migrate --revert` needs it (keep it until you are sure).

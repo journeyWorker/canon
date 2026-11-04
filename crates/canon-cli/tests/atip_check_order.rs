@@ -337,7 +337,7 @@ fn atip_checkorder_04_a_missing_required_argument_alone_and_a_broken_domain_alon
     let missing = empty("canon finding add --round 1 --seq 1 --severity note --actor a --summary s", &[("CANON_ROLE", "implementer")]);
     assert_answer(&missing, "USAGE", "--change");
     let domain = empty("canon finding add --change add-login --round 0 --seq 1 --severity note --actor a --summary s", &[("CANON_ROLE", "implementer")]);
-    assert_answer(&domain, "FINDING_INVALID_ARGUMENT", "--round");
+    assert_answer(&domain, "FINDING_ARGUMENT_INVALID", "--round");
     let both = empty("canon finding add --round 0 --seq 1 --severity note --actor a --summary s", &[("CANON_ROLE", "implementer")]);
     assert_answer(&both, "USAGE", "--change");
     // An operand missing is named by its value name, and comes before an option missing.
@@ -418,14 +418,14 @@ fn atip_checkorder_05_a_broken_domain_is_answered_before_a_constraint_and_before
 fn atip_checkorder_06_the_round_domain_answers_before_the_promote_conflict() {
     let rest = "--change add-login --seq 1 --severity note --actor a --summary s";
     let both = empty(&format!("canon finding add {rest} --round 0 --promote --no-promote"), &[("CANON_ROLE", "implementer")]);
-    assert_answer(&both, "FINDING_INVALID_ARGUMENT", "--round");
+    assert_answer(&both, "FINDING_ARGUMENT_INVALID", "--round");
     let flipped = empty(&format!("canon finding add {rest} --no-promote --promote --round 0"), &[("CANON_ROLE", "implementer")]);
-    assert_answer(&flipped, "FINDING_INVALID_ARGUMENT", "--round");
+    assert_answer(&flipped, "FINDING_ARGUMENT_INVALID", "--round");
     let constraint = empty(&format!("canon finding add {rest} --round 1 --promote --no-promote"), &[("CANON_ROLE", "implementer")]);
     assert_answer(&constraint, "USAGE", "--promote");
     // Two domains broken: the first in the document's order (`--round` before `--seq`), though `--seq` is written first.
     let two = empty("canon finding add --change add-login --seq 0 --round 0 --severity note --actor a --summary s", &[("CANON_ROLE", "implementer")]);
-    assert_answer(&two, "FINDING_INVALID_ARGUMENT", "--round");
+    assert_answer(&two, "FINDING_ARGUMENT_INVALID", "--round");
 }
 
 // ----------------------------------------------------------------------------------------------------------------- F4
@@ -531,9 +531,9 @@ fn atip_checkorder_08_a_constraint_is_answered_before_a_validator() {
 /// the two alone keeps its own code: the constraint's call is not swallowed by the validator, nor the validator's by the constraint.
 #[test]
 fn atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_alone_keeps_its_code() {
-    // brief approve: `--actor` needs `--relayed-via` (a constraint, USAGE); a blank `--approver` is a validator (APPROVAL_INCOMPLETE).
+    // brief approve: `--actor` needs `--relayed-via` (a constraint, USAGE); a blank `--approver` is a validator (APPROVAL_INVALID).
     let validator = empty("canon brief approve add-login --approver \" \" --note ok", &[]);
-    assert_answer(&validator, "APPROVAL_INCOMPLETE", "--approver");
+    assert_answer(&validator, "APPROVAL_INVALID", "--approver");
     let constraint = empty("canon brief approve add-login --approver alice --note ok --actor impl", &[]);
     assert_answer(&constraint, "USAGE", "--relayed-via");
     let both = empty("canon brief approve add-login --approver \" \" --note ok --actor impl", &[]);
@@ -550,17 +550,17 @@ fn atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_al
 // ----------------------------------------------------------------------------------------------------------------- F5
 
 /// atip.checkorder.09: an unknown `CANON_ROLE` is a check that depends on an environment value, so it is a validator and answers
-/// last; alone it is `UNKNOWN_ROLE`; an explicit `--as` that is no role is a failure to parse.
+/// last; alone it is `ROLE_INVALID`; an explicit `--as` that is no role is a failure to parse.
 #[test]
 fn atip_checkorder_09_an_unknown_role_in_the_environment_answers_after_every_other_stateless_check() {
     let bogus = [("CANON_ROLE", "bogus")];
     let rest = "--change add-login --seq 1 --severity note --actor a --summary s";
     // Alone: the role.
     let alone = empty(&format!("canon finding add {rest} --round 1"), &bogus);
-    assert_answer(&alone, "UNKNOWN_ROLE", "CANON_ROLE");
-    assert_answer(&empty("canon status", &bogus), "UNKNOWN_ROLE", "CANON_ROLE");
+    assert_answer(&alone, "ROLE_INVALID", "CANON_ROLE");
+    assert_answer(&empty("canon status", &bogus), "ROLE_INVALID", "CANON_ROLE");
     // Beside a broken domain, a missing required argument, a broken constraint, a validator and a failure to parse: those answer.
-    assert_answer(&empty(&format!("canon finding add {rest} --round 0"), &bogus), "FINDING_INVALID_ARGUMENT", "--round");
+    assert_answer(&empty(&format!("canon finding add {rest} --round 0"), &bogus), "FINDING_ARGUMENT_INVALID", "--round");
     assert_answer(&empty("canon finding add --seq 1 --severity note --actor a --summary s --round 1", &bogus), "USAGE", "--change");
     assert_answer(&empty(&format!("canon finding add {rest} --round 1 --promote --no-promote"), &bogus), "USAGE", "--promote");
     assert_answer(&empty("canon export --kind change --before 2026-02-30", &bogus), "USAGE", "--before");
@@ -568,7 +568,7 @@ fn atip_checkorder_09_an_unknown_role_in_the_environment_answers_after_every_oth
     // The relayed approval's own role validator names the variable too, after the constraints.
     let digest = "add-login=sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     let relay = empty(&format!("canon brief approve add-login --relayed-via ask --actor a --approver alice --note ok --digest {digest}"), &bogus);
-    assert_answer(&relay, "UNKNOWN_ROLE", "CANON_ROLE");
+    assert_answer(&relay, "ROLE_INVALID", "CANON_ROLE");
     let relay_constraint = empty("canon brief approve add-login --actor a --approver alice --note ok", &bogus);
     assert_answer(&relay_constraint, "USAGE", "--relayed-via");
 }
@@ -583,8 +583,8 @@ fn atip_checkorder_10_an_explicit_role_that_is_none_keeps_its_code_and_overrides
     assert_answer(&empty(&format!("canon finding add {rest} --round 0 --as zzz"), &implementer), "USAGE", "--as");
     assert_answer(&empty(&format!("canon finding add {rest} --round 0 --as zzz"), &[("CANON_ROLE", "bogus")]), "USAGE", "--as");
     let overridden = empty(&format!("canon finding add {rest} --round 1 --as implementer"), &[("CANON_ROLE", "bogus")]);
-    assert_ne!(overridden.code.as_deref(), Some("UNKNOWN_ROLE"), "{overridden:?}");
-    assert_eq!(empty(&format!("canon finding add {rest} --round 0 --as implementer"), &[("CANON_ROLE", "bogus")]).code.as_deref(), Some("FINDING_INVALID_ARGUMENT"));
+    assert_ne!(overridden.code.as_deref(), Some("ROLE_INVALID"), "{overridden:?}");
+    assert_eq!(empty(&format!("canon finding add {rest} --round 0 --as implementer"), &[("CANON_ROLE", "bogus")]).code.as_deref(), Some("FINDING_ARGUMENT_INVALID"));
 }
 
 // ----------------------------------------------------------------------------------------------------------------- F6
@@ -676,7 +676,7 @@ fn atip_checkorder_13_the_order_is_the_same_through_an_input_document() {
     let flag = empty("canon finding add --change add-login --seq 1 --severity note --actor a --summary s --round 0 --promote --no-promote", &implementer);
     let document = empty(r#"canon finding add --input '{"change":"add-login","seq":1,"severity":"note","actor":"a","summary":"s","round":0,"promote":true,"noPromote":true}'"#, &implementer);
     assert_eq!(flag.code, document.code, "{flag:?} {document:?}");
-    assert_eq!(flag.code.as_deref(), Some("FINDING_INVALID_ARGUMENT"));
+    assert_eq!(flag.code.as_deref(), Some("FINDING_ARGUMENT_INVALID"));
     assert!(document.field.as_deref().is_some_and(|field| field.ends_with("round")), "{document:?}");
     let missing_flag = empty("canon finding add --seq 1 --severity note --actor a --summary s --round 0", &implementer);
     let missing_document = empty(r#"canon finding add --input '{"seq":1,"severity":"note","actor":"a","summary":"s","round":0}'"#, &implementer);

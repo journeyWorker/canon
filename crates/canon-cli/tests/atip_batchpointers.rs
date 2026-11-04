@@ -100,7 +100,7 @@ fn atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with
         (json!({"operands": ["add-login"], "round": "x", "seq": 1, "disposition": "open"}), "INPUT_INVALID", "/1/round"),
         (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "nope"}), "INPUT_INVALID", "/1/disposition"),
         (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "open", "bogus": true}), "INPUT_INVALID", "/1/bogus"),
-        (json!({"operands": ["add-login"], "round": 0, "seq": 1, "disposition": "open"}), "FINDING_INVALID_ARGUMENT", "/1/round"),
+        (json!({"operands": ["add-login"], "round": 0, "seq": 1, "disposition": "open"}), "FINDING_ARGUMENT_INVALID", "/1/round"),
         (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "rejected"}), "", "/1"),
     ] {
         let (exit, body) = run_batch(repo, &leaf, &[good.clone(), bad.clone()]);
@@ -234,7 +234,7 @@ fn atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_p
     assert_eq!(exit, Some(1), "{body}");
     assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("BATCH_INCOMPLETE"), Some("/0")), "{body}");
     assert_eq!(statuses(&body), ["failed", "skipped"], "{body}");
-    assert_eq!(body["data"]["items"][0]["error"]["code"], "SUBJECT_INVALID_TRANSITION", "{body}");
+    assert_eq!(body["data"]["items"][0]["error"]["code"], "SUBJECT_CONFLICT", "{body}");
 }
 
 #[test]

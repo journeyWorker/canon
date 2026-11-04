@@ -1237,7 +1237,7 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     assert!(line_for(&older).contains(&format!("rm {older}")), "a modified orphan names the removal by hand: {out}");
 
     let json = stdout_json(&canon(&["skills", "check", "--providers", "claude", "--json"], &source, &target));
-    assert_eq!(json["error"]["code"], "SKILLS_DRIFT");
+    assert_eq!(json["error"]["code"], "SKILLS_CHECK_FAILED");
     assert!(json["error"]["message"].as_str().unwrap().contains(&old), "the error names the orphan: {json}");
     assert!(json["error"]["hint"].as_str().unwrap().contains(&older), "the hint names what to remove by hand: {json}");
     let orphans = json["data"]["orphans"].as_array().unwrap();

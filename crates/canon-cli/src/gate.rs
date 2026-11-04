@@ -261,7 +261,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
         }
         return 0;
     }
-    CliError::failed("GATE_VIOLATIONS", format!("{} violation(s)", report.violations.len()))
+    CliError::failed("GATE_CHECK_FAILED", format!("{} violation(s)", report.violations.len()))
         .hint("fix each violation named in data.violations, then run `canon gate check` again")
         .emit_with_data_and_meta("canon gate check", json, &data, coverage.meta())
 }
@@ -501,7 +501,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
         Err(e) => {
-            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).hint("`canon schema task done` lists the accepted arguments and their forms").field("TASK_ID").emit("canon task done", json);
+            return CliError::refused("TASK_ID_INVALID", e.to_string()).hint("`canon schema task done` lists the accepted arguments and their forms").field("TASK_ID").emit("canon task done", json);
         }
     };
 
@@ -612,7 +612,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
             return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
         }
         Err(e @ WriteBackError::Unsupported { .. }) => {
-            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).hint("use a form the command supports (`canon schema task done` lists the arguments)").emit("canon task done", json);
+            return CliError::refused("TASK_UNSUPPORTED", e.to_string()).hint("use a form the command supports (`canon schema task done` lists the arguments)").emit("canon task done", json);
         }
     };
 

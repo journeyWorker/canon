@@ -174,7 +174,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let change = match stage_change(&staging_path, slug, kind, title) {
         Ok(change) => change,
         Err(e) => {
-            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.clone()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
+            return CliError::refused("CHANGE_ARGUMENT_INVALID", e.clone()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
         }
     };
 

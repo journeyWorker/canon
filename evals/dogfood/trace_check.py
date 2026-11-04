@@ -87,7 +87,7 @@ def classify_failure(output):
 
 
 # Leaves that record a human's decision: an agent never runs them, with or without its role.
-HUMAN_ONLY = {("brief", "approve"), ("policy", "approve"), ("divergence", "accept")}
+HUMAN_DECISION_LEAVES = {("brief", "approve"), ("policy", "approve"), ("divergence", "accept")}
 ROLE_VARIABLE = "CANON_ROLE"
 # `error.code`s of a call whose shape the CLI refused: a wrong or unknown option, operand or input key.
 SHAPE_CODES = {"USAGE", "UNKNOWN_COMMAND", "COMMAND_REQUIRED"}
@@ -895,8 +895,8 @@ def analyze(inputs, question_turns=()):
         declared = False
         for call in session["calls"]:
             declared = declared or bool(call.get("role"))
-            if tuple(call["leaf"].split()) in HUMAN_ONLY and not call["help"]:
-                refused = call.get("error_code") == "HUMAN_ONLY"
+            if tuple(call["leaf"].split()) in HUMAN_DECISION_LEAVES and not call["help"]:
+                refused = call.get("error_code") == "ACTOR_DENIED"
                 if call["role_stripped"] or (declared and not call.get("role") and not refused):
                     failures.append({"check": "human_only_role_stripped", "session": sid, "command": call["command"],
                                      "turn": call["turn"], "line": call["line"], "file": call["file"]})

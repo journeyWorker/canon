@@ -238,7 +238,7 @@ fn an_unknown_canon_role_is_refused_with_unknown_role() {
     let dir = tempfile::tempdir().unwrap();
     let out = canon_with(dir.path(), &["status", "--json"], &[("CANON_ROLE", "janitor")]);
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
-    assert_eq!(json_of(&out)["error"]["code"], "UNKNOWN_ROLE");
+    assert_eq!(json_of(&out)["error"]["code"], "ROLE_INVALID");
     assert!(json_of(&out)["error"]["message"].as_str().unwrap().contains("janitor"), "{}", stdout(&out));
     assert!(stderr(&out).is_empty(), "--json writes nothing to stderr: {}", stderr(&out));
 
@@ -253,7 +253,7 @@ fn an_unknown_canon_role_is_refused_with_unknown_role() {
 
     let human = canon_with(dir.path(), &["status"], &[("CANON_ROLE", "janitor")]);
     assert_eq!(human.status.code(), Some(2));
-    assert!(stderr(&human).contains("UNKNOWN_ROLE"), "{}", stderr(&human));
+    assert!(stderr(&human).contains("ROLE_INVALID"), "{}", stderr(&human));
 
     let overridden = canon_with(dir.path(), &["schema", "--as", "planner", "--json"], &[("CANON_ROLE", "janitor")]);
     assert!(overridden.status.success(), "the flag wins, so the bad variable is never consulted: {}", stderr(&overridden));

@@ -380,7 +380,7 @@ pub fn leaf_takes_repo(command: &clap::Command, names: &[&str]) -> bool {
     leaf.get_arguments().any(|arg| arg.get_id() == "repo")
 }
 
-/// A command that needs canon state refuses, `CONFIG_MISSING`, when `--repo`
+/// A command that needs canon state refuses, `CONFIG_REQUIRED`, when `--repo`
 /// (absent: the nearest ancestor of cwd with a `canon.yaml`; present: that
 /// directory as given) holds no `canon.yaml`. The exceptions are
 /// [`crate::context::CONFIG_EXEMPT`], a leaf without `--repo` (`schema`,

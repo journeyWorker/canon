@@ -89,7 +89,7 @@ in the JSON. Give the reason when you reject or defer: it is the only record
 of why the finding was not fixed.
 
 `--scenario` (repeatable, each a scenario the index knows; refused with
-`FINDING_UNKNOWN_SCENARIO` otherwise) names the scenarios the finding is
+`SCENARIO_NOT_FOUND` otherwise) names the scenarios the finding is
 about. After a `fixed` close, fresh evidence for those scenarios alone
 re-verifies the fix; a finding naming none asks every evidenced scenario of
 the subject, as before. `finding close` copies the list.
@@ -116,14 +116,14 @@ needs it or `--introduced-unknown` (never both). A revision that names no
 commit is refused (exit `2`). A finding recorded against uncommitted code
 is allowed: the record carries the `codeTree` it saw and `worktreeDirty`.
 Outside git, or in a repository with no commit, the write is refused with
-`NO_COMMIT`.
+`COMMIT_REQUIRED`.
 
 Many findings at once: `--input` takes inline JSON, a file or `-`; an array
 (or NDJSON) is a batch validated before any write. Keys are the option
 names in camelCase (`change`, `actor`, `resolutionRev`); `canon schema
 finding add --json` shows `input`: the schema of one document and a complete `example`. An identical
 repeat is `unchanged` (`data.unchanged`) and writes nothing; a different
-finding under an occupied key is `FINDING_SEQ_OCCUPIED`.
+finding under an occupied key is `FINDING_EXISTS`.
 
 ### A defect the author found in its own work
 
@@ -197,7 +197,7 @@ saw (the tree with `.canon/`, the spec roots and `code.exclude` removed), and
 allowed, and the commit made from it has the same code tree, so committing it
 afterwards leaves the review as it was: a review is judged by its pins (the
 scenario and what its evidence says), not by the commit. Outside git, or
-with no commit, the write is refused with `NO_COMMIT`. An identical review
+with no commit, the write is refused with `COMMIT_REQUIRED`. An identical review
 written again is `unchanged` (`data.unchanged` under `--json`) and adds no
 record.
 

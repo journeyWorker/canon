@@ -49,7 +49,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: Every domain agrees with the real parser just inside and just outside its bounds, with the code its row names
     Given a built canon and the story repo
     When every domain of every command is asked of the parser with a value just inside and a value just outside it
-    Then the parser agrees at every bound with the code the row names: finding close --round 0 is FINDING_INVALID_ARGUMENT, query --limit 0 and --max-artifact-mib 0 are USAGE, an id outside its pattern is refused
+    Then the parser agrees at every bound with the code the row names: finding close --round 0 is FINDING_ARGUMENT_INVALID, query --limit 0 and --max-artifact-mib 0 are USAGE, an id outside its pattern is refused
 
   # canon: {"schema":1,"at":"2026-11-01T11:00:03Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
   @subject:atip-schema
@@ -139,7 +139,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relayed approval is a relation: its role, its actor and its answer are validators over --relayed-via, the environment is declared on --as and --actor, and the human's blank answer has its own code
     Given a built canon
     When canon schema brief approve, policy approve, divergence accept and migrate run
-    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INCOMPLETE or POLICY_APPROVAL_REFUSED
+    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INVALID or POLICY_APPROVAL_REFUSED
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:12Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema
@@ -149,7 +149,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relayed approval without a role, an actor or an answer, and a blank human answer, are refused in an empty directory with their codes, and CANON_ACTOR and CANON_ROLE fill the first two
     Given an empty directory with an empty HOME and no CANON_ROLE or CANON_ACTOR
     When brief approve and policy approve run relayed without a role, with a role and no actor, and with a blank approver or note, and unrelayed with a blank answer; then with CANON_ROLE and CANON_ACTOR set
-    Then each refusal is exit 2 with its code (USAGE naming --relayed-via, --actor, --approver or --note, APPROVAL_INCOMPLETE, POLICY_APPROVAL_REFUSED) and writes nothing; with the two variables set the call goes on to the repository and answers CONFIG_MISSING
+    Then each refusal is exit 2 with its code (USAGE naming --relayed-via, --actor, --approver or --note, APPROVAL_INVALID, POLICY_APPROVAL_REFUSED) and writes nothing; with the two variables set the call goes on to the repository and answers CONFIG_REQUIRED
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:16Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema
@@ -229,7 +229,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: The stateless stage is part of batch preflight: a domain, constraint or validator fault in any element refuses the batch with exit 2 before it writes
     Given the story repo
     When finding add runs with --input an array of two elements, one good and one with a blocker and no origin, a round of 0, both origins, or a line separator, in either order
-    Then each is exit 2 with the code of the fault (FINDING_INTRODUCED_REQUIRED, FINDING_INVALID_ARGUMENT) and a field pointed at the faulty element, and nothing is written, not even the good element; the same elements one at a time are refused the same way, and an array of good elements writes
+    Then each is exit 2 with the code of the fault (FINDING_INTRODUCED_REQUIRED, FINDING_ARGUMENT_INVALID) and a field pointed at the faulty element, and nothing is written, not even the good element; the same elements one at a time are refused the same way, and an array of good elements writes
 
   # canon: {"schema":1,"at":"2026-11-01T17:50:38Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r4"}}
   @subject:atip-schema
@@ -259,4 +259,4 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A stateless fault in a later batch element is the answer before the first valid element's missing repository
     Given an empty directory with an empty HOME
     When export, artifacts store, ingest records and ingest sessions run with --input an array whose first element is valid and whose second breaks a validator or a domain, and with every element valid
-    Then the first is exit 2 with the second element's code and a field pointed at it (/items/1/...), the second answers CONFIG_MISSING; every element's stateless stage runs before any element's dry run
+    Then the first is exit 2 with the second element's code and a field pointed at it (/items/1/...), the second answers CONFIG_REQUIRED; every element's stateless stage runs before any element's dry run

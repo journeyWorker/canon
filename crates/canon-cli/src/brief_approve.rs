@@ -152,11 +152,11 @@ impl Report for Refused {}
 /// The next step for each code [`approve`] refuses with.
 fn hint_for(code: &str) -> &'static str {
     match code {
-        "APPROVAL_INCOMPLETE" => "pass --approver <name> and --note <the human's answer>, each one non-empty line",
+        "APPROVAL_INVALID" => "pass --approver <name> and --note <the human's answer>, each one non-empty line",
         "BRIEF_APPROVE_REFUSED" => "run `canon brief check`, clear the blockers it lists, then ask the human to approve",
-        "BRIEF_UNAPPROVABLE" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
+        "BRIEF_INVALID" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
         "BRIEF_UNREADABLE" => "check that brief.md is a readable UTF-8 file, then run `canon brief approve` again",
-        "RELAY_DIGEST_MISMATCH" => "run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw",
+        "RELAY_DIGEST_STALE" => "run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw",
         "POLICY_APPROVAL_FAILED" => "check that .canon/policy.yaml is readable and writable, then run `canon brief approve` again",
         _ => "check that the change's brief.md is writable, then run `canon brief approve` again",
     }
@@ -231,7 +231,7 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
     // that already carry it: nothing to write.
     let unchanged = already_approved_so(&text, by, note, opts.relay) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note), opts.relay).is_some());
     if !unchanged {
-        approved_text(&text, by, "1970-01-01T00:00:00Z", note, opts.relay).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &format!("{}: {e}", checked.brief)))?;
+        approved_text(&text, by, "1970-01-01T00:00:00Z", note, opts.relay).map_err(|e| refuse("BRIEF_INVALID", &format!("{}: {e}", checked.brief)).reason("UNAPPROVABLE"))?;
         // What the approval will write is checked here, with the rest, so an unwritable brief or approval file refuses before any id is written.
         let approval_file = repo.join(canon_model::paths::POLICY_APPROVAL_FILE);
         let targets: Vec<&Path> = if policy_approved { vec![approval_file.as_path(), path.as_path()] } else { vec![path.as_path()] };
@@ -246,14 +246,14 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
 /// digest of the brief file now: a relayed approval is of what they read.
 fn verify_shown(change: &ChangeId, brief: &str, path: &Path, shown: &BTreeMap<String, String>) -> Result<(), CliError> {
     let Some(digest) = shown.get(change.as_str()) else {
-        return Err(CliError::refused("USAGE", format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", change.as_str())).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")));
+        return Err(CliError::refused("USAGE", format!("a relayed approval of `{0}` needs the digest the human was shown: pass --digest {0}=<the digest `canon brief show {0} --body` printed>", change.as_str())).field("--digest").hint(hint_for("RELAY_DIGEST_STALE")));
     };
     let text = std::fs::read_to_string(path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{brief}`: {e}")))?;
     let now = approval_digest(&text);
     if digest.eq_ignore_ascii_case(&now) {
         return Ok(());
     }
-    Err(CliError::refused("RELAY_DIGEST_MISMATCH", format!("{brief} is {now} now, but the human was shown {digest}; the human must answer for the brief as it is, so nothing was recorded")).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")))
+    Err(CliError::refused("RELAY_DIGEST_STALE", format!("{brief} is {now} now, but the human was shown {digest}; the human must answer for the brief as it is, so nothing was recorded")).field("--digest").hint(hint_for("RELAY_DIGEST_STALE")))
 }
 
 /// The answer's own two lines, trimmed: refused up front, for every id alike.
@@ -261,10 +261,10 @@ fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
     let (by, note) = (by.trim(), note.trim());
     for (flag, value) in [("--approver", by), ("--note", note)] {
         if value.is_empty() {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty")).field(flag));
+            return Err(refuse("APPROVAL_INVALID", &format!("{flag} must carry the human's answer, not be empty")).field(flag));
         }
         if value.contains(['\n', '\r']) {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line")).field(flag));
+            return Err(refuse("APPROVAL_INVALID", &format!("{flag} must be one line")).field(flag));
         }
     }
     Ok((by.to_string(), note.to_string()))
@@ -272,7 +272,7 @@ fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
 
 /// Writes one approved brief (and, first, the policy approval) at `when`.
 fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, policy_approved: bool, relay: Option<&ApprovalRelay>) -> Result<Approved, CliError> {
-    let approved = approved_text(&checked.text, by, when, note, relay).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e.to_string()))?;
+    let approved = approved_text(&checked.text, by, when, note, relay).map_err(|e| refuse("BRIEF_INVALID", &e.to_string()).reason("UNAPPROVABLE"))?;
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
     if policy_approved {
@@ -426,7 +426,7 @@ pub(crate) fn check_approve(args: &crate::cli::brief::BriefApproveArgs) -> Resul
             _ => None,
         };
         if let Some(message) = refusal {
-            return Err(CliError::refused("USAGE", message).field("--digest").hint(hint_for("RELAY_DIGEST_MISMATCH")));
+            return Err(CliError::refused("USAGE", message).field("--digest").hint(hint_for("RELAY_DIGEST_STALE")));
         }
     }
     Ok(())

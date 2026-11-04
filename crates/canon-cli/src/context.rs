@@ -443,9 +443,9 @@ pub fn discover_repo_root() -> PathBuf {
 /// directory canon was never set up in).
 pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
     ("init", "creates canon.yaml"),
-    ("migrate", "carries its own CONFIG_MISSING refusal, worded for the layout it moves"),
+    ("migrate", "carries its own CONFIG_REQUIRED refusal, worded for the layout it moves"),
     ("demo init", "scaffolds a new repo, canon.yaml included"),
-    ("demo review", "refuses with DEMO_NOT_INITIALIZED when `demo init` has not run"),
+    ("demo review", "refuses with DEMO_REQUIRED when `demo init` has not run"),
     ("context", "a capability query that never fails: without a canon.yaml it describes the built-in surface"),
     ("regime show", "reads no repo: it only builds a key from its arguments"),
     ("adapter validate", "reads one response file; the context-pack join runs only when a canon.yaml is found"),
@@ -478,7 +478,7 @@ pub fn needs_config(command: &str) -> bool {
 }
 
 /// The repo root a command that needs canon state runs against, or the
-/// `CONFIG_MISSING` refusal when no `canon.yaml` is there. `repo` is `--repo`
+/// `CONFIG_REQUIRED` refusal when no `canon.yaml` is there. `repo` is `--repo`
 /// as given (absent: the nearest ancestor of the current directory holding a
 /// `canon.yaml`; present: that directory, no search).
 pub fn require_config(repo: Option<&Path>) -> Result<PathBuf, CliError> {
@@ -491,7 +491,7 @@ pub fn require_config(repo: Option<&Path>) -> Result<PathBuf, CliError> {
         return Ok(root);
     }
     let searched = if repo.is_none() { format!("`{}` and its parent directories", root.display()) } else { format!("`{}`", root.display()) };
-    Err(CliError::refused("CONFIG_MISSING", format!("no canon.yaml in {searched}"))
+    Err(CliError::refused("CONFIG_REQUIRED", format!("no canon.yaml in {searched}"))
         .field("--repo")
         .hint(format!("run `canon init` in the repository root to set canon up, or pass --repo <dir> naming a directory that holds canon.yaml (searched {searched})")))
 }

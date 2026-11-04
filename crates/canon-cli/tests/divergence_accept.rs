@@ -309,7 +309,7 @@ fn divergence_lifecycle_14_a_relayed_acceptance_records_the_relay_the_approver_a
 
 /// divergence.lifecycle.15: a relayed acceptance needs the human's name and
 /// answer, is refused with relay denied, and an agent role without the option
-/// is `HUMAN_ONLY`; nothing is written by any of them.
+/// is `ACTOR_DENIED`; nothing is written by any of them.
 #[test]
 fn divergence_lifecycle_15_a_relayed_acceptance_without_name_or_answer_or_with_relay_denied_writes_nothing() {
     let dir = repo();
@@ -323,14 +323,14 @@ fn divergence_lifecycle_15_a_relayed_acceptance_without_name_or_answer_or_with_r
     refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--note", "ok")]), "USAGE");
     refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana")]), "USAGE");
     refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana"), ("--note", "  ")]), "USAGE");
-    let plain = refused(&accept_as(r, "planner", &[]), "HUMAN_ONLY");
+    let plain = refused(&accept_as(r, "planner", &[]), "ACTOR_DENIED");
     assert!(plain["error"]["hint"].as_str().unwrap().contains("--relayed-via"), "{plain}");
     let human = canon(r, &["divergence", "accept", SCENARIO, "--project", "demo", "--reason", "r", "--tracking", TRACKING, "--actor", "a", "--role", "reviewer", "--relayed-via", "ask"]);
     assert_eq!(human.status.code(), Some(2), "{}", out(&human));
     assert!(out(&human).contains("no agent role"), "{}", out(&human));
     let yaml = std::fs::read_to_string(r.join("canon.yaml")).unwrap();
     std::fs::write(r.join("canon.yaml"), format!("{yaml}approval:\n  relay: deny\n")).unwrap();
-    let denied = refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana"), ("--note", "ok")]), "HUMAN_ONLY");
+    let denied = refused(&accept_as(r, "planner", &[("--relayed-via", "ask"), ("--approver", "Ana"), ("--note", "ok")]), "ACTOR_DENIED");
     assert!(denied["error"]["message"].as_str().unwrap().contains("approval.relay"), "{denied}");
     assert!(accepted_records(r).is_empty(), "nothing was written");
 }

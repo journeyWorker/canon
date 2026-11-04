@@ -152,7 +152,7 @@ fn atip_l0_25_the_checked_codes_hold_their_decided_exits() {
         // only before the work: exit 2.
         ("LEDGER_ARCHIVE_UNAVAILABLE", 2),
         ("PLUGIN_SYNC_FAILED", 2),
-        ("RETRIEVE_FAILED", 2),
+        ("RETRIEVE_INVALID", 2),
     ];
     for (code, exit) in decided {
         assert_eq!(row(code).0, exit, "{code}");
@@ -186,7 +186,7 @@ fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
         ("BRIEF_UNREADABLE", 2),
         ("BRIEF_WRITE_FAILED", 1),
         ("BRIEF_APPROVE_REFUSED", 2),
-        ("BRIEF_UNAPPROVABLE", 2),
+        ("BRIEF_INVALID", 2),
     ];
     for (code, exit) in partners {
         assert_eq!(row(code).0, exit, "{code}");

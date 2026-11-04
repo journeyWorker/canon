@@ -628,7 +628,7 @@ Feature: evidence add
   Scenario: A project id that names no configured spec root is refused before anything is written
     Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
     When evidence add names a --project that is no configured root, for one scenario and with --all-scenarios
-    Then each add exits 2 with UNKNOWN_SPEC_ROOT before anything is staged, bound or written
+    Then each add exits 2 with SPEC_ROOT_NOT_FOUND before anything is staged, bound or written
     And the hint names the one root to use, `--project game`, and the same add under game is accepted
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:10Z","actor":{"agent_id":"canon-impl-026"}}
@@ -638,7 +638,7 @@ Feature: evidence add
   Scenario: The refusal of an unknown project id lists every configured spec root
     Given a repo whose canon.yaml configures two spec roots
     When evidence add names a --project that matches neither
-    Then it exits 2 with UNKNOWN_SPEC_ROOT, and the message, the hint and the JSON expected list name both roots
+    Then it exits 2 with SPEC_ROOT_NOT_FOUND, and the message, the hint and the JSON expected list name both roots
     And a root id that is configured is accepted whichever order the roots are listed in
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:18Z","actor":{"agent_id":"canon-impl-026"}}
@@ -648,7 +648,7 @@ Feature: evidence add
   Scenario: An approval payload is not issued for a project id that names no configured spec root
     Given a repo whose canon.yaml configures one spec root, game
     When evidence approval-payload names a --project that is no configured root
-    Then it exits 2 with UNKNOWN_SPEC_ROOT and prints no payload bytes
+    Then it exits 2 with SPEC_ROOT_NOT_FOUND and prints no payload bytes
     And the payload for the configured root is still printed
 
   # canon: {"schema":1,"at":"2026-10-23T12:02:58Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -707,10 +707,10 @@ Feature: evidence add
   @subject:evidence-attestation
   @case:failure
   @evidence.add.111
-  Scenario: Outside git, or before the first commit, an evidence add is refused with NO_COMMIT
+  Scenario: Outside git, or before the first commit, an evidence add is refused with COMMIT_REQUIRED
     Given a directory with no git repository, and a git repository with no commit, each holding an indexed scenario
     When evidence add runs in each
-    Then it exits 2 with NO_COMMIT and a hint to run git init and commit
+    Then it exits 2 with COMMIT_REQUIRED and a hint to run git init and commit
     And nothing is written
 
   # canon: {"schema":1,"at":"2026-10-23T12:03:23Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}

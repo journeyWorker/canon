@@ -551,7 +551,7 @@ Feature: subject lifecycle
   Scenario: A relayed brief approval whose shown digest differs or is missing is refused with exit 2 and nothing is written
     Given two changes with approvable briefs, the first shown with a stale digest and the second shown with none
     When canon brief approve runs relayed for the first alone, for the second alone, and for both
-    Then each exits 2, the first with RELAY_DIGEST_MISMATCH and the second with USAGE, and neither brief file nor the policy approval changed
+    Then each exits 2, the first with RELAY_DIGEST_STALE and the second with USAGE, and neither brief file nor the policy approval changed
     And an id whose digest is right is refused too when another id of the call is not
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:17Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
@@ -562,17 +562,17 @@ Feature: subject lifecycle
   Scenario: A relayed approval without the human's name, answer or an actor, or with no role declared, is refused with exit 2
     Given a planner role and a brief that passes the checks
     When canon brief approve is relayed with an empty --approver, an empty --note, no --actor and no CANON_ACTOR, and when --relayed-via is given with no role declared
-    Then each exits 2 with USAGE naming the missing option, or APPROVAL_INCOMPLETE for an empty name or answer, and nothing is written
+    Then each exits 2 with USAGE naming the missing option, or APPROVAL_INVALID for an empty name or answer, and nothing is written
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:20Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
   @subject:subject-lifecycle
   @case:failure
   @flow:canon-0-32-relay-approval.F3
   @subject.lifecycle.55
-  Scenario: An agent role without the relay option is refused HUMAN_ONLY and the hint names the relay procedure
+  Scenario: An agent role without the relay option is refused ACTOR_DENIED and the hint names the relay procedure
     Given each agent role in turn declared with --as
     When canon brief approve, canon policy approve and canon divergence accept run without --relayed-via
-    Then each exits 2 with HUMAN_ONLY, and the hint names the relay procedure (canon brief show --body, the question tool, --relayed-via) before the human's own call
+    Then each exits 2 with ACTOR_DENIED, and the hint names the relay procedure (canon brief show --body, the question tool, --relayed-via) before the human's own call
     And nothing is written
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:23Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
@@ -584,7 +584,7 @@ Feature: subject lifecycle
     Given a repo with a policy and a planner role with an actor
     When canon policy approve runs with --relayed-via, --approver, --note and --actor, and without --note, and with a role but no --relayed-via
     Then the first exits 0 and .canon/policy.approval.json holds relay with role, actor and tool, and canon policy show --json reports it
-    And the second exits 2 with USAGE and the third with HUMAN_ONLY, and the file is unchanged by both
+    And the second exits 2 with USAGE and the third with ACTOR_DENIED, and the file is unchanged by both
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:27Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
   @subject:subject-lifecycle
@@ -594,7 +594,7 @@ Feature: subject lifecycle
   Scenario: A relayed migrate commit that re-binds Approved lines records its relay in the backup journal
     Given a repo whose migrate plan re-binds an Approved line, a planner role and the plan digest
     When canon migrate --commit --plan-digest <d> runs without the relay option, and then with --relayed-via, --approver, --note and --actor
-    Then the first exits 2 with HUMAN_ONLY and rewrites nothing, and the second migrates and the backup journal holds relay with role, actor, tool, approver and answer
+    Then the first exits 2 with ACTOR_DENIED and rewrites nothing, and the second migrates and the backup journal holds relay with role, actor, tool, approver and answer
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:30Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
   @subject:subject-lifecycle
@@ -612,10 +612,10 @@ Feature: subject lifecycle
   @case:failure
   @flow:canon-0-32-relay-approval.F4
   @subject.lifecycle.59
-  Scenario: With approval.relay denied in canon.yaml a relayed approval is refused HUMAN_ONLY naming the key
+  Scenario: With approval.relay denied in canon.yaml a relayed approval is refused ACTOR_DENIED naming the key
     Given canon.yaml with approval: { relay: deny } and a planner role
     When canon brief approve, canon policy approve and canon migrate --commit run with --relayed-via and everything else a relay needs
-    Then each exits 2 with HUMAN_ONLY naming approval.relay in its message or hint, and the hint gives the call the human runs
+    Then each exits 2 with ACTOR_DENIED naming approval.relay in its message or hint, and the hint gives the call the human runs
     And nothing is written
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:35Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}

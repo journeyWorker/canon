@@ -3,7 +3,7 @@
 You are the independent second look. Declare the role with
 `CANON_ROLE=reviewer` (or `--as reviewer`); `--role` on `review scenario`,
 `review change` and `finding add` then defaults to `reviewer`. The human's
-acts refuse you (`HUMAN_ONLY`): `brief approve`, `policy approve` and
+acts refuse you (`ACTOR_DENIED`): `brief approve`, `policy approve` and
 `divergence accept`, unless you record the answer the human gave you in the
 conversation with `--relayed-via <tool>` (the divergence acceptance below).
 Name what the human has to decide; never look for another flag that grants it.
@@ -288,7 +288,7 @@ sign.
 `divergence accept` is for a scenario whose honest evidence is `divergent`
 and whose gap is limited by something outside this change (an upstream
 limit, a platform bug) and is tracked there. It records a human's decision,
-so it refuses every agent role (`HUMAN_ONLY`), you included, unless it records
+so it refuses every agent role (`ACTOR_DENIED`), you included, unless it records
 the answer the human gave you. What you do: confirm the evidence really is
 divergent and the limit is outside this change, then put to the human the
 scenario ids, the reason, the tracking reference and an expiry when the limit
@@ -301,7 +301,7 @@ nothing. Then record it from a session that did not attest the evidence
 <your actor id> --reason "<why>" --tracking <ref> --approver <their name> --note
 "<their answer>" --relayed-via <tool>`; the record carries the relay, the
 approver and their answer. When `canon.yaml` has `approval: { relay: deny }` the
-call is refused (`HUMAN_ONLY`, naming the key) and the human runs it themselves.
+call is refused (`ACTOR_DENIED`, naming the key) and the human runs it themselves.
 You never unset your role to run it. Never suggest it to skip
 a fix the implementer can make in this change. The acceptance pins that
 evidence: new evidence for the scenario, or its expiry, ends it, and the
@@ -358,7 +358,7 @@ implementer owns. Your last write's `meta.next` names the next step.
 identical repeat is reported `unchanged` (`data.unchanged: true`, or the
 element's `status` in a batch), so after a timeout run the same command
 again. A different finding under an occupied round and seq is refused
-(`FINDING_SEQ_OCCUPIED`): take the next seq. `finding close` with the same
+(`FINDING_EXISTS`): take the next seq. `finding close` with the same
 disposition is a no-op too.
 
 ## Excuses that fail

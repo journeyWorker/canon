@@ -247,7 +247,7 @@
 //! revision (`HEAD~1`, a branch, a tag, a short sha) and are resolved
 //! with [`crate::git_rev`]: `git rev-parse --verify <rev>^{commit}`, the
 //! FULL sha is recorded, and a revision git cannot resolve (also: outside
-//! a git work tree, or in a repo with no commit) is `NO_COMMIT`, exit 2.
+//! a git work tree, or in a repo with no commit) is `COMMIT_REQUIRED`, exit 2.
 //! `--rev` and `--resolution-rev` also record the code tree they saw
 //! (`code_tree`, `resolution_code_tree`) and `worktree_dirty`: the
 //! default `HEAD` is the working tree as it stands, so a round that
@@ -548,13 +548,13 @@ impl crate::reports::Report for FindingListReport<'_> {}
 /// `canon finding add`: the checks of the arguments alone, in the order the handler ran them.
 pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Result<(), CliError> {
     if args.round == 0 || args.seq == 0 {
-        return Err(CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
+        return Err(CliError::refused("FINDING_ARGUMENT_INVALID", format!("--round and --seq are 1-based (got --round {} --seq {}); a 0 would sort ahead of the first real finding in a key whose whole job is ordering rounds",
             args.round, args.seq
         )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }));
     }
     for (flag, value) in [("--actor", args.actor_id.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
-            return Err(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag));
+            return Err(CliError::refused("FINDING_ARGUMENT_INVALID", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag));
         }
     }
     // The free-text fields: a line separator would append a second row to the one the finding is rendered as. Checked through the row grammar's OWN separator set.
@@ -564,19 +564,19 @@ pub(crate) fn check_add(args: &crate::cli::finding::FindingAddArgs) -> Result<()
         ("--file-ref", args.file_ref.as_deref()),
     ] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return Err(CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag));
+        return Err(CliError::refused("FINDING_ARGUMENT_INVALID", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").field(flag));
     }
     // The coherence pair: `fixed` takes `--resolution-rev` or its default `HEAD`, so only the other direction can be wrong.
     if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
         if disposition != FindingDisposition::Fixed {
-            return Err(CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
+            return Err(CliError::refused("FINDING_RESOLUTION_REV_CONFLICT", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
                 disposition.as_str()
             )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev"));
         }
     }
     // The 0.30 rule: a commit or an explicit "not known", never both, and a defect finding owes one of them.
     if args.introduced_rev.is_some() && args.introduced_unknown {
-        return Err(CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
+        return Err(CliError::refused("FINDING_ARGUMENT_INVALID", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
             .hint("drop --introduced-rev, or drop --introduced-unknown")
             .field("--introduced-rev"));
     }
@@ -669,7 +669,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     let natural_key = match resolve_partition(RecordKind::Finding, &body) {
         Ok(key) => key.natural_key,
         Err(violation) => {
-            return CliError::refused("FINDING_INVALID_ARGUMENT", violation.detail.clone()).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_ARGUMENT_INVALID", violation.detail.clone()).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
     };
 
@@ -717,7 +717,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     }
     match occupied_by(&natural_key, &staging, &committed) {
         Ok(Some(occupant)) => {
-            return CliError::refused("FINDING_SEQ_OCCUPIED", format!("{} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
+            return CliError::refused("FINDING_EXISTS", format!("{} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
                 natural_key, args.change_id, args.round, args.seq
             )).hint("pick the next free --seq, or move the existing finding with `canon finding close`").emit("canon finding add", args.json);
         }
@@ -864,7 +864,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     };
 
     if args.round == 0 || args.seq == 0 {
-        return CliError::refused("FINDING_INVALID_ARGUMENT", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
+        return CliError::refused("FINDING_ARGUMENT_INVALID", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
             args.round, args.seq
         )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding close", args.json);
     }
@@ -875,7 +875,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     // correctly does not exist.
     if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
         if disposition != FindingDisposition::Fixed {
-            return CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
+            return CliError::refused("FINDING_RESOLUTION_REV_CONFLICT", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
                 disposition.as_str()
             )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev").emit("canon finding close", args.json);
         }
@@ -923,7 +923,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     // between them. Editing the staged copy is the honest repair.
     match find_finding(args, &staging) {
         Ok(Some(_)) => {
-            return CliError::refused("FINDING_STAGED", format!("`{}` round {} seq {} is still STAGED, never committed, so there is no recorded disposition to move. Run `canon gate promote` first, or delete the staged copy and re-author it with `canon finding add --disposition {}`.",
+            return CliError::refused("FINDING_CONFLICT", format!("`{}` round {} seq {} is still STAGED, never committed, so there is no recorded disposition to move. Run `canon gate promote` first, or delete the staged copy and re-author it with `canon finding add --disposition {}`.",
                 args.change_id,
                 args.round,
                 args.seq,
@@ -1310,7 +1310,7 @@ fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError
         return Ok(());
     }
     Err(CliError::refused(
-        "FINDING_UNKNOWN_SCENARIO",
+        "SCENARIO_NOT_FOUND",
         format!("no scenario record for {}; a finding names scenarios the index knows, so fresh evidence for them can re-verify its fix", missing.join(", ")),
     )
     .field("--scenario")
@@ -1329,7 +1329,7 @@ struct ResolvedCommits {
 }
 
 /// Resolve every commit option through [`crate::git_rev`], or the refusal
-/// (`NO_COMMIT`) of the first that does not resolve (module doc).
+/// (`COMMIT_REQUIRED`) of the first that does not resolve (module doc).
 fn resolve_commits(repo: &Path, args: &FindingArgs) -> Result<ResolvedCommits, CliError> {
     let reviewed = crate::git_rev::bind(repo, &args.rev)?;
     let resolution = match (args.disposition, args.resolution_rev.as_deref()) {

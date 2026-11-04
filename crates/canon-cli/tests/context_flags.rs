@@ -93,7 +93,7 @@ fn commands_from_a_subdirectory_find_the_repo_and_a_given_repo_is_used_as_is() {
     // `--repo` names the directory itself: no walk upward from it.
     let given = canon(&nested, &["status", "--repo", nested.to_str().unwrap(), "--json"]);
     assert_eq!(given.status.code(), Some(2));
-    assert_eq!(body(&given)["error"]["code"], "CONFIG_MISSING");
+    assert_eq!(body(&given)["error"]["code"], "CONFIG_REQUIRED");
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn adapter_validate_needs_no_canon_yaml_and_a_missing_response_is_a_refusal() {
     let empty = TempDir::new().unwrap();
     let out = canon(empty.path(), &["adapter", "validate", "--response", "no-such-response.json", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
-    assert_ne!(body(&out)["error"]["code"], "CONFIG_MISSING", "adapter validate needs no canon state");
+    assert_ne!(body(&out)["error"]["code"], "CONFIG_REQUIRED", "adapter validate needs no canon state");
 }
 
 #[test]

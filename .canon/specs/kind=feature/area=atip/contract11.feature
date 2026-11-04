@@ -129,7 +129,7 @@ Feature: ATIP 1.1 contract
   Scenario: A trace or search that refuses leaves the repository as it was: no index directory or file is written
     Given a repo with a finding and no index, and a repo whose index is fresh or stale
     When canon trace is given an id no record says, a sha prefix no record has, an operand with no shape, and canon search is given an empty text
-    Then each exits 2 with TRACE_NOT_FOUND, TRACE_OPERAND_INVALID or SEARCH_QUERY_EMPTY, no file under the repo changes, and no index directory or file appears; a fresh or stale index stays as it was, and a trace that answers still writes the index
+    Then each exits 2 with TRACE_NOT_FOUND, TRACE_OPERAND_INVALID or SEARCH_QUERY_REQUIRED, no file under the repo changes, and no index directory or file appears; a fresh or stale index stays as it was, and a trace that answers still writes the index
 
   # canon: {"schema":1,"at":"2026-11-01T13:29:54Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract

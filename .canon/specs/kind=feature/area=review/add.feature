@@ -311,7 +311,7 @@ Feature: review scenario
   Scenario: A review for a project id that names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
     When review scenario names a --project that is no configured root
-    Then it exits 2 with UNKNOWN_SPEC_ROOT, writes no review record, and the hint names the configured root
+    Then it exits 2 with SPEC_ROOT_NOT_FOUND, writes no review record, and the hint names the configured root
 
   # canon: {"schema":1,"at":"2026-10-23T12:07:06Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:review-attestation
@@ -379,10 +379,10 @@ Feature: review scenario
   @subject:review-attestation
   @case:failure
   @review.add.99
-  Scenario: Outside git, or before the first commit, a review is refused with NO_COMMIT
+  Scenario: Outside git, or before the first commit, a review is refused with COMMIT_REQUIRED
     Given a directory with no git repository, and a git repository with no commit, each holding an indexed scenario and a chore brief
     When review scenario and review change run in each
-    Then each exits 2 with NO_COMMIT and a hint to run git init and commit
+    Then each exits 2 with COMMIT_REQUIRED and a hint to run git init and commit
     And nothing is written
 
   # canon: {"schema":1,"at":"2026-10-23T13:17:26Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}

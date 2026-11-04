@@ -570,7 +570,7 @@ fn context_capability_54_with_two_spec_roots_a_missing_project_is_refused_in_the
     let out = canon(repo, &["feature", "new", "cart.extra", "--title", "Extra", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
-    assert_eq!(body["error"]["code"], "SPEC_ROOT_UNRESOLVED", "{body}");
+    assert_eq!(body["error"]["code"], "SPEC_ROOT_REQUIRED", "{body}");
     let message = body["error"]["message"].as_str().unwrap();
     let hint = body["error"]["hint"].as_str().unwrap();
     assert!(message.contains("--project <id>"), "{message}");
@@ -588,7 +588,7 @@ fn context_capability_55_an_unknown_project_root_and_an_unknown_finding_review_a
     let out = canon(repo, &["evidence", "add", "--project", "nope", "--scenario", "cart.add.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     let body = json(&out);
-    assert_eq!(body["error"]["code"], "UNKNOWN_SPEC_ROOT", "{body}");
+    assert_eq!(body["error"]["code"], "SPEC_ROOT_NOT_FOUND", "{body}");
     assert_eq!(body["error"]["field"], "--project", "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("`--project root`"), "{body}");
     unchanged(repo, &before, "a refused evidence add");

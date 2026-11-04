@@ -303,7 +303,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let repo = resolve_repo_root(repo);
     let canon_yaml = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml) else {
-        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).hint("run `canon init` in the repository root first").emit("canon migrate", json);
+        return CliError::refused("CONFIG_REQUIRED", format!("`{}` does not exist; run it in a repo canon manages (`canon init` sets one up)", canon_yaml.display())).hint("run `canon init` in the repository root first").emit("canon migrate", json);
     };
     let git = in_git_work_tree(&repo);
     // 0.30 `ledger-naming`: the old world is recorded and the renaming planned first; every other step reads the renamed ledger.
@@ -357,7 +357,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
         moved_paths.extend(names.moved_paths().into_iter().map(PathBuf::from));
         moved_paths.extend(briefs.paths());
         if let Some(dirty) = uncommitted(&repo, &moved_paths) {
-            return CliError::refused("MIGRATE_UNCOMMITTED", format!("uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}")).hint("commit or stash the listed paths (`git status` shows them), then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("MIGRATION_CONFLICT", format!("uncommitted changes under the paths it moves; commit or stash them, then run it again:\n{dirty}")).hint("commit or stash the listed paths (`git status` shows them), then run `canon migrate` again").emit("canon migrate", json);
         }
     }
 

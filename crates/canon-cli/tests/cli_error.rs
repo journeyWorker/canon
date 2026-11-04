@@ -129,7 +129,7 @@ fn query_scope_errors_and_unknown_kinds_have_codes_in_json_mode() {
     // A flag that does not apply to the kind: canon's own refusal.
     let out = run(repo, &["query", "--kind", "subject", "--change", "add-login", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert_eq!(json_error(&out)["code"], "QUERY_INVALID_ARGUMENT");
+    assert_eq!(json_error(&out)["code"], "QUERY_ARGUMENT_INVALID");
 
     // A kind that does not exist: clap rejects it, and `--json` still gets JSON.
     let out = run(repo, &["query", "--kind", "no-such-kind", "--json"]);
@@ -149,7 +149,7 @@ fn init_over_a_finished_repo_is_unchanged_and_demo_init_over_it_is_refused() {
     assert!(shown["meta"].get("unchanged").is_none(), "unchanged moved from meta into data: {shown}");
     let out = run(repo, &["demo", "init", "--repo", "."]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert_eq!(human_code(&out), "INIT_CONFIG_EXISTS");
+    assert_eq!(human_code(&out), "CONFIG_EXISTS");
 }
 
 #[test]
@@ -181,10 +181,10 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     let out = run(repo, &["brief", "approve", "--approver", "Ana", "--note", " ", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let error = json_error(&out);
-    assert_eq!((error["code"].as_str(), error["retryable"].as_bool()), (Some("APPROVAL_INCOMPLETE"), Some(false)), "{error}");
+    assert_eq!((error["code"].as_str(), error["retryable"].as_bool()), (Some("APPROVAL_INVALID"), Some(false)), "{error}");
     assert!(stderr(&out).is_empty(), "JSON mode writes nothing to stderr: {}", stderr(&out));
     let human = run(repo, &["brief", "approve", "--approver", "Ana", "--note", " "]);
-    assert_eq!(human_code(&human), "APPROVAL_INCOMPLETE", "human mode says the same thing on stderr: {}", stderr(&human));
+    assert_eq!(human_code(&human), "APPROVAL_INVALID", "human mode says the same thing on stderr: {}", stderr(&human));
 
     // Exits come from the registry: a missing brief is exit 2.
     let out = run(repo, &["brief", "check", "no-such-change", "--json"]);
@@ -275,10 +275,10 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
         }
     }
     let exit_of = |code: &str| canon_cli::cli_error::code_info(code).unwrap_or_else(|| panic!("{code} is not registered")).exit;
-    assert_eq!(exit_of("BRIEF_HAS_BLOCKERS"), 1, "`brief check` finding blockers is a finding");
+    assert_eq!(exit_of("BRIEF_CHECK_FAILED"), 1, "`brief check` finding blockers is a finding");
     assert_eq!(exit_of("BRIEF_APPROVE_REFUSED"), 2, "`brief approve` declining on blockers is a refusal: one code, one exit (D4)");
-    assert_eq!(exit_of("GATE_VIOLATIONS"), 1);
-    assert_eq!(exit_of("CONFIG_MISSING"), 2);
+    assert_eq!(exit_of("GATE_CHECK_FAILED"), 1);
+    assert_eq!(exit_of("CONFIG_REQUIRED"), 2);
     assert_eq!(exit_of("USAGE"), 2);
     assert_eq!(exit_of("POLICY_APPROVAL_UNREADABLE"), 1, "an unreadable approval is a closed gate, not a refused run");
     assert!(canon_cli::cli_error::code_info("DISPATCH_END_IN_PROGRESS").unwrap().retryable, "a concurrent close is the retryable case");
@@ -290,6 +290,6 @@ fn a_cli_error_takes_its_exit_and_retryability_from_the_registry() {
     use canon_cli::cli_error::{CliError, CliErrorExt as _};
     assert_eq!(CliError::refused("BRIEF_NOT_FOUND", "x").exit, 2);
     assert_eq!(CliError::failed("BRIEF_NOT_FOUND", "x").exit, 2, "the constructor does not choose the exit");
-    assert_eq!(CliError::failed("GATE_VIOLATIONS", "x").exit, 1);
+    assert_eq!(CliError::failed("GATE_CHECK_FAILED", "x").exit, 1);
     assert!(CliError::refused("DISPATCH_END_IN_PROGRESS", "x").retryable);
 }

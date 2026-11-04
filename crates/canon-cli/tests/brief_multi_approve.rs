@@ -153,7 +153,7 @@ fn skills_install_70_a_blocked_a_missing_and_an_unclosed_brief_refuse_all_and_wr
     let doc: Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
     let refused: Vec<(&str, &str)> = doc["data"]["refused"].as_array().unwrap().iter().map(|r| (r["changeId"].as_str().unwrap(), r["code"].as_str().unwrap())).collect();
-    assert_eq!(refused, [("d", "BRIEF_APPROVE_REFUSED"), ("ghost", "BRIEF_NOT_FOUND"), ("c", "BRIEF_UNAPPROVABLE")], "{doc}");
+    assert_eq!(refused, [("d", "BRIEF_APPROVE_REFUSED"), ("ghost", "BRIEF_NOT_FOUND"), ("c", "BRIEF_INVALID")], "{doc}");
     let message = doc["error"]["message"].as_str().unwrap();
     assert!(message.contains("`d`") && message.contains("`ghost`") && message.contains("`c`") && !message.contains("`b`"), "{message}");
 
@@ -177,7 +177,7 @@ fn skills_install_71_several_ids_are_human_only_and_the_hint_names_them_all() {
         let out = run_as(repo, Some(role), &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
         assert_eq!(out.status.code(), Some(2), "{role}: {}", stdout(&out));
         let doc: Value = serde_json::from_str(&stdout(&out)).unwrap();
-        assert_eq!(doc["error"]["code"], "HUMAN_ONLY", "{doc}");
+        assert_eq!(doc["error"]["code"], "ACTOR_DENIED", "{doc}");
         let hint = doc["error"]["hint"].as_str().unwrap();
         assert!(hint.contains("canon brief approve a b c --approver <their name> --note"), "{role}: {hint}");
     }

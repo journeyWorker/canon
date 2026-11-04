@@ -190,7 +190,7 @@ fn context_capability_30_a_failure_is_an_error_object_with_code_message_hint_and
     assert_eq!(blockers.status.code(), Some(1));
     let body = json_of(&blockers);
     assert_eq!(body["ok"], false, "{body}");
-    assert_eq!(body["error"]["code"], "BRIEF_HAS_BLOCKERS", "{body}");
+    assert_eq!(body["error"]["code"], "BRIEF_CHECK_FAILED", "{body}");
     for key in ["message", "hint"] {
         assert!(body["error"][key].as_str().is_some_and(|s| !s.is_empty()), "error.{key}: {body}");
     }
@@ -198,7 +198,7 @@ fn context_capability_30_a_failure_is_an_error_object_with_code_message_hint_and
     assert!(body["data"]["counts"]["blockers"].as_u64().is_some_and(|n| n > 0), "the failing check keeps its report: {body}");
 
     // Every code a run printed is one `canon schema --error` explains.
-    for code in ["BRIEF_NOT_FOUND", "USAGE", "BRIEF_HAS_BLOCKERS"] {
+    for code in ["BRIEF_NOT_FOUND", "USAGE", "BRIEF_CHECK_FAILED"] {
         let explained = canon(dir.path(), &["schema", "--error", code, "--json"]);
         assert!(explained.status.success(), "{code}: {}", stderr(&explained));
     }

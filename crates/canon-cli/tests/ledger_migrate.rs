@@ -388,7 +388,7 @@ fn ledger_migrate_01_read_commands_warn_and_point_at_migrate() {
         assert_eq!(out.status.code(), Some(exit), "`canon {args:?}` exit: {doc}");
         if let Some(code) = doc["error"]["code"].as_str() {
             assert!(!code.starts_with("CONFIG"), "`canon {args:?}` fails on configuration: {doc}");
-            assert_eq!(code, "GATE_VIOLATIONS", "`canon {args:?}` fails with {code}: {doc}");
+            assert_eq!(code, "GATE_CHECK_FAILED", "`canon {args:?}` fails with {code}: {doc}");
         } else {
             assert_eq!(doc["ok"], true, "`canon {args:?}`: {doc}");
         }

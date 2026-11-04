@@ -233,7 +233,7 @@ A record that names code (`evidence add`, `review scenario`, `finding add`)
 takes `--rev <git revision>`, default `HEAD`. Uncommitted code is allowed: the
 record carries a `codeTree` and `worktreeDirty`, and a review survives the
 commit as long as the code tree is the same. Outside git, or in a repo with no
-commits, such a command refuses with `NO_COMMIT`.
+commits, such a command refuses with `COMMIT_REQUIRED`.
 
 **Done when:** `canon gate check` exits `0`, and `canon subject show <id>`
 lists no uncovered scenario; both print the next step in `meta.next` when

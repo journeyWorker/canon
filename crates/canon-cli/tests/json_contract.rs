@@ -212,7 +212,7 @@ fn gate_check_reports_its_violations_as_json_and_keeps_its_exit_code() {
     let out = run(repo.path(), &["gate", "check", "--json"]);
     let body: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", String::from_utf8_lossy(&out.stdout)));
     assert_eq!(out.status.code(), Some(1), "{body}");
-    assert_eq!(body["error"]["code"], "GATE_VIOLATIONS");
+    assert_eq!(body["error"]["code"], "GATE_CHECK_FAILED");
     assert_eq!(body["meta"]["command"], "gate check");
     let violations = body["data"]["violations"].as_array().expect("violations[]");
     assert!(!violations.is_empty(), "{body}");
@@ -269,6 +269,6 @@ fn a_failing_format_check_is_an_error_with_the_violations_as_data() {
     let out = run(dir.path(), &["format", "corpus", "--json"]);
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(out.status.code(), Some(1), "{body}");
-    assert_eq!(body["error"]["code"], "FORMAT_VIOLATIONS");
+    assert_eq!(body["error"]["code"], "FORMAT_CHECK_FAILED");
     assert!(!body["data"]["violations"].as_array().unwrap().is_empty(), "{body}");
 }

@@ -366,7 +366,7 @@ impl Planner {
                     if old {
                         CliError::refused(crate::old_briefs::CODE, e).hint("run `canon migrate --json` to preview the rewrite, then the human runs `canon migrate --commit --plan-digest <digest>` when it re-binds an approval; nothing was written").field("--flow")
                     } else {
-                        CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("--flow")
+                        CliError::refused("SCAFFOLD_ARGUMENT_INVALID", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("--flow")
                     }
                 })?)
             }
@@ -374,7 +374,7 @@ impl Planner {
         for (axis, value) in [("lane", spec.lane.as_deref()), ("case", spec.case.as_deref())] {
             if let Some(value) = value {
                 if let Some(violation) = crate::subject::enum_membership_violation(&self.repo_root, axis, value) {
-                    return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", violation).hint("`canon schema scenario new` lists the accepted arguments and their forms").field(axis));
+                    return Err(CliError::refused("SCAFFOLD_ARGUMENT_INVALID", violation).hint("`canon schema scenario new` lists the accepted arguments and their forms").field(axis));
                 }
             }
         }
@@ -390,7 +390,7 @@ impl Planner {
                 // own root selection — the SAME [`resolve_spec_root`], so
                 // `--project` means one thing across both commands and an
                 // unresolvable root is never guessed at.
-                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("--project"))?;
+                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_REQUIRED", msg).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("--project"))?;
                 resolve_feature_path(root, tag.area(), tag.surface())
             }
             Some(feature) => {
@@ -399,7 +399,7 @@ impl Planner {
                 }
                 let resolved: PathBuf = if feature.is_absolute() { feature.to_path_buf() } else { self.repo_root.join(feature) };
                 if !path_under_any_root(&resolved, &self.roots) {
-                    return Err(CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
+                    return Err(CliError::refused("FEATURE_PATH_INVALID", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
                         resolved.display(),
                         self.roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
                     )).hint("put the file under a configured `specs.roots[]` entry, or add its root to canon.yaml").field("--feature"));
@@ -594,7 +594,7 @@ pub fn run_feature_new(
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.clone()).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
+            return CliError::refused("SPEC_ROOT_REQUIRED", msg.clone()).hint("pass --project <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
         }
     };
 

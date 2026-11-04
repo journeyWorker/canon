@@ -59,7 +59,7 @@ Feature: atip: STOPPED_MIDWAY, the code of a command that stopped after its earl
   Scenario: A refusal with no effect is exit 2 with the refusal's own code, never STOPPED_MIDWAY
     Given a repository holding .pi and a skill source that does not exist
     When canon init --dry-run --json runs, and canon init --providers with an unknown harness runs
-    Then the first exits 2 with SKILLS_INVALID_ARGUMENT and the second with INIT_INVALID_ARGUMENT, neither is STOPPED_MIDWAY and nothing is written
+    Then the first exits 2 with SKILLS_INVALID_ARGUMENT and the second with INIT_ARGUMENT_INVALID, neither is STOPPED_MIDWAY and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:24Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:atip-contract

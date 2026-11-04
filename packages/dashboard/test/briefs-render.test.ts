@@ -161,11 +161,11 @@ test("report.dashboard.14: a refused multi-brief approval names each refused bri
     code: "BRIEF_APPROVE_REFUSED",
     message: "1 of 3 briefs refused, so none was approved",
     hint: "reload this page to read the briefs named as they are now",
-    refused: [{ changeId: "b", code: "BRIEF_CHANGED_SINCE_PAGE_LOAD", message: "b changed after this page loaded it" }],
+    refused: [{ changeId: "b", code: "BRIEF_PAGE_STALE", message: "b changed after this page loaded it" }],
   };
   expect(refusedIds(failure)).toEqual(["b"]);
   const html = toHtml(renderApproveError(failure, null));
-  expect(html).toContain("<strong>b</strong> BRIEF_CHANGED_SINCE_PAGE_LOAD: b changed after this page loaded it");
+  expect(html).toContain("<strong>b</strong> BRIEF_PAGE_STALE: b changed after this page loaded it");
   expect(html).toContain("reload this page");
   expect(html).toContain("none was approved");
 });

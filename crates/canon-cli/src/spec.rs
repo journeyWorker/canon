@@ -46,7 +46,7 @@ pub const SPEC_PATH: &str = "docs/cli/canon.cli.json";
 const EXIT_TABLE: &[(u8, &str)] = &[
     (0, "ok"),
     (1, "the command ran and its answer is negative or incomplete: a finding, a failed check, an unverifiable result, a failure after the work began, an internal error"),
-    (2, "the command refused to run: usage, an unknown command, CONFIG_MISSING, an id or file that does not exist, unreadable input, an invalid argument, a target that cannot be written"),
+    (2, "the command refused to run: usage, an unknown command, CONFIG_REQUIRED, an id or file that does not exist, unreadable input, an invalid argument, a target that cannot be written"),
 ];
 
 /// An environment variable canon reads and a user may set.

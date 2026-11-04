@@ -181,7 +181,7 @@ pub(crate) fn run_search(args: SearchArgs) -> ExitCode {
     let command = "canon search";
     let query = text.trim();
     if query.is_empty() {
-        let error = CliError::refused("SEARCH_QUERY_EMPTY", "the search text is empty or only spaces").field("TEXT").hint("pass the text to find, e.g. `canon search \"timeout\"`");
+        let error = CliError::refused("SEARCH_QUERY_REQUIRED", "the search text is empty or only spaces").field("TEXT").hint("pass the text to find, e.g. `canon search \"timeout\"`");
         return ExitCode::from(error.emit("canon search", json));
     }
     let index = match open_index(command, &repo, json) {

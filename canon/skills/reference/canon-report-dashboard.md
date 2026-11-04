@@ -160,11 +160,11 @@ answer once and clicks Approve: one request carries every selected brief with
 the sha256 of the file the page read, and records exactly what `canon brief
 approve <id>+ --approver <name> --note <text>` records, the `Approved:` line
 bound to the brief digest and the policy approval, for each. A brief that
-changed after the page loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`) or that has
+changed after the page loaded (`BRIEF_PAGE_STALE`) or that has
 blockers refuses the whole request (409 `BRIEF_APPROVE_REFUSED`, naming each
 refused brief): nothing is written and the page says to read it again. A request
 naming one brief the old way (`changeId`, `sha256`) is still accepted. The server is localhost only and
-refuses requests from other origins (`DASHBOARD_ORIGIN_REFUSED`).
+refuses requests from other origins (`DASHBOARD_REQUEST_DENIED`).
 
 For an agent: when clean briefs are waiting, show them (`canon brief show
 <slug> --body`), ask with the harness question tool, and tell the human they

@@ -3,7 +3,7 @@
 //!
 //! `brief approve`, `policy approve`, `divergence accept` and the re-binding
 //! `migrate --commit` are the human's decisions, so a declared agent role is
-//! refused (`HUMAN_ONLY`). With `--relayed-via <tool>` (the tool the human was
+//! refused (`ACTOR_DENIED`). With `--relayed-via <tool>` (the tool the human was
 //! asked with) the agent records the human's answer for them, and the record
 //! says so: the agent's role and actor and the tool. Canon cannot tell that
 //! the human really answered; the marker and the answer on the record are the
@@ -190,7 +190,7 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
         (None, None) => return Ok(None),
         (None, Some(_)) => return check_role(command).map(|()| None),
         (Some(role), None) => {
-            return Err(CliError::refused("HUMAN_ONLY", format!("`{command}` records a human's decision and is not available to the {role} role without the relay option"))
+            return Err(CliError::refused("ACTOR_DENIED", format!("`{command}` records a human's decision and is not available to the {role} role without the relay option"))
                 .field("--as")
                 .hint(format!(
                     "to record an answer the human gave you in this conversation: show them what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on an explicit approval run `{relay_call}`; otherwise the human runs `{human_call}` in their own shell; never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself"
@@ -202,7 +202,7 @@ pub fn authorize(command: &str, human_call: &str, relay_call: &str, repo: &Path,
     match relay_allowed(repo) {
         Ok(true) => {}
         Ok(false) => {
-            return Err(CliError::refused("HUMAN_ONLY", format!("`{command}` was asked to record a relayed approval, and canon.yaml turns relaying off ({CONFIG_KEY}: deny)"))
+            return Err(CliError::refused("ACTOR_DENIED", format!("`{command}` was asked to record a relayed approval, and canon.yaml turns relaying off ({CONFIG_KEY}: deny)"))
                 .field(FLAG)
                 .hint(format!("the human runs `{human_call}` in their own shell, or sets `{CONFIG_KEY}: allow` in canon.yaml; never remove your role to run it yourself")));
         }

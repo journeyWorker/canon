@@ -18,7 +18,7 @@ pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
     let repo = repo.as_path();
     let page = page.page();
     if let Err(err) = crate::retention::validate_sensitive(repo, include_sensitive) {
-        CliError::refused("QUERY_INVALID_ARGUMENT", err.to_string()).hint("`canon schema query` lists the accepted arguments and their forms").emit("canon query", json);
+        CliError::refused("QUERY_ARGUMENT_INVALID", err.to_string()).hint("`canon schema query` lists the accepted arguments and their forms").emit("canon query", json);
         return ExitCode::from(2);
     }
     let Some(plugin_id) = plugin else {
@@ -145,7 +145,7 @@ pub(crate) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
     } else {
         let missing_provenance = report.violations.iter().any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
         let hint = with_provenance_fix("fix each violation named in data.violations, then run `canon format` again", missing_provenance);
-        let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
+        let error = CliError::failed("FORMAT_CHECK_FAILED", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
         ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()))
     }
 }
@@ -221,7 +221,7 @@ pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
                 E::ScopeConflict => CliError::refused("USAGE", e.to_string()).field(if domain.is_none() { "--subject" } else { "--regime" }).expected(["--regime", "--domain"]).hint("pass --regime or --domain, not both"),
                 E::SubjectWithoutDomain => CliError::refused("USAGE", e.to_string()).field("--subject").hint("add --domain <DOMAIN>, or drop --subject"),
                 E::RoleRegimeMismatch { regime_role, .. } => CliError::refused("USAGE", e.to_string()).field("--regime").received(regime_role.clone()).hint("pass the same role to --for-role and --regime (`canon regime show` prints a valid key)"),
-                E::DerivationFailed { .. } => CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name"),
+                E::DerivationFailed { .. } => CliError::refused("RETRIEVE_INVALID", e.to_string()).hint("check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name"),
             };
             ExitCode::from(error.emit("canon retrieve", json))
         }

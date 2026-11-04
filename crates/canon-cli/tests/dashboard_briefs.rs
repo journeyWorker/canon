@@ -389,7 +389,7 @@ fn report_dashboard_07_refuses_a_brief_that_changed_since_the_page_loaded() {
     let reply = post_approval(&live, &request);
     assert_eq!(reply.code, 409, "{}", reply.body);
     let error = &reply.json()["error"];
-    assert_eq!(error["code"], "BRIEF_CHANGED_SINCE_PAGE_LOAD");
+    assert_eq!(error["code"], "BRIEF_PAGE_STALE");
     assert!(error["hint"].as_str().unwrap().contains("reload"));
     assert_eq!(std::fs::read_to_string(&path).unwrap(), edited, "nothing was written");
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
@@ -483,7 +483,7 @@ fn report_dashboard_14_a_selected_brief_edited_after_the_page_read_it_refuses_al
     assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
     assert!(doc["error"]["message"].as_str().unwrap().contains("`ready2`") && doc["error"]["hint"].as_str().unwrap().contains("reload"), "{doc}");
     let refused: Vec<(&str, &str)> = doc["data"]["refused"].as_array().unwrap().iter().map(|r| (r["changeId"].as_str().unwrap(), r["code"].as_str().unwrap())).collect();
-    assert_eq!(refused, [("ready2", "BRIEF_CHANGED_SINCE_PAGE_LOAD")], "{doc}");
+    assert_eq!(refused, [("ready2", "BRIEF_PAGE_STALE")], "{doc}");
     assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before[0]);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), edited, "the edited brief is as its editor left it");
     assert_eq!(std::fs::read(brief_path(dir.path(), "ready3")).unwrap(), before[2]);
@@ -531,15 +531,15 @@ fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
     };
     type Case<'a> = (&'a str, Vec<(&'static str, String)>, u16, &'a str);
     let cases: Vec<Case<'_>> = vec![
-        ("foreign Origin", with("Origin", Some("http://evil.example".into())), 403, "DASHBOARD_ORIGIN_REFUSED"),
-        ("another port's Origin", with("Origin", Some(format!("http://127.0.0.1:{}", port.wrapping_add(1)))), 403, "DASHBOARD_ORIGIN_REFUSED"),
-        ("no Origin", with("Origin", None), 403, "DASHBOARD_ORIGIN_REFUSED"),
-        ("foreign Host", with("Host", Some("evil.example".into())), 403, "DASHBOARD_ORIGIN_REFUSED"),
-        ("rebound Host", with("Host", Some(format!("evil.example:{port}"))), 403, "DASHBOARD_ORIGIN_REFUSED"),
-        ("form content type", with("Content-Type", Some("application/x-www-form-urlencoded".into())), 400, "DASHBOARD_BAD_REQUEST"),
-        ("text content type", with("Content-Type", Some("text/plain".into())), 400, "DASHBOARD_BAD_REQUEST"),
-        ("no content type", with("Content-Type", None), 400, "DASHBOARD_BAD_REQUEST"),
-        ("no length", with("Content-Length", None), 400, "DASHBOARD_BAD_REQUEST"),
+        ("foreign Origin", with("Origin", Some("http://evil.example".into())), 403, "DASHBOARD_REQUEST_DENIED"),
+        ("another port's Origin", with("Origin", Some(format!("http://127.0.0.1:{}", port.wrapping_add(1)))), 403, "DASHBOARD_REQUEST_DENIED"),
+        ("no Origin", with("Origin", None), 403, "DASHBOARD_REQUEST_DENIED"),
+        ("foreign Host", with("Host", Some("evil.example".into())), 403, "DASHBOARD_REQUEST_DENIED"),
+        ("rebound Host", with("Host", Some(format!("evil.example:{port}"))), 403, "DASHBOARD_REQUEST_DENIED"),
+        ("form content type", with("Content-Type", Some("application/x-www-form-urlencoded".into())), 400, "DASHBOARD_REQUEST_INVALID"),
+        ("text content type", with("Content-Type", Some("text/plain".into())), 400, "DASHBOARD_REQUEST_INVALID"),
+        ("no content type", with("Content-Type", None), 400, "DASHBOARD_REQUEST_INVALID"),
+        ("no length", with("Content-Length", None), 400, "DASHBOARD_REQUEST_INVALID"),
     ];
     for (name, headers, code, error) in cases {
         let reply = http(port, "POST", "/api/briefs/approve", &headers, body.as_bytes());
@@ -555,7 +555,7 @@ fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
         for host in ["evil.example", "evil.example:80", &format!("evil.example:{port}"), &format!("127.0.0.1:{}", port.wrapping_add(1)), ""] {
             let rebound = http(port, "GET", path, &[("Host", host.to_string())], b"");
             assert_eq!(rebound.code, 403, "GET {path} under Host `{host}`: {}", rebound.body);
-            assert_eq!(rebound.json()["error"]["code"], "DASHBOARD_ORIGIN_REFUSED", "GET {path} under Host `{host}`");
+            assert_eq!(rebound.json()["error"]["code"], "DASHBOARD_REQUEST_DENIED", "GET {path} under Host `{host}`");
         }
         let no_host = http(port, "GET", path, &[], b"");
         assert_eq!(no_host.code, 403, "GET {path} with no Host");
@@ -593,7 +593,7 @@ fn report_dashboard_09_refuses_an_oversize_body_without_waiting_for_it() {
     assert!(started.elapsed() < Duration::from_secs(2), "answered after {:?}: the guard waited for the body", started.elapsed());
     let text = String::from_utf8_lossy(&raw);
     assert!(text.starts_with("HTTP/1.1 400"), "{text}");
-    assert!(text.contains("DASHBOARD_BAD_REQUEST") && text.contains("the body is 70000 bytes; the limit is 65536"), "{text}");
+    assert!(text.contains("DASHBOARD_REQUEST_INVALID") && text.contains("the body is 70000 bytes; the limit is 65536"), "{text}");
     assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before);
 }
 
@@ -611,7 +611,7 @@ fn report_dashboard_10_leaves_the_brief_untouched_on_every_refusal() {
     for (by, note, field) in [("", "Ship it.", "--approver"), ("Ana", "", "--note"), ("Ana\nBob", "Ship it.", "--approver"), ("Ana", "one\ntwo", "--note")] {
         let reply = post_approval(&live, &json!({ "changeId": "ready", "by": by, "note": note, "sha256": sha }));
         assert_eq!(reply.code, 400, "{by:?} {note:?}: {}", reply.body);
-        assert_eq!(reply.json()["error"]["code"], "APPROVAL_INCOMPLETE");
+        assert_eq!(reply.json()["error"]["code"], "APPROVAL_INVALID");
         assert!(reply.json()["error"]["message"].as_str().unwrap().contains(field));
     }
     let unknown = post_approval(&live, &json!({ "changeId": "no-such-change", "by": "Ana", "note": "Go.", "sha256": sha }));
@@ -619,7 +619,7 @@ fn report_dashboard_10_leaves_the_brief_untouched_on_every_refusal() {
     let archived = post_approval(&live, &json!({ "changeId": "archived", "by": "Ana", "note": "Go.", "sha256": sha }));
     assert_eq!(archived.code, 404, "an archived change is not live");
     let malformed = post(page_headers(port, 2), "{}");
-    assert_eq!((malformed.code, malformed.json()["error"]["code"].clone()), (400, json!("DASHBOARD_BAD_REQUEST")));
+    assert_eq!((malformed.code, malformed.json()["error"]["code"].clone()), (400, json!("DASHBOARD_REQUEST_INVALID")));
     let bad_id = post_approval(&live, &json!({ "changeId": "../../etc", "by": "Ana", "note": "Go.", "sha256": sha }));
     assert_eq!(bad_id.code, 400);
 

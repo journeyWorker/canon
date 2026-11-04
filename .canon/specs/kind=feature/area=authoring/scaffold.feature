@@ -148,7 +148,7 @@ Feature: authoring scaffold
   Scenario: A scenario written into an explicit feature file still refuses a project id that names no configured spec root
     Given a repo whose canon.yaml configures one spec root, game
     When scenario new writes into an explicit --feature file under that root and names a --project that is no configured root
-    Then it exits 2 with UNKNOWN_SPEC_ROOT and writes nothing, even though the file itself lies under a configured root
+    Then it exits 2 with SPEC_ROOT_NOT_FOUND and writes nothing, even though the file itself lies under a configured root
 
   # canon: {"schema":1,"at":"2026-10-23T11:49:03Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:authoring-scaffold

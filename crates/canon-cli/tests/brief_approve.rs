@@ -186,7 +186,7 @@ fn approval_is_refused_while_the_brief_has_blockers_or_the_words_are_empty() {
     std::fs::write(brief_path(repo), en_brief("")).unwrap();
     let out = approve(repo, "Ana", "  ");
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains("APPROVAL_INCOMPLETE"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("APPROVAL_INVALID"), "{}", stderr(&out));
 }
 
 #[test]

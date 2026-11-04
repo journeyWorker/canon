@@ -37,7 +37,7 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
         Err(code) => return code,
     };
     let root = crate::context::resolve_repo_root(&repo);
-    let project_id = match crate::inventory::resolve_project_id(&root, project_id.as_ref(), "REVIEW_INVALID_ARGUMENT", command, json) {
+    let project_id = match crate::inventory::resolve_project_id(&root, project_id.as_ref(), "REVIEW_ARGUMENT_INVALID", command, json) {
         Ok(id) => id,
         Err(code) => return ExitCode::from(code),
     };

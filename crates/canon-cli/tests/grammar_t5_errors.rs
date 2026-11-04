@@ -154,7 +154,7 @@ fn atip_contract11_05_schema_lists_every_warning_and_explains_each() {
     let error_codes: Vec<&str> = errors["data"]["errors"].as_array().unwrap().iter().map(|e| e["code"].as_str().unwrap()).collect();
     let warning_codes: Vec<&str> = listed.iter().map(|e| e["code"].as_str().unwrap()).collect();
     assert!(warning_codes.contains(&"OLD_LAYOUT_FOUND") && !error_codes.contains(&"OLD_LAYOUT_FOUND"), "a code that is only a warning left the error registry");
-    assert!(warning_codes.contains(&"CONFIG_MISSING") && error_codes.contains(&"CONFIG_MISSING"), "a code that is both is in both");
+    assert!(warning_codes.contains(&"CONFIG_MISSING") && error_codes.contains(&"CONFIG_REQUIRED") && !error_codes.contains(&"CONFIG_MISSING"), "the warning kept its name; the error was renamed");
     let one = document(&canon_in(dir.path(), home.path(), &strs(&["schema", "--error", "INPUT_INVALID", "--json"]), &[]));
     assert_eq!(one["data"]["kind"], "error");
     assert_eq!(one["data"]["error"]["reasons"].as_array().unwrap().len(), 9);

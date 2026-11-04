@@ -140,7 +140,7 @@ subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.s
 커밋하지 않은 코드에 대한 리뷰도 기록할 수 있습니다. 리뷰는 `--rev`의 커밋 대신
 작업 트리의 `codeTree`와 `worktreeDirty`를 담고, 그 코드를 커밋한 뒤에도 코드
 트리가 같다면 리뷰는 유효합니다. 코드가 달라졌을 때만 낡은 리뷰가 됩니다.
-git 밖이거나 커밋이 아직 없으면 `NO_COMMIT`입니다. 시나리오가 여럿이면 `--input`
+git 밖이거나 커밋이 아직 없으면 `COMMIT_REQUIRED`입니다. 시나리오가 여럿이면 `--input`
 배열로 한 번에 기록합니다(전부 검증된 뒤에야 쓰기 시작).
 
 `block_on_findings`이면 리뷰 finding(`canon finding add --severity

@@ -158,7 +158,7 @@ Feature: dispatch manifest
   Scenario: context-pack add refuses a manifest that names a missing input and stores nothing
     Given a context manifest that selects a document which does not exist
     When canon context-pack add --manifest names that manifest
-    Then it exits 2 with CONTEXT_INPUT_MISSING naming the missing file
+    Then it exits 2 with CONTEXT_INPUT_NOT_FOUND naming the missing file
     And the repo tree is identical to before the call
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:03Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -298,7 +298,7 @@ Feature: dispatch manifest
   Scenario: dispatch diff outside a canon repository is refused and writes nothing
     Given a directory with no canon.yaml in it or any parent
     When canon dispatch diff runs there
-    Then it exits 2 with CONFIG_MISSING on field --repo
+    Then it exits 2 with CONFIG_REQUIRED on field --repo
     And no file is created in the directory
 
   # canon: {"schema":1,"at":"2026-10-27T10:48:52Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}

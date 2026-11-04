@@ -185,7 +185,7 @@ fn dispatch_refuses_a_role_regime_mismatch_as_a_stable_usage_error() {
 
     assert_eq!(output.status.code(), Some(2), "role/regime mismatch is a usage refusal");
     assert!(output.stdout.is_empty(), "refusal must not emit a success snapshot");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("DISPATCH_ROLE_REGIME_MISMATCH"), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("DISPATCH_ROLE_CONFLICT"), "{}", String::from_utf8_lossy(&output.stderr));
     assert!(!repo.path().join(".canon/dispatch").exists(), "a refused dispatch must not write a manifest");
 }
 

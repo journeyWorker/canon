@@ -423,9 +423,9 @@ fn atip_constraints_09_a_validator_whose_rejects_is_not_refused_is_found() {
     let accepted = seeded("query", "validators", serde_json::json!({ "arguments": ["kind"], "code": "USAGE", "description": "Refuses nothing at all.", "rejects": ["canon query --kind change --json"] }));
     let problems = drive_validator(&accepted, accepted["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
     assert!(problems.iter().any(|problem| problem.contains("was not refused with USAGE")), "{problems:?}");
-    let other_code = seeded("query", "validators", serde_json::json!({ "arguments": ["limit"], "code": "QUERY_INVALID_ARGUMENT", "description": "Claims another code.", "rejects": ["canon query --kind change --limit 0 --json"] }));
+    let other_code = seeded("query", "validators", serde_json::json!({ "arguments": ["limit"], "code": "QUERY_ARGUMENT_INVALID", "description": "Claims another code.", "rejects": ["canon query --kind change --limit 0 --json"] }));
     let problems = drive_validator(&other_code, other_code["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));
-    assert!(problems.iter().any(|problem| problem.contains("was not refused with QUERY_INVALID_ARGUMENT")), "{problems:?}");
+    assert!(problems.iter().any(|problem| problem.contains("was not refused with QUERY_ARGUMENT_INVALID")), "{problems:?}");
     let example = harness::leaf("query")["examples"][0].clone();
     let also = seeded("query", "validators", serde_json::json!({ "arguments": ["kind"], "code": "USAGE", "description": "Is an example.", "rejects": [example] }));
     let problems = drive_validator(&also, also["validators"].as_array().and_then(|list| list.last()).expect("the seeded validator"));

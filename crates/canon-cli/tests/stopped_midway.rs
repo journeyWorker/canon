@@ -267,7 +267,7 @@ fn atip_midway_06_a_refusal_with_no_effect_is_exit_2_with_the_refusals_own_code(
     let unknown = pi_repo(dir.path(), "unknown");
     let refused = canon(&unknown, &["init", "--providers", "gemini", "--json"], &dir.path().join("missing"));
     assert_eq!(refused.status.code(), Some(2));
-    assert_eq!(document(&refused)["error"]["code"], "INIT_INVALID_ARGUMENT");
+    assert_eq!(document(&refused)["error"]["code"], "INIT_ARGUMENT_INVALID");
     assert!(!unknown.join("canon.yaml").exists());
 }
 
@@ -358,7 +358,7 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("ARTIFACTS_VERIFY_FAILED", Class::Keep(Why::Answer), "`artifacts verify` found a bound file missing or altered"),
     ("BATCH_INCOMPLETE", Class::Keep(Why::Batch), "the batch's own reserved code; an element that stops midway is its item error"),
     ("BRIEF_CHANGED_SINCE_APPROVAL", Class::Keep(Why::Answer), "the gate's verdict on a brief edited after approval"),
-    ("BRIEF_HAS_BLOCKERS", Class::Keep(Why::Answer), "`brief check`'s findings"),
+    ("BRIEF_CHECK_FAILED", Class::Keep(Why::Answer), "`brief check`'s findings"),
     ("BRIEF_UNAPPROVED", Class::Keep(Why::NoEffect), "the attestation is refused before its record is written"),
     ("BRIEF_WRITE_FAILED", Class::Keep(Why::Io), "the brief file could not be written"),
     ("CHANGE_ADOPTION_INCOMPLETE", Class::Keep(Why::Io), "judged: the only cause is the second record's store write failing after the first was written, which is the I/O category (`WRITE_UNAVAILABLE` before the work, `WRITE_FAILED` during it, spec 8.3), not a refusal of an argument; a tool keeps a code of its own for it until it chooses to move (migration guide 7)"),
@@ -376,10 +376,10 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("EVIDENCE_FABRICATED", Class::Keep(Why::Answer), "the gate's verdict on the note"),
     ("EVIDENCE_REPORT_CONTRADICTION", Class::Keep(Why::Answer), "the gate's verdict on the bound report"),
     ("EVIDENCE_STORE_FAILED", Class::Keep(Why::Io), "a bound file could not be written to the artifact store; the record or batch is rolled back"),
-    ("FORMAT_VIOLATIONS", Class::Keep(Why::Answer), "`format`'s findings"),
+    ("FORMAT_CHECK_FAILED", Class::Keep(Why::Answer), "`format`'s findings"),
     ("GATE_TASK_BLOCKED", Class::Keep(Why::Answer), "`task done`'s verdict on the evidence"),
     ("GATE_TASK_EVIDENCE_INVALID", Class::Keep(Why::Answer), "`task done`'s verdict on the evidence"),
-    ("GATE_VIOLATIONS", Class::Keep(Why::Answer), "`gate check`'s findings"),
+    ("GATE_CHECK_FAILED", Class::Keep(Why::Answer), "`gate check`'s findings"),
     ("HOOKS_INSTALL_FAILED", Class::Keep(Why::Io), "a hook file could not be written after the install began"),
     ("INGEST_FAILED", Class::Keep(Why::Io), "an ingest read or write failed"),
     ("INGEST_SOURCE_UNUSABLE", Class::Keep(Why::Answer), "a malformed plan source, reported with nothing persisted"),
@@ -387,7 +387,7 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("INTERNAL", Class::Keep(Why::Internal), "a bug of canon"),
     ("INVENTORY_ABORTED", Class::Keep(Why::Answer), "`inventory sync`'s findings"),
     ("INVENTORY_FAILED", Class::Keep(Why::Io), "the record store failed while the index was read or written"),
-    ("LEARN_DEMOTION_FAILED", Class::Keep(Why::Io), "the demotion's write failed"),
+    ("STRATEGY_DEMOTION_FAILED", Class::Keep(Why::Io), "the demotion's write failed"),
     ("LEARN_EVALUATION_REJECTED", Class::Keep(Why::Answer), "the promotion gate's verdict on the evaluation"),
     ("LEARN_PROMOTION_BLOCKED", Class::Keep(Why::Answer), "the promotion gate's verdict"),
     ("LEARN_PROMOTION_FAILED", Class::Keep(Why::Io), "the strategy store or file could not be written"),
@@ -410,7 +410,7 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("SEARCH_INDEX_FAILED", Class::Keep(Why::Io), "the records or the index could not be read or built"),
     ("SELFTEST_FAILED", Class::Keep(Why::Answer), "a selftest suite did not match its expected result"),
     ("SERIALIZE_FAILED", Class::Keep(Why::Internal), "a result that cannot be serialized is a bug of canon"),
-    ("SKILLS_DRIFT", Class::Keep(Why::Answer), "`skills check`'s finding"),
+    ("SKILLS_CHECK_FAILED", Class::Keep(Why::Answer), "`skills check`'s finding"),
     ("SKILLS_FAILED", Class::Keep(Why::Io), "a skills command's own I/O failure; `init` says it too when the install fails and `canon skills install` would not have refused it"),
     ("SUBJECT_GATE_VIOLATION", Class::Keep(Why::Answer), "the gate's verdict on a status transition"),
     ("TIER_FAILED", Class::Keep(Why::Io), "tier aging failed"),

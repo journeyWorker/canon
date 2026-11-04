@@ -10,7 +10,7 @@ Feature: Demo repo scaffold and review
     Given a directory that holds no canon.yaml
     When canon demo init --repo names it
     Then it exits 0 with data.repo the directory and data.scenario auth.login.01
-    And the directory now holds a canon.yaml, and canon gate check there exits 1 with GATE_VIOLATIONS
+    And the directory now holds a canon.yaml, and canon gate check there exits 1 with GATE_CHECK_FAILED
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:05Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
   @subject:authoring-scaffold
@@ -21,7 +21,7 @@ Feature: Demo repo scaffold and review
   Scenario: demo init in a directory that already has a canon.yaml is refused and changes nothing
     Given a directory that canon demo init already set up, or one with a canon.yaml whose .gitignore holds no canon lines
     When canon demo init --repo names it again
-    Then it exits 2 with INIT_CONFIG_EXISTS
+    Then it exits 2 with CONFIG_EXISTS
     And the directory tree is identical to before the call, and the policy file is unchanged
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:05Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -43,5 +43,5 @@ Feature: Demo repo scaffold and review
   Scenario: demo review in a directory that demo init never set up is refused and changes nothing
     Given a directory that holds no canon.yaml
     When canon demo review --repo names it
-    Then it exits 2 with DEMO_NOT_INITIALIZED
+    Then it exits 2 with DEMO_REQUIRED
     And the directory tree is identical to before the call

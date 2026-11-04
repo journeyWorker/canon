@@ -141,7 +141,7 @@ Feature: ledger naming
   Scenario: Messages that quote a key quote the typed key
     Given a finding at round 2 seq 3 and a second add at the same key
     When `canon finding add` runs twice
-    Then FINDING_SEQ_OCCUPIED quotes `<change id>_2_3`, and a promote refusal quotes the same key
+    Then FINDING_EXISTS quotes `<change id>_2_3`, and a promote refusal quotes the same key
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:21Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:report-generation

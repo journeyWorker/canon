@@ -54,13 +54,13 @@ use sha2::{Digest, Sha256};
 use crate::cli_error::CliErrorExt as _;
 use crate::safety::Effect;
 
-/// The `HUMAN_ONLY` refusal of `command` for a declared agent role (a plan that
+/// The `ACTOR_DENIED` refusal of `command` for a declared agent role (a plan that
 /// re-binds an `Approved:` line or a review pin is the human's), `None` in the
 /// human's own shell.
 pub fn human_only(command: &str, human_call: &str) -> Option<crate::cli_error::CliError> {
     let role = crate::role::Role::current(None)?;
     Some(
-        crate::cli_error::CliError::refused("HUMAN_ONLY", format!("`{command}` re-binds an `Approved:` line or a review pin, a human's decision, and is not available to the {role} role"))
+        crate::cli_error::CliError::refused("ACTOR_DENIED", format!("`{command}` re-binds an `Approved:` line or a review pin, a human's decision, and is not available to the {role} role"))
             .field("--as")
             .hint(format!(
                 "report this exact call to the human and wait; the human runs it in their own shell: `{human_call}`; never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself"
@@ -445,7 +445,7 @@ impl Plan {
         let approvals = self.briefs.iter().filter(|b| b.rebind_approval).count();
         let mut out = vec![if self.rebinds() {
             format!(
-                "canon migrate: briefs — this plan re-binds {approvals} `Approved:` line(s) and {} review pin(s); `--commit` is the human's (HUMAN_ONLY for every agent role unless it records their explicit answer with --relayed-via), a preview is open to all",
+                "canon migrate: briefs — this plan re-binds {approvals} `Approved:` line(s) and {} review pin(s); `--commit` is the human's (ACTOR_DENIED for every agent role unless it records their explicit answer with --relayed-via), a preview is open to all",
                 self.reviews.len()
             )
         } else {

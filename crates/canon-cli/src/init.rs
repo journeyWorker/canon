@@ -181,7 +181,7 @@ fn skeleton_yaml() -> String {
     out.push_str("#   # `canon brief approve`, `canon policy approve`, `canon divergence accept`\n");
     out.push_str("#   # and a `canon migrate --commit` that re-binds approvals, with\n");
     out.push_str("#   # `--relayed-via <tool>`; the record says it was relayed. `deny` refuses that\n");
-    out.push_str("#   # (HUMAN_ONLY): the human runs those calls themselves. Default: allow.\n");
+    out.push_str("#   # (ACTOR_DENIED): the human runs those calls themselves. Default: allow.\n");
     out.push_str("#   relay: allow\n");
     out
 }
@@ -716,7 +716,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).field("--language").hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
+            return CliError::refused("INIT_ARGUMENT_INVALID", format!("--language: {e}")).field("--language").hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
         }
     };
     let agents = if options.agents_md {
@@ -744,7 +744,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                return CliError::refused("INIT_INVALID_ARGUMENT", e.clone()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
+                return CliError::refused("INIT_ARGUMENT_INVALID", e.clone()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
             }
         }
     };
@@ -796,7 +796,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                     log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists and nothing is left to refresh", canon_yaml_path.display()));
                     return log.finish(repo);
                 }
-                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check`, or remove it first to start over").emit(log.command(), json);
+                return CliError::refused("CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check`, or remove it first to start over").emit(log.command(), json);
             }
             let what = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines" } else { "the canon .gitignore lines" };
             let refreshed = if dry_run { format!("{what} would be refreshed") } else { format!("{what} are refreshed") };
@@ -860,7 +860,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
 pub fn run_check_config(repo: &Path, json: bool) -> u8 {
     let canon_yaml_path = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml_path) else {
-        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).hint("run `canon init` in the repository root first").emit("canon init --check", json);
+        return CliError::refused("CONFIG_REQUIRED", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).hint("run `canon init` in the repository root first").emit("canon init --check", json);
     };
 
     let mut all_ok = true;

@@ -70,5 +70,5 @@ fn atip_constraints_07_finding_add_a_defect_without_its_origin_is_refused_before
 
 #[test]
 fn atip_constraints_07_query_a_status_foreign_to_the_kind_is_refused_before_any_state_is_read() {
-    refused_in_an_empty_directory("query", &["kind", "status"], "QUERY_INVALID_ARGUMENT");
+    refused_in_an_empty_directory("query", &["kind", "status"], "QUERY_ARGUMENT_INVALID");
 }

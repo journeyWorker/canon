@@ -1,5 +1,5 @@
 //! The stateless stage of step 6 (ATIP 11.7): the domains and the constraints a command document declares, enforced from the
-//! declarations themselves, after parsing and before any precondition or state read (`CONFIG_MISSING`, `OLD_LAYOUT`, a file, a
+//! declarations themselves, after parsing and before any precondition or state read (`CONFIG_REQUIRED`, `OLD_LAYOUT`, a file, a
 //! ledger), in the contract's order: a failure to parse and `required` (the parser's, `relaxed::tree`) → domains → constraints, in
 //! the order the document lists them → validators (`validators::check`, which runs after this stage).
 //!

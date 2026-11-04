@@ -295,7 +295,7 @@ answer; without it init takes the harnesses whose
 `.claude`, `.codex`, `.omp` or `.pi` directory exists, and with none detected
 it writes only a commented example
 and installs nothing. `.agents` alone never selects Codex. `canon skills
-install|check|doctor` follow the section; `install` prunes projected files the bundle no longer ships when their bytes match the lock (a modified one stays, reported as `kept:`), `check` exits 1 (`SKILLS_DRIFT`) naming each orphan and `doctor` prints `orphan:` lines; `canon skills install
+install|check|doctor` follow the section; `install` prunes projected files the bundle no longer ships when their bytes match the lock (a modified one stays, reported as `kept:`), `check` exits 1 (`SKILLS_CHECK_FAILED`) naming each orphan and `doctor` prints `orphan:` lines; `canon skills install
 --providers=<list>` rewrites it in place. Without the section they use the
 install lock's providers, then the detected ones; nothing undetected is ever
 added. A present section that is not this shape, or names another harness,

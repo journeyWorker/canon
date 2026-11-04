@@ -57,7 +57,7 @@ pub(crate) static TABLES: Tables = Tables {
                 },
                 Validator {
                     arguments: &["approver", "note"],
-                    code: "APPROVAL_INCOMPLETE",
+                    code: "APPROVAL_INVALID",
                     description: "The human's own answer (`--approver` and `--note`) is one line and, written by the human without `--relayed-via`, not blank once trimmed (a blank answer under `--relayed-via` is the relayed validator's, `USAGE`).",
                     rejects: &["canon brief approve add-login --approver \" \" --note ok", "canon brief approve add-login --approver alice --note \" \""],
                 },
@@ -131,12 +131,12 @@ pub(crate) static TABLES: Tables = Tables {
     ],
     domains: &[
         // The id of a task, read by the handler (the operand has no clap parser).
-        DomainRow::new(Scope::Arguments(&["task done"], "task"), Domain::matching(TASK_ID), "GATE_TASK_INVALID_ARGUMENT").inside(&["add-login#1", "add-login#1.2.3", "a#007"]).outside(&["Add#1", "add-login", "add-login#", "add-login#1.", "add-login#a", "#1"]),
+        DomainRow::new(Scope::Arguments(&["task done"], "task"), Domain::matching(TASK_ID), "TASK_ID_INVALID").inside(&["add-login#1", "add-login#1.2.3", "a#007"]).outside(&["Add#1", "add-login", "add-login#", "add-login#1.", "add-login#a", "#1"]),
         // The subject's domain: a kebab slug (its membership of the repo's vocabulary is state).
-        DomainRow::new(Scope::Arguments(&["subject new"], "domain"), Domain::matching(KEBAB), "SUBJECT_INVALID_ARGUMENT").inside(&["dev"]).outside(&["Dev", "a_b", "-a", "a-", "a--b", "d e", ""]),
+        DomainRow::new(Scope::Arguments(&["subject new"], "domain"), Domain::matching(KEBAB), "SUBJECT_ARGUMENT_INVALID").inside(&["dev"]).outside(&["Dev", "a_b", "-a", "a-", "a--b", "d e", ""]),
         // A reason is one non-blank line.
-        DomainRow::new(Scope::Arguments(&["subject move"], "reason"), Domain::matching(REASON), "SUBJECT_INVALID_ARGUMENT").inside(&["ok", "a\u{85}b", "a\u{2028}b", " a "]).outside(&["", " ", "\t", "a\nb", "a\rb", "a\n", "\u{85}"]),
-        DomainRow::new(Scope::Arguments(&["subject move"], "override-reason"), Domain::matching(REASON), "SUBJECT_INVALID_ARGUMENT").inside(&["ok", "a\u{85}b", " a "]).outside(&["", " ", "\t", "a\nb", "a\rb", "a\n", "\u{85}"]),
+        DomainRow::new(Scope::Arguments(&["subject move"], "reason"), Domain::matching(REASON), "SUBJECT_ARGUMENT_INVALID").inside(&["ok", "a\u{85}b", "a\u{2028}b", " a "]).outside(&["", " ", "\t", "a\nb", "a\rb", "a\n", "\u{85}"]),
+        DomainRow::new(Scope::Arguments(&["subject move"], "override-reason"), Domain::matching(REASON), "SUBJECT_ARGUMENT_INVALID").inside(&["ok", "a\u{85}b", " a "]).outside(&["", " ", "\t", "a\nb", "a\rb", "a\n", "\u{85}"]),
         // The tag of a scenario may carry the `@` the scenario bodies write it with; it is the parser's, not the shared grammar's.
         DomainRow::new(Scope::Arguments(&["scenario new"], "tag"), Domain::matching(SCENARIO_TAG), "USAGE").inside(&["auth.login.01", "@auth.login.01", "a-.-b.123"]).outside(&["auth.login.1", "@@auth.login.01", "Auth.login.01", "auth.login", "a.b.c.01", "@"]),
         DomainRow::new(Scope::Arguments(&["scenario new"], "lane"), Domain::matching(KEBAB), "USAGE").inside(&["a", "a-1"]).outside(&["A", "a_b", "-a", "a-", "a--b", ""]),

@@ -859,7 +859,7 @@ fn authoring_migrate_21_a_dirty_brief_is_refused_and_edited_or_role_mismatched_b
     fs::write(brief_file(r, "b"), &dirty).unwrap();
     let out = canon(r, &["migrate", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
-    assert!(out_text(&out).contains("MIGRATE_UNCOMMITTED") && out_text(&out).contains("changes/b/brief.md"), "{}", out_text(&out));
+    assert!(out_text(&out).contains("MIGRATION_CONFLICT") && out_text(&out).contains("changes/b/brief.md"), "{}", out_text(&out));
     assert_eq!(fs::read_to_string(brief_file(r, "b")).unwrap(), dirty);
     git(r, &["checkout", "--", "."]);
 
@@ -1035,7 +1035,7 @@ fn authoring_migrate_24_a_plan_that_re_binds_is_human_only_and_one_that_does_not
         let out = commit(r, Some(role), &digest);
         assert_eq!(out.status.code(), Some(2), "{role}: {}", out_text(&out));
         let doc = json(&out);
-        assert_eq!(doc["error"]["code"], "HUMAN_ONLY", "{doc}");
+        assert_eq!(doc["error"]["code"], "ACTOR_DENIED", "{doc}");
         assert!(doc["error"]["hint"].as_str().unwrap().contains(&digest), "the hint carries the exact call: {doc}");
         assert_eq!(tree(r), before, "{role}: the tree is unchanged");
     }
@@ -1069,7 +1069,7 @@ fn subject_lifecycle_57_a_relayed_migrate_commit_records_the_relay_in_the_backup
         canon_as(r, Some("planner"), &args)
     };
     let plain = commit(r, Some("planner"), &digest);
-    assert_eq!((plain.status.code(), json(&plain)["error"]["code"].as_str()), (Some(2), Some("HUMAN_ONLY")), "{}", out_text(&plain));
+    assert_eq!((plain.status.code(), json(&plain)["error"]["code"].as_str()), (Some(2), Some("ACTOR_DENIED")), "{}", out_text(&plain));
     assert!(json(&plain)["error"]["hint"].as_str().unwrap().contains("--relayed-via"), "{}", out_text(&plain));
     // (This file's runner sets CANON_ACTOR, so the actor is never the missing part here.)
     for extra in [&["--actor", "plan-1", "--note", "ok"][..], &["--actor", "plan-1", "--approver", "Ana"]] {
@@ -1199,7 +1199,7 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     let revert_digest = json(&out)["data"]["planDigest"].as_str().unwrap().to_string();
     let refused = canon_as(r, Some("orchestrator"), &["migrate", "--revert", "--commit", "--plan-digest", &revert_digest, "--json"]);
     assert_eq!(refused.status.code(), Some(2), "{}", out_text(&refused));
-    assert_eq!(json(&refused)["error"]["code"], "HUMAN_ONLY");
+    assert_eq!(json(&refused)["error"]["code"], "ACTOR_DENIED");
     let done = canon(r, &["migrate", "--revert", "--commit", "--plan-digest", &revert_digest, "--json"]);
     assert!(done.status.success(), "{}", out_text(&done));
     assert_eq!(tree(r), before, "the old briefs, digests and reviews are back byte for byte");

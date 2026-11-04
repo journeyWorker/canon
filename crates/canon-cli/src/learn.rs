@@ -106,13 +106,13 @@ pub fn run_promote_with_evidence(
             let evaluation: PromotionEvaluation = match read_json(eval) {
                 Ok(value) => value,
                 Err(error) => {
-                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json));
+                    return ExitCode::from(CliError::failed("STRATEGY_FILE_INVALID", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json));
                 }
             };
             let mut approval: PromotionApproval = match read_json(approval) {
                 Ok(value) => value,
                 Err(error) => {
-                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid approval: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json));
+                    return ExitCode::from(CliError::failed("STRATEGY_FILE_INVALID", format!("invalid approval: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json));
                 }
             };
             if let Some(signature) = signature_path {
@@ -130,7 +130,7 @@ pub fn run_promote_with_evidence(
             Some((evaluation, approval))
         }
         _ => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", "--evaluation and --approval must be supplied together").hint("`canon schema strategy promote` lists the accepted arguments and their forms").emit("canon strategy promote", json));
+            return ExitCode::from(CliError::failed("STRATEGY_ARGUMENT_INVALID", "--evaluation and --approval must be supplied together").hint("`canon schema strategy promote` lists the accepted arguments and their forms").emit("canon strategy promote", json));
         }
     };
     let git_tier_root = repo.join(&learn_config.strategies_root);
@@ -328,12 +328,12 @@ pub fn run_approval_payload(repo: &Path, strategy_id: &StrategyId, evaluation_pa
             return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy approval-payload", json));
         }
     }) else {
-        return ExitCode::from(CliError::refused("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy approval-payload", json));
+        return ExitCode::from(CliError::refused("STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy approval-payload", json));
     };
     let evaluation: PromotionEvaluation = match read_json(evaluation_path) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy approval-payload", json));
+            return ExitCode::from(CliError::failed("STRATEGY_FILE_INVALID", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy approval-payload", json));
         }
     };
     if let Err(error) = evaluation.validate_for(&candidate) {
@@ -403,7 +403,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
     match store.find_by_id(strategy_id) {
         Ok(Some(_)) => {}
         Ok(None) => {
-            return ExitCode::from(CliError::refused("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy rollback", json));
+            return ExitCode::from(CliError::refused("STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy rollback", json));
         }
         Err(error) => {
             return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));
@@ -412,7 +412,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
     let contradicting = match contradicting.map(canon_learn::TrajectoryId::parse).transpose() {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid contradicting trajectory id: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
+            return ExitCode::from(CliError::failed("STRATEGY_ARGUMENT_INVALID", format!("invalid contradicting trajectory id: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
         }
     };
     let trajectory_store = ParquetTrajectoryStore::open(repo.join(&config.root).join("trajectories"));
@@ -420,7 +420,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
         match trajectory_store.find_by_id(id) {
             Ok(Some(_)) => {}
             Ok(None) => {
-                return ExitCode::from(CliError::refused("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory against the recorded trajectories, or omit it").emit("canon strategy rollback", json));
+                return ExitCode::from(CliError::refused("TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory against the recorded trajectories, or omit it").emit("canon strategy rollback", json));
             }
             Err(error) => {
                 return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));
@@ -436,7 +436,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
     let approved_at = match chrono::DateTime::parse_from_rfc3339(approved_at) {
         Ok(value) => value.with_timezone(&Utc),
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid --approval-at timestamp: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
+            return ExitCode::from(CliError::failed("STRATEGY_ARGUMENT_INVALID", format!("invalid --approval-at timestamp: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
         }
     };
     let was_rolled_back = matches!(store.find_by_id(strategy_id), Ok(Some(item)) if item.lifecycle == Some(StrategyLifecycle::RolledBack));
@@ -473,10 +473,10 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
 /// `demotion_failure` is the error of the demotion a contradicting
 /// trajectory triggered, when that demotion failed: the promotion is still
 /// blocked, but the strategy stays active, which a caller must be able to
-/// tell apart (`LEARN_DEMOTION_FAILED`).
+/// tell apart (`STRATEGY_DEMOTION_FAILED`).
 fn report_block(decision: &PromotionDecision, demotion_failure: Option<&str>, json: bool) -> ExitCode {
     let error = match demotion_failure {
-        Some(failure) => CliError::failed("LEARN_DEMOTION_FAILED", format!("blocked by the promotion gate: {}; demoting the strategy after a contradicting trajectory also failed: {failure}", decision.reason()))
+        Some(failure) => CliError::failed("STRATEGY_DEMOTION_FAILED", format!("blocked by the promotion gate: {}; demoting the strategy after a contradicting trajectory also failed: {failure}", decision.reason()))
             .hint("the strategy is still active; fix the strategy store named above and run `canon strategy promote` again to retry the demotion"),
         None => CliError::failed("LEARN_PROMOTION_BLOCKED", format!("blocked by the promotion gate: {}", decision.reason())).hint(
             "the gate reads each trajectory's RESOLVED `verdict_record.outcome`, not its raw verdict rows — \

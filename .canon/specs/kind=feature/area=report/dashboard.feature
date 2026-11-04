@@ -68,7 +68,7 @@ Feature: report dashboard
   Scenario: A brief that changed since the page loaded is refused and left as it is
     Given a briefs page that loaded a brief and a brief file edited afterwards
     When the page posts the approval with the sha256 it loaded
-    Then the server answers 409 BRIEF_CHANGED_SINCE_PAGE_LOAD with a hint to reload
+    Then the server answers 409 BRIEF_PAGE_STALE with a hint to reload
     And the brief file and the policy approval are untouched
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
@@ -78,7 +78,7 @@ Feature: report dashboard
   Scenario: A brief with blockers is not approved from the page
     Given a brief with blocker findings, coverage rules excluded
     When the page posts its approval
-    Then the server answers 409 BRIEF_HAS_BLOCKERS
+    Then the server answers 409 BRIEF_CHECK_FAILED
     And the brief file and the policy approval are untouched
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
@@ -140,7 +140,7 @@ Feature: report dashboard
   Scenario: A selected brief edited after the page read it refuses the whole request and names it
     Given a briefs page that read three briefs and one of them edited afterwards
     When the page's request approves all three
-    Then the server answers 409 BRIEF_APPROVE_REFUSED naming the edited brief and its code BRIEF_CHANGED_SINCE_PAGE_LOAD
+    Then the server answers 409 BRIEF_APPROVE_REFUSED naming the edited brief and its code BRIEF_PAGE_STALE
     And none of the three briefs and no policy approval changed, and the page names the refused brief and says to read it again
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:14Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

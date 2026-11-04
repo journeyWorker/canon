@@ -12,7 +12,7 @@ use canon_model::RoleId;
 /// spec root `canon.yaml` configures.
 fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool) -> Result<ProjectId, ExitCode> {
     let repo = crate::context::resolve_repo_root(repo);
-    crate::inventory::resolve_project_id(&repo, given.as_ref(), "DIVERGENCE_INVALID_ARGUMENT", command, json).map_err(ExitCode::from)
+    crate::inventory::resolve_project_id(&repo, given.as_ref(), "DIVERGENCE_ARGUMENT_INVALID", command, json).map_err(ExitCode::from)
 }
 
 pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
@@ -92,7 +92,7 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
                 crate::divergence::DivergenceStateError::DeferredNeedsExpiry => "--expiry",
                 crate::divergence::DivergenceStateError::Unknown(_) => "--state",
             };
-            ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).field(field).hint("`canon schema divergence add` lists the accepted arguments and their forms").emit("canon divergence add", json))
+            ExitCode::from(CliError::refused("DIVERGENCE_ARGUMENT_INVALID", e.to_string()).field(field).hint("`canon schema divergence add` lists the accepted arguments and their forms").emit("canon divergence add", json))
         }
     }
 }

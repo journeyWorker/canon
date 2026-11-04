@@ -159,7 +159,7 @@ Feature: authoring brief check
   Scenario: A brief with blockers exits 1 and keeps its report, and a check that is refused exits 2
     Given a change whose brief has a structure blocker, and a slug that names no change
     When canon brief check runs on each, with --json
-    Then the brief with the blocker exits 1 with ok false and error code BRIEF_HAS_BLOCKERS, and data still carries the findings and counts
+    Then the brief with the blocker exits 1 with ok false and error code BRIEF_CHECK_FAILED, and data still carries the findings and counts
     And the same brief with its blocker fixed exits 0 even while advisories remain
     And the unknown slug exits 2 with BRIEF_NOT_FOUND and no report
 

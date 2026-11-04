@@ -40,9 +40,9 @@ pub struct CodeTree {
 const DEFAULT_EXCLUDE: [&str; 2] = ["docs/**", "*.md"];
 const NO_COMMIT_HINT: &str = "run the command inside a git work tree that has at least one commit (`git init` and `git commit`)";
 
-/// The `NO_COMMIT` refusal with its hint.
+/// The `COMMIT_REQUIRED` refusal with its hint.
 pub fn no_commit(message: impl Into<String>) -> CliError {
-    CliError::refused("NO_COMMIT", message).hint(NO_COMMIT_HINT)
+    CliError::refused("COMMIT_REQUIRED", message).hint(NO_COMMIT_HINT)
 }
 
 /// Where a computation of the code tree keeps what it writes: a temporary index and a temporary object
@@ -98,7 +98,7 @@ fn text(out: std::process::Output) -> String {
 
 /// The full sha of `rev` (`git rev-parse --verify <rev>^{commit}`, run in
 /// `repo`). A directory outside a git work tree, a repo with no commits and a
-/// revision git does not know are all `NO_COMMIT`.
+/// revision git does not know are all `COMMIT_REQUIRED`.
 pub fn resolve_rev(repo: &Path, rev: &str) -> Result<String, CliError> {
     let spec = format!("{rev}^{{commit}}");
     git(repo, None, &["rev-parse", "--verify", "--quiet", &spec], None).map(text).map_err(|why| no_commit(format!("`{rev}` names no commit in this directory{}", if why.is_empty() { String::new() } else { format!(": {why}") })))
@@ -126,7 +126,7 @@ pub struct Bound {
 /// differs from `HEAD`. Any other value names a commit, whose own code tree is
 /// recorded (`worktreeDirty` false). Uncommitted code is recorded, never
 /// refused; outside a git work tree, in a repo with no commit, or for a
-/// revision git does not know the answer is `NO_COMMIT`.
+/// revision git does not know the answer is `COMMIT_REQUIRED`.
 pub fn bind(repo: &Path, rev: &str) -> Result<Bound, CliError> {
     let sha = resolve_rev(repo, rev)?;
     let sha = canon_model::Sha::parse(&sha).map_err(|e| no_commit(format!("`{rev}` resolves to `{sha}`, which is not a 40-digit sha: {e}")))?;
@@ -244,7 +244,7 @@ fn filtered_tree(repo: &Path, index: &Scratch, exclude: &[String], roots: &[Stri
 /// names the rest. Never `<rev>^{tree}`. `dirty` is whether the working tree's
 /// code tree differs from `HEAD`'s (true when there is no commit yet and the
 /// working tree holds code); it is false for a named rev. A directory that is
-/// not a git work tree is `NO_COMMIT`.
+/// not a git work tree is `COMMIT_REQUIRED`.
 pub fn code_tree(repo: &Path, rev: Option<&str>) -> Result<CodeTree, CliError> {
     let exclude = code_exclude(repo)?;
     let roots = spec_root_prefixes(repo)?;

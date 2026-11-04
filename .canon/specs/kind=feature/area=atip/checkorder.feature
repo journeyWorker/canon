@@ -39,7 +39,7 @@ Feature: ATIP: the order of the stateless checks
   Scenario: A missing required argument alone is USAGE naming it, a broken domain alone is the domain's code, and the two together are the required argument's
     Given a built canon
     When canon finding add runs without --change, with --round 0, and with both, and canon finding close runs without its change
-    Then they answer USAGE --change, FINDING_INVALID_ARGUMENT --round, USAGE --change, and USAGE CHANGE_ID
+    Then they answer USAGE --change, FINDING_ARGUMENT_INVALID --round, USAGE --change, and USAGE CHANGE_ID
 
   # canon: {"schema":1,"at":"2026-11-02T07:41:40Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
   @subject:atip-schema
@@ -56,10 +56,10 @@ Feature: ATIP: the order of the stateless checks
   @case:failure
   @flow:canon-0-35-canon-check-order.F3
   @atip.checkorder.06
-  Scenario: finding add with --round 0 --promote --no-promote is FINDING_INVALID_ARGUMENT naming --round, and the conflict alone is USAGE naming --promote
+  Scenario: finding add with --round 0 --promote --no-promote is FINDING_ARGUMENT_INVALID naming --round, and the conflict alone is USAGE naming --promote
     Given a built canon
     When canon finding add runs with --round 0 --promote --no-promote, with the two promote flags first, with --round 1 and the conflict, and with --seq 0 written before --round 0
-    Then they answer FINDING_INVALID_ARGUMENT --round, FINDING_INVALID_ARGUMENT --round, USAGE --promote, and FINDING_INVALID_ARGUMENT --round
+    Then they answer FINDING_ARGUMENT_INVALID --round, FINDING_ARGUMENT_INVALID --round, USAGE --promote, and FINDING_ARGUMENT_INVALID --round
 
   # canon: {"schema":1,"at":"2026-11-02T07:41:56Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
   @subject:atip-schema
@@ -86,10 +86,10 @@ Feature: ATIP: the order of the stateless checks
   @case:happy
   @flow:canon-0-35-canon-check-order.F5
   @atip.checkorder.09
-  Scenario: An unknown CANON_ROLE answers after every other stateless check, and alone it is UNKNOWN_ROLE
+  Scenario: An unknown CANON_ROLE answers after every other stateless check, and alone it is ROLE_INVALID
     Given a built canon and CANON_ROLE=bogus
     When canon status runs, and canon finding add runs with a broken domain, a missing required argument, a broken constraint, a broken validator and an unknown option, and canon brief approve runs with a relayed approval
-    Then UNKNOWN_ROLE answers for the bare call and for the relayed approval, and each other fault answers before it
+    Then ROLE_INVALID answers for the bare call and for the relayed approval, and each other fault answers before it
 
   # canon: {"schema":1,"at":"2026-11-02T07:42:21Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
   @subject:atip-schema
@@ -179,7 +179,7 @@ Feature: ATIP: the order of the stateless checks
   Scenario: A constraint broken beside a validator's fault is the constraint's, each alone keeps its own code
     Given a built canon and no role in the environment
     When canon brief approve and canon policy approve run with a blank approver alone, with --actor and no --relayed-via alone, and with both written in either order
-    Then the validator alone answers APPROVAL_INCOMPLETE or POLICY_APPROVAL_REFUSED on --approver, the constraint alone and both together answer USAGE on --relayed-via
+    Then the validator alone answers APPROVAL_INVALID or POLICY_APPROVAL_REFUSED on --approver, the constraint alone and both together answer USAGE on --relayed-via
 
   # canon: {"schema":1,"at":"2026-11-03T04:58:31Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
   @subject:atip-schema

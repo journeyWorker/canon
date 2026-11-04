@@ -156,8 +156,8 @@ Feature: policy expressions
   @case:failure
   @flow:canon-0-30-spec-backfill.F3
   @policy.expressions.34
-  Scenario: Policy show outside a configured repo is refused with CONFIG_MISSING
+  Scenario: Policy show outside a configured repo is refused with CONFIG_REQUIRED
     Given a directory with no canon.yaml in it or in any parent
     When canon policy show is run, with and without --json
-    Then it exits 2 with CONFIG_MISSING naming the --repo field
+    Then it exits 2 with CONFIG_REQUIRED naming the --repo field
     And nothing was written

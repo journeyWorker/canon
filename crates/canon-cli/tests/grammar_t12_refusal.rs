@@ -11,7 +11,7 @@
 //!   fixture, whose index is stale, every recipe leaves the index's own
 //!   records as they were, and an accepted call is shown to refresh them;
 //! - every write leaf that needs canon state, pointed at a directory without
-//!   `canon.yaml`, exits 2 `CONFIG_MISSING` and writes nothing, in either
+//!   `canon.yaml`, exits 2 `CONFIG_REQUIRED` and writes nothing, in either
 //!   directory;
 //! - every leaf with `--dry-run`: its recipe plus `--dry-run` refuses with the
 //!   same exit and `error.code` and writes nothing;
@@ -91,48 +91,48 @@ const REFUSALS: &[Row] = &[
     lit("artifacts store", &["artifacts", "store"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("brief approve", &["brief", "approve", "no-such-change", "--approver", "alice", "--note", "ok"], "BRIEF_NOT_FOUND"),
     lit("change new", &["change", "new", "add-login", "--subject", "demo", "--title", "Again"], "CHANGE_EXISTS"),
-    lit("context-pack add", &["context-pack", "add", "--manifest", "missing.json"], "CONTEXT_INPUT_MISSING"),
+    lit("context-pack add", &["context-pack", "add", "--manifest", "missing.json"], "CONTEXT_INPUT_NOT_FOUND"),
     lit("dashboard", &["dashboard", "--repo", "@missing"], "REPO_UNREADABLE"),
     lit("demo init", &["demo", "init", "--repo", "canon.yaml"], "WRITE_UNAVAILABLE"),
-    lit("demo review", &["demo", "review", "--repo", "@empty"], "DEMO_NOT_INITIALIZED"),
+    lit("demo review", &["demo", "review", "--repo", "@empty"], "DEMO_REQUIRED"),
     lit("dispatch begin", &["dispatch", "begin", "--regime", "implementer/my-repo/api/abcdef012345", "--role", "implementer", "--task", "add-login#1"], "TASK_NOT_FOUND"),
     lit("dispatch end", &["dispatch", "end", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--run-outcome", "succeeded"], "DISPATCH_RUN_NOT_FOUND"),
     // The divergence leaves and `review scenario` take the commit option under whichever name the spec gives it: their recipe is the spec's example plus a spec root that does not exist.
-    example("divergence accept", &["--project", "nosuchroot"], "UNKNOWN_SPEC_ROOT"),
-    example("divergence add", &["--project", "nosuchroot"], "UNKNOWN_SPEC_ROOT"),
-    example("divergence defer", &["--project", "nosuchroot"], "UNKNOWN_SPEC_ROOT"),
-    example("divergence resolve", &["--project", "nosuchroot"], "UNKNOWN_SPEC_ROOT"),
+    example("divergence accept", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
+    example("divergence add", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
+    example("divergence defer", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
+    example("divergence resolve", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
     lit("evidence add", &["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BIND_REFUSED"),
     lit("evidence audit", &["evidence", "audit", "auth.login.01", "--ref", "audit-report.json", "--evaluator", "eval-1", "--evaluator-version", "2.1", "--evaluator-digest", DIGEST, "--audit-result", "confirmed", "--role", "implementer", "--artifact", "missing.bin"], "EVIDENCE_BIND_REFUSED"),
     lit("export", &["export", "--kind", "evidence", "--output", "missing-dir/out.json"], "WRITE_UNAVAILABLE"),
     lit("feature new", &["feature", "new", "auth.login", "--title", "Again"], "FEATURE_EXISTS"),
-    lit("finding add", &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "alice", "--summary", "Again"], "FINDING_SEQ_OCCUPIED"),
+    lit("finding add", &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "alice", "--summary", "Again"], "FINDING_EXISTS"),
     lit("finding close", &["finding", "close", "add-login", "--round", "9", "--seq", "9", "--disposition", "rejected", "--reason", "no such finding"], "FINDING_NOT_FOUND"),
     // `.claude/settings.json` is written first: a refusal on the second file must leave the first alone.
     lit("gate install-hooks", &["gate", "install-hooks"], "HOOKS_INSTALL_REFUSED").setup(HOOKS_JSON_IS_A_DIRECTORY),
     lit("gate promote", &["gate", "promote"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
-    lit("ingest plans", &["ingest", "plans", "--repo", "@empty"], "CONFIG_MISSING"),
-    lit("ingest records", &["ingest", "records", "--repo", "@empty"], "CONFIG_MISSING"),
-    lit("ingest sessions", &["ingest", "sessions", "--repo", "@empty"], "CONFIG_MISSING"),
-    lit("init", &["init", "--providers", "bogus", "--repo", "@empty"], "INIT_INVALID_ARGUMENT"),
+    lit("ingest plans", &["ingest", "plans", "--repo", "@empty"], "CONFIG_REQUIRED"),
+    lit("ingest records", &["ingest", "records", "--repo", "@empty"], "CONFIG_REQUIRED"),
+    lit("ingest sessions", &["ingest", "sessions", "--repo", "@empty"], "CONFIG_REQUIRED"),
+    lit("init", &["init", "--providers", "bogus", "--repo", "@empty"], "INIT_ARGUMENT_INVALID"),
     lit("inventory sync", &["inventory", "sync"], "INVENTORY_REFUSED").setup(BROKEN_CONFIG),
     lit("ledger compact", &["ledger", "compact", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("migrate", &["migrate", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("plugin sync", &["plugin", "sync", "no-such-plugin"], "PLUGIN_SYNC_FAILED"),
     lit("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"], "POLICY_APPROVAL_REFUSED").setup(NO_POLICY),
-    lit("prompt add", &["prompt", "add", "reviewer@v1", "--manifest", "missing.json"], "CONTEXT_INPUT_MISSING"),
+    lit("prompt add", &["prompt", "add", "reviewer@v1", "--manifest", "missing.json"], "CONTEXT_INPUT_NOT_FOUND"),
     lit("purge", &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("report build", &["report", "build"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     lit("report snapshot", &["report", "snapshot", "snapshot-out"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
     // The spec's example: `add-login` is a feature, and only a chore change is reviewed whole.
-    example("review change", &[], "REVIEW_INVALID_ARGUMENT"),
-    example("review scenario", &["--project", "nosuchroot"], "UNKNOWN_SPEC_ROOT"),
+    example("review change", &[], "REVIEW_ARGUMENT_INVALID"),
+    example("review scenario", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
     lit("scenario new", &["scenario", "new", "auth.login.02", "--title", "Again", "--feature", FEATURE], "SCENARIO_TAG_EXISTS"),
     lit("skills install", &["skills", "install", "--providers", "bogus"], "SKILLS_INVALID_ARGUMENT"),
     lit("strategy promote", &["strategy", "promote", "01ARZ3NDEKTSV4RRFFQ69G5FAV"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
-    lit("strategy rollback", &["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason", "regressed", "--actor", "alice", "--signature-file", "missing.sig", "--approval-at", "2030-01-01T00:00:00Z"], "LEARN_STRATEGY_NOT_FOUND"),
+    lit("strategy rollback", &["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason", "regressed", "--actor", "alice", "--signature-file", "missing.sig", "--approval-at", "2030-01-01T00:00:00Z"], "STRATEGY_NOT_FOUND"),
     lit("subject adopt", &["subject", "adopt", "no-such", "--change", "add-login"], "SUBJECT_ADOPT_REFUSED"),
-    lit("subject move", &["subject", "move", "demo", "--to", "shipped"], "SUBJECT_INVALID_TRANSITION"),
+    lit("subject move", &["subject", "move", "demo", "--to", "shipped"], "SUBJECT_CONFLICT"),
     lit("subject new", &["subject", "new", "demo", "--domain", "dev", "--title", "Again"], "SUBJECT_EXISTS"),
     lit("subject unadopt", &["subject", "unadopt", "no-such", "--change", "add-login"], "SUBJECT_ADOPT_REFUSED"),
     lit("task done", &["task", "done", "add-login#1"], "TASK_NOT_FOUND"),
@@ -380,11 +380,11 @@ const READ_REFUSALS: &[(&str, &[&str], &str)] = &[
     ("context-pack verify", &["context-pack", "verify", "sha256:0000000000000000000000000000000000000000000000000000000000000000"], "CONTEXT_PACK_NOT_FOUND"),
     ("subject show", &["subject", "show", "no-such"], "SUBJECT_NOT_FOUND"),
     ("trace", &["trace", "no-such_9_9"], "TRACE_NOT_FOUND"),
-    ("search", &["search", ""], "SEARCH_QUERY_EMPTY"),
+    ("search", &["search", ""], "SEARCH_QUERY_REQUIRED"),
     ("query", &["query", "--kind", "evidence", "--cursor", "zz"], "CURSOR_INVALID"),
     ("retrieve", &["retrieve", "--for-role", "reviewer"], "USAGE"),
     ("status", &["status", "--fields", "nosuch"], "USAGE"),
-    ("gate check", &["gate", "check", "--repo", "@missing"], "CONFIG_MISSING"),
+    ("gate check", &["gate", "check", "--repo", "@missing"], "CONFIG_REQUIRED"),
     ("adapter validate", &["adapter", "validate", "--response", "missing.json"], "ADAPTER_REFUSED"),
 ];
 
@@ -492,13 +492,13 @@ fn a_write_leaf_that_needs_canon_state_refuses_a_directory_without_a_config() {
         let out = run(&t, home.path(), &argv, &[]);
         let after = snap(&t);
         let code = parse(&out).as_ref().map(error_code).unwrap_or_default();
-        if out.status.code() != Some(2) || code != "CONFIG_MISSING" {
+        if out.status.code() != Some(2) || code != "CONFIG_REQUIRED" {
             found.push((name, format!("exit {:?} `{code}`: {}", out.status.code(), String::from_utf8_lossy(&out.stdout))));
             continue;
         }
         let diff = differences(&before, &after);
         if !diff.is_empty() {
-            found.push((name, format!("refused CONFIG_MISSING but wrote: {diff:?}")));
+            found.push((name, format!("refused CONFIG_REQUIRED but wrote: {diff:?}")));
         }
     }
     assert!(checked >= 25, "only {checked} leaves were swept");

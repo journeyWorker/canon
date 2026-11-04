@@ -1,9 +1,9 @@
-//! `--repo` discovery and the `CONFIG_MISSING` refusal (#109).
+//! `--repo` discovery and the `CONFIG_REQUIRED` refusal (#109).
 //!
 //! `--repo` absent means the nearest ancestor of the working directory that
 //! holds a `canon.yaml`; any value, `.` included, is that directory as given. A
 //! command that needs canon state and finds no `canon.yaml` refuses with
-//! `CONFIG_MISSING` (exit 2) instead of grading an empty repo as clean.
+//! `CONFIG_REQUIRED` (exit 2) instead of grading an empty repo as clean.
 //!
 //! These tests drive the built binary only, so the same compiled test can be
 //! pointed at an older `canon` to show it fails there.
@@ -60,7 +60,7 @@ fn gate_check_in_a_directory_without_canon_yaml_refuses_instead_of_reporting_cle
 
     assert_eq!(out.status.code(), Some(2), "stdout: {} stderr: {}", stdout(&out), stderr(&out));
     let error = error_of(&out);
-    assert_eq!(error["code"], "CONFIG_MISSING", "{error}");
+    assert_eq!(error["code"], "CONFIG_REQUIRED", "{error}");
     assert_eq!(error["field"], "--repo", "{error}");
     let hint = error["hint"].as_str().unwrap();
     assert!(hint.contains("canon init"), "the hint names the next step: {hint}");
@@ -80,13 +80,13 @@ fn gate_check_with_a_repo_that_has_no_canon_yaml_refuses_even_inside_a_canon_rep
 
     assert_eq!(out.status.code(), Some(2), "stdout: {} stderr: {}", stdout(&out), stderr(&out));
     let error = error_of(&out);
-    assert_eq!(error["code"], "CONFIG_MISSING", "{error}");
+    assert_eq!(error["code"], "CONFIG_REQUIRED", "{error}");
     assert_eq!(error["field"], "--repo", "{error}");
     assert!(error["hint"].as_str().unwrap().contains("subdir-without-config"), "{error}");
 
     let human = canon(root.path(), home.path(), &["gate", "check", "--repo", sub.to_str().unwrap()]);
     assert_eq!(human.status.code(), Some(2));
-    assert!(stderr(&human).contains("CONFIG_MISSING"), "{}", stderr(&human));
+    assert!(stderr(&human).contains("CONFIG_REQUIRED"), "{}", stderr(&human));
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn a_nested_directory_of_a_canon_repo_finds_the_root_without_repo() {
     // A given `--repo` is that directory as given, never searched upward from (D5).
     let given = canon(&nested, home.path(), &["status", "--repo", ".", "--json"]);
     assert_eq!(given.status.code(), Some(2), "{}", stderr(&given));
-    assert_eq!(error_of(&given)["code"], "CONFIG_MISSING");
+    assert_eq!(error_of(&given)["code"], "CONFIG_REQUIRED");
 
     let gate = canon(&nested, home.path(), &["gate", "check"]);
     assert_ne!(gate.status.code(), Some(2), "the gate runs on the root's canon.yaml: {}", stderr(&gate));
@@ -138,7 +138,7 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
         argv.push("--json");
         let out = canon(empty.path(), home.path(), &argv);
         assert_eq!(out.status.code(), Some(2), "{args:?}: stdout {} stderr {}", stdout(&out), stderr(&out));
-        assert_eq!(error_of(&out)["code"], "CONFIG_MISSING", "{args:?}");
+        assert_eq!(error_of(&out)["code"], "CONFIG_REQUIRED", "{args:?}");
     }
     assert!(std::fs::read_dir(empty.path()).unwrap().next().is_none(), "a refused command writes nothing");
 }
@@ -170,7 +170,7 @@ fn format_never_reports_a_missing_path_or_a_missing_config_as_clean() {
 
     let no_config = canon(empty.path(), home.path(), &["format", ".", "--repo", empty.path().to_str().unwrap(), "--json"]);
     assert_eq!(no_config.status.code(), Some(2), "stdout: {} stderr: {}", stdout(&no_config), stderr(&no_config));
-    assert_eq!(error_of(&no_config)["code"], "CONFIG_MISSING");
+    assert_eq!(error_of(&no_config)["code"], "CONFIG_REQUIRED");
 
     // A corpus that exists is still checked without a canon.yaml: `format` validates the directory it is handed.
     // One with no file in it examined nothing, so it is `unverifiable` (exit 1), never clean.

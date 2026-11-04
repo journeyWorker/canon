@@ -61,7 +61,7 @@ fn rev_forms_resolve_to_the_full_sha() {
     assert_eq!(resolve_rev(p, "main").unwrap(), head);
     assert_eq!(resolve_rev(p, "HEAD~1").unwrap(), first);
     assert_eq!(head.len(), 40);
-    assert_eq!(resolve_rev(p, "no-such-rev").unwrap_err().code, "NO_COMMIT");
+    assert_eq!(resolve_rev(p, "no-such-rev").unwrap_err().code, "COMMIT_REQUIRED");
 }
 
 #[test]
@@ -154,14 +154,14 @@ fn a_repo_without_commits_still_has_a_code_tree() {
     let one = code_tree(p, None).unwrap();
     assert!(one.dirty);
     assert_ne!(one.tree, empty.tree);
-    assert_eq!(code_tree(p, Some("HEAD")).unwrap_err().code, "NO_COMMIT");
-    assert_eq!(resolve_rev(p, "HEAD").unwrap_err().code, "NO_COMMIT");
+    assert_eq!(code_tree(p, Some("HEAD")).unwrap_err().code, "COMMIT_REQUIRED");
+    assert_eq!(resolve_rev(p, "HEAD").unwrap_err().code, "COMMIT_REQUIRED");
 }
 
 #[test]
 fn outside_a_git_work_tree_is_no_commit() {
     let dir = TempDir::new().unwrap();
-    assert_eq!(resolve_rev(dir.path(), "HEAD").unwrap_err().code, "NO_COMMIT");
+    assert_eq!(resolve_rev(dir.path(), "HEAD").unwrap_err().code, "COMMIT_REQUIRED");
     let err = code_tree(dir.path(), None).unwrap_err();
-    assert_eq!((err.code, err.exit), ("NO_COMMIT", 2));
+    assert_eq!((err.code, err.exit), ("COMMIT_REQUIRED", 2));
 }

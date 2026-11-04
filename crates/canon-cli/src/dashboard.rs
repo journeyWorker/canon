@@ -118,7 +118,7 @@ impl DashboardError {
     /// The refusal `canon dashboard` prints for this failure.
     pub fn to_cli_error(&self) -> CliError {
         match self {
-            DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", self.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check` reports what is wrong)"),
+            DashboardError::Config(_) => CliError::refused("CONFIG_INVALID", self.to_string()).reason("DASHBOARD").hint("fix the dashboard settings in canon.yaml (`canon init --check` reports what is wrong)"),
             DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_NOT_BUILT", self.to_string())
                 .hint("install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout"),
             DashboardError::RepoMissing(_) => CliError::refused("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
@@ -449,7 +449,7 @@ fn guard_host(head: &Head, port: u16) -> Result<(), Reply> {
     if allowed {
         return Ok(());
     }
-    Err(Reply::error(403, &CliError::refused("DASHBOARD_ORIGIN_REFUSED", format!("the request's Host `{}` is not this dashboard's address", head.header("host").unwrap_or("(none)"))).hint(format!("open the dashboard at http://127.0.0.1:{port}/ or http://localhost:{port}/, the address `canon dashboard` printed"))))
+    Err(Reply::error(403, &CliError::refused("DASHBOARD_REQUEST_DENIED", format!("the request's Host `{}` is not this dashboard's address", head.header("host").unwrap_or("(none)"))).hint(format!("open the dashboard at http://127.0.0.1:{port}/ or http://localhost:{port}/, the address `canon dashboard` printed"))))
 }
 
 /// The `Origin` header must be the page's own origin: another site's page
@@ -461,7 +461,7 @@ fn guard_origin(head: &Head, port: u16) -> Result<(), Reply> {
     }
     Err(Reply::error(
         403,
-        &CliError::refused("DASHBOARD_ORIGIN_REFUSED", format!("the request's Origin `{}` is not this dashboard's own origin", head.header("origin").unwrap_or("(none)")))
+        &CliError::refused("DASHBOARD_REQUEST_DENIED", format!("the request's Origin `{}` is not this dashboard's own origin", head.header("origin").unwrap_or("(none)")))
             .hint(format!("approve from the briefs page at http://127.0.0.1:{port}/briefs.html; a request with no Origin or another site's is refused")),
     ))
 }
@@ -473,7 +473,7 @@ fn guard_origin(head: &Head, port: u16) -> Result<(), Reply> {
 /// present and at most [`MAX_BODY`]. Returns the body's length.
 fn approve_guards(head: &Head, port: u16) -> Result<usize, Reply> {
     if head.method != "POST" {
-        return Err(Reply::error(405, &CliError::refused("DASHBOARD_BAD_REQUEST", format!("{} is not allowed here: approvals are POSTed", head.method)).hint("POST a JSON body from the briefs page")));
+        return Err(Reply::error(405, &CliError::refused("DASHBOARD_REQUEST_INVALID", format!("{} is not allowed here: approvals are POSTed", head.method)).hint("POST a JSON body from the briefs page")));
     }
     guard_origin(head, port)?;
     let json_type = head.header("content-type").is_some_and(|ct| ct.split(';').next().is_some_and(|media| media.trim().eq_ignore_ascii_case("application/json")));

@@ -120,7 +120,7 @@ exit 0
 $ canon review change add-login --project root --actor rev-1 --session s-3 --role reviewer --original-spec-ref brief.md --json
 exit 2
 --- stdout
-{"ok":false,"error":{"code":"REVIEW_INVALID_ARGUMENT","message":"change `add-login` has no brief in the repository","field":"CHANGE_ID","suggestions":[],"hint":"a change-level review is for a chore change whose brief is in the repository; review feature scenarios with `canon review scenario <SCENARIO_ID>...`","retryable":false},"meta":{"command":"review change","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+{"ok":false,"error":{"code":"REVIEW_ARGUMENT_INVALID","message":"change `add-login` has no brief in the repository","field":"CHANGE_ID","suggestions":[],"hint":"a change-level review is for a chore change whose brief is in the repository; review feature scenarios with `canon review scenario <SCENARIO_ID>...`","retryable":false},"meta":{"command":"review change","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
 
 --- stderr
 

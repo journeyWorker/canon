@@ -1766,7 +1766,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
-            "CHANGE_AMBIGUOUS",
+            "CHANGE_REQUIRED",
             format!("{} live changes have a brief ({}); pass the change id as the operand", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
         ).hint("pass the change id of one of the listed changes as the operand")),
     }
@@ -1956,7 +1956,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
         };
         if counts.blockers > 0 {
             // The failure keeps the report in `data`.
-            let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
+            let error = CliError::refused("BRIEF_CHECK_FAILED", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).reason("BLOCKERS").hint("fix each blocker in `findings`, then run `canon brief check` again");
             return error.emit_with_data("canon brief check", true, &body);
         }
         crate::json_out::data("brief check", &body);

@@ -223,10 +223,10 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),
         (None, Some(r)) => ProvenanceRef::OriginalSpecRef(r.clone()),
         (None, None) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit(&args.full(), args.json);
+            return CliError::refused("REVIEW_ARGUMENT_INVALID", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit(&args.full(), args.json);
         }
         (Some(_), Some(_)) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit(&args.full(), args.json);
+            return CliError::refused("REVIEW_ARGUMENT_INVALID", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit(&args.full(), args.json);
         }
     };
     let scenario_ids = if args.change.is_some() { Vec::new() } else { requested_scenarios(args) };
@@ -256,7 +256,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
         Some(change) => match chore_brief_digest(&repo, change) {
             Ok(digest) => Some(digest),
             Err(message) => {
-                return CliError::refused("REVIEW_INVALID_ARGUMENT", message).field("CHANGE_ID").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with `canon review scenario <SCENARIO_ID>...`").emit(&cmd, args.json);
+                return CliError::refused("REVIEW_ARGUMENT_INVALID", message).field("CHANGE_ID").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with `canon review scenario <SCENARIO_ID>...`").emit(&cmd, args.json);
             }
         },
         None => None,

@@ -49,8 +49,8 @@ a feature, a one-line request included. A human is needed once per scope:
      `canon brief approve <slug> <slug> --approver <their name> --note "<their words>" --relayed-via <ask|AskUserQuestion|chat> --actor <your actor id> --digest <slug>=<digest shown>`
      (one or more slugs, each with its own `--digest`, one answer for all, nothing written if any is refused).
      The `Approved:` line then carries `(relayed by <role> <actor> via <tool>)`.
-     A digest that no longer matches the brief is `RELAY_DIGEST_MISMATCH`: show
-     it again. Without `--relayed-via` an agent role gets `HUMAN_ONLY`, and so
+     A digest that no longer matches the brief is `RELAY_DIGEST_STALE`: show
+     it again. Without `--relayed-via` an agent role gets `ACTOR_DENIED`, and so
      does a repo whose `canon.yaml` says `approval: { relay: deny }`: then the
      human runs the call themselves. Never remove or unset your role
      (`env -u CANON_ROLE`, dropping `--as`) to run it yourself.
@@ -120,7 +120,7 @@ the record carries, so a review of a working tree survives the commit made
 from it; a review is judged by what it pins (the scenario and what its
 evidence says), never by the commit or the code tree. Outside a git work
 tree, or in a repo with no commits, a command that needs a commit refuses
-`NO_COMMIT`.
+`COMMIT_REQUIRED`.
 
 ### Evidence follows the code
 
@@ -181,7 +181,7 @@ names the stores not read.
 
 canon cannot detect a role; you declare it. Pass `--as <role>` or set
 `CANON_ROLE=planner|implementer|reviewer|orchestrator`; a flag wins over the
-variable, and an unknown value is refused (`UNKNOWN_ROLE`).
+variable, and an unknown value is refused (`ROLE_INVALID`).
 
 - **A role is set, or you were spawned as one:** load only
   `canon skills show role-<role>` and do that role's steps. `canon status`
@@ -243,7 +243,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - **Exit codes:** only 0, 1 and 2 exist: 0 ok; 1 the command ran and its answer
   is negative or incomplete (a failed check, a violation, `unverifiable` when
   nothing was examined, a partly failed batch); 2 refused to run (usage,
-  `CONFIG_MISSING`, an id or file that does not exist, an invalid argument).
+  `CONFIG_REQUIRED`, an id or file that does not exist, an invalid argument).
   A refusal leaves the tree unchanged.
 - Repeating a write is safe: a record that already exists with identical
   content is reported `unchanged` (`data.unchanged`), not duplicated.
@@ -264,7 +264,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`
   for the human. There is no `--force`. `brief approve`, `policy approve`,
   `divergence accept` and the `migrate --commit` that re-binds `Approved:`
-  lines record a human's decision and refuse every agent role (`HUMAN_ONLY`)
+  lines record a human's decision and refuse every agent role (`ACTOR_DENIED`)
   unless they record the explicit answer the human gave you, with
   `--relayed-via <tool>` (show, ask, record, as for the brief; `canon skills
   show role-planner`); never unset your role to run one.
@@ -338,7 +338,7 @@ canon init --providers=claude,codex
 canon skills install
 # any subset or none; rewrites skills.providers
 canon skills install --providers=claude,codex,omp,pi
-# read-only drift check; exit 1 (SKILLS_DRIFT) names each orphan, a projected file the bundle no longer ships
+# read-only drift check; exit 1 (SKILLS_CHECK_FAILED) names each orphan, a projected file the bundle no longer ships
 canon skills check
 # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
 canon skills doctor

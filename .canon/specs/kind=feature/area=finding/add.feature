@@ -139,7 +139,7 @@ Feature: finding add
   Scenario: A short revision that names no commit is refused
     Given a git repository
     When canon finding add names a short revision that matches no commit on --rev, --introduced-rev or --resolution-rev
-    Then the add is refused with exit 2 and NO_COMMIT, naming the value
+    Then the add is refused with exit 2 and COMMIT_REQUIRED, naming the value
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-21T09:00:00Z","actor":{"agent_id":"canon-impl-0241"}}
@@ -159,7 +159,7 @@ Feature: finding add
   Scenario: A --scenario the index does not know is refused with its code
     Given a repository whose index does not know the scenario id world.demo.99
     When canon finding add names world.demo.99 through --scenario
-    Then the command exits 2 with FINDING_UNKNOWN_SCENARIO, the field --scenario and a hint, naming the unknown id
+    Then the command exits 2 with SCENARIO_NOT_FOUND, the field --scenario and a hint, naming the unknown id
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-23T12:05:39Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -267,5 +267,5 @@ Feature: finding add
   Scenario: An introducing commit together with the unknown mark is refused
     Given a change under review
     When canon finding add is given --introduced-rev together with --introduced-unknown
-    Then it is refused with FINDING_INVALID_ARGUMENT, exit 2, naming the two options as exclusive
+    Then it is refused with FINDING_ARGUMENT_INVALID, exit 2, naming the two options as exclusive
     And nothing is staged

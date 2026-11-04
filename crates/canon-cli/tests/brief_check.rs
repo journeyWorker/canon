@@ -327,7 +327,7 @@ fn operational_errors_carry_a_string_code_and_the_registry_exit() {
     ok(dir.path(), &["change", "new", "one", "--subject", "demo", "--title", "One"]);
     ok(dir.path(), &["change", "new", "two", "--subject", "demo", "--title", "Two"]);
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CHANGE_AMBIGUOUS")));
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CHANGE_REQUIRED")));
     let (code, report) = check(dir.path(), &["one"]);
     assert_eq!((code, report["findings"].is_array()), (1, true), "naming the change resolves the ambiguity");
     let (code, report) = check(dir.path(), &["missing"]);

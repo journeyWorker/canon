@@ -95,7 +95,7 @@ async function approve(): Promise<void> {
     if (response.ok && json.data && json.data.approvals) return afterApproval(json.data);
     const failure = approveFailure(json, response.status);
     for (const id of refusedIds(failure)) main!.querySelector(`.brief[data-change="${CSS.escape(id)}"]`)?.classList.add("brief-refused");
-    const stale = failure.refused.length > 0 || failure.code === "BRIEF_CHANGED_SINCE_PAGE_LOAD";
+    const stale = failure.refused.length > 0 || failure.code === "BRIEF_PAGE_STALE";
     say(renderApproveError(failure, stale ? withReload() : null));
   } catch (e) {
     say(h("div", { class: "approve-error", role: "alert" }, h("p", {}, `The request failed: ${e instanceof Error ? e.message : String(e)}`)));

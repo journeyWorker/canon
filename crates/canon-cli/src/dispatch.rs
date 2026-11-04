@@ -301,14 +301,14 @@ impl DispatchError {
     /// one, and `retryable` where another process holds the close.
     pub(crate) fn to_cli_error(&self) -> CliError {
         let code = match self {
-            Self::RoleRegimeMismatch { .. } => "DISPATCH_ROLE_REGIME_MISMATCH",
-            Self::SkillDigestWithoutId => "DISPATCH_INVALID_ARGUMENT",
+            Self::RoleRegimeMismatch { .. } => "DISPATCH_ROLE_CONFLICT",
+            Self::SkillDigestWithoutId => "DISPATCH_ARGUMENT_INVALID",
             Self::Io(_) => "WRITE_FAILED",
             Self::Serialize(_) => "SERIALIZE_FAILED",
             Self::Unavailable(_) => "WRITE_UNAVAILABLE",
             Self::ContextPack(inner) => inner.to_cli_error().code,
             Self::TaskNotFound { .. } => "TASK_NOT_FOUND",
-            Self::NoPlanSources { .. } => "PLAN_SOURCES_MISSING",
+            Self::NoPlanSources { .. } => "PLAN_SOURCES_REQUIRED",
             Self::PlanCorpus { .. } => "PLAN_CORPUS_UNREADABLE",
             Self::NoSuchRun { .. } => "DISPATCH_RUN_NOT_FOUND",
             Self::AlreadyEnded { .. } => "DISPATCH_ALREADY_ENDED",

@@ -56,7 +56,7 @@ pub struct EvidenceAddArgs {
     /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario is given
     #[arg(long = "task", value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
-    /// Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written
+    /// Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (SPEC_ROOT_NOT_FOUND) before anything is written
     #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`
@@ -142,7 +142,7 @@ pub struct EvidenceAuditArgs {
     /// The re-audited scenario (`<area>.<surface>.<nn>`)
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
-    /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none
+    /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (SPEC_ROOT_NOT_FOUND) when it names none
     #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon

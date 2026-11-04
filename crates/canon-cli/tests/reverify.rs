@@ -376,7 +376,7 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
     let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map_or(0, std::iter::Iterator::count);
     let json = run(r, &["review", "change", "c-demo", "--project", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor", "reviewer-3", "--role", "reviewer", "--json"]);
     assert_eq!(json.status.code(), Some(2));
-    assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));
+    assert!(stdout(&json).contains("REVIEW_ARGUMENT_INVALID"), "{}", stdout(&json));
     let before = reviews(r);
 
     assert!(change_review(r, "bump-client").status.success());
@@ -591,7 +591,7 @@ fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
     );
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(body["error"]["code"], "FINDING_UNKNOWN_SCENARIO", "{body}");
+    assert_eq!(body["error"]["code"], "SCENARIO_NOT_FOUND", "{body}");
     assert_eq!(body["error"]["field"], "--scenario", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("`world.demo.99`"), "{body}");
     assert!(body["error"]["hint"].is_string(), "{body}");

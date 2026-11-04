@@ -36,7 +36,7 @@ fn write_evidence(ledger_root: &Path, task_id: &str, role: &str, verdict: Eviden
     GitTier::new(ledger_root).write(&record).expect("write evidence record");
 }
 
-/// The smallest `canon.yaml` a repo needs for `canon gate check` to run in it: without one the gate refuses (`CONFIG_MISSING`).
+/// The smallest `canon.yaml` a repo needs for `canon gate check` to run in it: without one the gate refuses (`CONFIG_REQUIRED`).
 /// Makes `repo` a git work tree with one commit, which every revision-bound
 /// write needs.
 fn git_seed(repo: &Path) {

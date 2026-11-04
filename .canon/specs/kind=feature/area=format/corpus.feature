@@ -117,5 +117,5 @@ Feature: format corpus
   Scenario: A corpus root that is missing, or a repo with no canon.yaml, never reads as clean
     Given a corpus root that does not exist, and a --repo that holds no canon.yaml
     When canon format runs over each
-    Then it exits 2, with REPO_UNREADABLE for the missing root and CONFIG_MISSING for the repo
+    Then it exits 2, with REPO_UNREADABLE for the missing root and CONFIG_REQUIRED for the repo
     And a corpus root that exists is still checked without a canon.yaml when no --repo is given

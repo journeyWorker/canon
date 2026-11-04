@@ -376,7 +376,7 @@ pub struct AcceptArgs {
 pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
     const CMD: &str = "canon divergence accept";
     let invalid = |message: String, field: &str| {
-        CliError::refused("DIVERGENCE_INVALID_ARGUMENT", message)
+        CliError::refused("DIVERGENCE_ARGUMENT_INVALID", message)
             .field(field)
             .hint(format!("give {field} a value and run `canon divergence accept` again; `canon schema divergence accept --json` lists every flag"))
             .emit(CMD, args.json)
@@ -425,7 +425,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         }
     }
     if !missing.is_empty() {
-        return CliError::refused("DIVERGENCE_INVALID_ARGUMENT", format!("no scenario record for {} in spec root `{}`; an acceptance pins the evidence of a scenario the index knows", missing.join(", "), args.project_id.as_str()))
+        return CliError::refused("DIVERGENCE_ARGUMENT_INVALID", format!("no scenario record for {} in spec root `{}`; an acceptance pins the evidence of a scenario the index knows", missing.join(", "), args.project_id.as_str()))
             .field("--scenario")
             .hint("run `canon inventory sync`, then accept again")
             .emit(CMD, args.json);

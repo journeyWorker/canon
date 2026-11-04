@@ -109,4 +109,4 @@ Feature: atip input order: the --input document is processed in the order of spe
   Scenario: An environment value the document cannot give, an unknown CANON_ROLE, still refuses the call although the document gives every key it can
     Given CANON_ROLE set to a value that is no role and a document that gives every key scenario new accepts
     When scenario new runs with the document
-    Then it is exit 2 UNKNOWN_ROLE at the field CANON_ROLE and nothing is written, and the same document with a valid CANON_ROLE is exit 0
+    Then it is exit 2 ROLE_INVALID at the field CANON_ROLE and nothing is written, and the same document with a valid CANON_ROLE is exit 0

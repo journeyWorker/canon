@@ -24,7 +24,7 @@ const APPROVAL_TOGETHER: &str = "The four approval options (`--approver`, `--app
 pub(crate) static TABLES: Tables = Tables {
     rules: &[
         ("divergence accept", &[Rule::requires("approver", &["relayed-via"]), Rule::requires("note", &["relayed-via"])]),
-        ("divergence add", &[Rule::requires_in("state", &["deferred"], &["reason", "expiry"]).code("DIVERGENCE_INVALID_ARGUMENT").help("A deferred divergence records why it is deferred and when the deferral lapses.")]),
+        ("divergence add", &[Rule::requires_in("state", &["deferred"], &["reason", "expiry"]).code("DIVERGENCE_ARGUMENT_INVALID").help("A deferred divergence records why it is deferred and when the deferral lapses.")]),
         (
             "evidence add",
             &[
@@ -54,19 +54,19 @@ pub(crate) static TABLES: Tables = Tables {
         (
             "finding add",
             &[
-                Rule::at_most_one(&["introduced-rev", "introduced-unknown"]).code("FINDING_INVALID_ARGUMENT").help("A finding names the commit that introduced the defect or says it is not known, never both."),
-                Rule::requires("resolution-rev", &["disposition"]).code("FINDING_RESOLUTION_REV_UNEXPECTED").help("Only a `fixed` finding was closed by a commit."),
-                Rule::forbids_in("disposition", &["open", "rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_UNEXPECTED").help("Only a `fixed` finding was closed by a commit."),
+                Rule::at_most_one(&["introduced-rev", "introduced-unknown"]).code("FINDING_ARGUMENT_INVALID").help("A finding names the commit that introduced the defect or says it is not known, never both."),
+                Rule::requires("resolution-rev", &["disposition"]).code("FINDING_RESOLUTION_REV_CONFLICT").help("Only a `fixed` finding was closed by a commit."),
+                Rule::forbids_in("disposition", &["open", "rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_CONFLICT").help("Only a `fixed` finding was closed by a commit."),
             ],
         ),
         (
             "finding close",
             &[
                 Rule::requires_in("disposition", &["rejected", "deferred"], &["reason"]).code("FINDING_REASON_REQUIRED").help("A rejected or deferred finding records why.").says("a rejected or deferred finding records why: --reason is required with --disposition rejected or deferred").hint("canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition {value} --reason \"<WHY>\""),
-                Rule::forbids_in("disposition", &["open", "rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_UNEXPECTED").help("Only a `fixed` finding was closed by a commit."),
+                Rule::forbids_in("disposition", &["open", "rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_CONFLICT").help("Only a `fixed` finding was closed by a commit."),
             ],
         ),
-        ("dispatch begin", &[Rule::requires("skill-digest", &["skill"]).code("DISPATCH_INVALID_ARGUMENT").help("A skill digest is the digest of a named skill.")]),
+        ("dispatch begin", &[Rule::requires("skill-digest", &["skill"]).code("DISPATCH_ARGUMENT_INVALID").help("A skill digest is the digest of a named skill.")]),
     ],
     validators: &[
         (
@@ -204,7 +204,7 @@ pub(crate) static TABLES: Tables = Tables {
             "dispatch begin",
             &[Validator {
                 arguments: &["role", "regime"],
-                code: "DISPATCH_ROLE_REGIME_MISMATCH",
+                code: "DISPATCH_ROLE_CONFLICT",
                 description: "`--role` must equal the first segment of `--regime` (`<role>/<repo>/<area>/<hash>`).",
                 rejects: &["canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role reviewer"],
             }],
@@ -231,15 +231,15 @@ pub(crate) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["review scenario", "review change"], "reviewer-model"), Domain::matching(RUNTIME_LABEL), "USAGE").inside(&["claude-sonnet-5", "a b"]).outside(&["", " a", "a ", "a\tb", "a\nb"]),
         DomainRow::new(Scope::Arguments(&["review scenario", "review change"], "reviewer-harness"), Domain::matching(RUNTIME_LABEL), "USAGE").inside(&["omp", "a b"]).outside(&["", " a", "a ", "a\tb", "a\nb"]),
         // divergence accept.
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "reason"), Domain::matching(NOT_BLANK), "DIVERGENCE_INVALID_ARGUMENT").inside(&["the engine drops the event", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "tracking"), Domain::matching(NOT_BLANK), "DIVERGENCE_INVALID_ARGUMENT").says("is empty: a blank tracking reference names no issue").inside(&["https://example.com/issues/1", " a "]).outside(&["", " ", "\t"]),
+        DomainRow::new(Scope::Arguments(&["divergence accept"], "reason"), Domain::matching(NOT_BLANK), "DIVERGENCE_ARGUMENT_INVALID").inside(&["the engine drops the event", " a "]).outside(&["", " ", "\t"]),
+        DomainRow::new(Scope::Arguments(&["divergence accept"], "tracking"), Domain::matching(NOT_BLANK), "DIVERGENCE_ARGUMENT_INVALID").says("is empty: a blank tracking reference names no issue").inside(&["https://example.com/issues/1", " a "]).outside(&["", " ", "\t"]),
         DomainRow::new(Scope::Arguments(&["divergence accept"], "role"), Domain::matching("^reviewer$"), "DIVERGENCE_ACCEPT_REFUSED").says("must name the reviewer step: only a reviewer step accepts a divergence").inside(&["reviewer"]).outside(&["implementer", "planner"]),
         // finding add / close.
-        DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "round"), Domain::at_least(1), "FINDING_INVALID_ARGUMENT"),
-        DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "seq"), Domain::at_least(1), "FINDING_INVALID_ARGUMENT"),
-        DomainRow::new(Scope::Arguments(&["finding add"], "actor"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_INVALID_ARGUMENT").inside(&["alice", " a "]).outside(&["", " ", "a\nb", "a\u{2028}b"]),
-        DomainRow::new(Scope::Arguments(&["finding add"], "summary"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_INVALID_ARGUMENT").inside(&["Token is logged", " a "]).outside(&["", " ", "a\nb", "a\u{2029}b"]),
-        DomainRow::new(Scope::Arguments(&["finding add"], "file-ref"), Domain::matching(ONE_LINE), "FINDING_INVALID_ARGUMENT").inside(&["src/main.rs:120-134", ""]).outside(&["a\nb", "a\u{85}b"]),
+        DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "round"), Domain::at_least(1), "FINDING_ARGUMENT_INVALID"),
+        DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "seq"), Domain::at_least(1), "FINDING_ARGUMENT_INVALID"),
+        DomainRow::new(Scope::Arguments(&["finding add"], "actor"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_ARGUMENT_INVALID").inside(&["alice", " a "]).outside(&["", " ", "a\nb", "a\u{2028}b"]),
+        DomainRow::new(Scope::Arguments(&["finding add"], "summary"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_ARGUMENT_INVALID").inside(&["Token is logged", " a "]).outside(&["", " ", "a\nb", "a\u{2029}b"]),
+        DomainRow::new(Scope::Arguments(&["finding add"], "file-ref"), Domain::matching(ONE_LINE), "FINDING_ARGUMENT_INVALID").inside(&["src/main.rs:120-134", ""]).outside(&["a\nb", "a\u{85}b"]),
         DomainRow::new(Scope::Arguments(&["finding add"], "introduced-rev"), Domain::matching(NOT_BLANK), "USAGE").inside(&["HEAD~1", " a "]).outside(&["", " ", "\t"]),
         DomainRow::new(Scope::Arguments(&["finding close"], "reason"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_REASON_REQUIRED").inside(&["works as designed", " a "]).outside(&["", " ", "a\nb", "a\u{2028}b"]),
         // dispatch begin.

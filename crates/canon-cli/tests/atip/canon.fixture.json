@@ -553,6 +553,11 @@
   "probe": "status",
   "registry": [
     {
+      "code": "ACTOR_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "ADAPTER_EXECUTION_NOT_AUTHORIZED",
       "exit": 1,
       "retryable": false
@@ -568,7 +573,7 @@
       "retryable": false
     },
     {
-      "code": "APPROVAL_INCOMPLETE",
+      "code": "APPROVAL_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -608,13 +613,19 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_CHANGED_SINCE_PAGE_LOAD",
-      "exit": 2,
+      "code": "BRIEF_CHECK_FAILED",
+      "exit": 1,
+      "reasons": [
+        "BLOCKERS"
+      ],
       "retryable": false
     },
     {
-      "code": "BRIEF_HAS_BLOCKERS",
-      "exit": 1,
+      "code": "BRIEF_INVALID",
+      "exit": 2,
+      "reasons": [
+        "UNAPPROVABLE"
+      ],
       "retryable": false
     },
     {
@@ -623,7 +634,7 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_UNAPPROVABLE",
+      "code": "BRIEF_PAGE_STALE",
       "exit": 2,
       "retryable": false
     },
@@ -648,7 +659,7 @@
       "retryable": false
     },
     {
-      "code": "CHANGE_AMBIGUOUS",
+      "code": "CHANGE_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -658,7 +669,7 @@
       "retryable": false
     },
     {
-      "code": "CHANGE_INVALID_ARGUMENT",
+      "code": "CHANGE_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -668,12 +679,30 @@
       "retryable": false
     },
     {
+      "code": "COMMIT_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "CONFIG_CHECK_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
-      "code": "CONFIG_MISSING",
+      "code": "CONFIG_EXISTS",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_INVALID",
+      "exit": 2,
+      "reasons": [
+        "DASHBOARD"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -688,7 +717,15 @@
       "retryable": false
     },
     {
-      "code": "CONTEXT_INPUT_MISSING",
+      "code": "CONTEXT_INPUT_INVALID",
+      "exit": 2,
+      "reasons": [
+        "SECRET"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_INPUT_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -713,12 +750,7 @@
       "retryable": false
     },
     {
-      "code": "CONTEXT_SECRET_DETECTED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "CONTEXT_UNSAFE_PATH",
+      "code": "CONTEXT_PATH_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -733,16 +765,6 @@
       "retryable": false
     },
     {
-      "code": "DASHBOARD_BAD_REQUEST",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "DASHBOARD_CONFIG_INVALID",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "DASHBOARD_FAILED",
       "exit": 1,
       "retryable": false
@@ -753,17 +775,22 @@
       "retryable": false
     },
     {
-      "code": "DASHBOARD_ORIGIN_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "DASHBOARD_PORT_IN_USE",
       "exit": 1,
       "retryable": true
     },
     {
-      "code": "DEMO_NOT_INITIALIZED",
+      "code": "DASHBOARD_REQUEST_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_REQUEST_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "DEMO_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -773,14 +800,14 @@
       "retryable": false
     },
     {
+      "code": "DISPATCH_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "DISPATCH_END_IN_PROGRESS",
       "exit": 1,
       "retryable": true
-    },
-    {
-      "code": "DISPATCH_INVALID_ARGUMENT",
-      "exit": 2,
-      "retryable": false
     },
     {
       "code": "DISPATCH_MANIFEST_MISMATCH",
@@ -798,7 +825,7 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_ROLE_REGIME_MISMATCH",
+      "code": "DISPATCH_ROLE_CONFLICT",
       "exit": 2,
       "retryable": false
     },
@@ -813,7 +840,7 @@
       "retryable": false
     },
     {
-      "code": "DIVERGENCE_INVALID_ARGUMENT",
+      "code": "DIVERGENCE_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -887,17 +914,27 @@
       "retryable": false
     },
     {
-      "code": "FEATURE_OUTSIDE_SPEC_ROOTS",
+      "code": "FEATURE_PATH_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "FINDING_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "FINDING_CONFLICT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "FINDING_EXISTS",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "FINDING_INTRODUCED_REQUIRED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "FINDING_INVALID_ARGUMENT",
       "exit": 2,
       "retryable": false
     },
@@ -912,7 +949,7 @@
       "retryable": false
     },
     {
-      "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+      "code": "FINDING_RESOLUTION_REV_CONFLICT",
       "exit": 2,
       "retryable": false
     },
@@ -922,22 +959,12 @@
       "retryable": false
     },
     {
-      "code": "FINDING_SEQ_OCCUPIED",
-      "exit": 2,
+      "code": "FORMAT_CHECK_FAILED",
+      "exit": 1,
       "retryable": false
     },
     {
-      "code": "FINDING_STAGED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "FINDING_UNKNOWN_SCENARIO",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "FORMAT_VIOLATIONS",
+      "code": "GATE_CHECK_FAILED",
       "exit": 1,
       "retryable": false
     },
@@ -952,32 +979,12 @@
       "retryable": false
     },
     {
-      "code": "GATE_TASK_INVALID_ARGUMENT",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "GATE_TASK_UNSUPPORTED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "GATE_VIOLATIONS",
-      "exit": 1,
-      "retryable": false
-    },
-    {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 1,
       "retryable": false
     },
     {
       "code": "HOOKS_INSTALL_REFUSED",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "HUMAN_ONLY",
       "exit": 2,
       "retryable": false
     },
@@ -997,12 +1004,7 @@
       "retryable": false
     },
     {
-      "code": "INIT_CONFIG_EXISTS",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "INIT_INVALID_ARGUMENT",
+      "code": "INIT_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1062,23 +1064,8 @@
       "retryable": false
     },
     {
-      "code": "LEARN_DEMOTION_FAILED",
-      "exit": 1,
-      "retryable": false
-    },
-    {
       "code": "LEARN_EVALUATION_REJECTED",
       "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_INVALID_ARGUMENT",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_INVALID_INPUT",
-      "exit": 2,
       "retryable": false
     },
     {
@@ -1098,16 +1085,6 @@
     },
     {
       "code": "LEARN_SIGNATURE_UNREADABLE",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_STRATEGY_NOT_FOUND",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "LEARN_TRAJECTORY_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -1142,17 +1119,12 @@
       "retryable": false
     },
     {
-      "code": "MIGRATE_UNCOMMITTED",
+      "code": "MIGRATION_CONFLICT",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "NO_BRIEF",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "NO_COMMIT",
       "exit": 2,
       "retryable": false
     },
@@ -1172,7 +1144,7 @@
       "retryable": false
     },
     {
-      "code": "PLAN_SOURCES_MISSING",
+      "code": "PLAN_SOURCES_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1227,13 +1199,13 @@
       "retryable": false
     },
     {
-      "code": "QUERY_FAILED",
-      "exit": 1,
+      "code": "QUERY_ARGUMENT_INVALID",
+      "exit": 2,
       "retryable": false
     },
     {
-      "code": "QUERY_INVALID_ARGUMENT",
-      "exit": 2,
+      "code": "QUERY_FAILED",
+      "exit": 1,
       "retryable": false
     },
     {
@@ -1242,7 +1214,7 @@
       "retryable": false
     },
     {
-      "code": "RELAY_DIGEST_MISMATCH",
+      "code": "RELAY_DIGEST_STALE",
       "exit": 2,
       "retryable": false
     },
@@ -1287,7 +1259,12 @@
       "retryable": false
     },
     {
-      "code": "RETRIEVE_FAILED",
+      "code": "RETRIEVE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARGUMENT_INVALID",
       "exit": 2,
       "retryable": false
     },
@@ -1297,17 +1274,22 @@
       "retryable": false
     },
     {
-      "code": "REVIEW_INVALID_ARGUMENT",
-      "exit": 2,
-      "retryable": false
-    },
-    {
       "code": "REVIEW_SCENARIO_NOT_INDEXED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "SCAFFOLD_INVALID_ARGUMENT",
+      "code": "ROLE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SCAFFOLD_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
@@ -1322,7 +1304,7 @@
       "retryable": false
     },
     {
-      "code": "SEARCH_QUERY_EMPTY",
+      "code": "SEARCH_QUERY_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1337,8 +1319,11 @@
       "retryable": false
     },
     {
-      "code": "SKILLS_DRIFT",
+      "code": "SKILLS_CHECK_FAILED",
       "exit": 1,
+      "reasons": [
+        "DRIFT"
+      ],
       "retryable": false
     },
     {
@@ -1357,7 +1342,12 @@
       "retryable": false
     },
     {
-      "code": "SPEC_ROOT_UNRESOLVED",
+      "code": "SPEC_ROOT_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOT_REQUIRED",
       "exit": 2,
       "retryable": false
     },
@@ -1370,8 +1360,41 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_DEMOTION_FAILED",
+      "exit": 1,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_FILE_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "SUBJECT_ADOPT_REFUSED",
       "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_ARGUMENT_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_CONFLICT",
+      "exit": 2,
+      "reasons": [
+        "TRANSITION"
+      ],
       "retryable": false
     },
     {
@@ -1382,16 +1405,6 @@
     {
       "code": "SUBJECT_GATE_VIOLATION",
       "exit": 1,
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_INVALID_ARGUMENT",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_INVALID_TRANSITION",
-      "exit": 2,
       "retryable": false
     },
     {
@@ -1410,12 +1423,22 @@
       "retryable": false
     },
     {
+      "code": "TASK_ID_INVALID",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "TASK_NOT_FOUND",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "TASK_ROW_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "TASK_UNSUPPORTED",
       "exit": 2,
       "retryable": false
     },
@@ -1435,22 +1458,17 @@
       "retryable": false
     },
     {
+      "code": "TRAJECTORY_NOT_FOUND",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "TYPED_ATOMS_INVALID",
       "exit": 2,
       "retryable": false
     },
     {
       "code": "UNKNOWN_COMMAND",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "UNKNOWN_ROLE",
-      "exit": 2,
-      "retryable": false
-    },
-    {
-      "code": "UNKNOWN_SPEC_ROOT",
       "exit": 2,
       "retryable": false
     },

@@ -31,7 +31,7 @@ use crate::brief_check::{check_text, parse_sections};
 use crate::cli_error::{CliError, CliErrorExt as _};
 
 /// The code for an approval whose brief differs from the page's copy.
-pub const CHANGED_SINCE_PAGE_LOAD: &str = "BRIEF_CHANGED_SINCE_PAGE_LOAD";
+pub const CHANGED_SINCE_PAGE_LOAD: &str = "BRIEF_PAGE_STALE";
 
 /// The refusal [`crate::brief_approve::approve`] raises when the brief's
 /// bytes are not the ones the caller showed the human.
@@ -60,15 +60,15 @@ impl Reply {
 
 /// A request the server cannot make sense of: a 400.
 pub fn bad_request(message: impl Into<String>) -> Reply {
-    Reply::error(400, &CliError::refused("DASHBOARD_BAD_REQUEST", message).hint("send a JSON body `{\"changeId\", \"by\", \"note\", \"sha256\"}` (or `briefs` for several) with `Content-Type: application/json`, as the briefs page does"))
+    Reply::error(400, &CliError::refused("DASHBOARD_REQUEST_INVALID", message).hint("send a JSON body `{\"changeId\", \"by\", \"note\", \"sha256\"}` (or `briefs` for several) with `Content-Type: application/json`, as the briefs page does"))
 }
 
 /// The HTTP status of a refusal from the approval core.
 fn status_of(code: &str) -> u16 {
     match code {
-        "APPROVAL_INCOMPLETE" => 400,
+        "APPROVAL_INVALID" => 400,
         "BRIEF_NOT_FOUND" => 404,
-        "BRIEF_APPROVE_REFUSED" | "BRIEF_UNAPPROVABLE" | CHANGED_SINCE_PAGE_LOAD => 409,
+        "BRIEF_APPROVE_REFUSED" | "BRIEF_INVALID" | CHANGED_SINCE_PAGE_LOAD => 409,
         // Another canon process holds the repository write lock: the page may ask again.
         "REPO_WRITE_BUSY" => 503,
         _ => 500,
@@ -267,7 +267,7 @@ struct ApproveBrief {
 }
 
 fn bad_change_id(id: &str) -> Reply {
-    Reply::error(400, &CliError::refused("DASHBOARD_BAD_REQUEST", format!("`{id}` is not a change id")).field("changeId").hint("send the changeId the briefs list gave"))
+    Reply::error(400, &CliError::refused("DASHBOARD_REQUEST_INVALID", format!("`{id}` is not a change id")).field("changeId").hint("send the changeId the briefs list gave"))
 }
 
 fn no_live_brief(ids: &[&str]) -> Reply {

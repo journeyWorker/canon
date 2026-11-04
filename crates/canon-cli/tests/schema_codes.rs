@@ -7,7 +7,7 @@
 //!   (within [`EMIT_WINDOW`] lines);
 //! - a code with no such call (a helper that builds the error for its caller)
 //!   goes to the commands in [`FILE_DEFAULTS`] for its file;
-//! - every command can emit the [`GLOBAL`] codes (`USAGE`, `UNKNOWN_ROLE`).
+//! - every command can emit the [`GLOBAL`] codes (`USAGE`, `ROLE_INVALID`).
 //!
 //! The test fails on any difference between the derived table and the checked
 //! in one, and on a source file that holds codes but is not accounted for, so
@@ -25,7 +25,7 @@ use canon_cli::schema::{error_codes, META};
 const EMIT_WINDOW: usize = 6;
 
 /// Files that are not error sites: the registry and the generated table, and
-/// `context.rs`, whose one code (`CONFIG_MISSING`, built by `require_config`)
+/// `context.rs`, whose one code (`CONFIG_REQUIRED`, built by `require_config`)
 /// is emitted by `run::entry` for every command that needs canon state (see
 /// [`needs_config_leaves`]); `input.rs`, whose INPUT_* codes `derive` attributes to every
 /// leaf that takes `--input`.
@@ -58,7 +58,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("divergence.rs", &["divergence"]),
     ("evidence.rs", &["evidence add", "evidence audit"]),
     ("finding.rs", &["finding add", "finding close"]),
-    // `NO_COMMIT`: `git_rev::bind` refuses the leaves that take a commit option (`--rev`, `--resolution-rev`, `--introduced-rev`).
+    // `COMMIT_REQUIRED`: `git_rev::bind` refuses the leaves that take a commit option (`--rev`, `--resolution-rev`, `--introduced-rev`).
     ("git_rev.rs", &["review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "evidence add", "evidence audit", "evidence approval-payload", "finding add", "finding close"]),
     // The typed-atom errors `canon evidence add` reports with `task done`'s grading;
     // `promote_after_stage`'s command comes from its caller.
@@ -129,7 +129,7 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("FINDING_UNKNOWN_SCENARIO", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("SCENARIO_NOT_FOUND", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
@@ -154,7 +154,7 @@ const WARNING_SITES: &[&str] = &["warn_err!(", "json_out::warn(", "warn_at(", "W
 /// before any leaf is known); `canon schema` has its own `UNKNOWN_COMMAND` for a path it is asked about.
 const PARSER_CODES: &[&str] = &["UNKNOWN_COMMAND", "COMMAND_REQUIRED"];
 
-const GLOBAL: &[&str] = &["INTERNAL", "USAGE", "UNKNOWN_ROLE"];
+const GLOBAL: &[&str] = &["INTERNAL", "USAGE", "ROLE_INVALID"];
 
 fn src_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
@@ -191,7 +191,7 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
     found
 }
 
-/// The leaves `run::entry` refuses with `CONFIG_MISSING` when no `canon.yaml` is
+/// The leaves `run::entry` refuses with `CONFIG_REQUIRED` when no `canon.yaml` is
 /// found: those with a `--repo` option that are not in
 /// `canon_cli::context::CONFIG_EXEMPT`. A leaf's options come from its own
 /// `canon schema` output, so a new `--repo` option is picked up by itself.
@@ -289,7 +289,7 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
         }
     }
     for leaf in needs_config_leaves() {
-        table.get_mut(leaf).expect("leaf has a row").insert("CONFIG_MISSING");
+        table.get_mut(leaf).expect("leaf has a row").insert("CONFIG_REQUIRED");
     }
     // `--input` (`input.rs`, run by `main` before the command): every INPUT_* code is possible on every
     // leaf that takes the option, and a batch is refused only where it is unsupported.
@@ -308,7 +308,7 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
     }
     // The human-only refusal (`run::human_only`) is emitted for its caller's leaf.
     for leaf in HUMAN_ONLY_LEAVES {
-        table.get_mut(leaf).expect("leaf has a row").insert("HUMAN_ONLY");
+        table.get_mut(leaf).expect("leaf has a row").insert("ACTOR_DENIED");
     }
     for command in promoters {
         for leaf in leaves_under(&command) {

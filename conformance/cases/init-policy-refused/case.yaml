@@ -1,4 +1,4 @@
-description: "`canon init` refuses an unknown `--policy` level and `--policy` together with `--no-policy` as usage errors (exit 2) before writing anything, so a following `canon status` still finds no canon.yaml and refuses with CONFIG_MISSING (exit 2)"
+description: "`canon init` refuses an unknown `--policy` level and `--policy` together with `--no-policy` as usage errors (exit 2) before writing anything, so a following `canon status` still finds no canon.yaml and refuses with CONFIG_REQUIRED (exit 2)"
 steps:
   - args: [init, --policy, extreme]
     exit: 2

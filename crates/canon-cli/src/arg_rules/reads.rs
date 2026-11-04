@@ -45,9 +45,9 @@ pub(crate) static TABLES: Tables = Tables {
         (
             "query",
             &[
-                Rule::forbids_in("kind", NOT_CHANGE_KINDS, &["change"]).code("QUERY_INVALID_ARGUMENT").help("`--change` applies only to `--kind change` and `--kind task`."),
-                Rule::forbids_in("kind", NOT_STATUS_KINDS, &["status"]).code("QUERY_INVALID_ARGUMENT").help("`--status` applies only to `--kind change`, `--kind task` and `--kind subject`."),
-                Rule::forbids_in("kind", NOT_DOMAIN_KINDS, &["domain"]).code("QUERY_INVALID_ARGUMENT").help("`--domain` applies only to `--kind subject`."),
+                Rule::forbids_in("kind", NOT_CHANGE_KINDS, &["change"]).code("QUERY_ARGUMENT_INVALID").help("`--change` applies only to `--kind change` and `--kind task`."),
+                Rule::forbids_in("kind", NOT_STATUS_KINDS, &["status"]).code("QUERY_ARGUMENT_INVALID").help("`--status` applies only to `--kind change`, `--kind task` and `--kind subject`."),
+                Rule::forbids_in("kind", NOT_DOMAIN_KINDS, &["domain"]).code("QUERY_ARGUMENT_INVALID").help("`--domain` applies only to `--kind subject`."),
             ],
         ),
         ("retrieve", &[Rule::exactly_one(&["regime", "domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>"), Rule::requires("subject", &["domain"])]),
@@ -58,7 +58,7 @@ pub(crate) static TABLES: Tables = Tables {
             &[
                 Validator {
                     arguments: &["kind", "status"],
-                    code: "QUERY_INVALID_ARGUMENT",
+                    code: "QUERY_ARGUMENT_INVALID",
                     description: "`--status` is one of the statuses of the queried kind: `open`, `done` for `task`; `proposed`, `in_progress`, `completed`, `archived` for `change`; `proposed`, `specced`, `building`, `verifying`, `shipped`, `retired` for `subject`.",
                     rejects: &["canon query --kind task --status proposed --json"],
                 },
@@ -117,8 +117,8 @@ pub(crate) static TABLES: Tables = Tables {
     domains: &[
         DomainRow::new(Scope::Arguments(&["trace"], "id"), Domain::matching(TRACE_OPERAND), "TRACE_OPERAND_INVALID").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "abcdef0", "loop-change_9_9", " a_1_2 "]).says("is none of the three shapes a trace operand takes: a review id (26 base32 characters), a commit sha (7 to 40 hex digits) or a finding key (<change>_<round>_<seq>)").outside(&["abc", "not a shape!", "abcdef", "a_1", "a__2", "a_1_x", "a_1_2_"]),
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
-        DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_EMPTY").inside(&["timeout", " a "]).outside(&["", "   "]),
-        DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_INVALID_ARGUMENT").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
+        DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_REQUIRED").inside(&["timeout", " a "]).outside(&["", "   "]),
+        DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_ARGUMENT_INVALID").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
         DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_INVALID_ARGUMENT").inside(&["claude", "none", "NONE", "", " Claude , codex,,pi ", ",omp"]).outside(&[",", "gemini", "none,claude", "claude,gemini", " , "]),
         DomainRow::new(Scope::Arguments(&["retrieve"], "regime"), Domain::matching(REGIME_KEY), "USAGE").inside(&["reviewer/canon/join-spine/9c93d024b1a2", "reviewer/b/c/abcdef"]).outside(&["reviewer/b/c", "reviewer/b/c/d/abcdef", "reviewer//c/abcdef", "reviewer/b/c/ABCDEF", "reviewer/b/c/abcde", "reviewer/b c/c/abcdef"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "role-segment"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["reviewer", " a b ", "/x/"]).outside(&["", "  ", "/", " / "]),

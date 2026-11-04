@@ -189,7 +189,7 @@ fn a_subject_status_off_the_chain_lists_the_states_it_may_move_to() {
     assert_eq!(strings(&e["expected"]), ["proposed", "specced", "building", "verifying", "shipped", "retired"]);
     // A known state that is not the next step names the next steps.
     let e = error_of(dir.path(), &["subject", "move", "demo", "--to", "shipped"]);
-    assert_eq!(e["code"], "SUBJECT_INVALID_TRANSITION");
+    assert_eq!(e["code"], "SUBJECT_CONFLICT");
     assert_eq!(strings(&e["expected"]), ["specced", "retired"]);
 }
 
@@ -197,18 +197,18 @@ fn a_subject_status_off_the_chain_lists_the_states_it_may_move_to() {
 fn input_validation_refusals_name_the_field_and_the_accepted_values() {
     let dir = repo();
     let e = error_of(dir.path(), &["query", "--kind", "subject", "--status", "nope"]);
-    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_INVALID_ARGUMENT"), Some("--status")));
+    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_ARGUMENT_INVALID"), Some("--status")));
     assert!(strings(&e["expected"]).contains(&"proposed"), "{e}");
 
     let e = error_of(dir.path(), &["query", "--kind", "evidence", "--domain", "dev"]);
-    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_INVALID_ARGUMENT"), Some("--domain")));
+    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_ARGUMENT_INVALID"), Some("--domain")));
 
     let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--resolution-rev", "HEAD"]);
-    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_REV_UNEXPECTED"), Some("--resolution-rev")));
+    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_REV_CONFLICT"), Some("--resolution-rev")));
 
     let regime = String::from_utf8(run(dir.path(), &["regime", "show", "--role-segment", "implementer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let e = error_of(dir.path(), &["dispatch", "begin", "--role", "reviewer", "--regime", &regime]);
-    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("DISPATCH_ROLE_REGIME_MISMATCH"), Some("--role")));
+    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("DISPATCH_ROLE_CONFLICT"), Some("--role")));
     assert_eq!(strings(&e["expected"]), ["implementer"]);
 }
 

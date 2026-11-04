@@ -82,7 +82,7 @@ Feature: finding close
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a committed finding
     When it is closed to fixed with no --resolution-rev, or with one this repo does not hold
-    Then without one the close records the full sha HEAD resolves to as its resolution, and with an unheld one the command exits 2 with NO_COMMIT
+    Then without one the close records the full sha HEAD resolves to as its resolution, and with an unheld one the command exits 2 with COMMIT_REQUIRED
     And a disposition other than fixed carrying --resolution-rev is refused with exit 2
     And neither refusal stages anything
 

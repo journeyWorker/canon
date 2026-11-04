@@ -88,7 +88,7 @@ fn brief_check_16_blockers_exit_1_with_the_report_and_a_refusal_exits_2() {
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
     let body = json(&out);
     assert_eq!(body["ok"], false, "{body}");
-    assert_eq!(body["error"]["code"], "BRIEF_HAS_BLOCKERS", "{body}");
+    assert_eq!(body["error"]["code"], "BRIEF_CHECK_FAILED", "{body}");
     assert!(body["data"]["findings"].is_array() && body["data"]["counts"].is_object(), "the report rides in data: {body}");
 
     std::fs::write(&brief, clean_brief()).unwrap();

@@ -341,7 +341,7 @@ fn finding_add_43_an_introducing_commit_together_with_the_unknown_mark_is_refuse
     let dir = fixture();
     let out = add_finding(dir.path(), "kept", "1", "blocker", &["--introduced-rev", "HEAD", "--introduced-unknown"]);
     assert_eq!(out.status.code(), Some(2));
-    assert!(text(&out).contains("FINDING_INVALID_ARGUMENT") && text(&out).contains("exclusive"), "{}", text(&out));
+    assert!(text(&out).contains("FINDING_ARGUMENT_INVALID") && text(&out).contains("exclusive"), "{}", text(&out));
     assert!(ledger(dir.path(), "finding").is_empty());
 }
 

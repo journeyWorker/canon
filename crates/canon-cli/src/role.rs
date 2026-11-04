@@ -9,7 +9,7 @@
 //! as before.
 //!
 //! [`declare`] runs once at startup: it resolves the declared role and remembers the result so [`Role::current`] can be called from
-//! anywhere without threading the flag. An unknown `CANON_ROLE` value (`UNKNOWN_ROLE`) declares nothing; the refusal comes back from
+//! anywhere without threading the flag. An unknown `CANON_ROLE` value (`ROLE_INVALID`) declares nothing; the refusal comes back from
 //! `declare` and `main` raises it after the other validators (ATIP 10.8.1, 11.7 step 6).
 
 use std::sync::OnceLock;
@@ -170,7 +170,7 @@ pub fn unknown_env_role() -> Option<CliError> {
         return None;
     }
     Some(
-        CliError::refused("UNKNOWN_ROLE", format!("{ENV}=`{value}` is not a role"))
+        CliError::refused("ROLE_INVALID", format!("{ENV}=`{value}` is not a role"))
             .field(ENV)
             .expected(["planner", "implementer", "reviewer", "orchestrator"])
             .hint(format!("use one of: {}; or pass --as <role>", ALL.iter().map(|r| r.as_str()).collect::<Vec<_>>().join(", "))),

@@ -116,7 +116,7 @@ Feature: learn promotion
   Scenario: The approval payload of an unknown strategy or a malformed id is refused and writes nothing
     Given a repo with no strategies and an evaluation file
     When canon strategy approval-payload runs for a well-formed id no strategy has, for the malformed id nope, and for a well-formed id without --evaluation
-    Then the unknown strategy exits 2 with LEARN_STRATEGY_NOT_FOUND, and the malformed id and the missing --evaluation each exit 2 with USAGE
+    Then the unknown strategy exits 2 with STRATEGY_NOT_FOUND, and the malformed id and the missing --evaluation each exit 2 with USAGE
     And no file in the repo changed
 
   # canon: {"schema":1,"at":"2026-10-26T11:42:44Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
@@ -152,6 +152,6 @@ Feature: learn promotion
   Scenario: A rollback of an unknown strategy is refused before any signature is read and writes nothing
     Given a repo with no strategy of a well-formed id, and a signature file that is missing or wrong
     When canon strategy rollback runs for that id with that signature file
-    Then it exits 2 with LEARN_STRATEGY_NOT_FOUND, with the file missing and with it wrong alike
+    Then it exits 2 with STRATEGY_NOT_FOUND, with the file missing and with it wrong alike
     And a rollback of an existing strategy with a wrong signature still exits 1 with LEARN_ROLLBACK_FAILED
     And no file in the repo changed

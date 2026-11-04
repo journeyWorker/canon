@@ -225,7 +225,7 @@ fn subject_lifecycle_53_a_relayed_approval_with_a_wrong_or_missing_digest_writes
     };
     let mismatch = call(&["a"], &[&stale]);
     assert_eq!(mismatch.status.code(), Some(2), "{}", text(&mismatch));
-    assert_eq!(code(&mismatch), "RELAY_DIGEST_MISMATCH");
+    assert_eq!(code(&mismatch), "RELAY_DIGEST_STALE");
     let missing = call(&["b"], &[&a]);
     assert_eq!(missing.status.code(), Some(2), "{}", text(&missing));
     assert_eq!(code(&missing), "USAGE");
@@ -234,14 +234,14 @@ fn subject_lifecycle_53_a_relayed_approval_with_a_wrong_or_missing_digest_writes
     let both = call(&["a", "b"], &[&a, &format!("b=sha256:{}", "1".repeat(64))]);
     assert_eq!(both.status.code(), Some(2), "{}", text(&both));
     assert_eq!(code(&both), "BRIEF_APPROVE_REFUSED", "{}", text(&both));
-    assert!(text(&both).contains("RELAY_DIGEST_MISMATCH"), "{}", text(&both));
+    assert!(text(&both).contains("RELAY_DIGEST_STALE"), "{}", text(&both));
     assert_eq!(snapshot(r), before, "no brief and no policy approval changed");
     assert!(!r.join(".canon/policy.approval.json").exists());
     // The brief edited after it was shown is refused too.
     let shown = digest_arg(r, "a");
     std::fs::write(brief_path(r, "a"), brief() + "\nAn edit after the human read it.\n").unwrap();
     let edited = call(&["a"], &[&shown]);
-    assert_eq!((edited.status.code(), code(&edited).as_str()), (Some(2), "RELAY_DIGEST_MISMATCH"), "{}", text(&edited));
+    assert_eq!((edited.status.code(), code(&edited).as_str()), (Some(2), "RELAY_DIGEST_STALE"), "{}", text(&edited));
     assert!(!read(r, "a").contains("Approved:"));
 }
 
@@ -269,7 +269,7 @@ fn subject_lifecycle_54_a_relayed_approval_without_name_answer_actor_or_role_is_
         let out = relayed(role, &extra);
         assert_eq!(out.status.code(), Some(2), "{what}: {}", text(&out));
         let found = code(&out);
-        assert!(["USAGE", "APPROVAL_INCOMPLETE"].contains(&found.as_str()), "{what}: {found}");
+        assert!(["USAGE", "APPROVAL_INVALID"].contains(&found.as_str()), "{what}: {found}");
     }
     let no_role = relayed(None, &["--actor", "plan-1", "--approver", "Ana", "--note", "ok"]);
     assert_eq!(code(&no_role), "USAGE");
@@ -286,7 +286,7 @@ fn subject_lifecycle_54_a_relayed_approval_without_name_answer_actor_or_role_is_
     assert_eq!(snapshot(r), before, "the refused calls wrote nothing");
 }
 
-/// subject.lifecycle.55: each agent role without the relay option is refused `HUMAN_ONLY` on
+/// subject.lifecycle.55: each agent role without the relay option is refused `ACTOR_DENIED` on
 /// brief approve, policy approve and divergence accept, the hint naming the relay procedure
 /// before the human's call; nothing is written.
 #[test]
@@ -303,7 +303,7 @@ fn subject_lifecycle_55_an_agent_role_without_the_relay_option_is_human_only_and
         for role in ["planner", "implementer", "reviewer", "orchestrator"] {
             let out = run_as(r, Some(role), args);
             assert_eq!(out.status.code(), Some(2), "{leaf} as {role}: {}", text(&out));
-            assert_eq!(code(&out), "HUMAN_ONLY", "{leaf} as {role}");
+            assert_eq!(code(&out), "ACTOR_DENIED", "{leaf} as {role}");
             let hint = json(&out)["error"]["hint"].as_str().unwrap().to_string();
             let (relay, human) = (hint.find("--relayed-via").expect(&hint), hint.find("their own shell").expect(&hint));
             assert!(relay < human, "{leaf}: the relay procedure comes first: {hint}");
@@ -324,7 +324,7 @@ fn subject_lifecycle_56_a_relayed_policy_approval_records_its_relay_and_refuses_
     let r = dir.path();
     let file = r.join(".canon/policy.approval.json");
     let none = run_as(r, Some("reviewer"), &["policy", "approve", "--approver", "Ana", "--note", "ok", "--json"]);
-    assert_eq!((none.status.code(), code(&none).as_str()), (Some(2), "HUMAN_ONLY"));
+    assert_eq!((none.status.code(), code(&none).as_str()), (Some(2), "ACTOR_DENIED"));
     let no_note = run_as(r, Some("reviewer"), &["policy", "approve", "--approver", "Ana", "--relayed-via", "ask", "--actor", "rev-1", "--json"]);
     assert_eq!((no_note.status.code(), code(&no_note).as_str()), (Some(2), "USAGE"), "{}", text(&no_note));
     let no_role = run(r, &["policy", "approve", "--approver", "Ana", "--note", "ok", "--relayed-via", "ask", "--actor", "rev-1", "--json"]);
@@ -377,7 +377,7 @@ fn subject_lifecycle_58_old_approved_lines_read_as_before_and_the_marker_is_outs
 }
 
 /// subject.lifecycle.59: `approval: { relay: deny }` makes every relayed call
-/// `HUMAN_ONLY` naming the key; a malformed section is refused.
+/// `ACTOR_DENIED` naming the key; a malformed section is refused.
 #[test]
 fn subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key() {
     let dir = repo();
@@ -390,7 +390,7 @@ fn subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key(
     let policy_call = run_as(r, Some("planner"), &["policy", "approve", "--approver", "Ana", "--note", "ok", "--relayed-via", "ask", "--actor", "plan-1", "--json"]);
     for out in [&brief_call, &policy_call] {
         assert_eq!(out.status.code(), Some(2), "{}", text(out));
-        assert_eq!(code(out), "HUMAN_ONLY");
+        assert_eq!(code(out), "ACTOR_DENIED");
         let doc = json(out);
         let named = format!("{}{}", doc["error"]["message"].as_str().unwrap(), doc["error"]["hint"].as_str().unwrap());
         assert!(named.contains("approval.relay"), "{named}");
@@ -401,7 +401,7 @@ fn subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key(
     let preview = ok(r, &["migrate", "--json"]);
     let digest = json(&preview)["data"]["planDigest"].as_str().unwrap().to_string();
     let migrate = run_as(r, Some("planner"), &["migrate", "--commit", "--plan-digest", &digest, "--relayed-via", "ask", "--actor", "plan-1", "--approver", "Ana", "--note", "ok", "--json"]);
-    assert_eq!((migrate.status.code(), code(&migrate).as_str()), (Some(2), "HUMAN_ONLY"), "{}", text(&migrate));
+    assert_eq!((migrate.status.code(), code(&migrate).as_str()), (Some(2), "ACTOR_DENIED"), "{}", text(&migrate));
     assert!(json(&migrate)["error"]["message"].as_str().unwrap().contains("approval.relay"), "{}", text(&migrate));
     // The human's own call is not affected.
     ok(r, &["brief", "approve", "a", "--approver", "Ana", "--note", "ok"]);
@@ -540,5 +540,5 @@ fn subject_lifecycle_57_the_relay_option_of_migrate_is_never_ignored() {
     std::fs::write(r.join("canon.yaml"), format!("{yaml}approval:\n  relay: deny\n")).unwrap();
     let digest = json(&ok(r, &["migrate", "--json"]))["data"]["planDigest"].as_str().unwrap().to_string();
     let denied = run_as(r, Some("planner"), &[&["migrate", "--commit", "--plan-digest", digest.as_str()][..], &relayed[..]].concat());
-    assert_eq!((denied.status.code(), code(&denied).as_str()), (Some(2), "HUMAN_ONLY"), "{}", text(&denied));
+    assert_eq!((denied.status.code(), code(&denied).as_str()), (Some(2), "ACTOR_DENIED"), "{}", text(&denied));
 }

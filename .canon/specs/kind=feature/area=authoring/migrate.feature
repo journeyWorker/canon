@@ -225,7 +225,7 @@ Feature: canon migrate
   Scenario: A preview refuses uncommitted briefs and names the briefs it will not re-bind
     Given a git repo whose old brief has an uncommitted edit, a brief edited after its approval, and a brief whose marker role differs from the table
     When canon migrate runs
-    Then the uncommitted brief is refused with MIGRATE_UNCOMMITTED and nothing is written
+    Then the uncommitted brief is refused with MIGRATION_CONFLICT and nothing is written
     And the edited brief and the role-mismatched brief are named as not re-bound, with the reason
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:52Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
@@ -259,7 +259,7 @@ Feature: canon migrate
   Scenario: A plan that re-binds an approval or a review pin is human-only to commit, and one that re-binds nothing is not
     Given a plan that re-binds an Approved: line and one that re-binds nothing
     When canon migrate --commit runs as planner and as orchestrator
-    Then the re-binding plan is refused with HUMAN_ONLY, exit 2, and the tree is unchanged
+    Then the re-binding plan is refused with ACTOR_DENIED, exit 2, and the tree is unchanged
     And the plan that re-binds nothing is run by the orchestrator, and a preview is open to every role
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:56Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}

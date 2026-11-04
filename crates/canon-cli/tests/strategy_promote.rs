@@ -361,7 +361,7 @@ fn a_failed_demotion_has_its_own_error_code() {
     let output = run_promote(dir.path(), &id, &["--json"]);
     assert_eq!(output.status.code(), Some(1), "{}", String::from_utf8_lossy(&output.stderr));
     let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("one JSON document");
-    assert_eq!(body["error"]["code"], "LEARN_DEMOTION_FAILED", "{body}");
+    assert_eq!(body["error"]["code"], "STRATEGY_DEMOTION_FAILED", "{body}");
 }
 
 /// `strategy approval-payload` is a read: identical arguments print identical

@@ -138,7 +138,7 @@ fn atip_constraints_03_handler_relations_are_constraints_with_their_codes() {
     assert_eq!(reason["if"]["in"], json!(["rejected", "deferred"]));
     assert_eq!(reason["code"], "FINDING_REASON_REQUIRED");
     let forbids = rules(close, "forbids").into_iter().find(|rule| rule["then"] == json!(["resolution-rev"])).unwrap_or_else(|| panic!("no rule forbids --resolution-rev: {:?}", close["constraints"]));
-    assert_eq!(forbids["code"], "FINDING_RESOLUTION_REV_UNEXPECTED");
+    assert_eq!(forbids["code"], "FINDING_RESOLUTION_REV_CONFLICT");
     let add = leaf("finding add");
     assert!(has_names(add, "atMostOne", &["introduced-rev", "introduced-unknown"]), "{:?}", add["constraints"]);
     let validator = add["validators"].as_array().into_iter().flatten().find(|validator| validator["code"] == "FINDING_INTRODUCED_REQUIRED").unwrap_or_else(|| panic!("no validator for the required origin: {:?}", add["validators"]));
@@ -486,7 +486,7 @@ fn atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_
     }
     // The human's own answer has a code of its own, and no domain claims one code for both paths.
     let brief = leaf("brief approve");
-    assert!(validator_of(brief, &["approver", "note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INCOMPLETE"));
+    assert!(validator_of(brief, &["approver", "note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
     assert!(validator_of(leaf("policy approve"), &["approver"]).is_some_and(|validator| validator["code"] == "POLICY_APPROVAL_REFUSED"));
     for (command, argument) in [("brief approve", "approver"), ("brief approve", "note"), ("policy approve", "approver")] {
         assert!(harness::option(leaf(command), argument).expect("the option").get("domain").is_none(), "`{command}` --{argument} has a domain");
@@ -494,7 +494,7 @@ fn atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_
 }
 
 /// atip.constraints.15: each of them refuses in an empty directory with no repository, with its code and the argument at fault;
-/// the environment fills the actor and the role; the human's blank answer is `APPROVAL_INCOMPLETE`.
+/// the environment fills the actor and the role; the human's blank answer is `APPROVAL_INVALID`.
 #[test]
 fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refused_before_any_state_is_read() {
     let digest = "--digest add-login=sha256:0123456789abcdef";
@@ -512,12 +512,12 @@ fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refuse
         check(&base, &[("CANON_ROLE", "implementer")], "USAGE", "--actor");
         check(&format!("{base} --as implementer --actor impl --approver \" \""), &[], "USAGE", "--approver");
         check(&format!("{base} --as implementer --actor impl --note \" \""), &[], "USAGE", "--note");
-        // The environment is a stateless input: CANON_ACTOR and CANON_ROLE fill them, and the call goes on to the repository (`CONFIG_MISSING`).
+        // The environment is a stateless input: CANON_ACTOR and CANON_ROLE fill them, and the call goes on to the repository (`CONFIG_REQUIRED`).
         let outcome = rule_support::run_empty_with(&words(&base), &[("CANON_ROLE", "implementer"), ("CANON_ACTOR", "impl")]);
-        assert_eq!(outcome.code.as_deref(), Some("CONFIG_MISSING"), "{command}: {outcome:?}");
+        assert_eq!(outcome.code.as_deref(), Some("CONFIG_REQUIRED"), "{command}: {outcome:?}");
     }
-    check("canon brief approve add-login --approver \" \" --note ok", &[], "APPROVAL_INCOMPLETE", "--approver");
-    check("canon brief approve add-login --approver alice --note \" \"", &[], "APPROVAL_INCOMPLETE", "--note");
+    check("canon brief approve add-login --approver \" \" --note ok", &[], "APPROVAL_INVALID", "--approver");
+    check("canon brief approve add-login --approver alice --note \" \"", &[], "APPROVAL_INVALID", "--note");
     check("canon policy approve --approver \" \"", &[], "POLICY_APPROVAL_REFUSED", "--approver");
     check("canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok", &[], "USAGE", "--relayed-via");
     check("canon divergence accept auth.login.01 --actor alice --reason why --tracking t --relayed-via ask --approver alice --note ok", &[], "USAGE", "--relayed-via");
@@ -611,12 +611,12 @@ fn assert_refused(outcome: &rule_support::Outcome, code: &str, field: &str) {
 /// (required, domains, constraints in the document's order, validators), the same in an empty directory as in a repository.
 #[test]
 fn atip_constraints_18_a_declared_domain_or_rule_answers_before_any_state_is_read_and_in_the_contracts_order() {
-    // The examples of the review: each answered CONFIG_MISSING, the missing file or PLAN_SOURCES_MISSING.
+    // The examples of the review: each answered CONFIG_REQUIRED, the missing file or PLAN_SOURCES_REQUIRED.
     let implementer = Some("implementer");
     for (line, code, field) in [
         ("canon finding close add-login --round 1 --seq 1 --disposition rejected --actor a", "FINDING_REASON_REQUIRED", "--reason"),
-        ("canon finding close add-login --round 0 --seq 1 --disposition fixed --actor a", "FINDING_INVALID_ARGUMENT", "--round"),
-        ("canon divergence add auth.login.01 --state deferred --actor a --reason r", "DIVERGENCE_INVALID_ARGUMENT", "--expiry"),
+        ("canon finding close add-login --round 0 --seq 1 --disposition fixed --actor a", "FINDING_ARGUMENT_INVALID", "--round"),
+        ("canon divergence add auth.login.01 --state deferred --actor a --reason r", "DIVERGENCE_ARGUMENT_INVALID", "--expiry"),
         ("canon evidence add --scenario auth.login.01 --class test-run --ref r --command-result out.txt", "EVIDENCE_INVALID_ARGUMENT", "--summary"),
         ("canon evidence audit auth.login.01 --ref r --evaluator e --evaluator-version 1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --report-case x", "EVIDENCE_INVALID_ARGUMENT", "--report"),
         ("canon evidence approval-payload --rev HEAD --approver alice --approval-at 2030-01-01T00:00:00Z", "EVIDENCE_REFUSED", "--task"),
@@ -628,14 +628,14 @@ fn atip_constraints_18_a_declared_domain_or_rule_answers_before_any_state_is_rea
     // The same calls with a repository answer the same.
     let repo = run(&["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--actor", "a"]);
     refused(&repo, "FINDING_REASON_REQUIRED", "--reason");
-    refused(&run(&["finding", "close", "add-login", "--round", "0", "--seq", "1", "--disposition", "fixed", "--actor", "a"]), "FINDING_INVALID_ARGUMENT", "--round");
+    refused(&run(&["finding", "close", "add-login", "--round", "0", "--seq", "1", "--disposition", "fixed", "--actor", "a"]), "FINDING_ARGUMENT_INVALID", "--round");
     // The order: a domain before a constraint before a validator, whichever code each has.
-    assert_refused(&empty("canon finding add --change add-login --round 0 --seq 1 --severity note --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--round");
-    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity blocker --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
+    assert_refused(&empty("canon finding add --change add-login --round 0 --seq 1 --severity note --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_ARGUMENT_INVALID", "--round");
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity blocker --actor a --summary s --introduced-rev r --introduced-unknown", implementer), "FINDING_ARGUMENT_INVALID", "--introduced-rev");
     assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class test-run --ref r", implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
     assert_refused(&empty("canon evidence add --scenario auth.login.01 --report junit:r.xml --artifact auth.login.01=a.txt --class audit --ref r --summary s", implementer), "EVIDENCE_INVALID_ARGUMENT", "--class");
     // The field is the first argument of the rule in the rule's own order, not the order on the command line.
-    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-unknown --introduced-rev r", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-unknown --introduced-rev r", implementer), "FINDING_ARGUMENT_INVALID", "--introduced-rev");
     assert_refused(&empty("canon init --policy strict --check", None), "USAGE", "--check");
 }
 
@@ -706,9 +706,9 @@ fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_
     let good = r#"{"change":"add-login","round":1,"seq":5,"severity":"note","actor":"alice","summary":"fine"}"#;
     for (bad, code, field) in [
         (r#"{"change":"add-login","round":1,"seq":6,"severity":"blocker","actor":"alice","summary":"no origin"}"#, "FINDING_INTRODUCED_REQUIRED", "/1"),
-        (r#"{"change":"add-login","round":0,"seq":6,"severity":"note","actor":"alice","summary":"round zero"}"#, "FINDING_INVALID_ARGUMENT", "/1/round"),
-        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"both","introducedRev":"HEAD","introducedUnknown":true}"#, "FINDING_INVALID_ARGUMENT", "/1"),
-        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"two\nrows"}"#, "FINDING_INVALID_ARGUMENT", "/1/summary"),
+        (r#"{"change":"add-login","round":0,"seq":6,"severity":"note","actor":"alice","summary":"round zero"}"#, "FINDING_ARGUMENT_INVALID", "/1/round"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"both","introducedRev":"HEAD","introducedUnknown":true}"#, "FINDING_ARGUMENT_INVALID", "/1"),
+        (r#"{"change":"add-login","round":1,"seq":6,"severity":"note","actor":"alice","summary":"two\nrows"}"#, "FINDING_ARGUMENT_INVALID", "/1/summary"),
     ] {
         for batch in [format!("[{good},{bad}]"), format!("[{bad},{good}]")] {
             let (outcome, changed) = run_in_copy(&["finding", "add", "--input", &batch]);
@@ -722,7 +722,7 @@ fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_
     }
     // The same elements, one at a time, are refused the same way; a batch of good elements still writes.
     let (single, _) = run_in_copy(&["finding", "add", "--change", "add-login", "--round", "0", "--seq", "6", "--severity", "note", "--actor", "alice", "--summary", "x"]);
-    assert_eq!(single.body["error"]["code"], "FINDING_INVALID_ARGUMENT");
+    assert_eq!(single.body["error"]["code"], "FINDING_ARGUMENT_INVALID");
     let two = format!("[{good},{}]", good.replace("\"seq\":5", "\"seq\":6"));
     let (written, changed) = run_in_copy(&["finding", "add", "--input", &two]);
     assert_eq!(written.exit, 0, "{}", written.body);
@@ -744,13 +744,13 @@ fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and
     assert_refused(&calendar, "USAGE", "--since");
     assert!(calendar.message.unwrap_or_default().contains("2026-02-30"));
     // The divergence options too: `--expiry` and `--as-of` are judged by the stage (the constraint first, then the calendar).
-    assert_refused(&empty("canon divergence add auth.login.01 --state deferred --expiry 2026-02-30 --actor a", implementer), "DIVERGENCE_INVALID_ARGUMENT", "--reason");
+    assert_refused(&empty("canon divergence add auth.login.01 --state deferred --expiry 2026-02-30 --actor a", implementer), "DIVERGENCE_ARGUMENT_INVALID", "--reason");
     assert_refused(&empty("canon divergence list --as-of 2026-02-30 --limit 1 --all", None), "USAGE", "--limit");
     assert_refused(&empty("canon divergence add auth.login.01 --state deferred --reason why --expiry 2026-02-30 --actor a", implementer), "USAGE", "--expiry");
     assert_refused(&empty("canon divergence list --as-of 2026-02-30", None), "USAGE", "--as-of");
     assert_refused(&empty("canon divergence list --as-of tomorrow", None), "USAGE", "--as-of");
     // The same for `--introduced-rev self` beside a broken exclusivity, and a lone `self`.
-    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self --introduced-unknown", implementer), "FINDING_INVALID_ARGUMENT", "--introduced-rev");
+    assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self --introduced-unknown", implementer), "FINDING_ARGUMENT_INVALID", "--introduced-rev");
     assert_refused(&empty("canon finding add --change add-login --round 1 --seq 1 --severity note --actor a --summary s --introduced-rev self", implementer), "USAGE", "--introduced-rev");
     // `--surface-ref` on `evidence add` beside `--all-scenarios --scenario`: the constraint first; alone, the form.
     assert_refused(&empty("canon evidence add --all-scenarios --scenario auth.login.01 --report junit:r.xml --class test-run --ref r --surface-ref /etc/passwd", implementer), "EVIDENCE_INVALID_ARGUMENT", "--scenario");
@@ -766,7 +766,7 @@ fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and
 #[test]
 fn atip_constraints_25_an_integer_refusal_names_the_declared_bound() {
     let zero = empty("canon finding close add-login --round 0 --seq 1 --disposition fixed", Some("implementer"));
-    assert_refused(&zero, "FINDING_INVALID_ARGUMENT", "--round");
+    assert_refused(&zero, "FINDING_ARGUMENT_INVALID", "--round");
     assert!(zero.message.unwrap_or_default().contains("at least 1"));
     let negative = empty("canon finding close add-login --round -1 --seq 1 --disposition fixed", Some("implementer"));
     assert_refused(&negative, "USAGE", "--round");

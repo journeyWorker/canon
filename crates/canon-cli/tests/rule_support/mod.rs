@@ -525,7 +525,7 @@ pub fn run_call(provision: &Provision, home: &Path, words: &[String], role: Opti
 }
 
 /// The role a call declares (`CANON_ROLE`): an agent role, except for the human's own acts, which refuse one
-/// (`HUMAN_ONLY`) unless the call relays the human's answer.
+/// (`ACTOR_DENIED`) unless the call relays the human's answer.
 pub fn declared_role(path: &str, assignment: &Assignment) -> Option<&'static str> {
     match path {
         "brief approve" | "policy approve" | "divergence accept" | "migrate" if !assignment.contains_key("relayed-via") => None,

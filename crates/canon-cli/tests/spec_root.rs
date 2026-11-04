@@ -1,5 +1,5 @@
 //! #104 through the real binary: a `--project` that names no spec root
-//! configured in canon.yaml is refused (exit 2, `UNKNOWN_SPEC_ROOT`) before
+//! configured in canon.yaml is refused (exit 2, `SPEC_ROOT_NOT_FOUND`) before
 //! anything is written, by every write command that takes one. The hint
 //! names the configured roots and, with one root, the exact flag to pass.
 //! Read-only commands are not checked: a filter on an id no root carries
@@ -97,7 +97,7 @@ fn evidence_args<'a>(project: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
 fn refusal(out: &Output) -> Value {
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(out), stderr(out));
     let body: Value = serde_json::from_str(&stdout(out)).unwrap_or_else(|e| panic!("JSON on stdout ({e}): {}{}", stdout(out), stderr(out)));
-    assert_eq!(body["error"]["code"], "UNKNOWN_SPEC_ROOT", "{body}");
+    assert_eq!(body["error"]["code"], "SPEC_ROOT_NOT_FOUND", "{body}");
     assert_eq!(body["error"]["field"], "--project", "{body}");
     body["error"].clone()
 }

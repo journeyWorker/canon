@@ -383,7 +383,7 @@ fn atip_inputorder_11_an_environment_value_the_document_cannot_give_still_refuse
     let before = tree(repo);
     let out = canon_with(repo, &["scenario", "new", "--input", &document, "--json"], None, &[("CANON_ROLE", "bogus")]);
     let (exit, code, _, field, body) = refusal(&out);
-    assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "UNKNOWN_ROLE", Some("CANON_ROLE")), "{body}");
+    assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "ROLE_INVALID", Some("CANON_ROLE")), "{body}");
     assert_eq!(tree(repo), before, "nothing is written");
     // the same document with a role in the environment is exit 0
     let out = canon_with(repo, &["scenario", "new", "--input", &document, "--json"], None, &[("CANON_ROLE", "implementer")]);

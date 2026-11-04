@@ -10,7 +10,7 @@ build nothing meanwhile. The only waiver is `--override-reason
 the human's answer: canon records it on the evidence, echoes it in
 `data.overrides[]` and lists it in `status` for the human. Never use it to
 skip the wait yourself. `brief approve`, `policy approve` and `divergence
-accept` are the human's; they refuse you (`HUMAN_ONLY`) unless they record an
+accept` are the human's; they refuse you (`ACTOR_DENIED`) unless they record an
 answer the human gave in the conversation (`--relayed-via`, the planner's
 procedure: `canon skills show role-planner`). You never run them without that
 answer, and never remove or unset your role (`env -u CANON_ROLE`, dropping
@@ -224,7 +224,7 @@ After the first `status`, follow `meta.next` of each write; do not call
 the commit it is about from `--rev` (default `HEAD`, any git revision). You
 need not commit first: code that is not committed yet is recorded with its
 `codeTree` and `worktreeDirty: true`, never refused. Outside git, or in a
-repo with no commits, a write that needs a commit refuses `NO_COMMIT`.
+repo with no commits, a write that needs a commit refuses `COMMIT_REQUIRED`.
 
 The forms you reach for most (the story's ids; swap in yours):
 

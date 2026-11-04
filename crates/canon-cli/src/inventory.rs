@@ -221,7 +221,7 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
         many => format!("canon.yaml configures the spec roots {}; pass `--project <one of them>`", many.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")),
     };
     Err(CliError::refused(
-        "UNKNOWN_SPEC_ROOT",
+        "SPEC_ROOT_NOT_FOUND",
         format!("`--project {}` names no spec root configured in canon.yaml (`specs.roots[]`: {}); nothing was written", project_id.as_str(), ids.join(", ")),
     )
     .hint(hint)

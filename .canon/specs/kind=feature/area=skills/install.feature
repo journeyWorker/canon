@@ -401,7 +401,7 @@ Feature: skills install
   Scenario: A human-only act refuses every agent role
     Given a repo set up by canon init
     When brief approve, policy approve and divergence accept run as planner, implementer, reviewer or orchestrator, by --as and by CANON_ROLE
-    Then each exits 2 with HUMAN_ONLY, not retryable, and a hint naming the leaf and the options only the human supplies
+    Then each exits 2 with ACTOR_DENIED, not retryable, and a hint naming the leaf and the options only the human supplies
     And the refusal changes nothing, and without a declared role the leaf runs
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:06Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
@@ -435,7 +435,7 @@ Feature: skills install
   Scenario: A brief approve call with several ids is human-only and the hint carries every id
     Given three changes whose briefs have no blocker and the planner role declared
     When canon brief approve runs with the three ids, by --as planner and by CANON_ROLE, with any flag
-    Then each exits 2 with HUMAN_ONLY and nothing is written
+    Then each exits 2 with ACTOR_DENIED and nothing is written
     And the hint gives the human one canon brief approve line holding all three ids
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:10Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}

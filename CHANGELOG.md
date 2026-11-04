@@ -4,16 +4,66 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
-### Contributors
-
-**The `atip` crate and the checker (`atip check`) are the atip repository's** (`canon-0-36-atip-dep`, https://github.com/journeyWorker/atip, issue #134). Nothing canon prints changes: the stdout and the exit status of every command, every `canon schema` answer (`--json`, `--errors`, `--warnings`, each command and each code), `docs/cli/canon.cli.json` and the conformance corpus are byte for byte the 0.35.0 ones.
-
-- The workspace no longer holds `crates/atip`, `crates/atip-check` (with its fake tool and its own fixture) and `crates/atip-probe`. `canon-cli` takes `atip` as a git dependency at the tag `atip-crate-v0.1.0` (the feature `validate` stays on, as it was), and `Cargo.lock` pins the commit the tag points at (`b274d8d`): `cargo build --locked` and, in the offline test job, `cargo fetch --locked` before the network ban work as before. The crate at 0.1.0 is newer than the copy canon had: it knows 1.3 and 1.4 (`CONTRACT_VERSION` is `1.4`), a command document has `is_async`, and its codes follow the minor. canon still declares 1.2 (`json_out::DECLARED_MINOR`); the declaration of 1.4 is `canon-0-36-claim-1-4`'s.
-- CI installs the checker from the atip repository (`cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked`, cached by its tag and the toolchain) and runs `atip check --level L2 --contract 1.2 --deep` once on the canon binary: the job `atip` replaces `atip-l0`, `atip-l2` and `atip-check-tests` (the L2 report holds every L0 and L1 row, so one job judges them all; `--deep` is the run that judges the declarations against the behaviour, where the default run is the interface checks only). `just atip-install` installs the same checker and `just atip` runs the same command; `just ci` runs `atip` and no longer `test-atip`.
-- Gone with the crates: `just test-atip`, the nextest profile `atip` and the default profile's filter that left `atip-check` out, and the `--exclude atip-check` of `just test`, of the job `offline` and of `scripts/check-witness.sh`. `just test` is `cargo test --workspace --locked`: the tests of the crate and of the checker run in the atip repository.
-- The tests of canon that tested the checker rather than canon are gone, and so are their scenarios: the 204 `atip-check` scenarios that spoke of the checker alone, the 43 scenarios of the crate features (`atip.crate12`, `atip.cratecursor`, `atip.crateplan`, `atip.crateshell`) and the two that spoke of the vendored schema copies (`atip.contract11.02`, `atip.l0.07`). `atip_check.rs` and `atip_claiml2.rs` no longer run the checker in process: the runs on canon (`atip_check_41`, `atip_check_42`, `atip_check_75`, `atip_check_98`, `atip_checkl1_31`, `atip_checkl1_34`, `atip_claiml2_03`, `_04`, `_05`, `_08`, `_10`) are the CI job `atip`. What stays is canon's own conformance: the fixture `canon.fixture.json` against `canon schema` (`atip_check_39`, `_40`), the test of the job and the recipe (`atip_check_43`, `atip_claiml2_07`) and every other test of canon. The subject `atip-check` keeps the three scenarios that are canon's (`atip.check.39`, `.40`, `.43`).
-
 ### Breaking
+
+**Fifty error codes take the name `<SUBJECT>_<CONDITION>`** (`canon-0-36-codes-rename`, scenarios `atip.codenames.01-09`). The contract's rule (atip/1 spec 7.2, `L1.code-names` for a tool that declares 1.3 or later) names a code by what it is about and the condition it reports, so a caller that meets a code it does not know reads the exit and the next action from the name's last words. These codes change their name only: the exit, `retryable`, meaning, `field` and fix of each are the ones it had, and the old name is in no registry view, no output and no guide (there is no alias). A call that raised the old name raises the new one. Where several old codes became one new code, or the old name says a situation, the situation is the `reason` of the new code (registered under it, and printed in `error.reason`). `canon schema --error <old name>` is refused as any unknown name is: `USAGE`, `field` `--error`.
+
+| 0.35 | 0.36 | `reason` |
+|---|---|---|
+| `APPROVAL_INCOMPLETE` | `APPROVAL_INVALID` |  |
+| `BRIEF_CHANGED_SINCE_PAGE_LOAD` | `BRIEF_PAGE_STALE` |  |
+| `BRIEF_HAS_BLOCKERS` | `BRIEF_CHECK_FAILED` | `BLOCKERS` |
+| `BRIEF_UNAPPROVABLE` | `BRIEF_INVALID` | `UNAPPROVABLE` |
+| `CHANGE_AMBIGUOUS` | `CHANGE_REQUIRED` |  |
+| `CHANGE_INVALID_ARGUMENT` | `CHANGE_ARGUMENT_INVALID` |  |
+| `CONFIG_MISSING` | `CONFIG_REQUIRED` |  |
+| `CONTEXT_INPUT_MISSING` | `CONTEXT_INPUT_NOT_FOUND` |  |
+| `CONTEXT_SECRET_DETECTED` | `CONTEXT_INPUT_INVALID` | `SECRET` |
+| `CONTEXT_UNSAFE_PATH` | `CONTEXT_PATH_INVALID` |  |
+| `DASHBOARD_BAD_REQUEST` | `DASHBOARD_REQUEST_INVALID` |  |
+| `DASHBOARD_CONFIG_INVALID` | `CONFIG_INVALID` | `DASHBOARD` |
+| `DASHBOARD_ORIGIN_REFUSED` | `DASHBOARD_REQUEST_DENIED` |  |
+| `DEMO_NOT_INITIALIZED` | `DEMO_REQUIRED` |  |
+| `DISPATCH_INVALID_ARGUMENT` | `DISPATCH_ARGUMENT_INVALID` |  |
+| `DISPATCH_ROLE_REGIME_MISMATCH` | `DISPATCH_ROLE_CONFLICT` |  |
+| `DIVERGENCE_INVALID_ARGUMENT` | `DIVERGENCE_ARGUMENT_INVALID` |  |
+| `FEATURE_OUTSIDE_SPEC_ROOTS` | `FEATURE_PATH_INVALID` |  |
+| `FINDING_INVALID_ARGUMENT` | `FINDING_ARGUMENT_INVALID` |  |
+| `FINDING_RESOLUTION_REV_UNEXPECTED` | `FINDING_RESOLUTION_REV_CONFLICT` |  |
+| `FINDING_SEQ_OCCUPIED` | `FINDING_EXISTS` |  |
+| `FINDING_STAGED` | `FINDING_CONFLICT` |  |
+| `FINDING_UNKNOWN_SCENARIO` | `SCENARIO_NOT_FOUND` |  |
+| `FORMAT_VIOLATIONS` | `FORMAT_CHECK_FAILED` |  |
+| `GATE_TASK_INVALID_ARGUMENT` | `TASK_ID_INVALID` |  |
+| `GATE_TASK_UNSUPPORTED` | `TASK_UNSUPPORTED` |  |
+| `GATE_VIOLATIONS` | `GATE_CHECK_FAILED` |  |
+| `HUMAN_ONLY` | `ACTOR_DENIED` |  |
+| `INIT_CONFIG_EXISTS` | `CONFIG_EXISTS` |  |
+| `INIT_INVALID_ARGUMENT` | `INIT_ARGUMENT_INVALID` |  |
+| `LEARN_DEMOTION_FAILED` | `STRATEGY_DEMOTION_FAILED` |  |
+| `LEARN_INVALID_ARGUMENT` | `STRATEGY_ARGUMENT_INVALID` |  |
+| `LEARN_INVALID_INPUT` | `STRATEGY_FILE_INVALID` |  |
+| `LEARN_STRATEGY_NOT_FOUND` | `STRATEGY_NOT_FOUND` |  |
+| `LEARN_TRAJECTORY_NOT_FOUND` | `TRAJECTORY_NOT_FOUND` |  |
+| `MIGRATE_UNCOMMITTED` | `MIGRATION_CONFLICT` |  |
+| `NO_COMMIT` | `COMMIT_REQUIRED` |  |
+| `PLAN_SOURCES_MISSING` | `PLAN_SOURCES_REQUIRED` |  |
+| `QUERY_INVALID_ARGUMENT` | `QUERY_ARGUMENT_INVALID` |  |
+| `RELAY_DIGEST_MISMATCH` | `RELAY_DIGEST_STALE` |  |
+| `RETRIEVE_FAILED` | `RETRIEVE_INVALID` |  |
+| `REVIEW_INVALID_ARGUMENT` | `REVIEW_ARGUMENT_INVALID` |  |
+| `SCAFFOLD_INVALID_ARGUMENT` | `SCAFFOLD_ARGUMENT_INVALID` |  |
+| `SEARCH_QUERY_EMPTY` | `SEARCH_QUERY_REQUIRED` |  |
+| `SKILLS_DRIFT` | `SKILLS_CHECK_FAILED` | `DRIFT` |
+| `SPEC_ROOT_UNRESOLVED` | `SPEC_ROOT_REQUIRED` |  |
+| `SUBJECT_INVALID_ARGUMENT` | `SUBJECT_ARGUMENT_INVALID` |  |
+| `SUBJECT_INVALID_TRANSITION` | `SUBJECT_CONFLICT` | `TRANSITION` |
+| `UNKNOWN_ROLE` | `ROLE_INVALID` |  |
+| `UNKNOWN_SPEC_ROOT` | `SPEC_ROOT_NOT_FOUND` |  |
+
+Not renamed here: the warning `CONFIG_MISSING` of `canon status` keeps its name (only the error `CONFIG_MISSING` is now `CONFIG_REQUIRED`). The other codes that do not follow the rule yet are renamed by the changes that follow in 0.36 (`codes-exit`, `codes-refusals`, `codes-stored`, `codes-incomplete`); `crates/canon-cli/tests/codes_names.rs` lists them, and the full table and the upgrade notes close the release in `canon-0-36-codes-table`.
+
+A caller that branches on a code replaces the old name with the new one from the table; a caller that read the exit of the old name reads the same exit from the new one. The skills, the website pages (`cli`, in both languages), the dashboard sources, the eval scripts and the scenarios say the new names, and `atip_l0_27` and `atip_codenames_06` fail when one of them spells an old name.
 
 **`--help --json` and `--version --json` are refused** (`canon-0-36-help-json`, scenarios `atip.helpjson.01-09`, atip/1 spec 4.4.1). `--help` is text for people and `canon schema` is the machine description, so a call that asks for JSON and for help or the version no longer gets text: it gets the failure envelope, exit 2, `USAGE`, and a `hint` that names what to run. The path is resolved first, so an unknown word still answers `UNKNOWN_COMMAND`, wherever the flag sits. The rule does not wait for the 1.4 declaration: a 1.2 tool may answer `--help --json` with the `schema` document or with a refusal (4.4.1).
 
@@ -28,6 +78,15 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 | `canon search -- --help --json` (the words after `--` are values) | no help request | unchanged |
 
 **Upgrade note:** a caller that read the machine description from `--help --json` read text. Run the `hint` instead: `canon schema <command> --json`. The version is `meta.toolVersion` of every answer. Nothing else prints differently, and the text help keeps its first line (`canon schema --json` and `canon skills show`). The guides, the website and the eval scripts never recommended `--help --json`; `atip.helpjson.09` fails if one starts to.
+
+### Contributors
+
+**The `atip` crate and the checker (`atip check`) are the atip repository's** (`canon-0-36-atip-dep`, https://github.com/journeyWorker/atip, issue #134). Nothing canon prints changes: the stdout and the exit status of every command, every `canon schema` answer (`--json`, `--errors`, `--warnings`, each command and each code), `docs/cli/canon.cli.json` and the conformance corpus are byte for byte the 0.35.0 ones.
+
+- The workspace no longer holds `crates/atip`, `crates/atip-check` (with its fake tool and its own fixture) and `crates/atip-probe`. `canon-cli` takes `atip` as a git dependency at the tag `atip-crate-v0.1.0` (the feature `validate` stays on, as it was), and `Cargo.lock` pins the commit the tag points at (`b274d8d`): `cargo build --locked` and, in the offline test job, `cargo fetch --locked` before the network ban work as before. The crate at 0.1.0 is newer than the copy canon had: it knows 1.3 and 1.4 (`CONTRACT_VERSION` is `1.4`), a command document has `is_async`, and its codes follow the minor. canon still declares 1.2 (`json_out::DECLARED_MINOR`); the declaration of 1.4 is `canon-0-36-claim-1-4`'s.
+- CI installs the checker from the atip repository (`cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.0 atip-check --locked`, cached by its tag and the toolchain) and runs `atip check --level L2 --contract 1.2 --deep` once on the canon binary: the job `atip` replaces `atip-l0`, `atip-l2` and `atip-check-tests` (the L2 report holds every L0 and L1 row, so one job judges them all; `--deep` is the run that judges the declarations against the behaviour, where the default run is the interface checks only). `just atip-install` installs the same checker and `just atip` runs the same command; `just ci` runs `atip` and no longer `test-atip`.
+- Gone with the crates: `just test-atip`, the nextest profile `atip` and the default profile's filter that left `atip-check` out, and the `--exclude atip-check` of `just test`, of the job `offline` and of `scripts/check-witness.sh`. `just test` is `cargo test --workspace --locked`: the tests of the crate and of the checker run in the atip repository.
+- The tests of canon that tested the checker rather than canon are gone, and so are their scenarios: the 204 `atip-check` scenarios that spoke of the checker alone, the 43 scenarios of the crate features (`atip.crate12`, `atip.cratecursor`, `atip.crateplan`, `atip.crateshell`) and the two that spoke of the vendored schema copies (`atip.contract11.02`, `atip.l0.07`). `atip_check.rs` and `atip_claiml2.rs` no longer run the checker in process: the runs on canon (`atip_check_41`, `atip_check_42`, `atip_check_75`, `atip_check_98`, `atip_checkl1_31`, `atip_checkl1_34`, `atip_claiml2_03`, `_04`, `_05`, `_08`, `_10`) are the CI job `atip`. What stays is canon's own conformance: the fixture `canon.fixture.json` against `canon schema` (`atip_check_39`, `_40`), the test of the job and the recipe (`atip_check_43`, `atip_claiml2_07`) and every other test of canon. The subject `atip-check` keeps the three scenarios that are canon's (`atip.check.39`, `.40`, `.43`).
 
 ## 0.35.0 — 2026-11-04
 

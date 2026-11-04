@@ -22,7 +22,7 @@ const failure = {
     "x-future": { anything: true },
     futureMember: [1, 2, 3],
   },
-  data: { refused: [{ changeId: "add-login", code: "BRIEF_HAS_BLOCKERS", message: "blockers", also: "unknown member of a refusal" }], newMember: 1 },
+  data: { refused: [{ changeId: "add-login", code: "BRIEF_CHECK_FAILED", message: "blockers", also: "unknown member of a refusal" }], newMember: 1 },
   meta: { schemaVersion: "1.9", tool: "canon", toolVersion: "9.9.9", contract: "atip/1", contractVersion: "1.9", command: "brief approve", "x-canon": {}, futureMeta: { a: 1 } },
 };
 
@@ -33,7 +33,7 @@ test("a failure with members it does not know is read: code, message, hint and e
   expect(read.hint).toBe("run it again");
   expect(refusedIds(read)).toEqual(["add-login"]);
   const html = toHtml(renderApproveError(read, null));
-  expect(html).toContain("BRIEF_HAS_BLOCKERS: blockers");
+  expect(html).toContain("BRIEF_CHECK_FAILED: blockers");
   expect(html).toContain("run it again");
 });
 

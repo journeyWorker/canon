@@ -13,7 +13,7 @@ description: canon --help 출력을 기준으로 목적별로 묶은 전체 서�
 대부분의 서브커맨드는 `--repo <dir>`를 받습니다. 생략하거나 `.`이면 `cwd`의
 조상 중 `canon.yaml`이 있는 가장 가까운 디렉터리이고, 다른 명시적 경로는 그
 디렉터리를 그대로 사용하며 탐색하지 않습니다. canon 상태가 필요한 명령이 거기서
-`canon.yaml`을 찾지 못하면 빈 레포를 깨끗하다고 보고하는 대신 `CONFIG_MISSING`
+`canon.yaml`을 찾지 못하면 빈 레포를 깨끗하다고 보고하는 대신 `CONFIG_REQUIRED`
 (exit `2`, `--repo` 명시, `canon init`과 찾아본 디렉터리를 알리는 힌트)으로
 거부합니다. `init`, `migrate`, `demo`, `context`, `regime`, `adapter`,
 `context-pack`, `prompt`는 없어도 실행됩니다. 모든 명령은 사람이 읽기 좋은 표/요약 대신 stdout에 기계가
@@ -476,7 +476,7 @@ canon scenario new --input '[{"operands":["auth.login.02"],"title":"Sign out"},{
 `finding`의 `--resolution-rev`와 `--introduced-rev`가 같은 규칙을 따릅니다.
 커밋하지 않은 코드에 대한 기록도 허용되며 `codeTree`/`worktreeDirty`를 함께 담습니다.
 코드 트리가 같다면 커밋 뒤에도 리뷰는 유효합니다. git 밖이거나 커밋이 아직 없으면
-`NO_COMMIT`입니다.
+`COMMIT_REQUIRED`입니다.
 
 **페이징과 필드.** `canon query`, `canon finding list`,
 `canon divergence list`, `canon export`는 최대 `--limit`개(기본 100)만
@@ -501,7 +501,7 @@ canon scenario new --input '[{"operands":["auth.login.02"],"title":"Sign out"},{
 `--kind`(반복)는 그 종류의 hit만 남기고, `--expand <N>`은 홉 수(기본 1), `--limit <N>`은
 hit 수(기본 20, 다음 페이지 없음)입니다. 한국어는 세 글자부터 찾고, 그보다 짧은 질의는
 노드 본문의 부분 문자열로 id순으로 찾습니다. 질의는 쓴 그대로 읽습니다. 빈 질의는
-exit 2(`SEARCH_QUERY_EMPTY`), 일치가 없으면 exit 0과 빈 `hits`입니다. 원본이 없는 참조는
+exit 2(`SEARCH_QUERY_REQUIRED`), 일치가 없으면 exit 0과 빈 `hits`입니다. 원본이 없는 참조는
 `placeholder: true`인 이웃이며 오류가 아닙니다.
 `canon trace <finding 키|리뷰 id|sha>`는 한 고리의 리뷰 → finding → 수정 → 재리뷰 →
 evidence 사슬을 시간순으로 냅니다(`data.chain[]`: 시각, id, kind, 역할, sha, 엣지). archive의
@@ -531,7 +531,7 @@ postgres, 객체 저장소의 레코드는 읽지 않고 `data.index.unreadStore
 
 에이전트는 역할을 선언할 수 있습니다: `planner`, `implementer`, `reviewer`,
 `orchestrator`. `CANON_ROLE=<role>`을 설정하거나 `--as <role>`을 넘기며(플래그가
-우선), 모르는 값은 `UNKNOWN_ROLE`입니다. 역할은 강제가 아니라 안내입니다.
+우선), 모르는 값은 `ROLE_INVALID`입니다. 역할은 강제가 아니라 안내입니다.
 `canon schema`는 그 역할의 명령을 나열하고, `canon status`와 `meta.next`는 그
 역할의 단계만 남기며 나머지는 `data.waitingOn`에 개수로 셉니다(orchestrator는 사람의
 단계도 봅니다). `evidence add`와 `review scenario`의 `--role` 기본값도 이 역할입니다.
@@ -544,7 +544,7 @@ postgres, 객체 저장소의 레코드는 읽지 않고 `data.index.unreadStore
 보여 주기, 하네스의 질문 도구로 묻기, 명시적 승인만 세기, `--relayed-via`로 기록하기)를,
 다음에 사람이 직접 칠 명령을 알려 줍니다. 대리 기록은 사람의 이름과 답, 대리한 에이전트의
 역할과 actor, 질문에 쓴 도구를 남기며, `canon.yaml`의 `approval: { relay: deny }`로 끌 수
-있습니다(끄면 `HUMAN_ONLY`). 거부를 넘어서 진행해야 할 때의 유일한 옵션은
+있습니다(끄면 `ACTOR_DENIED`). 거부를 넘어서 진행해야 할 때의 유일한 옵션은
 `--override-reason <TEXT>`이며(`--force`는 없습니다) 넘긴 사유는 기록에 남고
 `data.overrides[]`와 `canon status`에 보입니다.
 

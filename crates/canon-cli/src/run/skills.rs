@@ -130,7 +130,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
                 let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
                 let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, &data, coverage.meta()))
+                ExitCode::from(CliError::failed("SKILLS_CHECK_FAILED", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).reason("DRIFT").hint(hint).emit_with_data_and_meta("canon skills check", json, &data, coverage.meta()))
             }
         }
         Err(err) => ExitCode::from(skills_error(&err).emit("canon skills check", json)),

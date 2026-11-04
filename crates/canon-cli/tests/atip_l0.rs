@@ -420,7 +420,7 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
         assert_eq!(rows.get(code).copied(), Some((exit, false)), "{code} carries the contract's exit and retryable");
     }
     assert!(!rows.contains_key("OPERATION_REUSED"), "canon has no --operation");
-    for old in OLD_CODES {
+    for old in OLD_CODES.iter().chain(RENAMED_CODES) {
         assert!(!rows.contains_key(old), "`{old}` is gone from the registry");
     }
     // Every row conforms to the contract's registry-entry schema.
@@ -438,7 +438,7 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     let mut hits = Vec::new();
     for file in &files {
         let text = std::fs::read_to_string(file).unwrap();
-        for old in OLD_CODES {
+        for old in OLD_CODES.iter().chain(RENAMED_CODES) {
             if word_in(&text, old) {
                 hits.push(format!("{} spells {old}", file.strip_prefix(&root).unwrap().display()));
             }
@@ -447,10 +447,14 @@ fn atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names() 
     assert!(hits.is_empty(), "{hits:#?}");
 }
 
+/// Error codes 0.36 renamed (`canon-0-36-codes-rename`; each has a replacement in the CHANGELOG's table). `CONFIG_MISSING` is not here:
+/// the error is `CONFIG_REQUIRED`, but the warning of `status` keeps the name `CONFIG_MISSING`.
+const RENAMED_CODES: &[&str] = &["APPROVAL_INCOMPLETE", "BRIEF_CHANGED_SINCE_PAGE_LOAD", "BRIEF_HAS_BLOCKERS", "BRIEF_UNAPPROVABLE", "CHANGE_AMBIGUOUS", "CHANGE_INVALID_ARGUMENT", "CONTEXT_INPUT_MISSING", "CONTEXT_SECRET_DETECTED", "CONTEXT_UNSAFE_PATH", "DASHBOARD_BAD_REQUEST", "DASHBOARD_CONFIG_INVALID", "DASHBOARD_ORIGIN_REFUSED", "DEMO_NOT_INITIALIZED", "DISPATCH_INVALID_ARGUMENT", "DISPATCH_ROLE_REGIME_MISMATCH", "DIVERGENCE_INVALID_ARGUMENT", "FEATURE_OUTSIDE_SPEC_ROOTS", "FINDING_INVALID_ARGUMENT", "FINDING_RESOLUTION_REV_UNEXPECTED", "FINDING_SEQ_OCCUPIED", "FINDING_STAGED", "FINDING_UNKNOWN_SCENARIO", "FORMAT_VIOLATIONS", "GATE_TASK_INVALID_ARGUMENT", "GATE_TASK_UNSUPPORTED", "GATE_VIOLATIONS", "HUMAN_ONLY", "INIT_CONFIG_EXISTS", "INIT_INVALID_ARGUMENT", "LEARN_DEMOTION_FAILED", "LEARN_INVALID_ARGUMENT", "LEARN_INVALID_INPUT", "LEARN_STRATEGY_NOT_FOUND", "LEARN_TRAJECTORY_NOT_FOUND", "MIGRATE_UNCOMMITTED", "NO_COMMIT", "PLAN_SOURCES_MISSING", "QUERY_INVALID_ARGUMENT", "RELAY_DIGEST_MISMATCH", "RETRIEVE_FAILED", "REVIEW_INVALID_ARGUMENT", "SCAFFOLD_INVALID_ARGUMENT", "SEARCH_QUERY_EMPTY", "SKILLS_DRIFT", "SPEC_ROOT_UNRESOLVED", "SUBJECT_INVALID_ARGUMENT", "SUBJECT_INVALID_TRANSITION", "UNKNOWN_ROLE", "UNKNOWN_SPEC_ROOT"];
+
 /// The error codes 0.33 deletes (the CHANGELOG's replacement table lists them).
 const OLD_CODES: &[&str] = &["PLAN_CHANGED", "INPUT_ELEMENT_FAILED", "INPUT_BATCH_UNSUPPORTED", "INPUT_INVALID_TYPE", "INPUT_UNKNOWN_FIELD", "INPUT_UNREADABLE", "INPUT_STDIN_TTY", "INPUT_STDIN_CONFLICT", "INPUT_MISSING", "INVALID_CURSOR", "UNKNOWN_FIELD"];
 
-/// `word` in `text` as a whole identifier (so `CONTEXT_INPUT_MISSING` is not `INPUT_MISSING`).
+/// `word` in `text` as a whole identifier (so `CONTEXT_INPUT_NOT_FOUND` is not `INPUT_MISSING`).
 fn word_in(text: &str, word: &str) -> bool {
     text.match_indices(word).any(|(at, _)| {
         let before = text[..at].chars().next_back();
@@ -767,8 +771,8 @@ fn atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a
     assert!(sites >= 5, "the scan saw {sites} sites");
     assert!(missing.is_empty(), "{}", missing.join("\n"));
     let registered: BTreeSet<String> = ["INPUT_INVALID", "INPUT_TOO_LARGE"].iter().flat_map(|code| canon_cli::cli_error::code_info(code).unwrap().reasons.iter().map(|r| r.reason.to_string())).collect();
-    // The reasons of other codes are emitted by their own sites (`EVIDENCE_APPROVAL_INVALID`: `MALFORMED`, `SIGNATURE_MISMATCH`).
-    let others: BTreeSet<String> = canon_cli::cli_error::code_info("EVIDENCE_APPROVAL_INVALID").unwrap().reasons.iter().map(|r| r.reason.to_string()).collect();
+    // The reasons of other codes are emitted by their own sites (`EVIDENCE_APPROVAL_INVALID`: `MALFORMED`, `SIGNATURE_MISMATCH`; `BRIEF_CHECK_FAILED`: `BLOCKERS`, ...).
+    let others: BTreeSet<String> = canon_cli::cli_error::all_codes().iter().filter(|info| !["INPUT_INVALID", "INPUT_TOO_LARGE"].contains(&info.code)).flat_map(|info| info.reasons.iter().map(|r| r.reason.to_string())).collect();
     for reason in &emitted {
         if reason.chars().all(|c| c.is_ascii_uppercase() || c == '_') && !others.contains(reason) {
             assert!(registered.contains(reason), "{reason} is emitted and not registered under INPUT_INVALID or INPUT_TOO_LARGE");

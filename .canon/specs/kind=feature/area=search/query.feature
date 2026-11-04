@@ -42,7 +42,7 @@ Feature: Search query
   Scenario: An empty or whitespace query exits 2 and builds nothing
     Given a repo with records and no index
     When canon search runs with an empty argument and with an argument of only spaces
-    Then each exits 2 with SEARCH_QUERY_EMPTY
+    Then each exits 2 with SEARCH_QUERY_REQUIRED
     And no `.canon/index` directory was created
 
   # canon: {"schema":1,"at":"2026-10-27T14:15:46Z","actor":{"agent_id":"impl-031-search","role":"implementer","session_id":"search-2026-10-27"}}

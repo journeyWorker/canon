@@ -10,7 +10,7 @@ authoritative flag list at any time — this page mirrors that output.
 Most subcommands accept `--repo <dir>`. Absent or `.`, it is the nearest
 ancestor of `cwd` with a `canon.yaml`; any other explicit path is that
 directory as given, no walk. A command that needs canon state and finds no
-`canon.yaml` there refuses with `CONFIG_MISSING` (exit `2`, `--repo` named,
+`canon.yaml` there refuses with `CONFIG_REQUIRED` (exit `2`, `--repo` named,
 the hint naming `canon init` and the directory searched) instead of reporting
 an empty repo as clean. `init`, `migrate`, `demo`, `context`, `regime show`,
 `schema`, `skills show`, `adapter`, `context-pack` and `prompt` run without one. Every command accepts `--json` for one
@@ -483,7 +483,7 @@ canon finding add --input <JSON|FILE|->
 default `HEAD`); the finding commands add `--resolution-rev` and
 `--introduced-rev`. Uncommitted code is recorded too, with a `codeTree` and
 `worktreeDirty`, and a review survives the commit when the code tree is the
-same. Outside git, or with no commit, the command refuses with `NO_COMMIT`.
+same. Outside git, or with no commit, the command refuses with `COMMIT_REQUIRED`.
 
 **Paging and fields.** `canon query`, `canon finding list`,
 `canon divergence list` and `canon export` return at most `--limit`
@@ -509,7 +509,7 @@ record graph (`data.hits[]`, `data.neighbors[]`, `data.edges[]`, `data.counts`,
 sets the hops (default 1) and `--limit <N>` the hits (default 20, no next page).
 Korean is found from three characters; a shorter text is found as a part of a
 node's text, in id order. The text is read as typed. An empty text is exit 2
-(`SEARCH_QUERY_EMPTY`); no match is exit 0 with empty `hits`. A reference no
+(`SEARCH_QUERY_REQUIRED`); no match is exit 0 with empty `hits`. A reference no
 committed source holds is a neighbor with `placeholder: true`, never an error.
 `canon trace <finding key|review id|sha>` follows the review → finding → fix →
 re-review → evidence chain of one loop in time order (`data.chain[]`: time, id,
@@ -541,7 +541,7 @@ is a stored record verbatim carries it as `meta.x-canon.unchanged`).
 
 An agent can declare a role: `planner`, `implementer`, `reviewer` or
 `orchestrator`. Pass `--as <role>` or set `CANON_ROLE=<role>` (the flag wins);
-an unknown value is `UNKNOWN_ROLE`. A role is guidance, not enforcement:
+an unknown value is `ROLE_INVALID`. A role is guidance, not enforcement:
 `canon schema` lists the role's commands, `canon status` and `meta.next` keep
 only the role's steps and count the rest in `data.waitingOn` (the orchestrator also
 sees the human's steps), and `--role` on `evidence add` and `review scenario`

@@ -132,7 +132,7 @@ fn skills_check_reports_an_older_lock_as_outdated() {
     let out = canon(repo.path(), &["skills", "check", "--json"]);
     assert_eq!(out.status.code(), Some(1));
     let document = json(&out);
-    assert_eq!(document["error"]["code"], "SKILLS_DRIFT");
+    assert_eq!(document["error"]["code"], "SKILLS_CHECK_FAILED");
     assert_eq!(document["data"]["outdated"]["installedBy"], "0.1.0");
     assert_eq!(document["data"]["clean"], false);
     assert_eq!(canon(repo.path(), &["skills", "install"]).status.code(), Some(0));

@@ -127,7 +127,7 @@ class TraceCheckTests(unittest.TestCase):
             '{"error":{"code":"USAGE","message":"error: unexpected argument \'--project-id\' found"}} --project'), "naming")
         self.assertEqual(trace_check.classify_failure("error: invalid value 'review_record' for '--kind <KIND>'"), "naming")
         self.assertEqual(trace_check.classify_failure("error: unexpected argument '--zzz' found"), "other")
-        self.assertEqual(trace_check.error_code("canon: GATE_FAILED: nope"), "GATE_FAILED")
+        self.assertEqual(trace_check.error_code("canon: GATE_CHECK_FAILED: nope"), "GATE_CHECK_FAILED")
         self.assertEqual(trace_check.classify_failure(
             '{"error":{"code":"USAGE","hint":"--actor-id was removed in 0.31.0; use `canon finding add --actor x`"}}'), "naming")
         self.assertEqual(trace_check.classify_failure(
@@ -255,11 +255,11 @@ class SyntheticTranscriptTests(unittest.TestCase):
         self.assertEqual([f["check"] for f in report["failures"]], ["human_only_role_stripped"])
 
     def test_a_refused_human_only_call_is_not_a_violation(self):
-        refusal = failure("brief approve", "HUMAN_ONLY", "not available to the planner role")
+        refusal = failure("brief approve", "ACTOR_DENIED", "not available to the planner role")
         report = self.run_calls(("canon status --as planner --json", ""), ("canon brief approve x --approver me --note n --json", refusal))
         self.assertTrue(report["hard_checks_passed"])
         self.assertEqual(report["wrong_shape_calls"]["items"], [])
-        self.assertEqual([r["code"] for r in report["refusals"]], ["HUMAN_ONLY"])
+        self.assertEqual([r["code"] for r in report["refusals"]], ["ACTOR_DENIED"])
 
     def test_the_human_only_help_and_a_role_less_session_are_clean(self):
         report = self.run_calls(("canon brief approve --help", ""), ("canon brief approve x --approver me --note n --json", ""))

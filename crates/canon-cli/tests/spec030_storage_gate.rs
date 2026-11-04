@@ -784,12 +784,12 @@ fn policy_expressions_34_policy_show_outside_a_configured_repo_is_refused_with_c
     let out = canon_in(dir.path(), &["policy", "show", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let body = stdout_json(&out);
-    assert_eq!((body["ok"].as_bool(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(false), Some("CONFIG_MISSING"), Some("--repo")), "{body}");
+    assert_eq!((body["ok"].as_bool(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(false), Some("CONFIG_REQUIRED"), Some("--repo")), "{body}");
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0, "nothing was written");
 
     let human = canon_in(dir.path(), &["policy", "show"]);
     assert_eq!(human.status.code(), Some(2));
-    assert!(text(&human).contains("CONFIG_MISSING"), "{}", text(&human));
+    assert!(text(&human).contains("CONFIG_REQUIRED"), "{}", text(&human));
 }
 
 // ── plugin.overlay.10 / gate.check.109 ──

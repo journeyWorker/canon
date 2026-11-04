@@ -1,4 +1,4 @@
-description: "0.26 #104: a `--project` that names no spec root configured in canon.yaml (here `root`, in a repo whose only root is `game`) is refused with exit 2 and UNKNOWN_SPEC_ROOT before anything is written, by `canon evidence add` (single scenario, `--all-scenarios`, and `--json`), `canon review scenario` and `canon divergence add`; the hint names the one root to use, and the same commands succeed under `game`"
+description: "0.26 #104: a `--project` that names no spec root configured in canon.yaml (here `root`, in a repo whose only root is `game`) is refused with exit 2 and SPEC_ROOT_NOT_FOUND before anything is written, by `canon evidence add` (single scenario, `--all-scenarios`, and `--json`), `canon review scenario` and `canon divergence add`; the hint names the one root to use, and the same commands succeed under `game`"
 steps:
   - args: [inventory, sync]
     exit: 0

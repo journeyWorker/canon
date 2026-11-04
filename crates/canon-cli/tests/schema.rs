@@ -122,8 +122,8 @@ fn an_unknown_path_is_a_refusal_naming_the_nearest_matches() {
 
 #[test]
 fn error_returns_that_codes_row_and_an_unknown_code_exits_2() {
-    let v = json(&["schema", "--error", "CONFIG_MISSING", "--json"]);
-    assert_eq!(v["error"]["code"], "CONFIG_MISSING", "{v}");
+    let v = json(&["schema", "--error", "CONFIG_REQUIRED", "--json"]);
+    assert_eq!(v["error"]["code"], "CONFIG_REQUIRED", "{v}");
     assert_eq!(v["error"]["exit"], 2, "{v}");
     let out = canon(&["schema", "--error", "NOPE", "--json"]);
     assert_eq!(out.status.code(), Some(2));
@@ -134,11 +134,11 @@ fn error_returns_that_codes_row_and_an_unknown_code_exits_2() {
 
 #[test]
 fn errors_error_and_an_operand_conflict() {
-    assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_MISSING"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_REQUIRED"]).status.code(), Some(2));
     assert_eq!(canon(&["schema", "--warnings", "--warning", "OLD_LAYOUT_FOUND"]).status.code(), Some(2));
     assert_eq!(canon(&["schema", "--warning", "OLD_LAYOUT_FOUND", "evidence", "add"]).status.code(), Some(2));
-    assert_eq!(canon(&["schema", "--error", "CONFIG_MISSING", "evidence", "add"]).status.code(), Some(2));
-    assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_MISSING", "evidence", "add"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--error", "CONFIG_REQUIRED", "evidence", "add"]).status.code(), Some(2));
+    assert_eq!(canon(&["schema", "--errors", "--error", "CONFIG_REQUIRED", "evidence", "add"]).status.code(), Some(2));
 }
 
 #[test]

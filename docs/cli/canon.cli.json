@@ -13,7 +13,7 @@
         "ADAPTER_EXECUTION_NOT_AUTHORIZED",
         "ADAPTER_REFUSED",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -172,7 +172,7 @@
         "ADAPTER_REFUSED",
         "ADAPTER_RESPONSE_INVALID",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -443,7 +443,7 @@
         "ARTIFACTS_MOVE_REFUSED",
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_BIND_REFUSED",
         "EVIDENCE_STORE_FAILED",
@@ -455,7 +455,7 @@
         "PLAN_STALE",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -727,7 +727,7 @@
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -736,7 +736,7 @@
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -1230,13 +1230,13 @@
       "errors": [
         "ARTIFACTS_STORE_UNREACHABLE",
         "ARTIFACTS_VERIFY_FAILED",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_BIND_REFUSED",
         "EVIDENCE_STORE_FAILED",
         "EVIDENCE_STORE_UNAVAILABLE",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -1411,17 +1411,17 @@
       ],
       "effect": "write",
       "errors": [
-        "APPROVAL_INCOMPLETE",
+        "ACTOR_DENIED",
+        "APPROVAL_INVALID",
         "BATCH_INCOMPLETE",
         "BRIEF_APPROVE_REFUSED",
+        "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
-        "BRIEF_UNAPPROVABLE",
         "BRIEF_UNREADABLE",
         "BRIEF_WRITE_FAILED",
-        "CHANGE_AMBIGUOUS",
-        "CONFIG_MISSING",
+        "CHANGE_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "HUMAN_ONLY",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -1429,10 +1429,10 @@
         "NO_BRIEF",
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
-        "RELAY_DIGEST_MISMATCH",
+        "RELAY_DIGEST_STALE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SPEC_ROOTS_UNREADABLE",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -2203,7 +2203,7 @@
             "approver",
             "note"
           ],
-          "code": "APPROVAL_INCOMPLETE",
+          "code": "APPROVAL_INVALID",
           "description": "The human's own answer (`--approver` and `--note`) is one line and, written by the human without `--relayed-via`, not blank once trimmed (a blank answer under `--relayed-via` is the relayed validator's, `USAGE`).",
           "rejects": [
             "canon brief approve add-login --approver \" \" --note ok",
@@ -2242,16 +2242,16 @@
       "command": "brief check",
       "effect": "read",
       "errors": [
-        "BRIEF_HAS_BLOCKERS",
+        "BRIEF_CHECK_FAILED",
         "BRIEF_NOT_FOUND",
         "BRIEF_UNREADABLE",
-        "CHANGE_AMBIGUOUS",
-        "CONFIG_MISSING",
+        "CHANGE_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
         "NO_BRIEF",
+        "ROLE_INVALID",
         "SPEC_ROOTS_UNREADABLE",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -2546,13 +2546,13 @@
       "errors": [
         "BRIEF_NOT_FOUND",
         "BRIEF_UNREADABLE",
-        "CHANGE_AMBIGUOUS",
-        "CONFIG_MISSING",
+        "CHANGE_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
         "NO_BRIEF",
+        "ROLE_INVALID",
         "SPEC_ROOTS_UNREADABLE",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -2793,9 +2793,9 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
+        "CHANGE_ARGUMENT_INVALID",
         "CHANGE_EXISTS",
-        "CHANGE_INVALID_ARGUMENT",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -2804,8 +2804,8 @@
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SUBJECT_NOT_FOUND",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -3331,7 +3331,7 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -3429,7 +3429,7 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -4444,13 +4444,13 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CONTEXT_GIT_UNAVAILABLE",
-        "CONTEXT_INPUT_MISSING",
+        "CONTEXT_INPUT_INVALID",
+        "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
         "CONTEXT_PACK_NOT_FOUND",
         "CONTEXT_PACK_TAMPERED",
-        "CONTEXT_SECRET_DETECTED",
-        "CONTEXT_UNSAFE_PATH",
+        "CONTEXT_PATH_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -4458,8 +4458,8 @@
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -5262,18 +5262,18 @@
       "effect": "read",
       "errors": [
         "CONTEXT_GIT_UNAVAILABLE",
-        "CONTEXT_INPUT_MISSING",
+        "CONTEXT_INPUT_INVALID",
+        "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
         "CONTEXT_PACK_NOT_FOUND",
         "CONTEXT_PACK_TAMPERED",
-        "CONTEXT_SECRET_DETECTED",
-        "CONTEXT_UNSAFE_PATH",
+        "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -5661,18 +5661,18 @@
       "effect": "read",
       "errors": [
         "CONTEXT_GIT_UNAVAILABLE",
-        "CONTEXT_INPUT_MISSING",
+        "CONTEXT_INPUT_INVALID",
+        "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
         "CONTEXT_PACK_NOT_FOUND",
         "CONTEXT_PACK_TAMPERED",
-        "CONTEXT_SECRET_DETECTED",
-        "CONTEXT_UNSAFE_PATH",
+        "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -5777,24 +5777,24 @@
       "effect": "write",
       "effectNote": "prints one report, then serves until signalled; regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
       "errors": [
-        "APPROVAL_INCOMPLETE",
+        "APPROVAL_INVALID",
         "BRIEF_APPROVE_REFUSED",
-        "BRIEF_CHANGED_SINCE_PAGE_LOAD",
+        "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
-        "BRIEF_UNAPPROVABLE",
-        "DASHBOARD_BAD_REQUEST",
-        "DASHBOARD_CONFIG_INVALID",
+        "BRIEF_PAGE_STALE",
+        "CONFIG_INVALID",
         "DASHBOARD_FAILED",
         "DASHBOARD_NOT_BUILT",
-        "DASHBOARD_ORIGIN_REFUSED",
         "DASHBOARD_PORT_IN_USE",
+        "DASHBOARD_REQUEST_DENIED",
+        "DASHBOARD_REQUEST_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -5997,7 +5997,7 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -6404,12 +6404,12 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "DEMO_NOT_INITIALIZED",
+        "DEMO_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -6808,7 +6808,7 @@
       "command": "dispatch begin",
       "constraints": [
         {
-          "code": "DISPATCH_INVALID_ARGUMENT",
+          "code": "DISPATCH_ARGUMENT_INVALID",
           "help": "A skill digest is the digest of a named skill.",
           "if": {
             "name": "skill-digest"
@@ -6823,12 +6823,12 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "DISPATCH_ALREADY_ENDED",
+        "DISPATCH_ARGUMENT_INVALID",
         "DISPATCH_END_IN_PROGRESS",
-        "DISPATCH_INVALID_ARGUMENT",
         "DISPATCH_MANIFEST_MISMATCH",
         "DISPATCH_MANIFEST_UNREADABLE",
         "DISPATCH_NOT_RUNNING",
-        "DISPATCH_ROLE_REGIME_MISMATCH",
+        "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -6836,11 +6836,11 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
-        "PLAN_SOURCES_MISSING",
+        "PLAN_SOURCES_REQUIRED",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -7669,7 +7669,7 @@
             "role",
             "regime"
           ],
-          "code": "DISPATCH_ROLE_REGIME_MISMATCH",
+          "code": "DISPATCH_ROLE_CONFLICT",
           "description": "`--role` must equal the first segment of `--regime` (`<role>/<repo>/<area>/<hash>`).",
           "rejects": [
             "canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role reviewer"
@@ -7686,9 +7686,9 @@
       "command": "dispatch diff",
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -7850,12 +7850,12 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "DISPATCH_ALREADY_ENDED",
+        "DISPATCH_ARGUMENT_INVALID",
         "DISPATCH_END_IN_PROGRESS",
-        "DISPATCH_INVALID_ARGUMENT",
         "DISPATCH_MANIFEST_MISMATCH",
         "DISPATCH_MANIFEST_UNREADABLE",
         "DISPATCH_NOT_RUNNING",
-        "DISPATCH_ROLE_REGIME_MISMATCH",
+        "DISPATCH_ROLE_CONFLICT",
         "DISPATCH_RUN_NOT_FOUND",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -7863,11 +7863,11 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
-        "PLAN_SOURCES_MISSING",
+        "PLAN_SOURCES_REQUIRED",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
         "TASK_NOT_FOUND",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -8402,20 +8402,20 @@
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
       "errors": [
+        "ACTOR_DENIED",
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
-        "HUMAN_ONLY",
+        "DIVERGENCE_ARGUMENT_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -9124,7 +9124,7 @@
           "rule": "atMostOne"
         },
         {
-          "code": "DIVERGENCE_INVALID_ARGUMENT",
+          "code": "DIVERGENCE_ARGUMENT_INVALID",
           "help": "A deferred divergence records why it is deferred and when the deferral lapses.",
           "if": {
             "in": [
@@ -9142,20 +9142,20 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
+        "DIVERGENCE_ARGUMENT_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -9209,7 +9209,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -9530,7 +9530,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -9607,7 +9607,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -9862,20 +9862,20 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
+        "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_REFUSED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -9931,7 +9931,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -10190,7 +10190,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -10248,7 +10248,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -10493,13 +10493,13 @@
       ],
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "CURSOR_INVALID",
         "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
+        "DIVERGENCE_ARGUMENT_INVALID",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED"
       ],
@@ -10772,20 +10772,20 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
+        "DIVERGENCE_ARGUMENT_INVALID",
         "DIVERGENCE_REFUSED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -10839,7 +10839,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -11082,7 +11082,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -11134,7 +11134,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -11497,7 +11497,8 @@
         "BATCH_INCOMPLETE",
         "BRIEF_CHANGED_SINCE_APPROVAL",
         "BRIEF_UNAPPROVED",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
         "EVIDENCE_BATCH_REFUSED",
@@ -11512,16 +11513,15 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "TYPED_ATOMS_INVALID",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -11564,7 +11564,7 @@
           "domain": {
             "pattern": "^[a-z0-9][a-z0-9-]*$"
           },
-          "help": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
+          "help": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (SPEC_ROOT_NOT_FOUND) before anything is written",
           "name": "project",
           "repeatable": false,
           "required": false,
@@ -11754,7 +11754,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -12219,7 +12219,7 @@
               "type": "string"
             },
             "project": {
-              "description": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
+              "description": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (SPEC_ROOT_NOT_FOUND) before anything is written",
               "type": "string"
             },
             "promote": {
@@ -12245,7 +12245,7 @@
               "type": "array"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -12352,7 +12352,7 @@
               "type": "string"
             },
             "project": {
-              "description": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
+              "description": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (SPEC_ROOT_NOT_FOUND) before anything is written",
               "type": "string"
             },
             "promote": {
@@ -12378,7 +12378,7 @@
               "type": "array"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -12694,15 +12694,15 @@
       ],
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
         "EVIDENCE_SCENARIO_NOT_INDEXED",
         "INTERNAL",
-        "NO_COMMIT",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED"
       ],
@@ -12762,7 +12762,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -12964,7 +12964,8 @@
         "BATCH_INCOMPLETE",
         "BRIEF_CHANGED_SINCE_APPROVAL",
         "BRIEF_UNAPPROVED",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "EVIDENCE_APPROVAL_INVALID",
         "EVIDENCE_BATCH_REFUSED",
@@ -12979,16 +12980,15 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "TYPED_ATOMS_INVALID",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -13037,7 +13037,7 @@
           "domain": {
             "pattern": "^[a-z0-9][a-z0-9-]*$"
           },
-          "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none",
+          "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (SPEC_ROOT_NOT_FOUND) when it names none",
           "name": "project",
           "repeatable": false,
           "required": false,
@@ -13129,7 +13129,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -13643,7 +13643,7 @@
               "type": "string"
             },
             "project": {
-              "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none",
+              "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (SPEC_ROOT_NOT_FOUND) when it names none",
               "type": "string"
             },
             "promote": {
@@ -13669,7 +13669,7 @@
               "type": "array"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -13764,7 +13764,7 @@
               "type": "string"
             },
             "project": {
-              "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none",
+              "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (SPEC_ROOT_NOT_FOUND) when it names none",
               "type": "string"
             },
             "promote": {
@@ -13790,7 +13790,7 @@
               "type": "array"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "role": {
@@ -14045,7 +14045,7 @@
       "effectNote": "writes the --output file (mode 0600), replacing it if it exists, and appends one line to .canon/audit/access.jsonl on each run that succeeds; a refused run writes neither",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CURSOR_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -14055,7 +14055,7 @@
         "RETENTION_EXPORT_REFUSED",
         "RETENTION_PURGE_FAILED",
         "RETENTION_PURGE_REFUSED",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -15030,7 +15030,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "FEATURE_EXISTS",
         "INPUT_CONFLICT",
@@ -15040,8 +15040,8 @@
         "LAYOUT_MIGRATION_REQUIRED",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "SPEC_ROOT_UNRESOLVED",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
+        "SPEC_ROOT_REQUIRED",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -15561,7 +15561,7 @@
           "rule": "atMostOne"
         },
         {
-          "code": "FINDING_INVALID_ARGUMENT",
+          "code": "FINDING_ARGUMENT_INVALID",
           "help": "A finding names the commit that introduced the defect or says it is not known, never both.",
           "names": [
             "introduced-rev",
@@ -15570,7 +15570,7 @@
           "rule": "atMostOne"
         },
         {
-          "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+          "code": "FINDING_RESOLUTION_REV_CONFLICT",
           "help": "Only a `fixed` finding was closed by a commit.",
           "if": {
             "name": "resolution-rev"
@@ -15581,7 +15581,7 @@
           ]
         },
         {
-          "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+          "code": "FINDING_RESOLUTION_REV_CONFLICT",
           "help": "Only a `fixed` finding was closed by a commit.",
           "if": {
             "in": [
@@ -15600,24 +15600,24 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
+        "FINDING_ARGUMENT_INVALID",
+        "FINDING_EXISTS",
         "FINDING_INTRODUCED_REQUIRED",
-        "FINDING_INVALID_ARGUMENT",
-        "FINDING_RESOLUTION_REV_UNEXPECTED",
+        "FINDING_RESOLUTION_REV_CONFLICT",
         "FINDING_REVIEW_NOT_FOUND",
-        "FINDING_SEQ_OCCUPIED",
-        "FINDING_UNKNOWN_SCENARIO",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
+        "SCENARIO_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -15739,7 +15739,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -16234,7 +16234,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "review": {
@@ -16341,7 +16341,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "review": {
@@ -16558,7 +16558,7 @@
           ]
         },
         {
-          "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+          "code": "FINDING_RESOLUTION_REV_CONFLICT",
           "help": "Only a `fixed` finding was closed by a commit.",
           "if": {
             "in": [
@@ -16577,24 +16577,24 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
+        "FINDING_ARGUMENT_INVALID",
+        "FINDING_CONFLICT",
         "FINDING_INTRODUCED_REQUIRED",
-        "FINDING_INVALID_ARGUMENT",
         "FINDING_NOT_FOUND",
         "FINDING_REASON_REQUIRED",
-        "FINDING_RESOLUTION_REV_UNEXPECTED",
-        "FINDING_STAGED",
+        "FINDING_RESOLUTION_REV_CONFLICT",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -17325,12 +17325,12 @@
       ],
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "CURSOR_INVALID",
         "INTERNAL",
         "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -17559,12 +17559,12 @@
       "command": "format",
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "FORMAT_VIOLATIONS",
+        "FORMAT_CHECK_FAILED",
         "INTERNAL",
         "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "UNVERIFIABLE",
         "USAGE"
       ],
@@ -17700,12 +17700,12 @@
       "command": "gate check",
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "GATE_VIOLATIONS",
+        "GATE_CHECK_FAILED",
         "INTERNAL",
         "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "UNVERIFIABLE",
         "USAGE"
       ],
@@ -17879,7 +17879,7 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -18394,7 +18394,7 @@
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -18933,7 +18933,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INGEST_FAILED",
         "INGEST_SOURCE_UNUSABLE",
         "INPUT_CONFLICT",
@@ -18942,7 +18942,7 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -19836,7 +19836,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INGEST_FAILED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -19844,7 +19844,7 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -20563,7 +20563,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INGEST_FAILED",
         "INPUT_CONFLICT",
@@ -20572,7 +20572,7 @@
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -21573,20 +21573,20 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CONFIG_CHECK_FAILED",
-        "CONFIG_MISSING",
+        "CONFIG_EXISTS",
+        "CONFIG_REQUIRED",
         "INIT_AGENTS_MD_CONFLICT",
-        "INIT_CONFIG_EXISTS",
-        "INIT_INVALID_ARGUMENT",
+        "INIT_ARGUMENT_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
         "STOPPED_MIDWAY",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -22200,7 +22200,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -22210,7 +22210,7 @@
         "INVENTORY_REFUSED",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -22767,7 +22767,7 @@
       ],
       "effect": "destructive",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
@@ -22778,7 +22778,7 @@
         "OLD_LAYOUT",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -23132,9 +23132,9 @@
       ],
       "effect": "destructive",
       "errors": [
-        "CONFIG_MISSING",
+        "ACTOR_DENIED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "HUMAN_ONLY",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -23143,10 +23143,10 @@
         "MIGRATE_PINS_FAILED",
         "MIGRATE_REFUSED",
         "MIGRATE_STOPPED",
-        "MIGRATE_UNCOMMITTED",
+        "MIGRATION_CONFLICT",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -23629,7 +23629,7 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -23638,7 +23638,7 @@
         "PLUGIN_SYNC_ERRORS",
         "PLUGIN_SYNC_FAILED",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -24213,10 +24213,10 @@
       ],
       "effect": "write",
       "errors": [
+        "ACTOR_DENIED",
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "HUMAN_ONLY",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -24224,7 +24224,7 @@
         "POLICY_APPROVAL_FAILED",
         "POLICY_APPROVAL_REFUSED",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -24828,9 +24828,9 @@
       "command": "policy show",
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -25019,13 +25019,13 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CONTEXT_GIT_UNAVAILABLE",
-        "CONTEXT_INPUT_MISSING",
+        "CONTEXT_INPUT_INVALID",
+        "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
         "CONTEXT_PACK_NOT_FOUND",
         "CONTEXT_PACK_TAMPERED",
-        "CONTEXT_SECRET_DETECTED",
-        "CONTEXT_UNSAFE_PATH",
+        "CONTEXT_PATH_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -25033,8 +25033,8 @@
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -25583,18 +25583,18 @@
       "effect": "read",
       "errors": [
         "CONTEXT_GIT_UNAVAILABLE",
-        "CONTEXT_INPUT_MISSING",
+        "CONTEXT_INPUT_INVALID",
+        "CONTEXT_INPUT_NOT_FOUND",
         "CONTEXT_MANIFEST_INVALID",
         "CONTEXT_OBJECT_CONFLICT",
         "CONTEXT_PACK_NOT_FOUND",
         "CONTEXT_PACK_TAMPERED",
-        "CONTEXT_SECRET_DETECTED",
-        "CONTEXT_UNSAFE_PATH",
+        "CONTEXT_PATH_INVALID",
         "INTERNAL",
         "PROMPT_BUNDLE_INVALID",
         "REPO_UNREADABLE",
+        "ROLE_INVALID",
         "SERIALIZE_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -25806,7 +25806,7 @@
       "effect": "destructive",
       "effectNote": "a committed run writes one audit line; a preview writes nothing",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -25816,7 +25816,7 @@
         "REPO_WRITE_BUSY",
         "RETENTION_PURGE_FAILED",
         "RETENTION_PURGE_REFUSED",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -26186,7 +26186,7 @@
           "rule": "atMostOne"
         },
         {
-          "code": "QUERY_INVALID_ARGUMENT",
+          "code": "QUERY_ARGUMENT_INVALID",
           "help": "`--change` applies only to `--kind change` and `--kind task`.",
           "if": {
             "in": [
@@ -26211,7 +26211,7 @@
           ]
         },
         {
-          "code": "QUERY_INVALID_ARGUMENT",
+          "code": "QUERY_ARGUMENT_INVALID",
           "help": "`--status` applies only to `--kind change`, `--kind task` and `--kind subject`.",
           "if": {
             "in": [
@@ -26235,7 +26235,7 @@
           ]
         },
         {
-          "code": "QUERY_INVALID_ARGUMENT",
+          "code": "QUERY_ARGUMENT_INVALID",
           "help": "`--domain` applies only to `--kind subject`.",
           "if": {
             "in": [
@@ -26264,12 +26264,12 @@
       "effect": "read",
       "effectNote": "appends one line to .canon/audit/access.jsonl; a refused run writes none",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CURSOR_INVALID",
         "INTERNAL",
+        "QUERY_ARGUMENT_INVALID",
         "QUERY_FAILED",
-        "QUERY_INVALID_ARGUMENT",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -27040,7 +27040,7 @@
             "kind",
             "status"
           ],
-          "code": "QUERY_INVALID_ARGUMENT",
+          "code": "QUERY_ARGUMENT_INVALID",
           "description": "`--status` is one of the statuses of the queried kind: `open`, `done` for `task`; `proposed`, `in_progress`, `completed`, `archived` for `change`; `proposed`, `specced`, `building`, `verifying`, `shipped`, `retired` for `subject`.",
           "rejects": [
             "canon query --kind task --status proposed --json"
@@ -27072,7 +27072,7 @@
       "errors": [
         "INTERNAL",
         "REGIME_KEY_INVALID",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -27195,14 +27195,14 @@
       "effectNote": "scratch files go under the system temp dir",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPORT_FAILED",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -27588,12 +27588,12 @@
       "effect": "read",
       "effectNote": "scratch files go under the system temp dir; writes no repo file",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
         "REPORT_FAILED",
         "REPORT_STALE",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -27685,14 +27685,14 @@
       "effectNote": "scratch files go under the system temp dir",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPORT_FAILED",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -28161,8 +28161,8 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
-        "RETRIEVE_FAILED",
-        "UNKNOWN_ROLE",
+        "RETRIEVE_INVALID",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -28347,21 +28347,21 @@
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
+        "REVIEW_ARGUMENT_INVALID",
         "REVIEW_ARTIFACT_REFUSED",
-        "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -28425,7 +28425,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -28901,7 +28901,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "reviewOutcome": {
@@ -28984,7 +28984,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "reviewOutcome": {
@@ -29162,20 +29162,20 @@
         "ARTIFACTS_STORE_FAILED",
         "ARTIFACTS_STORE_UNREACHABLE",
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "COMMIT_REQUIRED",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "NO_COMMIT",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
+        "REVIEW_ARGUMENT_INVALID",
         "REVIEW_ARTIFACT_REFUSED",
-        "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "ROLE_INVALID",
+        "SPEC_ROOT_NOT_FOUND",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -29239,7 +29239,7 @@
         },
         {
           "default": "HEAD",
-          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
           "name": "rev",
           "repeatable": false,
           "required": false,
@@ -29784,7 +29784,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "reviewOutcome": {
@@ -29866,7 +29866,7 @@
               "type": "string"
             },
             "rev": {
-              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+              "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (COMMIT_REQUIRED)",
               "type": "string"
             },
             "reviewOutcome": {
@@ -29973,9 +29973,9 @@
       "effect": "write",
       "errors": [
         "BATCH_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
-        "FEATURE_OUTSIDE_SPEC_ROOTS",
+        "FEATURE_PATH_INVALID",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -29985,11 +29985,11 @@
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "SCAFFOLD_INVALID_ARGUMENT",
+        "ROLE_INVALID",
+        "SCAFFOLD_ARGUMENT_INVALID",
         "SCENARIO_TAG_EXISTS",
-        "SPEC_ROOT_UNRESOLVED",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
+        "SPEC_ROOT_NOT_FOUND",
+        "SPEC_ROOT_REQUIRED",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -30642,8 +30642,8 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
+        "ROLE_INVALID",
         "UNKNOWN_COMMAND",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -31818,12 +31818,12 @@
       "effect": "read",
       "effectNote": "first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
+        "ROLE_INVALID",
         "SEARCH_INDEX_FAILED",
-        "SEARCH_QUERY_EMPTY",
-        "UNKNOWN_ROLE",
+        "SEARCH_QUERY_REQUIRED",
         "USAGE"
       ],
       "examples": [
@@ -32200,8 +32200,8 @@
       "effectNote": "scratch directories in the system temp dir, removed on exit",
       "errors": [
         "INTERNAL",
+        "ROLE_INVALID",
         "SELFTEST_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -32336,10 +32336,10 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
-        "SKILLS_DRIFT",
+        "ROLE_INVALID",
+        "SKILLS_CHECK_FAILED",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -32566,9 +32566,9 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
+        "ROLE_INVALID",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -32685,9 +32685,9 @@
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SKILLS_FAILED",
         "SKILLS_INVALID_ARGUMENT",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -33253,7 +33253,7 @@
       "effect": "read",
       "errors": [
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "USAGE"
       ],
       "examples": [
@@ -33369,9 +33369,9 @@
       "command": "status",
       "effect": "read",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INTERNAL",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
         "UNVERIFIABLE",
         "USAGE"
       ],
@@ -34213,12 +34213,12 @@
       "errors": [
         "CONFIG_UNREADABLE",
         "INTERNAL",
-        "LEARN_DEMOTION_FAILED",
         "LEARN_EVALUATION_REJECTED",
-        "LEARN_INVALID_INPUT",
-        "LEARN_STRATEGY_NOT_FOUND",
         "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
+        "STRATEGY_DEMOTION_FAILED",
+        "STRATEGY_FILE_INVALID",
+        "STRATEGY_NOT_FOUND",
         "USAGE"
       ],
       "examples": [
@@ -34412,15 +34412,15 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "LEARN_DEMOTION_FAILED",
-        "LEARN_INVALID_ARGUMENT",
-        "LEARN_INVALID_INPUT",
         "LEARN_PROMOTION_BLOCKED",
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
+        "STRATEGY_ARGUMENT_INVALID",
+        "STRATEGY_DEMOTION_FAILED",
+        "STRATEGY_FILE_INVALID",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -34951,16 +34951,16 @@
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
-        "LEARN_DEMOTION_FAILED",
-        "LEARN_INVALID_ARGUMENT",
         "LEARN_ROLLBACK_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
-        "LEARN_STRATEGY_NOT_FOUND",
-        "LEARN_TRAJECTORY_NOT_FOUND",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
-        "UNKNOWN_ROLE",
+        "ROLE_INVALID",
+        "STRATEGY_ARGUMENT_INVALID",
+        "STRATEGY_DEMOTION_FAILED",
+        "STRATEGY_NOT_FOUND",
+        "TRAJECTORY_NOT_FOUND",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -35570,7 +35570,7 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -35578,9 +35578,9 @@
         "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -36284,7 +36284,7 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -36295,13 +36295,13 @@
         "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
+        "SUBJECT_ARGUMENT_INVALID",
+        "SUBJECT_CONFLICT",
         "SUBJECT_GATE_VIOLATION",
-        "SUBJECT_INVALID_ARGUMENT",
-        "SUBJECT_INVALID_TRANSITION",
         "SUBJECT_NOT_FOUND",
         "SUBJECT_REASON_REQUIRED",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -37214,7 +37214,7 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -37222,11 +37222,11 @@
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
+        "SUBJECT_ARGUMENT_INVALID",
         "SUBJECT_EXISTS",
         "SUBJECT_GATE_VIOLATION",
-        "SUBJECT_INVALID_ARGUMENT",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -38007,13 +38007,13 @@
       "effectNote": "refreshes the stale scenario-index cache once the subject is found; a refused call writes nothing",
       "errors": [
         "CHANGE_ADOPTION_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INTERNAL",
         "REPO_UNREADABLE",
+        "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_NOT_FOUND",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -38375,17 +38375,17 @@
       "errors": [
         "BATCH_INCOMPLETE",
         "CHANGE_ADOPTION_INCOMPLETE",
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
         "INTERNAL",
         "OLD_LAYOUT",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_UNADOPT_REFUSED",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -39090,8 +39090,6 @@
         "CONFIG_UNREADABLE",
         "GATE_TASK_BLOCKED",
         "GATE_TASK_EVIDENCE_INVALID",
-        "GATE_TASK_INVALID_ARGUMENT",
-        "GATE_TASK_UNSUPPORTED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -39100,10 +39098,12 @@
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
+        "TASK_ID_INVALID",
         "TASK_NOT_FOUND",
         "TASK_ROW_NOT_FOUND",
+        "TASK_UNSUPPORTED",
         "TYPED_ATOMS_INVALID",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED",
         "WRITE_UNAVAILABLE"
@@ -39572,7 +39572,7 @@
       ],
       "effect": "destructive",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "INPUT_CONFLICT",
         "INPUT_INVALID",
         "INPUT_TOO_LARGE",
@@ -39580,8 +39580,8 @@
         "OLD_LAYOUT",
         "PLAN_STALE",
         "REPO_WRITE_BUSY",
+        "ROLE_INVALID",
         "TIER_FAILED",
-        "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_UNAVAILABLE"
       ],
@@ -39826,13 +39826,13 @@
       "effect": "read",
       "effectNote": "first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written",
       "errors": [
-        "CONFIG_MISSING",
+        "CONFIG_REQUIRED",
         "CONFIG_UNREADABLE",
         "INTERNAL",
+        "ROLE_INVALID",
         "SEARCH_INDEX_FAILED",
         "TRACE_NOT_FOUND",
         "TRACE_OPERAND_INVALID",
-        "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
@@ -40150,6 +40150,13 @@
   ],
   "errors": [
     {
+      "code": "ACTOR_DENIED",
+      "exit": 2,
+      "fix": "Show the human what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on their explicit approval run the call again with --relayed-via <tool>, --actor, --approver and --note (a brief also takes --digest <change>=<shown digest>). Where canon.yaml says `approval: { relay: deny }`, the human runs the call in their own shell (or on the dashboard for a brief). Never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself.",
+      "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`, a `migrate --commit` that re-binds `Approved:` lines), so an agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused unless it relays the human's explicit answer with --relayed-via, and a repo whose canon.yaml says `approval: { relay: deny }` refuses that too",
+      "retryable": false
+    },
+    {
       "code": "ADAPTER_EXECUTION_NOT_AUTHORIZED",
       "exit": 1,
       "fix": "Have the adapter return a response that authorizes execution, or do not run the command through this adapter.",
@@ -40171,7 +40178,7 @@
       "retryable": false
     },
     {
-      "code": "APPROVAL_INCOMPLETE",
+      "code": "APPROVAL_INVALID",
       "exit": 2,
       "fix": "Pass a single-line, non-empty --approver and --note to `canon brief approve`.",
       "meaning": "`brief approve` got an empty or multi-line --by or --note",
@@ -40227,17 +40234,31 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_CHANGED_SINCE_PAGE_LOAD",
-      "exit": 2,
-      "fix": "Reload the dashboard page to see the current brief, then approve it again.",
-      "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
+      "code": "BRIEF_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
+      "meaning": "`brief check` ran and its answer is that the brief fails the check",
+      "reasons": [
+        {
+          "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
+          "meaning": "`brief check` found blocker findings; data.findings names each",
+          "reason": "BLOCKERS"
+        }
+      ],
       "retryable": false
     },
     {
-      "code": "BRIEF_HAS_BLOCKERS",
-      "exit": 1,
-      "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
-      "meaning": "`brief check` found blocker findings; data.findings names each",
+      "code": "BRIEF_INVALID",
+      "exit": 2,
+      "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
+      "meaning": "the brief cannot be approved as it stands",
+      "reasons": [
+        {
+          "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
+          "meaning": "the brief's text cannot take an `Approved:` line (for example an open code fence)",
+          "reason": "UNAPPROVABLE"
+        }
+      ],
       "retryable": false
     },
     {
@@ -40248,10 +40269,10 @@
       "retryable": false
     },
     {
-      "code": "BRIEF_UNAPPROVABLE",
+      "code": "BRIEF_PAGE_STALE",
       "exit": 2,
-      "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
-      "meaning": "the brief's text cannot take an `Approved:` line (for example an open code fence)",
+      "fix": "Reload the dashboard page to see the current brief, then approve it again.",
+      "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
       "retryable": false
     },
     {
@@ -40283,10 +40304,10 @@
       "retryable": false
     },
     {
-      "code": "CHANGE_AMBIGUOUS",
+      "code": "CHANGE_ARGUMENT_INVALID",
       "exit": 2,
-      "fix": "Pass the id of the change you mean as the operand.",
-      "meaning": "several live changes have a brief; pass the change id as the operand",
+      "fix": "Correct the arguments to `canon change new` so a brief can be built from them.",
+      "meaning": "`change new` could not build a brief from the given arguments",
       "retryable": false
     },
     {
@@ -40297,10 +40318,10 @@
       "retryable": false
     },
     {
-      "code": "CHANGE_INVALID_ARGUMENT",
+      "code": "CHANGE_REQUIRED",
       "exit": 2,
-      "fix": "Correct the arguments to `canon change new` so a brief can be built from them.",
-      "meaning": "`change new` could not build a brief from the given arguments",
+      "fix": "Pass the id of the change you mean as the operand.",
+      "meaning": "several live changes have a brief; pass the change id as the operand",
       "retryable": false
     },
     {
@@ -40311,6 +40332,13 @@
       "retryable": false
     },
     {
+      "code": "COMMIT_REQUIRED",
+      "exit": 2,
+      "fix": "Run the command inside a git work tree that has at least one commit.",
+      "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
+      "retryable": false
+    },
+    {
       "code": "CONFIG_CHECK_FAILED",
       "exit": 1,
       "fix": "Fix each section `data.sections` marks FAIL, then run `canon init --check` again.",
@@ -40318,7 +40346,28 @@
       "retryable": false
     },
     {
-      "code": "CONFIG_MISSING",
+      "code": "CONFIG_EXISTS",
+      "exit": 2,
+      "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it, or `canon demo init` in a directory without one.",
+      "meaning": "canon.yaml already exists and there is nothing else to refresh; `demo init` refuses any directory that holds one",
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_INVALID",
+      "exit": 2,
+      "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
+      "meaning": "a section of canon.yaml is present but unusable",
+      "reasons": [
+        {
+          "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
+          "meaning": "the dashboard's canon.yaml section is present but unusable",
+          "reason": "DASHBOARD"
+        }
+      ],
+      "retryable": false
+    },
+    {
+      "code": "CONFIG_REQUIRED",
       "exit": 2,
       "fix": "Run `canon init` or pass --repo <DIR> to a directory holding canon.yaml.",
       "meaning": "canon.yaml does not exist",
@@ -40339,7 +40388,21 @@
       "retryable": false
     },
     {
-      "code": "CONTEXT_INPUT_MISSING",
+      "code": "CONTEXT_INPUT_INVALID",
+      "exit": 2,
+      "fix": "Remove the plaintext secret from the selected input or deselect it, then build the pack again.",
+      "meaning": "a selected context input cannot go into the pack",
+      "reasons": [
+        {
+          "fix": "Remove the plaintext secret from the selected input or deselect it, then build the pack again.",
+          "meaning": "a selected context input contains plaintext secret material",
+          "reason": "SECRET"
+        }
+      ],
+      "retryable": false
+    },
+    {
+      "code": "CONTEXT_INPUT_NOT_FOUND",
       "exit": 2,
       "fix": "Create the selected context input or drop it from the selection.",
       "meaning": "a selected context input does not exist",
@@ -40374,14 +40437,7 @@
       "retryable": false
     },
     {
-      "code": "CONTEXT_SECRET_DETECTED",
-      "exit": 2,
-      "fix": "Remove the plaintext secret from the selected input or deselect it, then build the pack again.",
-      "meaning": "a selected context input contains plaintext secret material",
-      "retryable": false
-    },
-    {
-      "code": "CONTEXT_UNSAFE_PATH",
+      "code": "CONTEXT_PATH_INVALID",
       "exit": 2,
       "fix": "Select only repository-relative paths that stay inside the repository and contain no symlink.",
       "meaning": "a selected path is absolute, leaves the repository, or contains a symlink",
@@ -40412,20 +40468,6 @@
       "retryable": false
     },
     {
-      "code": "DASHBOARD_BAD_REQUEST",
-      "exit": 2,
-      "fix": "Send requests only through the briefs page the dashboard serves.",
-      "meaning": "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body",
-      "retryable": false
-    },
-    {
-      "code": "DASHBOARD_CONFIG_INVALID",
-      "exit": 2,
-      "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
-      "meaning": "the dashboard's canon.yaml section is present but unusable",
-      "retryable": false
-    },
-    {
       "code": "DASHBOARD_FAILED",
       "exit": 1,
       "fix": "Read the I/O error in the message, fix its cause, then start the dashboard again.",
@@ -40440,13 +40482,6 @@
       "retryable": false
     },
     {
-      "code": "DASHBOARD_ORIGIN_REFUSED",
-      "exit": 2,
-      "fix": "Open the dashboard at the exact address it is bound to.",
-      "meaning": "a dashboard request came with a Host or Origin that is not the bound address, so it was refused before anything was read",
-      "retryable": false
-    },
-    {
       "code": "DASHBOARD_PORT_IN_USE",
       "exit": 1,
       "fix": "Stop the process holding the port or choose another port, then start the dashboard again.",
@@ -40454,7 +40489,21 @@
       "retryable": true
     },
     {
-      "code": "DEMO_NOT_INITIALIZED",
+      "code": "DASHBOARD_REQUEST_DENIED",
+      "exit": 2,
+      "fix": "Open the dashboard at the exact address it is bound to.",
+      "meaning": "a dashboard request came with a Host or Origin that is not the bound address, so it was refused before anything was read",
+      "retryable": false
+    },
+    {
+      "code": "DASHBOARD_REQUEST_INVALID",
+      "exit": 2,
+      "fix": "Send requests only through the briefs page the dashboard serves.",
+      "meaning": "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body",
+      "retryable": false
+    },
+    {
+      "code": "DEMO_REQUIRED",
       "exit": 2,
       "fix": "Run `canon demo init` before `canon demo review`.",
       "meaning": "`demo review` ran before `demo init`",
@@ -40468,18 +40517,18 @@
       "retryable": false
     },
     {
+      "code": "DISPATCH_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Remove the conflicting dispatch flags; see `canon schema` for the command's options.",
+      "meaning": "a dispatch flag combination is invalid",
+      "retryable": false
+    },
+    {
       "code": "DISPATCH_END_IN_PROGRESS",
       "exit": 1,
       "fix": "Wait a moment and run `canon dispatch end` again.",
       "meaning": "another process is closing the run; retry",
       "retryable": true
-    },
-    {
-      "code": "DISPATCH_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Remove the conflicting dispatch flags; see `canon schema` for the command's options.",
-      "meaning": "a dispatch flag combination is invalid",
-      "retryable": false
     },
     {
       "code": "DISPATCH_MANIFEST_MISMATCH",
@@ -40503,7 +40552,7 @@
       "retryable": false
     },
     {
-      "code": "DISPATCH_ROLE_REGIME_MISMATCH",
+      "code": "DISPATCH_ROLE_CONFLICT",
       "exit": 2,
       "fix": "Pass a --role that matches the --regime's role, or change the --regime.",
       "meaning": "--role does not match the --regime's role",
@@ -40524,7 +40573,7 @@
       "retryable": false
     },
     {
-      "code": "DIVERGENCE_INVALID_ARGUMENT",
+      "code": "DIVERGENCE_ARGUMENT_INVALID",
       "exit": 2,
       "fix": "Correct the divergence flag value; see `canon schema` for the command's options.",
       "meaning": "a divergence flag value is invalid",
@@ -40634,10 +40683,31 @@
       "retryable": false
     },
     {
-      "code": "FEATURE_OUTSIDE_SPEC_ROOTS",
+      "code": "FEATURE_PATH_INVALID",
       "exit": 2,
       "fix": "Place the feature under a specs.roots entry in canon.yaml, or add a root that covers it.",
       "meaning": "the feature path is under no configured specs.roots entry",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Correct the `canon finding` argument that is empty, malformed or out of range.",
+      "meaning": "a `finding` argument is empty, malformed or out of range",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_CONFLICT",
+      "exit": 2,
+      "fix": "Commit the staged finding, then close it.",
+      "meaning": "the finding is still staged and cannot be closed until committed",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_EXISTS",
+      "exit": 2,
+      "fix": "Choose an unused seq for that change and round.",
+      "meaning": "a finding already holds that change, round and seq",
       "retryable": false
     },
     {
@@ -40645,13 +40715,6 @@
       "exit": 2,
       "fix": "Pass --introduced-rev <rev> when the introducing commit was established, or --introduced-unknown when it was not; a note needs neither.",
       "meaning": "a new blocker or should-fix finding names no introducing commit and does not say it is unknown",
-      "retryable": false
-    },
-    {
-      "code": "FINDING_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Correct the `canon finding` argument that is empty, malformed or out of range.",
-      "meaning": "a `finding` argument is empty, malformed or out of range",
       "retryable": false
     },
     {
@@ -40669,7 +40732,7 @@
       "retryable": false
     },
     {
-      "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
+      "code": "FINDING_RESOLUTION_REV_CONFLICT",
       "exit": 2,
       "fix": "Drop --resolution-rev, or close the finding as fixed.",
       "meaning": "--resolution-rev was given with a disposition other than fixed",
@@ -40683,31 +40746,17 @@
       "retryable": false
     },
     {
-      "code": "FINDING_SEQ_OCCUPIED",
-      "exit": 2,
-      "fix": "Choose an unused seq for that change and round.",
-      "meaning": "a finding already holds that change, round and seq",
-      "retryable": false
-    },
-    {
-      "code": "FINDING_STAGED",
-      "exit": 2,
-      "fix": "Commit the staged finding, then close it.",
-      "meaning": "the finding is still staged and cannot be closed until committed",
-      "retryable": false
-    },
-    {
-      "code": "FINDING_UNKNOWN_SCENARIO",
-      "exit": 2,
-      "fix": "Pass a --scenario that the scenario index knows; run `canon inventory sync` if the scenario is new.",
-      "meaning": "--scenario names a scenario the index does not know",
-      "retryable": false
-    },
-    {
-      "code": "FORMAT_VIOLATIONS",
+      "code": "FORMAT_CHECK_FAILED",
       "exit": 1,
       "fix": "Fix each violation listed in data.violations, then run `canon format` again.",
       "meaning": "`format` found spec-corpus violations; data.violations names each",
+      "retryable": false
+    },
+    {
+      "code": "GATE_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Fix each violation listed in data.violations, then run the gate again.",
+      "meaning": "the evidence gate found violations; data.violations names each",
       "retryable": false
     },
     {
@@ -40725,27 +40774,6 @@
       "retryable": false
     },
     {
-      "code": "GATE_TASK_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Pass a well-formed task id to `canon task done`.",
-      "meaning": "the task id is malformed",
-      "retryable": false
-    },
-    {
-      "code": "GATE_TASK_UNSUPPORTED",
-      "exit": 2,
-      "fix": "Mark the task done by hand in the plan document; this plan dialect cannot be flipped by canon.",
-      "meaning": "the plan dialect cannot flip this task",
-      "retryable": false
-    },
-    {
-      "code": "GATE_VIOLATIONS",
-      "exit": 1,
-      "fix": "Fix each violation listed in data.violations, then run the gate again.",
-      "meaning": "the evidence gate found violations; data.violations names each",
-      "retryable": false
-    },
-    {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 1,
       "fix": "Check that the hook file and its directory are writable, then run `canon gate install-hooks` again.",
@@ -40757,13 +40785,6 @@
       "exit": 2,
       "fix": "Pass --repo naming an existing directory and check that the hook files under .claude and .codex are valid JSON, then run the install again.",
       "meaning": "a hook install could not start: --repo is not an existing directory, or a hook file is unreadable or conflicting; nothing was written",
-      "retryable": false
-    },
-    {
-      "code": "HUMAN_ONLY",
-      "exit": 2,
-      "fix": "Show the human what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on their explicit approval run the call again with --relayed-via <tool>, --actor, --approver and --note (a brief also takes --digest <change>=<shown digest>). Where canon.yaml says `approval: { relay: deny }`, the human runs the call in their own shell (or on the dashboard for a brief). Never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself.",
-      "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`, a `migrate --commit` that re-binds `Approved:` lines), so an agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused unless it relays the human's explicit answer with --relayed-via, and a repo whose canon.yaml says `approval: { relay: deny }` refuses that too",
       "retryable": false
     },
     {
@@ -40788,14 +40809,7 @@
       "retryable": false
     },
     {
-      "code": "INIT_CONFIG_EXISTS",
-      "exit": 2,
-      "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it, or `canon demo init` in a directory without one.",
-      "meaning": "canon.yaml already exists and there is nothing else to refresh; `demo init` refuses any directory that holds one",
-      "retryable": false
-    },
-    {
-      "code": "INIT_INVALID_ARGUMENT",
+      "code": "INIT_ARGUMENT_INVALID",
       "exit": 2,
       "fix": "Pass a supported language and skill providers to `canon init`.",
       "meaning": "an `init` option is invalid (language or skill providers)",
@@ -40917,31 +40931,10 @@
       "retryable": false
     },
     {
-      "code": "LEARN_DEMOTION_FAILED",
-      "exit": 1,
-      "fix": "Run `canon strategy rollback` on the still-active strategy, then retry the promotion.",
-      "meaning": "promotion is blocked and the demotion a contradicting trajectory triggered also failed; the strategy is still active",
-      "retryable": false
-    },
-    {
       "code": "LEARN_EVALUATION_REJECTED",
       "exit": 1,
       "fix": "Supply an evaluation file that fits the candidate strategy, then run `canon strategy promote` again.",
       "meaning": "the promotion evaluation does not fit the candidate strategy",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Correct the `canon strategy` flag value; see `canon schema` for the command's options.",
-      "meaning": "a `strategy` flag value is invalid",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_INVALID_INPUT",
-      "exit": 2,
-      "fix": "Fix the evaluation or approval file so it parses and matches its schema.",
-      "meaning": "a `strategy` evaluation or approval file is invalid",
       "retryable": false
     },
     {
@@ -40970,20 +40963,6 @@
       "exit": 2,
       "fix": "Pass the path of a readable detached signature file.",
       "meaning": "the detached signature file could not be read",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_STRATEGY_NOT_FOUND",
-      "exit": 2,
-      "fix": "Pass the id of an existing strategy.",
-      "meaning": "no strategy with that id; `strategy rollback` and `strategy approval-payload` look the id up first",
-      "retryable": false
-    },
-    {
-      "code": "LEARN_TRAJECTORY_NOT_FOUND",
-      "exit": 2,
-      "fix": "Pass the id of a trajectory that exists, or omit the contradicting trajectory.",
-      "meaning": "the contradicting trajectory does not exist",
       "retryable": false
     },
     {
@@ -41029,7 +41008,7 @@
       "retryable": false
     },
     {
-      "code": "MIGRATE_UNCOMMITTED",
+      "code": "MIGRATION_CONFLICT",
       "exit": 2,
       "fix": "Commit or stash the uncommitted changes under the paths migrate moves, then run `canon migrate` again.",
       "meaning": "`migrate` refused because paths it moves have uncommitted changes",
@@ -41040,13 +41019,6 @@
       "exit": 2,
       "fix": "Run `canon change new` to create a change with a brief.",
       "meaning": "no live change has a brief",
-      "retryable": false
-    },
-    {
-      "code": "NO_COMMIT",
-      "exit": 2,
-      "fix": "Run the command inside a git work tree that has at least one commit.",
-      "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
       "retryable": false
     },
     {
@@ -41071,7 +41043,7 @@
       "retryable": false
     },
     {
-      "code": "PLAN_SOURCES_MISSING",
+      "code": "PLAN_SOURCES_REQUIRED",
       "exit": 2,
       "fix": "Configure plan sources in canon.yaml, then run the command again.",
       "meaning": "the repository configures no plan sources",
@@ -41148,17 +41120,17 @@
       "retryable": false
     },
     {
+      "code": "QUERY_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Remove the flag that does not apply to this kind; see `canon schema` for its options.",
+      "meaning": "a query flag is invalid for this kind",
+      "retryable": false
+    },
+    {
       "code": "QUERY_FAILED",
       "exit": 1,
       "fix": "Check that the ledger is readable, then run the query again.",
       "meaning": "the query could not read the ledger",
-      "retryable": false
-    },
-    {
-      "code": "QUERY_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Remove the flag that does not apply to this kind; see `canon schema` for its options.",
-      "meaning": "a query flag is invalid for this kind",
       "retryable": false
     },
     {
@@ -41169,7 +41141,7 @@
       "retryable": false
     },
     {
-      "code": "RELAY_DIGEST_MISMATCH",
+      "code": "RELAY_DIGEST_STALE",
       "exit": 2,
       "fix": "Run `canon brief show <change> --body` again, put the brief and its digest in front of the human, ask again, and relay the digest of what they saw.",
       "meaning": "a relayed brief approval names a digest that is not the brief's digest now, so the human was shown a different brief than the one on disk; nothing was recorded",
@@ -41232,10 +41204,17 @@
       "retryable": false
     },
     {
-      "code": "RETRIEVE_FAILED",
+      "code": "RETRIEVE_INVALID",
       "exit": 2,
       "fix": "Check --domain and --subject (`canon regime show` prints a valid key) and that the repo directory has a usable name, then run the retrieval again.",
       "meaning": "`retrieve` could not start: the domain/subject cannot be turned into a regime key (the scope flags that conflict, are missing or disagree with --role are `USAGE`); a store outage is not an error here, it serves empty guidance (exit 0)",
+      "retryable": false
+    },
+    {
+      "code": "REVIEW_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Add the missing `canon review` argument or drop the one that contradicts another.",
+      "meaning": "a `review scenario` or `review change` argument is missing or contradicts another",
       "retryable": false
     },
     {
@@ -41246,13 +41225,6 @@
       "retryable": false
     },
     {
-      "code": "REVIEW_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Add the missing `canon review` argument or drop the one that contradicts another.",
-      "meaning": "a `review scenario` or `review change` argument is missing or contradicts another",
-      "retryable": false
-    },
-    {
       "code": "REVIEW_SCENARIO_NOT_INDEXED",
       "exit": 2,
       "fix": "Run `canon inventory sync`, then review the scenario again.",
@@ -41260,10 +41232,24 @@
       "retryable": false
     },
     {
-      "code": "SCAFFOLD_INVALID_ARGUMENT",
+      "code": "ROLE_INVALID",
+      "exit": 2,
+      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
+      "meaning": "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)",
+      "retryable": false
+    },
+    {
+      "code": "SCAFFOLD_ARGUMENT_INVALID",
       "exit": 2,
       "fix": "Correct the scaffold argument named in the error.",
       "meaning": "a scaffold argument is invalid",
+      "retryable": false
+    },
+    {
+      "code": "SCENARIO_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass a --scenario that the scenario index knows; run `canon inventory sync` if the scenario is new.",
+      "meaning": "--scenario names a scenario the index does not know",
       "retryable": false
     },
     {
@@ -41281,7 +41267,7 @@
       "retryable": false
     },
     {
-      "code": "SEARCH_QUERY_EMPTY",
+      "code": "SEARCH_QUERY_REQUIRED",
       "exit": 2,
       "fix": "Pass the text to find, e.g. `canon search timeout`.",
       "meaning": "`search` was given an empty text or one of only spaces",
@@ -41302,10 +41288,17 @@
       "retryable": false
     },
     {
-      "code": "SKILLS_DRIFT",
+      "code": "SKILLS_CHECK_FAILED",
       "exit": 1,
       "fix": "Run `canon skills install` to refresh the installed skills.",
-      "meaning": "`skills check` found an installed skill missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version",
+      "meaning": "`skills check` ran and its answer is that the installed skills differ from the bundle",
+      "reasons": [
+        {
+          "fix": "Run `canon skills install` to refresh the installed skills.",
+          "meaning": "`skills check` found an installed skill missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version",
+          "reason": "DRIFT"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41330,7 +41323,14 @@
       "retryable": false
     },
     {
-      "code": "SPEC_ROOT_UNRESOLVED",
+      "code": "SPEC_ROOT_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass a --project that names a spec root configured in canon.yaml.",
+      "meaning": "`--project` names no spec root configured in canon.yaml, so nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "SPEC_ROOT_REQUIRED",
       "exit": 2,
       "fix": "Pass --project with the id of the spec root to use.",
       "meaning": "no single spec root could be chosen; pass --project",
@@ -41351,10 +41351,59 @@
       "retryable": false
     },
     {
+      "code": "STRATEGY_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Correct the `canon strategy` flag value; see `canon schema` for the command's options.",
+      "meaning": "a `strategy` flag value is invalid",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_DEMOTION_FAILED",
+      "exit": 1,
+      "fix": "Run `canon strategy rollback` on the still-active strategy, then retry the promotion.",
+      "meaning": "promotion is blocked and the demotion a contradicting trajectory triggered also failed; the strategy is still active",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_FILE_INVALID",
+      "exit": 2,
+      "fix": "Fix the evaluation or approval file so it parses and matches its schema.",
+      "meaning": "a `strategy` evaluation or approval file is invalid",
+      "retryable": false
+    },
+    {
+      "code": "STRATEGY_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of an existing strategy.",
+      "meaning": "no strategy with that id; `strategy rollback` and `strategy approval-payload` look the id up first",
+      "retryable": false
+    },
+    {
       "code": "SUBJECT_ADOPT_REFUSED",
       "exit": 2,
       "fix": "Fix the problem the error names, then run `canon subject adopt` again.",
       "meaning": "the change could not be adopted by the subject",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_ARGUMENT_INVALID",
+      "exit": 2,
+      "fix": "Correct the malformed `canon subject` argument.",
+      "meaning": "a `subject` argument is malformed",
+      "retryable": false
+    },
+    {
+      "code": "SUBJECT_CONFLICT",
+      "exit": 2,
+      "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
+      "meaning": "the requested change conflicts with the subject's state",
+      "reasons": [
+        {
+          "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
+          "meaning": "the status change is not an allowed transition",
+          "reason": "TRANSITION"
+        }
+      ],
       "retryable": false
     },
     {
@@ -41369,20 +41418,6 @@
       "exit": 1,
       "fix": "Fix each gate violation reported, then run `canon subject move` again.",
       "meaning": "the status transition is blocked by gate violations",
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_INVALID_ARGUMENT",
-      "exit": 2,
-      "fix": "Correct the malformed `canon subject` argument.",
-      "meaning": "a `subject` argument is malformed",
-      "retryable": false
-    },
-    {
-      "code": "SUBJECT_INVALID_TRANSITION",
-      "exit": 2,
-      "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
-      "meaning": "the status change is not an allowed transition",
       "retryable": false
     },
     {
@@ -41407,6 +41442,13 @@
       "retryable": false
     },
     {
+      "code": "TASK_ID_INVALID",
+      "exit": 2,
+      "fix": "Pass a well-formed task id to `canon task done`.",
+      "meaning": "the task id is malformed",
+      "retryable": false
+    },
+    {
       "code": "TASK_NOT_FOUND",
       "exit": 2,
       "fix": "Pass a task id that exists in the plan corpus.",
@@ -41418,6 +41460,13 @@
       "exit": 2,
       "fix": "Restore the task's row in its plan document, then run `canon task done` again.",
       "meaning": "the task's row is missing from its plan document",
+      "retryable": false
+    },
+    {
+      "code": "TASK_UNSUPPORTED",
+      "exit": 2,
+      "fix": "Mark the task done by hand in the plan document; this plan dialect cannot be flipped by canon.",
+      "meaning": "the plan dialect cannot flip this task",
       "retryable": false
     },
     {
@@ -41442,6 +41491,13 @@
       "retryable": false
     },
     {
+      "code": "TRAJECTORY_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the id of a trajectory that exists, or omit the contradicting trajectory.",
+      "meaning": "the contradicting trajectory does not exist",
+      "retryable": false
+    },
+    {
       "code": "TYPED_ATOMS_INVALID",
       "exit": 2,
       "fix": "Fix the change's typed-atoms file so it parses.",
@@ -41453,20 +41509,6 @@
       "exit": 2,
       "fix": "Run one of the commands `expected` lists; `canon schema` lists every command path.",
       "meaning": "a command word is not in canon's command tree, or `canon schema` was given a path canon does not have; `expected` lists the valid words at that level",
-      "retryable": false
-    },
-    {
-      "code": "UNKNOWN_ROLE",
-      "exit": 2,
-      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
-      "meaning": "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)",
-      "retryable": false
-    },
-    {
-      "code": "UNKNOWN_SPEC_ROOT",
-      "exit": 2,
-      "fix": "Pass a --project that names a spec root configured in canon.yaml.",
-      "meaning": "`--project` names no spec root configured in canon.yaml, so nothing was written",
       "retryable": false
     },
     {
@@ -41509,7 +41551,7 @@
     },
     {
       "code": 2,
-      "meaning": "the command refused to run: usage, an unknown command, CONFIG_MISSING, an id or file that does not exist, unreadable input, an invalid argument, a target that cannot be written"
+      "meaning": "the command refused to run: usage, an unknown command, CONFIG_REQUIRED, an id or file that does not exist, unreadable input, an invalid argument, a target that cannot be written"
     }
   ],
   "records": {

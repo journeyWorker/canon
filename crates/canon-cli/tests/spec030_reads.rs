@@ -182,7 +182,7 @@ fn learn_promotion_11_the_approval_payload_of_an_unknown_strategy_or_a_malformed
     let before = tree(repo);
     let unknown = canon(repo, &["strategy", "approval-payload", UNKNOWN_STRATEGY, "--evaluation", "evaluation.json", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
     assert_eq!(unknown.status.code(), Some(2));
-    assert_eq!(error_code(&unknown), "LEARN_STRATEGY_NOT_FOUND");
+    assert_eq!(error_code(&unknown), "STRATEGY_NOT_FOUND");
     let malformed = canon(repo, &["strategy", "approval-payload", "nope", "--evaluation", "evaluation.json", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
     assert_eq!(malformed.status.code(), Some(2));
     assert_eq!(error_code(&malformed), "USAGE");
@@ -296,7 +296,7 @@ fn context_capability_45_brief_show_of_a_change_with_no_brief_or_in_a_repo_with_
     assert!(json(&unknown)["error"]["message"].as_str().unwrap().contains(".canon/changes/nope/brief.md"));
     let ambiguous = canon(repo.path(), &["brief", "show", "--json"]);
     assert_eq!(ambiguous.status.code(), Some(2));
-    assert_eq!(error_code(&ambiguous), "CHANGE_AMBIGUOUS");
+    assert_eq!(error_code(&ambiguous), "CHANGE_REQUIRED");
     assert_eq!(tree(repo.path()), before, "a refused show writes nothing");
 }
 
@@ -362,7 +362,7 @@ fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_si
     for sig in ["missing.sig", "bad.sig"] {
         let out = canon(repo, &["strategy", "rollback", UNKNOWN_STRATEGY, "--reason", "regressed", "--actor", "alice", "--signature-file", sig, "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
         assert_eq!(out.status.code(), Some(2), "{sig}");
-        assert_eq!(error_code(&out), "LEARN_STRATEGY_NOT_FOUND", "{sig}");
+        assert_eq!(error_code(&out), "STRATEGY_NOT_FOUND", "{sig}");
         assert!(json(&out)["error"]["message"].as_str().unwrap().contains(UNKNOWN_STRATEGY));
     }
     let existing = canon(repo, &["strategy", "rollback", &candidate.id.to_string(), "--reason", "regressed", "--actor", "alice", "--signature-file", "bad.sig", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);

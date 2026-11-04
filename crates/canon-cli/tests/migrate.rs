@@ -331,7 +331,7 @@ fn authoring_migrate_03_a_dirty_path_it_moves_is_refused() {
     let out = commit(repo);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("canon: MIGRATE_UNCOMMITTED: uncommitted changes under the paths it moves; commit or stash them, then run it again:"), "{err}");
+    assert!(err.contains("canon: MIGRATION_CONFLICT: uncommitted changes under the paths it moves; commit or stash them, then run it again:"), "{err}");
     assert!(err.contains(&format!(" M {OLD_FEATURE}")) && err.contains("?? specs/features/kind=feature/area=cart/new.feature"), "{err}");
     assert!(repo.join(OLD_FEATURE).is_file() && !repo.join(".canon/specs").exists(), "nothing moved");
     assert_eq!(read(repo, "canon.yaml"), yaml);

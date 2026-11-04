@@ -1,7 +1,7 @@
 //! 0.28 D7b through the real binary (T17): every leaf that records "the commit
 //! a record is about" defaults `--rev` to `HEAD`, resolves any revision to the
 //! full sha, records `code_tree` and `worktree_dirty` for the code it saw,
-//! refuses nothing for uncommitted code, and refuses `NO_COMMIT` outside git.
+//! refuses nothing for uncommitted code, and refuses `COMMIT_REQUIRED` outside git.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -202,7 +202,7 @@ fn an_explicit_short_sha_branch_and_head_tilde_one_record_the_full_sha() {
     }
     let unknown = canon(r, &["divergence", "add", SCENARIO, "--actor", "x", "--role", "reviewer", "--rev", "no-such-rev", "--json"]);
     assert_eq!(unknown.status.code(), Some(2));
-    assert_eq!(error_of(&unknown)["code"], "NO_COMMIT");
+    assert_eq!(error_of(&unknown)["code"], "COMMIT_REQUIRED");
 }
 
 #[test]
@@ -251,12 +251,12 @@ fn outside_git_and_with_no_commit_every_leaf_refuses_no_commit_and_writes_nothin
             let out = run_leaf(r, &argv, &[]);
             assert_eq!(out.status.code(), Some(2), "{name}: {}{}", text(&out.stdout), text(&out.stderr));
             let error = error_of(&out);
-            assert_eq!(error["code"], "NO_COMMIT", "{name}: {error}");
+            assert_eq!(error["code"], "COMMIT_REQUIRED", "{name}: {error}");
             assert!(error["hint"].as_str().is_some_and(|h| h.contains("git")), "{name} says how to fix it: {error}");
         }
         let payload = canon(r, &["evidence", "approval-payload", "--scenario", SCENARIO, "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
         assert_eq!(payload.status.code(), Some(2));
-        assert_eq!(error_of(&payload)["code"], "NO_COMMIT");
+        assert_eq!(error_of(&payload)["code"], "COMMIT_REQUIRED");
         assert_eq!(files(&r.join(".canon/ledger")).len(), before, "a refusal writes nothing");
     }
 }

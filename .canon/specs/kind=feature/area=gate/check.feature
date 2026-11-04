@@ -436,7 +436,7 @@ Feature: gate check
   Scenario: A gate check where no canon.yaml is found refuses instead of reporting clean
     Given a directory with no canon.yaml in it or above it, and a canon repository with a subdirectory that has none
     When canon gate check runs in the first, and again with --repo naming the subdirectory
-    Then each exits 2 with CONFIG_MISSING, names --repo, and a hint naming canon init and the directory searched
+    Then each exits 2 with CONFIG_REQUIRED, names --repo, and a hint naming canon init and the directory searched
     And neither prints a clean result
 
   # canon: {"schema":1,"at":"2026-10-22T04:48:22Z","actor":{"agent_id":"canon-impl-027"}}

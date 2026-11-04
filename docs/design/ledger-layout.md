@@ -187,7 +187,7 @@ Specified as scenarios in the change, since they are output:
 
 - `canon query`'s ID column and its cursor tokens (a 0.29 cursor is refused
   with a hint to start over).
-- `FINDING_SEQ_OCCUPIED` and promote refusal messages that quote a key.
+- `FINDING_EXISTS` and promote refusal messages that quote a key.
 - `canon tier age` effect ids and `canon export` / `canon purge` manifest
   ids.
 - Every write's "wrote/staged <path>" line.

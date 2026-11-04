@@ -245,7 +245,7 @@ Feature: context capability
   Scenario: A command that needs canon state refuses without a canon.yaml, and the ones that run without it still do
     Given a directory with no canon.yaml in it or above it
     When a command that reads or records repository state runs there, such as status, query, finding list, report build or subject new
-    Then it exits 2 with CONFIG_MISSING and writes nothing
+    Then it exits 2 with CONFIG_REQUIRED and writes nothing
     And init, schema, context, regime show and retrieve still run there, and init creates the canon.yaml the others look for
 
   # canon: {"schema":1,"at":"2026-10-22T04:48:48Z","actor":{"agent_id":"canon-impl-027"}}
@@ -450,10 +450,10 @@ Feature: context capability
   @subject:context-capability
   @case:failure
   @context.capability.44
-  Scenario: An unknown CANON_ROLE value is refused with UNKNOWN_ROLE by status, while schema and context are never failed by it
+  Scenario: An unknown CANON_ROLE value is refused with ROLE_INVALID by status, while schema and context are never failed by it
     Given CANON_ROLE set to a value that is not a role
     When canon status runs, and canon schema and canon context run, and canon status runs with --as naming a valid role
-    Then status exits 2 with UNKNOWN_ROLE, naming the value, and with stderr empty under --json
+    Then status exits 2 with ROLE_INVALID, naming the value, and with stderr empty under --json
     And schema and context still exit 0, never filtered or failed by the variable, and context names the value in meta.warnings
     And the flag wins over the variable, and an unknown --as value is a usage error
 
@@ -465,7 +465,7 @@ Feature: context capability
   Scenario: Brief show of a change with no brief, or in a repo with no briefs, is refused with exit 2
     Given a repo with a subject and no change, and then two changes that each have a brief
     When canon brief show runs with no change in the first repo state, with the change nope, and with no change once two changes exist
-    Then the first exits 2 with NO_BRIEF, the second exits 2 with BRIEF_NOT_FOUND naming .canon/changes/nope/brief.md, and the third exits 2 with CHANGE_AMBIGUOUS
+    Then the first exits 2 with NO_BRIEF, the second exits 2 with BRIEF_NOT_FOUND naming .canon/changes/nope/brief.md, and the third exits 2 with CHANGE_REQUIRED
     And no file in the repo changed
 
   # canon: {"schema":1,"at":"2026-10-26T11:42:45Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
@@ -566,7 +566,7 @@ Feature: context capability
   Scenario: With two spec roots a missing --project is refused in the new spelling and the placeholders stay in the hint
     Given a repo that configures two spec roots
     When `canon feature new` runs without --project
-    Then it exits 2 with SPEC_ROOT_UNRESOLVED and nothing is written
+    Then it exits 2 with SPEC_ROOT_REQUIRED and nothing is written
     And the message and the hint name --project, and the placeholder in the hint is the one it had
 
   # canon: {"schema":1,"at":"2026-10-27T13:11:30Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
@@ -577,7 +577,7 @@ Feature: context capability
   Scenario: An unknown --project root and an unknown finding --review are refused naming the new options
     Given a repo with one spec root, and a committed change
     When `canon evidence add` names a root that is not configured with --project, and `canon finding add` names a review the ledger does not hold with --review
-    Then the first exits 2 with UNKNOWN_SPEC_ROOT, the field --project and a hint naming `--project` with the one configured root, as before the rename
+    Then the first exits 2 with SPEC_ROOT_NOT_FOUND, the field --project and a hint naming `--project` with the one configured root, as before the rename
     And the second is refused with the field --review, and neither writes anything
 
   # canon: {"schema":1,"at":"2026-10-27T13:12:22Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}

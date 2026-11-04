@@ -99,7 +99,7 @@ Feature: divergence lifecycle
   Scenario: A divergence command whose project id names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game
     When divergence add, resolve, defer and accept each name a --project that is no configured root, with no agent role declared
-    Then each exits 2 with UNKNOWN_SPEC_ROOT and stages or commits no divergence record
+    Then each exits 2 with SPEC_ROOT_NOT_FOUND and stages or commits no divergence record
     And divergence list, which only reads, still lists what the ledger holds
 
   # canon: {"schema":1,"at":"2026-10-23T12:06:16Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -109,7 +109,7 @@ Feature: divergence lifecycle
   Scenario: An acceptance is a human act and every agent role is refused
     Given an acceptance naming a reason and a tracking reference
     When canon divergence accept runs as planner, implementer, reviewer or orchestrator, declared by --as or by the environment
-    Then each run exits 2 with HUMAN_ONLY, retryable false, and a hint addressed to the human naming canon divergence accept
+    Then each run exits 2 with ACTOR_DENIED, retryable false, and a hint addressed to the human naming canon divergence accept
     And the refusal is the same whether the role is declared by --as or by the environment
 
   # canon: {"schema":1,"at":"2026-10-23T12:06:21Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -119,7 +119,7 @@ Feature: divergence lifecycle
   Scenario: With no agent role declared the acceptance reaches its own checks
     Given the same acceptance and no agent role declared
     When canon divergence accept runs
-    Then it is not refused as HUMAN_ONLY and reaches its own checks instead
+    Then it is not refused as ACTOR_DENIED and reaches its own checks instead
 
   # canon: {"schema":1,"at":"2026-10-26T11:42:45Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
   @subject:divergence-lifecycle
@@ -150,4 +150,4 @@ Feature: divergence lifecycle
   Scenario: A relayed acceptance without the human's name or answer, or with relay denied, is refused and writes nothing
     Given the same scenario and an agent role
     When canon divergence accept runs relayed without --approver, without --note, and with approval.relay denied in canon.yaml
-    Then each exits 2 (USAGE for the missing option, HUMAN_ONLY naming approval.relay for the denial) and no divergence record is written
+    Then each exits 2 (USAGE for the missing option, ACTOR_DENIED naming approval.relay for the denial) and no divergence record is written

@@ -225,7 +225,7 @@ canon divergence accept cart.add.01 --project root --reason "known gap" --tracki
 
 Accepting a scenario whose latest evidence is `divergent` as a known gap
 limited by something outside the change is a human-only act: with a role
-declared (`--as`, `CANON_ROLE`) the leaf is refused with `HUMAN_ONLY`. It is
+declared (`--as`, `CANON_ROLE`) the leaf is refused with `ACTOR_DENIED`. It is
 never a way to skip a fix.
 Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is
 divergent and the session and actor differ from the evidence's. The record
@@ -542,7 +542,7 @@ shows `input`: the schema of one document and a complete `example`. Each element
 `--rev <rev>` names the commit the evidence ran against (default `HEAD`).
 Evidence for uncommitted code is recorded with its `codeTree` and
 `worktreeDirty`; outside git, or with no commit, the add is refused with
-`NO_COMMIT`.
+`COMMIT_REQUIRED`.
 
 **Done when:** `canon gate check` shows no violation for the scenarios you
 recorded evidence for; each record's own output line says whether it was

@@ -191,7 +191,7 @@ fn dispatch_manifest_15_context_pack_add_refuses_a_manifest_that_names_a_missing
     let d = dir.path();
     std::fs::write(d.join("bad.json"), CONTEXT_MANIFEST.replace("README.md", "gone.md")).unwrap();
     let before = snapshot(d);
-    let b = refused(d, &["context-pack", "add", "--manifest", "bad.json"], 2, "CONTEXT_INPUT_MISSING");
+    let b = refused(d, &["context-pack", "add", "--manifest", "bad.json"], 2, "CONTEXT_INPUT_NOT_FOUND");
     assert!(b["error"]["message"].as_str().unwrap().contains("gone.md"), "{b}");
     assert_eq!(snapshot(d), before);
 }
@@ -356,7 +356,7 @@ fn dispatch_manifest_27_dispatch_end_on_a_run_that_was_never_begun_is_refused_an
 #[test]
 fn dispatch_manifest_28_dispatch_diff_outside_a_canon_repository_is_refused_and_writes_nothing() {
     let dir = TempDir::new().unwrap();
-    let b = refused(dir.path(), &["dispatch", "diff"], 2, "CONFIG_MISSING");
+    let b = refused(dir.path(), &["dispatch", "diff"], 2, "CONFIG_REQUIRED");
     assert_eq!(b["error"]["field"], "--repo");
     assert!(snapshot(dir.path()).is_empty());
 }
@@ -378,7 +378,7 @@ fn authoring_demo_01_demo_init_scaffolds_a_demo_repo_whose_gate_starts_red() {
     assert_eq!(b["data"]["repo"], target);
     assert_eq!(b["data"]["scenario"], "auth.login.01");
     assert!(d.join("canon.yaml").is_file());
-    refused(d, &["gate", "check"], 1, "GATE_VIOLATIONS");
+    refused(d, &["gate", "check"], 1, "GATE_CHECK_FAILED");
 }
 
 #[test]
@@ -386,7 +386,7 @@ fn authoring_demo_02_demo_init_in_a_directory_that_already_has_a_canon_yaml_is_r
     let dir = demo_repo();
     let d = dir.path();
     let before = snapshot(d);
-    refused(d, &["demo", "init", "--repo", d.to_str().unwrap()], 2, "INIT_CONFIG_EXISTS");
+    refused(d, &["demo", "init", "--repo", d.to_str().unwrap()], 2, "CONFIG_EXISTS");
     assert_eq!(snapshot(d), before);
 }
 
@@ -399,7 +399,7 @@ fn authoring_demo_02_demo_init_refuses_a_config_whose_gitignore_has_no_canon_lin
     std::fs::create_dir_all(d.join(".canon")).unwrap();
     std::fs::write(d.join(".canon/policy.yaml"), "version: mine\n").unwrap();
     let before = snapshot(d);
-    refused(d, &["demo", "init", "--repo", d.to_str().unwrap()], 2, "INIT_CONFIG_EXISTS");
+    refused(d, &["demo", "init", "--repo", d.to_str().unwrap()], 2, "CONFIG_EXISTS");
     assert_eq!(snapshot(d), before);
     assert_eq!(std::fs::read_to_string(d.join(".canon/policy.yaml")).unwrap(), "version: mine\n");
     assert!(!d.join(".gitignore").exists());
@@ -409,7 +409,7 @@ fn authoring_demo_02_demo_init_refuses_a_config_whose_gitignore_has_no_canon_lin
 fn authoring_demo_03_demo_review_records_the_reviewer_review_and_the_gate_turns_green() {
     let dir = demo_repo();
     let d = dir.path();
-    refused(d, &["gate", "check"], 1, "GATE_VIOLATIONS");
+    refused(d, &["gate", "check"], 1, "GATE_CHECK_FAILED");
     let b = ok(d, &["demo", "review", "--repo", d.to_str().unwrap()]);
     assert_eq!(b["data"]["scenario"], "auth.login.01");
     let gate = ok(d, &["gate", "check"]);
@@ -422,7 +422,7 @@ fn authoring_demo_04_demo_review_in_a_directory_that_demo_init_never_set_up_is_r
     let dir = TempDir::new().unwrap();
     let d = dir.path();
     let before = snapshot(d);
-    refused(d, &["demo", "review", "--repo", d.to_str().unwrap()], 2, "DEMO_NOT_INITIALIZED");
+    refused(d, &["demo", "review", "--repo", d.to_str().unwrap()], 2, "DEMO_REQUIRED");
     assert_eq!(snapshot(d), before);
 }
 

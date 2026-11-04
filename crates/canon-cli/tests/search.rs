@@ -613,7 +613,7 @@ fn search_query_04_an_empty_or_whitespace_query_exits_2_and_builds_nothing() {
     for query in ["", "   "] {
         let out = canon(&["search", query, "--json"], r);
         assert_eq!(out.status.code(), Some(2), "{}", text(&out));
-        assert_eq!(json_of(&out)["error"]["code"], "SEARCH_QUERY_EMPTY");
+        assert_eq!(json_of(&out)["error"]["code"], "SEARCH_QUERY_REQUIRED");
     }
     assert!(!r.join(".canon/index").exists());
 }
@@ -1015,7 +1015,7 @@ fn atip_contract11_14_a_search_of_an_empty_text_is_refused_and_writes_no_index()
     let r = dir.path();
     finding(r, "1", "1", "Token is logged", &[]);
     for text in ["", "   "] {
-        assert_refusal_changes_nothing(r, &["search", text, "--json"], "SEARCH_QUERY_EMPTY");
+        assert_refusal_changes_nothing(r, &["search", text, "--json"], "SEARCH_QUERY_REQUIRED");
     }
 }
 
