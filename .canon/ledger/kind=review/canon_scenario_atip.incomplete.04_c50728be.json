@@ -4,28 +4,29 @@
     "role": "reviewer",
     "session_id": "s-0-36-incomplete-rev"
   },
-  "at": "2026-11-04T11:38:53.826813Z",
-  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "at": "2026-11-04T12:26:19.977645Z",
+  "code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
   "kind": "review",
-  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pin": "b035f391c65c74aa551aea300b85201ba9d933fd",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_incomplete_04_a_hook_install_that_stops_after_the_first_file_is_incomplete_and_one_that_wrote_nothing_is_write_failed"
+          "junit:atip_incomplete_04_a_hook_install_that_stops_after_the_first_file_is_incomplete_and_one_that_wrote_nothing_is_write_failed",
+          "junit:atip_incomplete_04_a_script_write_that_fails_after_both_hook_files_is_incomplete"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "19caa4d27c411b3fbd39f3d5f782a2560c411605d5aaad170c0eaae20a93f019",
+    "scenario_digest": "6afae59098c21a60cf890cd2d2b40f71afb1aafbc68243d6c1ba4e41271f71e6",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
   },
-  "review_id": "01M6K5NP02SR1SM0J656B8CE9E",
+  "review_id": "01M6K8CHE9NHVTG87SCKBSAG2G",
   "reviewer": "rev-0-36-incomplete",
   "scenario_id": "atip.incomplete.04",
   "schema": 2,

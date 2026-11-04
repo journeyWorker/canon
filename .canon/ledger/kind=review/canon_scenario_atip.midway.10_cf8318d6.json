@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-36-incomplete-rev"
   },
-  "at": "2026-11-04T11:38:53.826813Z",
-  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "at": "2026-11-04T12:26:19.977645Z",
+  "code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
   "kind": "review",
-  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pin": "b035f391c65c74aa551aea300b85201ba9d933fd",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_incomplete_03_an_artifact_store_that_stops_after_a_blob_is_incomplete_and_the_same_call_finishes"
+          "junit:atip_midway_10_the_io_failure_codes_keep_their_names_exits_and_retryability"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "36d8aef04ada89f3a4a426d4038adf1fa4aa419de88251465de55796ccd39a37",
+    "scenario_digest": "4b41a28a574db02e97dc46d1f8142878358dfb5c17b5bb6e1deceb30ab7f1120",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
   },
-  "review_id": "01M6K5NP02SR1SM0J656B8CE9E",
+  "review_id": "01M6K8CHE9NHVTG87SCKBSAG2G",
   "reviewer": "rev-0-36-incomplete",
-  "scenario_id": "atip.incomplete.03",
+  "scenario_id": "atip.midway.10",
   "schema": 2,
   "worktree_dirty": false
 }

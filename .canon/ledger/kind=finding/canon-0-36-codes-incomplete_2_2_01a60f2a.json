@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:25:24.492131Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "disposition": "open",
+  "introduced_by": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "kind": "finding",
+  "reviewed_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 2,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[standards] Leftovers, all trivial. (1) Two layout-only hunks remain from the cargo fmt run: src/init.rs 618-622 (the `\"CONFIG_INVALID\" | ... =>` arm became a block with a chained `.hint().reason()` on three lines) and src/gate.rs 1137-1141 (`read_first(` split over three lines), plus a blank line added in src/tier.rs:87; the token check of the round-1 script finds about 7 lines in all, the other 8 it flags are moved lines, not layout. (2) tests/artifacts_object_store.rs:559 still says `ARTIFACTS_INCOMPLETE` in a doc comment (the code is ARTIFACTS_MOVE_INCOMPLETE). (3) `WRITE_FAILED`, an exit-1 failure code, is now the one reason of seven INCOMPLETE codes (CHANGE_ADOPTION, HOOKS_INSTALL, LEDGER_COMPACT, PLUGIN_SYNC, RETENTION_PURGE, TIER and, with REPO_*, LEDGER_COMPACT); a reason is 'a situation that needs a different next action' (7.6) and a registry row with one reason that equals the code's only situation says nothing, and 8.3.2 reserves reason for the refused code. It breaks nothing (a reason changes neither exit nor retryability, and the contract does not say a reason must be a refusal) and it satisfies brief F6; canon-0-36-code-reasons owns the reason names, so let it decide whether these rows keep one WRITE_FAILED reason or none.",
+  "worktree_dirty": false
+}

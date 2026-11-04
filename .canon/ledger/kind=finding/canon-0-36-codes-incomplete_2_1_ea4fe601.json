@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-36-incomplete",
+    "role": "reviewer",
+    "session_id": "s-0-36-incomplete-rev"
+  },
+  "at": "2026-11-04T12:25:18.889747Z",
+  "change_id": "canon-0-36-codes-incomplete",
+  "code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/inventory.rs:40-55",
+  "introduced_by": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "kind": "finding",
+  "reviewed_sha": "73e2b1a00b65b7309df366ecc4d2b1c3aa2a538d",
+  "reviewer": "rev-0-36-incomplete",
+  "round": 2,
+  "scenario_ids": [
+    "atip.incomplete.09"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] A sync that indexed nothing because a root fails its checks is answered INVENTORY_CHECK_FAILED at exit 1 with `data.roots`; it should be a refusal at exit 2 (INVENTORY_INVALID, the user-edited spec files) with the per-root violations in `error.details[]`. Reading of the contract (atip 1.4.2, spec/atip-1.md): 7.2.2 says a verdict the command must pass before its work (a gate, an approval, a check of its input or state) is a precondition (8.3) and refuses with exit 2 and a refusal condition, 'whatever the command calls it', and only 'a check whose negative answer is its ordinary result' reports in data with exit 0 or a FAILED code. `inventory sync` is a write command that indexes; the corpus being valid is the precondition of its work, not its result (the checks are `format`, `gate check`, `brief check`, which keep their exit-1 answers). 8.3 draws the line at 'did it run': a sync that indexed nothing did not. The same call also proves the point from the other side: 8.3.2 says INCOMPLETE's `reason` is 'the refused code alone', i.e. the refusal the later step met; the same corpus fault met after an earlier root was indexed is INVENTORY_INCOMPLETE, so the same fault met first must be that refusal at exit 2, and the INCOMPLETE reasons should be INVENTORY_INVALID (not VIOLATIONS/DUPLICATE_SCENARIOS, which are no refusal code; `data.roots` already names the violations and the duplicates). The implementer's objection that exit 2 'cannot carry data' does not hold in canon: refusals already carry causes in `details[]` (`gate promote` -> PROMOTION_INVALID with details, observed in round 1), and a preview of the same corpus then agrees with `init --dry-run` (exit 2 for the refusal a commit would meet first). Live: single root with a missing provenance line -> exit 1 INVENTORY_CHECK_FAILED, reason VIOLATIONS, data.roots, nothing created (the round-1 defect is fixed). Fix: INVENTORY_INVALID at exit 2 with details for a sync/preview that indexed nothing (a refusal carries no data), keep INVENTORY_INCOMPLETE (exit 1, data.roots) when an earlier root was indexed with the reason INVENTORY_INVALID, drop INVENTORY_CHECK_FAILED, update atip.incomplete.09, the registry, schema_codes, fixture and CHANGELOG. atip.incomplete.09 stays unsigned until then; if the owner rules that `inventory sync` is a check, the scenario text as it stands is signable.",
+  "worktree_dirty": false
+}

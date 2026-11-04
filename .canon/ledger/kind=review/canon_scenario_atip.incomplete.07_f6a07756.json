@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-36-incomplete-rev"
   },
-  "at": "2026-11-04T11:38:53.826813Z",
-  "code_tree": "69f874b97c5fe2773072f357faa2a411970ba5f2",
+  "at": "2026-11-04T12:26:19.977645Z",
+  "code_tree": "e8555372c943079ef45bf3cbe3f84e8927326853",
   "kind": "review",
-  "pin": "27962f49b807f24d807b4e74b22746a9edb0225c",
+  "pin": "b035f391c65c74aa551aea300b85201ba9d933fd",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:atip_incomplete_05_a_purge_that_stops_after_it_deleted_is_incomplete_and_its_digest_is_stale"
+          "junit:atip_incomplete_07_tier_aging_that_stops_after_records_moved_is_incomplete_and_one_that_moved_none_is_failed"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "7b364d0c602b482d7fc6687fda6e100522c333740f7ff06349089bd4ad9dd25c",
+    "scenario_digest": "fccbcbfe4761da620d8e3e41989b5176c215727e4a92c937a2f1e01eebfd2fcb",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-36-codes-incomplete/brief.md"
   },
-  "review_id": "01M6K5NP02SR1SM0J656B8CE9E",
+  "review_id": "01M6K8CHE9NHVTG87SCKBSAG2G",
   "reviewer": "rev-0-36-incomplete",
-  "scenario_id": "atip.incomplete.05",
+  "scenario_id": "atip.incomplete.07",
   "schema": 2,
   "worktree_dirty": false
 }
