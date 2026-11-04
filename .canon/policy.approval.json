@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-04T03:23:07Z",
-  "note": "휴가 중 승인 위임(2026-11-01 대화): STOPPED_MIDWAY 대체 범위를 실제 emitter 전부로 넓힘(리뷰 codes-exit 4)",
+  "approved_at": "2026-11-04T16:41:36Z",
+  "note": "휴가 중 승인 위임(2026-11-01 대화): 공유 옵션이 트리로 모여 트리는 커질 수 있음, 트리+명령 합 기준으로 조정",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",
