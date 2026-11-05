@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-claim-1-5",
+    "role": "reviewer",
+    "session_id": "s-0-37-claim15-rev"
+  },
+  "at": "2026-11-05T13:41:26.995994Z",
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "kind": "review",
+  "pin": "64924a3a7cc5f0535e51272b01b53e07f0d5f3da",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim14_11_the_consumers_declare_1_5_and_state_no_old_form_member_as_current"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "c2edc212c8f5461c358f4883568c91052425688747ffa4d3e8601e53b1477ff6",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-claim-1-5/brief.md"
+  },
+  "review_id": "01M6NZ2STK1KWC4N4BK5GAG67F",
+  "reviewer": "rev-0-37-claim-1-5",
+  "scenario_id": "atip.claim14.11",
+  "schema": 2,
+  "worktree_dirty": false
+}
