@@ -164,14 +164,31 @@ fn golden() -> Vec<(String, Vec<String>)> {
 /// `white_space_0_36.json` names the same list under `changedBy037`.
 const OPTION_VALUES_OPTIONS: [&str; 6] = ["actor", "approver", "relayed-via", "reason", "summary", "override-reason"];
 
-/// How many of the 59 places of the golden file hold one of those options, how many distinct patterns of the unchanged places are compared with their new spelling,
+/// The time options and the provider list that `canon-0-37-option-forms` narrowed to RFC 3339 and to the exact names. A place of the golden file that holds one has a
+/// pattern that deliberately refuses what 0.36.0 took (white space, a one-digit month, a sign on the year, a date alone for `--approval-at`, a capital in a provider),
+/// and says it without the white-space property, so it is not held to the old pattern (`atip.optionforms.*` hold it; `white_space_0_36.json` names the list under
+/// `changedBy037Forms`).
+const OPTION_FORMS_OPTIONS: [&str; 7] = ["approval-at", "expiry", "as-of", "before", "after", "since", "providers"];
+
+/// How many of the 59 places of the golden file hold an option of each change, how many distinct patterns of the unchanged places are compared with their new spelling,
 /// and how many distinct patterns that name white space the build declares now.
-const CHANGED_PLACES: usize = 17;
-const DISTINCT_COMPARED: usize = 12;
-const DISTINCT_NOW: usize = 13;
+const VALUES_PLACES: usize = 17;
+const FORMS_PLACES: usize = 13;
+const CHANGED_PLACES: usize = VALUES_PLACES + FORMS_PLACES;
+const DISTINCT_COMPARED: usize = 10;
+const DISTINCT_NOW: usize = 11;
 
 fn changed_by_option_values(place: &str) -> bool {
     place.rsplit_once(" --").is_some_and(|(_, option)| OPTION_VALUES_OPTIONS.contains(&option))
+}
+
+fn changed_by_option_forms(place: &str) -> bool {
+    place.rsplit_once(" --").is_some_and(|(_, option)| OPTION_FORMS_OPTIONS.contains(&option))
+}
+
+/// A place of the golden file that a 0.37 change re-declared on purpose.
+fn changed_by_037(place: &str) -> bool {
+    changed_by_option_values(place) || changed_by_option_forms(place)
 }
 
 /// The places that had no pattern with white space in 0.36.0 and have the text pattern or the regime key now.
@@ -466,13 +483,24 @@ fn atip_claim15_03_no_declared_pattern_lists_white_space_and_each_says_it_as_the
     // The places 0.36.0 listed white space are the places that say the property now, and no place gained or lost one; the places of the six name and sentence options
     // (`canon-0-37-option-values`) say the one text pattern, and they and the regime key of `dispatch begin` are the only places that gained one.
     let golden = golden();
-    let before: BTreeSet<&String> = golden.iter().flat_map(|(_, places)| places).filter(|place| !changed_by_option_values(place)).collect();
+    let before: BTreeSet<&String> = golden.iter().flat_map(|(_, places)| places).filter(|place| !changed_by_037(place)).collect();
     let after: BTreeSet<&String> = declared.iter().filter(|(place, pattern)| pattern.contains("White_Space") && !new_in_option_values(place)).map(|(place, _)| place).collect();
     assert_eq!(before, after, "the declarations that name white space are the ones that did");
     assert_eq!((golden.iter().map(|(_, places)| places.len()).sum::<usize>(), golden.len()), (59, 17), "59 declarations, 17 distinct patterns of 0.36.0");
-    assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| changed_by_option_values(place)).count(), CHANGED_PLACES);
+    assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| changed_by_option_values(place)).count(), VALUES_PLACES);
+    assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| changed_by_option_forms(place)).count(), FORMS_PLACES);
     for (place, pattern) in declared.iter().filter(|(place, _)| changed_by_option_values(place)) {
         assert!(pattern.contains("[^\\p{Cc}\\p{Zl}\\p{Zp}]"), "`{place}` declares the one text pattern of 0.37: {pattern}");
+    }
+    for (place, pattern) in declared.iter().filter(|(place, _)| changed_by_option_forms(place)) {
+        let want = if place.ends_with("--providers") {
+            canon_cli::arg_rules::PROVIDERS
+        } else if place.ends_with("--approval-at") {
+            canon_cli::arg_rules::DATE_TIME
+        } else {
+            canon_cli::arg_rules::TIMESTAMP
+        };
+        assert_eq!(pattern, want, "`{place}` declares the RFC 3339 or the provider pattern of 0.37");
     }
     let distinct: BTreeSet<&String> = declared.iter().filter(|(_, pattern)| pattern.contains("White_Space")).map(|(_, pattern)| pattern).collect();
     assert_eq!(distinct.len(), DISTINCT_NOW, "the distinct patterns now: {distinct:#?}");
@@ -497,7 +525,7 @@ fn atip_claim15_04_each_pattern_takes_and_refuses_the_values_it_did_in_0_36() {
     let mut compared = BTreeSet::new();
     let mut places = 0;
     for (old, at) in &golden {
-        for place in at.iter().filter(|place| !changed_by_option_values(place)) {
+        for place in at.iter().filter(|place| !changed_by_037(place)) {
             let new = declared.get(place).unwrap_or_else(|| panic!("`{place}` is declared"));
             places += 1;
             if !compared.insert((old.clone(), new.clone())) {
@@ -682,7 +710,7 @@ fn atip_claim15_08_a_1_4_profile_reads_the_property_as_a_problem_and_a_compile_o
     let sample: Vec<String> = CORPUS.iter().step_by(4).cloned().collect();
     let mut by_new: BTreeMap<&String, &String> = BTreeMap::new();
     for (old, at) in &golden {
-        for place in at.iter().filter(|place| !changed_by_option_values(place)) {
+        for place in at.iter().filter(|place| !changed_by_037(place)) {
             by_new.insert(&declared[place], old);
         }
     }

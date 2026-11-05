@@ -280,10 +280,19 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
     assert!(problems.is_empty(), "{} problems, the first ten:\n{}", problems.len(), problems.iter().take(10).cloned().collect::<Vec<_>>().join("\n"));
 }
 
-/// atip.constraints.06: the time pattern admits everything the parser accepts (it states the shape; the calendar is a validator's).
+/// atip.constraints.06: the time patterns are the shape the parsers read (the calendar is a validator's): each pattern admits everything its parser accepts, and
+/// refuses nothing of the parser's but a date or a time that is not on the calendar (0.37: RFC 3339 only).
 #[test]
 fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
-    let pattern = canon_cli::arg_rules::TIMESTAMP;
+    for (pattern, parse) in [
+        (canon_cli::arg_rules::TIMESTAMP, canon_cli::timestamp::parse as fn(&str) -> Result<chrono::DateTime<chrono::Utc>, canon_cli::timestamp::TimestampError>),
+        (canon_cli::arg_rules::DATE_TIME, canon_cli::timestamp::parse_date_time),
+    ] {
+        time_pattern_is_the_shape(pattern, parse);
+    }
+}
+
+fn time_pattern_is_the_shape(pattern: &str, parse: fn(&str) -> Result<chrono::DateTime<chrono::Utc>, canon_cli::timestamp::TimestampError>) {
     assert_eq!(atip::domain::pattern_problem(pattern, declared()), None);
     let alphabet: Vec<char> = "0123456789-:TtZz+ .\u{2212}\u{a0}\n".chars().collect();
     let mut state = 0x9E37_79B9_7F4A_7C15_u64;
@@ -295,7 +304,7 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     };
     let compiled = atip::domain::compile(&json!({ "pattern": pattern })).expect("the pattern compiles");
     let mut problems = Vec::new();
-    let mut seeds: Vec<String> = ["2030-01-01", "2030-1-1", " 2030-01-01", "2030-01-01T10:00:00Z", "2030-01-01t10:00:00z", "2030-01-01 10:00:00+02:00", "2030-01-01T10:00:00.123456789\u{2212}02:00", "0001-01-01T00:00:00+00:00", "2030-01-01T10:00:60Z", "+2030-01-01", "-0001-01-01", "99999-12-31", "2030-01-01T24:00:00Z"].iter().map(ToString::to_string).collect();
+    let mut seeds: Vec<String> = ["2030-01-01", "2030-1-1", " 2030-01-01", "2030-01-01T10:00:00Z", "2030-01-01t10:00:00z", "2030-01-01 10:00:00+02:00", "2030-01-01T10:00:00.123456789\u{2212}02:00", "2030-01-01T10:00:00.123456789-02:00", "0001-01-01T00:00:00+00:00", "2030-01-01T10:00:60Z", "+2030-01-01", "-0001-01-01", "99999-12-31", "2030-01-01T24:00:00Z", "2026-02-30", "2026-02-30T10:00:00Z", "2030-01-01T10:00:00+24:00"].iter().map(ToString::to_string).collect();
     for _ in 0..60_000 {
         let length = 6 + next(26);
         seeds.push((0..length).map(|_| alphabet[next(alphabet.len())]).collect());
@@ -315,10 +324,18 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     }
     let mut accepted = 0;
     for candidate in seeds {
-        if canon_cli::timestamp::parse(&candidate).is_ok() {
+        let parsed = parse(&candidate);
+        let admitted = compiled.admits(&json!(candidate));
+        if parsed.is_ok() {
             accepted += 1;
-            if !compiled.admits(&json!(candidate)) {
+            if !admitted {
                 problems.push(format!("the parser accepts {candidate:?} and the pattern refuses it"));
+            }
+        }
+        // What the pattern admits and the parser refuses is a date or a time that does not exist, which the calendar's refusal says (it has a cause).
+        if let (true, Err(error)) = (admitted, &parsed) {
+            if std::error::Error::source(error).is_none() {
+                problems.push(format!("the pattern admits {candidate:?} and the parser refuses its spelling"));
             }
         }
     }
@@ -755,7 +772,9 @@ fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_
 fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and_the_constraints() {
     let implementer = Some("implementer");
     // A broken constraint (the four approval options go together) and an impossible date: the constraint answers.
-    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30", implementer), "EVIDENCE_APPROVAL_REQUIRED", "--approval-role");
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30T10:00:00Z", implementer), "EVIDENCE_APPROVAL_REQUIRED", "--approval-role");
+    // A date alone is no date-time: the domain of `--approval-at` refuses it before the constraint (0.37).
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-01", implementer), "USAGE", "--approval-at");
     // A broken domain (the shape of a time) before the calendar, a calendar when nothing else is broken.
     assert_refused(&empty("canon query --kind change --since tomorrow", None), "USAGE", "--since");
     let shape = empty("canon query --kind change --since tomorrow", None);

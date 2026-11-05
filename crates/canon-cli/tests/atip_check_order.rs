@@ -618,7 +618,7 @@ fn atip_checkorder_11_the_field_of_each_kind_of_rule_follows_the_contracts_table
     assert_answer(&empty("canon evidence add --scenario auth.login.01", &implementer), "USAGE", "--class");
     assert_answer(&empty("canon evidence add --scenario auth.login.01 --class test-run", &implementer), "USAGE", "--ref");
     assert_answer(&empty("canon evidence add --class test-run --ref r", &implementer), "EVIDENCE_REQUIRED", "--task");
-    assert_answer(&empty("canon evidence approval-payload --approver a --approval-at 2030-01-01", &implementer), "EVIDENCE_REQUIRED", "--task");
+    assert_answer(&empty("canon evidence approval-payload --approver a --approval-at 2030-01-01T00:00:00Z", &implementer), "EVIDENCE_REQUIRED", "--task");
 }
 
 /// atip.checkorder.12 (every rule): the answer for each rule of each command is the code of the rule and the field the table names for

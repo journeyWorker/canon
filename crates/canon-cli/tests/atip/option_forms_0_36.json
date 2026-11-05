@@ -1,0 +1,1942 @@
+{
+ "_about": "What canon 0.36.0 accepted for the values `canon-0-37-option-forms` narrows (`atip.optionforms.13`): per option and value class, the commands whose argument stage (the value parser, the declared domain and the validators, which run before any state is read) took a value of that class. Measured on the released 0.36.0 binary (`canon 0.36.0`), one run per command and value on a copy of the story repository (`init` in a new git directory), a value counting as taken when the call was not refused with `--<option>` as its field (`init` names no field: `INIT_ARGUMENT_INVALID` counts as a refusal of `--providers`). `strategy approval-payload` and `strategy rollback` were run on a strategy id the repository does not hold, so only the argument stage was measured, not the later reads. `refused` lists the values 0.36.0 turned away already, so a class that 0.37 refuses and 0.36.0 refused too is not a row of the CHANGELOG. `atip.optionforms.13` holds the CHANGELOG to this file: every value of `accepted` that the build refuses now has a row.",
+ "classes": {
+  "date-only": "a date with no time (`2030-01-01`)",
+  "leading-space": "white space before the value",
+  "space-inside": "white space between the parts of a date",
+  "one-digit-month": "a month of one digit (`2030-1-01`)",
+  "one-digit-day": "a day of one digit (`2030-01-1`)",
+  "signed-year": "a sign on the year (`+2030-01-01`)",
+  "year-not-4-digits": "a year of fewer than four digits (`230-01-01`)",
+  "space-separator": "a space for the `T` between the date and the time",
+  "unicode-minus": "U+2212, the minus sign, for the `-` of an offset",
+  "lowercase-t-z": "a lowercase `t` or `z` (RFC 3339 reads them: 0.37 still takes them)",
+  "date-time": "a date-time spelled as RFC 3339 writes it (0.37 takes it)",
+  "fraction": "a date-time with a fraction of a second (0.37 takes it)",
+  "trailing-space": "white space after the value",
+  "no-seconds": "a time without seconds (`10:00`)",
+  "no-offset": "a time without an offset",
+  "offset-without-colon": "an offset without its colon (`+0200`)",
+  "valid": "a list RFC-exact: `claude`, `claude,omp`, `none` (0.37 takes it)",
+  "empty": "an empty value (0.36.0: no provider)",
+  "blank": "only white space (0.36.0: no provider)",
+  "uppercase": "an uppercase letter in a name or in `none` (`Claude`, `NONE`)",
+  "empty-item": "an empty item (`claude,,pi`, `claude,`, `,omp`)",
+  "space-around": "white space around the value or an item (` claude`, `claude, pi`)",
+  "none-with-names": "`none` beside a name (`none,claude`)",
+  "unknown": "a name that is no provider (`gemini`)",
+  "duplicate": "one name twice (`claude,claude`; 0.37 takes it: the brief does not refuse it)"
+ },
+ "accepted": [
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "date-only",
+   "value": "2030-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00+09:00",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00Z",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "fraction",
+   "value": "2030-01-01T10:00:00.123456789Z",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "leading-space",
+   "value": "\t2030-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "leading-space",
+   "value": " 2030-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "leading-space",
+   "value": "\u00a02030-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "lowercase-t-z",
+   "value": "2030-01-01t10:00:00z",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "one-digit-day",
+   "value": "2030-01-1",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "one-digit-month",
+   "value": "2030-1-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "signed-year",
+   "value": "+0001-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "signed-year",
+   "value": "+2030-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "signed-year",
+   "value": "-0001-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "space-inside",
+   "value": "2030-\t01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "space-inside",
+   "value": "2030- 01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "space-inside",
+   "value": "2030-01- 01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00.5-02:00",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00Z",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "unicode-minus",
+   "value": "2030-01-01T10:00:00\u221202:00",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "year-not-4-digits",
+   "value": "230-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "date-only",
+   "value": "2030-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00+09:00",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00Z",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "fraction",
+   "value": "2030-01-01T10:00:00.123456789Z",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "leading-space",
+   "value": "\t2030-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "leading-space",
+   "value": " 2030-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "leading-space",
+   "value": "\u00a02030-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "lowercase-t-z",
+   "value": "2030-01-01t10:00:00z",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "one-digit-day",
+   "value": "2030-01-1",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "one-digit-month",
+   "value": "2030-1-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "signed-year",
+   "value": "+0001-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "signed-year",
+   "value": "+2030-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "signed-year",
+   "value": "-0001-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "space-inside",
+   "value": "2030-\t01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "space-inside",
+   "value": "2030- 01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "space-inside",
+   "value": "2030-01- 01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00.5-02:00",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00Z",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "unicode-minus",
+   "value": "2030-01-01T10:00:00\u221202:00",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "year-not-4-digits",
+   "value": "230-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "date-only",
+   "value": "2030-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00+09:00",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00Z",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "fraction",
+   "value": "2030-01-01T10:00:00.123456789Z",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "leading-space",
+   "value": "\t2030-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "leading-space",
+   "value": " 2030-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "leading-space",
+   "value": "\u00a02030-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "lowercase-t-z",
+   "value": "2030-01-01t10:00:00z",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "one-digit-day",
+   "value": "2030-01-1",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "one-digit-month",
+   "value": "2030-1-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "signed-year",
+   "value": "+0001-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "signed-year",
+   "value": "+2030-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "signed-year",
+   "value": "-0001-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "space-inside",
+   "value": "2030-\t01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "space-inside",
+   "value": "2030- 01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "space-inside",
+   "value": "2030-01- 01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00.5-02:00",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00Z",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "unicode-minus",
+   "value": "2030-01-01T10:00:00\u221202:00",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "year-not-4-digits",
+   "value": "230-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "date-only",
+   "value": "2030-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00+09:00",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00Z",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "fraction",
+   "value": "2030-01-01T10:00:00.123456789Z",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "leading-space",
+   "value": "\t2030-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "leading-space",
+   "value": " 2030-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "leading-space",
+   "value": "\u00a02030-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "lowercase-t-z",
+   "value": "2030-01-01t10:00:00z",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "one-digit-day",
+   "value": "2030-01-1",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "one-digit-month",
+   "value": "2030-1-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "signed-year",
+   "value": "+0001-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "signed-year",
+   "value": "+2030-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "signed-year",
+   "value": "-0001-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "space-inside",
+   "value": "2030-\t01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "space-inside",
+   "value": "2030- 01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "space-inside",
+   "value": "2030-01- 01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00.5-02:00",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00Z",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "unicode-minus",
+   "value": "2030-01-01T10:00:00\u221202:00",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "year-not-4-digits",
+   "value": "230-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "date-only",
+   "value": "2030-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00+09:00",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00Z",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "fraction",
+   "value": "2030-01-01T10:00:00.123456789Z",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "leading-space",
+   "value": "\t2030-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "leading-space",
+   "value": " 2030-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "leading-space",
+   "value": "\u00a02030-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "lowercase-t-z",
+   "value": "2030-01-01t10:00:00z",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "one-digit-day",
+   "value": "2030-01-1",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "one-digit-month",
+   "value": "2030-1-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "signed-year",
+   "value": "+0001-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "signed-year",
+   "value": "+2030-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "signed-year",
+   "value": "-0001-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "space-inside",
+   "value": "2030-\t01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "space-inside",
+   "value": "2030- 01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "space-inside",
+   "value": "2030-01- 01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00.5-02:00",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00Z",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "unicode-minus",
+   "value": "2030-01-01T10:00:00\u221202:00",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "year-not-4-digits",
+   "value": "230-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "blank",
+   "value": "\t",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "blank",
+   "value": "  ",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "duplicate",
+   "value": "claude,claude",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "empty",
+   "value": "",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "empty-item",
+   "value": ",omp",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "empty-item",
+   "value": "claude,",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "empty-item",
+   "value": "claude,,pi",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "space-around",
+   "value": " claude",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "space-around",
+   "value": " none",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "space-around",
+   "value": "claude ",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "space-around",
+   "value": "claude ,pi",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "space-around",
+   "value": "claude, pi",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "space-around",
+   "value": "none ",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "uppercase",
+   "value": "Claude",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "uppercase",
+   "value": "NONE",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "uppercase",
+   "value": "None",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "valid",
+   "value": "claude",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "valid",
+   "value": "claude,omp",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "valid",
+   "value": "none",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "date-only",
+   "value": "2030-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00+09:00",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "date-time",
+   "value": "2030-01-01T10:00:00Z",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "fraction",
+   "value": "2030-01-01T10:00:00.123456789Z",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "leading-space",
+   "value": "\t2030-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "leading-space",
+   "value": " 2030-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "leading-space",
+   "value": "\u00a02030-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "lowercase-t-z",
+   "value": "2030-01-01t10:00:00z",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "one-digit-day",
+   "value": "2030-01-1",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "one-digit-month",
+   "value": "2030-1-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "signed-year",
+   "value": "+0001-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "signed-year",
+   "value": "+2030-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "signed-year",
+   "value": "-0001-01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "space-inside",
+   "value": "2030-\t01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "space-inside",
+   "value": "2030- 01-01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "space-inside",
+   "value": "2030-01- 01",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00.5-02:00",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "space-separator",
+   "value": "2030-01-01 10:00:00Z",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "unicode-minus",
+   "value": "2030-01-01T10:00:00\u221202:00",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "year-not-4-digits",
+   "value": "230-01-01",
+   "commands": [
+    "query"
+   ]
+  }
+ ],
+ "refused": [
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "leading-space",
+   "value": " 2030-01-01T10:00:00Z",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "no-offset",
+   "value": "2030-01-01T10:00:00",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "no-seconds",
+   "value": "2030-01-01T10:00Z",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "offset-without-colon",
+   "value": "2030-01-01T10:00:00+0200",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "trailing-space",
+   "value": "2030-01-01 ",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "trailing-space",
+   "value": "2030-01-01T10:00:00Z ",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "after",
+   "class": "year-not-4-digits",
+   "value": "20300-01-01",
+   "commands": [
+    "export"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "leading-space",
+   "value": " 2030-01-01T10:00:00Z",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "no-offset",
+   "value": "2030-01-01T10:00:00",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "no-seconds",
+   "value": "2030-01-01T10:00Z",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "offset-without-colon",
+   "value": "2030-01-01T10:00:00+0200",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "trailing-space",
+   "value": "2030-01-01 ",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "trailing-space",
+   "value": "2030-01-01T10:00:00Z ",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "approval-at",
+   "class": "year-not-4-digits",
+   "value": "20300-01-01",
+   "commands": [
+    "evidence add",
+    "evidence approval-payload",
+    "strategy approval-payload",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "leading-space",
+   "value": " 2030-01-01T10:00:00Z",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "no-offset",
+   "value": "2030-01-01T10:00:00",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "no-seconds",
+   "value": "2030-01-01T10:00Z",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "offset-without-colon",
+   "value": "2030-01-01T10:00:00+0200",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "trailing-space",
+   "value": "2030-01-01 ",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "trailing-space",
+   "value": "2030-01-01T10:00:00Z ",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "as-of",
+   "class": "year-not-4-digits",
+   "value": "20300-01-01",
+   "commands": [
+    "divergence list"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "leading-space",
+   "value": " 2030-01-01T10:00:00Z",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "no-offset",
+   "value": "2030-01-01T10:00:00",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "no-seconds",
+   "value": "2030-01-01T10:00Z",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "offset-without-colon",
+   "value": "2030-01-01T10:00:00+0200",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "trailing-space",
+   "value": "2030-01-01 ",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "trailing-space",
+   "value": "2030-01-01T10:00:00Z ",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "before",
+   "class": "year-not-4-digits",
+   "value": "20300-01-01",
+   "commands": [
+    "export",
+    "purge"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "leading-space",
+   "value": " 2030-01-01T10:00:00Z",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "no-offset",
+   "value": "2030-01-01T10:00:00",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "no-seconds",
+   "value": "2030-01-01T10:00Z",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "offset-without-colon",
+   "value": "2030-01-01T10:00:00+0200",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "trailing-space",
+   "value": "2030-01-01 ",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "trailing-space",
+   "value": "2030-01-01T10:00:00Z ",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "expiry",
+   "class": "year-not-4-digits",
+   "value": "20300-01-01",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "empty-item",
+   "value": ",",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "none-with-names",
+   "value": "claude,none",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "none-with-names",
+   "value": "none,claude",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "unknown",
+   "value": "claude,gemini",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "providers",
+   "option": "providers",
+   "class": "unknown",
+   "value": "gemini",
+   "commands": [
+    "init",
+    "skills check",
+    "skills doctor",
+    "skills install"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "leading-space",
+   "value": " 2030-01-01T10:00:00Z",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "no-offset",
+   "value": "2030-01-01T10:00:00",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "no-seconds",
+   "value": "2030-01-01T10:00Z",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "offset-without-colon",
+   "value": "2030-01-01T10:00:00+0200",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "trailing-space",
+   "value": "2030-01-01 ",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "trailing-space",
+   "value": "2030-01-01T10:00:00Z ",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "time",
+   "option": "since",
+   "class": "year-not-4-digits",
+   "value": "20300-01-01",
+   "commands": [
+    "query"
+   ]
+  }
+ ]
+}

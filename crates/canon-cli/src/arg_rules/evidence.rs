@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, CALENDAR, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE, VIA_DESCRIPTION};
+use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, CALENDAR, CALENDAR_DATE_TIME, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE, VIA_DESCRIPTION};
 
 /// A risk surface that is not empty, is trimmed and carries no `\n`, `\r` or NUL (the shape every `--surface-ref` has; the
 /// `effect:` form and the path rules are the validator's).
@@ -129,8 +129,8 @@ pub(crate) static TABLES: Tables = Tables {
                 Validator {
                     arguments: &["approval-at"],
                     code: "USAGE",
-                    description: CALENDAR,
-                    rejects: &["canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30"],
+                    description: CALENDAR_DATE_TIME,
+                    rejects: &["canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"],
                 },
                 Validator {
                     arguments: &["surface-ref"],
@@ -174,8 +174,8 @@ pub(crate) static TABLES: Tables = Tables {
                 Validator {
                     arguments: &["approval-at"],
                     code: "USAGE",
-                    description: CALENDAR,
-                    rejects: &["canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30"],
+                    description: CALENDAR_DATE_TIME,
+                    rejects: &["canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30T10:00:00Z"],
                 },
                 Validator {
                     arguments: &["surface-ref"],

@@ -109,8 +109,8 @@ pub(crate) static TABLES: Tables = Tables {
             &[Validator {
                 arguments: &["approval-at"],
                 code: "USAGE",
-                description: super::CALENDAR,
-                rejects: &["canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30 --json"],
+                description: super::CALENDAR_DATE_TIME,
+                rejects: &["canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30T10:00:00Z --json"],
             }],
         ),
         (
@@ -118,8 +118,8 @@ pub(crate) static TABLES: Tables = Tables {
             &[Validator {
                 arguments: &["approval-at"],
                 code: "USAGE",
-                description: super::CALENDAR,
-                rejects: &["canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30"],
+                description: super::CALENDAR_DATE_TIME,
+                rejects: &["canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"],
             }],
         ),
     ],

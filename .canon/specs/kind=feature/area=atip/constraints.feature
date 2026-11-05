@@ -68,7 +68,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   @atip.constraints.07
   Scenario: Every validator refuses every call it rejects with its code, and an impossible calendar date is refused by all 12 time options
     Given a built canon and the story repo
-    When the rejects call of every validator runs, and --since, --before, --after, --expiry, --as-of and --approval-at are each given 2026-02-30
+    When the rejects call of every validator runs, and --since, --before, --after, --expiry and --as-of are each given 2026-02-30 and --approval-at, which takes a date-time, is given 2026-02-30T10:00:00Z
     Then every rejects call exits 2 with the validator's code and a field that is one of its arguments and writes nothing; each of the 12 time options is named by the calendar validator of its command and refuses the date
 
   # canon: {"schema":1,"at":"2026-11-01T11:00:15Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}

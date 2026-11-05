@@ -179,6 +179,9 @@ decode한 뒤 외부에서
 `ssh-keygen -Y sign -n canon-learning-approval-v1`으로 서명합니다.
 Armored detached signature를 `PromotionApproval.signature`에 넣고
 `signer_key`를 principal과 같게 하며 `approver_role: human`을 사용합니다.
+`--approval-at`은 RFC 3339 date-time(`2026-10-02T12:00:00Z`, 날짜만 쓰면
+거절됩니다)이며 canon이 직접 찍지 않으므로, 한 번 정해 서명과
+`canon strategy rollback`에 같은 값을 씁니다.
 서명되는 canonical JSON은 다음과 같습니다:
 
 ```json

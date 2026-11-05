@@ -275,8 +275,9 @@ mod tests {
             for place in entry["at"].as_array().expect("places") {
                 let place = place.as_str().expect("a place");
                 let (owner, name) = place.rsplit_once(' ').expect("a place names its owner and its argument");
-                // The six name and sentence options have one text domain since 0.37 (`canon-0-37-option-values`) and say what it says, which is its own sentence.
-                if ["--actor", "--approver", "--relayed-via", "--reason", "--summary", "--override-reason"].contains(&name) {
+                // The six name and sentence options have one text domain since 0.37 (`canon-0-37-option-values`) and say what it says, which is its own sentence; the time
+                // options and the provider list have the RFC 3339 and exact-name patterns (`canon-0-37-option-forms`), which name no white space.
+                if ["--actor", "--approver", "--relayed-via", "--reason", "--summary", "--override-reason", "--approval-at", "--expiry", "--as-of", "--before", "--after", "--since", "--providers"].contains(&name) {
                     changed += 1;
                     continue;
                 }
@@ -299,7 +300,7 @@ mod tests {
                 compared += 1;
             }
         }
-        assert_eq!((compared, changed), (42, 17), "the 59 places that listed white space: 42 keep their wording, 17 hold a name or a sentence option");
+        assert_eq!((compared, changed), (29, 30), "the 59 places that listed white space: 29 keep their wording, 17 hold a name or a sentence option and 13 a time option or the provider list");
     }
 
     /// atip.checkorder.16: a domain judges the argument object (the value given, else the environment's, else the default), a constraint

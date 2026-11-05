@@ -24,10 +24,10 @@ use tempfile::TempDir;
 const GOLDEN: &str = "crates/canon-cli/tests/atip/option_values_0_36.json";
 
 /// The names of the options whose commands do not share a domain or a set of values, and why: each is a decision of another change.
-const ALLOWED: &[(&str, &str)] = &[
-    ("kind", "the set of values differs by command (the contract's L1.one-meaning-values asks for one meaning, as a SHOULD; a change of its own)"),
-    ("providers", "`init --providers` and the skills commands (`canon-0-37-option-forms`)"),
-];
+const ALLOWED: &[(&str, &str)] = &[("kind", "the set of values differs by command (the contract's L1.one-meaning-values asks for one meaning, as a SHOULD; a change of its own)")];
+
+/// The options of `canon-0-37-option-forms`: the rows of the CHANGELOG table that name them are held to that change's own golden file (`atip_optionforms.rs`), not to this one.
+const OPTION_FORMS: &[&str] = &["--approval-at", "--expiry", "--as-of", "--before", "--after", "--since", "--providers"];
 
 // ---------------------------------------------------------------------------
 // The story repo and the calls.
@@ -440,7 +440,7 @@ fn atip_optionvalues_07_a_blank_sentence_or_one_with_a_control_character_or_a_li
         }
     }
     // The signed reason: a blank or a multi-line reason never reaches the hash.
-    let got = call(&["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason=a\nb", "--actor", "alice", "--signature-file", "s.sig", "--approval-at", "2030-01-01"]);
+    let got = call(&["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason=a\nb", "--actor", "alice", "--signature-file", "s.sig", "--approval-at", "2030-01-01T00:00:00Z"]);
     assert_eq!((got.exit, got.code(), got.field()), (2, "STRATEGY_ARGUMENT_INVALID", "--reason"), "{}", got.envelope);
 }
 
@@ -574,10 +574,9 @@ fn atip_optionvalues_13_a_command_that_declares_another_domain_for_the_same_name
     option["possibleValues"] = json!(["fixed", "reopened"]);
     let refs: Vec<&Value> = seeded.iter().collect();
     assert!(sweep_problems(&refs, &[]).iter().any(|problem| problem.contains("`--disposition` has closed sets that are not nested")));
-    // The allowed names are the allowed ones: the real documents pass with the list and fail without it, by name.
+    // The allowed names are the allowed ones: every name has one domain in the real documents (`--providers` too, since `canon-0-37-option-forms`), and a seeded fault is found by name.
     let refs: Vec<&Value> = real.iter().collect();
-    let without = sweep_problems(&refs, &[]);
-    assert!(without.iter().any(|problem| problem.contains("`--providers`")), "{without:?}");
+    assert!(sweep_problems(&refs, &[]).is_empty(), "{:?}", sweep_problems(&refs, &[]));
     // `--kind` has closed sets that are nested today; a set that is not nested is found, and the allowed name skips it.
     let mut seeded = real.clone();
     let doc = seeded.iter_mut().find(|doc| doc["command"] == "query").expect("query");
@@ -586,7 +585,7 @@ fn atip_optionvalues_13_a_command_that_declares_another_domain_for_the_same_name
     let refs_seeded: Vec<&Value> = seeded.iter().collect();
     assert!(sweep_problems(&refs_seeded, &[]).iter().any(|problem| problem.contains("`--kind` has closed sets that are not nested")));
     assert!(!sweep_problems(&refs_seeded, &["kind"]).iter().any(|problem| problem.contains("`--kind`")));
-    assert!(sweep_problems(&refs, &["kind", "providers"]).is_empty());
+    assert!(sweep_problems(&refs, &["kind"]).is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -686,7 +685,7 @@ fn atip_optionvalues_14_the_changelog_has_a_row_for_every_value_0_36_took_and_th
     // The table has no row that no refusal needs.
     let rows = breaking_rows(&changelog);
     assert!(rows.len() >= 15, "{} rows", rows.len());
-    for row in &rows {
+    for row in rows.iter().filter(|row| !backticked(&row[0]).iter().all(|option| OPTION_FORMS.contains(&option.as_str()))) {
         let (options, commands, classes) = (backticked(&row[0]), backticked(&row[1]), backticked(&row[2]));
         let needed = refused.iter().any(|(option, command, class)| options.contains(&format!("--{option}")) && commands.contains(command) && classes.contains(class));
         assert!(needed, "the row {row:?} names a value that is not refused now");

@@ -129,7 +129,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   @flow:canon-0-37-option-values.F6
   @atip.optionvalues.12
   Scenario: Every option of the same name has one domain in every command
-    Given every command document of canon schema and the two names allowed by a reason, --kind and --providers
+    Given every command document of canon schema and the one name allowed by a reason, --kind (`--providers` has one domain since `canon-0-37-option-forms`)
     When the sweep groups the declarations by option name
     Then no name has two domains or closed sets that are not nested outside the allowed list, the sweep reads more than 80 names and more than 25 shared ones, and every option of the three rules has one domain
 
@@ -142,7 +142,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: A command that declares another domain for the same name fails the sweep
     Given the real documents with one command given the pattern of a bare id for --actor, one without a domain for --reason and one with a closed set that is not nested for --disposition
     When the sweep reads each seeded set of documents
-    Then it finds each seeded fault by the option name and the commands, finds --kind and --providers when they are not allowed, and passes the real documents with the two allowed
+    Then it finds each seeded fault by the option name and the commands, finds --kind when it is not allowed, and passes the real documents with the one allowed
 
   # canon: {"schema":1,"at":"2026-11-05T14:14:34Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-contract

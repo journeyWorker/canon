@@ -3,21 +3,11 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION, VIA_DESCRIPTION};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, PROVIDERS, ROLE_DESCRIPTION, VIA_DESCRIPTION};
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
 const LANGUAGE: &str = concat!("^", white_space!(), "*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*", white_space!(), "*$");
-
-/// `--providers`: blank or `none` (any case) for no provider, else a comma separated list of `claude`, `codex`, `omp`, `pi` (any
-/// case, white space around each, blank items skipped, at least one name).
-const PROVIDERS: &str = concat!(
-    "^(", white_space!(), "*",
-    "|", white_space!(), "*[Nn][Oo][Nn][Ee]", white_space!(), "*",
-    "|(", white_space!(), "*,)*", white_space!(), "*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])", white_space!(), "*",
-    "(,", white_space!(), "*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])", white_space!(), "*)?)*",
-    ")$"
-);
 
 /// A `regime show` segment: at least one character that canonicalizing (trim, white space and `/` to `-`) keeps.
 const REGIME_SEGMENT: &str = concat!("^[", white_space!(), "/]*[^", white_space!(), "/][^\u{0}]*$");
@@ -128,7 +118,15 @@ pub(crate) static TABLES: Tables = Tables {
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_REQUIRED").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_ARGUMENT_INVALID").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
-        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID").inside(&["claude", "none", "NONE", "", " Claude , codex,,pi ", ",omp"]).outside(&[",", "gemini", "none,claude", "claude,gemini", " , "]),
+        // `init` and the three `skills` commands read one list: the rows say it in the same pattern, each with its own code.
+        DomainRow::new(Scope::Arguments(&["init"], "providers"), Domain::matching(PROVIDERS), "INIT_ARGUMENT_INVALID")
+            .says("is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)")
+            .inside(&["claude", "none", "claude,omp", "omp,omp", "pi,codex,claude"])
+            .outside(&["", " ", "Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "none,claude", "claude,none", "gemini", "claude,gemini"]),
+        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID")
+            .says("is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)")
+            .inside(&["claude", "none", "claude,omp", "omp,omp", "pi,codex,claude"])
+            .outside(&["", " ", "Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "none,claude", "claude,none", "gemini", "claude,gemini"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "role-segment"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["reviewer", " a b ", "/x/"]).outside(&["", "  ", "/", " / "]),
         DomainRow::new(Scope::Arguments(&["regime show"], "repo-name"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["my-repo", "A B"]).outside(&["", "  ", "//"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "area"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["api", "a/b"]).outside(&["", "\t", "/ /"]),

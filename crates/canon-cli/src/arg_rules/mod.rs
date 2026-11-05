@@ -218,14 +218,16 @@ pub const TASK_ID: &str = "^[a-z0-9]+(-[a-z0-9]+)*#[0-9]+(\\.[0-9]+)*$";
 pub const ULID: &str = "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$";
 /// A session id: not empty, no leading or trailing white space, no control character.
 pub const SESSION_ID: &str = concat!("^[^\\p{Cc}", white_space!(), "]([^\\p{Cc}]*[^\\p{Cc}", white_space!(), "])?$");
-/// A time as every `<TIMESTAMP>` option reads it: an RFC 3339 time, or a date written with or without leading zeros
-/// (the shape only; that the date exists is a validator's).
-pub const TIMESTAMP: &str = concat!(
-    "^(",
-    white_space!(), "*[-+]?[0-9]+-", white_space!(), "*[0-9]{1,2}-", white_space!(), "*[0-9]{1,2}",
-    "|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+\u{2212}][0-9]{2}:[0-9]{2})",
-    ")$"
-);
+/// A time as a time option reads it (`--expiry`, `--as-of`, `--before`, `--after`, `--since`): an RFC 3339 full-date (`2030-01-01`, that day's UTC
+/// midnight) or date-time (`2030-01-01T10:00:00Z`): four digits of year, two of month and day and of each field of the time, `T` and `Z` in either
+/// case, an optional fraction and `Z` or `+HH:MM` / `-HH:MM`; no sign on the year, no white space and no other separator (the shape only; that the
+/// date exists is a validator's).
+pub const TIMESTAMP: &str = "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$";
+/// A time as `--approval-at` reads it: an RFC 3339 date-time and nothing else, the spelling of [`TIMESTAMP`] with a time.
+pub const DATE_TIME: &str = "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$";
+/// `--providers` of `init` and of the `skills` commands (0.37 `canon-0-37-option-forms`): `none`, or one or more of `claude`, `codex`, `omp`, `pi` (lowercase)
+/// joined by single commas: no white space, no empty item, `none` alone. A name written twice is taken.
+pub const PROVIDERS: &str = "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$";
 /// Text with at least one character that is not white space.
 pub const NOT_BLANK: &str = concat!("^", any_char!(), "*", not_white_space!(), any_char!(), "*$");
 /// One line (no line separator), possibly empty.
@@ -266,16 +268,26 @@ static SHARED: Tables = Tables {
         DomainRow::new(Scope::ValueName("REVIEW_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAL"]),
         DomainRow::new(Scope::ValueName("STRATEGY_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAO"]),
         DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b", "a\u{a0}b", "a\u{feff}"]).outside(&[" s", "s ", "a\tb", "\u{a0}s", "s\u{3000}", "\u{2003}s"]),
-        DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE").says("is an invalid timestamp: an RFC 3339 time (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`) is expected").inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-1-1", "2030-01-01 10:00:00+02:00"]).outside(&["tomorrow", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "01/02/2030"]),
+        DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE")
+            .says("is an invalid timestamp: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`) is expected")
+            .inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-01-01t10:00:00z", "2030-01-01T10:00:00.5+09:00", "2030-01-01T10:00:00-02:00"])
+            .outside(&["tomorrow", "2030-1-1", "2030-1-01", "2030-01-1", " 2030-01-01", "2030-01-01 ", "+2030-01-01", "20300-01-01", "2030- 01-01", "2030-01-01 10:00:00Z", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "2030-01-01T10:00:00\u{2212}02:00", "01/02/2030"]),
+        // `--approval-at` is signed into the payload: a date-time, which a date alone is not.
+        DomainRow::new(Scope::Arguments(&["evidence add", "evidence approval-payload", "strategy approval-payload", "strategy rollback"], "approval-at"), Domain::matching(DATE_TIME), "USAGE")
+            .says("is an invalid timestamp: an RFC 3339 date-time (`2030-01-01T10:00:00Z`) is expected; a date alone is refused")
+            .inside(&["2030-01-01T00:00:00Z", "2030-01-01t10:00:00z", "2030-01-01T10:00:00.123456789+09:00", "2030-01-01T10:00:00-02:00"])
+            .outside(&["tomorrow", "2030-01-01", "2030-1-1T10:00:00Z", " 2030-01-01T10:00:00Z", "2030-01-01T10:00:00Z ", "+2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "2030-01-01T10:00:00\u{2212}02:00"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
         DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve"], "limit"), Domain::at_least(1), "USAGE"),
         DomainRow::new(Scope::Everywhere("max-artifact-mib"), Domain::at_least(1), "USAGE"),
     ],
 };
 
-/// What the validator of a `<TIMESTAMP>` option says (every command that has one writes the same sentence): the shape is
-/// the option's domain, that the date exists is this.
-pub const CALENDAR: &str = "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.";
+/// What the validator of a time option says (every command that has one writes the same sentence): the spelling is the option's domain, that the
+/// date exists is this.
+pub const CALENDAR: &str = "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused.";
+/// What the validator of `--approval-at` says: the same, for a date-time alone.
+pub const CALENDAR_DATE_TIME: &str = "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused.";
 
 /// What the validators of a relayed approval say (`brief approve`, `policy approve`, `divergence accept`, `migrate`): the environment is
 /// a stateless input (spec 11.7), so the role and the actor the variables fill are read here, not by a precondition.

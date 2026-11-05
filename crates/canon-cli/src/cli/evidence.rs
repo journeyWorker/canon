@@ -41,8 +41,8 @@ pub struct EvidenceApprovalPayloadArgs {
     /// Who approved (the human whose detached signature the payload is for)
     #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
-    /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
+    /// The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `evidence add`
+    #[arg(long, value_name = "TIMESTAMP")]
     pub approval_at: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -101,8 +101,8 @@ pub struct EvidenceAddArgs {
     /// Armored SSH detached signature file. Canon never signs on the user's behalf.
     #[arg(long, value_name = "FILE")]
     pub signature_file: Option<PathBuf>,
-    /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
+    /// The approval time included in the signed approval payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over
+    #[arg(long, value_name = "TIMESTAMP")]
     pub approval_at: Option<String>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,

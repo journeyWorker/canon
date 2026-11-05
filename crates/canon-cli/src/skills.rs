@@ -658,19 +658,16 @@ pub fn provider_bundle_root(target_dir: &Path, provider: Provider) -> PathBuf {
     provider_skill_root(target_dir, provider).join("canon")
 }
 
-/// A `--providers` value: a comma-separated list of provider names, or
-/// `none` (or an empty value) for none. Sorted, without duplicates.
+/// A `--providers` value (0.37 `canon-0-37-option-forms`): `none` for none, else one or more of the provider names (`claude`, `codex`, `omp`,
+/// `pi`, lowercase) joined by single commas, with no white space and no empty item. Sorted, without duplicates (a name written twice is taken).
 pub fn parse_provider_list(value: &str) -> Result<Vec<Provider>, SkillsError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+    if value == "none" {
         return Ok(Vec::new());
     }
     let mut providers = Vec::new();
-    for part in trimmed.split(',').filter(|part| !part.trim().is_empty()) {
-        providers.push(Provider::parse(part)?);
-    }
-    if providers.is_empty() {
-        return Err(SkillsError::InvalidProvider(value.to_string()));
+    for part in value.split(',') {
+        let provider = ALL_PROVIDERS.into_iter().find(|provider| provider.descriptor().name == part).ok_or_else(|| SkillsError::InvalidProvider(part.to_string()))?;
+        providers.push(provider);
     }
     providers.sort();
     providers.dedup();

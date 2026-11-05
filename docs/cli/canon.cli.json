@@ -1482,9 +1482,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence",
+          "help": "When the acceptance stops holding: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); none means it holds until new evidence",
           "name": "expiry",
           "valueName": "TIMESTAMP"
         },
@@ -1538,7 +1538,7 @@
             "expiry"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         },
         {
           "arguments": [
@@ -1682,9 +1682,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
+          "help": "When a deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); required with `--state deferred`",
           "name": "expiry",
           "valueName": "TIMESTAMP"
         },
@@ -1717,7 +1717,7 @@
             "expiry"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -1802,9 +1802,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "When the deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "expiry",
           "required": true,
           "valueName": "TIMESTAMP"
@@ -1832,7 +1832,7 @@
             "expiry"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -1875,9 +1875,9 @@
         {
           "defaultNote": "now",
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Governs Deferred expiry; defaults to now",
+          "help": "Governs Deferred expiry; an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); defaults to now",
           "name": "as-of",
           "valueName": "TIMESTAMP"
         },
@@ -1911,7 +1911,7 @@
             "as-of"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -2335,9 +2335,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
           },
-          "help": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
+          "help": "The approval time included in the signed approval payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
           "name": "approval-at",
           "valueName": "TIMESTAMP"
         },
@@ -2387,7 +2387,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         },
         {
           "arguments": [
@@ -2505,7 +2505,15 @@
           "required": true,
           "valueName": "NAME"
         },
-        "approval-at",
+        {
+          "domain": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
+          },
+          "help": "The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `evidence add`",
+          "name": "approval-at",
+          "required": true,
+          "valueName": "TIMESTAMP"
+        },
         "repo",
         "as"
       ],
@@ -2523,7 +2531,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         },
         {
           "arguments": [
@@ -2861,17 +2869,17 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "Only records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "before",
           "valueName": "TIMESTAMP"
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "Only records at or after this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "after",
           "valueName": "TIMESTAMP"
         },
@@ -2963,7 +2971,7 @@
             "after"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         },
         {
           "arguments": [
@@ -4159,7 +4167,10 @@
           "valueType": "switch"
         },
         {
-          "help": "Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)",
+          "domain": {
+            "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
+          },
+          "help": "Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)",
           "name": "providers",
           "valueName": "LIST"
         },
@@ -4940,9 +4951,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "Remove records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "before",
           "required": true,
           "valueName": "TIMESTAMP"
@@ -4965,7 +4976,7 @@
             "before"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -5107,9 +5118,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Only records with at >= <since> (RFC3339/ISO-8601)",
+          "help": "Only records with at >= <since>: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "since",
           "valueName": "TIMESTAMP"
         },
@@ -5279,7 +5290,7 @@
             "since"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -6367,9 +6378,9 @@
         {
           "defaultNote": "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories",
           "domain": {
-            "pattern": "^(\\p{White_Space}*|\\p{White_Space}*[Nn][Oo][Nn][Ee]\\p{White_Space}*|(\\p{White_Space}*,)*\\p{White_Space}*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*(,\\p{White_Space}*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*)?)*)$"
+            "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
           },
-          "help": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
+          "help": "Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
           "name": "providers",
           "valueName": "LIST"
         },
@@ -6570,7 +6581,15 @@
           "required": true,
           "valueName": "NAME"
         },
-        "approval-at",
+        {
+          "domain": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
+          },
+          "help": "The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `strategy rollback`",
+          "name": "approval-at",
+          "required": true,
+          "valueName": "TIMESTAMP"
+        },
         "repo",
         "as"
       ],
@@ -6588,7 +6607,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         }
       ],
       "x-canon": {
@@ -6806,9 +6825,9 @@
         },
         {
           "domain": {
-            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
           },
-          "help": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
+          "help": "When the approver signed: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
           "name": "approval-at",
           "required": true,
           "valueName": "TIMESTAMP"
@@ -6840,7 +6859,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         }
       ],
       "x-canon": {
@@ -16895,7 +16914,7 @@
               "type": "string"
             },
             "expiry": {
-              "description": "The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence",
+              "description": "When the acceptance stops holding: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); none means it holds until new evidence",
               "type": "string"
             },
             "note": {
@@ -17308,7 +17327,7 @@
               "type": "string"
             },
             "expiry": {
-              "description": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
+              "description": "When a deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); required with `--state deferred`",
               "type": "string"
             },
             "noPromote": {
@@ -17742,7 +17761,7 @@
               "type": "string"
             },
             "expiry": {
-              "description": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "When the deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "operands": {
@@ -18543,7 +18562,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30"
+          "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"
         ],
         [
           "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --surface-ref /etc/passwd",
@@ -18826,7 +18845,7 @@
               "type": "boolean"
             },
             "approvalAt": {
-              "description": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
+              "description": "The approval time included in the signed approval payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
               "type": "string"
             },
             "approvalRole": {
@@ -19260,7 +19279,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30"
+          "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30T10:00:00Z"
         ],
         [
           "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --surface-ref /etc/passwd",
@@ -20225,11 +20244,11 @@
           "additionalProperties": false,
           "properties": {
             "after": {
-              "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "Only records at or after this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "before": {
-              "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "Only records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "dryRun": {
@@ -25478,7 +25497,7 @@
               ]
             },
             "providers": {
-              "description": "Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)",
+              "description": "Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)",
               "type": "string"
             }
           },
@@ -28128,7 +28147,7 @@
           "additionalProperties": false,
           "properties": {
             "before": {
-              "description": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "Remove records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "kind": {
@@ -32912,7 +32931,7 @@
               "type": "boolean"
             },
             "providers": {
-              "description": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
+              "description": "Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
               "type": "string"
             },
             "skillsSource": {
@@ -33700,7 +33719,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30 --json"
+          "canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30T10:00:00Z --json"
         ]
       ],
       "schemas": {
@@ -34120,7 +34139,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30"
+          "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"
         ]
       ],
       "schemas": {
@@ -34445,7 +34464,7 @@
               "type": "string"
             },
             "approvalAt": {
-              "description": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
+              "description": "When the approver signed: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
               "type": "string"
             },
             "contradictingTrajectory": {
@@ -39118,15 +39137,6 @@
         "valueName": "TEXT"
       },
       {
-        "domain": {
-          "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
-        },
-        "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
-        "name": "approval-at",
-        "required": true,
-        "valueName": "TIMESTAMP"
-      },
-      {
         "defaultNote": "HEAD when --disposition is fixed",
         "help": "The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff",
         "name": "resolution-rev",
@@ -39216,9 +39226,9 @@
       {
         "defaultNote": "the providers `skills install` would use",
         "domain": {
-          "pattern": "^(\\p{White_Space}*|\\p{White_Space}*[Nn][Oo][Nn][Ee]\\p{White_Space}*|(\\p{White_Space}*,)*\\p{White_Space}*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*(,\\p{White_Space}*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*)?)*)$"
+          "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
         },
-        "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
+        "help": "Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install",
         "name": "providers",
         "valueName": "LIST"
       }

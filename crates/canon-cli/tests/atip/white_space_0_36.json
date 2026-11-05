@@ -1,5 +1,5 @@
 {
-  "_about": "The 17 distinct domain patterns of canon 0.36.0 (atip/1 1.4) that listed white space by hand, as `canon schema` printed them, with the 59 places that declared them. canon-0-37-claim-1-5 (`atip.claim15.04`) holds the 1.5 patterns of those places to these: the same values in and out. `canon-0-37-option-values` re-baselined it in one way: the 17 places of `changedBy037` (the six name and sentence options) are held to the text rule of that change (`atip.optionvalues.*`), not to these patterns, because that change deliberately narrows what they accept (a control character or a line break inside, an empty or blank value) and widens what the parser takes (the white space around). The patterns and places stay here as the record of what 0.36.0 took, and `atip/option_values_0_36.json` lists the values per class.",
+  "_about": "The 17 distinct domain patterns of canon 0.36.0 (atip/1 1.4) that listed white space by hand, as `canon schema` printed them, with the 59 places that declared them. canon-0-37-claim-1-5 (`atip.claim15.04`) holds the 1.5 patterns of those places to these: the same values in and out. `canon-0-37-option-values` re-baselined it in one way: the 17 places of `changedBy037` (the six name and sentence options) are held to the text rule of that change (`atip.optionvalues.*`), not to these patterns, because that change deliberately narrows what they accept (a control character or a line break inside, an empty or blank value) and widens what the parser takes (the white space around). `canon-0-37-option-forms` re-baselined it in one more way: the 13 places of `changedBy037Forms` (the time options and the provider list) are held to the RFC 3339 and exact-name patterns of that change (`atip.optionforms.11`), which name no white space, because it deliberately refuses what they took (white space, a one-digit month, a sign on the year, a date alone for `--approval-at`, a capital in a name). The patterns and places stay here as the record of what 0.36.0 took, and `atip/option_values_0_36.json` and `atip/option_forms_0_36.json` list the values per class.",
   "patterns": [
     {
       "pattern": "^[^\\n\\r\u000b\f\u0085\\p{Zl}\\p{Zp}]*$",
@@ -174,6 +174,33 @@
       "subject move --override-reason",
       "subject move --reason",
       "tree --override-reason"
+    ]
+  },
+  "changedBy037Forms": {
+    "change": "canon-0-37-option-forms",
+    "options": [
+      "approval-at",
+      "expiry",
+      "as-of",
+      "before",
+      "after",
+      "since",
+      "providers"
+    ],
+    "places": [
+      "divergence accept --expiry",
+      "divergence add --expiry",
+      "divergence defer --expiry",
+      "divergence list --as-of",
+      "evidence add --approval-at",
+      "export --after",
+      "export --before",
+      "purge --before",
+      "query --since",
+      "skills install --providers",
+      "strategy rollback --approval-at",
+      "tree --approval-at",
+      "tree --providers"
     ]
   }
 }

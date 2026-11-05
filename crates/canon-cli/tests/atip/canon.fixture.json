@@ -79,12 +79,24 @@
         ]
       }
     },
+    "divergence accept": {
+      "domainRejects": {
+        "expiry": [
+          "2030-01-1",
+          "+2030-01-01"
+        ]
+      }
+    },
     "divergence add": {
       "domainRejects": {
         "actor": [
           "",
           " ",
           "a\tb"
+        ],
+        "expiry": [
+          "2030-1-1",
+          " 2030-01-01"
         ],
         "project": [
           "Core",
@@ -100,11 +112,22 @@
         ]
       }
     },
+    "divergence defer": {
+      "domainRejects": {
+        "expiry": [
+          "2030-1-1",
+          "2030-01-01 10:00:00Z"
+        ]
+      }
+    },
     "divergence list": {
       "domainRejects": {
         "as-of": [
           "Core",
-          "-core"
+          "-core",
+          "2030-1-1",
+          " 2030-01-01",
+          "2030-01-01 10:00:00Z"
         ]
       },
       "fields": [
@@ -136,6 +159,11 @@
           " ",
           "a\tb"
         ],
+        "approval-at": [
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01 10:00:00Z"
+        ],
         "override-reason": [
           "",
           " ",
@@ -152,7 +180,11 @@
       "domainRejects": {
         "approval-at": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01 10:00:00Z",
+          "2030-1-1T10:00:00Z"
         ],
         "approver": [
           "",
@@ -212,11 +244,15 @@
       "domainRejects": {
         "after": [
           "Core",
-          "-core"
+          "-core",
+          "2030-1-1",
+          " 2030-01-01"
         ],
         "before": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01 10:00:00Z",
+          "2030-01-01T10:00:00−02:00"
         ]
       },
       "fields": [
@@ -402,6 +438,17 @@
         ]
       ]
     },
+    "init": {
+      "domainRejects": {
+        "providers": [
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
+        ]
+      }
+    },
     "ledger compact": {
       "preview": [
         [
@@ -428,6 +475,13 @@
       }
     },
     "purge": {
+      "domainRejects": {
+        "before": [
+          "2030-1-1",
+          " 2030-01-01",
+          "2030-01-01T10:00:00−02:00"
+        ]
+      },
       "preview": [
         [
           "purge",
@@ -454,7 +508,9 @@
         ],
         "since": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01 10:00:00Z",
+          "+2030-01-01"
         ]
       },
       "fields": [
@@ -543,7 +599,12 @@
       "domainRejects": {
         "providers": [
           "Core",
-          "-core"
+          "-core",
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
         ]
       }
     },
@@ -551,7 +612,23 @@
       "domainRejects": {
         "providers": [
           "Core",
-          "-core"
+          "-core",
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
+        ]
+      }
+    },
+    "skills install": {
+      "domainRejects": {
+        "providers": [
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
         ]
       }
     },
@@ -573,7 +650,10 @@
       "domainRejects": {
         "approval-at": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01 10:00:00Z"
         ],
         "approver": [
           "",
@@ -583,6 +663,15 @@
         "strategy": [
           "Core",
           "-core"
+        ]
+      }
+    },
+    "strategy rollback": {
+      "domainRejects": {
+        "approval-at": [
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01T10:00:00−02:00"
         ]
       }
     },

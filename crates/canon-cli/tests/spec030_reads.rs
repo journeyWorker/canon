@@ -469,3 +469,118 @@ fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_si
     assert_eq!(error_code(&existing), "STRATEGY_SIGNATURE_INVALID");
     assert_eq!(tree(repo), before, "a refused rollback writes nothing");
 }
+
+// ---------------------------------------------------------------------------
+// `canon-0-37-option-forms`: `--approval-at` is an RFC 3339 date-time, the instant the payload holds and the signature was made over.
+
+/// One instant (2030-01-01T10:00:00.123456789Z), as `--approval-at` may spell it.
+fn instant_spellings() -> Vec<String> {
+    let at = instant();
+    let offset = chrono::FixedOffset::east_opt(9 * 3600).expect("an offset");
+    vec![
+        at.to_rfc3339_opts(SecondsFormat::Nanos, true),
+        at.to_rfc3339_opts(SecondsFormat::Nanos, true).to_lowercase(),
+        at.with_timezone(&offset).to_rfc3339_opts(SecondsFormat::Nanos, false),
+        at.with_timezone(&chrono::FixedOffset::west_opt(5 * 3600).expect("an offset")).to_rfc3339_opts(SecondsFormat::Nanos, false),
+    ]
+}
+
+fn instant() -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339("2030-01-01T10:00:00.123456789Z").expect("an instant").with_timezone(&Utc)
+}
+
+#[test]
+fn atip_optionforms_01_the_strategy_approval_payload_is_the_same_bytes_for_one_instant_in_any_spelling_and_reads_no_clock() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    let (candidate, evaluation) = candidate_and_evaluation(repo);
+    fs::write(repo.join("evaluation.json"), serde_json::to_vec(&evaluation).unwrap()).unwrap();
+    let id = candidate.id.to_string();
+    let payload = |at: &str| canon(repo, &["strategy", "approval-payload", id.as_str(), "--evaluation", "evaluation.json", "--approver", "alice", "--approval-at", at]);
+    let before = tree(repo);
+    let spellings = instant_spellings();
+    let first = payload(&spellings[0]);
+    assert_eq!(first.status.code(), Some(0), "{}", String::from_utf8_lossy(&first.stderr));
+    assert!(String::from_utf8_lossy(&first.stdout).contains("\"timestamp\":\"2030-01-01T10:00:00.123456789Z\""), "{}", String::from_utf8_lossy(&first.stdout));
+    for at in &spellings {
+        let got = payload(at);
+        assert_eq!((got.status.code(), &got.stdout), (Some(0), &first.stdout), "`{at}` is the bytes of the instant");
+    }
+    assert_eq!(payload(&spellings[0]).stdout, first.stdout, "the same arguments print the same bytes");
+    assert_ne!(payload("2030-01-01T10:00:00.123456788Z").stdout, first.stdout, "another instant is other bytes");
+    // The report holds the instant as UTC, whatever the spelling.
+    let doc = json(&canon(repo, &["strategy", "approval-payload", id.as_str(), "--evaluation", "evaluation.json", "--approver", "alice", "--approval-at", "2030-01-01T19:00:00+09:00", "--json"]));
+    assert_eq!(doc["data"]["approvalAt"], "2030-01-01T10:00:00Z");
+    assert_eq!(tree(repo), before, "the payload is a read");
+    // A date alone, and the loose spellings, print no bytes.
+    for at in ["2030-01-01", " 2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z", "2030-1-1T10:00:00Z", "+2030-01-01T10:00:00Z", "2030-01-01T10:00:00\u{2212}02:00", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T25:00:00Z"] {
+        let value = format!("--approval-at={at}");
+        let got = canon(repo, &["strategy", "approval-payload", id.as_str(), "--evaluation", "evaluation.json", "--approver", "alice", &value]);
+        assert_eq!(got.status.code(), Some(2), "`{at}`");
+        assert!(got.stdout.is_empty(), "`{at}` printed bytes: {}", String::from_utf8_lossy(&got.stdout));
+    }
+    assert_eq!(tree(repo), before, "a refused payload writes nothing");
+}
+
+/// A promoted strategy and the signature `rollback.sig` of its rollback by `alice` at `at`; the strategy id.
+fn promoted_and_signed(signing: &Signing, reason: &str, at: DateTime<Utc>) -> String {
+    let repo = signing.repo.path();
+    let (candidate, evaluation) = candidate_and_evaluation(repo);
+    let strategies = ParquetStrategyStore::open(repo.join(".canon/learn/strategies"));
+    let approved_at = Utc::now();
+    let mut approval = PromotionApproval::new(candidate.id, evaluation.digest(), "alice", "human", true, approved_at);
+    let payload = approval_payload_bytes(&ApprovalPayload { namespace: "canon-learning-approval-v1", subject: &format!("strategy:{}", candidate.id), project: None, artifact_sha: &evaluation.digest(), run_id: None, surface: &[], effects: &[], actor: "alice", timestamp: &approved_at });
+    approval.signature = Some(signing.sign(&payload));
+    approval.signer_key = Some("alice".to_string());
+    approval.integrity_digest = approval.recomputed_integrity_digest();
+    promote_strategy_approved(&strategies, &candidate.id, &repo.join(".canon/strategies"), &evaluation, &approval).unwrap();
+    let reason_digest = format!("{:x}", Sha256::digest(reason.as_bytes()));
+    let rollback_payload = approval_payload_bytes(&ApprovalPayload { namespace: "canon-learning-approval-v1", subject: &format!("strategy:{}:rollback:{reason_digest}", candidate.id), project: None, artifact_sha: &reason_digest, run_id: None, surface: &[], effects: &[], actor: "alice", timestamp: &at });
+    fs::write(repo.join("rollback.sig"), signing.sign(&rollback_payload)).unwrap();
+    candidate.id.to_string()
+}
+
+#[test]
+fn atip_optionforms_05_a_rollback_signed_over_an_instant_is_recorded_when_the_time_is_written_in_any_spelling_of_it() {
+    let reason = "paired fixture contradiction";
+    for (index, at) in instant_spellings().iter().enumerate() {
+        let signing = Signing::new();
+        let repo = signing.repo.path();
+        let id = promoted_and_signed(&signing, reason, instant());
+        let promoted = repo.join(".canon/strategies/dev").join(format!("{id}.md"));
+        assert!(fs::read_to_string(&promoted).unwrap().contains("status: active"), "the strategy is promoted");
+        let out = canon(repo, &["strategy", "rollback", &id, "--reason", reason, "--actor", "alice", "--signature-file", "rollback.sig", "--approval-at", at, "--json"]);
+        let doc = json(&out);
+        assert_eq!((out.status.code(), &doc["ok"]), (Some(0), &Value::Bool(true)), "spelling {index} `{at}`: {doc}");
+        assert_eq!(doc["data"]["strategyId"], id.as_str());
+        let after = fs::read_to_string(&promoted).unwrap();
+        assert!(after.contains("status: rolled_back") && after.contains("rollback_actor: \"alice\""), "spelling {index}: {after}");
+    }
+}
+
+#[test]
+fn atip_optionforms_06_a_rollback_with_another_instant_or_a_refused_spelling_is_refused_and_records_nothing() {
+    let reason = "paired fixture contradiction";
+    let signing = Signing::new();
+    let repo = signing.repo.path();
+    let id = promoted_and_signed(&signing, reason, instant());
+    let before = tree(repo);
+    let rollback = |at: &str| {
+        let value = format!("--approval-at={at}");
+        canon(repo, &["strategy", "rollback", &id, "--reason", reason, "--actor", "alice", "--signature-file", "rollback.sig", &value, "--json"])
+    };
+    // Another instant: the signature does not verify over it.
+    for at in ["2030-01-01T10:00:00.123456788Z", "2030-01-01T10:00:00Z", "2030-01-01T10:00:00.123456789+01:00", "2030-01-02T10:00:00.123456789Z"] {
+        let out = rollback(at);
+        assert_eq!((out.status.code(), error_code(&out).as_str()), (Some(2), "STRATEGY_SIGNATURE_INVALID"), "`{at}`: {}", String::from_utf8_lossy(&out.stdout));
+        assert_eq!(tree(repo), before, "`{at}` recorded something");
+    }
+    // A spelling that is no RFC 3339 date-time: the argument stage refuses it, the date the signature may have been made over included.
+    for at in ["2030-01-01", " 2030-01-01T10:00:00.123456789Z", "2030-01-01 10:00:00.123456789Z", "2030-01-01T10:00", "2030-1-1T10:00:00Z", "2030-01-01T10:00:00.123456789\u{2212}02:00", ""] {
+        let out = rollback(at);
+        let doc = json(&out);
+        assert_eq!((out.status.code(), doc["error"]["code"].as_str(), doc["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("--approval-at")), "`{at}`: {doc}");
+        assert_eq!(tree(repo), before, "`{at}` recorded something");
+    }
+    assert!(fs::read_to_string(repo.join(".canon/strategies/dev").join(format!("{id}.md"))).unwrap().contains("status: active"), "the strategy is still active");
+}

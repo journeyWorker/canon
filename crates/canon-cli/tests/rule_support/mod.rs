@@ -228,7 +228,7 @@ pub fn sample(doc: &Value, example: &[String], argument: &Value) -> String {
         "TASK_ID" => "add-login#1",
         "RUN_ID" | "REVIEW_ID" | "STRATEGY_ID" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
         "SESSION_ID" => "s1",
-        "TIMESTAMP" => "2030-01-01",
+        "TIMESTAMP" => "2030-01-01T00:00:00Z",
         "ACTOR_ID" => "alice",
         "N" => "2",
         "REV" => "HEAD",
