@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-forms",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-forms-rev"
+  },
+  "at": "2026-11-05T17:22:40.786115Z",
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "kind": "review",
+  "pin": "60b8a7668b49253a51c37565ba9e0d4382e761bf",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_optionforms_08_a_loose_or_impossible_time_is_refused_for_each_date_option_and_nothing_is_recorded"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ea79a2d962e24f351b4120cc1bc7edfdf4a8c08353a1736ff0b0da8d72d3ac23",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-option-forms/brief.md"
+  },
+  "review_id": "01M6PBQWGJVJ5PTG2WZFB640GB",
+  "reviewer": "rev-0-37-option-forms",
+  "scenario_id": "atip.optionforms.08",
+  "schema": 2,
+  "worktree_dirty": false
+}

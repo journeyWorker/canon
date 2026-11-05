@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-forms",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-forms-rev"
+  },
+  "at": "2026-11-05T17:23:35.992530Z",
+  "change_id": "canon-0-37-option-forms",
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_optionforms.rs:672",
+  "introduced_by": "2a49a90afa4d8c7eb0ab721132b525c2afd01142",
+  "kind": "finding",
+  "reviewed_sha": "60b8a7668b49253a51c37565ba9e0d4382e761bf",
+  "reviewer": "rev-0-37-option-forms",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionforms.12"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards pass: atip.optionforms.12 says a date or time that does not exist is refused 'with its cause', but the test only asserts parse_date_time/parse return Err (never that TimestampError source is Some), and the real binary prints 'want an RFC 3339 date-time ...' for 2026-02-30T10:00:00Z with no word that the date does not exist (same text shape as 0.36.0: 'want RFC3339 or YYYY-MM-DD'); blast radius: the 12 time options' refusal text for calendar-impossible values, which atip_optionforms_08 checks by code and field only. Non-blocking.",
+  "worktree_dirty": false
+}
