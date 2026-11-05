@@ -15,11 +15,11 @@ const NAME_AT_VERSION: &str = "^[^@]+@[^@]+$";
 /// A context pack id: `sha256:` and 64 lower-case hex digits.
 const PACK_ID: &str = "^sha256:[0-9a-f]{64}$";
 /// A line of text that is not blank and holds no CR or LF (`subject move --reason`).
-const REASON: &str = concat!("^[^\\n\\r]*[^", white_space!(), "][^\\n\\r]*$");
+const REASON: &str = concat!("^[^\\n\\r]*", not_white_space!(), "[^\\n\\r]*$");
 /// The tool a relayed approval names (`--relayed-via`): one token, no white space, parenthesis or quote.
 const RELAY_TOKEN: &str = concat!("^[^", white_space!(), "()\"']+$");
 /// The relaying agent's actor id (`--actor` with `--relayed-via`): once trimmed, one such token.
-const RELAY_ACTOR: &str = concat!("^[", white_space!(), "]*[^", white_space!(), "()\"']+[", white_space!(), "]*$");
+const RELAY_ACTOR: &str = concat!("^", white_space!(), "*[^", white_space!(), "()\"']+", white_space!(), "*$");
 /// One `--digest` entry: `<change>=sha256:<digest>`, the change not empty.
 const DIGEST: &str = "^[^=]+=sha256:[^\u{0}]*$";
 
@@ -143,7 +143,7 @@ pub(crate) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["scenario new"], "case"), Domain::matching(KEBAB), "USAGE").inside(&["a", "a-1"]).outside(&["A", "a_b", "-a", "a-", "a--b", ""]),
         DomainRow::new(Scope::Arguments(&["feature new"], "surface"), Domain::matching(SURFACE), "USAGE").inside(&["auth.login", "a-.-b", "1.2"]).outside(&["auth", "auth.login.01", "Auth.login", ".login", "auth.", "a_b.c", ""]),
         // The tool and the actor of a relayed approval.
-        DomainRow::new(Scope::Arguments(&["brief approve", "policy approve"], "relayed-via"), Domain::matching(RELAY_TOKEN), "USAGE").inside(&["ask", "AskUserQuestion", "chat"]).outside(&["", " ", "a b", "a(b", "a)b", "a\"b", "a'b", "a\tb", "a\nb"]),
+        DomainRow::new(Scope::Arguments(&["brief approve", "policy approve"], "relayed-via"), Domain::matching(RELAY_TOKEN), "USAGE").inside(&["ask", "AskUserQuestion", "chat"]).outside(&["", " ", "a b", "a(b", "a)b", "a\"b", "a'b", "a\tb", "a\nb", "a\u{a0}b", "a\u{3000}b", "a\u{85}b"]),
         DomainRow::new(Scope::Arguments(&["brief approve", "policy approve"], "actor"), Domain::matching(RELAY_ACTOR), "USAGE").inside(&["impl", " impl ", "impl\n"]).outside(&["", " ", "\t", "a b", "a(b", "a)b", "a\"b", "a'b", " a b "]),
         // A shown digest: `<change>=sha256:<digest>`.
         DomainRow::new(Scope::Arguments(&["brief approve"], "digest"), Domain::matching(DIGEST), "USAGE").inside(&["add-login=sha256:0123456789abcdef", "add-login=sha256:"]).outside(&["add-login", "=sha256:aa", "add-login=aa", "add-login=SHA256:aa", "add-login=sha256", ""]),

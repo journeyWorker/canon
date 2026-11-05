@@ -442,8 +442,8 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     assert_eq!(code, Some(0));
     assert_eq!(first["data"]["kind"], "tree");
     assert_eq!(first["data"]["level"], "L2");
-    assert_eq!(first["meta"]["schemaVersion"], "1.4");
-    assert_eq!(first["meta"]["contractVersion"], "1.4");
+    assert_eq!(first["meta"]["schemaVersion"], "1.5");
+    assert_eq!(first["meta"]["contractVersion"], "1.5");
     assert_eq!(first["meta"]["command"], "schema");
     assert_eq!(atip::schema_doc_problems(&first), Vec::<String>::new());
     assert!(first["data"].get("roles").is_none(), "the old top-level roles member is gone");
@@ -842,7 +842,7 @@ fn atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation
 fn atip_schemadoc_07_errors_outputs_and_schemas_hold_together_in_every_command_document() {
     let mut problems = Vec::new();
     for doc in COMMANDS.iter() {
-        let envelope = json!({ "ok": true, "data": doc, "meta": { "tool": "canon", "toolVersion": "0.0.0", "contract": "atip/1", "contractVersion": "1.4", "schemaVersion": "1.4", "command": "schema" } });
+        let envelope = json!({ "ok": true, "data": doc, "meta": { "tool": "canon", "toolVersion": "0.0.0", "contract": "atip/1", "contractVersion": "1.5", "schemaVersion": "1.5", "command": "schema" } });
         problems.extend(atip::schema_doc_problems(&envelope).into_iter().map(|problem| format!("`{}`: {problem}", doc["command"])));
         problems.extend(rule_problems(doc));
         for code in names(doc, "errors") {
@@ -1023,7 +1023,7 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
     let described = canon_cli::spec::described(&root, None).expect("described");
     assert_eq!(file["tree"], described.tree().to_value());
     assert_eq!(file["tree"]["level"], "L2");
-    assert_eq!(file["contractVersion"], "1.4");
+    assert_eq!(file["contractVersion"], "1.5");
     // The file is the 1.4 form: the tree and the command documents hold no `path`, and the schemas live in their own map.
     let commands = file["commands"].as_array().expect("commands");
     assert_eq!(commands.len(), 78);

@@ -31,20 +31,20 @@ fn atip_contract11_01_every_envelope_declares_the_contract_and_its_version_and_a
     for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["finding", "nosuch", "--json"], vec!["--json"], vec!["schema", "--json"], vec!["schema", "status", "--json"], vec!["schema", "--errors", "--json"], vec!["schema", "--warnings", "--json"], vec!["gate", "check", "--json"]] {
         let document = json(&canon(dir.path(), &args));
         assert_eq!(document["meta"]["contract"], "atip/1", "{args:?}: {document}");
-        assert_eq!(document["meta"]["contractVersion"], "1.4", "{args:?}: the same build says the same version everywhere: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.5", "{args:?}: the same build says the same version everywhere: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     for (flag, kind) in [("--errors", "errors"), ("--warnings", "warnings")] {
         let document = json(&canon(dir.path(), &["schema", flag, "--json"]));
         assert_eq!(document["data"]["kind"], kind);
-        assert_eq!(document["meta"]["schemaVersion"], "1.4", "{document}");
+        assert_eq!(document["meta"]["schemaVersion"], "1.5", "{document}");
         assert_eq!(document["meta"]["command"], "schema");
     }
     for (flag, code, kind) in [("--error", "USAGE", "error"), ("--warning", "OLD_LAYOUT_FOUND", "warning")] {
         let document = json(&canon(dir.path(), &["schema", flag, code, "--json"]));
-        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.4")), "{document}");
+        assert_eq!((document["data"]["kind"].as_str(), document["meta"]["schemaVersion"].as_str()), (Some(kind), Some("1.5")), "{document}");
     }
-    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.4.
+    // The output of another command keeps its own version: only the registry answers and `schema` itself are 1.5.
     assert_eq!(json(&canon(dir.path(), &["nosuch", "--json"]))["meta"]["schemaVersion"], "1.0");
 }
 
@@ -167,7 +167,7 @@ fn atip_contract11_17_an_envelope_without_the_contract_or_with_version_1_0_or_an
     for args in [vec!["status", "--json"], vec!["nosuch", "--json"], vec!["schema", "--errors", "--json"]] {
         let envelope = json(&canon(dir.path(), &args));
         assert_eq!(atip::envelope_problems(&envelope), Vec::<String>::new(), "{args:?}: the shipped envelope passes");
-        assert_eq!((envelope["meta"]["contract"].as_str(), envelope["meta"]["contractVersion"].as_str()), (Some("atip/1"), Some("1.4")), "{args:?}");
+        assert_eq!((envelope["meta"]["contract"].as_str(), envelope["meta"]["contractVersion"].as_str()), (Some("atip/1"), Some("1.5")), "{args:?}");
         for (fault, change) in [
             ("contract removed", Box::new(|meta: &mut serde_json::Map<String, Value>| drop(meta.remove("contract"))) as Box<dyn Fn(&mut serde_json::Map<String, Value>)>),
             ("contractVersion 1.0", Box::new(|meta| drop(meta.insert("contractVersion".into(), Value::from("1.0"))))),

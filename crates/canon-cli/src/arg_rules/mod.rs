@@ -164,22 +164,34 @@ pub fn codes_for(path: &str, arguments: &[(String, Option<String>)]) -> Vec<&'st
 
 // ------------------------------------------------------------------ patterns
 
-/// The character classes the patterns below are written in. A domain `pattern` is `^`, a restricted I-Regexp body and
-/// `$` (spec 10.7.4): no `.`, no `\d`, no `|` outside parentheses. The characters are written out because I-Regexp has no `\s`.
-/// A pattern carries no raw line terminator (`^\^.*\$$` of the contract's schema must match it, and `.` does not match one),
-/// so LF, CR, U+2028 and U+2029 are written as `\n`, `\r`, `\p{Zl}` and `\p{Zp}`.
+/// The white space the patterns below are written with. A domain `pattern` is `^`, a restricted I-Regexp body and `$` (spec 10.7.4,
+/// Annex V2): no `.`, no `\d`, no `\s`, no `|` outside parentheses. Since atip/1 1.5 the body says white space as the Unicode
+/// property `White_Space` (`\p{White_Space}`, `\P{White_Space}`), outside and inside a class, a name Rust `regex` and ECMAScript with
+/// the `u` flag read the same: U+0009 to U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F and
+/// U+3000. A pattern carries no raw line terminator (`^\^.*\$$` of the contract's schema must match it, and `.` does not match one).
 macro_rules! white_space {
     () => {
-        " \\t\\n\u{b}\u{c}\\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\\p{Zl}\\p{Zp}\u{202f}\u{205f}\u{3000}"
+        "\\p{White_Space}"
     };
 }
 
-/// The line separators a line of text may not carry: U+000A, U+000B, U+000C, U+000D, U+0085, U+2028 and U+2029.
-macro_rules! line_breaks {
+/// A character that is not white space.
+macro_rules! not_white_space {
     () => {
-        "\\n\\r\u{b}\u{c}\u{85}\\p{Zl}\\p{Zp}"
+        "\\P{White_Space}"
     };
 }
+
+/// Any character but a line separator (U+000A to U+000D, U+0085, U+2028 and U+2029). `White_Space` is the space separators, the tab and
+/// those seven, so this class (Annex V2) names none of them.
+macro_rules! line_char {
+    () => {
+        "[\\P{White_Space}\\p{Zs}\\t]"
+    };
+}
+
+/// The text of [`line_char!`] for the code that reads a pattern's shape.
+pub(crate) const LINE_CHAR: &str = line_char!();
 
 /// Any character a command line can carry.
 macro_rules! any_char {
@@ -211,18 +223,18 @@ pub const SESSION_ID: &str = concat!("^[^\\p{Cc}", white_space!(), "]([^\\p{Cc}]
 /// (the shape only; that the date exists is a validator's).
 pub const TIMESTAMP: &str = concat!(
     "^(",
-    "[", white_space!(), "]*[-+]?[0-9]+-[", white_space!(), "]*[0-9]{1,2}-[", white_space!(), "]*[0-9]{1,2}",
+    white_space!(), "*[-+]?[0-9]+-", white_space!(), "*[0-9]{1,2}-", white_space!(), "*[0-9]{1,2}",
     "|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+\u{2212}][0-9]{2}:[0-9]{2})",
     ")$"
 );
 /// Text with at least one character that is not white space.
-pub const NOT_BLANK: &str = concat!("^", any_char!(), "*[^", white_space!(), "]", any_char!(), "*$");
+pub const NOT_BLANK: &str = concat!("^", any_char!(), "*", not_white_space!(), any_char!(), "*$");
 /// One line (no line separator), possibly empty.
-pub const ONE_LINE: &str = concat!("^[^", line_breaks!(), "]*$");
+pub const ONE_LINE: &str = concat!("^", line_char!(), "*$");
 /// One line with at least one character that is not white space.
-pub const ONE_LINE_NOT_BLANK: &str = concat!("^[^", line_breaks!(), "]*[^", white_space!(), "][^", line_breaks!(), "]*$");
+pub const ONE_LINE_NOT_BLANK: &str = concat!("^", line_char!(), "*", not_white_space!(), line_char!(), "*$");
 /// One line that neither starts nor ends with white space, and is not empty.
-pub const TRIMMED_ONE_LINE: &str = concat!("^[^", white_space!(), "]([^", line_breaks!(), "]*[^", white_space!(), "])?$");
+pub const TRIMMED_ONE_LINE: &str = concat!("^", not_white_space!(), "(", line_char!(), "*", not_white_space!(), ")?$");
 /// A lowercase hex sha-256: 64 digits.
 pub const SHA256_HEX: &str = "^[0-9a-f]{64}$";
 
@@ -249,7 +261,7 @@ static SHARED: Tables = Tables {
         DomainRow::new(Scope::ValueName("RUN_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "01arz3ndektsv4rrffq69g5fav"]).outside(&["01ARZ3NDEKTSV4RRFFQ69G5FA", "01ARZ3NDEKTSV4RRFFQ69G5FAI", "01ARZ3NDEKTSV4RRFFQ69G5FAVV"]),
         DomainRow::new(Scope::ValueName("REVIEW_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAL"]),
         DomainRow::new(Scope::ValueName("STRATEGY_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAO"]),
-        DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b"]).outside(&[" s", "s ", "a\tb"]),
+        DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b", "a\u{a0}b", "a\u{feff}"]).outside(&[" s", "s ", "a\tb", "\u{a0}s", "s\u{3000}", "\u{2003}s"]),
         DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE").says("is an invalid timestamp: an RFC 3339 time (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`) is expected").inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-1-1", "2030-01-01 10:00:00+02:00"]).outside(&["tomorrow", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "01/02/2030"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
         DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search"], "limit"), Domain::at_least(1), "USAGE"),

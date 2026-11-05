@@ -7,10 +7,10 @@ use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, CALENDAR, ROLE_DESCRIPTION
 
 /// A text that neither starts nor ends with white space, is not empty, and carries no `\n` and no `\r`: the approver of
 /// `evidence add` (the handler refuses only those two line breaks, unlike the shared `TRIMMED_ONE_LINE`).
-const APPROVER: &str = concat!("^[^", white_space!(), "]([^\\n\\r]*[^", white_space!(), "])?$");
+const APPROVER: &str = concat!("^", not_white_space!(), "([^\\n\\r]*", not_white_space!(), ")?$");
 /// A risk surface that is not empty, is trimmed and carries no `\n`, `\r` or NUL (the shape every `--surface-ref` has; the
 /// `effect:` form and the path rules are the validator's).
-const SURFACE_REF: &str = concat!("^[^", white_space!(), "]([^\\n\\r\u{0}]*[^", white_space!(), "])?$");
+const SURFACE_REF: &str = concat!("^", not_white_space!(), "([^\\n\\r\u{0}]*", not_white_space!(), ")?$");
 /// A `--report` is `<junit|cucumber|swift-testing>:<path>` with a path.
 const REPORT: &str = "^(junit|cucumber|swift-testing):[^\u{0}]+$";
 /// A `--prompt-bundle` is `NAME@VERSION`: a name and a version, neither empty, the version without a second `@`.
@@ -223,7 +223,7 @@ pub(crate) static TABLES: Tables = Tables {
             .inside(&["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"])
             .outside(&["", "0123456789abcdef", "0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"]),
         DomainRow::new(Scope::Arguments(&["evidence add"], "approver"), Domain::matching(APPROVER), "EVIDENCE_APPROVAL_INVALID").reason("MALFORMED").inside(&["alice", "a b", "a\u{2028}b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
-        DomainRow::new(Scope::Arguments(&["evidence approval-payload"], "approver"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["alice", "a b"]).outside(&["", " a", "a ", "a\nb", "a\u{2028}b"]),
+        DomainRow::new(Scope::Arguments(&["evidence approval-payload"], "approver"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["alice", "a b", "a\u{a0}b"]).outside(&["", " a", "a ", "a\nb", "a\u{2028}b", "\u{a0}a", "a\u{3000}"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence approval-payload"], "surface-ref"), Domain::matching(SURFACE_REF), "USAGE").inside(&["src/lib.rs", "effect:payments", "a b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "report"), Domain::matching(REPORT), "USAGE").inside(&["junit:r.xml", "cucumber:r.json", "swift-testing:e.jsonl", "junit:a:b"]).outside(&["r.xml", "junit:", "mocha:r.xml", ":r.xml", "JUnit:r.xml"]),
         // review: the runtime labels clap's value parser reads.

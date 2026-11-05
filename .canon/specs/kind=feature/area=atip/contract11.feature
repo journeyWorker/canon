@@ -6,10 +6,10 @@ Feature: ATIP 1.1 contract
   @case:happy
   @flow:canon-0-34-atip-1-1.F1
   @atip.contract11.01
-  Scenario: Every envelope declares contract atip/1 and the contractVersion canon declares (1.4 since 0.36), and a registry answer names its kind
+  Scenario: Every envelope declares contract atip/1 and the contractVersion canon declares (1.4 in 0.36, 1.5 since 0.37), and a registry answer names its kind
     Given a repo with canon.yaml
     When canon status --json, canon nosuch --json, canon schema --errors --json and canon schema --json run
-    Then every meta holds contract atip/1 and contractVersion 1.4 and passes the contract envelope schema; the errors answer has data.kind errors and meta.schemaVersion 1.4
+    Then every meta holds contract atip/1 and contractVersion 1.5 and passes the contract envelope schema; the errors answer has data.kind errors and meta.schemaVersion 1.5
 
   # canon: {"schema":1,"at":"2026-11-01T07:33:57Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract
@@ -39,7 +39,7 @@ Feature: ATIP 1.1 contract
   Scenario: The warning registry answers schema --warnings and --warning with the same entries, and a warning-only code leaves the error registry
     Given a repo
     When canon schema --warnings --json runs, then canon schema --warning CODE --json for each code, and canon schema --errors --json
-    Then the entries of the two answers are equal, every row validates against the warning entry schema, data.kind is warnings and warning, meta.schemaVersion is 1.4, and a code that is only a warning is in --warnings and not in --errors
+    Then the entries of the two answers are equal, every row validates against the warning entry schema, data.kind is warnings and warning, meta.schemaVersion is 1.5, and a code that is only a warning is in --warnings and not in --errors
 
   # canon: {"schema":1,"at":"2026-11-01T07:34:06Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract

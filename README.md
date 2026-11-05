@@ -64,7 +64,7 @@ no docker). The atip/1 contract crate and its checker are the
 `atip` crate at the tag `atip-crate-v0.2.0` (a git dependency, pinned by `Cargo.lock`), and the
 tests of the crate and the checker run there. Canon proves its own conformance by running the
 checker once, on the canon binary: `just atip-install` installs it at the tag `atip-check-v0.2.0`
-and `just atip-deep` runs `atip check --level L2 --contract 1.4 --deep` (the CI job `atip`); `just atip` runs the same check without `--deep`, in seconds.
+and `just atip-deep` runs `atip check --level L2 --contract 1.5 --deep` (the CI job `atip`); `just atip` runs the same check without `--deep`, in seconds.
 
 ## Safety boundaries
 

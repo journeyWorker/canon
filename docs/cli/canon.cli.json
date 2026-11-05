@@ -373,7 +373,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+$"
+            "pattern": "^[^\\p{White_Space}()\"']+$"
           },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
           "name": "relayed-via",
@@ -382,7 +382,7 @@
         {
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*[^\\p{White_Space}()\"']+\\p{White_Space}*$"
           },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
@@ -1449,7 +1449,7 @@
         "project",
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "Why the gap is accepted",
           "name": "reason",
@@ -1458,7 +1458,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "Where the gap is tracked: an issue URL or reference",
           "name": "tracking",
@@ -1467,7 +1467,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence",
           "name": "expiry",
@@ -1485,7 +1485,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence",
           "name": "session",
@@ -1647,7 +1647,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
           "name": "expiry",
@@ -1764,7 +1764,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "expiry",
@@ -1837,7 +1837,7 @@
         {
           "defaultNote": "now",
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "Governs Deferred expiry; defaults to now",
           "name": "as-of",
@@ -2194,7 +2194,7 @@
         {
           "defaultNote": "test-run when a --report is given",
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`",
           "name": "class"
@@ -2202,7 +2202,7 @@
         {
           "defaultNote": "the --report paths, comma-separated, when one is given",
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon",
           "name": "ref",
@@ -2221,7 +2221,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)",
           "name": "summary",
@@ -2239,7 +2239,7 @@
         "run",
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
           "help": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
           "name": "surface-ref",
@@ -2249,7 +2249,7 @@
         {
           "default": "canon",
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "name": "actor",
@@ -2266,7 +2266,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count",
           "name": "session",
@@ -2274,7 +2274,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([^\\n\\r]*\\P{White_Space})?$"
           },
           "help": "Human approval identity; authentication comes only from the detached signature",
           "name": "approver",
@@ -2297,7 +2297,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
           "name": "approval-at",
@@ -2451,7 +2451,7 @@
         "rev",
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
           "help": "The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)",
           "name": "surface-ref",
@@ -2460,7 +2460,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space})?$"
           },
           "help": "Who approved (the human whose detached signature the payload is for)",
           "name": "approver",
@@ -2622,7 +2622,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon",
           "name": "ref",
@@ -2631,7 +2631,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "One-line note (scanned for fabrication markers; line breaks refused)",
           "name": "summary",
@@ -2642,7 +2642,7 @@
         {
           "default": "canon",
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "name": "actor",
@@ -2659,7 +2659,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The attesting session (recorded as actor.session_id)",
           "name": "session",
@@ -2683,7 +2683,7 @@
         "max-artifact-mib",
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space})?$"
           },
           "help": "The external evaluator that re-audited the scenario (canon never runs it)",
           "name": "evaluator",
@@ -2692,7 +2692,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space})?$"
           },
           "help": "The evaluator's version",
           "name": "evaluator-version",
@@ -2823,7 +2823,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "before",
@@ -2831,7 +2831,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "after",
@@ -3179,7 +3179,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space}[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
           "name": "actor",
@@ -3188,7 +3188,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space}[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)",
           "name": "summary",
@@ -3199,7 +3199,7 @@
         "resolution-rev",
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The SOURCED introducing commit, any git revision (resolved to the full sha). Leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff",
           "name": "introduced-rev",
@@ -3220,7 +3220,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "Where in the tree, as path/to/file.rs:120-134 (line breaks refused)",
           "name": "file-ref",
@@ -3246,7 +3246,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The authoring session (recorded as actor.session_id)",
           "name": "session",
@@ -3427,7 +3427,7 @@
         "resolution-rev",
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space}[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`",
           "name": "reason",
@@ -3450,7 +3450,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The session that authored the TRANSITION (recorded as actor.session_id)",
           "name": "session",
@@ -4123,7 +4123,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*\\p{White_Space}*$"
           },
           "help": "Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml",
           "name": "language",
@@ -4593,7 +4593,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+$"
+            "pattern": "^[^\\p{White_Space}()\"']+$"
           },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --note carries the human's answer",
           "name": "relayed-via",
@@ -4602,7 +4602,7 @@
         {
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*[^\\p{White_Space}()\"']+\\p{White_Space}*$"
           },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
@@ -4882,7 +4882,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "name": "before",
@@ -5049,7 +5049,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "Only records with at >= <since> (RFC3339/ISO-8601)",
           "name": "since",
@@ -5243,7 +5243,7 @@
       "options": [
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+            "pattern": "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
           },
           "help": "The <role> segment (canonicalized)",
           "name": "role-segment",
@@ -5252,7 +5252,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+            "pattern": "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
           },
           "help": "The <repo> segment (canonicalized)",
           "name": "repo-name",
@@ -5261,7 +5261,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+            "pattern": "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
           },
           "help": "The <area> segment (canonicalized)",
           "name": "area",
@@ -5270,7 +5270,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9A-Fa-f]{6,64}[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*[0-9A-Fa-f]{6,64}\\p{White_Space}*$"
           },
           "help": "The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)",
           "name": "hash",
@@ -5470,7 +5470,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[0-9a-f]{6,64}$"
+            "pattern": "^[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[0-9a-f]{6,64}$"
           },
           "help": "Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject",
           "name": "regime",
@@ -5620,7 +5620,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "name": "session",
@@ -5755,7 +5755,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "name": "session",
@@ -6036,7 +6036,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/SchemaReport",
-          "schemaVersion": "1.4"
+          "schemaVersion": "1.5"
         }
       ],
       "summary": "Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes",
@@ -6078,7 +6078,7 @@
       "operands": [
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The text to find, read as typed: quotes and words such as AND are not syntax",
           "name": "text",
@@ -6298,7 +6298,7 @@
         {
           "defaultNote": "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories",
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+            "pattern": "^(\\p{White_Space}*|\\p{White_Space}*[Nn][Oo][Nn][Ee]\\p{White_Space}*|(\\p{White_Space}*,)*\\p{White_Space}*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*(,\\p{White_Space}*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*)?)*)$"
           },
           "help": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
           "name": "providers",
@@ -6731,7 +6731,7 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
           },
           "help": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
           "name": "approval-at",
@@ -6932,7 +6932,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r]*$"
+            "pattern": "^[^\\n\\r]*\\P{White_Space}[^\\n\\r]*$"
           },
           "help": "Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories",
           "name": "override-reason",
@@ -6940,7 +6940,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r]*$"
+            "pattern": "^[^\\n\\r]*\\P{White_Space}[^\\n\\r]*$"
           },
           "help": "Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor",
           "name": "reason",
@@ -7379,7 +7379,7 @@
       "operands": [
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)\\p{White_Space}*$"
           },
           "help": "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)",
           "name": "id",
@@ -7407,7 +7407,7 @@
     }
   ],
   "contract": "atip/1",
-  "contractVersion": "1.4",
+  "contractVersion": "1.5",
   "envVars": [
     {
       "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
@@ -38885,7 +38885,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The acting session (recorded as actor.session_id); optional",
         "name": "session",
@@ -39012,7 +39012,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space}[\\P{White_Space}\\p{Zs}\\t]*$"
         },
         "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
         "name": "override-reason",
@@ -39020,7 +39020,7 @@
       },
       {
         "domain": {
-          "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+          "pattern": "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
         },
         "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
         "name": "approval-at",
@@ -39077,7 +39077,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The reviewer runtime's provider (e.g. anthropic, openai)",
         "name": "reviewer-provider",
@@ -39085,7 +39085,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The reviewer runtime's model id",
         "name": "reviewer-model",
@@ -39093,7 +39093,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The harness that ran the reviewer (e.g. omp, codex, claude)",
         "name": "reviewer-harness",
@@ -39117,7 +39117,7 @@
       {
         "defaultNote": "the providers `skills install` would use",
         "domain": {
-          "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+          "pattern": "^(\\p{White_Space}*|\\p{White_Space}*[Nn][Oo][Nn][Ee]\\p{White_Space}*|(\\p{White_Space}*,)*\\p{White_Space}*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*(,\\p{White_Space}*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*)?)*)$"
         },
         "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
         "name": "providers",

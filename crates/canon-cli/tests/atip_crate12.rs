@@ -1,4 +1,4 @@
-//! canon-0-35-crate-1-2, seen from canon: the `atip` crate moves to 1.2; canon declares its minor by a constant of its own (1.2 in `canon-0-35-claim-l2`, 1.4 in `canon-0-36-claim-1-4`).
+//! canon-0-35-crate-1-2, seen from canon: the `atip` crate moves to 1.2; canon declares its minor by a constant of its own (1.2 in `canon-0-35-claim-l2`, 1.4 in `canon-0-36-claim-1-4`, 1.5 in `canon-0-37-claim-1-5`).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,15 +32,15 @@ fn sources_without_comments(dir: &Path) -> Vec<(PathBuf, String)> {
 #[test]
 fn atip_crate12_12_canon_declares_the_minor_of_its_answers_by_its_own_constant_and_the_crate_knows_it() {
     assert!(atip::Minor::parse(canon_cli::json_out::DECLARED_MINOR).is_ok(), "the crate knows the minor canon declares");
-    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.4", "canon declares 1.4: its own constant, changed by a decision to claim the minor");
+    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.5", "canon declares 1.5: its own constant, changed by a decision to claim the minor");
     let dir = tempfile::tempdir().expect("a temp dir");
     let schema = canon(dir.path(), &["schema", "--json"]);
-    assert_eq!(schema["meta"]["contractVersion"], "1.4", "{schema}");
-    assert_eq!(schema["meta"]["schemaVersion"], "1.4", "the self-description follows the declared minor");
+    assert_eq!(schema["meta"]["contractVersion"], "1.5", "{schema}");
+    assert_eq!(schema["meta"]["schemaVersion"], "1.5", "the self-description follows the declared minor");
     // A refusal declares it too: `status` finds no canon.yaml here.
     let status = canon(dir.path(), &["status", "--json"]);
-    assert_eq!((status["ok"].clone(), status["meta"]["contractVersion"].clone()), (Value::Bool(false), Value::from("1.4")), "{status}");
-    assert!(atip::envelope_problems(&status).is_empty(), "a 1.4 document is valid against the vendored schema");
+    assert_eq!((status["ok"].clone(), status["meta"]["contractVersion"].clone()), (Value::Bool(false), Value::from("1.5")), "{status}");
+    assert!(atip::envelope_problems(&status).is_empty(), "a 1.5 document is valid against the vendored schema");
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn atip_crate12_15_a_reserved_code_registered_with_another_exit_or_retryability_
     }
     assert_eq!(judged, 11, "the reserved codes canon registers");
     // A registry that registers STOPPED_MIDWAY at exit 2: a problem in a 1.2 document (the code is reserved at exit 1), none in a 1.1 one (the code is the
-    // tool's own) and none in canon's own 1.4 one (it is no code at all, since it ends in no condition).
+    // tool's own) and none in canon's own 1.5 one (it is no code at all, since it ends in no condition).
     let at_exit_two = |minor: atip::Minor| atip::registration_problem(minor, "STOPPED_MIDWAY", Some(2), Some(false));
     assert!(at_exit_two(atip::Minor::V1_2).is_some_and(|problem| problem.contains("reserved is exit 1")));
     assert_eq!(at_exit_two(atip::Minor::V1_1), None);
@@ -127,8 +127,8 @@ fn atip_crate12_15_a_reserved_code_registered_with_another_exit_or_retryability_
 fn atip_crate12_18_field_rules_follow_the_declared_minor_and_a_minor_the_crate_does_not_know_is_refused() {
     use atip::fields::{check_declaration, Rules};
     let declared = Rules::for_minor(canon_cli::json_out::DECLARED_MINOR).expect("canon declares a minor the crate knows");
-    assert_eq!(declared, Rules::at(atip::Minor::V1_4));
-    assert_eq!(declared, Rules::for_minor("1.1").expect("a minor"), "1.1 to 1.4 keep the same rules");
+    assert_eq!(declared, Rules::at(atip::Minor::V1_5));
+    assert_eq!(declared, Rules::for_minor("1.1").expect("a minor"), "1.1 to 1.5 keep the same rules");
     assert_ne!(declared, Rules::for_minor("1.0").expect("a minor"), "1.0 has no bracketed key, no map key and no map cut node");
     for text in ["1.9", "1.6", "2.0", "", "1"] {
         assert_eq!(Rules::for_minor(text), Err(atip::UnknownMinor(text.to_string())), "`{text}` is refused, not read as the nearest minor");

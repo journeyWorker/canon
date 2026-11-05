@@ -1,4 +1,4 @@
-Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs prove it
+Feature: atip canon claim l2: canon declares atip/1 (1.4 in 0.36, 1.5 since 0.37) and L2, and the CI jobs prove it
   # canon: {"schema":1,"at":"2026-11-02T21:07:05Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
 
   # canon: {"schema":1,"at":"2026-11-02T21:07:16Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
@@ -7,10 +7,10 @@ Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs 
   @case:happy
   @flow:canon-0-35-claim-l2.F1
   @atip.claiml2.01
-  Scenario: Every canon envelope, an error and the schema answer included, declares contractVersion 1.4, the schema answer has schemaVersion 1.4 and its tree says level L2
+  Scenario: Every canon envelope, an error and the schema answer included, declares contractVersion 1.5, the schema answer has schemaVersion 1.5 and its tree says level L2
     Given a repository with canon init
     When status, an unknown command, schema, schema --errors and schema --warnings are run with --json
-    Then every envelope has meta.contractVersion 1.4 and passes the contract's envelope schema, the schema answer has meta.schemaVersion 1.4, and the tree of schema has level L2
+    Then every envelope has meta.contractVersion 1.5 and passes the contract's envelope schema, the schema answer has meta.schemaVersion 1.5, and the tree of schema has level L2
 
   # canon: {"schema":1,"at":"2026-11-02T21:07:24Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract
@@ -40,10 +40,10 @@ Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs 
   @case:happy
   @flow:canon-0-35-claim-l2.F3
   @atip.claiml2.07
-  Scenario: just atip-deep and the CI job atip run canon at L2 with --contract 1.4 and --deep, just atip runs it without --deep, and just ci includes atip-deep
+  Scenario: just atip-deep and the CI job atip run canon at L2 with --contract 1.5 and --deep, just atip runs it without --deep, and just ci includes atip-deep
     Given the justfile and the workflow of the repository
     When the recipes atip-deep and atip and the job atip are read
-    Then the recipe atip-deep and the job run the installed checker once on the canon binary at L2 with --contract 1.4, --deep and the canon fixture, both build canon only, the recipe atip runs the same check without --deep, the jobs atip-l0, atip-l1, atip-l2 and atip-check-tests are gone because the L2 report holds every L0 and L1 row and the checker's tests are the atip repository's, and the recipe ci lists atip-deep
+    Then the recipe atip-deep and the job run the installed checker once on the canon binary at L2 with --contract 1.5, --deep and the canon fixture, both build canon only, the recipe atip runs the same check without --deep, the jobs atip-l0, atip-l1, atip-l2 and atip-check-tests are gone because the L2 report holds every L0 and L1 row and the checker's tests are the atip repository's, and the recipe ci lists atip-deep
 
   # canon: {"schema":1,"at":"2026-11-02T21:09:34Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract
@@ -51,10 +51,10 @@ Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs 
   @case:happy
   @flow:canon-0-35-claim-l2.F4
   @atip.claiml2.09
-  Scenario: canon's fixture claims 1.4 and holds prepare, notRun, the preview of each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
+  Scenario: canon's fixture claims 1.5 and holds prepare, notRun, the preview of each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
     Given canon's fixture
     When it is read
-    Then it has contractVersion 1.4, prepare with a git repository and one empty commit, notRun naming dashboard, a preview for each of the five destructive commands, batchFailsAt and batchFailsFirst for the batch commands it lists, and allowedEffects for the commands that write the audit line, and its registry is the generated one
+    Then it has contractVersion 1.5, prepare with a git repository and one empty commit, notRun naming dashboard, a preview for each of the five destructive commands, batchFailsAt and batchFailsFirst for the batch commands it lists, and allowedEffects for the commands that write the audit line, and its registry is the generated one
 
   # canon: {"schema":1,"at":"2026-11-02T21:10:16Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract
@@ -151,7 +151,7 @@ Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs 
   @flow:canon-0-35-claim-l2.F4
   @atip.claiml2.19
   Scenario: A fixture missing a required item, or claiming another minor, is refused by the fixture test
-    Given canon's committed fixture, which has contractVersion 1.4, prepare, notRun, a preview for each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
+    Given canon's committed fixture, which has contractVersion 1.5, prepare, notRun, a preview for each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
     When each of those items is taken out of a copy, or contractVersion is lowered to 1.3, and the fixture test reads the copy
     Then the committed fixture has no problem, and every copy is refused with a problem that names the missing item
 
@@ -162,6 +162,6 @@ Feature: atip canon claim l2: canon declares atip/1 1.4 and L2, and the CI jobs 
   @flow:canon-0-35-claim-l2.F3
   @atip.claiml2.20
   Scenario: Lowering the declared minor, the fixture's contractVersion, the job's or a recipe's --contract below the others fails the agreement check
-    Given the declared minor, the fixture's contractVersion, the job atip and the recipes atip and atip-deep, which all say 1.4
+    Given the declared minor, the fixture's contractVersion, the job atip and the recipes atip and atip-deep, which all say 1.5
     When one of the five is lowered to 1.3, or the job gives no minor
     Then the agreement check finds exactly the lowered one by name, and the missing declaration as a job that gives no minor, so the L2 run on canon cannot pass with a lowered contract

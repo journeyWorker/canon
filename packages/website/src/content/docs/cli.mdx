@@ -417,7 +417,7 @@ stderr: `{"ok": true, "data": …, "meta": …}` on success and
 `{"ok": false, "error": …, "meta": …}` on failure (an exit 1 partial report
 also carries `data`). The envelope follows atip/1. `meta` carries
 `schemaVersion`, `tool` (`canon`), `toolVersion`, `contract` (`atip/1`),
-`contractVersion` (`1.4`, on every envelope) and the
+`contractVersion` (`1.5`, on every envelope) and the
 resolved `command`, plus `output` (the report name, for a command that
 declares several), `context` (`{repo}`), `next`, `warnings`, `coverage`, `page`
 and `x-canon` (canon-only extras) where they apply. A member with no value is
@@ -437,7 +437,7 @@ members, and a value of a closed set it has not seen is one item to leave out.
     "tool": "canon",
     "toolVersion": "0.34.0",
     "contract": "atip/1",
-    "contractVersion": "1.4",
+    "contractVersion": "1.5",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [

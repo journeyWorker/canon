@@ -136,8 +136,11 @@ fn says_for(domain: &Domain) -> String {
         return integer_says(*minimum, *maximum);
     }
     let Domain::Text { pattern: Some(pattern), .. } = domain else { return "is outside its domain".to_string() };
-    let breaks = pattern.contains("[^\\n\\r");
-    let blank = pattern.contains("[^ \\t");
+    // A pattern refuses a line separator when it writes the class of any character but one (`LINE_CHAR`) or leaves `\n` and `\r` out of a class;
+    // it refuses a blank text when a character that is not white space is required, outside the one-line class that names it too.
+    let breaks = pattern.contains(super::LINE_CHAR) || pattern.contains("[^\\n\\r");
+    let without_line = pattern.replace(super::LINE_CHAR, "");
+    let blank = without_line.contains("\\P{White_Space}") || without_line.contains("[^\\p{White_Space}");
     if *pattern == super::KEBAB || *pattern == super::PROJECT_ID {
         "must be a kebab-case slug: lowercase letters and digits, single hyphens between them".to_string()
     } else if breaks && blank {

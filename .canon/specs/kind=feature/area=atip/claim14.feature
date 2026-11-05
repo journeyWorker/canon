@@ -1,4 +1,4 @@
-Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers in the 1.4 form
+Feature: atip claim 1.4: canon writes its schema answers in the 1.4 form (declared as 1.4 in 0.36, as 1.5 since 0.37)
   # canon: {"schema":1,"at":"2026-11-04T15:57:29Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
 
   # canon: {"schema":1,"at":"2026-11-04T15:57:29Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
@@ -7,10 +7,10 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   @case:happy
   @flow:canon-0-36-claim-1-4.F1
   @atip.claim14.01
-  Scenario: Every envelope and schema answer says contractVersion 1.4, and the tree says level L2 with shared options and no path, no kind command and no member at its default
+  Scenario: Every envelope and schema answer says contractVersion 1.5, and the tree says level L2 with shared options and no path, no kind command and no member at its default
     Given canon status, an unknown command, schema, schema finding close, schema --errors, schema --warnings and schema finding close --schemas run with --json
     When each envelope is read and the tree of canon schema --json is walked
-    Then each says contractVersion 1.4 and passes the contract's envelope schema, the schema answers say schemaVersion 1.4, the tree says level L2 and has options, and no entry has path or kind command and no member of the tree is at its default
+    Then each says contractVersion 1.5 and passes the contract's envelope schema, the schema answers say schemaVersion 1.5, the tree says level L2 and has options, and no entry has path or kind command and no member of the tree is at its default
 
   # canon: {"schema":1,"at":"2026-11-04T15:58:06Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-schema
@@ -117,7 +117,7 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   @case:happy
   @flow:canon-0-36-claim-1-4.F5
   @atip.claim14.11
-  Scenario: The guides, website pages, eval scripts, conformance expectations, generated spec, README and ARCHITECTURE declare 1.4 and state no old-form member as current
+  Scenario: The guides, website pages, eval scripts, conformance expectations, generated spec, README and ARCHITECTURE declare 1.5 and state no old-form member as current
     Given the guides, website pages in en and ko, eval scripts, conformance expectations, the generated spec, README and ARCHITECTURE
     When their text is scanned for the declaration and for members of the old form stated as current
     Then no file spells canon's declaration as 1.0 to 1.3 and none states input.schemaRef, input.option, path of a command document, schemas inside a command document, kind command of a tree entry or rejects in a command document as current
@@ -139,10 +139,10 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   @case:failure
   @flow:canon-0-36-claim-1-4.F6
   @atip.claim14.13
-  Scenario: The declared minor, the fixture, the CI job atip and the recipes atip and atip-deep agree on 1.4, and the check fails when one of them says 1.3
+  Scenario: The declared minor, the fixture, the CI job atip and the recipes atip and atip-deep agree on 1.5, and the check fails when one of them says 1.4
     Given DECLARED_MINOR, the fixture's contractVersion, the --contract of the CI job atip and of the recipes atip and atip-deep, with one of them seeded as 1.3
     When the agreement check reads them
-    Then all real values are 1.4 and the check fails for the seeded one
+    Then all real values are 1.5 and the check fails for the seeded one
 
   # canon: {"schema":1,"at":"2026-11-04T15:59:46Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-contract
@@ -150,10 +150,10 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   @case:happy
   @flow:canon-0-36-claim-1-4.F6
   @atip.claim14.14
-  Scenario: The CI job and the recipe atip-deep run atip check --level L2 --contract 1.4 --deep with the canon fixture, the recipe atip runs it without --deep, and just ci includes atip-deep
+  Scenario: The CI job and the recipe atip-deep run atip check --level L2 --contract 1.5 --deep with the canon fixture, the recipe atip runs it without --deep, and just ci includes atip-deep
     Given the CI job atip, the recipes atip and atip-deep, the recipe ci and the canon fixture
     When their commands are read
-    Then the job and atip-deep run atip check --level L2 --contract 1.4 --deep with the fixture at the tag atip-check-v0.2.0, atip runs it without --deep, ci includes atip-deep and the fixture claims 1.4
+    Then the job and atip-deep run atip check --level L2 --contract 1.5 --deep with the fixture at the tag atip-check-v0.2.0, atip runs it without --deep, ci includes atip-deep and the fixture claims 1.5
 
   # canon: {"schema":1,"at":"2026-11-04T15:59:52Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-contract
@@ -161,10 +161,10 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   @case:happy
   @flow:canon-0-36-claim-1-4.F7
   @atip.claim14.15
-  Scenario: The CHANGELOG Unreleased section holds the entry canon declares atip/1 1.4 with its before and after table, the sizes measured from the v0.35.0 binary and from this build, every tree plus one command sum, and the callers note
+  Scenario: The CHANGELOG 0.36.0 section holds the entry canon declares atip/1 1.4 with its before and after table, the sizes measured from the v0.35.0 binary and from the 0.36.0 build, every tree plus one command sum, and the callers note
     Given the Unreleased section of the CHANGELOG and the built binary
     When the entry is read and the sizes of schema finding close, finding list, purge, skills show, evidence add and the tree are measured, with the sum of the tree and each one command
-    Then the entry has its table with the declaration, the schema answer forms, --schemas and --help --json, each stated 1.4 size equals the measure, each command document is smaller than its 0.35 one, the tree may be larger, every sum is stated as the tree plus the command and a sum that is larger has its reason (the crate's sharing rule), and a callers paragraph mentions 1.3
+    Then the entry has its table with the declaration, the schema answer forms, --schemas and --help --json, each stated 1.4 size is the 0.36.0 measure (a live answer is not larger than it and lies within a tenth of it, the patterns of 0.37 being shorter), each command document is smaller than its 0.35 one, the tree may be larger, every sum is stated as the tree plus the command and a sum that is larger has its reason (the crate's sharing rule), and a callers paragraph mentions 1.3
 
   # canon: {"schema":1,"at":"2026-11-04T15:59:58Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-contract

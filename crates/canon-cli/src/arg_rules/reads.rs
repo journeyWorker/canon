@@ -7,15 +7,15 @@ use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDA
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
-const LANGUAGE: &str = concat!("^[", white_space!(), "]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[", white_space!(), "]*$");
+const LANGUAGE: &str = concat!("^", white_space!(), "*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*", white_space!(), "*$");
 
 /// `--providers`: blank or `none` (any case) for no provider, else a comma separated list of `claude`, `codex`, `omp`, `pi` (any
 /// case, white space around each, blank items skipped, at least one name).
 const PROVIDERS: &str = concat!(
-    "^([", white_space!(), "]*",
-    "|[", white_space!(), "]*[Nn][Oo][Nn][Ee][", white_space!(), "]*",
-    "|([", white_space!(), "]*,)*[", white_space!(), "]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[", white_space!(), "]*",
-    "(,[", white_space!(), "]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[", white_space!(), "]*)?)*",
+    "^(", white_space!(), "*",
+    "|", white_space!(), "*[Nn][Oo][Nn][Ee]", white_space!(), "*",
+    "|(", white_space!(), "*,)*", white_space!(), "*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])", white_space!(), "*",
+    "(,", white_space!(), "*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])", white_space!(), "*)?)*",
     ")$"
 );
 
@@ -26,13 +26,13 @@ const REGIME_KEY: &str = concat!("^[^/", white_space!(), "]+/[^/", white_space!(
 const REGIME_SEGMENT: &str = concat!("^[", white_space!(), "/]*[^", white_space!(), "/][^\u{0}]*$");
 
 /// The `regime show --hash`: trimmed and lowercased it is 6 to 64 hex digits.
-const REGIME_HASH: &str = concat!("^[", white_space!(), "]*[0-9A-Fa-f]{6,64}[", white_space!(), "]*$");
+const REGIME_HASH: &str = concat!("^", white_space!(), "*[0-9A-Fa-f]{6,64}", white_space!(), "*$");
 
 /// Every kind but the ones a filter of `query` applies to.
 /// What `canon trace` reads an operand as, after trimming (`search/trace.rs`): a review id (26 characters of Crockford base32),
 /// a commit sha (7 to 40 hex digits) or a finding key `<change>_<round>_<seq>` with a non-empty change. It is judged from the text
 /// alone, before any read; a pattern is a necessary condition: it admits some text (` _1_2`) that the parser then calls unrecognised.
-const TRACE_OPERAND: &str = concat!("^[", white_space!(), "]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|", any_char!(), "+_[0-9]+_[0-9]+)[", white_space!(), "]*$");
+const TRACE_OPERAND: &str = concat!("^", white_space!(), "*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|", any_char!(), "+_[0-9]+_[0-9]+)", white_space!(), "*$");
 
 const NOT_CHANGE_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding"];
 const NOT_STATUS_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];

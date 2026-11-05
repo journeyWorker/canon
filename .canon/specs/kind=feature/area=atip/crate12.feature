@@ -9,7 +9,7 @@ Feature: atip crate 1.2, seen from canon: the minor canon declares, the reserved
   Scenario: canon declares the minor of its answers by a constant of its own that the atip crate knows, and a success and a refusal both carry it
     Given the canon binary, the atip crate and the minor canon declares
     When Minor::parse reads the declared minor, and canon schema and canon status in a directory with no canon.yaml print their meta
-    Then the crate knows the minor, contractVersion and schemaVersion of the self-description are the declared 1.4, the refusal carries it too and passes the contract's envelope schema
+    Then the crate knows the minor, contractVersion and schemaVersion of the self-description are the declared 1.5, the refusal carries it too and passes the contract's envelope schema
 
   # canon: {"schema":1,"at":"2026-11-04T19:17:41Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
   @subject:atip-contract
@@ -29,7 +29,7 @@ Feature: atip crate 1.2, seen from canon: the minor canon declares, the reserved
   Scenario: The reserved codes canon registers have the exit and retryability of the crate's table for the minor canon declares
     Given the reserved code table of the crate and canon schema --errors
     When the reserved codes of the declared minor are read from the table and each is looked up in the registry canon prints
-    Then twelve codes are reserved at 1.4 and canon registers eleven of them, each at the table's exit and retryability and with no problem from registration_problem, the twelfth (OPERATION_REUSED) is the one canon has no --operation for, and the table has thirteen rows with STOPPED_MIDWAY at exit 1, not retryable, reserved in 1.2 alone, which canon does not register
+    Then twelve codes are reserved at 1.5 and canon registers eleven of them, each at the table's exit and retryability and with no problem from registration_problem, the twelfth (OPERATION_REUSED) is the one canon has no --operation for, and the table has thirteen rows with STOPPED_MIDWAY at exit 1, not retryable, reserved in 1.2 alone, which canon does not register
 
   # canon: {"schema":1,"at":"2026-11-04T19:17:51Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
   @subject:atip-contract

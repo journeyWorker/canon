@@ -212,8 +212,11 @@ fn atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults() {
     assert!(found(&[option(json!({ "pattern": "^\\d+$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("not I-Regexp")));
     assert!(found(&[option(json!({ "minLength": 1 }), Value::Null, ValueType::Integer)]).iter().any(|problem| problem.contains("outside the domain profile")));
     assert!(found(&[option(json!({ "minimum": 9_007_199_254_740_992_i64 }), Value::Null, ValueType::Integer)]).iter().any(|problem| problem.contains("safe integer")));
-    // Canon declares 1.4, where a pattern may not use the white space property (Annex V2 is since 1.5, spec 15.7): it is a problem.
-    assert!(found(&[option(json!({ "pattern": "^\\p{White_Space}$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("{White_Space} is since 1.5") && problem.contains("declares contract 1.4")));
+    // Canon declares 1.5, where a pattern may use the white space property (Annex V2, spec 15.7): it is no problem. A document that declares 1.4 may not: it is one.
+    assert!(found(&[option(json!({ "pattern": "^\\p{White_Space}$" }), Value::Null, ValueType::String)]).is_empty());
+    let at_1_4 = document_problems(&[option(json!({ "pattern": "^\\p{White_Space}$" }), Value::Null, ValueType::String)], &[], &[], &[], &["USAGE".to_string()], &[], atip::Minor::parse("1.4").expect("the crate knows 1.4"));
+    assert!(at_1_4.iter().any(|problem| problem.contains("{White_Space} is since 1.5") && problem.contains("declares contract 1.4")), "{at_1_4:?}");
+    assert!(found(&[option(json!({ "pattern": "^\\s+$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("not I-Regexp")), "`\\s` is a problem at the minor canon declares too");
     assert!(found(&[option(json!({ "minimum": 1 }), json!(1), ValueType::Integer)]).is_empty());
 }
 
