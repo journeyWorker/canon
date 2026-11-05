@@ -19,7 +19,7 @@ use super::{DomainRow, Scope, Tables, KEBAB, LINE_TEXT, REGIME_KEY};
 /// spaces, and any script is text.
 const TEXT_INSIDE: &[&str] = &["alice", " alice ", "\talice\n", "a b", "a\u{a0}b", "a\u{3000}b", "알리스", "a\u{2028}", "\u{85}a"];
 /// Values it refuses: nothing, only white space, and a control character, a line separator or a paragraph separator inside the text.
-const TEXT_OUTSIDE: &[&str] = &["", " ", "\t", "\n", "\u{85}", "\u{2028}", "a\nb", "a\rb", "a\tb", "a\u{b}b", "a\u{c}b", "a\u{1b}b", "a\u{7f}b", "a\u{85}b", "a\u{2028}b", "a\u{2029}b"];
+const TEXT_OUTSIDE: &[&str] = &["", " ", "\t", "\n", "\u{85}", "\u{2028}", "a\nb", "a\rb", "a\tb", "a\u{b}b", "a\u{c}b", "a\u{1b}b", "a\u{7f}b", "a\u{1}b", "a\u{8}b", "a\u{e}b", "a\u{1a}b", "a\u{1c}b", "a\u{1f}b", "a\u{80}b", "a\u{85}b", "a\u{2028}b", "a\u{2029}b"];
 /// The sentence rows' own: a sentence with spaces in it.
 const SENTENCE_INSIDE: &[&str] = &["the engine drops the event", " a ", "\ta\n", "a\u{a0}b", "한 줄의 이유", "a\u{2029}"];
 

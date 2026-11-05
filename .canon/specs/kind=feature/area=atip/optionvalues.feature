@@ -10,7 +10,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: The id options --project, --role and --domain declare the one kebab slug in every command and take a value inside it
     Given every command document of canon schema, and a value inside the slug for --project, --role and --domain in the commands that can run on the story repository
     When the declarations are read and the calls run
-    Then each of the 33 declarations is the kebab slug pattern, divergence accept --role keeps its reviewer-only refusal as a validator beside it, and the calls with a value inside the slug are taken
+    Then each of the 25 declarations (3 of --domain, 11 of --project, 11 of --role) is the kebab slug pattern, divergence accept --role keeps its reviewer-only refusal as a validator beside it, and the calls with a value inside the slug are taken
 
   # canon: {"schema":1,"at":"2026-11-05T14:12:22Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema
@@ -32,7 +32,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: A name is trimmed and the trimmed value is what is recorded and signed, and every name and sentence option declares one domain in every command
     Given --actor with white space around it on scenario new and finding add, --approver with white space around it on evidence approval-payload, and every command document that has --actor, --approver, --relayed-via, --reason, --summary or --override-reason
     When the calls run and the documents are read
-    Then the record holds alice and not the padded value, the payload signed over the padded approver is the payload of the trimmed one, and the 41 declarations of the six options are one pattern with the class [^\p{Cc}\p{Zl}\p{Zp}]
+    Then the record holds alice and not the padded value, the payload signed over the padded approver is the payload of the trimmed one, and the 43 declarations of the six options are one pattern with the class [^\p{Cc}\p{Zl}\p{Zp}]
 
   # canon: {"schema":1,"at":"2026-11-05T14:12:44Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema
@@ -162,9 +162,9 @@ Feature: atip option values: an option of the same name takes the same value in 
   @flow:canon-0-37-option-values.F7
   @atip.optionvalues.15
   Scenario: The check of the CHANGELOG fails for a missing row, a missing answer and a missing entry
-    Given the CHANGELOG with one row taken out, with a row that has no way to move, and with the entry for the trimmed values reworded, and a refused value no row names
+    Given the CHANGELOG with one row taken out, with the class of the other control characters left out of every row, with a row that has no way to move, and with the entry for the trimmed values reworded, and a refused value no row names
     When the check reads each
-    Then it finds the missing row by its option and class, the row with no way to move, the missing entry and the unlisted class, and passes the complete CHANGELOG
+    Then it finds the missing row by its option and class, the missing class by name, the row with no way to move, the missing entry and the unlisted class, and passes the complete CHANGELOG
 
   # canon: {"schema":1,"at":"2026-11-05T14:14:56Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-contract

@@ -300,7 +300,7 @@ fn atip_optionvalues_03_every_name_and_sentence_option_declares_one_domain_in_ev
         }
     }
     assert_eq!(patterns.len(), 1, "one pattern for the six options: {patterns:?}");
-    assert!(read >= 40, "every cell was read ({read})");
+    assert_eq!(read, 43, "the 43 declarations of the six options were read");
     let pattern = patterns.into_iter().next().expect("one");
     assert!(pattern.contains("[^\\p{Cc}\\p{Zl}\\p{Zp}]"), "the class of a name and a sentence is written `[^\\p{{Cc}}\\p{{Zl}}\\p{{Zp}}]`: {pattern}");
     assert_eq!(atip::domain::pattern_problem(&pattern, atip::Minor::parse("1.5").expect("1.5")), None);
@@ -308,7 +308,7 @@ fn atip_optionvalues_03_every_name_and_sentence_option_declares_one_domain_in_ev
 
 /// The values every name and sentence option takes and refuses, by the domain, over a table of values.
 const TAKEN: &[&str] = &["alice", " alice ", "\talice\n", "a b", "a\u{a0}b", "a\u{3000}b", "알리스", "a\u{2028}", "\u{85}a", "--x", "a(b", "a'b"];
-const REFUSED: &[&str] = &["", " ", "\t", "\n", "\u{85}", "\u{2028}", "a\nb", "a\rb", "a\tb", "a\u{b}b", "a\u{c}b", "a\u{1b}b", "a\u{7f}b", "a\u{85}b", "a\u{2028}b", "a\u{2029}b", "a\u{9f}b"];
+const REFUSED: &[&str] = &["", " ", "\t", "\n", "\u{85}", "\u{2028}", "a\nb", "a\rb", "a\tb", "a\u{b}b", "a\u{c}b", "a\u{1b}b", "a\u{7f}b", "a\u{1}b", "a\u{8}b", "a\u{e}b", "a\u{1a}b", "a\u{1c}b", "a\u{1f}b", "a\u{80}b", "a\u{85}b", "a\u{2028}b", "a\u{2029}b", "a\u{9f}b"];
 
 #[test]
 fn atip_optionvalues_04_a_blank_name_or_one_with_a_control_character_or_a_line_break_inside_is_refused() {
@@ -328,7 +328,7 @@ fn atip_optionvalues_04_a_blank_name_or_one_with_a_control_character_or_a_line_b
             cells += 1;
         }
     }
-    assert!(cells >= 40, "{cells} cells");
+    assert_eq!(cells, 43, "the 43 declarations of the six options");
     // Through the binary, in four commands that took everything or nearly: nothing is written and the command's own code answers.
     for (value, label) in [("a\nb", "a line break"), ("a\tb", "a tab"), ("a\u{1b}b", "an escape"), (" ", "white space only")] {
         let actor = format!("--actor={value}");
@@ -597,6 +597,7 @@ struct Entry {
     class: String,
     value: Value,
     commands: Vec<String>,
+    members: Vec<Value>,
 }
 
 fn golden() -> Vec<Entry> {
@@ -614,16 +615,20 @@ fn golden() -> Vec<Entry> {
                 _ => panic!("a value is text"),
             },
             commands: entry["commands"].as_array().expect("commands").iter().map(|command| command.as_str().expect("a command").to_string()).collect(),
+            members: entry["members"].as_array().into_iter().flatten().map(|member| json!(member.as_str().expect("a member is text"))).collect(),
         })
         .collect()
 }
 
-/// The `(option, command, class)` triples of the golden file that this build refuses: a value 0.36.0 took.
+/// The `(option, command, class)` triples of the golden file that this build refuses: a value 0.36.0 took. A class that lists `members` is refused as a whole: every member
+/// is judged, and a class some of whose values are taken and some refused is a fault of the golden file.
 fn refused_now(entries: &[Entry]) -> BTreeSet<(String, String, String)> {
     let mut found = BTreeSet::new();
     for entry in entries {
         for command in &entry.commands {
-            if !admits(command, &entry.option, &entry.value) {
+            let sides: BTreeSet<bool> = std::iter::once(&entry.value).chain(&entry.members).map(|value| admits(command, &entry.option, value)).collect();
+            assert_eq!(sides.len(), 1, "the class `{}` of `--{}` in `{command}` is taken in part and refused in part", entry.class, entry.option);
+            if sides.contains(&false) {
                 found.insert((entry.option.clone(), command.clone(), entry.class.clone()));
             }
         }
@@ -704,6 +709,11 @@ fn atip_optionvalues_15_the_check_of_the_changelog_fails_for_a_missing_row_a_mis
     let without_row: String = lines.iter().enumerate().filter(|(index, _)| *index != at).map(|(_, line)| *line).collect::<Vec<_>>().join("\n");
     let problems = changelog_problems(&without_row, &refused);
     assert!(problems.iter().any(|problem| problem.contains("`--actor`") && problem.contains("tab-inside")), "{problems:?}");
+    // A whole class left out of the table (the control characters of no class of their own): every row that names it loses it, and the check finds the class by name.
+    let without_class = changelog.replace(", `other-control`", "");
+    assert_ne!(without_class, changelog, "the table names the class `other-control`");
+    let problems = changelog_problems(&without_class, &refused);
+    assert!(problems.iter().any(|problem| problem.contains("other-control")), "{problems:?}");
     // A row with no way to move.
     let blank_move = lines.iter().enumerate().map(|(index, line)| if index == at { "| `--actor` | `evidence add` | `tab-inside` | refused |  |".to_string() } else { (*line).to_string() }).collect::<Vec<_>>().join("\n");
     assert!(changelog_problems(&blank_move, &refused).iter().any(|problem| problem.contains("no way to move")));

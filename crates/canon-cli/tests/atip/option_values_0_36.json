@@ -1,5 +1,5 @@
 {
- "_about": "What canon 0.36.0 accepted for the values `canon-0-37-option-values` narrows (`atip.optionvalues.14`): per option and value class, the commands that took a value of that class. Measured on the released 0.36.0 binary, one run per command on a fresh fixture (the rest by reading the 0.36.0 source: `strategy rollback --reason`, `strategy approval-payload --approver`, and the form-feed and vertical-tab values of the sentence options, which the handlers and patterns of 0.36.0 did not look at). `atip.optionvalues.14` holds the CHANGELOG to this file: every value of it that the build refuses now has a row.",
+ "_about": "What canon 0.36.0 accepted for the values `canon-0-37-option-values` narrows (`atip.optionvalues.14`): per option and value class, the commands that took a value of that class. Measured on the released 0.36.0 binary, one run per command on a fresh fixture (the rest by reading the 0.36.0 source: `strategy rollback --reason`, `strategy approval-payload --approver`, and the form-feed and vertical-tab values of the sentence options, which the handlers and patterns of 0.36.0 did not look at). `atip.optionvalues.14` holds the CHANGELOG to this file: every value of it that the build refuses now has a row. Round 2 added the class `other-control` (the control characters of no class of their own): a real-binary probe of 0.36.0 (the reviewer's old-vs-new matrix and a spot check of `finding add --summary` and `scenario new --actor` with U+007F, U+009F, U+0001 and U+001F) shows every cell that took an escape took them too, so each `escape-inside` entry has an `other-control` entry with the same commands.",
  "classes": {
   "empty": "an empty value",
   "blank": "only white space (spaces, a tab)",
@@ -16,7 +16,8 @@
   "space-inside": "a space inside",
   "space-around": "a space around",
   "zero": "0",
-  "open": "the value `open`"
+  "open": "the value `open`",
+  "other-control": "a control character that has no class of its own inside the value: U+0001-0008, U+000E-001A, U+001C-001F, U+007F, U+0080-009F except U+0085 (U+0000 cannot be given on a command line); `value` is one of them and `members` the others"
  },
  "accepted": [
   {
@@ -92,6 +93,42 @@
   {
    "kind": "text",
    "option": "actor",
+   "class": "other-control",
+   "value": "a\u007fb",
+   "members": [
+    "a\u0001b",
+    "a\bb",
+    "a\u000eb",
+    "a\u001ab",
+    "a\u001cb",
+    "a\u001fb",
+    "a\u0080b",
+    "a\u009fb"
+   ],
+   "commands": [
+    "brief approve",
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence audit",
+    "feature new",
+    "finding add",
+    "finding close",
+    "migrate",
+    "policy approve",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
    "class": "lf-cr",
    "value": "a\nb",
    "commands": [
@@ -208,6 +245,31 @@
   {
    "kind": "text",
    "option": "approver",
+   "class": "other-control",
+   "value": "a\u007fb",
+   "members": [
+    "a\u0001b",
+    "a\bb",
+    "a\u000eb",
+    "a\u001ab",
+    "a\u001cb",
+    "a\u001fb",
+    "a\u0080b",
+    "a\u009fb"
+   ],
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "evidence add",
+    "evidence approval-payload",
+    "migrate",
+    "policy approve",
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
    "class": "lf-cr",
    "value": "a\nb",
    "commands": [
@@ -272,6 +334,27 @@
   {
    "kind": "text",
    "option": "override-reason",
+   "class": "other-control",
+   "value": "a\u007fb",
+   "members": [
+    "a\u0001b",
+    "a\bb",
+    "a\u000eb",
+    "a\u001ab",
+    "a\u001cb",
+    "a\u001fb",
+    "a\u0080b",
+    "a\u009fb"
+   ],
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "override-reason",
    "class": "nel-ls-ps-inside",
    "value": "a\u2028b",
    "commands": [
@@ -323,6 +406,30 @@
    "option": "reason",
    "class": "escape-inside",
    "value": "a\u001bb",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "finding close",
+    "strategy rollback",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "other-control",
+   "value": "a\u007fb",
+   "members": [
+    "a\u0001b",
+    "a\bb",
+    "a\u000eb",
+    "a\u001ab",
+    "a\u001cb",
+    "a\u001fb",
+    "a\u0080b",
+    "a\u009fb"
+   ],
    "commands": [
     "divergence accept",
     "divergence add",
@@ -398,6 +505,28 @@
   },
   {
    "kind": "text",
+   "option": "relayed-via",
+   "class": "other-control",
+   "value": "a\u007fb",
+   "members": [
+    "a\u0001b",
+    "a\bb",
+    "a\u000eb",
+    "a\u001ab",
+    "a\u001cb",
+    "a\u001fb",
+    "a\u0080b",
+    "a\u009fb"
+   ],
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "migrate",
+    "policy approve"
+   ]
+  },
+  {
+   "kind": "text",
    "option": "summary",
    "class": "blank",
    "value": "   ",
@@ -423,6 +552,28 @@
    "option": "summary",
    "class": "escape-inside",
    "value": "a\u001bb",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "finding add",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "other-control",
+   "value": "a\u007fb",
+   "members": [
+    "a\u0001b",
+    "a\bb",
+    "a\u000eb",
+    "a\u001ab",
+    "a\u001cb",
+    "a\u001fb",
+    "a\u0080b",
+    "a\u009fb"
+   ],
    "commands": [
     "evidence add",
     "evidence audit",
