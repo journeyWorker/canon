@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-atip-dep",
+    "role": "reviewer",
+    "session_id": "s-0-37-atip-dep-rev"
+  },
+  "at": "2026-11-05T11:36:10.461738Z",
+  "code_tree": "a0b30fc38bd6d7ca24840380886f8f53027384c0",
+  "kind": "review",
+  "pin": "ab16057f0c0badf5d52bcd07d4180694648b2272",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "sha256:0140e5267a6a53774acf00204d5245eb0e40bdae3ef332e8841eb118d0dd4b99"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "4510976eb4fdc30e16937f800c8dbe05e3232f2d0936399e99569ae1af39e9db",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-atip-dep/brief.md"
+  },
+  "review_id": "01M6NQXDEX06TJ9322EFZ5BHXF",
+  "reviewer": "rev-0-37-atip-dep",
+  "scenario_id": "atip.contract11.12",
+  "schema": 2,
+  "worktree_dirty": false
+}
