@@ -245,6 +245,55 @@ mod tests {
             .arg(Arg::new("plain").long("plain").num_args(1))
     }
 
+    /// What 0.36.0 said of a text value outside a domain (`says_for` read the pattern by the characters it listed: `[^\n\r` and `[^ \t`).
+    fn said_in_0_36(pattern: &str) -> String {
+        let breaks = pattern.contains("[^\\n\\r");
+        let blank = pattern.contains("[^ \\t");
+        if breaks && blank {
+            "must be one non-empty line: it is blank or carries a line separator".to_string()
+        } else if breaks {
+            "must be one line: it carries a line separator".to_string()
+        } else if blank {
+            "is empty or only white space".to_string()
+        } else {
+            format!("does not match its pattern {pattern}")
+        }
+    }
+
+    /// atip.claim15.04 (F2): the words a refusal uses for a value outside a text domain are read from the shape of its pattern; the pattern of each place that
+    /// listed white space in 0.36.0 is written with the property now, and its refusal says what it said.
+    #[test]
+    fn atip_claim15_04_a_refusal_says_for_each_pattern_that_listed_white_space_what_it_said_in_0_36() {
+        let golden: serde_json::Value = serde_json::from_str(include_str!("../../tests/atip/white_space_0_36.json")).expect("the golden patterns are JSON");
+        let model = crate::spec::model();
+        let mut compared = 0;
+        for entry in golden["patterns"].as_array().expect("patterns") {
+            let old = entry["pattern"].as_str().expect("a pattern");
+            for place in entry["at"].as_array().expect("places") {
+                let place = place.as_str().expect("a place");
+                let (owner, name) = place.rsplit_once(' ').expect("a place names its owner and its argument");
+                let name = name.trim_start_matches("--");
+                let argument = model["commands"]
+                    .as_array()
+                    .expect("commands")
+                    .iter()
+                    .filter(|doc| owner == "tree" || doc["command"] == owner)
+                    .flat_map(|doc| doc["options"].as_array().into_iter().flatten().chain(doc["operands"].as_array().into_iter().flatten()))
+                    .find(|argument| (argument["name"] == name || argument["valueName"] == name) && argument["domain"]["pattern"].is_string())
+                    .unwrap_or_else(|| panic!("`{place}` declares a pattern"));
+                let new = argument["domain"]["pattern"].as_str().expect("a pattern").to_string();
+                assert!(new.contains("White_Space"), "`{place}` says white space as the property: {new}");
+                let domain = Domain::matching(Box::leak(new.clone().into_boxed_str()));
+                // A refusal that has no words for the shape of its pattern quotes the pattern: the pattern it quotes is the one declared now.
+                let before = said_in_0_36(old);
+                let expected = if before.starts_with("does not match its pattern ") { format!("does not match its pattern {new}") } else { before };
+                assert_eq!(says_for(&domain), expected, "`{place}`: {new}");
+                compared += 1;
+            }
+        }
+        assert_eq!(compared, 59, "the 59 places that listed white space");
+    }
+
     /// atip.checkorder.16: a domain judges the argument object (the value given, else the environment's, else the default), a constraint
     /// only what was given (spec 11.7 step 6, 10.8.1).
     #[test]

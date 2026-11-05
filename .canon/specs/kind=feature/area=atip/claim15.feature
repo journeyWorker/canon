@@ -41,9 +41,9 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @flow:canon-0-37-claim-1-5.F2
   @atip.claim15.04
   Scenario: Each of the 17 new patterns takes and refuses the values its pattern of 0.36.0 did, over every scalar value and the near misses of the bases
-    Given the 17 patterns of 0.36.0 as canon schema printed them, the new pattern of each of the 59 places, every scalar value up to U+3100 with a sample of the rest, and the near misses of the bases built from the controls and the white space and their neighbours
+    Given the 17 patterns of 0.36.0 as canon schema printed them, the new pattern of each of the 59 places and the words of its refusal, every scalar value up to U+3100 with a sample of the rest, and the near misses of the bases built from the controls and the white space and their neighbours
     When each old and new pattern decides each value, and the pattern for --relayed-via decides every scalar value against the white space of the standard library
-    Then no value changes sides, each pattern takes some values and refuses some, and the property is exactly the 25 code points of White_Space
+    Then no value changes sides, each pattern takes some values and refuses some, the property is exactly the 25 code points of White_Space, and the refusal of each of the 59 places says what it said in 0.36.0 (where it quotes its pattern it quotes the one declared now)
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:54Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
