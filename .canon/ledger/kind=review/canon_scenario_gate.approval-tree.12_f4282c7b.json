@@ -4,11 +4,10 @@
     "role": "reviewer",
     "session_id": "s-0-37-approval-evidence-rev"
   },
-  "at": "2026-11-05T12:18:17.556887Z",
-  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "at": "2026-11-05T12:51:46.217796Z",
+  "code_tree": "c860b5a2a3ec5dd80941f624e1c64bb57dc75dc6",
   "kind": "review",
-  "outcome": "indeterminate",
-  "pin": "dd758decc5cf88e1569cd1cd9335fd4307f91b88",
+  "pin": "708da55f7fb22141581ea938499bb4e1f71c1cfa",
   "pins": {
     "checks": [
       {
@@ -19,14 +18,14 @@
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "e0e5f23a9ed1f3465266b4463e2f5a3ba1b7e9936430ec9115bbe3491d955d62",
+    "scenario_digest": "b8eb4d31fa84e3a069add3d4b5b45465c480269ad1dcd835d881550193e1180b",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-37-approval-evidence/brief.md"
   },
-  "review_id": "01M6NTAHAMYSMRCD06X3WDT0R7",
+  "review_id": "01M6NW7TX905F463AWMJSDBKFC",
   "reviewer": "rev-0-37-approval-evidence",
   "scenario_id": "gate.approval-tree.12",
   "schema": 2,

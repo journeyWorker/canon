@@ -4,10 +4,10 @@
     "role": "reviewer",
     "session_id": "s-0-37-approval-evidence-rev"
   },
-  "at": "2026-11-05T12:18:05.619361Z",
-  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "at": "2026-11-05T12:51:46.217796Z",
+  "code_tree": "c860b5a2a3ec5dd80941f624e1c64bb57dc75dc6",
   "kind": "review",
-  "pin": "dd758decc5cf88e1569cd1cd9335fd4307f91b88",
+  "pin": "708da55f7fb22141581ea938499bb4e1f71c1cfa",
   "pins": {
     "checks": [
       {
@@ -18,14 +18,14 @@
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "126006866a566c52197347325fda86ad5e37911323ff811145216e8c71fa0460",
+    "scenario_digest": "31819981c2b31d202371226c245b85c449ab88d45dcf41842c961593479d33a6",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-37-approval-evidence/brief.md"
   },
-  "review_id": "01M6NTA5NK704Z21QV48ZAX0ZT",
+  "review_id": "01M6NW7TX905F463AWMJSDBKFC",
   "reviewer": "rev-0-37-approval-evidence",
   "scenario_id": "gate.approval-tree.05",
   "schema": 2,
