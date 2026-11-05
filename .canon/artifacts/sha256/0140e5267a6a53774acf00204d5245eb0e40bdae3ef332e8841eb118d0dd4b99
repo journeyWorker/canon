@@ -1,0 +1,21 @@
+# canon-0-37-atip-dep: contract11.12 re-run at a5f6b6ba0b9e4d5fbb4492067402b082ac4287f2 (tree 58b93acd046099d5de3ea6c368a5025ae51a83a7)
+$ bun test packages/dashboard/test/envelope-tolerance.test.ts
+bun test v1.4.4 (38afee6c8)
+
+ 4 pass
+ 0 fail
+ 14 expect() calls
+Ran 4 tests across 1 file. [48.00ms]
+$ bun test packages/cli/test/launcher.test.ts
+bun test v1.4.4 (38afee6c8)
+
+ 5 pass
+ 0 fail
+ 7 expect() calls
+Ran 5 tests across 1 file. [619.00ms]
+$ python3 -m unittest evals.dogfood.test_trace_check
+....................................
+----------------------------------------------------------------------
+Ran 36 tests in 0.400s
+
+OK

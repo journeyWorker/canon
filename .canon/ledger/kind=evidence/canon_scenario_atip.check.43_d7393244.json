@@ -1,0 +1,71 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-dep-037",
+    "role": "implementer",
+    "session_id": "s-0-37-atip-dep"
+  },
+  "at": "2026-11-05T11:25:12.646060Z",
+  "attachments": [
+    {
+      "path": "target/evidence/evidence-summary.md",
+      "sha256": "789bbfa1aa9b5f9f5db33478c4ca406026cb0e83ede6701c88b96ad8a5f03f8b"
+    },
+    {
+      "path": "target/evidence/battery-hashes-before-and-after.txt",
+      "sha256": "06757376d8d9e84216721e8b6772539c560c2171c52d5bc0d74b62553c849ff6"
+    },
+    {
+      "path": "target/evidence/battery-manifest-0.36.0.txt",
+      "sha256": "d22b0a9c29cd236055189f9d4a883c04ece33b0e54ac4f52205a7853245ec7f0"
+    },
+    {
+      "path": "target/evidence/search.txt",
+      "sha256": "69637258a26695303c3bdd7bce23442fe23047e81e2c74ac5020f69c375c08d1"
+    },
+    {
+      "path": "target/evidence/just-atip.log",
+      "sha256": "759266c2247ee0401bfcb7aec073161e83940dd893f5ce47fff81ea72a164326"
+    },
+    {
+      "path": "target/evidence/atip-deep.log",
+      "sha256": "cc0ec3c77c1d8c12cce651109ef02c921f1460aad5ca2fefc607ec48dfcfc77b"
+    },
+    {
+      "path": "target/evidence/atip-deep-0.1.4-checker-on-0.36.0-binary.log",
+      "sha256": "e1ceadfdca3dc13d1cde8b0d3931eb578349d940be3ec759ad39f140cec69511"
+    },
+    {
+      "path": "target/evidence/lint.log",
+      "sha256": "acedaebb87d48803b190550eab782f80793096c48f853493640261c04c248853"
+    },
+    {
+      "path": "target/evidence/conformance-docs.log",
+      "sha256": "42cfd56256754e0556a2459364300a8080c98daec4db02603c782f077b90d12f"
+    },
+    {
+      "path": "target/evidence/nextest-summary.log",
+      "sha256": "2c3b08b0797e61090cfedadaa69183e5b325b28257b7d0c061fffaeb4f90067c"
+    },
+    {
+      "case": "atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon_binary_with_the_same_command",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "44f8784de9c58e354423dbc0166cc6de3e0327e080578fa6c54b9c876854e701"
+    }
+  ],
+  "code_tree": "a0b30fc38bd6d7ca24840380886f8f53027384c0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-atip-dep; 3817 tests passed at a5f6b6ba0); the output hashes before and after, the search, just atip, just atip-deep, lint"
+  },
+  "evidence_sha": "a5f6b6ba0b9e4d5fbb4492067402b082ac4287f2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1217,
+  "scenario_id": "atip.check.43",
+  "schema": 1,
+  "staging_id": "a288e25f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

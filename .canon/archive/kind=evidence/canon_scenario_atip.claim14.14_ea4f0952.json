@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-dep-037",
+    "role": "implementer",
+    "session_id": "s-0-37-atip-dep"
+  },
+  "at": "2026-11-05T11:17:33.813201Z",
+  "attachments": [
+    {
+      "case": "atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_4_with_the_fixture",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "44f8784de9c58e354423dbc0166cc6de3e0327e080578fa6c54b9c876854e701"
+    }
+  ],
+  "code_tree": "a0b30fc38bd6d7ca24840380886f8f53027384c0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-atip-dep; 3817 tests passed at a5f6b6ba0, the atip crate at atip-crate-v0.2.0, canon declaring 1.4)"
+  },
+  "evidence_sha": "a5f6b6ba0b9e4d5fbb4492067402b082ac4287f2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 64,
+  "scenario_id": "atip.claim14.14",
+  "schema": 1,
+  "staging_id": "03a8a30d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

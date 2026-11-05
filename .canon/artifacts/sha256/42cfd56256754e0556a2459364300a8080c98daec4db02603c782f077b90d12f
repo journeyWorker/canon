@@ -1,0 +1,26 @@
+conformance/regenerate.sh
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.88s
+     Running tests/conformance.rs (/Volumes/External/build/cargo/canon-AtipDep037/debug/deps/conformance-e002bfc4c9b91297)
+
+running 4 tests
+test ledger_digest_rule_rewrites_only_ledger_record_paths ... ok
+test normalization_rules_rewrite_only_the_documented_values ... ok
+test mismatch_diff_is_unified_with_context ... ok
+test conformance_corpus_replays_byte_exact has been running for over 60 seconds
+test conformance_corpus_replays_byte_exact ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 89.12s
+
+--- git status --short -- conformance/ docs/ (empty = no difference)
+--- git diff --stat (whole tree, empty = no difference)
+CANON_BLESS_DOCS=1 cargo test -p canon-cli --test docs_generated
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.54s
+     Running tests/docs_generated.rs (/Volumes/External/build/cargo/canon-AtipDep037/debug/deps/docs_generated-da83a4bacb3eab3f)
+
+running 2 tests
+test the_files_that_need_blocks_have_them ... ok
+test every_generated_block_is_what_the_spec_renders ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+tree: 58b93acd046099d5de3ea6c368a5025ae51a83a7 dirty-lines: 0

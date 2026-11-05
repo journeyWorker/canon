@@ -1,0 +1,28 @@
+# Output of the 0.36.0 binary and of this change's binary (canon declares 1.4 in both)
+before = 0.36.0: the installed release binary (/Users/journey/.bun/bin/canon, canon 0.36.0) and the build of main d0245f33d (same hashes)
+after  = the build of a5f6b6ba0 (tree 58b93acd046099d5de3ea6c368a5025ae51a83a7), cargo build --locked -p canon-cli, the atip crate at atip-crate-v0.2.0
+
+## The three answers (sha256 of stdout)
+canon schema --json
+  0.36.0 installed : b5238c4d662495306ab16111586860a539fa2b13376e5f67c68802a76cf40c0c
+  main build       : b5238c4d662495306ab16111586860a539fa2b13376e5f67c68802a76cf40c0c
+  after (a5f6b6ba0): b5238c4d662495306ab16111586860a539fa2b13376e5f67c68802a76cf40c0c
+canon schema --errors --json
+  0.36.0 installed : 9ee9fe8914027754afcf19a623e268260f07bb19fcd8d2d2fdd7dcbaea3ffc5d
+  main build       : 9ee9fe8914027754afcf19a623e268260f07bb19fcd8d2d2fdd7dcbaea3ffc5d
+  after (a5f6b6ba0): 9ee9fe8914027754afcf19a623e268260f07bb19fcd8d2d2fdd7dcbaea3ffc5d
+canon schema --warnings --json
+  0.36.0 installed : 031e6a876d9051e2e128d34c6bb99692c38ec3a6c5b3c02c52553bd785e7981a
+  main build       : 031e6a876d9051e2e128d34c6bb99692c38ec3a6c5b3c02c52553bd785e7981a
+  after (a5f6b6ba0): 031e6a876d9051e2e128d34c6bb99692c38ec3a6c5b3c02c52553bd785e7981a
+
+## The battery (snap.py): stdout, stderr and exit status of 713 calls, one line each: sha256 exit call
+calls: the tree (schema --json), schema --schemas --json, and for each of the 105 commands in the tree: schema <path>, schema <path> --schemas, <path> --help, <path> --help --json; schema --error <CODE> for 234 codes; schema --warning <CODE> for 52 warnings; --version; --help
+sha256 of manifest, 0.36.0 installed : d22b0a9c29cd236055189f9d4a883c04ece33b0e54ac4f52205a7853245ec7f0
+sha256 of manifest, main build       : d22b0a9c29cd236055189f9d4a883c04ece33b0e54ac4f52205a7853245ec7f0
+sha256 of manifest, after            : d22b0a9c29cd236055189f9d4a883c04ece33b0e54ac4f52205a7853245ec7f0
+cmp installed vs after: identical (713 of 713 lines)
+cmp main build vs after: identical (713 of 713 lines)
+calls by exit status:     580 0     133 2 
+
+## just conformance (blessing, then the diff) and just docs: see conformance-docs.log: no file under conformance/ and no generated block changed; git status is clean.

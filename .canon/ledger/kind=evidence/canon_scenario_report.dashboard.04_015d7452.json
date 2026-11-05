@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-atip-dep-037",
+    "role": "implementer",
+    "session_id": "s-0-37-atip-dep"
+  },
+  "at": "2026-11-05T11:17:33.813201Z",
+  "attachments": [
+    {
+      "case": "dashboard::tests::report_dashboard_04_the_demo_fixture_is_never_served_from_either_source",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "44f8784de9c58e354423dbc0166cc6de3e0327e080578fa6c54b9c876854e701"
+    },
+    {
+      "case": "report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served_and_says_why",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "44f8784de9c58e354423dbc0166cc6de3e0327e080578fa6c54b9c876854e701"
+    },
+    {
+      "case": "report_dashboard_04_serves_an_explicit_snapshot_without_duckdb",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "44f8784de9c58e354423dbc0166cc6de3e0327e080578fa6c54b9c876854e701"
+    }
+  ],
+  "code_tree": "a0b30fc38bd6d7ca24840380886f8f53027384c0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-atip-dep; 3817 tests passed at a5f6b6ba0, the atip crate at atip-crate-v0.2.0, canon declaring 1.4)"
+  },
+  "evidence_sha": "a5f6b6ba0b9e4d5fbb4492067402b082ac4287f2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 422,
+  "scenario_id": "report.dashboard.04",
+  "schema": 1,
+  "staging_id": "8248da22",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
