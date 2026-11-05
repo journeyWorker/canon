@@ -88,7 +88,7 @@ live:
 
 # Install the checker canon is held to: the atip repo's `atip check`, at the tag the CI job `atip` installs.
 atip-install:
-    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.4 atip-check --locked
+    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.2.0 atip-check --locked
 
 # atip check on the canon binary, interface checks only (seconds): L2, contract 1.4. Needs the checker: `just atip-install`.
 atip:

@@ -200,6 +200,11 @@ fn built<T>(result: Result<T, atip::project::Problem>) -> Built<T> {
     result.map_err(|problem| problem.to_string())
 }
 
+/// The minor canon declares (`json_out::DECLARED_MINOR`), as the crate's value: what the crate's checks of a document read to decide what that document may say.
+fn declared_minor() -> Built<atip::Minor> {
+    atip::Minor::parse(crate::json_out::DECLARED_MINOR).map_err(|unknown| unknown.to_string())
+}
+
 /// `x-canon` of a command: the roles whose steps use it (empty: humans only).
 fn x_canon(path: &str) -> BTreeMap<String, Value> {
     let roles: Vec<&str> = meta_for(path).map_or_else(Vec::new, |meta| meta.roles.iter().map(|role| role.as_str()).collect());
@@ -398,7 +403,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     let validators: Vec<ValidatorDoc> = crate::arg_rules::validators_for(path).iter().map(atip::constraint::Validator::doc).collect();
     let examples = examples_of(path)?;
     let errors = errors_of(path, &options, &operands, batch);
-    let problems = atip::constraint::document_problems(&options, &operands, &constraints, &validators, &errors, &examples);
+    let problems = atip::constraint::document_problems(&options, &operands, &constraints, &validators, &errors, &examples, declared_minor()?);
     if !problems.is_empty() {
         return Err(format!("`{path}`: {}", problems.join("; ")));
     }
@@ -459,7 +464,7 @@ pub fn described(root: &Command, role: Option<Role>) -> Built<Described> {
     let tree = tree(root, role)?;
     let commands = commands(root)?;
     let usage = usage_replacements(&commands);
-    let minor = atip::Minor::parse(crate::json_out::DECLARED_MINOR).map_err(|unknown| unknown.to_string())?;
+    let minor = declared_minor()?;
     let groups: Vec<String> = tree.commands.iter().filter(|entry| entry.kind == EntryKind::Group).map(|entry| entry.command.clone()).collect();
     let mut described = Described::new(minor, tree.level.clone(), tree.commands, commands).map_err(|problem| problem.to_string())?.usage_replacements(usage).tree_extensions(tree.extensions);
     if let Some(role) = role {

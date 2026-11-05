@@ -1531,10 +1531,10 @@ fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_4_with_the_fi
         assert!(tokens.join(" ").contains("--bin {{ target }}/debug/canon") || value_after(&tokens, "--bin").is_some_and(|bin| bin.ends_with("debug/canon")), "{what} runs the built canon: {tokens:?}");
     }
     // The checker's tag is the same in the job (install and cache key) and in the recipe that installs it.
-    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.1.4")), "the job installs the checker at atip-check-v0.1.4");
-    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.1.4")), "the cache key of the checker names its tag");
+    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.2.0")), "the job installs the checker at atip-check-v0.2.0");
+    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.2.0")), "the cache key of the checker names its tag");
     let (_, install) = recipe(&justfile, "atip-install");
-    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.1.4")), "`just atip-install` installs the checker at atip-check-v0.1.4");
+    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.2.0")), "`just atip-install` installs the checker at atip-check-v0.2.0");
     // `just ci` includes the deep run.
     let (ci_header, _) = recipe(&justfile, "ci");
     assert!(ci_header.split_whitespace().skip(1).any(|dependency| dependency == "atip-deep"), "`just ci` depends on atip-deep: {ci_header}");

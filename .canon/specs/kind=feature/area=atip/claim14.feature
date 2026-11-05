@@ -153,7 +153,7 @@ Feature: atip claim 1.4: canon declares atip/1 1.4 and writes its schema answers
   Scenario: The CI job and the recipe atip-deep run atip check --level L2 --contract 1.4 --deep with the canon fixture, the recipe atip runs it without --deep, and just ci includes atip-deep
     Given the CI job atip, the recipes atip and atip-deep, the recipe ci and the canon fixture
     When their commands are read
-    Then the job and atip-deep run atip check --level L2 --contract 1.4 --deep with the fixture at the tag atip-check-v0.1.4, atip runs it without --deep, ci includes atip-deep and the fixture claims 1.4
+    Then the job and atip-deep run atip check --level L2 --contract 1.4 --deep with the fixture at the tag atip-check-v0.2.0, atip runs it without --deep, ci includes atip-deep and the fixture claims 1.4
 
   # canon: {"schema":1,"at":"2026-11-04T15:59:52Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-contract

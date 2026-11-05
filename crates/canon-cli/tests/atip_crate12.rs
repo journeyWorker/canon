@@ -45,10 +45,10 @@ fn atip_crate12_12_canon_declares_the_minor_of_its_answers_by_its_own_constant_a
 
 #[test]
 fn atip_crate12_13_a_text_that_is_no_minor_is_refused_and_no_source_of_canon_reads_the_crates_contract_version() {
-    for text in ["1.9", "1.5", "2.0", "1", "", "1.1.0", "v1.1"] {
+    for text in ["1.9", "1.6", "2.0", "1", "", "1.1.0", "v1.1"] {
         assert_eq!(atip::Minor::parse(text), Err(atip::UnknownMinor(text.to_string())), "`{text}` is no minor the crate knows, and is not read as the nearest one");
     }
-    for text in ["1.0", "1.1", "1.2", "1.3", "1.4"] {
+    for text in ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5"] {
         assert_eq!(atip::Minor::parse(text).map(atip::Minor::as_str), Ok(text), "the crate knows {text}");
     }
     let sources = sources_without_comments(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"));
@@ -130,7 +130,7 @@ fn atip_crate12_18_field_rules_follow_the_declared_minor_and_a_minor_the_crate_d
     assert_eq!(declared, Rules::at(atip::Minor::V1_4));
     assert_eq!(declared, Rules::for_minor("1.1").expect("a minor"), "1.1 to 1.4 keep the same rules");
     assert_ne!(declared, Rules::for_minor("1.0").expect("a minor"), "1.0 has no bracketed key, no map key and no map cut node");
-    for text in ["1.9", "1.5", "2.0", "", "1"] {
+    for text in ["1.9", "1.6", "2.0", "", "1"] {
         assert_eq!(Rules::for_minor(text), Err(atip::UnknownMinor(text.to_string())), "`{text}` is refused, not read as the nearest minor");
     }
     // What the rules change: a key that is not an identifier is written in brackets, which canon's declared rules allow and 1.0's refuse.

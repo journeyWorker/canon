@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Contributors
+
+**The `atip` crate and the checker move to the tags of contract 1.5.0** (`canon-0-37-atip-dep`, https://github.com/journeyWorker/atip, commit c6c1a1d). `canon-cli` takes `atip` at the tag `atip-crate-v0.2.0` (`Cargo.lock` pins c6c1a1d), and CI, `just atip-install`, `just atip` and `just atip-deep` use the checker at `atip-check-v0.2.0`. Canon still declares 1.4 and nothing it prints changes: the output of every command, `canon schema` (the tree, every command document, `--schemas`, `--errors`, `--warnings`, `--error`, `--warning`), the checked-in generated spec and the conformance expectations are byte-for-byte those of 0.36.0. The crate's checks of a pattern and of a document now take the declared minor (`atip::Minor`), which canon passes from `json_out::DECLARED_MINOR`: at 1.4 a domain pattern that uses `\p{White_Space}` or `\P{White_Space}` is a problem (contract 15.7). The 1.5 declaration is a later change (`canon-0-37-claim-1-5`).
+
 ## 0.36.0 — 2026-11-05
 
 canon declares atip/1 1.4 and meets its L2, renames its 179 error codes after `<SUBJECT>_<CONDITION>` (the table is below), and takes the `atip` crate and the checker from the atip repository as git dependencies.

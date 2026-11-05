@@ -13,6 +13,11 @@ use harness::{canon_in, fixture, leaf, leaves, options};
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
+/// The minor canon declares, which the crate's checks of a pattern and of a document take.
+fn declared() -> atip::Minor {
+    atip::Minor::parse(canon_cli::json_out::DECLARED_MINOR).expect("the declared minor is one the crate knows")
+}
+
 fn names(rule: &Value) -> Vec<&str> {
     rule["names"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()
 }
@@ -122,7 +127,7 @@ fn atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_
     };
     let options = [flag("a"), flag("b")];
     let twice = [Rule::at_most_one(&["a", "b"]).doc(), Rule::at_most_one(&["b", "a"]).doc()];
-    let problems = document_problems(&options, &[], &twice, &[], &["USAGE".to_string()], &[]);
+    let problems = document_problems(&options, &[], &twice, &[], &["USAGE".to_string()], &[], declared());
     assert!(problems.iter().any(|problem| problem.contains("stated twice")), "{problems:?}");
 }
 
@@ -168,7 +173,7 @@ fn atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults() {
                 "string" => ValueType::String,
                 other => panic!("`{}` --{}: a {other} has a domain", doc["command"], argument["name"]),
             };
-            for problem in atip::domain::profile_problems(value_type, domain) {
+            for problem in atip::domain::profile_problems(value_type, domain, declared()) {
                 problems.push(format!("`{}` {}: {problem}", doc["command"], argument["name"]));
             }
             let defaults: Vec<&Value> = match &argument["default"] {
@@ -201,12 +206,14 @@ fn atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults() {
         domain: Some(domain),
         help: "h".to_string(),
     };
-    let found = |options: &[OptionDoc]| document_problems(options, &[], &[], &[], &["USAGE".to_string()], &[]);
+    let found = |options: &[OptionDoc]| document_problems(options, &[], &[], &[], &["USAGE".to_string()], &[], declared());
     assert!(found(&[option(json!({ "minimum": 1 }), json!(0), ValueType::Integer)]).iter().any(|problem| problem.contains("default")));
     assert!(found(&[option(json!({ "pattern": "^a|b$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("| outside parentheses")));
     assert!(found(&[option(json!({ "pattern": "^\\d+$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("not I-Regexp")));
     assert!(found(&[option(json!({ "minLength": 1 }), Value::Null, ValueType::Integer)]).iter().any(|problem| problem.contains("outside the domain profile")));
     assert!(found(&[option(json!({ "minimum": 9_007_199_254_740_992_i64 }), Value::Null, ValueType::Integer)]).iter().any(|problem| problem.contains("safe integer")));
+    // Canon declares 1.4, where a pattern may not use the white space property (Annex V2 is since 1.5, spec 15.7): it is a problem.
+    assert!(found(&[option(json!({ "pattern": "^\\p{White_Space}$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("{White_Space} is since 1.5") && problem.contains("declares contract 1.4")));
     assert!(found(&[option(json!({ "minimum": 1 }), json!(1), ValueType::Integer)]).is_empty());
 }
 
@@ -237,7 +244,7 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
     };
     let mut problems = Vec::new();
     for (name, pattern, alphabet, accepts) in kinds {
-        assert_eq!(atip::domain::pattern_problem(pattern), None, "{name}");
+        assert_eq!(atip::domain::pattern_problem(pattern, declared()), None, "{name}");
         let alphabet: Vec<char> = alphabet.chars().collect();
         let ulid = matches!(name, "RUN_ID" | "REVIEW_ID");
         let compiled = atip::domain::compile(&json!({ "pattern": pattern })).expect("the pattern compiles");
@@ -268,7 +275,7 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
 #[test]
 fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     let pattern = canon_cli::arg_rules::TIMESTAMP;
-    assert_eq!(atip::domain::pattern_problem(pattern), None);
+    assert_eq!(atip::domain::pattern_problem(pattern, declared()), None);
     let alphabet: Vec<char> = "0123456789-:TtZz+ .\u{2212}\u{a0}\n".chars().collect();
     let mut state = 0x9E37_79B9_7F4A_7C15_u64;
     let mut next = move |bound: usize| {
@@ -419,7 +426,7 @@ fn atip_constraints_11_a_sixty_four_bit_integer_outside_the_safe_range_is_refuse
         assert_eq!(result.body["error"]["code"], "USAGE", "{}", result.body);
     }
     // Failure path: a domain bound above the safe range is found by the profile check.
-    assert!(!atip::domain::profile_problems(ValueType::Integer, &json!({ "maximum": 9_007_199_254_740_992_i64 })).is_empty());
+    assert!(!atip::domain::profile_problems(ValueType::Integer, &json!({ "maximum": 9_007_199_254_740_992_i64 }), declared()).is_empty());
 }
 
 fn options_of(doc: &Value) -> &Vec<Value> {

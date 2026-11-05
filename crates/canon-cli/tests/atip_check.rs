@@ -7,7 +7,7 @@
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
 //! committed file differs from what the binary says.
 //!
-//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.1.4`) and canon runs it once, in the
+//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.2.0`) and canon runs it once, in the
 //! CI job `atip` and in `just atip-deep`: `atip check --level L2 --contract 1.4 --deep` on the canon binary and this fixture (`just atip` runs it without `--deep`). No test of canon runs the checker.
 
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ const CANON: &str = env!("CARGO_BIN_EXE_canon");
 /// The command the CI job and the just recipe run, with the binary's directory spelled `target/debug`.
 const COMMAND: &str = "atip check --bin target/debug/canon --level L2 --contract 1.4 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json";
 /// The command that installs the checker, at the tag canon is held to, in the CI job and in the just recipe.
-const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.4 atip-check --locked";
+const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.2.0 atip-check --locked";
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
