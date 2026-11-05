@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-values",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-values-rev"
+  },
+  "at": "2026-11-05T17:34:10.528516Z",
+  "change_id": "canon-0-37-option-values",
+  "code_tree": "6c821ebc0206bfdb9c42effe7b848374defa9e37",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "95c690e4732859ae66b4158c00ca0c0c53ed6c19",
+  "kind": "finding",
+  "reviewed_sha": "95c690e4732859ae66b4158c00ca0c0c53ed6c19",
+  "reviewer": "rev-0-37-option-values",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionvalues.14"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Round 2 CHANGELOG, two small slips (nothing refused is missing; the 42 other-control cells match a fresh 0.36.0-vs-0.37 probe of 43 cells, the 43rd being strategy rollback --actor, a recoded refusal now named): (1) 'Five more' under Codes that moved lists four moves, the fifth (divergence accept blank relayed --approver) sits in the sentence before; say 'Four more'. (2) 'Values 0.37 takes that 0.36.0 refused' omits evidence audit --actor, --summary, --override-reason (tab/newline-wrapped values were --actor/--summary/--override-reason refusals in 0.36.0 and pass the option now) and finding close --reason wrapped in a tab, newline, U+0085 or U+2028. A loosening, so no caller breaks; name them or say 'among them'.",
+  "worktree_dirty": false
+}
